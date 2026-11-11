@@ -153,3 +153,11 @@ numbers: see `operator/README.md`.
 
 * IMSRG(3) commutator-term goldens: OperatorDump has no 3B section yet (reserved for M10).
 * Tensor operators are not dumped (reduced-ME convention still open, design/15).
+
+**Commutator, emax 1 (M7-T2).** `commutator/emax1_He4/` (closed shell He4) and
+`commutator/emax1_He6/` (open shell He6, neutron 0p3/2 occupation 0.5) add the term-by-term
+commutators for the (A,H), (H,A), (H,H) and (A,A) pairs at emax 1, plus per-directory
+`norms.json` and a sum-versus-`all` check. Pairs, terms, hermiticity, the one dropped He6 dump
+and the regeneration command (`REFHARNESS` must point at `harness-build-comm`) are in
+`commutator/README.md`, section "emax 1, other hermiticity pairs and an open-shell reference".
+Script: `tools/reference/gen_golden_commutator_extra.sh`.

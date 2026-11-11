@@ -1,0 +1,17 @@
+# imsrg-operator-dump v1
+source imsrg-devel src-sha256:ddcbf1aff166414e746113d5f3de2ddc1e72783fb7c201829cd58e317717f40f refharness commutator comm110ss
+basis emax 1 lmax 1 hw 16
+reference He6
+norbits 6
+orbit 0 0 0 1 -1 1
+orbit 1 0 0 1 1 1
+orbit 2 0 1 3 -1 0
+orbit 3 0 1 3 1 0.5
+orbit 4 0 1 1 -1 0
+orbit 5 0 1 1 1 0
+spec particle_rank 2 rank_J 0 parity 0 delta_Tz 0 hermiticity H
+zero_body 0
+one_body 0
+two_body 0
+three_body none
+end
