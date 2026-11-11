@@ -51,7 +51,8 @@ double wigner_9j(TwoJ j11, TwoJ j12, TwoJ j13, TwoJ j21, TwoJ j22, TwoJ j23, Two
 
 /// Normalized 9j symbol: sqrt((2 j13 + 1)(2 j23 + 1)(2 j31 + 1)(2 j32 + 1)) times the 9j symbol,
 /// as imsrg++ `AngMom::NormNineJ` (`AngMom.cc:132-135`); e.g. the LS-jj recoupling coefficient
-/// <(la lb) L, (sa sb) S; J | (la sa) ja, (lb sb) jb; J> = norm_9j(la, sa, ja, lb, sb, jb, L, S, J).
+/// <(la lb) L, (sa sb) S; J | (la sa) ja, (lb sb) jb; J> = norm_9j(la, sa, ja, lb, sb, jb, L, S,
+/// J).
 double norm_9j(TwoJ j11, TwoJ j12, TwoJ j13, TwoJ j21, TwoJ j22, TwoJ j23, TwoJ j31, TwoJ j32,
                TwoJ j33) noexcept;
 
