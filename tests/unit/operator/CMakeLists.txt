@@ -22,3 +22,10 @@ imsrg_add_test(NAME operator_dump
   LABELS unit
   NO_GTEST_MAIN)
 target_compile_definitions(operator_dump PRIVATE IMSRG_GOLDEN_DIR="${_imsrg_golden_dir}")
+
+imsrg_add_test(NAME operator_golden_norms
+  SOURCES test_golden_norms.cpp ${_imsrg_exec_main}
+  DEPS operator
+  LABELS unit
+  NO_GTEST_MAIN)
+target_compile_definitions(operator_golden_norms PRIVATE IMSRG_GOLDEN_DIR="${_imsrg_golden_dir}")
