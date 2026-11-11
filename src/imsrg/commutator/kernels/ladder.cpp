@@ -12,6 +12,7 @@
 #include <type_traits>
 #include <utility>
 
+#include "imsrg/base/assert.hpp"
 #include "imsrg/commutator/commutator.hpp"
 #include "imsrg/commutator/detail/device_views.hpp"
 #include "imsrg/commutator/detail/workspace_impl.hpp"
@@ -109,8 +110,9 @@ void compute_intermediates(const op::Operator& X, const op::Operator& Y, int h_z
   gather("commutator::ladder_gather_hh", lad.hh, impl, xv, yv);
   exec::fence("commutator::ladder_gather");
 
-  // W = Xg Yg per channel and projector; a channel without listed kets gives a zero block
-  // (k == 0 gemm with beta == 0).
+  // W = Xg Yg per channel and projector. A channel without listed kets (k == 0) is skipped: its
+  // product block stays zero (zero-initialized at construction, written only by these gemms and
+  // the symmetrization, which maps 0 to 0).
   lad.problems.clear();
   const int nch = xv.tb.num_channels;
   for (LadderProjector* p : {&lad.pp, &lad.hh}) {
@@ -124,17 +126,21 @@ void compute_intermediates(const op::Operator& X, const op::Operator& Y, int h_z
       std::int64_t dim = 1;
       while (dim * dim < n) ++dim;  // block size n = N^2
       const std::int64_t k = p->count_host[static_cast<std::size_t>(ch)];
+      if (k == 0) continue;
       const std::int64_t goff = p->gather_offset_host[static_cast<std::size_t>(ch)];
       linalg::GemmProblem g;
       g.alpha = 1.0;
       g.A = MatrixView<const double>{xg + goff, dim, k, dim};
-      g.B = MatrixView<const double>{yg + goff, k, dim, std::max<std::int64_t>(k, 1)};
+      g.B = MatrixView<const double>{yg + goff, k, dim, k};
       g.beta = 0.0;
       g.C = MatrixView<double>{prod + impl.block_offsets_host[static_cast<std::size_t>(ch)], dim,
                                dim, dim};
       lad.problems.push_back(g);
     }
   }
+  // Host BLAS only; device backends need a device gemm (design/12 section 3).
+  IMSRG_CHECK(lad.pp.product.host_is_device(),
+              "ladder: host BLAS on device memory; needs a device gemm (GPU backends)");
   linalg::grouped_gemm(lad.problems);
 
   SymArgs s;
@@ -241,7 +247,10 @@ bool has_two_body(const op::Operator& X, const op::Operator& Y) {
   return X.two_body().allocated() && Y.two_body().allocated();
 }
 
-int z_sign(const op::Operator& Z) { return op::hermiticity_sign(Z.hermiticity()); }
+/// hZ = -hX hY from X and Y (Z's flag is validated against it by `check_term_inputs`).
+int z_sign(const op::Operator& X, const op::Operator& Y) {
+  return detail::commutator_hermiticity_sign(X, Y);
+}
 
 }  // namespace
 
@@ -249,7 +258,7 @@ void comm222_pp_hhss(const op::Operator& X, const op::Operator& Y, op::Operator&
   detail::check_term_inputs(X, Y, Z, ws);
   if (!has_two_body(X, Y) || !Z.two_body().allocated()) return;
   auto& impl = ws.impl();
-  compute_intermediates(X, Y, z_sign(Z), impl);
+  compute_intermediates(X, Y, z_sign(X, Y), impl);
   add_ladder_two_body(Z, impl);
 }
 
@@ -257,7 +266,7 @@ void comm221ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Wo
   detail::check_term_inputs(X, Y, Z, ws);
   if (!has_two_body(X, Y)) return;
   auto& impl = ws.impl();
-  compute_intermediates(X, Y, z_sign(Z), impl);
+  compute_intermediates(X, Y, z_sign(X, Y), impl);
   add_221(Z, impl, X);
 }
 
@@ -266,7 +275,7 @@ void comm222_pp_hh_221ss(const op::Operator& X, const op::Operator& Y, op::Opera
   detail::check_term_inputs(X, Y, Z, ws);
   if (!has_two_body(X, Y)) return;
   auto& impl = ws.impl();
-  compute_intermediates(X, Y, z_sign(Z), impl);
+  compute_intermediates(X, Y, z_sign(X, Y), impl);
   if (Z.two_body().allocated()) add_ladder_two_body(Z, impl);
   add_221(Z, impl, X);
 }

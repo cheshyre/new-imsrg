@@ -5,6 +5,8 @@
 #include <cmath>
 #include <cstdint>
 
+#include "imsrg/base/assert.hpp"
+#include "imsrg/base/constants.hpp"
 #include "imsrg/commutator/commutator.hpp"
 #include "imsrg/commutator/detail/device_views.hpp"
 #include "imsrg/commutator/detail/workspace_impl.hpp"
@@ -33,7 +35,8 @@ static_assert(std::is_trivially_copyable_v<OneBodyArgs>);
 
 void comm110ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Workspace& ws) {
   detail::check_term_inputs(X, Y, Z, ws);
-  if (Z.hermiticity() == Hermiticity::AntiHermitian) return;
+  // [X,Y] is anti-Hermitian (hZ = -hX hY = -1) -> the scalar part vanishes.
+  if (detail::commutator_hermiticity_sign(X, Y) < 0) return;
   const auto& impl = ws.impl();
   OneBodyArgs a;
   a.x = std::as_const(X).one_body().device_view();
@@ -63,7 +66,8 @@ void comm110ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Wo
 
 void comm220ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Workspace& ws) {
   detail::check_term_inputs(X, Y, Z, ws);
-  if (Z.hermiticity() == Hermiticity::AntiHermitian) return;
+  // [X,Y] is anti-Hermitian (hZ = -hX hY = -1) -> the scalar part vanishes.
+  if (detail::commutator_hermiticity_sign(X, Y) < 0) return;
   if (!X.two_body().allocated() || !Y.two_body().allocated()) return;
   const auto& impl = ws.impl();
   const TwoBodyView xv = impl.two_body_view(X);
@@ -111,13 +115,17 @@ void comm111ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Wo
   const auto x1 = std::as_const(X).one_body().device_view();
   const auto y1 = std::as_const(Y).one_body().device_view();
   const auto z1 = Z.one_body().device_view();
+  // Host BLAS only: on a device backend the buffers are not host-addressable (design/12 section 3).
+  IMSRG_CHECK(Z.one_body().buffer().host_is_device(),
+              "comm111ss: host BLAS on device memory; needs a device gemm (GPU backends)");
   linalg::gemm(1.0, x1, linalg::Op::NoTrans, y1, linalg::Op::NoTrans, 1.0, z1);
   linalg::gemm(-1.0, y1, linalg::Op::NoTrans, x1, linalg::Op::NoTrans, 1.0, z1);
 }
 
 void comm121ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Workspace& ws) {
   detail::check_term_inputs(X, Y, Z, ws);
-  if (!X.two_body().allocated() || !Y.two_body().allocated()) return;
+  // [X1,Y2] and [X2,Y1] each need only one two-body operand (a missing part reads as zero).
+  if (!X.two_body().allocated() && !Y.two_body().allocated()) return;
   const auto& impl = ws.impl();
   OneBodyArgs a;
   a.x = std::as_const(X).one_body().device_view();
@@ -174,55 +182,58 @@ void comm122ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Wo
   if (!Z.two_body().allocated()) return;
   if (!X.two_body().allocated() && !Y.two_body().allocated()) return;
   const auto& impl = ws.impl();
-  OneBodyArgs a;
-  a.x = std::as_const(X).one_body().device_view();
-  a.y = std::as_const(Y).one_body().device_view();
-  a.occ = impl.tables.orbits().occupation;
-  a.j2 = impl.tables.orbits().j2;
-  a.ch1 = impl.one_body_channels();
+  const auto x1 = std::as_const(X).one_body().device_view();
+  const auto y1 = std::as_const(Y).one_body().device_view();
   const TwoBodyView xv = impl.two_body_view(X);
   const TwoBodyView yv = impl.two_body_view(Y);
-  const TwoBodyView zv = impl.two_body_view(Z);
+  const double* xd = xv.data;
+  const double* yd = yv.data;
   double* z2 = Z.two_body().matrix().buffer().device_data();
   const std::int64_t* block_offset = impl.block_offsets.device_data();
-  const int nch = zv.tb.num_channels;
+  const std::int32_t* num_kets = xv.tb.channel_num_kets;
+  const std::int32_t* row_base = impl.lifted.row_base.device_data();
+  const std::int32_t* entry_offset = impl.lifted.entry_offset.device_data();
+  const std::int32_t* lm = impl.lifted.m.device_data();
+  const std::int32_t* lfrom = impl.lifted.from.device_data();
+  const std::int32_t* lto = impl.lifted.to.device_data();
+  const double* lcoef = impl.lifted.coef.device_data();
+  const double hz = static_cast<double>(detail::commutator_hermiticity_sign(X, Y));
+  const int nch = xv.tb.num_channels;
   const exec::Index total = static_cast<exec::Index>(impl.two_body_size);
+  // One thread per element (r, c) with r <= c. B(r, c) is the bra part (lifted one-body list of
+  // row r acting on column c of X, Y); the ket part of Z(r, c) is hZ B(c, r) by hermiticity of X,
+  // Y (checked by check_term_inputs), and Z(c, r) = hZ Z(r, c). No division or sqrt.
   exec::parallel_for(
       "commutator::comm122ss", total, IMSRG_LAMBDA(const exec::Index e) {
         const int ch = detail::find_block(block_offset, nch, e);
-        const std::int64_t local = e - block_offset[ch];
-        const int n = zv.tb.channel_num_kets[ch];
-        const int ib = static_cast<int>(local % n);
-        const int ik = static_cast<int>(local / n);
-        const int* kets = zv.tb.channel_kets + zv.tb.channel_ket_offset[ch];
-        const int i = zv.tb.ket_p[kets[ib]];
-        const int j = zv.tb.ket_q[kets[ib]];
-        const int k = zv.tb.ket_p[kets[ik]];
-        const int l = zv.tb.ket_q[kets[ik]];
-        const int two_J = zv.tb.channel_two_j[ch];
-        double z = 0.0;
-        for (int m = a.ch1.offsets[i]; m < a.ch1.offsets[i + 1]; ++m) {
-          const int c = a.ch1.orbits[m];
-          z += a.x(i, c) * yv.get_unnormalized(c, j, k, l, two_J) -
-               a.y(i, c) * xv.get_unnormalized(c, j, k, l, two_J);
+        const std::int64_t off = block_offset[ch];
+        const std::int64_t local = e - off;
+        const int n = num_kets[ch];
+        const int r = static_cast<int>(local % n);
+        const int c = static_cast<int>(local / n);
+        if (r > c) return;
+        const int rb = row_base[ch];
+        double b_rc = 0.0;
+        double b_cr = 0.0;
+        for (int side = 0; side < 2; ++side) {
+          const int row = side == 0 ? r : c;
+          const std::int64_t col = side == 0 ? c : r;
+          double acc = 0.0;
+          for (int t = entry_offset[rb + row]; t < entry_offset[rb + row + 1]; ++t) {
+            const std::int64_t idx = off + lm[t] + col * n;
+            double v = 0.0;
+            if (yd != nullptr) v += x1(lfrom[t], lto[t]) * yd[idx];
+            if (xd != nullptr) v -= y1(lfrom[t], lto[t]) * xd[idx];
+            acc += lcoef[t] * v;
+          }
+          if (side == 0)
+            b_rc = acc;
+          else
+            b_cr = acc;
         }
-        for (int m = a.ch1.offsets[j]; m < a.ch1.offsets[j + 1]; ++m) {
-          const int c = a.ch1.orbits[m];
-          z += a.x(j, c) * yv.get_unnormalized(i, c, k, l, two_J) -
-               a.y(j, c) * xv.get_unnormalized(i, c, k, l, two_J);
-        }
-        for (int m = a.ch1.offsets[k]; m < a.ch1.offsets[k + 1]; ++m) {
-          const int c = a.ch1.orbits[m];
-          z -= yv.get_unnormalized(i, j, c, l, two_J) * a.x(c, k) -
-               xv.get_unnormalized(i, j, c, l, two_J) * a.y(c, k);
-        }
-        for (int m = a.ch1.offsets[l]; m < a.ch1.offsets[l + 1]; ++m) {
-          const int c = a.ch1.orbits[m];
-          z -= yv.get_unnormalized(i, j, k, c, two_J) * a.x(c, l) -
-               xv.get_unnormalized(i, j, k, c, two_J) * a.y(c, l);
-        }
-        const double norm = std::sqrt((i == j ? 2.0 : 1.0) * (k == l ? 2.0 : 1.0));
-        z2[e] += z / norm;
+        const double z = b_rc + hz * b_cr;
+        z2[off + r + static_cast<std::int64_t>(c) * n] += z;
+        if (r < c) z2[off + c + static_cast<std::int64_t>(r) * n] += hz * z;
       });
   exec::fence("commutator::comm122ss");
 }

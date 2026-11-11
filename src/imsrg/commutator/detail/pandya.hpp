@@ -9,9 +9,10 @@
 /// (orbit pairs p <= q), the ordered-pair basis has dimension 2 Ncc: index of (p, q) is
 /// local(|pq>) for p <= q and local(|qp>) + Ncc for p > q. The contraction runs over the list K
 /// of ordered pairs kappa = (a, b) with n_a != n_b (`nk` entries, built from the kets of the
-/// channel with both orders, weight D = n_a - n_b). Because of hermiticity and the flip
-/// symmetry only rows alpha of the kets (i <= l) are computed; the remaining rows follow from the
-/// symmetries, see `kernels/particle_hole.cpp`.
+/// channel with both orders, weight D = n_a - n_b). K is stored in flipped pairs: the flip (b, a)
+/// of the K entry kappa is kappa ^ 1 (the fused fill of the kernel relies on it). Because of
+/// hermiticity and the flip symmetry only rows alpha of the kets (i <= l) are computed; the
+/// remaining rows follow from the symmetries, see `kernels/particle_hole.cpp`.
 ///
 /// Scratch layout (all column-major; element (r, s) of an R-row block at offset + r + s R):
 ///   XK : Ncc x nk,   YK : nk x 2 Ncc,   W : Ncc x 2 Ncc,   ZB : Ncc x 2 Ncc.
@@ -95,7 +96,8 @@ struct PandyaData {
 /// Builds the Pandya data of `ms`: the cc ket lists, the pair lists K (from the reference
 /// occupations of `ms`), device copies of the cc index tables and the scratch buffers with their
 /// block offsets. Needs an initialized `exec::Runtime`. All allocation of the term happens
-/// here. Memory O(sum over cc channels of Ncc (nk + 4 Ncc)).
+/// here. Memory O(sum over cc channels of Ncc (2 nk + 4 Ncc)) doubles: XK (Ncc nk) + YK (2 Ncc nk)
+/// + W and ZB (2 Ncc^2 each), i.e. Ncc (3 nk + 4 Ncc); `scratch_bytes()` reports it.
 PandyaData build_pandya_data(const basis::ModelSpace& ms);
 
 }  // namespace imsrg::commutator::detail

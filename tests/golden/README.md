@@ -125,7 +125,7 @@ Single IMSRG(2) commutator terms evaluated by the old code (`refharness commutat
 on (eta_white, H) and (random_A, random_H) at emax 2; inputs, outputs and norms. Terms:
 `comm110ss comm220ss comm111ss comm121ss comm221ss comm122ss comm222_pp_hhss comm222_phss
 comm222_pp_hh_221ss` and `all` (`Commutator::Commutator`, IMSRG(3) off). Commands, checks and the
-one omitted output (comm111ss of eta_white with the HF H is pure rounding noise): see
+one omitted output (comm111ss of eta_white with the HF H, ~1e-8, fails the hermiticity check): see
 `commutator/README.md`.
 
 ### `e2e/` (integration tests) — `tools/reference/gen_golden_e2e.sh`

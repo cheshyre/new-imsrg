@@ -211,18 +211,26 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
   **Assumed meanwhile:** `model_space_for_dump` builds the partition with the holes
   (n >= OCC_CUT) as core and every other orbit as q-space; the reader rejects occupations that
   differ from the target model space unless `check_occupations = false`.
-* **M7-Q1** (2026-11-12, M7 lead) - `tests/golden/commutator/README.md` calls the omitted
+* **M7-Q1** (2026-11-12, M7 lead) - The golden README called the omitted
   `Z_comm111ss__eta_white__H` rounding noise (~1e-16), but the term is ~1.4e-8 (the one-body
   parts of eta_white and the HF H nearly commute, so the relative hermiticity check of the
-  reader, 1e-12 * max entry, rejects the dump). The tests compare comm111ss for that pair with
-  `Z_all` minus the other golden terms (deviation 3.9e-16). **Assumed meanwhile:** the README
-  wording is stale; the golden set is otherwise complete.
-* **M7-Q2** (2026-11-12, M7 T3a) - The T3a kernels need a declaration beyond the public headers:
-  `detail::check_term_inputs(X, Y, Z, ws)` in `commutator/detail/workspace_impl.hpp` (model-space
-  compatibility and NonHermitian guard, shared by all term kernels). The term functions are
-  declared in `commutator.hpp` under `commutator::terms`. T3b/T4 reuse the same guard.
-  **Assumed meanwhile:** no public signature changed; `comm111ss` runs two host GEMMs on the
-  one-body device views (fence first), as the one-body block is tiny.
+  reader, 1e-12 * max entry, rejects the dump). **Resolved in M7:** README wording corrected;
+  the tests compare comm111ss for that pair with `Z_all` minus the other golden terms (3.9e-16).
+* **M7-Q2** (2026-11-12, M7 lead) - The fast IMSRG(2) kernels support X and Y that are each
+  Hermitian or anti-Hermitian; a NonHermitian input throws NotImplementedError (the ladder and
+  Pandya paths use X^T = hX X; imsrg++ silently returns wrong numbers, reference/02 P-9).
+  `commutator_ref` handles any hermiticity. **Assumed meanwhile:** no phase-1 flow needs
+  non-Hermitian operators; add general paths (explicit Y P X products) if one does.
+* **M7-Q3** (2026-11-12, M7 lead) - design/30 section 1 lists the Jacobi identity as a property
+  test, but the IMSRG(2)-truncated commutator satisfies it only for one-body operators (the
+  dropped 3B part of [Y2, W2] feeds back into 2B through comm132-type terms). **Assumed
+  meanwhile:** the Jacobi test uses particle_rank-1 operators; antisymmetry, linearity and the
+  hermiticity of [A, H] are tested for the full IMSRG(2) commutator.
+* **M7-Q4** (2026-11-12, M7 lead) - Workspace memory: the ladder intermediates (Mpp, Mhh and the
+  gathered operands, about 4x a two-body operator) and the Pandya scratch (XK, YK, W, ZB, about
+  6x) are allocated eagerly; at emax 12 that would be ~11-13 GB (reviewer estimate). Fine for
+  emax <= 6 (all tests and runs, AGENTS.md rule 3). **Assumed meanwhile:** keep the eager
+  allocation; M12 (performance) can share ZB with W, gather in place, and stream channels.
 * **M6-Q1** (2026-11-12, opslib) - The golden `Rp2.dump` includes the spin-orbit term
   (`RpSpinOrbitCorrection`), contradicting the brief. **Assumed meanwhile:** `rp2` includes it by
   default (matches the golden to 6e-16); `include_spin_orbit = false` excludes it.
@@ -299,3 +307,19 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
   ours logs it at info level, and the flow lines go to the log as well as to the CSV. Output
   file names differ from imsrg++ (`<stem>.snt`, `<stem>_<op>.snt`, `results.json`).
   **Assumed meanwhile:** fine (design/16 output section); the ITs compare numerically.
+* **M9-Q1** (2026-11-12, M9 mbpt) - mbpt may not depend on hf, but the NAT-basis Hamiltonian needs
+  hf's normal-ordering machinery for a density other than the HF one. **Assumed meanwhile:**
+  mbpt exposes only `mbpt2_density_matrix`, `natural_orbitals`, `reference_density_ho`, `matmul`
+  and `to_nat_basis`; the tests (`tests/unit/mbpt/mbpt_test_support.hpp`) assemble the NAT H by
+  passing a modified `HFResult` (C = C_ho2hf C_hf2nat, rho, F, E_HF, reference occupations) to
+  `hf::normal_ordered_hamiltonian`, using `hf::detail::Monopole2B/3B`. hf should expose a public
+  "normal-ordered H for a given orbital basis and density" API (or the driver, M8, owns this).
+* **M9-Q2** (2026-11-12, M9 mbpt) - `natural_orbitals` checks sum (2j+1) n = A with 1e-6; imsrg++
+  uses 1e-8 and `exit()`s. **Assumed meanwhile:** 1e-6 and `InvariantError`; measured deviations at
+  emax 4 are far below both.
+* **M9-Q3** (2026-11-12, M9 mbpt) - Not implemented: `use_NAT_occupations` and the `NAT_order`
+  "energy"/"mp2" options (imsrg++ default occupations = reference, order = descending occupation
+  within a channel). **Assumed meanwhile:** default behaviour only; add when a job needs them.
+* **M9-Q4** (2026-11-12, M9 mbpt) - IT-5 `Hbare_0b` / `mbpt.EMP2` in `result.json` are the NAT-basis
+  E_HF and E_MP2 (the `hf.EHF` entry is the HF-basis value). Reproduced to 2e-10 (E_HF NAT) and
+  4e-9 (E_MP2 NAT); worth noting in design/30 that the keys have this meaning.

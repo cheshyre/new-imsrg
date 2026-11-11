@@ -40,6 +40,14 @@ struct LadderData {
   LadderProjector hh;  ///< Weights n_p n_q.
   /// Scratch for the per-call gemm descriptions (capacity reserved at construction).
   std::vector<linalg::GemmProblem> problems;
+
+  /// Total size in bytes of the scratch buffers (Xg, Yg and product of both projectors). O(1).
+  std::size_t scratch_bytes() const noexcept {
+    std::size_t n = 0;
+    for (const LadderProjector* p : {&pp, &hh})
+      n += p->xg.size() + p->yg.size() + p->product.size();
+    return n * sizeof(double);
+  }
 };
 
 /// Builds the ladder data of `ms` (lists, offsets and all scratch buffers). Needs an initialized

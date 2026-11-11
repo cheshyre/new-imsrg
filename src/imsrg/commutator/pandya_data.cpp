@@ -123,6 +123,9 @@ PandyaData build_pandya_data(const basis::ModelSpace& ms) {
     const auto cs = static_cast<std::size_t>(c);
     const std::int64_t n = d.ncc_host[cs];
     const std::int64_t nk = d.nk_host[cs];
+    // k == 0 (nk == 0) blocks are skipped: their W stays zero (zero-initialized, never written).
+    // The problems run on host BLAS (see the host_is_device check in comm222_phss, design/12
+    // section 3).
     if (n == 0 || nk == 0) continue;
     linalg::GemmProblem g;
     g.alpha = 1.0;

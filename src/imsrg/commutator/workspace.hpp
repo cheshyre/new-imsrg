@@ -30,7 +30,10 @@ namespace imsrg::commutator {
 class Workspace {
  public:
   /// Builds the precomputed data and scratch buffers for `ms`. Cost: dominated by the 6j table
-  /// (O((emax+1)^4 (2 emax+2)^2)) and the scratch allocation (a few operator-sized buffers).
+  /// (O((emax+1)^4 (2 emax+2)^2)) and the scratch allocation. Scratch footprint: the ladder keeps
+  /// about 4 (measured 3.5x at O16 emax 4, 3.8x at emax 6) and the Pandya term about 6 to 8
+  /// (8.0x, 6.6x) two-body operators of memory; the exact bytes are printed by the
+  /// `commutator_robustness.scratch_footprint` test).
   /// @throws InvariantError if `ms` is null.
   explicit Workspace(std::shared_ptr<const basis::ModelSpace> ms);
 

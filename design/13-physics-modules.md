@@ -124,6 +124,15 @@ sd shell): every number identical to imsrg++, comment lines identical except the
   does; verify the exact pipeline in `imsrg++.cc`.
 * MP4 and Van Vleck are out of the near-term scope.
 
+**As implemented (M9).** `mbpt::mp2_energy`, `mbpt::mp3_energy` (pp, hh, ph, total),
+`mbpt2_density_matrix` (HFMBPT.cc:421-777 with the regulated denominators),
+`natural_orbitals` (per-channel `eigh`, descending occupation, columns signed so C(i,i) >= 0,
+trace check against A), `reference_density_ho`, `matmul`, `to_nat_basis`. mbpt does not depend on
+hf: the NAT-basis Hamiltonian is assembled by the caller from a modified `HFResult` (see
+M9-Q1 and `tests/unit/mbpt/mbpt_test_support.hpp`). Not implemented: `use_NAT_occupations`,
+`NAT_order` energy/mp2 (M9-Q3). Verified: MP2/MP3 at emax 2 (2N and 2N+3N) to 1e-15; IT-1 EMP2
+to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9.
+
 ## 6. commutator (reference: `reference/02`)
 
 * IMSRG(2) scalar terms: comm110, comm111, comm121, comm122, comm220, comm221, comm222_pp_hh,
@@ -134,6 +143,24 @@ sd shell): every number identical to imsrg++, comment lines identical except the
   named presets: `imsrg2`, `imsrg3_n7`, `imsrg3_full`. IMSRG(3f2) is **not** a TermMask preset:
   it acts at the BCH level (it reuses the nested commutator from two steps back, `BCH.cc:182-191`)
   and is switched on with `BchOptions::factorized` (`[imsrg3] factorized = true`).
+* **As implemented (M7, tag `m7-api-ready`):** headers `imsrg/commutator/{options,workspace,
+  commutator}.hpp`. `commutator(X, Y, Z, opts, ws)` overwrites Z (reusing its storage when the
+  spec matches) and an allocating overload returns Z; `terms::comm*ss` add one term each;
+  `commutator_spec` gives Z's spec (rank max of the inputs, hermiticity rule of imsrg++). The
+  `Workspace` (one per model space, eagerly built, one call at a time) holds the device tables,
+  the dense 6j table, the ladder ket lists and the Pandya data, and all scratch. Every fast term
+  writes every element of its output part (no final symmetrization); X and Y must each be
+  Hermitian or anti-Hermitian (NotImplementedError otherwise, QUESTIONS M7-Q2), and Z must
+  carry the hermiticity `commutator_spec` gives. Ladders: per channel gathered GEMMs
+  `X P Y` with P = diag(nbar nbar) and diag(n n), symmetrized with `Y P X = hX hY (X P Y)^T`,
+  shared with the 221 term. Particle-hole: Pandya transform of X and Y into the cross-coupled
+  channels (6j from the table), one GEMM `Ncc x nk x 2Ncc` per channel over the ordered pairs
+  with n_a != n_b, and an inverse transform that reads only the stored half of Zbar through
+  the flip symmetry `F W F = -hX hY Phi W Phi` (so, unlike imsrg++, it does not depend on the
+  lexicographic ket order, reference/02 P-12). `commutator_ref` (tests only) evaluates the same
+  formulas with plain loops for any hermiticity. Validation: imsrg-devel goldens at emax 1-2
+  (all hermiticity pairs, closed and open shell) and fast vs reference on random operators,
+  all deviations below 2e-15 relative; benchmark in `design/benchmarks/imsrg2-commutators.md`.
 
 ## 7. flow (reference: `reference/03`)
 
