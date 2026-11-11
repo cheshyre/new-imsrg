@@ -6,7 +6,8 @@
 # if MPI is enabled) -> layering check -> clang-format (our sources only). Tests labeled `slow`
 # never run here. The last line is exactly `CI PASS <preset>` or `CI FAIL <preset>: <step>`, and
 # the exit status is nonzero on failure. Works from any worktree: it checks the checkout that
-# contains this script. Needs no network once the submodules are checked out.
+# contains this script. Needs no network once the submodules are checked out. The layering and
+# format checks see tracked files and new files not yet added (never gitignored ones).
 #
 # Environment:
 #   IMSRG_BUILD_DIR    build tree (default <repo>/build/<preset>); give two CI runs in one checkout
@@ -24,8 +25,11 @@ script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 summary=""
 ci_start=$SECONDS
+current_step=setup
+finished=0
 
 finish() {  # $1 = PASS or the name of the failed step
+  finished=1
   printf '\n[ci] summary for preset %s:\n%b' "$preset" "$summary"
   printf '[ci] total %ds\n' $((SECONDS - ci_start))
   if [ "$1" = PASS ]; then
@@ -36,10 +40,21 @@ finish() {  # $1 = PASS or the name of the failed step
   exit 1
 }
 
+# Any unexpected exit (an unset variable, a signal) still ends with the CI FAIL line.
+on_exit() {
+  local rc=$?
+  if [ "$finished" -ne 1 ]; then
+    echo "CI FAIL $preset: $current_step (aborted, status $rc)"
+    if [ "$rc" -eq 0 ]; then exit 1; fi
+  fi
+}
+trap on_exit EXIT
+
 # run_step <name> <command...>: runs the command, records its time, and fails CI if it fails.
 run_step() {
   local name=$1 t0=$SECONDS rc
   shift
+  current_step=$name
   printf '\n[ci] ==== %s ====\n' "$name"
   "$@"
   rc=$?
@@ -69,14 +84,18 @@ ncpu=$(imsrg_ncpu)
 jobs=${IMSRG_CI_JOBS:-$ncpu}
 export OMP_NUM_THREADS=${OMP_NUM_THREADS:-4}
 export OMP_PROC_BIND=${OMP_PROC_BIND:-false}
-test_jobs=$((ncpu / OMP_NUM_THREADS))
+threads=${OMP_NUM_THREADS%%,*}  # "4,2" (nested levels) -> 4
+case $threads in
+  ''|*[!0-9]*|0) threads=4 ;;
+esac
+test_jobs=$((ncpu / threads))
 if [ "$test_jobs" -lt 1 ]; then test_jobs=1; fi
 python=python3
 if [ -x "$IMSRG_VENV/bin/python" ]; then python="$IMSRG_VENV/bin/python"; fi
 imsrg_link_venv "$repo_root"
 
 echo "[ci] preset $preset, checkout $repo_root"
-echo "[ci] build dir $build_dir, $jobs build jobs, $test_jobs test jobs x $OMP_NUM_THREADS threads"
+echo "[ci] build dir $build_dir, $jobs build jobs, $test_jobs test jobs x $threads threads"
 echo "[ci] deps prefix $IMSRG_DEPS_PREFIX; $(cmake --version | head -n 1); python $python"
 
 # ---- steps -----------------------------------------------------------------------------------
@@ -138,9 +157,11 @@ step_format() {
     echo "clang-format not found (brew install clang-format)"; return 1
   fi
   echo "$(clang-format --version)"
-  local files
-  files=$(git ls-files -- src apps tests python tools/bench \
-    | grep -E '\.(c|cc|cpp|cxx|cu|h|hh|hpp|hxx|inl|ipp|tpp)$' | grep -v '^tests/golden/')
+  # Tracked files plus new files not yet added (but never ignored ones), that still exist.
+  local files f
+  files=$(git ls-files --cached --others --exclude-standard -- src apps tests python tools/bench \
+    | grep -E '\.(c|cc|cpp|cxx|cu|h|hh|hpp|hxx|inl|ipp|tpp)$' | grep -v '^tests/golden/' \
+    | sort -u | while IFS= read -r f; do if [ -f "$f" ]; then echo "$f"; fi; done)
   if [ -z "$files" ]; then echo "no C++ sources"; return 0; fi
   echo "checking $(echo "$files" | wc -l | tr -d ' ') files"
   echo "$files" | tr '\n' '\0' | xargs -0 clang-format --dry-run --Werror

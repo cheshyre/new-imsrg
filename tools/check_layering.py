@@ -141,11 +141,13 @@ def check_module_deps(path: Path, dag: Dict[str, List[str]]) -> List[Violation]:
 
 
 def list_files(root: Path, use_git: bool) -> List[str]:
-    """Repo-relative posix paths of C/C++ files under src/ (git-tracked, else a walk)."""
+    """Repo-relative posix paths of C/C++ files under src/: git-tracked files plus new files not
+    yet added (never gitignored ones), so a check before `git add` sees new headers; else a walk."""
     names: Optional[List[str]] = None
     if use_git:
         try:
-            r = subprocess.run(["git", "ls-files", "-z", "src/"], cwd=root,
+            r = subprocess.run(["git", "ls-files", "-z", "--cached", "--others",
+                                "--exclude-standard", "src/"], cwd=root,
                                capture_output=True, check=True)
             names = [n for n in r.stdout.decode().split("\0") if n]
         except (OSError, subprocess.CalledProcessError):
