@@ -71,8 +71,9 @@ consequence.
   or must general operators work?
 * **M9-Q3**: natural-orbital options not implemented (`use_NAT_occupations`, `NAT_order`
   "energy"/"mp2"). Needed?
-* **D21** in practice: report how the sign-keeping denominator floor affected IT results (see the
-  M8 entry in `STATUS.md`) and confirm.
+* **D21** in practice: the sign-keeping denominator floor had no effect in any IT (no denominator
+  fell below 1e-6; M8-1). Also M8-2 (the Hartree-Fock generator no longer fills the diagonal) and
+  M8-3 (a diverging flow throws `NumericalError`). Confirm.
 
 **C. Configuration and CLI**
 * **Q13**: must the TOML config state `basis.emax`, `basis.hw` and the file e1max values
@@ -80,6 +81,9 @@ consequence.
 * **M8a-Q1..Q7**: generator/method enum placement; `flow`/`flow_rk4` as P1; `steps = 1` with a
   valence space; legacy `valence_space=<nucleus>` with a different `reference`; exit codes;
   particle ranks and orbit spellings of the operator catalog; `dE3max` absent instead of 99.
+* **M8-Q1..Q4**: mapping of the config enums to `flow`; no MP2 column yet; Omega always kept in
+  memory and HF mixing fixed to linear in the driver; log and output-file-name differences from
+  imsrg++.
 * **Q11, Q12, Q14**: legacy quirks (`nsteps=1` with a valence space, `imsrg3_at_end` without
   `IMSRG3`, `denominator_delta` without an orbit).
 

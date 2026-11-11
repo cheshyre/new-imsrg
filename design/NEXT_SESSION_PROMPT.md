@@ -1,7 +1,7 @@
 # Prompt for the next unsupervised implementation session (run 2)
 
-The first unsupervised run (2026-11-11 23:41 → 2026-11-12 ~08:45 JST) merged M0–M7, M8a, M9 and
-M11 phase 1; see `design/reports/2026-11-12-overnight.md`. This prompt starts the second run.
+The first unsupervised run (2026-11-11 23:41 → 2026-11-12 ~08:45 JST) merged M0–M9 (M8 in two
+parts, M8a config/CLI and M8 flow/pipeline) and M11 phase 1; see `design/reports/2026-11-12-overnight.md`. This prompt starts the second run.
 (The prompt of the first run is in the git history of this file.)
 
 **Owner pre-flight (once, before launching):**
@@ -97,19 +97,22 @@ answers recorded in `design/QUESTIONS.md` since the first run). The most importa
 * **Merged into `develop`:** M0 bootstrap; M1 reference build, refharness, golden data (incl.
   IT-1..IT-10 goldens); M2 base/exec/comm/linalg/angmom; M3 basis; M4 operator (`imsrg::op`);
   M5+M6 io/opslib/hf (HF matches imsrg++ to 2e-13, DIIS); M7 IMSRG(2) commutators (all scalar terms,
-  ≤ 1.5e-15 vs goldens, 1.1–1.2× imsrg++ time); M8a config + legacy CLI + `apps/imsrg`; M9 mbpt;
-  M11 phase 1 Python bindings.
-* **M8 (flow, BCH, Magnus, driver pipeline, integration tests):** see the M8 entry in
-  `design/STATUS.md` for what was merged or what remains on `feature/m8-flow-driver`.
+  ≤ 1.5e-15 vs goldens, 1.1–1.2× imsrg++ time); M8a config + legacy CLI + `apps/imsrg`; M8 flow
+  (generators, BCH, Magnus with the imsrg++ step rule) + driver pipeline: IT-2, IT-3, IT-4, IT-6,
+  IT-7, IT-12 pass with identical step counts and |ΔE0| ≤ 3e-10 MeV; M9 mbpt; M11 phase 1 Python
+  bindings. CI on `develop`: 851 unit, 34 integration, 3 MPI, 23 Python tests.
+* **M8 follow-ups (not done):** Opus review of the flow numerics; flow-RK4/DP45, hunter-gatherer,
+  scratch Omega storage; a `hartree_fock.mixing` key (mixing is fixed to linear in the driver);
+  MP2 column in the results; NAT basis / IT-5 in the driver; `Denominators` copies H every step.
 * **Not started:** M10 (IMSRG(3)), M11 phase 2, M12 (MPI + performance), M13 (Makefile, docs).
 
 ## Plan for this run (in order; at most 3 leads at once)
 
 1. Preflight (above).
-2. **Finish M8** from `feature/m8-flow-driver` (or from `develop` if it was merged): the remaining
-   integration tests among IT-2, IT-3, IT-4, IT-6, IT-7, IT-12 (acceptance of M8 in
-   `40-roadmap.md`), flow-RK4/DP45, 2-step valence-space decoupling, more generators; resolve
-   M8a-Q1 (generator/method enums now live in `flow`). Merge when CI passes.
+2. **M8 follow-ups** (one lead or one Sonnet implementer, from `develop`): the Opus review of the
+   flow numerics first, then the `hartree_fock.mixing` key, the MP2 column, NAT basis and IT-5 in
+   the driver, flow-RK4/DP45, and the `Denominators` copy; resolve M8-Q1..Q4 and M8a-Q1 with the
+   owner's answers if available. Merge when CI passes.
 3. **M10 IMSRG(3)**, following `design/14-imsrg3-plan.md`: the layout benchmark (brief below) and
    the decision row in `00-requirements-and-decisions.md`, then the brute-force m-scheme reference,
    perturbative triples (IT-8), IMSRG(3)-N7 (IT-9), IMSRG(3f2) (IT-10; check the definition in
