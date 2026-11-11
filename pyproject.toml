@@ -1,0 +1,25 @@
+[build-system]
+requires = ["scikit-build-core>=0.10", "numpy"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "imsrg"
+version = "0.1.0"
+description = "Python bindings of the imsrg rewrite (nanobind)"
+requires-python = ">=3.10"
+dependencies = ["numpy"]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.scikit-build]
+cmake.build-type = "Release"
+wheel.packages = []
+build-dir = "build/skbuild"
+
+[tool.scikit-build.cmake.define]
+IMSRG_BUILD_PYTHON = "ON"
+IMSRG_BUILD_TESTS = "OFF"
+
+[tool.pytest.ini_options]
+testpaths = ["tests/python"]
