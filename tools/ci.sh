@@ -146,6 +146,10 @@ step_mpi() {
     -j "$test_jobs"
 }
 
+step_python() {
+  PYTHONPATH="$build_dir/python" "$python" -m pytest -q tests/python
+}
+
 step_layering() {
   "$python" tools/check_layering.py --repo-root "$repo_root" \
     --module-deps "$build_dir/imsrg_module_deps.json" &&
@@ -187,6 +191,16 @@ fi
 case $(cache_value IMSRG_ENABLE_MPI) in
   ON|on|TRUE|true|YES|yes|1|Y|y) run_step "mpi tests" step_mpi ;;
   *) skip_step "mpi tests" "IMSRG_ENABLE_MPI is off" ;;
+esac
+
+case $(cache_value IMSRG_BUILD_PYTHON) in
+  ON|on|TRUE|true|YES|yes|1|Y|y)
+    if ls "$build_dir"/python/imsrg/_core*.so >/dev/null 2>&1; then
+      run_step "python tests" step_python
+    else
+      skip_step "python tests" "extension imsrg._core not found in $build_dir/python/imsrg"
+    fi ;;
+  *) skip_step "python tests" "IMSRG_BUILD_PYTHON is off" ;;
 esac
 
 run_step layering step_layering
