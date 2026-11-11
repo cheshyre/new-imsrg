@@ -105,4 +105,5 @@ covers the fixed behaviour.
 
 | # | Reference location | Bug | Our behaviour | Validated by |
 |---|--------------------|-----|---------------|--------------|
+| 1 | `AngMom.cc:167-241` (`AngMom::Moshinsky`) | Precision, not logic: the double-precision Buck et al. sum misses 1e-12 relative on 22 of the 405,537 brackets with E <= 16 (up to 7.8e-11 relative, 1.3e-13 absolute), because large prefactors amplify the rounding of the CG/9j factors | Same algorithm and convention, evaluated in double-double and rounded once (M2) | `angmom_moshinsky`: all 405,537 brackets vs an independent exact construction (`tests/unit/angmom/reference/gen_moshinsky_exact.py`), 0 failures; imsrg++ samples agree within 1e-12 |
 | (fill in during implementation) | | | | |

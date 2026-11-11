@@ -213,6 +213,11 @@ Operator transform_basis(const Operator&, const UnitaryTransform& C);    // e.g.
   Kokkos and MPI. Exactly one exists per process: in `main()`, or created on import in Python.
   The communicator is passed **explicitly** to code that needs it (through `CommutatorOptions` /
   pipeline context). Nothing calls `MPI_COMM_WORLD` implicitly.
+  *As implemented in M2:* the two halves are separate RAII objects, because `exec` and `comm` may
+  not depend on each other and `mpi.h` is confined to `comm`: `comm::Environment` (MPI, created
+  first) and `exec::Runtime` (Kokkos, created second, destroyed first). The combined
+  `imsrg::Runtime` is a thin composition in `driver` (M8); until then `main()` creates both in
+  this order (QUESTIONS M2-Q2).
 * Logging: `imsrg::log::info(...)` and friends, using {fmt}. Only rank 0 prints by default.
   Verbosity is set by config.
 * Profiling: `IMSRG_SCOPED_TIMER("name")` feeds a thread-safe registry and also emits
