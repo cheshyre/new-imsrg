@@ -211,3 +211,10 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
   **Assumed meanwhile:** `model_space_for_dump` builds the partition with the holes
   (n >= OCC_CUT) as core and every other orbit as q-space; the reader rejects occupations that
   differ from the target model space unless `check_occupations = false`.
+* **M6-T2-Q1** (2026-11-12, opslib) - The golden `Rp2.dump` includes the spin-orbit term
+  (`RpSpinOrbitCorrection`), contradicting the brief. **Assumed meanwhile:** `rp2` includes it by
+  default (matches the golden to 6e-16); `include_spin_orbit = false` excludes it.
+* **M6-T2-Q2** (2026-11-12, opslib) - imsrg++ quirks reproduced: `t_cm`'s two-body part drops
+  entries with |v| <= 1e-7 (R2CM and the radius terms keep all); the E2max skip in the
+  `Calculate_p1p2`/`r1r2` loops is moot because the two-body ket basis is already E2max-limited.
+  **Assumed meanwhile:** reproduced as is; not silently fixed.
