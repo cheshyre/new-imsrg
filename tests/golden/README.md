@@ -129,6 +129,12 @@ stdout). Commands, key numbers, wall times and the investigation of the divergin
 (IT-4/IT-5 with the contact-only 3N file, IT-8 at emax 2) with the replacement goldens
 `IT-4/smax10`, `IT-5/smax10`, `IT-8/He4_emax2`: see `e2e/README.md`.
 
+### `operator/emax2/` (M4) — `tools/reference/gen_golden_operator.sh`
+
+Normal ordering (`Operator::DoNormalOrdering` / `UndoNormalOrdering`) and the HF-basis
+transformation (`HartreeFock::TransformToHFBasis`) of the old code. Commands, contents and
+numbers: see `operator/README.md`.
+
 ## Missing (not produced in M1)
 
 * `refharness flow [--factorized]` is still a stub (`tools/reference/rh_flow.cpp`), so there is
