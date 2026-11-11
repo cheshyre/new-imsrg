@@ -209,6 +209,7 @@ op::Operator read_me2j(const std::filesystem::path& path, const Me2jReadOptions&
     report->values_read = read;
     report->seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
   }
+  H.sync_to_device();  // the elements were set through the host mirror (no-op on host backends)
   return H;
 }
 
