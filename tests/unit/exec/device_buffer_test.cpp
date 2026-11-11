@@ -103,6 +103,28 @@ TEST(ExecDeviceBuffer, ResizeKeepsPrefix) {
   EXPECT_EQ(b.to_vector(), (std::vector<std::int64_t>{0, 0, 0}));
 }
 
+// Empty buffers hold no allocation (so they may outlive the Runtime) and report no device data.
+TEST(ExecDeviceBuffer, EmptyBuffersHoldNoAllocation) {
+  DeviceBuffer<double> zero(0, "zero");
+  EXPECT_TRUE(zero.empty());
+  EXPECT_EQ(zero.device_data(), nullptr);
+  EXPECT_TRUE(zero.host_span().empty());
+  DeviceBuffer<double> shrunk(5);
+  shrunk.resize(0);
+  EXPECT_EQ(shrunk.device_data(), nullptr);
+  DeviceBuffer<double> grown;
+  grown.resize(2);
+  EXPECT_EQ(grown.to_vector(), (std::vector<double>{0.0, 0.0}));
+}
+
+TEST(ExecDeviceBuffer, SelfAssignmentKeepsData) {
+  DeviceBuffer<double> b(3);
+  b.fill(2.5);
+  const DeviceBuffer<double>& alias = b;
+  b = alias;
+  EXPECT_EQ(b.to_vector(), (std::vector<double>{2.5, 2.5, 2.5}));
+}
+
 TEST(ExecDeviceBuffer, HostSpanSyncRoundTrip) {
   DeviceBuffer<double> b(6);
   auto h = b.host_span();
