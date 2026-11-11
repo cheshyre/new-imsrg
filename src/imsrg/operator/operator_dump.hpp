@@ -25,13 +25,13 @@ struct DumpOrbit {
 
 /// Everything before the `zero_body` record of a dump.
 struct OperatorDumpHeader {
-  std::string source;            ///< Free text of the `source` record.
-  std::int32_t emax = 0;         ///< `basis emax`.
-  std::int32_t lmax = 0;         ///< `basis lmax` (min(lmax, emax) as written by imsrg-devel).
-  double hw = 0.0;               ///< `basis hw` (hbar omega, MeV).
-  std::string reference;         ///< `reference` record (a nucleus name or "custom").
-  std::vector<DumpOrbit> orbits; ///< The `orbit` records in file order (index = position).
-  OperatorSpec spec;             ///< The `spec` record.
+  std::string source;             ///< Free text of the `source` record.
+  std::int32_t emax = 0;          ///< `basis emax`.
+  std::int32_t lmax = 0;          ///< `basis lmax` (min(lmax, emax) as written by imsrg-devel).
+  double hw = 0.0;                ///< `basis hw` (hbar omega, MeV).
+  std::string reference;          ///< `reference` record (a nucleus name or "custom").
+  std::vector<DumpOrbit> orbits;  ///< The `orbit` records in file order (index = position).
+  OperatorSpec spec;              ///< The `spec` record.
 };
 
 /// Options of the readers.
