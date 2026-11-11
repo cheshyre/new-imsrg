@@ -10,6 +10,7 @@
 namespace imsrg::mbpt {
 
 namespace {
+std::size_t u(std::int64_t i) { return static_cast<std::size_t>(i); }
 double diag(const op::Operator& H, OrbitIndex a) { return H.one_body().get(a, a); }
 }  // namespace
 
@@ -38,8 +39,9 @@ double mp2_energy(op::Operator& H) {
           if ((oi.l + oj.l + oa.l + ob.l) % 2 > 0) continue;
           if (oi.tz2.twice + oj.tz2.twice != oa.tz2.twice + ob.tz2.twice) continue;
           const double denom = ea + diag(H, b) - ei - ej;
-          int jmin = std::max(std::abs(oi.j2.twice - oj.j2.twice),
-                              std::abs(oa.j2.twice - ob.j2.twice)) / 2;
+          int jmin =
+              std::max(std::abs(oi.j2.twice - oj.j2.twice), std::abs(oa.j2.twice - ob.j2.twice)) /
+              2;
           const int jmax = std::min(oi.j2.twice + oj.j2.twice, oa.j2.twice + ob.j2.twice) / 2;
           int dj = 1;
           if (a == b || i == j) {
@@ -76,30 +78,30 @@ Mp3Energy mp3_energy(op::Operator& H) {
     if (hh.empty() || pp.empty()) continue;
     const auto V = H.two_body().host_block(ch);
     const auto kets = tb.channel_kets(ch);
-    const std::size_t nh = hh.size(), np = pp.size();
-    linalg::Matrix<double> M(static_cast<std::int64_t>(nh), static_cast<std::int64_t>(np));
-    for (std::size_t I = 0; I < nh; ++I) {
-      const auto& kh = tb.ket(kets[hh[I].value()]);
+    const auto nh = static_cast<std::int64_t>(hh.size()), np = static_cast<std::int64_t>(pp.size());
+    linalg::Matrix<double> M(nh, np);
+    for (std::int64_t I = 0; I < nh; ++I) {
+      const auto& kh = tb.ket(kets[u(hh[u(I)].value())]);
       const double eh = diag(H, kh.p) + diag(H, kh.q);
-      for (std::size_t A = 0; A < np; ++A) {
-        const auto& kp = tb.ket(kets[pp[A].value()]);
+      for (std::int64_t A = 0; A < np; ++A) {
+        const auto& kp = tb.ket(kets[u(pp[u(A)].value())]);
         const double ep = diag(H, kp.p) + diag(H, kp.q);
-        M(I, A) = V(hh[I].value(), pp[A].value()) / (eh - ep);
+        M(I, A) = V(hh[u(I)].value(), pp[u(A)].value()) / (eh - ep);
       }
     }
     const double w = 2 * tbc.J() + 1;
     // Epp = (2J+1) tr(M Vpp M^T), Ehh = (2J+1) tr(M^T Vhh M)
-    for (std::size_t A = 0; A < np; ++A)
-      for (std::size_t B = 0; B < np; ++B) {
+    for (std::int64_t A = 0; A < np; ++A)
+      for (std::int64_t B = 0; B < np; ++B) {
         double s = 0.0;
-        for (std::size_t I = 0; I < nh; ++I) s += M(I, A) * M(I, B);
-        out.pp += w * s * V(pp[A].value(), pp[B].value());
+        for (std::int64_t I = 0; I < nh; ++I) s += M(I, A) * M(I, B);
+        out.pp += w * s * V(pp[u(A)].value(), pp[u(B)].value());
       }
-    for (std::size_t I = 0; I < nh; ++I)
-      for (std::size_t K = 0; K < nh; ++K) {
+    for (std::int64_t I = 0; I < nh; ++I)
+      for (std::int64_t K = 0; K < nh; ++K) {
         double s = 0.0;
-        for (std::size_t A = 0; A < np; ++A) s += M(I, A) * M(K, A);
-        out.hh += w * s * V(hh[I].value(), hh[K].value());
+        for (std::int64_t A = 0; A < np; ++A) s += M(I, A) * M(K, A);
+        out.hh += w * s * V(hh[u(I)].value(), hh[u(K)].value());
       }
   }
 
@@ -129,16 +131,16 @@ Mp3Energy mp3_energy(op::Operator& H) {
       }
       pk.push_back(x);
     }
-    const std::size_t n = pk.size();
+    const auto n = static_cast<std::int64_t>(pk.size());
     if (n == 0) continue;
-    linalg::Matrix<double> V1(static_cast<std::int64_t>(n), static_cast<std::int64_t>(n));
-    linalg::Matrix<double> V2(static_cast<std::int64_t>(n), static_cast<std::int64_t>(n));
+    linalg::Matrix<double> V1(n, n);
+    linalg::Matrix<double> V2(n, n);
     const TwoJ tJph{2 * Jph};
     const auto& two = H.two_body();
-    for (std::size_t I = 0; I < n; ++I)
-      for (std::size_t II = 0; II < n; ++II) {
-        const auto& x = pk[I];
-        const auto& y = pk[II];  // (b, j)
+    for (std::int64_t I = 0; I < n; ++I)
+      for (std::int64_t II = 0; II < n; ++II) {
+        const auto& x = pk[u(I)];
+        const auto& y = pk[u(II)];  // (b, j)
         const double delta = diag(H, x.i) + diag(H, y.i) - diag(H, x.a) - diag(H, y.a);
         V1(I, II) = 0.0;
         V2(II, I) = 0.0;
@@ -159,10 +161,10 @@ Mp3Energy mp3_energy(op::Operator& H) {
       }
     // Eph += (2Jph+1) tr(V1 V2 V1^T)
     double tr = 0.0;
-    for (std::size_t I = 0; I < n; ++I)
-      for (std::size_t K = 0; K < n; ++K) {
+    for (std::int64_t I = 0; I < n; ++I)
+      for (std::int64_t K = 0; K < n; ++K) {
         double s = 0.0;
-        for (std::size_t II = 0; II < n; ++II) s += V1(I, II) * V2(II, K);
+        for (std::int64_t II = 0; II < n; ++II) s += V1(I, II) * V2(II, K);
         tr += s * V1(I, K);
       }
     out.ph += (2 * Jph + 1) * tr;

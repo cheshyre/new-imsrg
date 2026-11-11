@@ -12,9 +12,9 @@ namespace imsrg::mbpt {
 
 /// Third-order energy split into the imsrg++ terms (Epp, Ehh, Eph) and their sum.
 struct Mp3Energy {
-  double pp = 0.0;     ///< Particle-particle ladder.
-  double hh = 0.0;     ///< Hole-hole ladder.
-  double ph = 0.0;     ///< Particle-hole ring term (imsrg++ comments it as unreliable; matched as is).
+  double pp = 0.0;  ///< Particle-particle ladder.
+  double hh = 0.0;  ///< Hole-hole ladder.
+  double ph = 0.0;  ///< Particle-hole ring term (imsrg++ comments it as unreliable; matched as is).
   double total = 0.0;  ///< pp + hh + ph.
 };
 

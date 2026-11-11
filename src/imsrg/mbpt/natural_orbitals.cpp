@@ -66,7 +66,8 @@ linalg::Matrix<double> mbpt2_density_matrix(op::Operator& H) {
             const double ebc = x.e(b) + x.e(c) - x.e(i) - x.e(j);
             if (std::abs(eac * ebc) < kEps) continue;
             const int jmin = std::max({std::abs(x.j2(a) - x.j2(c)), std::abs(x.j2(i) - x.j2(j)),
-                                       std::abs(x.j2(b) - x.j2(c))}) / 2;
+                                       std::abs(x.j2(b) - x.j2(c))}) /
+                             2;
             const int jmax =
                 std::min({x.j2(a) + x.j2(c), x.j2(i) + x.j2(j), x.j2(b) + x.j2(c)}) / 2;
             double t = 0.0;
@@ -94,7 +95,8 @@ linalg::Matrix<double> mbpt2_density_matrix(op::Operator& H) {
             const double ejk = x.e(a) + x.e(b) - x.e(k) - x.e(j);
             if (std::abs(eik * ejk) < kEps) continue;
             const int jmin = std::max({std::abs(x.j2(a) - x.j2(b)), std::abs(x.j2(i) - x.j2(k)),
-                                       std::abs(x.j2(j) - x.j2(k))}) / 2;
+                                       std::abs(x.j2(j) - x.j2(k))}) /
+                             2;
             const int jmax =
                 std::min({x.j2(a) + x.j2(b), x.j2(i) + x.j2(k), x.j2(j) + x.j2(k)}) / 2;
             double t = 0.0;
@@ -122,7 +124,8 @@ linalg::Matrix<double> mbpt2_density_matrix(op::Operator& H) {
             const double ebcij = x.e(b) + x.e(c) - x.e(i) - x.e(j);
             if (eai * ebcij < kEps) continue;
             const int jmin = std::max({std::abs(x.j2(a) - x.j2(j)), std::abs(x.j2(b) - x.j2(c)),
-                                       std::abs(x.j2(i) - x.j2(j))}) / 2;
+                                       std::abs(x.j2(i) - x.j2(j))}) /
+                             2;
             const int jmax =
                 std::min({x.j2(a) + x.j2(j), x.j2(b) + x.j2(c), x.j2(i) + x.j2(j)}) / 2;
             double t = 0.0;
@@ -138,7 +141,8 @@ linalg::Matrix<double> mbpt2_density_matrix(op::Operator& H) {
             const double eabkj = x.e(a) + x.e(b) - x.e(k) - x.e(j);
             if (eai * eabkj < kEps) continue;
             const int jmin = std::max({std::abs(x.j2(k) - x.j2(j)), std::abs(x.j2(i) - x.j2(b)),
-                                       std::abs(x.j2(a) - x.j2(b))}) / 2;
+                                       std::abs(x.j2(a) - x.j2(b))}) /
+                             2;
             const int jmax =
                 std::min({x.j2(k) + x.j2(j), x.j2(i) + x.j2(b), x.j2(a) + x.j2(b)}) / 2;
             double t = 0.0;
@@ -162,7 +166,8 @@ NaturalOrbitals natural_orbitals(const linalg::Matrix<double>& rho_hf,
                                  const basis::ModelSpace& ms) {
   const auto& basis = ms.basis();
   const std::int64_t N = ms.num_orbits();
-  NaturalOrbitals out{linalg::Matrix<double>(N, N), std::vector<double>(static_cast<size_t>(N), 0.0)};
+  NaturalOrbitals out{linalg::Matrix<double>(N, N),
+                      std::vector<double>(static_cast<size_t>(N), 0.0)};
   double trace = 0.0;
   for (std::int64_t a = 0; a < N; ++a) {
     const OrbitIndex oa(static_cast<std::int32_t>(a));
@@ -171,15 +176,20 @@ NaturalOrbitals natural_orbitals(const linalg::Matrix<double>& rho_hf,
     const std::int64_t n = static_cast<std::int64_t>(idx.size());
     linalg::Matrix<double> blk(n, n);
     for (std::int64_t r = 0; r < n; ++r)
-      for (std::int64_t c = 0; c < n; ++c) blk(r, c) = rho_hf(idx[r].value(), idx[c].value());
+      for (std::int64_t c = 0; c < n; ++c)
+        blk(r, c) = rho_hf(idx[static_cast<std::size_t>(r)].value(),
+                           idx[static_cast<std::size_t>(c)].value());
     const auto eig = linalg::eigh(blk.const_view());
     const int j2 = basis.orbit(oa).j2.twice;
     for (std::int64_t c = 0; c < n; ++c) {
-      const std::int64_t src = n - 1 - c;  // descending occupations
+      const std::int64_t src = n - 1 - c;                                 // descending occupations
       const double sign = (eig.eigenvectors(c, src) < 0.0) ? -1.0 : 1.0;  // C(i,i) >= 0
+      const auto cc = static_cast<std::size_t>(c);
       for (std::int64_t r = 0; r < n; ++r)
-        out.c_hf2nat(idx[r].value(), idx[c].value()) = sign * eig.eigenvectors(r, src);
-      out.occupations[static_cast<size_t>(idx[c].value())] = eig.eigenvalues[static_cast<size_t>(src)];
+        out.c_hf2nat(idx[static_cast<std::size_t>(r)].value(), idx[cc].value()) =
+            sign * eig.eigenvectors(r, src);
+      out.occupations[static_cast<size_t>(idx[cc].value())] =
+          eig.eigenvalues[static_cast<size_t>(src)];
       trace += (j2 + 1) * eig.eigenvalues[static_cast<size_t>(src)];
     }
   }

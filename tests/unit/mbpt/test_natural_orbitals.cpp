@@ -41,8 +41,8 @@ TEST(MbptNaturalOrbitals, Emax2Invariants) {
   EXPECT_EQ(max_offblock, 0.0);
 
   std::cout << "[nat emax2] E_HF(HF) " << res.e_hf_hf << " E_HF(NAT) " << res.e_hf_nat
-            << " E0(NAT H) " << res.h_nat.zero_body() << " MP2(NAT) "
-            << mbpt::mp2_energy(res.h_nat) << "\n";
+            << " E0(NAT H) " << res.h_nat.zero_body() << " MP2(NAT) " << mbpt::mp2_energy(res.h_nat)
+            << "\n";
   EXPECT_GE(res.e_hf_nat, res.e_hf_hf - 1e-8);  // HF is the variational minimum
   EXPECT_NEAR(res.h_nat.zero_body(), res.e_hf_nat, 1e-9);
 }

@@ -15,7 +15,8 @@ namespace imsrg::mbpt {
 
 /// Natural orbitals of one density matrix.
 struct NaturalOrbitals {
-  linalg::Matrix<double> c_hf2nat;  ///< Row = HF orbit, column = NAT orbit; block diagonal in (l,j,tz).
+  linalg::Matrix<double>
+      c_hf2nat;  ///< Row = HF orbit, column = NAT orbit; block diagonal in (l,j,tz).
   std::vector<double> occupations;  ///< Occupation of each NAT orbit (descending within a channel).
 };
 
@@ -29,8 +30,7 @@ linalg::Matrix<double> mbpt2_density_matrix(op::Operator& H);
 /// Diagonalizes each (l,j,tz) block of `rho_hf`, orders eigenvalues descending, fixes the column
 /// signs so that C(i,i) >= 0 and checks sum (2j+1) n = A to 1e-6. Throws InvariantError if the
 /// trace check fails. Complexity O(sum n_ch^3).
-NaturalOrbitals natural_orbitals(const linalg::Matrix<double>& rho_hf,
-                                 const basis::ModelSpace& ms);
+NaturalOrbitals natural_orbitals(const linalg::Matrix<double>& rho_hf, const basis::ModelSpace& ms);
 
 /// HO-basis reference density of the NAT basis: rho(a,b) = sum over reference holes alpha of
 /// n_alpha C_ho2nat(a,alpha) C_ho2nat(b,alpha) (imsrg++ default, use_NAT_occupations = false).
