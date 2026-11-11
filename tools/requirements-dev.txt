@@ -1,0 +1,7 @@
+# Python packages for the shared development venv ($IMSRG_VENV, made by tools/bootstrap_deps.sh).
+# numpy: array checks in tests; pytest: integration and binding tests; sympy: exact Wigner symbols
+# for the angmom reference tables; scikit-build-core: builds the nanobind extension (pip install -e).
+numpy>=2.0
+pytest>=8.0
+sympy>=1.13
+scikit-build-core>=0.10

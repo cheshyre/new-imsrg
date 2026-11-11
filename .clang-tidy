@@ -1,0 +1,6 @@
+# imsrg rewrite: clang-tidy configuration.
+# Advisory only: not enforced and not run in CI yet.
+Checks: 'bugprone-*,performance-*,modernize-*,-modernize-use-trailing-return-type,-bugprone-easily-swappable-parameters,-modernize-avoid-c-arrays'
+WarningsAsErrors: ''
+HeaderFilterRegex: '(src|apps|tests)/.*'
+FormatStyle: file

@@ -1,0 +1,6 @@
+{"version": 1, "modules": [
+  {"name": "base", "deps": [], "dir": "src/imsrg/base"},
+  {"name": "basis", "deps": ["operator"], "dir": "src/imsrg/basis"},
+  {"name": "bogus", "deps": [], "dir": "src/imsrg/bogus"},
+  {"name": "comm", "deps": ["base"], "dir": "src/imsrg/comm_x"}
+]}

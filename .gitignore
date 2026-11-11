@@ -86,3 +86,14 @@ tests/golden/generated/
 *.me3j
 *.me3j.gz
 *.stream.bin
+
+# imsrg rewrite (M0)
+build*/
+# .venv may be a symlink to the shared venv; a pattern with a trailing slash would not match a symlink
+.venv
+# compile_commands.json symlinks created by editors/clangd at the repo root
+/compile_commands.json
+# tests/golden/ holds committed reference data: the generic patterns above (*.out, *.log, *.tmp,
+# ...) must not silently drop golden files; generated golden data stays ignored.
+!tests/golden/**
+tests/golden/generated/

@@ -1,0 +1,153 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 25,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "IMSRG_DEPS_PREFIX": "$env{IMSRG_DEPS_PREFIX}"
+      }
+    },
+    {
+      "name": "backend-openmp",
+      "hidden": true,
+      "cacheVariables": {
+        "IMSRG_KOKKOS_BACKEND": "openmp",
+        "OpenMP_ROOT": "/opt/homebrew/opt/libomp"
+      }
+    },
+    {
+      "name": "backend-serial",
+      "hidden": true,
+      "cacheVariables": {
+        "IMSRG_KOKKOS_BACKEND": "serial"
+      }
+    },
+    {
+      "name": "debug-flags",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_FLAGS_DEBUG": "-O1 -g"
+      }
+    },
+    {
+      "name": "dev-openmp",
+      "displayName": "Dev (OpenMP, Debug -O1 -g)",
+      "description": "Daily development: Kokkos OpenMP backend, Debug with assertions, -O1 -g",
+      "inherits": ["base", "backend-openmp", "debug-flags"]
+    },
+    {
+      "name": "dev-serial",
+      "displayName": "Dev (Serial, Debug -O1 -g)",
+      "description": "Debugging: Kokkos Serial backend, Debug with assertions, -O1 -g",
+      "inherits": ["base", "backend-serial", "debug-flags"]
+    },
+    {
+      "name": "release-openmp",
+      "displayName": "Release (OpenMP, -O3 native)",
+      "description": "Performance runs: Kokkos OpenMP, -O3, -mcpu=native/-march=native",
+      "inherits": ["base", "backend-openmp"],
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "IMSRG_NATIVE_ARCH": "ON"
+      }
+    },
+    {
+      "name": "asan",
+      "displayName": "AddressSanitizer + UBSan (Serial)",
+      "description": "AddressSanitizer + UBSan on the Serial backend",
+      "inherits": ["base", "backend-serial", "debug-flags"],
+      "cacheVariables": {
+        "IMSRG_SANITIZE": "address;undefined"
+      }
+    },
+    {
+      "name": "cuda",
+      "displayName": "Cluster (Kokkos CUDA, Release)",
+      "description": "Cluster build, Kokkos CUDA (not testable on the dev machine). Needs Kokkos installed with CUDA in $IMSRG_DEPS_PREFIX/kokkos-cuda or -DKokkos_ROOT=...",
+      "inherits": ["base"],
+      "cacheVariables": {
+        "IMSRG_KOKKOS_BACKEND": "cuda",
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_COMPILER": "${sourceDir}/extern/kokkos/bin/nvcc_wrapper"
+      }
+    },
+    {
+      "name": "hip",
+      "displayName": "Cluster (Kokkos HIP, Release)",
+      "description": "Cluster build, Kokkos HIP (not testable on the dev machine). Needs Kokkos installed with HIP in $IMSRG_DEPS_PREFIX/kokkos-hip or -DKokkos_ROOT=...",
+      "inherits": ["base"],
+      "cacheVariables": {
+        "IMSRG_KOKKOS_BACKEND": "hip",
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_COMPILER": "hipcc"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "dev-openmp",
+      "configurePreset": "dev-openmp"
+    },
+    {
+      "name": "dev-serial",
+      "configurePreset": "dev-serial"
+    },
+    {
+      "name": "release-openmp",
+      "configurePreset": "release-openmp"
+    },
+    {
+      "name": "asan",
+      "configurePreset": "asan"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "test-base",
+      "hidden": true,
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
+      },
+      "environment": {
+        "OMP_PROC_BIND": "false",
+        "OMP_NUM_THREADS": "4"
+      }
+    },
+    {
+      "name": "dev-openmp",
+      "configurePreset": "dev-openmp",
+      "inherits": "test-base"
+    },
+    {
+      "name": "dev-serial",
+      "configurePreset": "dev-serial",
+      "inherits": "test-base"
+    },
+    {
+      "name": "release-openmp",
+      "configurePreset": "release-openmp",
+      "inherits": "test-base"
+    },
+    {
+      "name": "asan",
+      "configurePreset": "asan",
+      "inherits": "test-base",
+      "environment": {
+        "UBSAN_OPTIONS": "print_stacktrace=1:halt_on_error=1"
+      }
+    }
+  ]
+}

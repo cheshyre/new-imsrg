@@ -1,0 +1,7 @@
+{"version": 1, "modules": [
+  {"name": "base", "deps": [], "dir": "src/imsrg/base"},
+  {"name": "exec", "deps": ["base"], "dir": "src/imsrg/exec"},
+  {"name": "comm", "deps": ["base"], "dir": "src/imsrg/comm"},
+  {"name": "basis", "deps": ["base", "exec"], "dir": "src/imsrg/basis"},
+  {"name": "operator", "deps": ["basis", "exec", "base"], "dir": "src/imsrg/operator"}
+]}
