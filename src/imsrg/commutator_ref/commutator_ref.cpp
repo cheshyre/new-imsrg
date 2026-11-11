@@ -52,7 +52,9 @@ int phase_of(int n) { return (n % 2 == 0) ? 1 : -1; }
 OrbitIndex oi(int a) { return OrbitIndex{a}; }
 
 /// Unnormalized <ab; J|V|cd; J> for integer J.
+/// A missing two-body part (particle_rank 1) reads as zero.
 double tbme(const Operator& O, int J, int a, int b, int c, int d) {
+  if (!O.two_body().allocated()) return 0.0;
   return O.two_body().get_unnormalized(oi(a), oi(b), oi(c), oi(d), TwoJ{2 * J});
 }
 
@@ -182,7 +184,8 @@ void comm111ss(const Operator& X, const Operator& Y, Operator& Z) {
 }
 
 void comm121ss(const Operator& X, const Operator& Y, Operator& Z) {
-  if (!X.two_body().allocated() || !Y.two_body().allocated()) return;
+  // [X1,Y2] and [X2,Y1] each need only one two-body operand: skip only if both are missing.
+  if (!X.two_body().allocated() && !Y.two_body().allocated()) return;
   const int n = X.model_space().num_orbits();
   const auto occ = occupations_of(X);
   add_to_every_one_body_element(Z, [&](int i, int j) {

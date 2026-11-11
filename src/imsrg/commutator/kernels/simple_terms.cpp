@@ -5,6 +5,8 @@
 #include <cmath>
 #include <cstdint>
 
+#include "imsrg/base/assert.hpp"
+#include "imsrg/base/constants.hpp"
 #include "imsrg/commutator/commutator.hpp"
 #include "imsrg/commutator/detail/device_views.hpp"
 #include "imsrg/commutator/detail/workspace_impl.hpp"
@@ -33,7 +35,8 @@ static_assert(std::is_trivially_copyable_v<OneBodyArgs>);
 
 void comm110ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Workspace& ws) {
   detail::check_term_inputs(X, Y, Z, ws);
-  if (Z.hermiticity() == Hermiticity::AntiHermitian) return;
+  // [X,Y] is anti-Hermitian (hZ = -hX hY = -1) -> the scalar part vanishes.
+  if (detail::commutator_hermiticity_sign(X, Y) < 0) return;
   const auto& impl = ws.impl();
   OneBodyArgs a;
   a.x = std::as_const(X).one_body().device_view();
@@ -63,7 +66,8 @@ void comm110ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Wo
 
 void comm220ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Workspace& ws) {
   detail::check_term_inputs(X, Y, Z, ws);
-  if (Z.hermiticity() == Hermiticity::AntiHermitian) return;
+  // [X,Y] is anti-Hermitian (hZ = -hX hY = -1) -> the scalar part vanishes.
+  if (detail::commutator_hermiticity_sign(X, Y) < 0) return;
   if (!X.two_body().allocated() || !Y.two_body().allocated()) return;
   const auto& impl = ws.impl();
   const TwoBodyView xv = impl.two_body_view(X);
@@ -111,13 +115,17 @@ void comm111ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Wo
   const auto x1 = std::as_const(X).one_body().device_view();
   const auto y1 = std::as_const(Y).one_body().device_view();
   const auto z1 = Z.one_body().device_view();
+  // Host BLAS only: on a device backend the buffers are not host-addressable (design/12 section 3).
+  IMSRG_CHECK(Z.one_body().buffer().host_is_device(),
+              "comm111ss: host BLAS on device memory; needs a device gemm (GPU backends)");
   linalg::gemm(1.0, x1, linalg::Op::NoTrans, y1, linalg::Op::NoTrans, 1.0, z1);
   linalg::gemm(-1.0, y1, linalg::Op::NoTrans, x1, linalg::Op::NoTrans, 1.0, z1);
 }
 
 void comm121ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Workspace& ws) {
   detail::check_term_inputs(X, Y, Z, ws);
-  if (!X.two_body().allocated() || !Y.two_body().allocated()) return;
+  // [X1,Y2] and [X2,Y1] each need only one two-body operand (a missing part reads as zero).
+  if (!X.two_body().allocated() && !Y.two_body().allocated()) return;
   const auto& impl = ws.impl();
   OneBodyArgs a;
   a.x = std::as_const(X).one_body().device_view();
@@ -221,8 +229,10 @@ void comm122ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Wo
           z -= yv.get_unnormalized(i, j, k, c, two_J) * a.x(c, l) -
                xv.get_unnormalized(i, j, k, c, two_J) * a.y(c, l);
         }
-        const double norm = std::sqrt((i == j ? 2.0 : 1.0) * (k == l ? 2.0 : 1.0));
-        z2[e] += z / norm;
+        // imsrg++ normalization: divide by sqrt(2) per equal-orbit pair (exact constants::sqrt2).
+        if (i == j) z /= constants::sqrt2;
+        if (k == l) z /= constants::sqrt2;
+        z2[e] += z;
       });
   exec::fence("commutator::comm122ss");
 }
