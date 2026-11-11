@@ -19,7 +19,10 @@ Reading order for a new agent or developer:
 | `40-roadmap.md` | Milestones M0–M13 with acceptance criteria and agent roles |
 | `41-agent-workflow.md` | How the multi-agent session works: roles, git, parallelism, briefs, context |
 | `QUESTIONS.md` | Open questions for the project owner (append, never block) |
-| `NEXT_SESSION_PROMPT.md` | The prompt that starts the unsupervised implementation run |
+| `NEXT_SESSION_PROMPT.md` | The prompt that starts the next unsupervised implementation run |
+| `INTERVIEW_PROMPT.md` | The prompt for an interactive session that answers the open questions and interviews the owner |
+| `reports/` | Reports of the unsupervised runs (e.g. `2026-11-12-overnight.md`) |
+| `benchmarks/` | Benchmark results (e.g. `imsrg2-commutators.md`) |
 | `claude-settings.proposed.json` | Proposed Claude Code settings for the unattended run (owner installs) |
 | `reference/01..05-*.md` | Detailed analyses of imsrg-devel with file:line citations (feature checklists) |
 
