@@ -349,7 +349,15 @@ bool absent_by_sentinel(Absent rule, double v) {
   return false;
 }
 
+/// Drops one leading '+' (imsrg++ read numbers with istringstream, which accepts it); "+-1"
+/// stays invalid.
+std::string_view strip_plus(std::string_view s) {
+  if (s.size() > 1 && s.front() == '+' && s[1] != '-') s.remove_prefix(1);
+  return s;
+}
+
 std::optional<std::int64_t> try_int(std::string_view s) {
+  s = strip_plus(s);
   std::int64_t v = 0;
   const char* b = s.data();
   const char* e = s.data() + s.size();
@@ -358,12 +366,14 @@ std::optional<std::int64_t> try_int(std::string_view s) {
   return v;
 }
 
+/// Finite doubles only ("inf" and "nan" are not valid parameter values).
 std::optional<double> try_double(std::string_view s) {
+  s = strip_plus(s);
   double v = 0.0;
   const char* b = s.data();
   const char* e = s.data() + s.size();
   const auto r = std::from_chars(b, e, v);
-  if (r.ec != std::errc{} || r.ptr != e || s.empty()) return std::nullopt;
+  if (r.ec != std::errc{} || r.ptr != e || s.empty() || !std::isfinite(v)) return std::nullopt;
   return v;
 }
 
@@ -433,6 +443,17 @@ class Translator {
     return it == scalars_.end() ? nullptr : &it->second;
   }
   bool given(std::string_view key) const { return get(key) != nullptr || vectors_.contains(key); }
+  // Given with a parsable value. Keys whose old default is supplied get it also when the given
+  // value is invalid: that value is already reported (E-LEGACY-VALUE), and a missing required key
+  // would only add a consequential V-03.
+  bool given_valid_int(std::string_view key) const {
+    const Entry* e = get(key);
+    return e != nullptr && try_int(e->value).has_value();
+  }
+  bool given_valid_double(std::string_view key) const {
+    const Entry* e = get(key);
+    return e != nullptr && try_double(e->value).has_value();
+  }
 
   static SourceRef arg_ref(const Entry& e) { return {SourceRef::Kind::LegacyArg, e.token, 0, 0}; }
   static SourceRef default_ref(std::string_view key) {
@@ -821,9 +842,9 @@ class Translator {
     const Entry* b3 = get("3bme");
     if (has_3n_) {
       put_s("interaction.three_body.file", b3->value, arg_ref(*b3));
-      if (!given("file3e1max"))
+      if (!given_valid_int("file3e1max"))
         put_i("interaction.three_body.e1max", 12, default_ref("file3e1max"));
-      if (!given("file3e3max"))
+      if (!given_valid_int("file3e3max"))
         put_i("interaction.three_body.e3max", 12, default_ref("file3e3max"));
     }
     struct EnumKey {
@@ -863,9 +884,10 @@ class Translator {
 
   void do_numbers() {
     // Supplied defaults.
-    if (!given("emax")) put_i("basis.emax", 6, default_ref("emax"));
-    if (!given("hw")) put_d("basis.hw", 20.0, default_ref("hw"));
-    if (!given("file2e1max")) put_i("interaction.two_body.e1max", 12, default_ref("file2e1max"));
+    if (!given_valid_int("emax")) put_i("basis.emax", 6, default_ref("emax"));
+    if (!given_valid_double("hw")) put_d("basis.hw", 20.0, default_ref("hw"));
+    if (!given_valid_int("file2e1max"))
+      put_i("interaction.two_body.e1max", 12, default_ref("file2e1max"));
 
     for (const DirectNumber& d : kDirectInts) {
       const Entry* e = get(d.key);

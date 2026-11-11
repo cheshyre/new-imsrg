@@ -11,6 +11,7 @@
 
 #include <gtest/gtest.h>
 
+#include "imsrg/driver/config/load_config.hpp"
 #include "imsrg/driver/config/schema_keys.hpp"
 #include "imsrg/driver/legacy/legacy_parameters.hpp"
 
@@ -140,6 +141,29 @@ TEST(LegacyTranslate, SuppliedDefaults) {
   const auto t3 = tr({"3bme=x.me3j"});
   EXPECT_EQ(num_i(t3, "interaction.three_body.e1max"), 12);
   EXPECT_EQ(num_i(t3, "interaction.three_body.e3max"), 12);
+}
+
+// An invalid value of a defaulted key is reported once; the old default is still supplied so that
+// resolution adds no consequential "required key missing" (found in review).
+TEST(LegacyTranslate, InvalidValueOfDefaultedKeyStillGetsDefault) {
+  const auto t = tr({"emax=4.5", "hw=abc"});
+  EXPECT_TRUE(has(t, "E-LEGACY-VALUE"));
+  EXPECT_EQ(num_i(t, "basis.emax"), 6);
+  EXPECT_EQ(num_d(t, "basis.hw"), 20.0);
+  ConfigSources s;
+  s.legacy_args = {"2bme=x.me2j", "emax=4.5", "reference=O16"};
+  const auto loaded = load_config(s, LoadOptions{.check_files = false});
+  ASSERT_FALSE(loaded.has_value());
+  for (const ConfigIssue& i : loaded.error()) EXPECT_NE(i.code, "V-03") << i.to_string();
+}
+
+// imsrg++ read numbers with istringstream: a leading '+' is accepted; inf/nan are not values.
+TEST(LegacyTranslate, NumberSyntax) {
+  EXPECT_EQ(num_i(tr({"emax=+4"}), "basis.emax"), 4);
+  EXPECT_EQ(num_d(tr({"hw=+16.5"}), "basis.hw"), 16.5);
+  EXPECT_TRUE(has(tr({"emax=+-4"}), "E-LEGACY-VALUE"));
+  EXPECT_TRUE(has(tr({"smax=inf"}), "E-LEGACY-VALUE"));
+  EXPECT_TRUE(has(tr({"smax=nan"}), "E-LEGACY-VALUE"));
 }
 
 TEST(LegacyTranslate, ArgSourceRef) {

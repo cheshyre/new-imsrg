@@ -370,12 +370,10 @@ void Checker::imsrg_rules() {
   if (cfg_.imsrg.omega.storage == OmegaStorage::Scratch && cfg_.run.scratch_dir.empty()) {
     error("V-44", "run.scratch_dir", "imsrg.omega.storage = \"scratch\" requires run.scratch_dir");
   }
-  const bool magnus = im.method == Method::Magnus || im.method == Method::MagnusBackoff ||
-                      im.method == Method::MagnusModifiedEuler ||
-                      im.method == Method::MagnusAdaptive;
-  if (im.perturbative_triples && !magnus) {
+  // design/16 V-45 and V-52 (and imsrg++, which tests method == "magnus") mean exactly magnus.
+  if (im.perturbative_triples && im.method != Method::Magnus) {
     strict("V-45", "imsrg.perturbative_triples",
-           "imsrg.perturbative_triples requires a magnus method, got \"" +
+           "imsrg.perturbative_triples requires imsrg.method = \"magnus\", got \"" +
                std::string(to_string(im.method)) + "\"");
   }
   if (is_flow_method(im.method) && cfg_.imsrg3.active()) {
@@ -423,12 +421,8 @@ void Checker::imsrg3_rules() {
     if (i3.threebody_threshold != def.threebody_threshold) bad("threebody_threshold");
   }
   if (i3.at_end) {
-    const bool magnus = cfg_.imsrg.method == Method::Magnus ||
-                        cfg_.imsrg.method == Method::MagnusBackoff ||
-                        cfg_.imsrg.method == Method::MagnusModifiedEuler ||
-                        cfg_.imsrg.method == Method::MagnusAdaptive;
-    if (!magnus) {
-      strict("V-52", "imsrg3.at_end", "imsrg3.at_end requires a magnus method");
+    if (cfg_.imsrg.method != Method::Magnus) {
+      strict("V-52", "imsrg3.at_end", "imsrg3.at_end requires imsrg.method = \"magnus\"");
     }
     if (!cfg_.interaction.three_body) {
       warning("V-52", "imsrg3.at_end",

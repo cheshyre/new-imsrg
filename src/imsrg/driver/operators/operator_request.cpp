@@ -147,9 +147,9 @@ void add_planned_rows(std::vector<OperatorCatalogEntry>& v) {
   pl("M1n", {1, 0, 0, 1}, "neutron magnetic dipole");
   pl("M1S", {1, 0, 0, 1}, "spin part of the magnetic dipole");
   pl("M1L", {1, 0, 0, 1}, "orbital part of the magnetic dipole");
-  pl("Sigma", {1, 0, 0, 1}, "spin operator");
-  pl("Sigma_p", {1, 0, 0, 1}, "proton spin operator");
-  pl("Sigma_n", {1, 0, 0, 1}, "neutron spin operator");
+  pl("Sigma", {1, 0, 0, 2}, "spin operator");  // Operator(ms,1,0,0,2), R05 1.2
+  pl("Sigma_p", {1, 0, 0, 2}, "proton spin operator");
+  pl("Sigma_n", {1, 0, 0, 2}, "neutron spin operator");
   pl("ISM", {0, 0, 0, 1}, "isoscalar monopole response operator");
   pl("IVM", {0, 0, 0, 1}, "isovector monopole response operator");
   pl("ISQ", {2, 0, 0, 1}, "isoscalar quadrupole response operator");
@@ -159,7 +159,7 @@ void add_planned_rows(std::vector<OperatorCatalogEntry>& v) {
   pl("IVD", {1, 0, 1, 1}, "isovector dipole response operator");
   pl("ISD", {1, 0, 1, 1}, "isoscalar dipole response operator, ISD_<Rms>");
   pl("Schiff", {1, 0, 1, 1}, "Schiff moment, Schiff_<R>");
-  pl("Anapole", {1, 0, 1, 1}, "anapole moment");
+  pl("Anapole", {1, 0, 1, 2}, "anapole moment");  // Operator(ms,1,0,1,2), R05 1.2
   pl("GamowTeller", {1, 1, 0, 2}, "allowed Gamow-Teller operator");
   // Charge changing and parity odd.
   pl("Fermi", {0, 1, 0, 2}, "allowed Fermi operator");

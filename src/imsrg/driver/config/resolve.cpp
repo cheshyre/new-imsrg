@@ -96,6 +96,10 @@ class Reader {
       return false;
     } else if constexpr (std::is_same_v<F, double>) {
       if (const double* d = v.get_if<double>()) {
+        if (!std::isfinite(*d)) {  // TOML allows inf and nan; no parameter means them
+          issues_.push_back(make_error("V-02", path, path + " must be a finite number", v.where));
+          return false;
+        }
         f = *d;
         return true;
       }

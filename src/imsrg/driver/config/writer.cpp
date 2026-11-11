@@ -128,9 +128,13 @@ std::string format_value(const KeyInfo& key, const T& value) {
 /// `visit_schema` visitor: collects (table, "key = value") lines in canonical order.
 struct LineWriter {
   std::vector<std::pair<std::string, std::string>> lines;
+  /// One-stage run: imsrg.generator.valence is inert (resolve resets it to its default) and an
+  /// explicit value is V-41 with a valence space, so it is left out to keep the file loadable.
+  bool one_stage = false;
 
   template <class T>
   void field(const KeyInfo& key, const T& value) {
+    if (one_stage && key.path == "imsrg.generator.valence") return;
     if constexpr (requires { value.has_value(); }) {
       if (value.has_value()) emit(key, *value);
     } else {
@@ -161,6 +165,7 @@ std::string to_toml(const RunConfig& config, bool include_provenance) {
       "# imsrg resolved configuration (design/16-config-and-cli.md); reproduce with: imsrg "
       "--config <this file>\n";
   LineWriter writer;
+  writer.one_stage = config.imsrg.steps == 1;
   visit_schema(config, writer);
   std::string current;
   bool first = true;

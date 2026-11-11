@@ -238,6 +238,24 @@ TEST(RoundTrip, EveryKeySetToANonDefaultValue) {
   EXPECT_TRUE(cfg.interaction.three_body.has_value());
 }
 
+// A one-stage valence-space run: generator.valence is inert, so the writer leaves it out; an
+// explicit value would be V-41 on re-reading (found in review).
+TEST(RoundTrip, OneStageValenceSpaceRunReloads) {
+  expect_round_trip(
+      "[basis]\nemax = 4\nhw = 20.0\n[reference]\nnucleus = \"O16\"\n[valence]\n"
+      "space = \"sd-shell\"\n[interaction.two_body]\nfile = \"x.me2j\"\ne1max = 14\n"
+      "[imsrg]\nsteps = 1\n[imsrg.generator]\ncore = \"shell_model_atan\"\n",
+      "one_stage_toml");
+
+  ConfigSources s;
+  s.legacy_args = {"2bme=x.me2j",   "file2e1max=14",          "emax=4",
+                   "reference=O16", "valence_space=sd-shell", "nsteps=1"};
+  auto legacy = load_config(s, LoadOptions{.check_files = false});
+  ASSERT_TRUE(legacy.has_value()) << issues_text(legacy.error());
+  EXPECT_EQ(to_toml(legacy.value(), false).find("\nvalence = "), std::string::npos);
+  expect_round_trip(to_toml(legacy.value(), false), "one_stage_legacy");
+}
+
 TEST(RoundTrip, SpellingsOfOneOperatorWriteTheSameCanonicalName) {
   const std::string base =
       "[basis]\nemax = 2\nhw = 16.0\n[reference]\nnucleus = \"O16\"\n"

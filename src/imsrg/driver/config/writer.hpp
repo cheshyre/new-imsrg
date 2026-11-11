@@ -6,7 +6,9 @@
 /// one written key, absent optionals omitted, doubles with 17 significant digits ("%.17g", a ".0"
 /// appended if the text would otherwise read as a TOML integer), strings as TOML basic strings
 /// with escapes, arrays on one line, operator requests as their canonical names, from-file
-/// entries as inline tables. Reading the output back with `load_config` gives an equal config.
+/// entries as inline tables. `imsrg.generator.valence` is left out when `imsrg.steps == 1` (it is
+/// inert then, and an explicit value with a valence space is V-41). Reading the output back with
+/// `load_config` gives an equal config.
 
 #include <filesystem>
 #include <string>

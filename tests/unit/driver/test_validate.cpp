@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <initializer_list>
+#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
@@ -23,6 +24,17 @@ RawValue::Data I(std::int64_t v) { return v; }
 RawValue::Data D(double v) { return v; }
 RawValue::Data S(const char* v) { return std::string(v); }
 RawValue::Data B(bool v) { return v; }
+
+/// `operators.from_file` with one entry whose dTz is `dtz` (V-62 rows).
+RawValue::Data from_file_entry(std::int64_t dtz) {
+  auto val = [](RawValue::Data d) {
+    return RawValue{std::move(d), SourceRef{SourceRef::Kind::TomlString, "test", 3, 1}};
+  };
+  RawTable entry{{"name", val(std::string("op"))},
+                 {"dtz", val(dtz)},
+                 {"file_2b", val(std::string("op.me2j"))}};
+  return RawArray{val(std::move(entry))};
+}
 
 RawTree minimal() {
   RawTree t;
@@ -180,8 +192,32 @@ std::vector<Row> rows() {
        {{"imsrg.method", S("flow")}, {"imsrg.perturbative_triples", B(true)}},
        "V-45",
        "imsrg.perturbative_triples",
-       "requires a magnus method",
+       "requires imsrg.method = \"magnus\"",
        true},
+      {"V46_flow_with_imsrg3",
+       {{"imsrg.method", S("flow_rk4")}, {"imsrg3.in_flow", B(true)}},
+       "V-46",
+       "imsrg.method",
+       "cannot be combined with IMSRG(3)",
+       false},
+      {"V52_at_end_needs_magnus",
+       {{"imsrg.method", S("flow")}, {"imsrg3.at_end", B(true)}},
+       "V-52",
+       "imsrg3.at_end",
+       "requires imsrg.method = \"magnus\"",
+       false},  // V-46 also fires (every P1 non-magnus method is a flow method)
+      {"V62_from_file_dtz",
+       {{"operators.from_file", from_file_entry(3)}},
+       "V-62",
+       "operators.from_file[0].dtz",
+       "must be in -2..2",
+       false},
+      {"V02_non_finite_double",
+       {{"imsrg.step.smax", D(std::numeric_limits<double>::infinity())}},
+       "V-02",
+       "imsrg.step.smax",
+       "finite",
+       false},
       {"V48_space_emax",
        {{"imsrg.space.emax", I(6)}},
        "V-48",
