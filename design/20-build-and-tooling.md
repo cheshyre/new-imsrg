@@ -16,6 +16,15 @@
 | OpenMP runtime | `brew install libomp` on macOS (Apple clang needs `-Xpreprocessor -fopenmp`, handled by Kokkos' CMake when `OpenMP_ROOT` points at libomp), native on Linux | Kokkos OpenMP backend | |
 | Python ≥ 3.10 + numpy, pytest, sympy, scikit-build-core | project venv `.venv` (`python3 -m venv .venv`) | | sympy provides exact Wigner symbols for the angmom tests. |
 
+Homebrew versions on 2026-11-11 (checked with `brew info`, nothing installed yet): cmake 4.4.5,
+ninja 1.13.2, ccache 4.14.3, open-mpi 5.0.11, libomp 23.1.5, gsl 2.8, boost 1.92.0, openblas
+0.3.34, llvm 23.1.5, gcc 16.2.0, **kokkos 5.2.2**. Pin the Kokkos submodule to the latest 5.x
+release tag after checking its minimum toolchain against the owner's baseline (GCC ≥ 11,
+CUDA ≥ 12, ROCm ≥ 6; D20). If Kokkos 5 needs newer CUDA/ROCm minor versions than the baseline,
+record that in QUESTIONS.md and keep 5.x anyway, unless 4.x support turns out to be essential.
+Do not use Homebrew's kokkos package for development builds (its backend configuration is not
+under our control); build from the submodule via `tools/bootstrap_deps.sh`.
+
 macOS bootstrap (allowed by the user):
 ```bash
 brew install cmake ninja ccache open-mpi libomp     # for the new code
@@ -83,6 +92,9 @@ For speed across many git worktrees, `tools/bootstrap_deps.sh` builds Kokkos fro
   Boost headers (odeint), GSL, BLAS (OpenBLAS or Accelerate), zlib, OpenMP. With Apple clang,
   point CMake to brew's libomp. If that fails, use brew `gcc` (g++-15) or `llvm` for this
   build only.
+* CMake 4.x removed compatibility with very old `cmake_minimum_required` versions. If a vendored
+  dependency of imsrg-devel fails to configure for that reason, pass
+  `-DCMAKE_POLICY_VERSION_MINIMUM=3.5`.
 * Build both the `imsrg++` executable and the `pyIMSRG` module. Record the exact commands in
   `tools/reference/build_imsrg_devel.sh` and the git hash or date of the reference source in
   `tests/golden/README.md`.

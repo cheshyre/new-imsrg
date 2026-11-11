@@ -39,6 +39,13 @@ The owner's interview answers (scope, priorities, permissions) are recorded in
   the repo to generate reference data is allowed.
 * Old-code bugs that change results: fix them, document them, and validate the fixed path another way.
 * The CLI accepts both a new TOML config and the old `key=value` parameters.
+* Tolerances: deterministic unit checks stay tight (~1e-10 relative). End-to-end acceptance is
+  1e-4 MeV (HF, MBPT) and 1e-3 MeV (IMSRG E0, valence-space elements). Always log the actual
+  deviation.
+* After the IMSRG(3) layout benchmark, **choose the layout yourself** and continue.
+* HF needs a correct DIIS from the start (plain mixing stays selectable for comparisons).
+* Inputs to support: me2j, NO2B, me3j, plus Navratil/Miyagi operator files (later). Other old
+  readers are dropped.
 
 ## Where everything is
 
