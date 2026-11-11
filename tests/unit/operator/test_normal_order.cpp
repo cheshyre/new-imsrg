@@ -276,4 +276,58 @@ TEST(NormalOrderProperties, WrongOccupationCountThrows) {
   EXPECT_THROW(undo_normal_order(Operator{}), InvariantError);
 }
 
+// ---- NO2B three-body input --------------------------------------------------------------------
+
+/// Small NO2B container (emax 2) with three nonzero elements, scaled by `factor`: 0s1/2 0s1/2
+/// coupled to J = 0, T12 = 1, with the spectator 0p1/2 (2T = 1) or 0p3/2 (2T = 1 and 3).
+No2bThreeBody small_v3(double factor) {
+  No2bThreeBody v3(No2bTruncation{2, 4, 6, 2});
+  const auto s = *v3.isospin_orbit_index(0, 0, TwoJ{1});
+  const auto p1 = *v3.isospin_orbit_index(0, 1, TwoJ{1});
+  const auto p3 = *v3.isospin_orbit_index(0, 1, TwoJ{3});
+  v3.set_isospin(s, s, p1, 1, s, s, p1, 1, 0, 1, 0.8 * factor);
+  v3.set_isospin(s, s, p3, 1, s, s, p3, 1, 0, 3, -0.5 * factor);
+  v3.set_isospin(s, s, p3, 1, s, s, p3, 1, 0, 1, 0.3 * factor);
+  return v3;
+}
+
+TEST(NormalOrderNo2b, EmptyInputEqualsPlainNormalOrder) {
+  const auto ms = ne20();
+  const No2bThreeBody empty(No2bTruncation{2, 4, 6, 2});
+  for (const Hermiticity herm : {Hermiticity::Hermitian}) {
+    const Operator x = random_operator(ms, herm, 2, 61);
+    const double d = max_abs_difference(normal_order(x, empty), normal_order(x)).max();
+    EXPECT_EQ(d, 0.0);
+  }
+}
+
+TEST(NormalOrderNo2b, ZeroOccupationsLeaveOperatorUnchanged) {
+  const auto ms = ne20();
+  const Operator x = random_operator(ms, Hermiticity::Hermitian, 2, 62);
+  const std::vector<double> occ(static_cast<std::size_t>(ms->num_orbits()), 0.0);
+  const Operator y = normal_order(x, small_v3(1.0), occ, NormalOrderDirection::ToReference);
+  EXPECT_EQ(max_abs_difference(y, x).max(), 0.0);
+}
+
+TEST(NormalOrderNo2b, IsLinearInThreeBodyValues) {
+  const auto ms = ne20();
+  const Operator x = random_operator(ms, Hermiticity::Hermitian, 2, 63);
+  const Operator base = normal_order(x);
+  const Operator one = normal_order(x, small_v3(1.0)) - base;
+  const Operator two = normal_order(x, small_v3(2.0)) - base;
+  EXPECT_GT(max_abs(one).max(), 1e-3);  // the 3N input contributes
+  expect_equal_parts(two, 2.0 * one, 1e-12, "NO2B linearity");
+}
+
+TEST(NormalOrderNo2b, RejectsBadArguments) {
+  const auto ms = ne20();
+  const No2bThreeBody v3 = small_v3(1.0);
+  const Operator nonherm = random_operator(ms, Hermiticity::NonHermitian, 2, 64);
+  EXPECT_THROW(normal_order(nonherm, v3), InvariantError);
+  const Operator x = random_operator(ms, Hermiticity::Hermitian, 2, 65);
+  const std::vector<double> occ(static_cast<std::size_t>(ms->num_orbits()) - 1, 0.5);
+  EXPECT_THROW(normal_order(x, v3, occ, NormalOrderDirection::ToReference), InvariantError);
+  EXPECT_THROW(normal_order(Operator{}, v3), InvariantError);
+}
+
 }  // namespace
