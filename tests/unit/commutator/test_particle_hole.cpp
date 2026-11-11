@@ -85,10 +85,10 @@ TEST(commutator_particle_hole, Timing) {
   Operator Z(ms, commutator::commutator_spec(A.spec(), H.spec()));
   commutator::terms::comm222_phss(A, H, Z, ws);  // warm-up
   const auto t0 = std::chrono::steady_clock::now();
-  for (int i = 0; i < 3; ++i) commutator::terms::comm222_phss(A, H, Z, ws);
+  for (int i = 0; i < 20; ++i) commutator::terms::comm222_phss(A, H, Z, ws);
   const auto t1 = std::chrono::steady_clock::now();
-  std::printf("[timing] comm222_phss emax 4 O16: %.3f s per call\n",
-              std::chrono::duration<double>(t1 - t0).count() / 3.0);
+  std::printf("[timing] comm222_phss emax 4 O16: %.3f ms per call\n",
+              1.0e3 * std::chrono::duration<double>(t1 - t0).count() / 20.0);
   // The term accumulates into Z, so compare a single fresh call with the reference.
   Operator Zfast(ms, commutator::commutator_spec(A.spec(), H.spec()));
   Operator Zref(ms, commutator::commutator_spec(A.spec(), H.spec()));

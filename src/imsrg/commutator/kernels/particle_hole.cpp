@@ -38,7 +38,9 @@ struct PhArgs {
   TwoBodyView yv;
   TwoBodyView zv;
   angmom::SixJView sj;
-  double hxhy = 1.0;  ///< hX hY (hermiticity signs).
+  double hx = 1.0;    ///< Hermiticity sign of X (+1 Hermitian, -1 anti-Hermitian).
+  double hy = 1.0;    ///< Hermiticity sign of Y.
+  double hxhy = 1.0;  ///< hX hY.
 };
 static_assert(std::is_trivially_copyable_v<PhArgs>);
 
@@ -124,43 +126,43 @@ void comm222_phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   a.sj = impl.sixj.device_view();
   const double hx = X.hermiticity() == Hermiticity::Hermitian ? 1.0 : -1.0;
   const double hy = Y.hermiticity() == Hermiticity::Hermitian ? 1.0 : -1.0;
+  a.hx = hx;
+  a.hy = hy;
   a.hxhy = hx * hy;
 
   const int num_cc = pd.num_cc;
   const auto xk_total = static_cast<exec::Index>(pd.xk_off_host.back());
-  const auto yk_total = static_cast<exec::Index>(pd.yk_off_host.back());
   const auto w_total = static_cast<exec::Index>(pd.w_off_host.back());
 
   if (xk_total > 0) {
+    // One evaluation per (kappa, beta < Ncc) fills XK and YK (kappa = (a, b), beta = ket (k, j)):
+    //   xbar = Xbar(kappa, beta), ybar = Ybar(kappa, beta);
+    //   XK(beta, kappa)            = D_kappa hX xbar            (Xbar^T = hX Xbar),
+    //   YK(kappa, beta)            = ybar,
+    //   YK(flip kappa, beta + Ncc) = hY phi_kappa phi_beta ybar (F Ybar F = hY Phi Ybar Phi).
+    // The flipped pair (b, a) of K index kappa is kappa ^ 1 (K is built in flipped pairs), and the
+    // flip is a bijection, so every target element is written exactly once.
     exec::parallel_for(
-        "commutator::comm222_phss::XK", xk_total, IMSRG_LAMBDA(const exec::Index e) {
+        "commutator::comm222_phss::fill", xk_total, IMSRG_LAMBDA(const exec::Index e) {
           const int c = detail::find_block(a.pv.xk_off, num_cc, e);
           const std::int64_t local = e - a.pv.xk_off[c];
           const int n = a.pv.ncc[c];
-          const int alpha = static_cast<int>(local % n);
-          const int kappa = static_cast<int>(local / n);
-          const int i = a.pv.ket_p[a.pv.ket_off[c] + alpha];
-          const int l = a.pv.ket_q[a.pv.ket_off[c] + alpha];
-          const int ka = a.pv.k_off[c] + kappa;
-          const double v =
-              a.pv.k_d[ka] * pandya_bar(a.xv, a.sj, i, l, a.pv.k_a[ka], a.pv.k_b[ka], 2 * (c / 6));
-          a.pv.xk[e] = v;
-        });
-    exec::parallel_for(
-        "commutator::comm222_phss::YK", yk_total, IMSRG_LAMBDA(const exec::Index e) {
-          const int c = detail::find_block(a.pv.yk_off, num_cc, e);
-          const std::int64_t local = e - a.pv.yk_off[c];
           const int nk = a.pv.nk[c];
-          const int n = a.pv.ncc[c];
-          const int kappa = static_cast<int>(local % nk);
-          const int beta = static_cast<int>(local / nk);
+          const int beta = static_cast<int>(local % n);
+          const int kappa = static_cast<int>(local / n);
           const int ka = a.pv.k_off[c] + kappa;
-          const int kb = beta < n ? beta : beta - n;
-          const int p = a.pv.ket_p[a.pv.ket_off[c] + kb];
-          const int q = a.pv.ket_q[a.pv.ket_off[c] + kb];
-          const int k = beta < n ? p : q;
-          const int j = beta < n ? q : p;
-          a.pv.yk[e] = pandya_bar(a.yv, a.sj, a.pv.k_a[ka], a.pv.k_b[ka], k, j, 2 * (c / 6));
+          const int ia = a.pv.k_a[ka], ib = a.pv.k_b[ka];
+          const int k = a.pv.ket_p[a.pv.ket_off[c] + beta];
+          const int j = a.pv.ket_q[a.pv.ket_off[c] + beta];
+          const int two_Jp = 2 * (c / 6);
+          const double xbar = pandya_bar(a.xv, a.sj, ia, ib, k, j, two_Jp);
+          const double ybar = pandya_bar(a.yv, a.sj, ia, ib, k, j, two_Jp);
+          const int* j2 = a.zv.tb.orbit_j2;
+          const double phi = parity_sign((j2[ia] + j2[ib]) / 2 + (j2[k] + j2[j]) / 2);
+          double* yk = a.pv.yk + a.pv.yk_off[c];
+          a.pv.xk[e] = a.pv.k_d[ka] * a.hx * xbar;
+          yk[kappa + static_cast<std::int64_t>(beta) * nk] = ybar;
+          yk[(kappa ^ 1) + static_cast<std::int64_t>(beta + n) * nk] = a.hy * phi * ybar;
         });
   }
   exec::fence("commutator::comm222_phss::fill");
@@ -205,6 +207,7 @@ void comm222_phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
         const int n = tb.channel_num_kets[ch];
         const int ib = static_cast<int>(local % n);
         const int ik = static_cast<int>(local / n);
+        if (ib > ik) return;  // lower triangle: mirrored from the upper one below
         const int* kets = tb.channel_kets + tb.channel_ket_offset[ch];
         const int i = tb.ket_p[kets[ib]];
         const int j = tb.ket_q[kets[ib]];
@@ -233,6 +236,8 @@ void comm222_phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
         if (i == j) z /= constants::sqrt2;
         if (k == l) z /= constants::sqrt2;
         z2[e] += z;
+        // Z is (anti-)Hermitian with sign hZ = -hX hY: fill the mirrored element (ik, ib).
+        if (ib != ik) z2[ik + static_cast<std::int64_t>(ib) * n + block_offset[ch]] -= a.hxhy * z;
       });
   exec::fence("commutator::comm222_phss");
 }
