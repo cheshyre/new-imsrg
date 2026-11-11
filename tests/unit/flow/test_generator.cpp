@@ -108,13 +108,15 @@ void check_generator_structure(const Operator& H_in, const Operator& eta_in,
       const OrbitIndex x{p}, y{q};
       double expected = 0.0;
       if (one_body_down(ms, shell, x, y)) {
-        expected = flow::generator_function(opts.kind, H.one_body().get(x, y), den.one_body(x, y), nq);
+        expected =
+            flow::generator_function(opts.kind, H.one_body().get(x, y), den.one_body(x, y), nq);
       } else if (one_body_down(ms, shell, y, x)) {
         expected =
             flow::generator_function(opts.kind, H.one_body().get(x, y), -den.one_body(y, x), nq);
       }
       const double got = eta.one_body().get(x, y);
-      EXPECT_NEAR(got, expected, 1e-12 * std::max(1.0, std::abs(expected))) << label << " 1B " << p << "," << q;
+      EXPECT_NEAR(got, expected, 1e-12 * std::max(1.0, std::abs(expected)))
+          << label << " 1B " << p << "," << q;
       EXPECT_NEAR(got, -eta.one_body().get(y, x), 1e-12 * std::max(1.0, std::abs(got)))
           << label << " 1B antihermitian " << p << "," << q;
       if (got != 0.0) ++nonzero_1b;
@@ -327,8 +329,9 @@ TEST(GeneratorDenominators, MonopoleEqualsDirectJSum) {
   GeneratorOptions opts;  // Epstein-Nesbet
   const Denominators den(H, opts);
   const std::int32_t norb = ms->num_orbits();
-  const std::int32_t pairs[][2] = {{0, 0}, {0, 3}, {2, 5}, {3, 3}, {1, 7}, {norb - 1, norb - 1},
-                                   {4, norb - 2}, {5, 15}, {6, 6}, {10, 10}, {0, 10}};
+  const std::int32_t pairs[][2] = {
+      {0, 0},        {0, 3},  {2, 5}, {3, 3},   {1, 7}, {norb - 1, norb - 1},
+      {4, norb - 2}, {5, 15}, {6, 6}, {10, 10}, {0, 10}};
   for (const auto& pr : pairs) {
     const OrbitIndex a{pr[0]}, b{pr[1]};
     const int ja = ms->basis().orbit(a).j2.twice, jb = ms->basis().orbit(b).j2.twice;
@@ -360,8 +363,8 @@ TEST(GeneratorDenominators, EpsteinNesbetOneAndTwoBody) {
   for (std::int32_t p = 0; p < norb; p += 3) {
     for (std::int32_t q = 1; q < norb; q += 4) {
       const OrbitIndex i{p}, j{q};
-      const double d = fdiag(i) - fdiag(j) +
-                       (occ[i.to_size()] - occ[j.to_size()]) * den.monopole(i, j);
+      const double d =
+          fdiag(i) - fdiag(j) + (occ[i.to_size()] - occ[j.to_size()]) * den.monopole(i, j);
       EXPECT_DOUBLE_EQ(den.one_body(i, j), flow::floor_denominator(d, 1e-6));
     }
   }
@@ -379,9 +382,9 @@ TEST(GeneratorDenominators, EpsteinNesbetOneAndTwoBody) {
         const double d =
             fdiag(i) + fdiag(j) - fdiag(k) - fdiag(l) +
             (1 - n_of(i) - n_of(j)) * den.monopole(i, j) -
-            (1 - n_of(k) - n_of(l)) * den.monopole(k, l) + (n_of(i) - n_of(k)) * den.monopole(i, k) +
-            (n_of(i) - n_of(l)) * den.monopole(i, l) + (n_of(j) - n_of(k)) * den.monopole(j, k) +
-            (n_of(j) - n_of(l)) * den.monopole(j, l);
+            (1 - n_of(k) - n_of(l)) * den.monopole(k, l) +
+            (n_of(i) - n_of(k)) * den.monopole(i, k) + (n_of(i) - n_of(l)) * den.monopole(i, l) +
+            (n_of(j) - n_of(k)) * den.monopole(j, k) + (n_of(j) - n_of(l)) * den.monopole(j, l);
         EXPECT_NEAR(den.two_body(ch, LocalKetIndex{r}, LocalKetIndex{s}),
                     flow::floor_denominator(d, 1e-6), 1e-12 * std::max(1.0, std::abs(d)));
         ++checked;
@@ -480,13 +483,10 @@ TEST(GeneratorDenominators, DeltaAllAndOrbit) {
   const Denominators dorb(H, orb);
   const auto fdiag = [&](OrbitIndex x) { return H.one_body().get(x, x); };
   const OrbitIndex i{5}, j{8}, k{3};
-  EXPECT_DOUBLE_EQ(dall.one_body(i, j),
-                   flow::floor_denominator(fdiag(i) - fdiag(j) + 0.25, 1e-6));
+  EXPECT_DOUBLE_EQ(dall.one_body(i, j), flow::floor_denominator(fdiag(i) - fdiag(j) + 0.25, 1e-6));
   EXPECT_DOUBLE_EQ(dorb.one_body(i, j), d0.one_body(i, j));  // orbit 3 not involved
-  EXPECT_DOUBLE_EQ(dorb.one_body(k, j),
-                   flow::floor_denominator(fdiag(k) - fdiag(j) + 0.25, 1e-6));
-  EXPECT_DOUBLE_EQ(dorb.one_body(j, k),
-                   flow::floor_denominator(fdiag(j) - fdiag(k) + 0.25, 1e-6));
+  EXPECT_DOUBLE_EQ(dorb.one_body(k, j), flow::floor_denominator(fdiag(k) - fdiag(j) + 0.25, 1e-6));
+  EXPECT_DOUBLE_EQ(dorb.one_body(j, k), flow::floor_denominator(fdiag(j) - fdiag(k) + 0.25, 1e-6));
   // Two-body: only with the "all" flag (imsrg++ quirk P5).
   const auto& tb = ms->two_body();
   const ChannelIndex ch{0};

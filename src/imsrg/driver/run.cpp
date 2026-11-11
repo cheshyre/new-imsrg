@@ -52,18 +52,30 @@ void reject_planned(const RunConfig& c) {
 /// driver::Generator -> flow::GeneratorKind (the enums list the same generators, M8a-Q1).
 flow::GeneratorKind generator_kind(Generator g) {
   switch (g) {
-    case Generator::White: return flow::GeneratorKind::White;
-    case Generator::Atan: return flow::GeneratorKind::Atan;
-    case Generator::ImaginaryTime: return flow::GeneratorKind::ImaginaryTime;
-    case Generator::Wegner: return flow::GeneratorKind::Wegner;
-    case Generator::QtransferAtan: return flow::GeneratorKind::QtransferAtan;
-    case Generator::ShellModel: return flow::GeneratorKind::ShellModel;
-    case Generator::ShellModelAtan: return flow::GeneratorKind::ShellModelAtan;
-    case Generator::ShellModelWegner: return flow::GeneratorKind::ShellModelWegner;
-    case Generator::ShellModelImaginaryTime: return flow::GeneratorKind::ShellModelImaginaryTime;
-    case Generator::ShellModelAtanNpnh: return flow::GeneratorKind::ShellModelAtanNpnh;
-    case Generator::HartreeFock: return flow::GeneratorKind::HartreeFock;
-    case Generator::OnePa: return flow::GeneratorKind::OnePa;
+    case Generator::White:
+      return flow::GeneratorKind::White;
+    case Generator::Atan:
+      return flow::GeneratorKind::Atan;
+    case Generator::ImaginaryTime:
+      return flow::GeneratorKind::ImaginaryTime;
+    case Generator::Wegner:
+      return flow::GeneratorKind::Wegner;
+    case Generator::QtransferAtan:
+      return flow::GeneratorKind::QtransferAtan;
+    case Generator::ShellModel:
+      return flow::GeneratorKind::ShellModel;
+    case Generator::ShellModelAtan:
+      return flow::GeneratorKind::ShellModelAtan;
+    case Generator::ShellModelWegner:
+      return flow::GeneratorKind::ShellModelWegner;
+    case Generator::ShellModelImaginaryTime:
+      return flow::GeneratorKind::ShellModelImaginaryTime;
+    case Generator::ShellModelAtanNpnh:
+      return flow::GeneratorKind::ShellModelAtanNpnh;
+    case Generator::HartreeFock:
+      return flow::GeneratorKind::HartreeFock;
+    case Generator::OnePa:
+      return flow::GeneratorKind::OnePa;
   }
   throw InvariantError("unknown driver::Generator");
 }
@@ -76,9 +88,15 @@ flow::GeneratorOptions generator_options(const RunConfig& c, Generator g,
     planned("generator \"" + std::string(to_string(g)) + "\"");
   }
   switch (c.imsrg.denominator.partitioning) {
-    case Partitioning::EpsteinNesbet: o.partitioning = flow::Partitioning::EpsteinNesbet; break;
-    case Partitioning::MollerPlesset: o.partitioning = flow::Partitioning::MollerPlesset; break;
-    case Partitioning::MpIsospin: o.partitioning = flow::Partitioning::MpIsospin; break;
+    case Partitioning::EpsteinNesbet:
+      o.partitioning = flow::Partitioning::EpsteinNesbet;
+      break;
+    case Partitioning::MollerPlesset:
+      o.partitioning = flow::Partitioning::MollerPlesset;
+      break;
+    case Partitioning::MpIsospin:
+      o.partitioning = flow::Partitioning::MpIsospin;
+      break;
   }
   o.qtransfer_n = c.imsrg.generator.qtransfer_n;
   o.denominator_delta = c.imsrg.denominator.delta;
@@ -120,9 +138,12 @@ std::string json_string(const std::string& s) {
 
 const char* stop_name(flow::StopReason r) {
   switch (r) {
-    case flow::StopReason::Converged: return "converged";
-    case flow::StopReason::SmaxReached: return "smax";
-    case flow::StopReason::Diverged: return "diverged";
+    case flow::StopReason::Converged:
+      return "converged";
+    case flow::StopReason::SmaxReached:
+      return "smax";
+    case flow::StopReason::Diverged:
+      return "diverged";
   }
   return "unknown";
 }
@@ -136,9 +157,8 @@ class FlowLog {
     if (!out_) throw InputError("cannot write the flow file '" + path.string() + "'");
     out_ << "stage,istep,s,ds,E0,norm_H,norm_eta_1b,norm_eta_2b,norm_eta,norm_omega_1b,"
             "norm_omega_2b,norm_omega,num_omegas,wall_s\n";
-    log::info("{:>5} {:>5} {:>12} {:>18} {:>14} {:>14} {:>14} {:>14} {:>4} {:>10}", "stage",
-              "step", "s", "E0", "|eta_1b|", "|eta_2b|", "|Omega_1b|", "|Omega_2b|", "nOm",
-              "wall(s)");
+    log::info("{:>5} {:>5} {:>12} {:>18} {:>14} {:>14} {:>14} {:>14} {:>4} {:>10}", "stage", "step",
+              "s", "E0", "|eta_1b|", "|eta_2b|", "|Omega_1b|", "|Omega_2b|", "nOm", "wall(s)");
   }
   void operator()(const flow::FlowStatus& st) {
     out_ << st.stage << ',' << st.istep << ',' << fmt17(st.s) << ',' << fmt17(st.ds) << ','
@@ -147,10 +167,11 @@ class FlowLog {
          << ',' << fmt17(st.norm_omega_2b) << ',' << fmt17(st.norm_omega) << ',' << st.num_omegas
          << ',' << fmt17(st.wall_seconds) << '\n';
     out_.flush();
-    log::info("{:>5} {:>5} {:>12.5f} {:>18.9f} {:>14.9f} {:>14.9f} {:>14.9f} {:>14.9f} {:>4} "
-              "{:>10.3f}",
-              st.stage, st.istep, st.s, st.e0, st.norm_eta_1b, st.norm_eta_2b, st.norm_omega_1b,
-              st.norm_omega_2b, st.num_omegas, st.wall_seconds);
+    log::info(
+        "{:>5} {:>5} {:>12.5f} {:>18.9f} {:>14.9f} {:>14.9f} {:>14.9f} {:>14.9f} {:>4} "
+        "{:>10.3f}",
+        st.stage, st.istep, st.s, st.e0, st.norm_eta_1b, st.norm_eta_2b, st.norm_omega_1b,
+        st.norm_omega_2b, st.num_omegas, st.wall_seconds);
   }
 
  private:
@@ -250,8 +271,8 @@ void write_results(const fs::path& path, const pipeline::PreparedHamiltonian& ph
   }
   out << "]},\n  \"operators\": {";
   for (std::size_t i = 0; i < ops.size(); ++i) {
-    out << (i ? ", " : "") << json_string(ops[i].name) << ": {\"reference\": "
-        << fmt17(ops[i].reference) << ", \"imsrg\": " << fmt17(ops[i].imsrg)
+    out << (i ? ", " : "") << json_string(ops[i].name)
+        << ": {\"reference\": " << fmt17(ops[i].reference) << ", \"imsrg\": " << fmt17(ops[i].imsrg)
         << ", \"file\": " << json_string(ops[i].file) << "}";
   }
   out << "},\n  \"valence_interaction\": "

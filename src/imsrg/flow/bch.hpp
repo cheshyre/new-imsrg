@@ -41,9 +41,9 @@ struct BchReport {
 /// transformation, but any hermiticity the commutator accepts works.
 /// Preconditions: X and Omega scalar, number conserving, on `ws`'s model space.
 /// Complexity: (number of nested commutators) x one commutator.
-op::Operator bch_transform(const op::Operator& X, const op::Operator& Omega,
-                           const BchOptions& opts, const commutator::CommutatorOptions& copts,
-                           commutator::Workspace& ws, BchReport* report = nullptr);
+op::Operator bch_transform(const op::Operator& X, const op::Operator& Omega, const BchOptions& opts,
+                           const commutator::CommutatorOptions& copts, commutator::Workspace& ws,
+                           BchReport* report = nullptr);
 
 /// Z with e^Z = e^X e^Y for small X (imsrg++ `BCH_Product`, BCH.cc:261-352): with
 /// B = {1, -1/2, 1/6, 0, -1/30, 0, 1/42, 0, -1/30}, k! = {1, 1, 2, 6, ...}:

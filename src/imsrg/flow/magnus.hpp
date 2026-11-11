@@ -21,31 +21,31 @@ namespace imsrg::flow {
 /// Step control of the Magnus solver. Defaults are those of the imsrg++ executable
 /// (`Parameters.hh`), not of the `IMSRGSolver` constructor.
 struct SolverOptions {
-  double smax = 200.0;            ///< Stop when s >= smax.
-  double dsmax = 0.5;             ///< Upper bound of ds.
-  double ds_0 = 0.5;              ///< Initial ds; unused by Magnus (imsrg++ quirk P3).
-  double domega = 0.1;            ///< Bound of ||eta ds|| (and of ||eta ds|| ||Omega||).
-  double omega_norm_max = 0.25;   ///< Split Omega when ||Omega|| exceeds this.
-  double eta_criterion = 1e-6;    ///< Converged when ||eta|| < this (compared as a float, P7).
-  bool magnus_adaptive = true;    ///< Recompute ds every step (imsrg++ `magnus_adaptive`).
+  double smax = 200.0;           ///< Stop when s >= smax.
+  double dsmax = 0.5;            ///< Upper bound of ds.
+  double ds_0 = 0.5;             ///< Initial ds; unused by Magnus (imsrg++ quirk P3).
+  double domega = 0.1;           ///< Bound of ||eta ds|| (and of ||eta ds|| ||Omega||).
+  double omega_norm_max = 0.25;  ///< Split Omega when ||Omega|| exceeds this.
+  double eta_criterion = 1e-6;   ///< Converged when ||eta|| < this (compared as a float, P7).
+  bool magnus_adaptive = true;   ///< Recompute ds every step (imsrg++ `magnus_adaptive`).
 };
 
 /// One line of the flow log: the state after the step (istep 0 = the initial state of a stage).
 struct FlowStatus {
-  int stage = 1;                ///< 1-based number of the `solve` call.
-  int istep = 0;                ///< Step within the stage (restarts at 0 per stage, as imsrg++).
-  double s = 0.0;               ///< Flow parameter (continues across stages).
-  double ds = 0.0;              ///< Step just taken (0 for istep 0).
-  double e0 = 0.0;              ///< Zero-body part of H(s).
-  double norm_h = 0.0;          ///< ||H(s)|| (op::norm, zero-body excluded).
-  double norm_eta_1b = 0.0;     ///< One-body norm of eta(s).
-  double norm_eta_2b = 0.0;     ///< Two-body norm of eta(s).
-  double norm_eta = 0.0;        ///< ||eta(s)||.
-  double norm_omega_1b = 0.0;   ///< One-body norm of the current (last) Omega.
-  double norm_omega_2b = 0.0;   ///< Two-body norm of the current Omega.
-  double norm_omega = 0.0;      ///< ||current Omega||.
-  std::size_t num_omegas = 1;   ///< Size of the Omega stack.
-  double wall_seconds = 0.0;    ///< Wall time since the solver was constructed.
+  int stage = 1;               ///< 1-based number of the `solve` call.
+  int istep = 0;               ///< Step within the stage (restarts at 0 per stage, as imsrg++).
+  double s = 0.0;              ///< Flow parameter (continues across stages).
+  double ds = 0.0;             ///< Step just taken (0 for istep 0).
+  double e0 = 0.0;             ///< Zero-body part of H(s).
+  double norm_h = 0.0;         ///< ||H(s)|| (op::norm, zero-body excluded).
+  double norm_eta_1b = 0.0;    ///< One-body norm of eta(s).
+  double norm_eta_2b = 0.0;    ///< Two-body norm of eta(s).
+  double norm_eta = 0.0;       ///< ||eta(s)||.
+  double norm_omega_1b = 0.0;  ///< One-body norm of the current (last) Omega.
+  double norm_omega_2b = 0.0;  ///< Two-body norm of the current Omega.
+  double norm_omega = 0.0;     ///< ||current Omega||.
+  std::size_t num_omegas = 1;  ///< Size of the Omega stack.
+  double wall_seconds = 0.0;   ///< Wall time since the solver was constructed.
 };
 
 /// Why `solve` stopped.
@@ -57,9 +57,9 @@ enum class StopReason : std::uint8_t {
 
 /// Summary of one `solve` call.
 struct SolveResult {
-  int steps = 0;        ///< Steps taken in this stage.
-  double s = 0.0;       ///< Final s.
-  double e0 = 0.0;      ///< Final zero-body part of H(s).
+  int steps = 0;    ///< Steps taken in this stage.
+  double s = 0.0;   ///< Final s.
+  double e0 = 0.0;  ///< Final zero-body part of H(s).
   double norm_eta = 0.0;
   StopReason reason = StopReason::SmaxReached;
 };

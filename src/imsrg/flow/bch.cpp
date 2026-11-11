@@ -19,9 +19,9 @@ op::Operator with_particle_rank(const op::Operator& op, std::int32_t particle_ra
   return out;
 }
 
-op::Operator bch_transform(const op::Operator& X, const op::Operator& Omega,
-                           const BchOptions& opts, const commutator::CommutatorOptions& copts,
-                           commutator::Workspace& ws, BchReport* report) {
+op::Operator bch_transform(const op::Operator& X, const op::Operator& Omega, const BchOptions& opts,
+                           const commutator::CommutatorOptions& copts, commutator::Workspace& ws,
+                           BchReport* report) {
   if (report != nullptr) *report = BchReport{};
   const double nx = op::norm(X);
   const double ny = op::norm(Omega);
@@ -50,8 +50,7 @@ op::Operator bch_transform(const op::Operator& X, const op::Operator& Omega,
     if (i == opts.warn_iterations)
       log::warn("BCH transform not converged after {} nested commutators", opts.warn_iterations);
     else if (i == opts.max_iterations)
-      log::warn("BCH transform did not converge after {} nested commutators",
-                opts.max_iterations);
+      log::warn("BCH transform did not converge after {} nested commutators", opts.max_iterations);
   }
   if (report != nullptr) {
     report->nested_commutators = count;
@@ -62,8 +61,8 @@ op::Operator bch_transform(const op::Operator& X, const op::Operator& Omega,
 
 op::Operator bch_product(const op::Operator& X, const op::Operator& Y, const BchOptions& opts,
                          const commutator::CommutatorOptions& copts, commutator::Workspace& ws) {
-  constexpr std::array<double, 9> bernoulli = {1.0,  -0.5, 1. / 6, 0.0, -1. / 30,
-                                               0.0,  1. / 42, 0.0, -1. / 30};
+  constexpr std::array<double, 9> bernoulli = {1.0, -0.5,    1. / 6, 0.0,     -1. / 30,
+                                               0.0, 1. / 42, 0.0,    -1. / 30};
   constexpr std::array<double, 9> factorial = {1.0, 1.0, 2.0, 6.0, 24., 120., 720., 5040., 40320.};
   const double thr = opts.product_threshold;
   const double nx = op::norm(X);

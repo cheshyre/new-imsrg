@@ -59,13 +59,13 @@ flow::SolverOptions short_flow(double smax) {
 constexpr double kTol = 1e-8;
 
 TEST(MagnusSolver, ShortFlowMatchesImsrgFlowFile) {
-  const auto golden =
-      read_flow_file(std::string(IMSRG_GOLDEN_DIR) + "/e2e/IT-8/emax2/flow.dat");
+  const auto golden = read_flow_file(std::string(IMSRG_GOLDEN_DIR) + "/e2e/IT-8/emax2/flow.dat");
   ASSERT_GT(golden.size(), 30u);
   const double smax = 4.0;
   flow::MagnusSolver solver(emax2_hno(), short_flow(smax), flow::GeneratorOptions{});
   std::vector<flow::FlowStatus> lines;
-  const flow::SolveResult r = solver.solve([&](const flow::FlowStatus& st) { lines.push_back(st); });
+  const flow::SolveResult r =
+      solver.solve([&](const flow::FlowStatus& st) { lines.push_back(st); });
   EXPECT_EQ(r.reason, flow::StopReason::SmaxReached);
   EXPECT_DOUBLE_EQ(r.s, smax);
   double max_de0 = 0, max_dnorm = 0;
@@ -77,11 +77,10 @@ TEST(MagnusSolver, ShortFlowMatchesImsrgFlowFile) {
     if (g.s > smax - 1e-5) break;  // the last step is cut at smax
     EXPECT_NEAR(st.s, g.s, 6e-6) << "step " << st.istep;
     const double de0 = std::abs(st.e0 - g.e0);
-    const double dnorm = std::max({std::abs(st.norm_h - g.norm_h),
-                                   std::abs(st.norm_omega_1b - g.om1),
-                                   std::abs(st.norm_omega_2b - g.om2),
-                                   std::abs(st.norm_eta_1b - g.eta1),
-                                   std::abs(st.norm_eta_2b - g.eta2)});
+    const double dnorm =
+        std::max({std::abs(st.norm_h - g.norm_h), std::abs(st.norm_omega_1b - g.om1),
+                  std::abs(st.norm_omega_2b - g.om2), std::abs(st.norm_eta_1b - g.eta1),
+                  std::abs(st.norm_eta_2b - g.eta2)});
     EXPECT_LT(de0, kTol) << "step " << st.istep;
     EXPECT_LT(dnorm, kTol) << "step " << st.istep;
     max_de0 = std::max(max_de0, de0);
@@ -114,7 +113,8 @@ TEST(MagnusSolver, SecondStageOpensNewOmegaAndContinuesS) {
   EXPECT_EQ(op::norm(solver.omegas().back()), 0.0);
   solver.set_smax(1.6);
   std::vector<flow::FlowStatus> lines;
-  const flow::SolveResult r2 = solver.solve([&](const flow::FlowStatus& st) { lines.push_back(st); });
+  const flow::SolveResult r2 =
+      solver.solve([&](const flow::FlowStatus& st) { lines.push_back(st); });
   ASSERT_FALSE(lines.empty());
   EXPECT_EQ(lines.front().stage, 2);
   EXPECT_EQ(lines.front().istep, 0);

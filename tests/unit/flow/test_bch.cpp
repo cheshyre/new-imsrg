@@ -35,9 +35,13 @@ struct Dense {
   int n = 0;
   std::vector<double> a;  // row-major
   Dense() = default;
-  explicit Dense(int n_) : n(n_), a(static_cast<std::size_t>(n_) * n_, 0.0) {}
-  double& operator()(int i, int j) { return a[static_cast<std::size_t>(i) * n + j]; }
-  double operator()(int i, int j) const { return a[static_cast<std::size_t>(i) * n + j]; }
+  explicit Dense(int n_)
+      : n(n_), a(static_cast<std::size_t>(n_) * static_cast<std::size_t>(n_), 0.0) {}
+  double& operator()(int i, int j) { return a[index(i, j)]; }
+  double operator()(int i, int j) const { return a[index(i, j)]; }
+  std::size_t index(int i, int j) const {
+    return static_cast<std::size_t>(i) * static_cast<std::size_t>(n) + static_cast<std::size_t>(j);
+  }
 };
 
 Dense identity(int n) {
@@ -131,7 +135,7 @@ TEST(flow_bch, one_body_exactness) {
   const int n = ms->basis().num_orbits();
   const auto occ = ms->reference().occupations();
   for (int rank : {1, 2}) {
-    for (std::uint64_t seed : {11, 12, 13}) {
+    for (std::uint64_t seed : {11u, 12u, 13u}) {
       Operator Om = rand_op(ms, Hermiticity::AntiHermitian, seed, 1, 0.3);
       op::RandomOperatorOptions ro;
       ro.seed = seed + 100;
@@ -142,9 +146,9 @@ TEST(flow_bch, one_body_exactness) {
       BchOptions bo;
       bo.transform_threshold = 1e-12;
       BchReport rep;
-      Operator Z = flow::bch_transform(flow::with_particle_rank(X, rank),
-                                       flow::with_particle_rank(Om, rank), bo,
-                                       CommutatorOptions{}, ws, &rep);
+      Operator Z =
+          flow::bch_transform(flow::with_particle_rank(X, rank), flow::with_particle_rank(Om, rank),
+                              bo, CommutatorOptions{}, ws, &rep);
       const Dense U = expm(one_body_dense(Om));
       const Dense X1 = one_body_dense(X);
       const Dense Zref = mul(mul(U, X1), transpose(U));
@@ -152,7 +156,8 @@ TEST(flow_bch, one_body_exactness) {
       const double dev1 = max_abs_diff(Z1, Zref);
       double e0 = X.zero_body();
       for (int a = 0; a < n; ++a)
-        e0 += occ[a] * (ms->basis().orbit(OrbitIndex{a}).j2.twice + 1) * (Zref(a, a) - X1(a, a));
+        e0 += occ[static_cast<std::size_t>(a)] * (ms->basis().orbit(OrbitIndex{a}).j2.twice + 1) *
+              (Zref(a, a) - X1(a, a));
       const double dev0 = std::abs(Z.zero_body() - e0);
       const double eps0 = op::norm(X) * std::exp(-0.6) * 1e-12 / 0.6;
       std::printf("[bch one-body] rank %d seed %llu: n_comm %d, dev1 %.2e dev0 %.2e (eps0 %.2e)\n",
@@ -202,7 +207,7 @@ TEST(flow_bch, product_one_body) {
   // different blocks' rotations do not commute (2x2 antisymmetric matrices would).
   const auto ms = make_space(4, "O16");
   Workspace ws(ms);
-  for (std::uint64_t seed : {31, 32, 33}) {
+  for (std::uint64_t seed : {31u, 32u, 33u}) {
     Operator X = rand_op(ms, Hermiticity::AntiHermitian, seed, 1, 1e-2);
     Operator Y = rand_op(ms, Hermiticity::AntiHermitian, seed + 50, 1, 0.2);
     Operator Z = flow::bch_product(X, Y, BchOptions{}, CommutatorOptions{}, ws);

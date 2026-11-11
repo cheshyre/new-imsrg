@@ -16,8 +16,7 @@ namespace imsrg::flow {
 namespace {
 
 double now_seconds() {
-  return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch())
-      .count();
+  return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
 /// A zero Omega: scalar, anti-Hermitian, two-body (imsrg++ copies Eta and erases it).
@@ -37,9 +36,9 @@ MagnusSolver::MagnusSolver(op::Operator H0, const SolverOptions& solver,
       h0_(std::move(H0)),
       t_start_(now_seconds()) {
   IMSRG_CHECK(!h0_.empty(), "MagnusSolver: empty Hamiltonian");
-  IMSRG_CHECK(h0_.spec().is_scalar() && h0_.spec().is_number_conserving() &&
-                  h0_.spec().particle_rank == 2,
-              "MagnusSolver: H0 must be a scalar, number-conserving two-body operator");
+  IMSRG_CHECK(
+      h0_.spec().is_scalar() && h0_.spec().is_number_conserving() && h0_.spec().particle_rank == 2,
+      "MagnusSolver: H0 must be a scalar, number-conserving two-body operator");
   ws_ = std::make_unique<commutator::Workspace>(h0_.model_space_ptr());
   h_ = h0_;
   eta_ = op::Operator(h0_.model_space_ptr(), generator_spec(h0_.spec(), generator_.kind));

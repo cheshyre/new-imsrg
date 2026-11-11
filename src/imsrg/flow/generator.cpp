@@ -66,9 +66,9 @@ double generator_function(GeneratorKind kind, double h_od, double denominator, i
     case GeneratorKind::Wegner:
       return h_od * denominator;
     case GeneratorKind::QtransferAtan: {
-      const double w = std::pow(std::abs(denominator) * constants::m_nucleon /
-                                    (constants::hbarc * constants::hbarc),
-                                0.5 * qtransfer_n);
+      const double w = std::pow(
+          std::abs(denominator) * constants::m_nucleon / (constants::hbarc * constants::hbarc),
+          0.5 * qtransfer_n);
       return w * 0.5 * std::atan(2.0 * h_od / denominator);
     }
     default:
@@ -132,8 +132,8 @@ double Denominators::one_body(OrbitIndex i, OrbitIndex j) const {
                f_diag_[isospin_partner_[j.to_size()].to_size()]);
   }
   if (opts_.denominator_delta_all ||
-      (opts_.denominator_delta_orbit && (*opts_.denominator_delta_orbit == i ||
-                                         *opts_.denominator_delta_orbit == j))) {
+      (opts_.denominator_delta_orbit &&
+       (*opts_.denominator_delta_orbit == i || *opts_.denominator_delta_orbit == j))) {
     d += opts_.denominator_delta;
   }
   return floor_denominator(d, opts_.denominator_cutoff);
@@ -241,8 +241,8 @@ void compute_generator(const op::Operator& H, op::Operator& eta, const Generator
         for (LocalKetIndex k : sub.kets(ch, kc_ket)) {
           for (KetClass bc : bra_classes) {
             for (LocalKetIndex b : sub.kets(ch, bc)) {
-              const double v = generator_function(
-                  kind, Hh.two_body().get(ch, ch, b, k), den.two_body(ch, b, k), nq);
+              const double v = generator_function(kind, Hh.two_body().get(ch, ch, b, k),
+                                                  den.two_body(ch, b, k), nq);
               eta.two_body().set(ch, ch, b, k, v);
               eta.two_body().set(ch, ch, k, b, -v);
             }
