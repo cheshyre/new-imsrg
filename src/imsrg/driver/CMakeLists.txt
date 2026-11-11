@@ -4,7 +4,8 @@
 #
 # toml++ is PRIVATE and included only by config/toml_reader.cpp; public headers include neither
 # toml++ nor CLI11. M8a declares only the modules the configuration layer uses (base; basis for
-# nucleus names, named valence spaces and orbit labels); M8 adds the pipeline modules.
+# nucleus names, named valence spaces and orbit labels); M8 adds the pipeline modules (io, opslib,
+# hf, commutator, flow) for pipeline/*.cpp and run.cpp.
 imsrg_add_module(NAME driver
   SOURCES
     config/config_issue.cpp
@@ -17,8 +18,9 @@ imsrg_add_module(NAME driver
     config/load_config.cpp
     legacy/legacy_parameters.cpp
     operators/operator_request.cpp
+    pipeline/hamiltonian.cpp
     run.cpp
-  DEPS base basis
+  DEPS base exec comm basis operator io opslib hf commutator flow
   PRIVATE_LIBS tomlplusplus::tomlplusplus)
 
 # Version and git hash for the provenance record, on the one file that uses them (a new commit
