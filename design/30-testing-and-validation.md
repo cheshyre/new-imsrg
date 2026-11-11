@@ -68,6 +68,13 @@ Build the reference outside the repo (`20-build-and-tooling.md` §5). Then:
 4. pyIMSRG (old Python bindings) may be used instead of the harness where convenient. It has
    no numpy interchange (opaque `ArmaMat`), so element access is slow but fine at emax ≤ 2.
 
+**Notes from M1 (2026-11-12).** The golden data, their commands and formats are listed in
+`tests/golden/README.md`. The 3N test file is a contact-only (cE) component (its T = 3/2 matrix
+elements vanish), which makes the full IT-4/IT-5 Magnus flows diverge; IT-4/IT-5 therefore compare
+the HF numbers and the flow stopped at s = 10 (`tests/golden/e2e/IT-4/smax10`, `IT-5/smax10`).
+O16 at emax 2 is unstable in IMSRG(2) with this 2N interaction (any generator tried), so the
+emax-2 part of IT-8 uses He4 (`e2e/IT-8/He4_emax2`); O16 is covered at emax 3. See M1-Q1.
+
 ## 4. Integration test matrix
 
 All tests use `hw=16`. 2N file `VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz` with

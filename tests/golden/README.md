@@ -112,3 +112,30 @@ Each holds `hf.json`; the emax-2 directories also hold `HNO.dump` (the HF-basis 
 prints `EHF = -313.1684814`, `EMP2 = -16.30552947`, `EMP3 = -2.50739061` (identical).
 The emax-4 dumps (`hamiltonian`, `HNO`) are regenerated on demand into `generated/` (gitignored)
 with `gen_golden_hamiltonian.sh --generated`.
+
+### `commutator/emax2_O16/` (M7) — `tools/reference/gen_golden_commutator.sh`
+
+Single IMSRG(2) commutator terms evaluated by the old code (`refharness commutator TERM X Y Z`)
+on (eta_white, H) and (random_A, random_H) at emax 2; inputs, outputs and norms. Terms:
+`comm110ss comm220ss comm111ss comm121ss comm221ss comm122ss comm222_pp_hhss comm222_phss
+comm222_pp_hh_221ss` and `all` (`Commutator::Commutator`, IMSRG(3) off). Commands, checks and the
+one omitted output (comm111ss of eta_white with the HF H is pure rounding noise): see
+`commutator/README.md`.
+
+### `e2e/` (integration tests) — `tools/reference/gen_golden_e2e.sh`
+
+Output of the `imsrg++` executable for IT-1 … IT-9 (`result.json`, flow file, `.snt` files,
+stdout). Commands, key numbers, wall times and the investigation of the diverging flows
+(IT-4/IT-5 with the contact-only 3N file, IT-8 at emax 2) with the replacement goldens
+`IT-4/smax10`, `IT-5/smax10`, `IT-8/He4_emax2`: see `e2e/README.md`.
+
+## Missing (not produced in M1)
+
+* `refharness flow [--factorized]` is still a stub (`tools/reference/rh_flow.cpp`), so there is
+  **no IT-10 (IMSRG(3f2)) golden** and no %.17g trajectory for IT-2 (use the 9-decimal
+  `e2e/IT-2/flow.dat`). Suggested implementation: copy `IMSRGSolver::Solve_magnus_euler`
+  (imsrg-devel `src/IMSRGSolver.cc:280-366`) into the harness using the solver's public members,
+  print each step with `%.17g`, validate against `e2e/IT-2/flow.dat`, and set
+  `BCH::SetUseFactorizedCorrection(true)` for `--factorized`.
+* IMSRG(3) commutator-term goldens: OperatorDump has no 3B section yet (reserved for M10).
+* Tensor operators are not dumped (reduced-ME convention still open, design/15).
