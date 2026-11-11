@@ -5,5 +5,6 @@ imsrg_add_module(NAME io
   SOURCES
     input_stream.cpp
     me2j.cpp
+    no2b.cpp
   DEPS operator basis base
   PRIVATE_LIBS ZLIB::ZLIB)

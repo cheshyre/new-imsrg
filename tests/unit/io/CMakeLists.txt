@@ -26,6 +26,23 @@ target_compile_definitions(io_me2j_golden PRIVATE
   IMSRG_TEST_DATA_DIR="${IMSRG_TEST_DATA_DIR}"
   IMSRG_GENERATED_GOLDEN_DIR="${IMSRG_GENERATED_GOLDEN_DIR}")
 
+imsrg_add_test(NAME io_no2b
+  SOURCES test_no2b.cpp ${_imsrg_exec_main}
+  DEPS io
+  LABELS unit
+  NO_GTEST_MAIN)
+
+# Reads of the real NO2B 3N file, normal-ordered, against the harness dumps (skipped if absent).
+imsrg_add_test(NAME io_no2b_golden
+  SOURCES test_no2b_golden.cpp ${_imsrg_exec_main}
+  DEPS io
+  LABELS integration reference
+  NO_GTEST_MAIN)
+target_compile_definitions(io_no2b_golden PRIVATE
+  IMSRG_GOLDEN_DIR="${_imsrg_golden_dir}"
+  IMSRG_TEST_DATA_DIR="${IMSRG_TEST_DATA_DIR}"
+  IMSRG_GENERATED_GOLDEN_DIR="${IMSRG_GENERATED_GOLDEN_DIR}")
+
 # Consumes the whole 1.2 GB (uncompressed) file to verify its value count.
 imsrg_add_test(NAME io_me2j_full_file
   SOURCES test_me2j_full_file.cpp ${_imsrg_exec_main}
