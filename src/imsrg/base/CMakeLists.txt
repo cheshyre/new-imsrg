@@ -4,4 +4,6 @@
 imsrg_add_module(NAME base
   SOURCES
     assert.cpp
+    log.cpp
+    timer.cpp
   LIBS fmt::fmt)
