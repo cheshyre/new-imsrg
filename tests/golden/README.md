@@ -143,6 +143,12 @@ CSV `step,s,E0,norm_eta,norm_omega`). IT-2 reproduces the executable (256 steps,
 `IT-2/trajectory.csv` has steps 0-9 and the last step. IT-10 (IMSRG(3f2), `--factorized`):
 `O16_emax2`, `He4_emax2`, `O16_emax3` (full trajectories, `result.json`). See `e2e/README.md`.
 
+### `operator/emax2/` (M4) — `tools/reference/gen_golden_operator.sh`
+
+Normal ordering (`Operator::DoNormalOrdering` / `UndoNormalOrdering`) and the HF-basis
+transformation (`HartreeFock::TransformToHFBasis`) of the old code. Commands, contents and
+numbers: see `operator/README.md`.
+
 ## Missing (not produced in M1)
 
 * IMSRG(3) commutator-term goldens: OperatorDump has no 3B section yet (reserved for M10).

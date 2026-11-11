@@ -204,3 +204,10 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
   no switch for it. The `Elast`/norm divergence guards (|eta| > 1e12, |E| > 1e9) are harness
   additions. **Assumed meanwhile:** this is the intended IT-10 reference; O16 emax 2 converges
   with it, so no He4 substitute was needed (He4 emax 2 kept as extra).
+* **M4-Q1** (2026-11-12, M4 lead) — The `operator` module cannot use the namespace
+  `imsrg::operator` (C++ keyword). **Assumed meanwhile:** `imsrg::op`; the CMake target and the
+  include path stay `imsrg::operator` / `imsrg/operator/...` (design/10 §3.3 updated).
+* **M4-Q2** (2026-11-12, M4 lead) — An OperatorDump records occupations but no valence space.
+  **Assumed meanwhile:** `model_space_for_dump` builds the partition with the holes
+  (n >= OCC_CUT) as core and every other orbit as q-space; the reader rejects occupations that
+  differ from the target model space unless `check_occupations = false`.

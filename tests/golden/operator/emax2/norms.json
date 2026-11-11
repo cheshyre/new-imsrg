@@ -1,0 +1,37 @@
+{
+  "H_HFbasis": {
+    "zero_body": 0,
+    "one_body_norm": 148.11313243598624,
+    "two_body_norm": 294.82904599602205,
+    "three_body_norm": 0,
+    "norm": 329.94191361954074
+  },
+  "H_NO_O16": {
+    "zero_body": -131.36614629998803,
+    "one_body_norm": 145.21168070705383,
+    "two_body_norm": 294.82904599602205,
+    "three_body_norm": 0,
+    "norm": 328.6496593284281
+  },
+  "H_NO_O16_undo": {
+    "zero_body": 5.551115123125783e-17,
+    "one_body_norm": 148.11313243598624,
+    "two_body_norm": 294.82904599602205,
+    "three_body_norm": 0,
+    "norm": 329.94191361954074
+  },
+  "randomA_NO_Ne20": {
+    "zero_body": 0,
+    "one_body_norm": 10.10180966844805,
+    "two_body_norm": 241.1282363895773,
+    "three_body_norm": 0,
+    "norm": 241.33974588311273
+  },
+  "randomH_NO_Ne20": {
+    "zero_body": 34.60371755893503,
+    "one_body_norm": 64.65320734501717,
+    "two_body_norm": 275.5476457272699,
+    "three_body_norm": 0,
+    "norm": 283.03099174090255
+  }
+}

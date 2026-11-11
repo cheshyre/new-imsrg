@@ -114,6 +114,10 @@ DumpHeader read_opdump_header(const std::string& path);
 /// number on malformed input.
 Operator read_opdump(const std::string& path, ModelSpace& ms);
 
+/// Builds the ModelSpace described by the header of an OperatorDump (emax, hw, reference;
+/// valence_space = `valence_space` key or the dump's reference; e3max key or min(12, 3 emax)).
+std::unique_ptr<ModelSpace> modelspace_for_dump(const std::string& path, const Args& a);
+
 // ---------------------------------------------------------------- tiny JSON writer
 /// Minimal ordered JSON object writer (numbers with %.17g).
 class Json {
@@ -146,5 +150,7 @@ int cmd_norms(const Args& a);
 int cmd_commutator(const Args& a);
 int cmd_generator(const Args& a);
 int cmd_flow(const Args& a);
+int cmd_normal_order(const Args& a);
+int cmd_basis_transform(const Args& a);
 
 }  // namespace rh

@@ -298,8 +298,6 @@ Operator read_opdump(const std::string& path, ModelSpace& ms) {
   return op;
 }
 
-namespace {
-
 std::unique_ptr<ModelSpace> modelspace_for_dump(const std::string& path, const Args& a) {
   DumpHeader h = read_opdump_header(path);
   SpaceParams p;
@@ -310,6 +308,8 @@ std::unique_ptr<ModelSpace> modelspace_for_dump(const std::string& path, const A
   p.e3max = a.integer("e3max", std::min(12, 3 * h.emax));
   return make_modelspace(p);
 }
+
+namespace {
 
 std::string dump_source_line(const std::string& path) {
   std::ifstream f(path);

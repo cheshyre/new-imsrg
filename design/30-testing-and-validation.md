@@ -120,3 +120,4 @@ covers the fixed behaviour.
 | M3-4 | `ModelSpace.cc:696-747` (`GetjjSpace`) | Proton/neutron counts outside [2, 258) index outside the closure table | `InputError` (M3-Q1) | `basis_reference` valence-space tests |
 | M3-5 | `ModelSpace.cc:528-543` (`String2Qnumbers`) | Two-digit n is misparsed | Strict parser, multi-digit n accepted | `basis_core` label tests |
 | M3-6 | `ModelSpace.cc:81-159, 853-960` | Copies keep `Orbit*` into the source; `operator=` drops members | Value types; `ModelSpace` parts are `shared_ptr<const ...>`, no back-pointers | `basis_model_space` (derived spaces share parts, equality) |
+| M4-1 | `TwoBodyME.cc:234-260` (`AddToTBME`) | The partner element of an anti-Hermitian operator receives +v instead of -v | `TwoBody::add_normalized` writes h·v (h = -1 anti-Hermitian, no partner for non-Hermitian) | `operator_core` (`test_two_body.cpp`, anti-Hermitian add) |

@@ -205,6 +205,17 @@ Operator transform_basis(const Operator&, const UnitaryTransform& C);    // e.g.
   reference cannot be mixed in by accident.
 * No `Operator` member allocates unused blocks. imsrg++'s always-allocated ThreeLeg block costs
   about 0.14 GB at emax = 12.
+* **As implemented (M4):** the C++ namespace is `imsrg::op` (`operator` is a keyword; the CMake
+  target stays `imsrg::operator`). Parts are reached through accessors (`zero_body()`,
+  `one_body()`, `two_body()`, `three_body()`); `OperatorSpec` adds `delta_particle_number` for
+  later dagger operators and `validate()` rejects what is not implemented yet. A scalar
+  `TwoBody` holds one block per channel, all channels in order (empty ones 0 x 0), so block k is
+  channel k. Element accessors use host mirrors (`sync_to_host/device` on GPU backends).
+  Headers: `imsrg/operator/{operator_spec,one_body,two_body,three_body,operator,arithmetic,norms,
+  compare,operator_dump,normal_ordering,basis_transform,random_operator,no2b}.hpp`. The NO2B
+  input container `No2bThreeBody` mirrors imsrg++ `ThreeBodyStorage_no2b<float>` (isospin
+  orbits, channels (J2, P2, J1, P1, T3), packed triangles), so `io` can follow imsrg++'s
+  `ReadFile` loop; `normal_order(op, v3)` reproduces `DoNormalOrdering3`.
 
 ### 3.4 Algorithms as free functions or small value types
 

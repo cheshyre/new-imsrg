@@ -10,6 +10,11 @@
 //                                                                     (rh_hamiltonian.cpp)
 //   roundtrip IN OUT  read an OperatorDump and write it again         (rh_opdump.cpp)
 //   norms IN          norms of an OperatorDump as imsrg++ computes them (rh_opdump.cpp)
+//   normal-order IN OUT [reference=NAME] [undo=true]
+//                     re-normal-order an OperatorDump w.r.t. another reference (Operator::
+//                     DoNormalOrdering / UndoNormalOrdering)           (rh_operator.cpp)
+//   basis-transform IN C.txt OUT   HartreeFock::TransformToHFBasis with C read from a text file
+//                                                                     (rh_operator.cpp)
 //   commutator TERM X Y Z   evaluate one named commutator term        (rh_commutator.cpp)
 //   generator TYPE H ETA    imsrg++ generator eta(H) of a given type    (rh_commutator.cpp)
 //   flow [--factorized]     full IMSRG pipeline with %.17g trajectory  (rh_flow.cpp)
@@ -240,6 +245,8 @@ int main(int argc, char** argv) {
     if (c == "hf") return rh::cmd_hf(a);
     if (c == "roundtrip") return rh::cmd_roundtrip(a);
     if (c == "norms") return rh::cmd_norms(a);
+    if (c == "normal-order") return rh::cmd_normal_order(a);
+    if (c == "basis-transform") return rh::cmd_basis_transform(a);
     if (c == "commutator") return rh::cmd_commutator(a);
     if (c == "generator") return rh::cmd_generator(a);
     if (c == "flow") return rh::cmd_flow(a);
