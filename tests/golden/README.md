@@ -141,13 +141,15 @@ Normal ordering (`Operator::DoNormalOrdering` / `UndoNormalOrdering`) and the HF
 transformation (`HartreeFock::TransformToHFBasis`) of the old code. Commands, contents and
 numbers: see `operator/README.md`.
 
+### `e2e/IT-2/trajectory.csv`, `e2e/IT-10/` — `tools/reference/gen_golden_flow.sh`
+
+`refharness flow` (a copy of `IMSRGSolver::Solve_magnus_euler` using the old library, `%.17g`
+CSV `step,s,E0,norm_eta,norm_omega`). IT-2 reproduces the executable (256 steps, final s
+124.45796230102064, E0 -164.6487723082966, |dE0| = 3e-10 vs `IT-2/result.json`);
+`IT-2/trajectory.csv` has steps 0-9 and the last step. IT-10 (IMSRG(3f2), `--factorized`):
+`O16_emax2`, `He4_emax2`, `O16_emax3` (full trajectories, `result.json`). See `e2e/README.md`.
+
 ## Missing (not produced in M1)
 
-* `refharness flow [--factorized]` is still a stub (`tools/reference/rh_flow.cpp`), so there is
-  **no IT-10 (IMSRG(3f2)) golden** and no %.17g trajectory for IT-2 (use the 9-decimal
-  `e2e/IT-2/flow.dat`). Suggested implementation: copy `IMSRGSolver::Solve_magnus_euler`
-  (imsrg-devel `src/IMSRGSolver.cc:280-366`) into the harness using the solver's public members,
-  print each step with `%.17g`, validate against `e2e/IT-2/flow.dat`, and set
-  `BCH::SetUseFactorizedCorrection(true)` for `--factorized`.
 * IMSRG(3) commutator-term goldens: OperatorDump has no 3B section yet (reserved for M10).
 * Tensor operators are not dumped (reduced-ME convention still open, design/15).

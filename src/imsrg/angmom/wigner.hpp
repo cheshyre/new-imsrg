@@ -14,10 +14,11 @@
 /// Every function returns exactly 0.0 for arguments that do not form a valid symbol (a triangle
 /// condition fails, |m| > j, j and m of different integrality, projections that do not sum
 /// correctly, or a negative 2j). Evaluation is host-only, in double precision with Racah's
-/// single-sum formulas over a factorial table; the absolute error is below about 1e-15 for all
-/// 2j <= 51 (validated against sympy's exact values, tests/unit/angmom). Precondition: every
-/// factorial argument stays <= 170, which holds for all 2j <= 100. Kernels never evaluate symbols:
-/// they read precomputed tables (design/12 section 4.4).
+/// single-sum formulas over a factorial table. Accuracy, validated against sympy's exact values
+/// for every argument needed up to emax 8 (tests/unit/angmom): |error| <= max(1e-12 |x|, 1e-14)
+/// (typically ~1e-16 absolute; ~1e-14 for <l1 0 l2 0|L 0> with l <= 16); it degrades for larger
+/// j (~1e-11 at l ~ 30). Arguments whose factorials would exceed 170! give 0. Kernels never
+/// evaluate symbols: they read precomputed tables (design/12 section 4.4).
 
 #include "imsrg/base/device.hpp"
 #include "imsrg/base/types.hpp"
