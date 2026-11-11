@@ -5,13 +5,13 @@
 #include <string>
 #include <vector>
 
+#include "bindings.hpp"
 #include <nanobind/ndarray.h>
 #include <nanobind/stl/filesystem.h>
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
 
-#include "bindings.hpp"
 #include "imsrg/base/error.hpp"
 #include "imsrg/operator/arithmetic.hpp"
 #include "imsrg/operator/normal_ordering.hpp"
@@ -135,11 +135,14 @@ void bind_operator(nb::module_& m) {
           nb::arg("channel"), nb::arg("writable") = false,
           "Zero-copy numpy view of the two-body block of a channel (column-major).")
       .def("sync_to_host", [](PyOperator& o) { o.sync_to_host(); })
-      .def("sync_to_device", [](PyOperator& o) { o.sync_to_device(); },
-           "Copies host edits (writable views) to the device data.")
+      .def(
+          "sync_to_device", [](PyOperator& o) { o.sync_to_device(); },
+          "Copies host edits (writable views) to the device data.")
       .def("set_zero", [](PyOperator& o) { o.set_zero(); })
-      .def("copy", [](const PyOperator& o) { return PyOperator(static_cast<const op::Operator&>(o)); })
-      .def("__copy__", [](const PyOperator& o) { return PyOperator(static_cast<const op::Operator&>(o)); })
+      .def("copy",
+           [](const PyOperator& o) { return PyOperator(static_cast<const op::Operator&>(o)); })
+      .def("__copy__",
+           [](const PyOperator& o) { return PyOperator(static_cast<const op::Operator&>(o)); })
       .def("__add__",
            [](const PyOperator& a, const PyOperator& b) {
              nb::gil_scoped_release r;
@@ -152,7 +155,8 @@ void bind_operator(nb::module_& m) {
            })
       .def("__neg__", [](const PyOperator& a) { return PyOperator(op::operator-(a)); })
       .def("__mul__", [](const PyOperator& a, double c) { return PyOperator(op::operator*(a, c)); })
-      .def("__rmul__", [](const PyOperator& a, double c) { return PyOperator(op::operator*(c, a)); })
+      .def("__rmul__",
+           [](const PyOperator& a, double c) { return PyOperator(op::operator*(c, a)); })
       .def("__truediv__",
            [](const PyOperator& a, double c) { return PyOperator(op::operator/(a, c)); })
       .def("__iadd__",
@@ -181,24 +185,26 @@ void bind_operator(nb::module_& m) {
              op::operator/=(as_op(self), c);
              return self;
            })
-      .def("norm", [](const PyOperator& o) { return op::norm(o); }, "Frobenius-type total norm.")
+      .def(
+          "norm", [](const PyOperator& o) { return op::norm(o); }, "Frobenius-type total norm.")
       .def("one_body_norm", [](const PyOperator& o) { return op::one_body_norm(o); })
       .def("two_body_norm", [](const PyOperator& o) { return op::two_body_norm(o); })
       .def("three_body_norm", [](const PyOperator& o) { return op::three_body_norm(o); })
-      .def("normal_ordered",
-           [](const PyOperator& o) {
-             nb::gil_scoped_release r;
-             return PyOperator(op::normal_order(o));
-           },
-           "Normal ordering w.r.t. the model-space reference (two-body approximation).")
+      .def(
+          "normal_ordered",
+          [](const PyOperator& o) {
+            nb::gil_scoped_release r;
+            return PyOperator(op::normal_order(o));
+          },
+          "Normal ordering w.r.t. the model-space reference (two-body approximation).")
       .def("undo_normal_order",
            [](const PyOperator& o) {
              nb::gil_scoped_release r;
              return PyOperator(op::undo_normal_order(o));
            })
       .def("__repr__", [](const PyOperator& o) {
-        return "Operator(zero_body=" + std::to_string(o.zero_body()) + ", norb=" +
-               std::to_string(o.model_space_ptr()->num_orbits()) + ")";
+        return "Operator(zero_body=" + std::to_string(o.zero_body()) +
+               ", norb=" + std::to_string(o.model_space_ptr()->num_orbits()) + ")";
       });
 
   m.def(
@@ -269,8 +275,7 @@ void bind_operator(nb::module_& m) {
         opt.reference = reference;
         op::write_operator_dump(path, o, opt);
       },
-      nb::arg("path"), nb::arg("operator"), nb::arg("source") = "imsrg",
-      nb::arg("reference") = "");
+      nb::arg("path"), nb::arg("operator"), nb::arg("source") = "imsrg", nb::arg("reference") = "");
 }
 
 }  // namespace imsrg::py

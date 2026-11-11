@@ -1,15 +1,16 @@
 /// @file
 /// imsrg.Runtime: process singleton for Kokkos (and optionally MPI), design/18 section 4.3.
 
+#include "imsrg/exec/runtime.hpp"
+
 #include <memory>
 #include <mutex>
 
+#include "bindings.hpp"
 #include <nanobind/stl/string.h>
 
-#include "bindings.hpp"
 #include "imsrg/base/error.hpp"
 #include "imsrg/comm/environment.hpp"
-#include "imsrg/exec/runtime.hpp"
 
 namespace imsrg::py {
 namespace {
@@ -75,11 +76,12 @@ void bind_runtime(nb::module_& m) {
           nb::arg("num_threads") = -1, nb::arg("device_id") = -1, nb::arg("mpi") = false,
           nb::arg("print_configuration") = false)
       .def("__enter__", [](nb::object self) { return self; })
-      .def("__exit__", [](RuntimeHandle&, nb::args) {
-        auto& s = state();
-        std::lock_guard lock(s.mutex);
-        finalize_locked(s);
-      })
+      .def("__exit__",
+           [](RuntimeHandle&, nb::args) {
+             auto& s = state();
+             std::lock_guard lock(s.mutex);
+             finalize_locked(s);
+           })
       .def_static("ensure", &ensure_runtime, "Initializes with defaults if not yet initialized.")
       .def_static(
           "finalize",

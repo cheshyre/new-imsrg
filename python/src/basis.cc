@@ -4,12 +4,12 @@
 #include <string>
 #include <vector>
 
+#include "bindings.hpp"
 #include <nanobind/ndarray.h>
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
 
-#include "bindings.hpp"
 #include "imsrg/base/error.hpp"
 #include "imsrg/basis/orbit.hpp"
 
@@ -66,9 +66,8 @@ void bind_basis(nb::module_& m) {
            [](const basis::Orbit& o) {
              return (((o.n * 31 + o.l) * 31 + o.j2.twice) * 31) + o.tz2.twice;
            })
-      .def("__repr__", [](const basis::Orbit& o) {
-        return "Orbit(" + basis::orbit_label(o) + ")";
-      });
+      .def("__repr__",
+           [](const basis::Orbit& o) { return "Orbit(" + basis::orbit_label(o) + ")"; });
 
   nb::class_<PyChannel>(m, "Channel", "A two-body channel (2J, parity, 2Tz).")
       .def_ro("index", &PyChannel::index)
@@ -110,57 +109,63 @@ void bind_basis(nb::module_& m) {
       .def_prop_ro("num_kets", [](const PyModelSpace& s) { return s.ms->two_body().num_kets(); })
       .def_prop_ro("num_channels",
                    [](const PyModelSpace& s) { return s.ms->two_body().num_channels(); })
-      .def("orbits",
-           [](const PyModelSpace& s) {
-             const auto o = s.ms->basis().orbits();
-             return std::vector<basis::Orbit>(o.begin(), o.end());
-           },
-           "List of Orbit in index order.")
+      .def(
+          "orbits",
+          [](const PyModelSpace& s) {
+            const auto o = s.ms->basis().orbits();
+            return std::vector<basis::Orbit>(o.begin(), o.end());
+          },
+          "List of Orbit in index order.")
       .def("occupations",
            [](const PyModelSpace& s) {
              const auto o = s.ms->reference().occupations();
              return std::vector<double>(o.begin(), o.end());
            })
-      .def("kets", [](const PyModelSpace& s) { return ket_array(s.ms->two_body().kets()); },
-           "All two-body kets as an (num_kets, 2) int32 array of orbit indices (p <= q).")
-      .def("channels",
-           [](const PyModelSpace& s) {
-             const auto& tb = s.ms->two_body();
-             std::vector<PyChannel> out;
-             for (std::int32_t i = 0; i < tb.num_channels(); ++i)
-               out.push_back(make_channel(tb, ChannelIndex{i}));
-             return out;
-           },
-           "List of Channel in index order.")
-      .def("channel",
-           [](const PyModelSpace& s, int index) {
-             const auto& tb = s.ms->two_body();
-             if (index < 0 || index >= tb.num_channels())
-               throw imsrg::InputError("channel index out of range");
-             return make_channel(tb, ChannelIndex{index});
-           },
-           nb::arg("index"))
-      .def("find_channel",
-           [](const PyModelSpace& s, int two_j, int parity, int two_tz) -> std::optional<PyChannel> {
-             const auto& tb = s.ms->two_body();
-             const auto ch = tb.find_channel(TwoJ{two_j}, static_cast<Parity>(parity), TwoTz{two_tz});
-             if (!ch) return std::nullopt;
-             return make_channel(tb, *ch);
-           },
-           nb::arg("two_j"), nb::arg("parity"), nb::arg("two_tz"))
-      .def("channel_kets",
-           [](const PyModelSpace& s, int index) {
-             const auto& tb = s.ms->two_body();
-             if (index < 0 || index >= tb.num_channels())
-               throw imsrg::InputError("channel index out of range");
-             std::vector<basis::Ket> kets;
-             for (const KetIndex k : tb.channel_kets(ChannelIndex{index})) kets.push_back(tb.ket(k));
-             return ket_array(kets);
-           },
-           nb::arg("index"), "Kets of a channel in local order, as an (n, 2) int32 array.")
+      .def(
+          "kets", [](const PyModelSpace& s) { return ket_array(s.ms->two_body().kets()); },
+          "All two-body kets as an (num_kets, 2) int32 array of orbit indices (p <= q).")
+      .def(
+          "channels",
+          [](const PyModelSpace& s) {
+            const auto& tb = s.ms->two_body();
+            std::vector<PyChannel> out;
+            for (std::int32_t i = 0; i < tb.num_channels(); ++i)
+              out.push_back(make_channel(tb, ChannelIndex{i}));
+            return out;
+          },
+          "List of Channel in index order.")
+      .def(
+          "channel",
+          [](const PyModelSpace& s, int index) {
+            const auto& tb = s.ms->two_body();
+            if (index < 0 || index >= tb.num_channels())
+              throw imsrg::InputError("channel index out of range");
+            return make_channel(tb, ChannelIndex{index});
+          },
+          nb::arg("index"))
+      .def(
+          "find_channel",
+          [](const PyModelSpace& s, int two_j, int parity, int two_tz) -> std::optional<PyChannel> {
+            const auto& tb = s.ms->two_body();
+            const auto ch =
+                tb.find_channel(TwoJ{two_j}, static_cast<Parity>(parity), TwoTz{two_tz});
+            if (!ch) return std::nullopt;
+            return make_channel(tb, *ch);
+          },
+          nb::arg("two_j"), nb::arg("parity"), nb::arg("two_tz"))
+      .def(
+          "channel_kets",
+          [](const PyModelSpace& s, int index) {
+            const auto& tb = s.ms->two_body();
+            if (index < 0 || index >= tb.num_channels())
+              throw imsrg::InputError("channel index out of range");
+            std::vector<basis::Ket> kets;
+            for (const KetIndex k : tb.channel_kets(ChannelIndex{index})) kets.push_back(tb.ket(k));
+            return ket_array(kets);
+          },
+          nb::arg("index"), "Kets of a channel in local order, as an (n, 2) int32 array.")
       .def("__eq__", [](const PyModelSpace& a, const PyModelSpace& b) { return a.ms == b.ms; })
-      .def("__hash__",
-           [](const PyModelSpace& s) { return std::hash<const void*>{}(s.ms.get()); });
+      .def("__hash__", [](const PyModelSpace& s) { return std::hash<const void*>{}(s.ms.get()); });
 }
 
 }  // namespace imsrg::py

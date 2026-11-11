@@ -240,3 +240,11 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
   **Assumed meanwhile:** M8/M10 treat an absent `imsrg3.de3max` as no cut (e.g. in the
   `new_E3max` rule of `imsrg3_at_end`). `valence.custom` is stored as a string; its orbit-list
   format is for M8 to define and check.
+* **M11-Q1** (2026-11-12, M11 python) - Operators alive at interpreter exit block `Runtime`
+  finalization; the atexit hook runs `gc.collect()` first, but reference cycles holding operators
+  in user code could still keep one alive. **Assumed meanwhile:** `_atexit()` finalizes only if no
+  operators remain, otherwise leaves Kokkos to process exit; a C++ `Runtime` API to force
+  finalize would be cleaner.
+* **M11-Q2** (2026-11-12, M11 python) - `tests/golden/basis/*.txt` header documents `channel idx
+  2J parity 2Tz nkets` but stores J and Tz. **Assumed meanwhile:** tests compare with `two_j/2`,
+  `two_tz/2`; the harness comment should be corrected.
