@@ -51,3 +51,11 @@ imsrg_add_test(NAME io_me2j_full_file
   NO_GTEST_MAIN)
 target_compile_definitions(io_me2j_full_file PRIVATE
   IMSRG_TEST_DATA_DIR="${IMSRG_TEST_DATA_DIR}")
+
+# The tokyo and NuShellX writers against the files of the old code (skipped if absent).
+imsrg_add_test(NAME io_valence_writers
+  SOURCES test_valence_writers.cpp ${_imsrg_exec_main}
+  DEPS io
+  LABELS integration reference
+  NO_GTEST_MAIN)
+target_compile_definitions(io_valence_writers PRIVATE IMSRG_GOLDEN_DIR="${_imsrg_golden_dir}")

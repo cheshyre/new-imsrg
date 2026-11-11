@@ -6,5 +6,6 @@ imsrg_add_module(NAME io
     input_stream.cpp
     me2j.cpp
     no2b.cpp
+    valence_writers.cpp
   DEPS operator basis base
   PRIVATE_LIBS ZLIB::ZLIB)
