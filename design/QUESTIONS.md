@@ -217,12 +217,21 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
   reader, 1e-12 * max entry, rejects the dump). The tests compare comm111ss for that pair with
   `Z_all` minus the other golden terms (deviation 3.9e-16). **Assumed meanwhile:** the README
   wording is stale; the golden set is otherwise complete.
-* **M7-Q2** (2026-11-12, M7 T3a) - The T3a kernels need a declaration beyond the public headers:
-  `detail::check_term_inputs(X, Y, Z, ws)` in `commutator/detail/workspace_impl.hpp` (model-space
-  compatibility and NonHermitian guard, shared by all term kernels). The term functions are
-  declared in `commutator.hpp` under `commutator::terms`. T3b/T4 reuse the same guard.
-  **Assumed meanwhile:** no public signature changed; `comm111ss` runs two host GEMMs on the
-  one-body device views (fence first), as the one-body block is tiny.
+* **M7-Q2** (2026-11-12, M7 lead) - The fast IMSRG(2) kernels support X and Y that are each
+  Hermitian or anti-Hermitian; a NonHermitian input throws NotImplementedError (the ladder and
+  Pandya paths use X^T = hX X; imsrg++ silently returns wrong numbers, reference/02 P-9).
+  `commutator_ref` handles any hermiticity. **Assumed meanwhile:** no phase-1 flow needs
+  non-Hermitian operators; add general paths (explicit Y P X products) if one does.
+* **M7-Q3** (2026-11-12, M7 lead) - design/30 section 1 lists the Jacobi identity as a property
+  test, but the IMSRG(2)-truncated commutator satisfies it only for one-body operators (the
+  dropped 3B part of [Y2, W2] feeds back into 2B through comm132-type terms). **Assumed
+  meanwhile:** the Jacobi test uses particle_rank-1 operators; antisymmetry, linearity and the
+  hermiticity of [A, H] are tested for the full IMSRG(2) commutator.
+* **M7-Q4** (2026-11-12, M7 lead) - Workspace memory: the ladder intermediates (Mpp, Mhh and the
+  gathered operands, about 4x a two-body operator) and the Pandya scratch (XK, YK, W, ZB, about
+  6x) are allocated eagerly; at emax 12 that would be ~11-13 GB (reviewer estimate). Fine for
+  emax <= 6 (all tests and runs, AGENTS.md rule 3). **Assumed meanwhile:** keep the eager
+  allocation; M12 (performance) can share ZB with W, gather in place, and stream channels.
 * **M8a-Q1** (2026-11-12, M8a config) - `Generator` and `Method` enums (with their canonical TOML
   spellings) live in `driver/config/schema.hpp`, since `flow` does not exist yet. **Assumed
   meanwhile:** M8 makes `flow` reuse them or maps them 1:1 in the driver; the spellings are fixed.
