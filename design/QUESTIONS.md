@@ -122,3 +122,4 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
   it automatically; updating or reinstalling the Command Line Tools would make the workaround
   unnecessary. **Assumed meanwhile:** keep the workaround (it switches itself off once the default
   SDK links).
+* **M1-Q1** (2026-11-12, M1) — The brief's IT-4/IT-5 command line (`3bme_type=no2b` with the `NO2B_ThBME_..._ms6_12_18.stream.bin` file, emax=4) gives an unphysical old-code result: E_HF = -313.17 MeV (e3hf = -201.9) and a magnus flow that diverges to E0 ~ -1e9 after ~37 time units; IT-8 (emax=2, no 3N) diverges the same way. Is the 3N setup (file/e3max/no2b type) or the shifted-Magnus step control meant to be different for these goldens? **Assumed meanwhile:** the commands are run exactly as in the brief and the diverged runs are committed as-is, documented in tests/golden/e2e/README.md; IT-4/5 comparisons should use the early flow steps and HF numbers only.
