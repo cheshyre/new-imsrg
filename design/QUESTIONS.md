@@ -271,3 +271,19 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
 * **M11-Q2** (2026-11-12, M11 python) - `tests/golden/basis/*.txt` header documents `channel idx
   2J parity 2Tz nkets` but stores J and Tz. **Assumed meanwhile:** tests compare with `two_j/2`,
   `two_tz/2`; the harness comment should be corrected.
+* **M9-Q1** (2026-11-12, M9 mbpt) - mbpt may not depend on hf, but the NAT-basis Hamiltonian needs
+  hf's normal-ordering machinery for a density other than the HF one. **Assumed meanwhile:**
+  mbpt exposes only `mbpt2_density_matrix`, `natural_orbitals`, `reference_density_ho`, `matmul`
+  and `to_nat_basis`; the tests (`tests/unit/mbpt/mbpt_test_support.hpp`) assemble the NAT H by
+  passing a modified `HFResult` (C = C_ho2hf C_hf2nat, rho, F, E_HF, reference occupations) to
+  `hf::normal_ordered_hamiltonian`, using `hf::detail::Monopole2B/3B`. hf should expose a public
+  "normal-ordered H for a given orbital basis and density" API (or the driver, M8, owns this).
+* **M9-Q2** (2026-11-12, M9 mbpt) - `natural_orbitals` checks sum (2j+1) n = A with 1e-6; imsrg++
+  uses 1e-8 and `exit()`s. **Assumed meanwhile:** 1e-6 and `InvariantError`; measured deviations at
+  emax 4 are far below both.
+* **M9-Q3** (2026-11-12, M9 mbpt) - Not implemented: `use_NAT_occupations` and the `NAT_order`
+  "energy"/"mp2" options (imsrg++ default occupations = reference, order = descending occupation
+  within a channel). **Assumed meanwhile:** default behaviour only; add when a job needs them.
+* **M9-Q4** (2026-11-12, M9 mbpt) - IT-5 `Hbare_0b` / `mbpt.EMP2` in `result.json` are the NAT-basis
+  E_HF and E_MP2 (the `hf.EHF` entry is the HF-basis value). Reproduced to 2e-10 (E_HF NAT) and
+  4e-9 (E_MP2 NAT); worth noting in design/30 that the keys have this meaning.
