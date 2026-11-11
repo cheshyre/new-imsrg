@@ -1,0 +1,28 @@
+[basis]
+emax = 2
+hw = 16.0
+e3max = 6
+
+[reference]
+nucleus = "O16"
+
+[interaction.two_body]
+file  = "VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz"
+e1max = 14
+e2max = 28
+lmax  = 14
+
+[interaction.three_body]
+file  = "NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin"
+type  = "no2b"
+e1max = 6
+e2max = 12
+e3max = 18
+
+[imsrg]
+method = "magnus"
+
+[imsrg3]
+in_flow = true
+variant = "n7"
+threebody_threshold = 0.0
