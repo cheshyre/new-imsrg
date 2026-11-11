@@ -74,7 +74,8 @@ tools/bootstrap_deps.sh       # once per machine: Kokkos (openmp, serial) + the 
   `PRE_TEST` mode (nothing runs at build time) as `<name>.<Suite>.<Case>`; with `MPI_RANKS` the
   executable is one test run under `mpiexec -n <n>` (label `mpi` added). Labels are applied from a
   small CTest include file, because the `PROPERTIES` of `gtest_discover_tests` (CMake 4.4) turn a
-  label list into a single label.
+  label list into a single label. Test target names are global: prefix them with the module
+  (`base_strong_types`, `angmom_wigner`); CMake fails on duplicates.
 * Bundled dependencies (fmt, toml++, CLI11, GoogleTest, and the in-tree Kokkos fallback) are added
   with `add_subdirectory(... SYSTEM)`, so our warning flags never apply to their headers.
 * Toolchain smoke tests live in `tests/smoke/` (Kokkos backend check + `parallel_reduce`, label
@@ -107,7 +108,9 @@ As implemented in M0:
 * Presets cannot express "environment variable or default", so they pass
   `IMSRG_DEPS_PREFIX=$env{IMSRG_DEPS_PREFIX}` (possibly empty) and `IMSRG_KOKKOS_BACKEND`;
   CMake applies the default and sets `Kokkos_ROOT=<prefix>/kokkos-<backend>` unless `Kokkos_ROOT`
-  or `Kokkos_DIR` is given (e.g. a cluster module). Configure fails if the install's
+  or `Kokkos_DIR` is given (e.g. a cluster module). A Kokkos that was given, or that is installed
+  in the prefix, must load (configure fails otherwise, instead of silently building a different
+  Kokkos in-tree); only when neither exists is extern/kokkos built in-tree. Configure fails if the install's
   `Kokkos_DEVICES` do not match the backend (a serial build needs a Serial-only Kokkos, so that
   the default execution space really is Serial). The OpenMP presets pass
   `OpenMP_ROOT=/opt/homebrew/opt/libomp`; CMake also finds Homebrew libomp itself on macOS.
@@ -117,9 +120,11 @@ As implemented in M0:
   static libraries), `Kokkos_ENABLE_DEPRECATED_CODE_5=OFF`. Each build takes a few seconds.
 * `tools/bootstrap_deps.sh [--backends "openmp serial"] [--no-venv] [--force] [--jobs N]` is
   idempotent (a stamp records Kokkos commit, compiler and options; a no-op run takes 0.4 s),
-  serializes concurrent runs with an `mkdir` lock in the prefix (stale locks of dead processes are
-  removed), and installs via `DESTDIR` staging plus a rename, so a concurrent configure never sees
-  a half-written prefix. Build trees live in `$IMSRG_DEPS_PREFIX/build/`.
+  serializes concurrent runs with an `mkdir` lock in the prefix (a lock whose owner on this host
+  is dead, or that has no pid file after a minute, is stale; one waiter at a time may break it;
+  locks of other hosts are never broken), and installs via `DESTDIR` staging plus two renames, so a
+  concurrent configure sees the old install, the new one, or for an instant none (it would then
+  build Kokkos in-tree), never a partial one. Build trees live in `$IMSRG_DEPS_PREFIX/build/`.
 * `release-openmp` sets `IMSRG_NATIVE_ARCH=ON`; `asan` sets `IMSRG_SANITIZE=address;undefined`
   (with `-fno-sanitize-recover=undefined`). Test presets set `OMP_PROC_BIND=false` and
   `OMP_NUM_THREADS=4`. `cuda` uses `extern/kokkos/bin/nvcc_wrapper`, `hip` uses `hipcc`; both are
@@ -151,7 +156,13 @@ As implemented in M0:
   `src/`. Rule (c) is what enforces "public headers must not include Kokkos/MPI". CTest runs it
   (`layering.check`) and its `--self-test` against `tests/layering/fixtures/{good,bad}`
   (`layering.self_test`), both labeled `unit`. Adding a module means updating its table and
-  `10-architecture.md` §2 in the same commit.
+  `10-architecture.md` §2 in the same commit. Like the format check, it sees tracked files plus
+  new files not yet added (never gitignored ones), so a run before `git add` is meaningful.
+  Consequence for M2: device annotations used in public headers (`IMSRG_FUNCTION`,
+  `IMSRG_INLINE_FUNCTION`; `base` types must be usable in kernels) cannot come from Kokkos
+  headers, which `base` cannot see anyway. Define them without Kokkos (keyed on
+  `__CUDACC__`/`__HIPCC__`, i.e. `__host__ __device__` there and empty otherwise); `IMSRG_LAMBDA`
+  is needed only in kernel files and can come from `exec/kokkos_backend.hpp`.
 * `tools/ci.sh` and `tools/check_layering.py` operate on `git ls-files` only: the main checkout
   root also holds untracked `imsrg-devel/` and `.claude/worktrees/`. pytest uses
   `testpaths = ["tests/python", "tests/integration"]`.

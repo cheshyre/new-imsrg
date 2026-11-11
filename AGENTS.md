@@ -56,9 +56,11 @@ tools/ci.sh dev-openmp             # the full pre-merge check; last line: CI PAS
   `cmake --preset dev-openmp -B build/<task>`, `cmake --build build/<task>`,
   `ctest --test-dir build/<task> -L unit`, and `IMSRG_BUILD_DIR=build/<task> tools/ci.sh dev-openmp`.
 * **New module:** add `src/imsrg/<m>/CMakeLists.txt` with `imsrg_add_module(NAME <m> SOURCES ...
-  DEPS ...)` and `tests/unit/<m>/CMakeLists.txt` with `imsrg_add_test(NAME ... SOURCES ...
-  DEPS <m> LABELS unit)`. Both directories are discovered automatically; no shared CMake file
-  changes. Include project headers as `"imsrg/<module>/x.hpp"`.
+  DEPS ...)` and `tests/unit/<m>/CMakeLists.txt` with `imsrg_add_test(NAME <m>_<topic> SOURCES ...
+  DEPS <m> LABELS unit)` (test names are global, hence the module prefix). Both directories are
+  discovered automatically; no shared CMake file changes. Include project headers as
+  `"imsrg/<module>/x.hpp"`. Kernels in tests go into free functions, never into a `TEST` body
+  (`design/12-compute-backend.md` §5).
 * macOS: the default SDK of this machine does not link; CMake works around it by itself
   (`cmake/ImsrgAppleSdk.cmake`). For compiles outside CMake, export
   `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk`.
