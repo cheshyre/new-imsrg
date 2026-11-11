@@ -158,3 +158,8 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
   applied when the 3B kets are enumerated (imsrg++ enumerates with E3max only and applies them in
   the commutators); `ThreeBodyChannels::passes_configuration_cut` evaluates them per ket.
   **Assumed meanwhile:** M10 decides whether its layout drops those kets or masks them.
+* **M1-Q2** (2026-11-12, M1 flow) - "IMSRG(3f2)" in `refharness flow --factorized` means plain
+  IMSRG(2) (no 3B storage, `IMSRG3` off) plus `BCH::SetUseFactorizedCorrection(true)`; imsrg++ has
+  no switch for it. The `Elast`/norm divergence guards (|eta| > 1e12, |E| > 1e9) are harness
+  additions. **Assumed meanwhile:** this is the intended IT-10 reference; O16 emax 2 converges
+  with it, so no He4 substitute was needed (He4 emax 2 kept as extra).
