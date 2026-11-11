@@ -20,9 +20,17 @@ imsrg_add_test(NAME basis_two_body
   DEPS basis
   LABELS unit)
 
-# The golden-file parser (a test helper) and its self-test.
+# The golden-file parser (a test helper), its self-test, and the record-by-record comparison of
+# the basis bookkeeping with every golden file (test_golden_basis.cpp).
 imsrg_add_test(NAME basis_golden_dump
-  SOURCES test_golden_basis_dump.cpp golden_basis_dump.cpp
+  SOURCES test_golden_basis_dump.cpp test_golden_basis.cpp golden_basis_dump.cpp
   DEPS basis
   LABELS unit)
 target_compile_definitions(basis_golden_dump PRIVATE IMSRG_GOLDEN_DIR="${_imsrg_golden_dir}")
+
+# The ModelSpace bundle (construction paths, sharing, with_reference).
+imsrg_add_test(NAME basis_model_space
+  SOURCES test_model_space.cpp golden_basis_dump.cpp
+  DEPS basis
+  LABELS unit)
+target_compile_definitions(basis_model_space PRIVATE IMSRG_GOLDEN_DIR="${_imsrg_golden_dir}")
