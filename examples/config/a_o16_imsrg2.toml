@@ -1,0 +1,28 @@
+[run]
+task = "imsrg"
+
+[basis]
+emax = 4
+hw = 16.0
+kind = "hf"
+
+[reference]
+nucleus = "O16"
+
+[interaction.two_body]
+file   = "VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz"
+format = "me2j"
+e1max  = 14
+e2max  = 28
+lmax   = 14
+
+[imsrg]
+method = "magnus"
+[imsrg.generator]
+core = "atan"
+
+[operators]
+list = ["Rp2"]
+
+[output]
+directory = "output"

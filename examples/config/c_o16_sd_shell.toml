@@ -1,0 +1,28 @@
+[basis]
+emax = 6
+hw = 20.0
+
+[reference]
+nucleus = "O16"                 # HF reference; core of sd-shell is also O16
+
+[valence]
+space = "sd-shell"
+
+[interaction.two_body]
+file  = "VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz"   # hw of file need not equal basis.hw only if the file is hw-independent; user responsibility
+e1max = 14
+e2max = 28
+lmax  = 14
+
+[imsrg]
+method = "magnus"
+# steps omitted: auto -> 2 because valence orbits exist
+[imsrg.generator]
+core    = "atan"
+valence = "shell_model_atan"
+
+[operators]
+list = ["Rp2"]
+
+[output]
+valence_file_format = "tokyo"

@@ -330,6 +330,14 @@ threebody_threshold = 0.0
 
 Equivalent legacy command for (a): `imsrg 2bme=VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz file2e1max=14 file2e2max=28 file2lmax=14 emax=4 hw=16 reference=O16 valence_space=O16 Operators=Rp2` -- must resolve to exactly the struct of (a) (tested, section 6).
 
+Equivalent legacy command for (b): `imsrg 2bme=VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz file2e1max=14 file2e2max=28 file2lmax=14 emax=4 hw=16 reference=O16 valence_space=O16 3bme=NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin 3bme_type=no2b file3e1max=6 file3e2max=12 file3e3max=18`
+
+Equivalent legacy command for (c): `imsrg 2bme=VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz file2e1max=14 file2e2max=28 file2lmax=14 emax=6 hw=20 reference=O16 valence_space=sd-shell Operators=Rp2`
+
+Equivalent legacy command for (d): `imsrg 2bme=VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz file2e1max=14 file2e2max=28 file2lmax=14 emax=2 e3max=6 hw=16 reference=O16 valence_space=O16 3bme=NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin 3bme_type=no2b file3e1max=6 file3e2max=12 file3e3max=18 IMSRG3=true imsrg3_n7=true`
+
+(Clarification, M8a: (b) and (d) list no operators, so their legacy commands have no `Operators=`. The test of section 6.3 item 6 extracts the four TOML blocks and these four command lines from this file; `examples/config/{a,b,c,d}_*.toml` hold the same four TOML files and are checked against the blocks. Relative input paths are relative to the working directory, as in imsrg++.)
+
 ### 2.12 CLI
 
 ```
