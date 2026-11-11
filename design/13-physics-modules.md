@@ -124,6 +124,15 @@ sd shell): every number identical to imsrg++, comment lines identical except the
   does; verify the exact pipeline in `imsrg++.cc`.
 * MP4 and Van Vleck are out of the near-term scope.
 
+**As implemented (M9).** `mbpt::mp2_energy`, `mbpt::mp3_energy` (pp, hh, ph, total),
+`mbpt2_density_matrix` (HFMBPT.cc:421-777 with the regulated denominators),
+`natural_orbitals` (per-channel `eigh`, descending occupation, columns signed so C(i,i) >= 0,
+trace check against A), `reference_density_ho`, `matmul`, `to_nat_basis`. mbpt does not depend on
+hf: the NAT-basis Hamiltonian is assembled by the caller from a modified `HFResult` (see
+M9-Q1 and `tests/unit/mbpt/mbpt_test_support.hpp`). Not implemented: `use_NAT_occupations`,
+`NAT_order` energy/mp2 (M9-Q3). Verified: MP2/MP3 at emax 2 (2N and 2N+3N) to 1e-15; IT-1 EMP2
+to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9.
+
 ## 6. commutator (reference: `reference/02`)
 
 * IMSRG(2) scalar terms: comm110, comm111, comm121, comm122, comm220, comm221, comm222_pp_hh,
