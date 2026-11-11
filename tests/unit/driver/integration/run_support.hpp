@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "mini_json.hpp"
+#include <unistd.h>
 
 #include "imsrg/driver/config/load_config.hpp"
 #include "imsrg/driver/run.hpp"
@@ -73,7 +74,10 @@ inline std::string slurp(const fs::path& path) {
 /// A fresh, empty directory `<tmp>/imsrg_it_<tag>_<pid-independent counter>`; any earlier
 /// directory of the same name is removed first.
 inline fs::path fresh_dir(const std::string& tag) {
-  const fs::path d = fs::temp_directory_path() / ("imsrg_it_" + tag);
+  // CTest runs every test case in its own process, in parallel, and the IT-2/IT-6/IT-12 cases
+  // each repeat the shared run: the process id keeps their output directories apart.
+  const fs::path d =
+      fs::temp_directory_path() / ("imsrg_it_" + tag + "_" + std::to_string(::getpid()));
   std::error_code ec;
   fs::remove_all(d, ec);
   fs::create_directories(d);
