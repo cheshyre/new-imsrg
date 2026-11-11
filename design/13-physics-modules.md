@@ -86,6 +86,11 @@ file name contains `stream.bin`, size checked against the count; the container i
 `op::No2bThreeBody`). Only the prefix needed for the model space is decoded: emax 4 reads 27,336
 me2j values in 4 ms and 2.7 M NO2B values in 0.05 s; the whole me2j file (168,066,656 values,
 count check) takes 9 s (test label `slow`). No caching is needed.
+Writers: `imsrg/io/valence_writers.hpp` (`write_tokyo`, `write_nushellx_int`,
+`write_nushellx_sps`; `ValenceWriteOptions` carries the provenance of the header lines and the
+mode `Hamiltonian` or `IsospinAveragedOperator` = imsrg++ `"op"`). Golden files from the new
+harness subcommand `refharness write-valence` (`tests/golden/io/`, HF HNO at emax 2 in the
+sd shell): every number identical to imsrg++, comment lines identical except the version line.
 
 ## 4. hf (reference: `reference/04` §1)
 
