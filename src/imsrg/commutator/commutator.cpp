@@ -19,8 +19,13 @@ void check_term_inputs(const op::Operator& X, const op::Operator& Y, const op::O
   IMSRG_CHECK(&Z != &X && &Z != &Y, "commutator: Z must not alias X or Y");
   if (X.hermiticity() == Hermiticity::NonHermitian || Y.hermiticity() == Hermiticity::NonHermitian)
     throw NotImplementedError("commutator: NonHermitian X or Y is not supported");
-  IMSRG_CHECK(Z.hermiticity() != Hermiticity::NonHermitian,
-              "commutator: Z must be Hermitian or anti-Hermitian");
+  IMSRG_CHECK(Z.hermiticity() == commutator_spec(X.spec(), Y.spec()).hermiticity,
+              "commutator: Z's hermiticity must be that of [X, Y] (Hermitian if X and Y differ in "
+              "hermiticity, anti-Hermitian otherwise)");
+}
+
+int commutator_hermiticity_sign(const op::Operator& X, const op::Operator& Y) {
+  return -op::hermiticity_sign(X.hermiticity()) * op::hermiticity_sign(Y.hermiticity());
 }
 
 }  // namespace detail

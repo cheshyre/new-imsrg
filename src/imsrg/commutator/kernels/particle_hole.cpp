@@ -14,6 +14,8 @@
 #include <cstdint>
 #include <type_traits>
 
+#include "imsrg/base/assert.hpp"
+#include "imsrg/base/constants.hpp"
 #include "imsrg/base/error.hpp"
 #include "imsrg/commutator/commutator.hpp"
 #include "imsrg/commutator/detail/device_views.hpp"
@@ -162,6 +164,9 @@ void comm222_phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
         });
   }
   exec::fence("commutator::comm222_phss::fill");
+  // Host BLAS only; device backends need a device gemm (design/12 section 3).
+  IMSRG_CHECK(pd.w.host_is_device(),
+              "comm222_phss: host BLAS on device memory; needs a device gemm (GPU backends)");
   linalg::grouped_gemm(pd.gemms);
 
   exec::parallel_for(
@@ -224,8 +229,10 @@ void comm222_phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
           if (s2 != 0.0) t -= ph_ij * s2 * zbar(a, j, l, k, i, Jp);
           z += (2 * Jp + 1) * t;
         }
-        const double norm = std::sqrt((i == j ? 2.0 : 1.0) * (k == l ? 2.0 : 1.0));
-        z2[e] += z / norm;
+        // imsrg++ normalization: divide by sqrt(2) per equal-orbit pair (exact constants::sqrt2).
+        if (i == j) z /= constants::sqrt2;
+        if (k == l) z /= constants::sqrt2;
+        z2[e] += z;
       });
   exec::fence("commutator::comm222_phss");
 }

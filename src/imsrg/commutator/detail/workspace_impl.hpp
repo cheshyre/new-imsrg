@@ -59,11 +59,17 @@ namespace detail {
 
 /// Shared precondition check of every `terms::` function and of `commutator()`: X, Y and Z are
 /// non-empty on the workspace's model space (`Workspace::compatible`), Z is neither X nor Y, and
-/// X, Y and Z have a definite hermiticity.
-/// @throws InvariantError on a violated precondition, NotImplementedError if X or Y is
+/// X, Y and Z have a definite hermiticity, and Z's hermiticity is that of [X, Y]
+/// (`commutator_spec`), so the kernels may derive it from X and Y alone.
+/// @throws InvariantError on a violated precondition (incl. a wrong hermiticity of Z),
+/// NotImplementedError if X or Y is
 ///         NonHermitian (the fast kernels use the (anti-)Hermiticity). O(1).
 void check_term_inputs(const op::Operator& X, const op::Operator& Y, const op::Operator& Z,
                        const Workspace& ws);
+
+/// Hermiticity sign hZ = -hX hY (+1 Hermitian, -1 anti-Hermitian) of [X, Y] for X, Y of definite
+/// hermiticity: [X,Y]^dagger = hX hY [Y,X] = -hX hY [X,Y]. Kernels use this instead of Z's flag.
+int commutator_hermiticity_sign(const op::Operator& X, const op::Operator& Y);
 
 }  // namespace detail
 
