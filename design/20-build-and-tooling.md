@@ -112,6 +112,27 @@ For speed across many git worktrees, `tools/bootstrap_deps.sh` builds Kokkos fro
   **copy** (`new-imsrg-reference/imsrg-devel-patched`) and record the patch in
   `tools/reference/patches/`.
 
+**What worked (M1, 2026-11-11):** `tools/reference/build_imsrg_devel.sh [all|imsrg|harness]`.
+* The script rsyncs a pristine copy of `src/` to `new-imsrg-reference/imsrg-devel-src/src`
+  (checksum verified against the original; the reference has no `.git`, so its version is the
+  sha256 over `src/`, recorded in `tests/golden/README.md`) and builds from the copy, so nothing
+  is ever written into the read-only tree.
+* Toolchain: Apple clang 21 + Homebrew libomp via `-DOpenMP_ROOT=$(brew --prefix)/opt/libomp`
+  (FindOpenMP then adds `-Xclang -fopenmp`), OpenBLAS/GSL/Boost from `CMAKE_PREFIX_PATH`,
+  `-DCMAKE_POLICY_VERSION_MINIMUM=3.5`, Ninja, ccache, `-DIMSRG_BUILD_PYTHON_BINDINGS=OFF`. No
+  source patches were needed; the old code compiles warning-free. Full build ≈ 1–2 min on 18 cores.
+* **macOS SDK pitfall (affects M0 too):** xcrun's default SDK on the dev machine is
+  `MacOSX27.0.sdk`, whose `libSystem.tbd` lists the architecture `arm64e.x1-macos` that the
+  installed linker (ld-1267) rejects ("tapi error: malformed file"); even a C hello-world fails
+  to link, so CMake reports a broken compiler. Fix: `-DCMAKE_OSX_SYSROOT=` the 26.5 SDK
+  (`/Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk`) or `SDKROOT=` the same. The script
+  probes the default SDK and falls back automatically.
+* The old `src/CMakeLists.txt` sets `CMAKE_CURRENT_BINARY_DIR` to `"../build"` for its generated
+  `version.cc`, so its binary directory must be named `build` (then `../build` is itself):
+  `new-imsrg-reference/build` for the standalone build, and `add_subdirectory(<src> build)` in the
+  wrapper `tools/reference/CMakeLists.txt` (binary dir `new-imsrg-reference/harness-build`).
+  The wrapper also needs its own `find_package(OpenMP)` (imported targets are directory-scoped).
+
 ## 6. Plain Makefile (later, M13)
 
 A single `Makefile` at the root for users without CMake. It assumes a pre-installed Kokkos
