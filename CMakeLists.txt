@@ -21,7 +21,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # ---- Options (design/20 section 2) ----------------------------------------------------------------
 option(IMSRG_BUILD_TESTS "Build the tests (GoogleTest, CTest)" ON)
-option(IMSRG_BUILD_PYTHON "Build the nanobind module imsrg._core (once python/ exists, M11)" ON)
+option(IMSRG_BUILD_PYTHON "Build the nanobind module imsrg._core (python/, design/18)" ON)
 option(IMSRG_ENABLE_KOKKOS_KERNELS "Use Kokkos Kernels (not supported yet)" OFF)
 option(IMSRG_UNITY_BUILD "Unity builds for the imsrg module libraries" OFF)
 option(IMSRG_WERROR "Treat warnings in imsrg targets as errors (ON in tools/ci.sh)" OFF)
@@ -68,18 +68,17 @@ if(IMSRG_BUILD_TESTS)
   include(ImsrgTesting)      # imsrg_add_test()
 endif()
 
+# The module libraries are linked into the shared object imsrg._core, so they need PIC.
+if(IMSRG_BUILD_PYTHON)
+  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif()
+
 add_subdirectory(src)
 if(EXISTS "${PROJECT_SOURCE_DIR}/apps/CMakeLists.txt")
   add_subdirectory(apps)
 endif()
 if(IMSRG_BUILD_PYTHON)
-  if(EXISTS "${PROJECT_SOURCE_DIR}/python/CMakeLists.txt")
-    # Hook for M11: find Python (Interpreter + Development.Module) and nanobind
-    # (add_subdirectory(extern/nanobind)) here, then add python/.
-    message(FATAL_ERROR "python/ exists but the nanobind wiring is not written yet (M11)")
-  else()
-    message(STATUS "imsrg: IMSRG_BUILD_PYTHON=ON, but python/ does not exist yet (M11)")
-  endif()
+  add_subdirectory(python)  # nanobind module imsrg._core (design/18 section 2)
 endif()
 if(IMSRG_BUILD_TESTS)
   add_subdirectory(tests)
