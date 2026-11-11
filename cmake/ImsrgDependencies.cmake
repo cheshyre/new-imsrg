@@ -60,6 +60,8 @@ else()
     set(Kokkos_ENABLE_${_imsrg_backend_uc} ON CACHE BOOL "")
   endif()
   add_subdirectory("${PROJECT_SOURCE_DIR}/extern/kokkos" extern/kokkos SYSTEM)
+  get_directory_property(Kokkos_VERSION DIRECTORY "${PROJECT_SOURCE_DIR}/extern/kokkos"
+                         DEFINITION Kokkos_VERSION)
   set(IMSRG_KOKKOS_SOURCE "in-tree: extern/kokkos")
 endif()
 
