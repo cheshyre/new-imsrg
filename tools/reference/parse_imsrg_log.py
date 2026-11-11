@@ -77,16 +77,30 @@ def parse_spe_tables(lines):
     return tables
 
 
+FLOW_NAMES = FLOW_COLS[:13]  # istep .. N_Ops (timing columns are not kept)
+_D9 = r"(-?\d+\.\d{9})"
+# Columns are fixed-width in the writer but touch/overflow for large values (a diverged flow has
+# |E0| ~ 1e9), so split by the known number formats instead: 5 decimals for s, 9 for the norms and
+# energies, integers for Ncomm and N_Ops.
+FLOW_RE = re.compile(r"^\s*(\d+)\s+(\d+\.\d{5})\s*" + r"\s*".join([_D9] * 9)
+                     + r"\s*(\d+)\s*" + _D9 + r"\s*(\d+)\s")
+
+
+def split_flow_line(ln):
+    """Split one flow-file line into the 13 kept columns as strings; None if not a flow line."""
+    m = FLOW_RE.match(ln)
+    return list(m.groups()) if m else None
+
+
 def parse_flow(path):
     text = read(path)
     if text is None:
         return None
     rows = []
     for ln in text.splitlines():
-        t = ln.split()
-        if len(t) < 15 or not re.match(r"^\d+$", t[0]):
-            continue
-        rows.append(t)
+        t = split_flow_line(ln)
+        if t is not None:
+            rows.append(t)
     if not rows:
         return {"n_lines": 0}
     stages, prev = 1, -1
@@ -97,9 +111,7 @@ def parse_flow(path):
 
     def conv(t):
         d = {}
-        for name, v in zip(FLOW_COLS, t):
-            if name in ("walltime_s", "rss_MB", "slash", "max_MB"):
-                continue
+        for name, v in zip(FLOW_NAMES, t):
             d[name] = int(v) if name in ("istep", "Ncomm", "N_Ops") else float(v)
         return d
 
@@ -108,7 +120,7 @@ def parse_flow(path):
         "n_lines": len(rows),
         "n_steps": sum(1 for t in rows if int(t[0]) >= 1),
         "n_stages": stages,
-        "columns": [c for c in FLOW_COLS if c not in ("walltime_s", "rss_MB", "slash", "max_MB")],
+        "columns": FLOW_NAMES,
         "first": conv(rows[0]),
         "last": conv(last),
         "last_raw": " ".join(last[:13]),
