@@ -7,6 +7,7 @@
 #include <vector>
 
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include "imsrg/base/error.hpp"
 #include "imsrg/base/half.hpp"
@@ -27,7 +28,9 @@ float synthetic_value(std::int64_t k) {
 }
 
 fs::path temp_dir() {
-  const fs::path d = fs::temp_directory_path() / "imsrg_io_no2b_test";
+  // Per-process directory: ctest runs every test in its own process, in parallel.
+  const fs::path d =
+      fs::temp_directory_path() / ("imsrg_io_no2b_test_" + std::to_string(::getpid()));
   fs::create_directories(d);
   return d;
 }

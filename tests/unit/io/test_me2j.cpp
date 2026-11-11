@@ -12,6 +12,7 @@
 #include <vector>
 
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include "imsrg/base/error.hpp"
 #include "imsrg/base/types.hpp"
@@ -144,7 +145,10 @@ std::string synthetic_text(const std::map<Record, Values>& values) {
 }
 
 fs::path write_synthetic(const std::string& name, const std::string& text, bool gz) {
-  const fs::path p = fs::temp_directory_path() / ("imsrg_me2j_test_" + name);
+  // The process id keeps parallel ctest processes (one per test) from sharing, and deleting,
+  // each other's files.
+  const fs::path p =
+      fs::temp_directory_path() / ("imsrg_me2j_test_" + std::to_string(::getpid()) + "_" + name);
   if (gz) {
     GzipWriter w(p);
     w.write(text);

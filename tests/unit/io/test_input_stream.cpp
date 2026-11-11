@@ -10,6 +10,7 @@
 #include <vector>
 
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include "imsrg/base/error.hpp"
 #include "imsrg/io/input_stream.hpp"
@@ -21,7 +22,8 @@ using namespace imsrg::io;
 namespace fs = std::filesystem;
 
 fs::path temp_path(const std::string& name) {
-  return fs::temp_directory_path() / ("imsrg_io_test_" + name);
+  // Per-process names: ctest runs every test in its own process, in parallel.
+  return fs::temp_directory_path() / ("imsrg_io_test_" + std::to_string(::getpid()) + "_" + name);
 }
 
 void write_plain(const fs::path& p, const std::string& text) {
