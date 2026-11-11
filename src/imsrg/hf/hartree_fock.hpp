@@ -36,10 +36,10 @@ struct HFOptions {
   std::int32_t max_iterations = 1000;
   /// Linear mixing: weight of the OLD density (imsrg++ 0.2 for the density mixing).
   double density_mixing = 0.2;
-  /// Keep the occupations of the reference fixed (no `FillLowestOrbits`). With false the lowest
-  /// orbits are re-filled periodically from iteration 11 on (imsrg++ `freeze_occupations`;
-  /// the constructor default there is true, the golden data were produced with freezing on).
-  bool freeze_occupations = true;
+  /// Keep the occupations of the reference fixed (no `FillLowestOrbits`). With false (default,
+  /// as the imsrg++ driver, which calls `UnFreezeOccupations()`; the goldens were produced so)
+  /// the lowest orbits are re-filled periodically from iteration 11 on.
+  bool freeze_occupations = false;
   /// DIIS: first iteration whose Fock matrix enters the subspace.
   std::int32_t diis_start = 2;
   /// DIIS: number of (Fock, error) pairs kept.
@@ -85,5 +85,26 @@ struct HFResult {
 /// @throws InputError / InvariantError if H has no two-body part or `v3` does not match its
 ///         model space.
 HFResult solve(const op::Operator& H, const op::No2bThreeBody* v3, const HFOptions& options = {});
+
+/// The Hamiltonian in the Hartree-Fock basis and normal ordered with respect to the HF reference,
+/// with the three-body part truncated at the normal-ordered two-body level (imsrg++
+/// `HartreeFock::GetNormalOrderedH(2)`): E0 = E_HF, f = C^T F C, Gamma = D^T (V2 + V3NO) D, where
+/// V3NO^J_{pq,rs} = 1/(2J+1) sum_{ab} rho_ab V3^{J}_{pqa,rsb} (a, b in one (l, 2j, tz) channel,
+/// |rho_ab| >= 1e-8, e_a + e_p + e_q <= options.e3max, normalized kets, built in the oscillator
+/// basis from `r.rho`) and D is the J-coupled basis change of `op::transform_basis`. `H` supplies
+/// the model space, the spec and V2 (its zero- and one-body parts are replaced); `v3` may be null
+/// (2N only). If the final occupations differ from the reference of H's model space by more than
+/// 1e-3 in any orbit (imsrg++ `UpdateReference`) the result lives on `ms.with_reference(...)`
+/// with the HF occupations, otherwise on H's model space. `H` is not modified.
+/// Complexity: O(sum_ch n_ch^2 (#orbits in channel)^2) for V3NO, plus the transformation.
+/// @throws InvariantError / InputError if `r` does not match H's model space.
+op::Operator normal_ordered_hamiltonian(const op::Operator& H, const op::No2bThreeBody* v3,
+                                        const HFResult& r, const HFOptions& options = {});
+
+/// `O` transformed to the HF basis defined by `r.C` (imsrg++ `TransformToHFBasis`): the one-body
+/// part C^T O C and the two-body part D^T V D per channel; the zero-body part is unchanged and
+/// no normal ordering is performed. `O` is not modified.
+/// Complexity: O(norb^3 + sum_ch n_ch^3).
+op::Operator to_hf_basis(const op::Operator& O, const HFResult& r);
 
 }  // namespace imsrg::hf

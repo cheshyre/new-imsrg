@@ -11,6 +11,7 @@
 #include "imsrg/hf/diis.hpp"
 #include "imsrg/hf/monopole.hpp"
 #include "imsrg/linalg/blas.hpp"
+#include "imsrg/operator/basis_transform.hpp"
 
 namespace imsrg::hf {
 
@@ -282,6 +283,90 @@ HFResult solve(const op::Operator& H, const op::No2bThreeBody* v3, const HFOptio
               "invalid Hartree-Fock options");
   Solver solver(H, v3, options);
   return solver.run();
+}
+
+op::Operator to_hf_basis(const op::Operator& O, const HFResult& r) {
+  IMSRG_CHECK(!O.empty(), "to_hf_basis needs a non-empty operator");
+  return op::transform_basis(O, r.C.const_view());
+}
+
+op::Operator normal_ordered_hamiltonian(const op::Operator& H, const op::No2bThreeBody* v3,
+                                        const HFResult& r, const HFOptions& options) {
+  IMSRG_CHECK(!H.empty(), "normal_ordered_hamiltonian needs a non-empty Hamiltonian");
+  const auto ms = H.model_space_ptr();
+  const auto& basis = ms->basis();
+  const std::int32_t norb = basis.num_orbits();
+  IMSRG_CHECK(r.F.rows() == norb && r.rho.rows() == norb && r.C.rows() == norb &&
+                  static_cast<std::int32_t>(r.occupations.size()) == norb,
+              "HFResult does not match the model space of H");
+
+  op::Operator X = H;  // deep copy, oscillator basis
+  X.sync_to_host();
+  X.zero_body() = r.e_hf;
+  {
+    auto f = X.one_body().host_view();
+    for (std::int64_t j = 0; j < norb; ++j)
+      for (std::int64_t i = 0; i < norb; ++i) f(i, j) = r.F(i, j);
+  }
+
+  if (v3 != nullptr) {
+    const auto channels = detail::one_body_channels(basis);
+    std::vector<const std::vector<std::int32_t>*> channel_of(static_cast<std::size_t>(norb));
+    for (const auto& ch : channels)
+      for (std::int32_t i : ch) channel_of[static_cast<std::size_t>(i)] = &ch;
+    const auto& tbc = ms->two_body();
+    for (std::int32_t ch = 0; ch < tbc.num_channels(); ++ch) {
+      const ChannelIndex chi{ch};
+      const auto kets = tbc.channel_kets(chi);
+      const std::int32_t J = tbc.channel(chi).J();
+      auto blk = X.two_body().host_block(chi);
+      const auto npq = static_cast<std::int64_t>(kets.size());
+      for (std::int64_t i = 0; i < npq; ++i) {
+        const auto& bra = tbc.ket(kets[static_cast<std::size_t>(i)]);
+        const auto& op_ = basis.orbit(bra.p);
+        const auto& oq = basis.orbit(bra.q);
+        const std::int32_t e2bra = op_.e() + oq.e();
+        for (std::int64_t j = i; j < npq; ++j) {
+          const auto& ket = tbc.ket(kets[static_cast<std::size_t>(j)]);
+          const auto& orr = basis.orbit(ket.p);
+          const auto& os = basis.orbit(ket.q);
+          const std::int32_t e2ket = orr.e() + os.e();
+          double v = 0.0;
+          for (std::int32_t a = 0; a < norb; ++a) {
+            const auto& oa = basis.orbit(OrbitIndex{a});
+            if (oa.e() + e2bra > options.e3max) continue;
+            for (std::int32_t b : *channel_of[static_cast<std::size_t>(a)]) {
+              const auto& ob = basis.orbit(OrbitIndex{b});
+              if (ob.e() + e2ket > options.e3max) continue;
+              const double rab = r.rho(a, b);
+              if (std::abs(rab) < 1e-8) continue;
+              // imsrg++ passes the integer J as the J2 argument.
+              v += rab * v3->get_pn(op_, oq, oa, orr, os, ob, J);
+            }
+          }
+          v /= static_cast<double>(2 * J + 1);
+          if (bra.p == bra.q) v /= std::sqrt(2.0);
+          if (ket.p == ket.q) v /= std::sqrt(2.0);
+          blk(i, j) += v;
+          if (j != i) blk(j, i) += v;
+        }
+      }
+    }
+  }
+  X.sync_to_device();
+
+  op::Operator out = op::transform_basis(X, r.C.const_view());
+  const auto ref_occ = ms->reference().occupations();
+  bool changed = false;
+  for (std::int32_t a = 0; a < norb; ++a) {
+    const auto k = static_cast<std::size_t>(a);
+    if (std::abs(ref_occ[k] - r.occupations[k]) > 1e-3) changed = true;
+  }
+  if (changed) {
+    auto ref = basis::Reference::from_occupations(basis, r.occupations, "hf");
+    out = op::with_model_space(out, ms->with_reference(std::move(ref)));
+  }
+  return out;
 }
 
 }  // namespace imsrg::hf
