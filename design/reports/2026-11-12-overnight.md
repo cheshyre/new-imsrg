@@ -17,7 +17,10 @@ Prompts for what comes next: `design/NEXT_SESSION_PROMPT.md` (run 2) and
   IT-4, IT-6, IT-7 and IT-12 with identical step counts and |ΔE0| ≤ 3e-10 MeV.
 * **CI on `develop` (0676e7b and later):** `tools/ci.sh dev-openmp` PASS with 851 unit, 34
   integration, 3 MPI and 23 Python tests, plus the layering and clang-format checks. Every lead
-  also ran `dev-serial` before reporting.
+  also ran `dev-serial` before reporting. The final hand-off merge exposed a pre-existing race between
+  parallel io tests on a shared temp file (one failure in 851); it was fixed with per-process file
+  names, and CI then passed twice on `develop` (a810b4a). The orchestrator had advanced `develop`
+  before that fix by a scripting error; `STATUS.md` records it.
 * **Not started:** M10 (IMSRG(3); the layout-benchmark lead was stopped right after launch when the
   owner ended the run, and its brief is in the next-session prompt), M11 phase 2, M12, M13.
 * **The usage budget, not wall time, bounded the night:** all agents stopped on the 5-hour usage
