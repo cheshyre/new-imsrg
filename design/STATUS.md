@@ -2,43 +2,34 @@
 
 ## Current state (keep this section up to date)
 
-* **Phase:** overnight implementation run in progress (started 2026-11-11 23:41 JST).
-* **Integration branch:** `develop` (local). It is advanced from the orchestrator's worktree
-  branch `claude/imsrg-refactor-overnight-800606` after `tools/ci.sh dev-openmp` passes on the
-  merge result (see QUESTIONS O1; the main checkout's index needs a sync in the morning).
-* **Merged so far:** M0 (bootstrap: submodules, CMake, presets, `tools/ci.sh`, layering check);
-  M1 (reference build script, refharness, golden data for basis/H/HF/MBPT/commutators and
-  IT-1..IT-10, incl. the %.17g IT-2 trajectory from `refharness flow`);
-  M3 (basis: orbits, references, valence spaces, partitions, 2B/ph/3B channels, ModelSpace,
-  DeviceTables; all 14 golden basis files match exactly); M2 (base, exec, comm, linalg with
-  Accelerate BLAS/LAPACK, angmom: Wigner/CG vs sympy, Moshinsky in double-double);
-  M4 (operator: spec, 1B/2B parts, arithmetic, norms, OperatorDump, normal ordering incl.
-  fractional occupations and NO2B, basis transformation, random generator; namespace `imsrg::op`);
-  M8a (driver config: TOML schema, all 85 legacy keys, operator catalog, validation, resolved-
-  config writer; `apps/imsrg` CLI; `driver::run` still stops with E-PLANNED until M8);
-  M11 phase 1 (nanobind `imsrg._core`: Runtime, basis, operator, dumps, config; pytest step in
-  `tools/ci.sh`); M5+M6 (io: me2j/NO2B readers, tokyo/NuShellX writers; opslib scalar operators; hf
-  with imsrg++ mixing and Pulay DIIS, HF-basis transformation, IT-1/IT-4 HF integration tests);
-  M9 (mbpt: MP2/MP3, MBPT(2) density matrix, natural orbitals, NAT-basis transformation);
-  M7 (commutator: all scalar IMSRG(2) terms as Kokkos kernels + `commutator_ref`; 1.1–1.2× the
-  imsrg++ time at emax 4/6);
-  M8 (flow: generators, BCH, Magnus solver with the imsrg++ step rule; driver pipeline behind
-  `driver::run`; IT-2, IT-3, IT-4, IT-6, IT-7, IT-12 pass).
-* **In progress (before the final merges):** M8 (`feature/m8-flow-driver`: flow, pipeline, integration tests). Next: M8 flow from M7's `m7-api-ready` tag, then
-  the driver pipeline and the integration tests.
-* **Interruptions:** all agents stopped on the 5-hour usage limit from about 01:30 to 02:30 JST and
-  again from about 04:15 to 07:30 JST, and were resumed. Usage budget, not wall time, is the
-  binding constraint of the night.
-* **Morning report:** `design/reports/2026-11-12-overnight.md` (draft at 07:40, finalized at the
-  end of the run).
-* **Toolchain:** Homebrew cmake 4.4.5, ninja 1.13.2, ccache 4.14.3, Open MPI 5.0.11, libomp
-  23.1.5, clang-format 23.1.5, gsl, boost, openblas; Apple clang 21; Python 3.15.2. Kokkos 5.3.0
-  (submodule) installed per backend in `~/.cache/imsrg-deps` by `tools/bootstrap_deps.sh`; shared
-  venv `~/.cache/imsrg-deps/venv`. Default MacOSX27.0.sdk does not link: `cmake/ImsrgAppleSdk.cmake`
-  picks a working SDK (Q24).
-* **Verified input facts:** me2j test file = 168,066,656 values (e1max 14, e2max 28, lmax 14);
-  NO2B test file = 32,685,840 floats (6, 12, 18; single precision).
-* **Blocking questions:** none. Open questions: `QUESTIONS.md` (Q20–Q24 from M0, O1–O2).
+* **Phase:** run 1 of the unsupervised implementation ended 2026-11-12 ~08:45 JST at the owner's
+  request (started 2026-11-11 23:41). Report: `design/reports/2026-11-12-overnight.md`. Next:
+  the owner interview (`design/INTERVIEW_PROMPT.md`), then run 2 (`design/NEXT_SESSION_PROMPT.md`).
+* **Integration branch:** `develop` (local). In run 1 it was advanced from the orchestrator's
+  worktree branch `claude/imsrg-refactor-overnight-800606` with `git update-ref` after
+  `tools/ci.sh dev-openmp` passed on each merge (QUESTIONS O1). **The main checkout's index still
+  shows 331b2d4 and needs a sync** (see O1).
+* **Merged:** M0 bootstrap; M1 reference build, refharness, golden data (IT-1..IT-10); M2
+  base/exec/comm/linalg/angmom; M3 basis; M4 operator (`imsrg::op`); M5+M6 io/opslib/hf (mixing +
+  DIIS); M7 IMSRG(2) commutators (Kokkos kernels + `commutator_ref`); M8a config/legacy CLI/`apps/imsrg`;
+  M8 flow (generators, BCH, Magnus) + driver pipeline; M9 mbpt; M11 phase 1 Python bindings.
+* **End to end:** `imsrg` reproduces imsrg-devel for IT-2, IT-3, IT-4, IT-6, IT-7, IT-12 (same step
+  counts, |ΔE0| ≤ 3e-10 MeV, `.snt` ≤ 1.2e-14). CI on `develop`: 851 unit, 34 integration, 3 MPI,
+  23 Python tests, dev-openmp PASS (dev-serial passed in every lead's final run).
+* **Not started:** M10 IMSRG(3) (layout-benchmark brief ready in `NEXT_SESSION_PROMPT.md`;
+  `feature/m10-layout-benchmark` exists but has no commits), M11 phase 2, M12, M13. Open M8
+  follow-ups: Opus review of the flow numerics, flow-RK4/DP45, hunter-gatherer, `hartree_fock.mixing`
+  key, MP2 column, NAT basis/IT-5 in the driver, `Denominators` copies H every step.
+* **Interruptions:** all agents stopped on the 5-hour usage limit 01:30–02:30 and 04:15–07:30 JST.
+  Usage budget, not wall time, was the binding constraint.
+* **Toolchain:** Homebrew cmake 4.4.5, ninja 1.13.2, ccache 4.14.3, Open MPI 5.0.11, libomp 23.1.5,
+  clang-format 23.1.5, gsl, boost, openblas; Apple clang 21; Python 3.15.2; Kokkos 5.3.0 per backend
+  in `~/.cache/imsrg-deps` (`tools/bootstrap_deps.sh`); shared venv `~/.cache/imsrg-deps/venv`. The
+  default MacOSX27.0.sdk does not link; `cmake/ImsrgAppleSdk.cmake` picks a working SDK (Q24).
+  Reference build and harness: `/Users/cheshyre/Downloads/new-imsrg-reference/`.
+* **Inputs:** me2j test file = 168,066,656 values (e1max 14, e2max 28, lmax 14); NO2B test file =
+  32,685,840 floats (6, 12, 18; single precision) holding only the cE contact term (M1-Q1).
+* **Blocking questions:** none. Open: ~50 entries with "Assumed meanwhile" in `QUESTIONS.md`.
 
 ## Log (append one entry per merged branch)
 
@@ -59,3 +50,4 @@
 | 2026-11-12 08:15 | feature/m9-mbpt → develop | `mbpt` (deps operator, linalg, basis; not hf): `mp2_energy`, `mp3_energy`, MBPT(2) one-body density matrix, natural orbitals, `to_nat_basis` | Unit + integration tests; ci.sh dev-openmp PASS (worker and on the merge). Deviations vs imsrg-devel: MP2/MP3 at emax 2 (2N, 2N+3N) ~1e-16; IT-1 EMP2 −3.4e-9 MeV; IT-5 E_HF −1.06e-8, NAT-basis E_HF 1.9e-10, NAT EMP2 3.6e-9 MeV | M9-Q1..Q4. Test support drives `hf::detail` to build the NAT-basis H (test-only coupling). IT-5's IMSRG part waits for M8 |
 | 2026-11-12 08:20 | feature/m7-commutator → develop | `commutator`: public API, `CommutatorOptions`/`TermMask`, `Workspace`, all 8 scalar IMSRG(2) terms + fused `comm222_pp_hh_221ss` as Kokkos kernels (grouped GEMM for pp/hh, Pandya ph with 6j weights); `commutator_ref` (tests only); emax-1 goldens for (H,A)/(H,H)/(A,A) on He4 and open-shell He6; refharness `bench-commutator`; `IMSRG_BUILD_BENCH` | dev-openmp + dev-serial PASS at b202e81 (lead); dev-openmp PASS on the merge. Max deviations: every term vs goldens ≤ 1.5e-15 rel., full commutator vs `Z_all` 2.9e-16, fast vs ref (incl. fractional occupations) ≤ 1.9e-15, properties ≤ 1.1e-14. Benchmark full commutator ours/imsrg++: emax 4 5.7/5.2 ms (1 thread), 1.6/1.4 ms (6); emax 6 80/67 ms, 16.7/14.7 ms | Opus review: 2 majors fixed (Z hermiticity, host BLAS on device pointers); comm121ss fix 3a90d6f landed after `m7-api-ready`. M7-Q1..Q4 (fast path rejects NonHermitian; Workspace ≈ 10× a 2B operator). Next: sparse Pandya maps, Workspace memory (M12) |
 | 2026-11-12 08:25 | feature/m8-flow-driver → develop | `flow`: White/atan and the other phase-1 generators (2e-17 vs goldens), BCH transform/product with imsrg++ thresholds, Magnus solver with the imsrg++ step rule and Omega stack, operator transformation; `driver::run` pipeline (me2j/NO2B → HF → normal ordering → IMSRG(2) Magnus, single reference and 1-/2-step valence space, Rp2 transformation, results JSON, flow CSV, tokyo `.snt`), runtime in `main`; in-process integration tests | 851 unit + 34 integration + 3 MPI tests, dev-openmp + dev-serial PASS (lead); dev-openmp PASS on the merge. IT-2 ΔE0 −3.0e-10 MeV, 256 steps (imsrg++ 256), first 10 trajectory steps 5.7e-14; IT-6 ΔRp2 1.9e-10 fm²; IT-12 bitwise identical; IT-4 (smax 10) ΔE0 1.5e-10, 29 steps (29); IT-3 421 steps (421), `.snt` 8e-15; IT-7 431 steps (431), `.snt` 1.2e-14 | Deviations M8-1 (D21 floor keeps the sign; no effect in any IT), M8-2 (HF generator diagonal not filled), M8-3 (divergence throws NumericalError). M8-Q1..Q4. Not done: Opus review of the flow numerics, flow_rk4/DP45, hunter-gatherer, `hartree_fock.mixing` key, MP2 column, NAT/IT-5 in the driver, triples/IMSRG(3), `Denominators` copies H every step |
+| 2026-11-12 08:45 | feature/session-handoff → develop | Final run-1 report, `NEXT_SESSION_PROMPT.md` for run 2 (state, plan, lessons, M10 brief), `INTERVIEW_PROMPT.md` (owner Q&A and design interview), design index, removal of the deviation-log placeholder row | ci.sh dev-openmp PASS on the merge (docs only) | Run ended at the owner's request; M10 benchmark lead stopped right after launch |
