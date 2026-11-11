@@ -15,7 +15,9 @@ in `imsrg::operator`) both implement exactly this spec. A change needs a version
   quantum numbers (n, l, 2j, 2tz), so the file does not rely on index conventions (even though both
   codes use the same ones, D11).
 * Two-body values are **normalized, antisymmetrized, J-coupled** matrix elements
-  ⟨pq; J‖V‖rs; J'⟩ with `p ≤ q`, `r ≤ s` (imsrg++ `TwoBody.GetTBME_J` normalization for scalars).
+  ⟨pq; J‖V‖rs; J'⟩ with `p ≤ q`, `r ≤ s`: the values of imsrg++ `TwoBody.GetTBME_J_norm`
+  (`TwoBodyME.cc:408`). Do **not** use `GetTBME_J`, which returns unnormalized values (×√2 per
+  identical pair, `TwoBodyME.cc:170-176`).
   For tensor operators the value is the reduced matrix element in imsrg++'s convention (to be fixed
   when tensor operators are implemented).
 * All nonzero entries are listed, both (pq, rs) and (rs, pq). Readers check Hermiticity against

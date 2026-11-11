@@ -1,9 +1,19 @@
 # Prompt for the unsupervised implementation session
 
-Paste everything below the line into a new Claude Code session (Opus) opened on the repository
-`/Users/cheshyre/Downloads/new-imsrg` (a fresh worktree is fine). Before starting, the owner should
-review `design/claude-settings.proposed.json`, install it if agreed, and pick a permission mode
-that will not stall overnight (e.g. auto mode, or accept-edits plus the allowlist).
+**Owner pre-flight (once, before launching):**
+
+1. `git -C /Users/cheshyre/Downloads/new-imsrg switch develop`, then start the session (Opus) in
+   `/Users/cheshyre/Downloads/new-imsrg`. CLAUDE.md, AGENTS.md and the `.claude/agents/`
+   definitions must exist in the checkout **when the session starts**, because agent definitions
+   are loaded at startup. They are on `develop` only, not on `main`.
+2. Review `design/claude-settings.proposed.json`. If you agree, install it as `.claude/settings.json`
+   (or `.claude/settings.local.json`). Pick a permission mode that will not stall overnight (e.g.
+   auto mode, or accept-edits plus the allowlist).
+3. Optional hard stop against pushing:
+   `git -C /Users/cheshyre/Downloads/new-imsrg remote set-url --push origin DISABLED`
+   (undo later with `git remote set-url --push origin https://github.com/cheshyre/new-imsrg`).
+
+Then paste everything below the line.
 
 ---
 
@@ -49,9 +59,15 @@ The owner's interview answers (scope, priorities, permissions) are recorded in
 
 ## Where everything is
 
-* Repository: `/Users/cheshyre/Downloads/new-imsrg` (git). The design is on branch **`develop`**
-  (created from `feature/design-plan`). Check it out, or create your worktree from it, before doing
-  anything else. If `develop` is checked out in another worktree, work from a branch cut from it.
+* Repository: `/Users/cheshyre/Downloads/new-imsrg` (git). The design is on the local branch
+  **`develop`**. First, run `git branch --show-current` and
+  `git merge-base --is-ancestor feature/design-plan develop`. You should be on `develop` (or on a
+  branch cut from it), and the check must succeed. If you are elsewhere, switch to `develop`. If
+  `develop` lacks the design commits, stop and write that into a file `PREFLIGHT_FAILED.md` at the
+  repo root. If the `imsrg-lead` / `imsrg-implementer` / `imsrg-mechanic` / `imsrg-reviewer` agent
+  types are unavailable (the session started before `develop` was checked out), spawn
+  `general-purpose` agents with the matching `model` instead, and paste the body of the
+  corresponding `.claude/agents/*.md` file into their prompt.
 * Read first, in this order: `AGENTS.md`, `CLAUDE.md`, `design/README.md`, `design/STATUS.md`,
   `design/00-requirements-and-decisions.md`, `design/40-roadmap.md`, `design/41-agent-workflow.md`.
   Leads read the other design docs and `design/reference/*.md` as their milestone requires. You,

@@ -5,7 +5,9 @@ green, and record progress in `design/STATUS.md`. A milestone is **done** only w
 acceptance criteria pass in `tools/ci.sh` and its branch is merged into `develop`.
 
 Columns: **Lead** = model of the agent leading the milestone; **Workers** = models for its
-sub-tasks; **Par** = milestones that may run in parallel (separate worktrees).
+sub-tasks; **Par** = milestones that may run in parallel (separate worktrees). Lead `opus` means spawn an
+`imsrg-lead` agent; lead `sonnet`/`haiku` means the milestone is small enough to delegate directly
+to one `imsrg-implementer`/`imsrg-mechanic`, without a lead agent.
 
 | ID | Milestone | Depends | Par | Lead / Workers |
 |----|-----------|---------|-----|----------------|
@@ -42,9 +44,10 @@ started if time allows. Keep going down the list for as long as the session runs
   Kokkos kernel test and an MPI hello-world test (`mpirun -n 2`); the layering check passes.
 
 ## M1 — Reference build and golden harness
-* Build imsrg-devel per `20-build-and-tooling.md` §5 (`imsrg++` and `pyIMSRG`).
-* Run the old executable for IT-1 … IT-10 configurations and store the golden outputs.
-  IMSRG(3) runs are emax 2 and 3 only.
+* Build imsrg-devel per `20-build-and-tooling.md` §5 (`imsrg++`; `pyIMSRG` optional).
+* Run the old executable for the IT-1 … IT-9 configurations and store the golden outputs
+  (IMSRG(3) runs at emax 2 and 3 only). IT-10 (IMSRG(3f2)) and the flow trajectories come from the
+  harness (`refharness flow [--factorized]`).
 * Write `tools/reference/refharness.cpp` with the subcommands in `30-testing-and-validation.md`
   §3. It writes the OperatorDump format exactly as specified in `15-operator-dump-format.md`,
   which M4 implements too.

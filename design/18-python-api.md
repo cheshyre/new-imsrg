@@ -1,5 +1,9 @@
 # 18 - Python API (nanobind bindings and the `imsrg` package)
 
+> **Precedence:** where this document disagrees with `10-architecture.md`, `16-config-and-cli.md` or
+> `20-build-and-tooling.md`, those documents win (module/target names, test locations, build options,
+> dependencies via submodules). Source files use `.hpp`/`.cpp`.
+
 Status: proposal. Scope: `imsrg._core` (nanobind extension) and the pure-Python package `imsrg`.
 Old reference: `imsrg-devel/src/pyIMSRG.cc` (pybind11, 961 lines, ~150 individually exposed commutator terms, `arma::mat` as an opaque class, no numpy, no GIL release).
 
@@ -132,7 +136,7 @@ class Operator:
     # arithmetic (value semantics; Python-visible results are new Operators)
     __add__, __sub__, __mul__ (float), __rmul__, __truediv__, __neg__, __iadd__, __isub__, __imul__, __itruediv__
     def copy(self) -> Operator
-    def norm(self, *, parts: Parts = Parts.ALL) -> float     # Parts: ONE | TWO | THREE | ALL (ZeroBody included in ALL)
+    def norm(self, *, parts: Parts = Parts.ALL) -> float     # Parts: ONE | TWO | THREE | ALL; ALL = sqrt(n1^2+n2^2+n3^2), zero-body EXCLUDED (imsrg++, D12)
     def to_reduced(self) / to_unreduced(self) -> Operator
     # transformations
     def normal_order(self, *, wrt: NormalOrdering = NormalOrdering.REFERENCE) -> Operator
@@ -183,7 +187,7 @@ All readers take `ms` and return an `Operator` (no output-parameter style as in 
 ### 2.4 `imsrg.hf`
 ```python
 hf.solve(h: Operator, *, options: HFOptions = HFOptions()) -> HFResult
-@dataclass HFOptions: max_iterations=500, tolerance=1e-8, mixing=0.0, freeze_occupations=False,
+@dataclass HFOptions: max_iterations=1000, tolerance=1e-8, accelerator="diis"|"mixing", mixing=0.2 (imsrg++ default, HartreeFock.cc:59-60), freeze_occupations=False,
                       use_three_body=True, fill_lowest: bool=False
 class HFResult:
     energy: float                       # E_HF
@@ -264,7 +268,7 @@ config.from_toml(path) / from_dict(d) / to_dict(); Config.validate()      # unkn
 pipeline.run(cfg: Config) -> PipelineResult             # the library equivalent of the imsrg++ driver
 pipeline.steps: read_hamiltonian, build_model_space, hartree_fock, normal_order, flow, transform_observables, write_outputs
 ```
-`pipeline.run` is plain Python composed of the public API above (no extra C++), so it is also executable documentation; the CLI `python -m imsrg run config.toml` (entry point `imsrg`) calls it. Observables are a list of `ObservableSpec(name, kwargs)` resolved through `ops.from_name`. Results: `PipelineResult.e_hf, .e0, .observables: dict[str, float|np.ndarray], .log`.
+`pipeline.run(config)` calls the C++ `driver::run` through the bindings, so there is exactly one pipeline implementation; the step functions above remain available for interactive use. `python -m imsrg run config.toml` calls `pipeline.run`. There is **no** console-script entry point named `imsrg` (that name belongs to the C++ executable). Observables are a list of `ObservableSpec(name, kwargs)` resolved through `ops.from_name`. Results: `PipelineResult.e_hf, .e0, .observables: dict[str, float|np.ndarray], .log`.
 
 ### 2.9 Full example script
 
@@ -281,7 +285,7 @@ ms = ModelSpace.from_reference(emax=emax, e2max=2 * emax, reference="O16", hw=hw
 
 # 2N interaction (file e1max = 14, 2N-only: Hamiltonian = T_rel + V)
 h_bare = io.read_me2j("VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz", ms,
-                      file_e1max=14, hw=hw)            # includes kinetic energy T_rel (Hcm-free convention, see doc 5)
+                      file_e1max=14, file_e2max=28, file_lmax=14)  # 2N interaction ONLY; add the kinetic term separately, as the driver does
 rp2 = ops.rp2(ms)                                      # observable, built in the HO basis
 
 res = hf.solve(h_bare)
@@ -402,7 +406,7 @@ As defined in 2.2: operator state `{HOST_CURRENT, DEVICE_CURRENT, BOTH}`; read-o
 
 ## 5. Testing the bindings (pytest)
 
-Layout: `python/tests/` for binding tests (run against the installed wheel in CI), `tests/data/` for small reference arrays. C++ unit tests live in the C++ test tree; Python does *not* host the physics validation of the core, but it does host the comparisons that need an external oracle.
+Layout: `tests/python/` for binding tests (run against the installed wheel in CI), `tests/data/` for small reference arrays. C++ unit tests live in the C++ test tree; Python does *not* host the physics validation of the core, but it does host the comparisons that need an external oracle.
 
 ### 5.1 Tiers
 1. **Binding hygiene** (`test_api_surface.py`): every public symbol has a docstring; stubs are in sync (regenerate and diff); enum round trips; `repr` stability; index-type strictness (`TypeError`); error mapping (each `ImsrgError` subclass is raised by a minimal failing call); lifetime tests (`del ms` while operator alive; view survives `del op`; `StaleHostError` path); `copy` and `deepcopy` are deep (modify the copy's block, original unchanged); GIL release verified by a thread that increments a counter while `commutator` runs on a medium operator.
@@ -425,8 +429,8 @@ The old code stays buildable (read-only tree) and is the oracle for the first mi
 
 ## 6. Build and packaging
 
-- **Python package build**: `pyproject.toml` with `build-backend = "scikit_build_core.build"`, `requires = ["scikit-build-core>=0.10", "nanobind>=2.2"]`; `pip install .` builds the C++ library as part of the wheel. `[tool.scikit-build] cmake.args = ["-DIMSRG_BUILD_PYTHON=ON"]`, `wheel.packages = ["python/imsrg"]`, `wheel.install-dir = "imsrg"`, `cmake.build-type = "Release"`, `minimum-version`, and `sdist.include` listing the third-party sources we vendor. Kokkos is found with `find_package(Kokkos)` (editable installs and clusters) or built via FetchContent when `IMSRG_FETCH_KOKKOS=ON`; backend selection through `-DKokkos_ENABLE_OPENMP/CUDA/HIP` forwarded via `SKBUILD_CMAKE_ARGS`/`[tool.scikit-build.cmake.define]` and documented per cluster in `docs/install.md`. Editable dev install: `pip install -e . --no-build-isolation -Ceditable.rebuild=true`.
-- **Option**: top-level CMake option `IMSRG_BUILD_PYTHON` (default `OFF` for plain CMake builds, forced `ON` by scikit-build-core). When `OFF` the C++ library, drivers and C++ tests build with no Python/nanobind dependency.
+- **Python package build**: `pyproject.toml` with `build-backend = "scikit_build_core.build"`, `requires = ["scikit-build-core>=0.10"]` (nanobind comes from the `extern/nanobind` submodule); `pip install .` builds the C++ library as part of the wheel. `[tool.scikit-build] cmake.args = ["-DIMSRG_BUILD_PYTHON=ON"]`, `wheel.packages = ["python/imsrg"]`, `wheel.install-dir = "imsrg"`, `cmake.build-type = "Release"`, `minimum-version`, and `sdist.include` listing the third-party sources we vendor. Kokkos is found with `find_package(Kokkos)` (deps prefix or cluster module) or built from the `extern/kokkos` submodule as a fallback (no FetchContent); backend selection through `-DKokkos_ENABLE_OPENMP/CUDA/HIP` forwarded via `SKBUILD_CMAKE_ARGS`/`[tool.scikit-build.cmake.define]` and documented per cluster in `docs/install.md`. Editable dev install: `pip install -e . --no-build-isolation -Ceditable.rebuild=true`.
+- **Option**: top-level CMake option `IMSRG_BUILD_PYTHON` (default `ON` per `20-build-and-tooling.md`; forced `ON` by scikit-build-core). When `OFF` the C++ library, drivers and C++ tests build with no Python/nanobind dependency.
 - **Target layout** (bindings are a consumer of the public library, never part of it):
   ```
   python/
@@ -441,7 +445,7 @@ The old code stays buildable (read-only tree) and is the oracle for the first mi
     imsrg/                 # pure Python package (+ py.typed, _core.pyi generated)
     tests/
   ```
-  `nanobind_add_module(_core NB_STATIC STABLE_ABI LTO python/src/*.cc)` (stable ABI only where nanobind supports it with `nb::ndarray`: requires Python >= 3.12; otherwise per-version wheels), `target_link_libraries(_core PRIVATE imsrg::operators imsrg::hf imsrg::mbpt imsrg::commutators imsrg::flow imsrg::io imsrg::basis imsrg::runtime)`. **Only public library targets** (exported with `imsrg::` aliases, public headers only) are linked: no internal include directories and no `-I src/...`. Anything the bindings need that is not in a public header is a signal to add it to the public API (or to a `imsrg::testing` target), not to include private headers. `commutators::terms` is exposed from the public `imsrg::commutators_terms` target, compiled in by default but removable with `-DIMSRG_EXPOSE_TERMS=OFF` for slim wheels; the reference implementations require `-DIMSRG_BUILD_REFERENCE=ON` (on in CI, in dev wheels, off in release wheels; `terms.reference` is absent when off and tests skip).
+  `nanobind_add_module(_core NB_STATIC STABLE_ABI LTO python/src/*.cc)` (stable ABI only where nanobind supports it with `nb::ndarray`: requires Python >= 3.12; otherwise per-version wheels), `target_link_libraries(_core PRIVATE imsrg::driver imsrg::operator imsrg::hf imsrg::mbpt imsrg::commutator imsrg::flow imsrg::io imsrg::basis imsrg::exec)`. **Only public library targets** (exported with `imsrg::` aliases, public headers only) are linked: no internal include directories and no `-I src/...`. Anything the bindings need that is not in a public header is a signal to add it to the public API (or to a `imsrg::testing` target), not to include private headers. `commutators::terms` is exposed from the public `imsrg::commutators_terms` target, compiled in by default but removable with `-DIMSRG_EXPOSE_TERMS=OFF` for slim wheels; the reference implementations require `-DIMSRG_BUILD_REFERENCE=ON` (on in CI, in dev wheels, off in release wheels; `terms.reference` is absent when off and tests skip).
 - **Library linkage**: for wheels, the C++ libraries are static (`BUILD_SHARED_LIBS=OFF`, `-fPIC`) and linked into `_core`, so a single `.so` carries everything and avoids rpath issues; the Kokkos backend libs are linked statically as well. For development installs against a shared `libimsrg` (to avoid the old "remove .so before relink to prevent SIGBUS" hack), the `imsrg::*` targets can be shared and the module gets `INSTALL_RPATH $ORIGIN`.
 - **Stubs**: `nanobind_add_stub(_core_stub MODULE imsrg._core OUTPUT python/imsrg/_core.pyi PYTHON_PATH $<TARGET_FILE_DIR:_core> DEPENDS _core)` in the build; the `.pyi` is installed into the wheel.
 - **Versioning**: `imsrg.__version__` from `scikit-build-core` metadata (`dynamic = ["version"]` read from `CMakeLists.txt` project version); `imsrg.build_info()` returns git hash, compiler, Kokkos backend/arch, MPI on/off, `IMSRG_EXPOSE_TERMS`, `IMSRG_BUILD_REFERENCE` flags. Replaces old `BuildVersion`.

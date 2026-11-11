@@ -40,6 +40,10 @@ must compile and run on clusters later. Threads is optional.
   cuBLAS grouped GEMM), `eigh` (host LAPACK `dsyevd`, used for HF and small problems),
   `solve`/`lstsq` for DIIS.
 * Backends are chosen at configure time. A test runs every op against a naive reference loop.
+* Threading: BLAS calls made inside parallel regions run single-threaded
+  (`VECLIB_MAXIMUM_THREADS=1`, `OPENBLAS_NUM_THREADS=1`, or MKL sequential); large standalone GEMMs
+  outside parallel regions may use threaded BLAS. MPI tests set `OMP_NUM_THREADS` so that
+  ranks × threads ≤ cores (e.g. 4 ranks × 4 threads).
 
 ## 4. Kernel strategy
 

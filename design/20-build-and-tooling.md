@@ -27,7 +27,7 @@ under our control); build from the submodule via `tools/bootstrap_deps.sh`.
 
 macOS bootstrap (allowed by the user):
 ```bash
-brew install cmake ninja ccache open-mpi libomp     # for the new code
+brew install cmake ninja ccache open-mpi libomp clang-format   # for the new code
 brew install gsl boost openblas                     # additionally needed to build imsrg-devel
 python3 -m venv .venv && .venv/bin/pip install numpy pytest sympy scikit-build-core
 ```
@@ -76,6 +76,12 @@ For speed across many git worktrees, `tools/bootstrap_deps.sh` builds Kokkos fro
   data are present, the layering check, and `clang-format --dry-run`. This is the single command
   agents run before every merge. It must print a one-line PASS/FAIL summary.
 * `tools/check_layering.py`: enforces the module DAG (`10-architecture.md` §2).
+* `tools/ci.sh` and `tools/check_layering.py` operate on `git ls-files` only: the main checkout
+  root also holds untracked `imsrg-devel/` and `.claude/worktrees/`. pytest uses
+  `testpaths = ["tests/python", "tests/integration"]`.
+* Concurrency: never run two builds in one build directory. Tasks that share a checkout use
+  separate build dirs (`-B build/<task>`) or build sequentially. `tools/bootstrap_deps.sh` takes a
+  lock (`mkdir`-based) on the deps prefix.
 * `tools/reference/build_imsrg_devel.sh`: builds the old code outside the repo (§5).
 * `tools/reference/gen_golden_*.py|.cpp`: produces golden data (see `30-testing-and-validation.md`).
 * `.clang-format` (based on Google style, 100 columns) and `.clang-tidy` (bugprone, performance,
@@ -95,7 +101,11 @@ For speed across many git worktrees, `tools/bootstrap_deps.sh` builds Kokkos fro
 * CMake 4.x removed compatibility with very old `cmake_minimum_required` versions. If a vendored
   dependency of imsrg-devel fails to configure for that reason, pass
   `-DCMAKE_POLICY_VERSION_MINIMUM=3.5`.
-* Build both the `imsrg++` executable and the `pyIMSRG` module. Record the exact commands in
+* Build the `imsrg++` executable and the old library. The vendored pybind11 (2.13.0.dev1) likely
+  does not support the system Python 3.15: build `pyIMSRG` against Homebrew `python@3.12` if it is
+  needed, or skip it (`-DIMSRG_BUILD_PYTHON_BINDINGS=OFF`); M1 can pass with the C++ harness alone.
+  Build the harness with a small wrapper `CMakeLists.txt` in `tools/reference/` that pulls in the
+  old `src` via `add_subdirectory`. **Never run the old `install` target** (it writes into `$HOME`). Record the exact commands in
   `tools/reference/build_imsrg_devel.sh` and the git hash or date of the reference source in
   `tests/golden/README.md`.
 * If a bug fix needs a "patched reference" to validate the fixed path, apply the patch to a
@@ -112,7 +122,8 @@ executable.
 
 ## 7. Python packaging
 
-`pyproject.toml` with scikit-build-core. `pip install -e .` (or `pip install .`) builds the
+`pyproject.toml` with scikit-build-core. `pip install -e . --no-build-isolation` (with `CMAKE_ARGS`
+pointing at the Kokkos deps prefix and `OpenMP_ROOT=$(brew --prefix libomp)`) builds the
 `_core` extension through the same CMake project (`IMSRG_BUILD_PYTHON=ON`,
 `IMSRG_BUILD_TESTS=OFF`). For development, the in-tree build's `python/` directory can be put
 on `PYTHONPATH` directly. Details: `18-python-api.md`.

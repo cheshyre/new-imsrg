@@ -78,15 +78,15 @@ file3e1max=6 file3e2max=12 file3e3max=18`. **Never emax > 6. IMSRG(3) only at em
 | ID | Run | Compare |
 |----|-----|---------|
 | IT-1 | HF, O16, emax 4, 2N only | E_HF, SPEs, MBPT(2) energy |
-| IT-2 | IMSRG(2) Magnus, single reference, O16, emax 4, 2N only (default generator) | E0, first 10 flow steps, final ‖η‖ |
+| IT-2 | IMSRG(2) Magnus, single reference, O16, emax 4, 2N only (default generator) | E0, number of steps, final ‖η‖; trajectory (s, E0, ‖η‖) of the first 10 steps from `refharness flow`, which prints `%.17g` (imsrg++ stdout has only 5 decimals for s and separate 1B/2B norms) |
 | IT-3 | VS-IMSRG(2), sd-shell, O16 core, emax 4, 2N only | 0B/1B/2B of the `.snt` output |
 | IT-4 | HF + IMSRG(2), O16, emax 4, 2N + NO2B 3N | E_HF, E0 |
 | IT-5 | Natural-orbital basis, O16, emax 4, 2N + 3N | E_HF(NAT basis), E0 |
 | IT-6 | Operator transformation Rp2 (IT-2 setup) | ⟨Rp2⟩ after IMSRG |
-| IT-7 | Two-step VS decoupling (core generator, then valence generator), e.g. Ne20 in sd-shell, emax 4 | `.snt` elements |
+| IT-7 | Valence space with an open-shell reference: `reference=Ne20`, sd-shell, emax 4 (fractional occupations in normal ordering) | `.snt` elements |
 | IT-8 | Perturbative triples, O16, emax 2 and 3, 2N | E0, triples energy |
 | IT-9 | IMSRG(3)-N7 Magnus, He4 and O16, emax 2 (3 under `slow`) | E0 |
-| IT-10 | IMSRG(3f2) Magnus, O16, emax 2 and 3 | E0 |
+| IT-10 | IMSRG(3f2) Magnus, O16, emax 2 and 3 (golden data from `refharness flow --factorized`; imsrg++ has no executable switch) | E0 |
 | IT-11 | IT-2 with `mpirun -n 2` and `-n 4` | identical to IT-2 within 1e-10 relative |
 | IT-12 | IT-2 driven through legacy `key=value` arguments vs TOML config | identical results |
 | IT-13 | emax 6 O16 IMSRG(2), release build (label `slow`, `perf`) | E0 vs golden, wall time vs imsrg-devel (recorded, not asserted) |
@@ -94,7 +94,7 @@ file3e1max=6 file3e2max=12 file3e3max=18`. **Never emax > 6. IMSRG(3) only at em
 ## 5. Performance tracking
 
 `tools/bench/` holds micro-benchmarks for the key kernels (comm222_ph, comm222_pp_hh, BCH
-transform, and later the IMSRG(3) kernels) at emax 4 and 6. Results (with commit hash, preset,
+transform) at emax 4 and 6, and for the IMSRG(3) kernels at **emax 2 and 3 only**. Results (with commit hash, preset,
 thread count) are appended to `design/benchmarks/*.md`. Compare against imsrg-devel timings
 from the same machine. The goal is to be at least as fast on CPU before any GPU work.
 

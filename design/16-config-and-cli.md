@@ -13,7 +13,7 @@ Legacy source (read-only): `/Users/cheshyre/Downloads/new-imsrg/imsrg-devel/src/
 3. **One resolved object.** Sources (TOML file, legacy `key=value`, `--set`) are merged into a raw tree, defaults applied, derived values computed (effective `file_e2max`, mass number, number of steps, output stem), validation run, and the result frozen as `RunConfig`. The same object is serialised to `<output.directory>/resolved_config.toml`. Feeding that file back reproduces the run (provenance table is ignored on input).
 4. **Validate everything up front, report everything at once.** All errors are collected (not first-fail) before any expensive work. Each error has: source (file:line:col, or `legacy arg 'emax=abc'`, or `--set`), key path, what was expected (type/range/allowed values), and a "did you mean" suggestion for unknown keys/enum values. Input files are checked for existence/readability in the same preflight.
 5. **Unknown keys are hard errors** (TOML and legacy). Old behaviour (print "Unkown parameter", continue) hid typos.
-6. **Policy for old quirks:** fix genuine bugs and document; keep behaviour that defines the numerics (Magnus step-size rule, norm conventions, BCH thresholds, denominator floors). Where the old code *tolerated* something harmless/no-op, the TOML schema is strict (error) but the legacy layer downgrades to a **warning** and reproduces the old numerics, so existing scripts keep running (section 3.4).
+6. **Policy for old quirks:** fix genuine bugs and document; keep behaviour that defines the numerics (Magnus step-size rule, norm conventions, BCH thresholds). Exception: the generator denominator floor keeps the sign of the denominator (D21, owner decision). Where the old code *tolerated* something harmless/no-op, the TOML schema is strict (error) but the legacy layer downgrades to a **warning** and reproduces the old numerics, so existing scripts keep running (section 3.4).
 7. **Provenance.** `resolved_config.toml` is written at the start of the run (after validation, before the HF step) so failed runs still leave it. It contains all keys with defaults filled, canonical enum spellings, and a `[provenance]` table (version, git hash, date, original command line, legacy args verbatim, translation warnings, applied rules).
 
 Terminology: "legacy layer" = `LegacyParameters`; "TOML schema" = the new canonical config.
@@ -88,7 +88,7 @@ For single-reference runs set only `reference.nucleus`.
 |---|---|---|---|
 | `file` | path | req if table present | 3N file. |
 | `type` | enum `full`, `no2b`, `mono` | `full` | `full`: all 3N matrix elements (me3j); `no2b`: file already normal ordered to 2B in HO basis (stream.bin); `mono`: monopole-only (PL). |
-| `format` | enum `me3j`, `navratil` (PL), `hdf5` (PL) | `me3j` | file family for `type=full`. |
+| `format` | enum `me3j`, `navratil` (PL), (HDF5 dropped, D24) | `me3j` | file family for `type=full`. |
 | `no2b_precision` | enum `single`, `half` | `single` | storage precision of a `no2b` file. |
 | `e1max`, `e3max` | int | req | file e1max, e3max. |
 | `e2max` | opt int | none = no extra e2 cut | file e2max cut. |
@@ -107,7 +107,7 @@ For single-reference runs set only `reference.nucleus`.
 
 | key | type | default | meaning |
 |---|---|---|---|
-| `method` | enum `magnus`, `magnus_backoff` (PL), `magnus_modified_euler` (PL), `magnus_adaptive` (PL), `flow` (PL), `flow_euler` (PL), `flow_rk4` (PL), `restore_4th_order` (PL) | `magnus` | solver. Legacy `magnus_euler`->`magnus`, `flow_adaptive`->`flow`. |
+| `method` | enum `magnus`, `magnus_backoff` (PL), `magnus_modified_euler` (PL), `magnus_adaptive` (PL), `flow` (P1, DP45), `flow_euler` (PL), `flow_rk4` (P1), `restore_4th_order` (PL) | `magnus` | solver. Legacy `magnus_euler`->`magnus`, `flow_adaptive`->`flow`. |
 | `steps` | opt int in {1,2} | auto: 2 if valence orbits exist, else 1 | decoupling stages. |
 | `use_brueckner_bch` | bool | `false` | Brueckner-style BCH (separate 1-body then 2-body transform). |
 | `goose_tank` | bool | `false` | IMSRG(2)* goose-tank correction in commutators (PL). |
@@ -121,7 +121,7 @@ For single-reference runs set only `reference.nucleus`.
 | `valence` | enum generator | `shell_model_atan` | generator of stage 2. |
 | `qtransfer_n` | int >= 1 | `1` | exponent index for `qtransfer_atan` (`0.5*n`). |
 
-Generator enum: `white`, `atan`, `imaginary_time`, `wegner`, `qtransfer_atan`, `shell_model`, `shell_model_atan`, `shell_model_wegner`, `shell_model_imaginary_time`, `shell_model_atan_npnh`, `hartree_fock`, `one_pa`. P1: `atan`, `white`, `imaginary_time`, `shell_model_atan`, `shell_model`; the rest PL. (Legacy spellings: `shell-model-atan`, `imaginary-time`, `qtransfer-atan_<n>`, `hartree-fock`, `1PA`, ...)
+Generator enum: `white`, `atan`, `imaginary_time`, `wegner`, `qtransfer_atan`, `shell_model`, `shell_model_atan`, `shell_model_wegner`, `shell_model_imaginary_time`, `shell_model_atan_npnh`, `hartree_fock`, `one_pa`. P1 (aligned with `13-physics-modules.md` §7): `white`, `atan`, `imaginary_time`, `wegner`, `qtransfer_atan`, `shell_model`, `shell_model_atan`, `shell_model_imaginary_time`, `hartree_fock`; the rest PL. (Legacy spellings: `shell-model-atan`, `imaginary-time`, `qtransfer-atan_<n>`, `hartree-fock`, `1PA`, ...)
 
 `[imsrg.denominator]`
 
@@ -161,13 +161,14 @@ Generator enum: `white`, `atan`, `imaginary_time`, `wegner`, `qtransfer_atan`, `
 
 ### 2.8 `[imsrg3]`
 
-Whole table absent or all-default = IMSRG(2). Non-default keys without `in_flow` or `at_end` are errors in TOML.
+Whole table absent or all-default = IMSRG(2). Non-default keys without `in_flow` or `at_end` are errors in TOML (except `factorized`, which works with IMSRG(2) storage).
 
 | key | type | default | meaning |
 |---|---|---|---|
 | `in_flow` | bool | `false` | include 3-body terms in commutators during the flow (old `IMSRG3`). |
 | `at_end` | bool | `false` | after the IMSRG(2) flow, replay Omega at IMSRG(3) level (old `imsrg3_at_end`); requires `method="magnus"`. |
 | `variant` | enum `full`, `n7`, `mp4` | `full` | which 3-body commutator terms (old `imsrg3_n7`, `imsrg3_mp4`; both set = error). |
+| `factorized` | bool | `false` | IMSRG(3f2): factorized double-commutator correction inside the BCH transform. imsrg++ exposes it only as `BCH::SetUseFactorizedCorrection` (pyIMSRG), with no executable parameter; here it maps to `BchOptions::factorized`, not to the commutator TermMask. |
 | `no_qqq` | bool | `false` | drop `qqq` terms (old `imsrg3_no_qqq`). |
 | `only_2b_eta` | bool | `false` | generator stays 2-body. |
 | `only_2b_omega` | bool | `false` | Omega stays 2-body. |

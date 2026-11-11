@@ -42,8 +42,7 @@ block extents):
 | **B. Orthonormal antisymmetric basis** | Per channel, eigenvectors (eigenvalue 1) of the antisymmetrizer on the a ≤ b ≤ c, Jab set | Minimal dimension; dense, GEMM-friendly blocks for [3,3]→3 and the 3B-diagonal parts of [2,3]→3 | Needs basis-change maps (dense, per channel) to reach orbit labels; extra up-front cost |
 | **C. Partially antisymmetric** | \|(ab)Jab c⟩ with a < b (or a ≤ b), all c | Simple kernels; 2B operators act directly on the (ab) pair | About 3× memory; antisymmetrizer applied explicitly |
 
-Benchmark protocol (emax = 2 and 3, plus emax = 4 for timing only, if it fits in memory; E3max
-as in the tests):
+Benchmark protocol (**emax = 2 and 3 only**, owner rule; E3max as in the tests):
 
 * kernels: [2,2]→3 (`comm223`-type), [2,3]→3 (`comm233`-type, pp/hh and ph), [3,3]→2, and the
   perturbative-triples energy;
@@ -82,13 +81,16 @@ learn from (`reference/05` §3), but note its shadowed `random_me` bug, which ze
    imsrg-devel is buggy, then end to end (E0 of a Magnus IMSRG(3)-N7 flow at emax 2 and 3).
 3. **IMSRG(3f2)**: the factorized double-commutator terms inside BCH. Validate against
    imsrg-devel (`UnitTestFactorized.py` cases) and against explicit IMSRG(3) evaluation of the
-   same double commutator at emax 2.
+   same double commutator at emax 2. imsrg++ has no executable parameter for it (only
+   `BCH::SetUseFactorizedCorrection`, reachable from pyIMSRG), so golden flow data come from the
+   harness (`refharness flow --factorized`). In our code it is `BchOptions::factorized`.
 4. Later: the full IMSRG(3) term set; MPI distribution of 3B blocks (D14 phase 2); GPU tuning.
 
 ## 5. Data-structure requirements fixed now (so core work does not block IMSRG(3))
 
 * `Operator::three_body` is `std::optional<ThreeBody>`. `ThreeBody` hides its layout behind a
   small interface, so the layout choice does not leak into the commutator signatures.
+* `ThreeBodyLayout` provides `imsrgpp_norm()`, which reproduces imsrg++'s n3 for any layout (D12).
 * `ThreeBodyChannels` lives in `basis` and is built lazily on request
   (`ModelSpace::with_three_body(cuts)`).
 * `CommutatorOptions` already carries `Truncation`, `TermMask`, and `ThreeBodyCuts`

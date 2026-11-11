@@ -33,6 +33,10 @@ we do not port it line by line.
 6. **Old-code bugs:** fix them, document each in `design/30-testing-and-validation.md` §6, and
    validate the fixed path another way (brute force, a patched reference copy, or a limit case).
 7. Never commit large files (> 1 MB) or generated data. Golden data in `tests/golden/` stays small.
+8. Never run two builds in the same build directory at once. Tasks sharing a checkout use their own
+   build directory (`cmake --preset dev-openmp -B build/<task>`) or build one after another.
+9. Scripts and globs work on `git ls-files`: the main checkout root also holds untracked
+   `imsrg-devel/` and `.claude/worktrees/`.
 
 ## Build and test (available after milestone M0)
 
@@ -43,7 +47,8 @@ cmake --build --preset dev-openmp
 ctest --preset dev-openmp -L unit  # labels: unit, integration, mpi, slow, reference
 tools/ci.sh dev-openmp             # the full pre-merge check; prints PASS/FAIL
 ```
-Python: `.venv/bin/pip install -e .` then `.venv/bin/pytest tests/python`.
+Python: `CMAKE_ARGS="-DKokkos_ROOT=$HOME/.cache/imsrg-deps/kokkos-openmp -DOpenMP_ROOT=$(brew --prefix libomp)" .venv/bin/pip install -e . --no-build-isolation`,
+then `.venv/bin/pytest tests/python`.
 
 ## Code conventions
 
@@ -73,7 +78,8 @@ Python: `.venv/bin/pip install -e .` then `.venv/bin/pytest tests/python`.
   neutron. Proton indices are even; neutron = proton + 1.
 * 2B kets `|pq; J⟩` with `p ≤ q`, lexicographic. Matrix elements are stored **normalized** and
   antisymmetrized. Getters for unnormalized values are named explicitly.
-* Operator norms: 1B weighted by (2j+1), 2B by (2J+1)². These drive step sizes and BCH
+* Operator norms: 1B weighted by (2j+1), 2B by (2J+1)², 3B as imsrg++'s canonical pn Frobenius norm
+  (for any layout); the zero-body part is excluded from the total. These drive step sizes and BCH
   thresholds; do not change them.
 * Units: MeV and fm. Physical constants are copied exactly from imsrg++ `PhysicalConstants.hh`.
 

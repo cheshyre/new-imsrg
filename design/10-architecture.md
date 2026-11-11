@@ -69,6 +69,10 @@ python   _core       nanobind module                                            
 
 Rules:
 
+* Dependencies are **transitive**: a module may include headers from its listed dependencies and
+  everything they depend on. `base` is available everywhere.
+* Input 3N containers (NO2B, isospin me3j storage) are data types in `operator`; `io` fills them,
+  and `hf` and normal ordering consume them.
 * `flow` does **not** depend on `hf`, `io` or `opslib`. The driver wires them together.
 * `commutator_ref` is never linked into production targets, only into tests and the Python
   test helpers.

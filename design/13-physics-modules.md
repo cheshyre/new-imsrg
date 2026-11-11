@@ -11,8 +11,9 @@ implementing a module.**
   Orbits are sorted by HO energy.
 * Truncations: `emax`, `lmax`, and the optional `emax_unocc`/`emax_imsrg` from the old
   parameters. There is **no E2max cut on 2B kets** (E2max is used only by file readers).
-  E3max defaults to `min(14, 3*emax)` in imsrg++; we keep that default but make it explicit in
-  the config.
+  E3max: the imsrg++ *driver* default is **12** (`Parameters.hh:130`, applied at `imsrg++.cc:335`);
+  the `min(14, 3*emax)` in the ModelSpace constructor is always overwritten by the driver. Use 12
+  as the legacy default, and make it explicit in the config.
 * Reference: nucleus names such as `O16`, `Ca48`, `He4` map to Z and N. Filling is by HO energy
   ordering, with equal filling of open shells, as in imsrg++, unless an occupation file is given.
   After HF, orbits are re-filled by HF energy (`freeze_occupations=false` is the default).
@@ -29,8 +30,11 @@ implementing a module.**
 * 2B normalization: matrix elements are stored normalized. imsrg++ getters return
   `sqrt((1+δpq)(1+δrs)) * V` for the "unnormalized" accessors; implement the same pair of
   accessors (`get_normalized`, `get_unnormalized`) and name them explicitly.
-* Norms (D12): 1B part weighted by (2j+1), 2B part by (2J+1)². These norms drive step sizes and
-  BCH thresholds, so they must match imsrg++ exactly.
+* Norms (D12): 1B part weighted by (2j+1), 2B part by (2J+1)². The total is √(n1² + n2² + n3²)
+  **without** the zero-body part (`Operator.cc:1644-1661`). n3 is imsrg++'s Frobenius norm over its
+  canonical pn storage (`ThreeBodyStorage_pn.cc:341`); every 3B layout must reproduce that value
+  (`ThreeBodyLayout::imsrgpp_norm()`, tested against harness dumps). These norms drive step sizes,
+  Omega splitting and BCH termination, so they must match imsrg++ exactly.
 * Normal ordering: vacuum ↔ reference for 2B (0, 1, 2 body) and 3B → 2B, 1B, 0B. NO2B with
   fractional occupations is included.
 * Known reference bugs to fix (fix + document policy): `Subtract` in isospin 3B storage adds;
@@ -51,12 +55,16 @@ Phase-1 formats, in this order:
    and when the whole file is read, check the count at EOF. For the test file,
    `file2e1max=14 file2e2max=28 file2lmax=14`; **verified**: the file holds exactly 168,066,656
    values after the header, which equals the predicted count for these truncations. Reading stops after the prefix
-   needed for the calculation's emax. Values arrive in isospin form, 4 floats per J line
-   (`T0 pn, nn, T1 pn, pp`); convert to pn exactly as `Set_pn_TBME_from_iso` does.
+   needed for the calculation's emax. Parse the file as a **token stream** (the test file has 10 values per text line, unrelated to
+   the record structure): 4 values per (abcd, J) record (`T0 pn, nn, T1 pn, pp`). Parse each value
+   into a `float` first, then widen to double, exactly as imsrg++ does (`ReadWrite.cc:882`);
+   otherwise read values differ at the 1e-7 relative level. Convert to pn exactly as
+   `Set_pn_TBME_from_iso` does.
 2. **NO2B** (`*.stream.bin`, float, or half with `no2b_precision=half`). The test file is
    `NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin` with `file3e1max=6
-   file3e2max=12 file3e3max=18`. imsrg++ detects the type from the file name; we take it from
-   config (`three_body.format = "no2b"`) and only warn on a name mismatch.
+   file3e2max=12 file3e3max=18`. imsrg++ takes the type from `3bme_type=no2b` (`imsrg++.cc:477`); the file name only selects
+   the encoding. Our config key is `[interaction.three_body] type = "no2b"`. Verified: the test
+   file holds exactly 32,685,840 floats, the expected count for (6, 12, 18) in single precision.
 3. **Tokyo `.snt`** and **NuShellX `.int/.sps`** writers for valence-space interactions and
    operators. They must match imsrg++ output **byte-for-byte modulo floating-point formatting**;
    compare numerically, line by line.
@@ -100,7 +108,9 @@ Phase-1 formats, in this order:
   and term-by-term tests on random (anti-)Hermitian operators against imsrg-devel golden data.
 * IMSRG(3) terms: see `14-imsrg3-plan.md`.
 * Term selection uses an enum bitset `TermMask` in `CommutatorOptions` (no string keys) and
-  named presets: `imsrg2`, `imsrg3_n7`, `imsrg3_full`, `imsrg3f2`.
+  named presets: `imsrg2`, `imsrg3_n7`, `imsrg3_full`. IMSRG(3f2) is **not** a TermMask preset:
+  it acts at the BCH level (it reuses the nested commutator from two steps back, `BCH.cc:182-191`)
+  and is switched on with `BchOptions::factorized` (`[imsrg3] factorized = true`).
 
 ## 7. flow (reference: `reference/03`)
 
@@ -108,7 +118,8 @@ Phase-1 formats, in this order:
   `Omega ← BCH_Product(η ds, Omega)`, then `H ← BCH_Transform(H0, Omega)`) and `flow_rk4` /
   `flow` (DP45 on H). Later: `magnus_modified_euler`, `magnus_adaptive`, `restore_4th_order`.
 * Step size: `ds = min(domega/‖η‖, domega/‖η‖/(‖Ω‖+1e-9), (omega_norm_max+1e-5)/‖η‖, dsmax)`,
-  recomputed every step. `ds_0` is effectively unused in magnus; keep it for flow methods.
+  recomputed every step, then capped with `ds = min(ds, smax - s)`; replicate the `domega` bump
+  too (`IMSRGSolver.cc:290`, `:335`). `ds_0` is effectively unused in magnus; keep it for flow methods.
 * Omega stack: when `‖Ω‖ > omega_norm_max`, push Ω and restart from the transformed H.
   Operators are transformed afterwards by replaying the stack. Optional scratch-to-disk.
 * BCH transform: nested commutators with 1/i!, terminating on a threshold epsilon, at most 40

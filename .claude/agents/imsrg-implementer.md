@@ -19,8 +19,9 @@ Rules:
   kernels).
 * Follow the conventions in `AGENTS.md`: strong types, value semantics, no globals, no `exit()`,
   no Kokkos in public headers, device-code rules for kernels.
-* Build and run the relevant tests (`cmake --build --preset dev-openmp` and `ctest --preset
-  dev-openmp -R <module>`) before you commit. Commit on the branch you were given with an
+* Build and run the relevant tests before you commit, in the build directory your brief names
+  (default: the `dev-openmp` preset's directory; if other workers share your checkout, use your
+  own, e.g. `cmake --preset dev-openmp -B build/<task>`). Commit on the branch you were given with an
   explanatory message and a `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>` trailer.
   Never push. Never use `git stash`.
 * Report (≤ 200 words): files changed, commits, test results (pass/fail counts), anything you

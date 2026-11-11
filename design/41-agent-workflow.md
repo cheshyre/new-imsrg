@@ -33,7 +33,9 @@ orchestrator → lead → worker structure works as described.
 
 * Parallel leads use `isolation: "worktree"`, one worktree per milestone, so they never edit
   the same checkout. Workers inside one lead's milestone share the lead's worktree and must
-  touch disjoint files, or run one after another.
+  touch disjoint files, or run one after another. Workers that share a checkout use separate
+  build directories (`-B build/<task>`) or build one at a time; two builds must never run in the
+  same build directory.
 * Kokkos is built once per backend into the deps prefix (`tools/bootstrap_deps.sh`), so a new
   worktree only compiles our code. ccache is shared.
 * Merge conflicts are resolved by the orchestrator (or delegated to the lead that owns the
