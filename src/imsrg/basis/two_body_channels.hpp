@@ -221,6 +221,12 @@ class TwoBodyKetSubsets {
   std::span<const LocalKetIndex> subset_table() const noexcept { return subset_table_; }
   /// Offsets into `subset_table()`, size num_channels() * kNumKetClasses + 1.
   std::span<const std::int32_t> subset_offsets() const noexcept { return subset_offsets_; }
+  /// Flat table aligned with `subset_table()`: n_p n_q of each entry (meaningful only inside the
+  /// HH and PH subsets, 0 elsewhere). For device mirrors.
+  std::span<const double> occupation_product_table() const noexcept { return occupation_products_; }
+  /// Flat table aligned with `subset_table()`: (1 - n_p)(1 - n_q) of each entry (meaningful only
+  /// inside the HH and PH subsets, 0 elsewhere). For device mirrors.
+  std::span<const double> vacancy_product_table() const noexcept { return vacancy_products_; }
 
  private:
   std::int32_t num_channels_ = 0;

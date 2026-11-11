@@ -40,3 +40,12 @@ imsrg_add_test(NAME basis_model_space
   DEPS basis
   LABELS unit)
 target_compile_definitions(basis_model_space PRIVATE IMSRG_GOLDEN_DIR="${_imsrg_golden_dir}")
+
+# Device-copyable index tables (DeviceTables): device accessors are evaluated in kernels
+# (device_tables_kernels.cpp) and compared with the host classes.
+imsrg_add_test(NAME basis_device_tables
+  SOURCES test_device_tables.cpp device_tables_kernels.cpp
+          ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cpp
+  DEPS basis exec
+  LABELS unit
+  NO_GTEST_MAIN)
