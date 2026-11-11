@@ -211,6 +211,26 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
   **Assumed meanwhile:** `model_space_for_dump` builds the partition with the holes
   (n >= OCC_CUT) as core and every other orbit as q-space; the reader rejects occupations that
   differ from the target model space unless `check_occupations = false`.
+* **M7-Q1** (2026-11-12, M7 lead) - The golden README called the omitted
+  `Z_comm111ss__eta_white__H` rounding noise (~1e-16), but the term is ~1.4e-8 (the one-body
+  parts of eta_white and the HF H nearly commute, so the relative hermiticity check of the
+  reader, 1e-12 * max entry, rejects the dump). **Resolved in M7:** README wording corrected;
+  the tests compare comm111ss for that pair with `Z_all` minus the other golden terms (3.9e-16).
+* **M7-Q2** (2026-11-12, M7 lead) - The fast IMSRG(2) kernels support X and Y that are each
+  Hermitian or anti-Hermitian; a NonHermitian input throws NotImplementedError (the ladder and
+  Pandya paths use X^T = hX X; imsrg++ silently returns wrong numbers, reference/02 P-9).
+  `commutator_ref` handles any hermiticity. **Assumed meanwhile:** no phase-1 flow needs
+  non-Hermitian operators; add general paths (explicit Y P X products) if one does.
+* **M7-Q3** (2026-11-12, M7 lead) - design/30 section 1 lists the Jacobi identity as a property
+  test, but the IMSRG(2)-truncated commutator satisfies it only for one-body operators (the
+  dropped 3B part of [Y2, W2] feeds back into 2B through comm132-type terms). **Assumed
+  meanwhile:** the Jacobi test uses particle_rank-1 operators; antisymmetry, linearity and the
+  hermiticity of [A, H] are tested for the full IMSRG(2) commutator.
+* **M7-Q4** (2026-11-12, M7 lead) - Workspace memory: the ladder intermediates (Mpp, Mhh and the
+  gathered operands, about 4x a two-body operator) and the Pandya scratch (XK, YK, W, ZB, about
+  6x) are allocated eagerly; at emax 12 that would be ~11-13 GB (reviewer estimate). Fine for
+  emax <= 6 (all tests and runs, AGENTS.md rule 3). **Assumed meanwhile:** keep the eager
+  allocation; M12 (performance) can share ZB with W, gather in place, and stream channels.
 * **M6-Q1** (2026-11-12, opslib) - The golden `Rp2.dump` includes the spin-orbit term
   (`RpSpinOrbitCorrection`), contradicting the brief. **Assumed meanwhile:** `rp2` includes it by
   default (matches the golden to 6e-16); `include_spin_orbit = false` excludes it.
