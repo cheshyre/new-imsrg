@@ -21,7 +21,7 @@ namespace imsrg::opslib {
 enum class Species { Proton, Neutron, Matter };
 
 /// Maps an imsrg++ option string ("proton", "neutron", "matter") to a `Species`.
-/// @throws std::invalid_argument for any other string.
+/// @throws InputError for any other string.
 Species species_from_string(const std::string& option);
 
 /// One-body r^2 restricted to one species (imsrg++ `R2_1body_Op(modelspace, option)`):

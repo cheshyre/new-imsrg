@@ -1,8 +1,7 @@
 #include "imsrg/opslib/radius.hpp"
 
-#include <stdexcept>
-
 #include "imsrg/base/constants.hpp"
+#include "imsrg/base/error.hpp"
 #include "imsrg/operator/arithmetic.hpp"
 #include "imsrg/opslib/center_of_mass.hpp"
 #include "imsrg/opslib/detail/pair_engine.hpp"
@@ -45,7 +44,7 @@ Species species_from_string(const std::string& option) {
   if (option == "matter") {
     return Species::Matter;
   }
-  throw std::invalid_argument("species_from_string: unknown option '" + option + "'");
+  throw InputError("species_from_string: unknown option '" + option + "'");
 }
 
 op::Operator r2_one_body(const std::shared_ptr<const basis::ModelSpace>& ms, Species species) {

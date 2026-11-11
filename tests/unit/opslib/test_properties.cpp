@@ -3,11 +3,11 @@
 #include <cmath>
 #include <filesystem>
 #include <iostream>
-#include <stdexcept>
 
 #include <gtest/gtest.h>
 
 #include "imsrg/base/constants.hpp"
+#include "imsrg/base/error.hpp"
 #include "imsrg/operator/arithmetic.hpp"
 #include "imsrg/operator/compare.hpp"
 #include "imsrg/operator/operator_dump.hpp"
@@ -125,7 +125,7 @@ TEST(OpslibProperties, SpeciesStringsAndEdgeCases) {
   EXPECT_EQ(opslib::species_from_string("proton"), opslib::Species::Proton);
   EXPECT_EQ(opslib::species_from_string("neutron"), opslib::Species::Neutron);
   EXPECT_EQ(opslib::species_from_string("matter"), opslib::Species::Matter);
-  EXPECT_THROW(opslib::species_from_string("charge"), std::invalid_argument);
+  EXPECT_THROW(opslib::species_from_string("charge"), InputError);
   const auto ms = golden_space();
   EXPECT_EQ(op::max_abs(opslib::rp2(ms, kA, 0)).max(), 0.0);
   EXPECT_EQ(op::max_abs(opslib::rn2(ms, kA, kA)).max(), 0.0);
