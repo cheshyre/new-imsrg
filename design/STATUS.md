@@ -16,10 +16,14 @@
   fractional occupations and NO2B, basis transformation, random generator; namespace `imsrg::op`);
   M8a (driver config: TOML schema, all 85 legacy keys, operator catalog, validation, resolved-
   config writer; `apps/imsrg` CLI; `driver::run` still stops with E-PLANNED until M8).
-* **In progress:** M5+M6 (`feature/m56-io-hf`), M7 (`feature/m7-commutator`). Next: M8 flow from M7's `m7-api-ready` tag, then
+* **In progress:** M5+M6 (`feature/m56-io-hf`), M7 (`feature/m7-commutator`), M11 phase 1
+  (`feature/m11-python`). Next: M8 flow from M7's `m7-api-ready` tag, then
   the driver pipeline and the integration tests.
-* **Interruption:** all agents stopped on the 5-hour usage limit from about 01:30 to 02:30 JST and
-  were resumed. Usage budget, not wall time, is the binding constraint of the night.
+* **Interruptions:** all agents stopped on the 5-hour usage limit from about 01:30 to 02:30 JST and
+  again from about 04:15 to 07:30 JST, and were resumed. Usage budget, not wall time, is the
+  binding constraint of the night.
+* **Morning report:** `design/reports/2026-11-12-overnight.md` (draft at 07:40, finalized at the
+  end of the run).
 * **Toolchain:** Homebrew cmake 4.4.5, ninja 1.13.2, ccache 4.14.3, Open MPI 5.0.11, libomp
   23.1.5, clang-format 23.1.5, gsl, boost, openblas; Apple clang 21; Python 3.15.2. Kokkos 5.3.0
   (submodule) installed per backend in `~/.cache/imsrg-deps` by `tools/bootstrap_deps.sh`; shared
