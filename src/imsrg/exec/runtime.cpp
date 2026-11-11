@@ -1,5 +1,6 @@
 #include "imsrg/exec/runtime.hpp"
 
+#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <vector>
@@ -11,6 +12,17 @@
 namespace imsrg::exec {
 
 namespace {
+
+void validate(const RuntimeOptions& o) {
+  if (o.num_threads == 0 || o.num_threads < -1) {
+    throw ConfigError("exec::Runtime: num_threads must be -1 (default) or >= 1, got " +
+                      std::to_string(o.num_threads));
+  }
+  if (o.device_id < -1) {
+    throw ConfigError("exec::Runtime: device_id must be -1 (default) or >= 0, got " +
+                      std::to_string(o.device_id));
+  }
+}
 
 void require_fresh_kokkos() {
   if (Kokkos::is_initialized()) {
@@ -47,11 +59,13 @@ bool has_flag(const std::vector<char*>& args, const std::string& prefix) {
 }  // namespace
 
 Runtime::Runtime(const RuntimeOptions& options) {
+  validate(options);
   require_fresh_kokkos();
   Kokkos::initialize(make_settings(options));
 }
 
 Runtime::Runtime(int& argc, char** argv, const RuntimeOptions& options) {
+  validate(options);
   require_fresh_kokkos();
   // Kokkos::initialize(argc, argv) cannot be combined with settings, so options are turned into
   // arguments (unless the command line already sets them) appended to a working copy.
@@ -74,7 +88,12 @@ Runtime::Runtime(int& argc, char** argv, const RuntimeOptions& options) {
   Kokkos::initialize(n, args.data());
   // Kokkos removed the arguments it consumed, including every appended --kokkos-* flag (whose
   // strings die with `extra`), so at most the caller's arguments remain; hand them back.
-  if (n > argc) {
+  bool only_caller_args = n <= argc;
+  for (int i = 0; i < n && only_caller_args; ++i) {
+    only_caller_args =
+        std::find(argv, argv + argc, args[static_cast<std::size_t>(i)]) != argv + argc;
+  }
+  if (!only_caller_args) {
     Kokkos::finalize();
     throw RuntimeError("exec::Runtime: Kokkos left appended --kokkos-* arguments unconsumed");
   }

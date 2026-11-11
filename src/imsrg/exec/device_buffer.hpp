@@ -39,7 +39,10 @@ struct DeviceBufferAccess;
 /// Owning array of `T` in the default memory space. Value semantics: copying deep-copies the data
 /// on the device, moving is cheap and leaves the source empty. Requires an initialized
 /// `exec::Runtime` for every operation except default construction, moves of empty buffers, and
-/// destruction of empty buffers.
+/// destruction of empty buffers. Empty buffers (size 0, also after `resize(0)` or a move) hold no
+/// allocation, so they may outlive the Runtime; non-empty buffers must be destroyed before it.
+/// Not thread-safe: the lazily created host mirror is mutable state (also behind `const`), so
+/// create it (`host_span()` or `sync_to_host()`) before sharing a buffer between host threads.
 template <class T>
 class DeviceBuffer {
   static_assert(std::is_trivially_copyable_v<T>, "DeviceBuffer<T> needs a trivially copyable T");
@@ -50,7 +53,8 @@ class DeviceBuffer {
   /// Empty buffer without allocation; `label()` is "imsrg::DeviceBuffer".
   DeviceBuffer() noexcept;
 
-  /// `n` zero-initialized elements, allocated with `label` (shown by Kokkos tools).
+  /// `n` zero-initialized elements, allocated with `label` (shown by Kokkos tools). `n == 0`
+  /// allocates nothing (and keeps the default label).
   explicit DeviceBuffer(std::size_t n, std::string_view label = "imsrg::DeviceBuffer");
 
   /// Deep copy (device-to-device); the host mirror of the copy is created on demand.

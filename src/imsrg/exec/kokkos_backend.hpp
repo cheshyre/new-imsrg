@@ -17,6 +17,7 @@
 
 #include <Kokkos_Core.hpp>
 
+#include "imsrg/base/assert.hpp"
 #include "imsrg/exec/detail/device_buffer_impl.hpp"
 #include "imsrg/exec/device_buffer.hpp"
 
@@ -50,6 +51,7 @@ DeviceView<const T> view(const DeviceBuffer<T>& buf) {
 /// value captures. Asynchronous on async backends.
 template <class F>
 void parallel_for(const char* name, Index n, const F& f) {
+  IMSRG_CHECK(n >= 0, name);
   Kokkos::parallel_for(name, RangePolicy(0, n), f);
 }
 
@@ -57,6 +59,7 @@ void parallel_for(const char* name, Index n, const F& f) {
 template <class F>
 void parallel_for_md(const char* name, Index n0, Index n1, const F& f) {
   using Policy = Kokkos::MDRangePolicy<DefaultExecSpace, Kokkos::Rank<2>, Kokkos::IndexType<Index>>;
+  IMSRG_CHECK(n0 >= 0 && n1 >= 0, name);
   Kokkos::parallel_for(name, Policy({0, 0}, {n0, n1}), f);
 }
 
@@ -65,6 +68,7 @@ void parallel_for_md(const char* name, Index n0, Index n1, const F& f) {
 /// reduction order.
 template <class F, class T>
 void parallel_reduce(const char* name, Index n, const F& f, T& result) {
+  IMSRG_CHECK(n >= 0, name);
   Kokkos::parallel_reduce(name, RangePolicy(0, n), f, result);
 }
 
@@ -72,15 +76,20 @@ void parallel_reduce(const char* name, Index n, const F& f, T& result) {
 /// (`if (x > m) m = x`). Blocking. For `n == 0` the result is the lowest value of `T`.
 template <class F, class T>
 void parallel_reduce_max(const char* name, Index n, const F& f, T& result) {
+  IMSRG_CHECK(n >= 0, name);
   Kokkos::parallel_reduce(name, RangePolicy(0, n), f, Kokkos::Max<T>(result));
 }
 
-/// Runs `f(member)` once per team: `league_size` teams of `team_size` threads (<= 0: chosen by
-/// Kokkos, AUTO), each with `scratch_bytes_per_team` bytes of level-0 team scratch, available in
-/// the kernel through `member.team_scratch(0)`. Asynchronous on async backends.
+/// Runs `f(member)` on EVERY thread of `league_size` teams of `team_size` threads (<= 0: chosen
+/// by Kokkos, AUTO; Serial always uses 1), each team with `scratch_bytes_per_team` bytes of
+/// level-0 scratch (`member.team_scratch(0)`). Kernels must therefore split work with
+/// `Kokkos::TeamThreadRange` and guard per-team writes with `Kokkos::single(PerTeam)` and
+/// `member.team_barrier()`; CPU tests with team size 1 do not exercise this, so review it.
+/// Asynchronous on async backends.
 template <class F>
 void team_for(const char* name, int league_size, int team_size, std::size_t scratch_bytes_per_team,
               const F& f) {
+  IMSRG_CHECK(league_size >= 0, name);
   Kokkos::TeamPolicy<DefaultExecSpace> policy =
       team_size > 0 ? Kokkos::TeamPolicy<DefaultExecSpace>(league_size, team_size)
                     : Kokkos::TeamPolicy<DefaultExecSpace>(league_size, Kokkos::AUTO);

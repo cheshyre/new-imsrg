@@ -12,7 +12,8 @@
 namespace imsrg::exec {
 
 /// Options of the execution runtime. A value of -1 selects the Kokkos default (which honours
-/// `OMP_NUM_THREADS`, `--kokkos-*` arguments, and the environment).
+/// `OMP_NUM_THREADS`, `--kokkos-*` arguments, and the environment). Other values must be >= 1
+/// (threads) or >= 0 (device id); the `Runtime` constructors throw `ConfigError` otherwise.
 struct RuntimeOptions {
   int num_threads = -1;              ///< Host threads for the OpenMP/Threads backends.
   int device_id = -1;                ///< Accelerator index for CUDA/HIP backends.

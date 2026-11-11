@@ -158,3 +158,44 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
   applied when the 3B kets are enumerated (imsrg++ enumerates with E3max only and applies them in
   the commutators); `ThreeBodyChannels::passes_configuration_cut` evaluates them per ket.
   **Assumed meanwhile:** M10 decides whether its layout drops those kets or masks them.
+* **M2-Q1** (2026-11-12, M2) — Logging needs process-wide output configuration (level, "only rank
+  0 prints"), while AGENTS.md forbids mutable globals. `base` provides explicit, thread-safe
+  `log::Logger` objects plus one `log::default_logger()` behind `imsrg::log::info(...)` (design/10
+  §4). Timer registries and profiler hooks are explicit objects, never global. **Assumed
+  meanwhile:** the default logger is the single sanctioned global (it configures output only and
+  never affects results).
+* **M2-Q2** (2026-11-12, M2) — design/10 §4 describes one `imsrg::Runtime` "(module exec plus
+  comm)", but the DAG forbids exec<->comm edges and `mpi.h` is confined to comm. **Assumed
+  meanwhile:** two RAII objects, `comm::Environment` (MPI, create first) and `exec::Runtime`
+  (Kokkos, create second); the combined `imsrg::Runtime` is a thin composition in `driver` (M8).
+  Alternative: allow comm -> exec (useful later for GPU-aware MPI on `DeviceBuffer`s).
+* **M2-Q3** (2026-11-12, M2) — imsrg++ `PhysConst::INVSQRT2` is `0.7071067811865` (13 digits,
+  relative error 6.7e-14), used in Operator.cc, imsrg_util.cc, Atomic.cc and DaggerCommutators.cc.
+  `constants::inv_sqrt2` copies it exactly (as instructed). **Assumed meanwhile:** later modules
+  use it only where they reproduce those imsrg++ formulas and `1/sqrt(2)` elsewhere; either way the
+  effect (~1e-13 relative) is far below the 1e-10 unit tolerances.
+* **M2-Q4** (2026-11-12, M2) — linalg's non-Accelerate path declares Fortran LAPACK/BLAS symbols
+  without the hidden string-length arguments that gfortran-compiled libraries formally expect
+  (a known ABI pitfall); it is not compiled on this machine (Accelerate is used). **Assumed
+  meanwhile:** fine for OpenBLAS/MKL in practice; on the first Linux build, test it or switch to
+  passing the lengths (or LAPACKE).
+* **M2-Q5** (2026-11-12, M2) — CPU CI cannot exercise GPU-only paths flagged by the exec review:
+  `DeviceBuffer` with a separate host mirror (sync copies) and `team_for` kernels with team size
+  > 1 (`team_barrier`/`single`). **Assumed meanwhile:** reviewers check these by hand; add a
+  CUDA/HIP compile-and-run job when a GPU machine is available.
+* **M2-Q6** (2026-11-12, M2) — `angmom::talmi_b` uses the Brody-Moshinsky factorial formula in
+  double like `AngMom::TalmiB` (accurate to ~1e-15 relative for n <= 6, l <= 12, checked against
+  exact values), while imsrg_util switches to an lgamma/long-double variant for large arguments and
+  to quadrature when radial sums cancel badly (pmax >= 20). **Assumed meanwhile:** the factorial
+  version suffices for M2; whoever ports radial integrals (opslib) decides on the large-argument
+  path.
+
+* **M2-Q7** (2026-11-12, M2) — `angmom::moshinsky` evaluates the Buck et al. sum in
+  double-double (the plain double algorithm of imsrg++ misses the 1e-12 bound on 22 of the
+  405,537 brackets with E <= 16, by up to 7.8e-11 relative, because large prefactors amplify
+  the rounding of the CG/9j factors), so our values deviate from imsrg++ by up to ~1e-10
+  relative on such brackets (logged in `30` §6). Its double-double tables cover E <= 40
+  (`moshinsky_max_energy`, emax 20; NaN beyond, and `MoshinskyTable` checks it). The double
+  `wigner` functions are validated on the emax-8 domain; at l ~ 30 the double <l1 0 l2 0|L 0>
+  errs by ~1e-11. **Assumed meanwhile:** double-double only for the bracket tables (built once
+  per run; ~3 s for all E <= 16 in a Debug build); raise the limits if larger spaces need them.
