@@ -37,6 +37,7 @@ std::shared_ptr<const ModelSpace> ModelSpace::create(SingleParticleBasis basis, 
   ms->two_body_ = std::move(two_body);
   ms->two_body_subsets_ =
       std::make_shared<const TwoBodyKetSubsets>(*ms->two_body_, *ms->reference_, *ms->partition_);
+  ms->particle_hole_ = std::make_shared<const ParticleHoleChannels>(*ms->two_body_);
   return ms;
 }
 
@@ -62,6 +63,8 @@ std::shared_ptr<const ModelSpace> ModelSpace::with_reference_and_partition(
   std::shared_ptr<ModelSpace> ms(new ModelSpace());
   ms->basis_ = basis_;
   ms->two_body_ = two_body_;
+  ms->particle_hole_ = particle_hole_;
+  ms->three_body_ = three_body_;
   ms->reference_ = std::make_shared<const Reference>(std::move(reference));
   ms->partition_ = std::make_shared<const Partition>(std::move(partition));
   ms->two_body_subsets_ =
@@ -69,9 +72,20 @@ std::shared_ptr<const ModelSpace> ModelSpace::with_reference_and_partition(
   return ms;
 }
 
+std::shared_ptr<const ModelSpace> ModelSpace::with_three_body(const ThreeBodyCuts& cuts) const {
+  std::shared_ptr<ModelSpace> ms(new ModelSpace(*this));
+  ms->three_body_ = std::make_shared<const ThreeBodyChannels>(*basis_, cuts);
+  return ms;
+}
+
 bool operator==(const ModelSpace& a, const ModelSpace& b) noexcept {
   if (&a == &b) return true;
-  return *a.basis_ == *b.basis_ && *a.reference_ == *b.reference_ && *a.partition_ == *b.partition_;
+  const bool same_3b = (a.three_body_ == nullptr && b.three_body_ == nullptr) ||
+                       (a.three_body_ != nullptr && b.three_body_ != nullptr &&
+                        a.three_body_->cuts().e3max == b.three_body_->cuts().e3max &&
+                        a.three_body_->cuts().emax_3body == b.three_body_->cuts().emax_3body);
+  return same_3b && *a.basis_ == *b.basis_ && *a.reference_ == *b.reference_ &&
+         *a.partition_ == *b.partition_;
 }
 
 }  // namespace imsrg::basis

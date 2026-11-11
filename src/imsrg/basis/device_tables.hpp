@@ -13,6 +13,7 @@
 
 #include "imsrg/base/device.hpp"
 #include "imsrg/base/types.hpp"
+#include "imsrg/basis/model_space.hpp"
 #include "imsrg/basis/orbit.hpp"
 #include "imsrg/basis/partition.hpp"
 #include "imsrg/basis/reference.hpp"
@@ -125,6 +126,13 @@ class DeviceTables {
   DeviceTables(const SingleParticleBasis& basis, const Reference& reference,
                const Partition& partition, const TwoBodyChannels& channels,
                const TwoBodyKetSubsets& subsets);
+
+  /// The device tables of a model space (its basis, reference, partition, two-body channels and
+  /// ket subsets). The ModelSpace does not own them (M3-Q7); the caller keeps this object alive
+  /// as long as kernels use its views.
+  explicit DeviceTables(const ModelSpace& ms)
+      : DeviceTables(ms.basis(), ms.reference(), ms.partition(), ms.two_body(),
+                     ms.two_body_subsets()) {}
 
   DeviceTables(const DeviceTables&) = delete;
   DeviceTables& operator=(const DeviceTables&) = delete;

@@ -162,5 +162,15 @@ TEST(DeviceTables, HostContentsAndMove) {
   EXPECT_EQ(b.subsets().num_channels, ms->two_body_subsets().num_channels());
 }
 
+// The ModelSpace convenience constructor mirrors the same parts.
+TEST(BasisDeviceTables, FromModelSpace) {
+  const auto ms = ModelSpace::from_names(BasisTruncation{2}, 16.0, "Ne20", "sd-shell");
+  const DeviceTables t(*ms);
+  EXPECT_EQ(t.orbits().num_orbits, ms->num_orbits());
+  EXPECT_EQ(t.two_body().num_kets, ms->two_body().num_kets());
+  EXPECT_EQ(t.two_body().num_channels, ms->two_body().num_channels());
+  EXPECT_EQ(t.subsets().num_channels, ms->two_body_subsets().num_channels());
+}
+
 }  // namespace
 }  // namespace imsrg::basis

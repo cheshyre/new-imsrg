@@ -7,9 +7,11 @@
 #include <memory>
 #include <string_view>
 
+#include "imsrg/basis/particle_hole_channels.hpp"
 #include "imsrg/basis/partition.hpp"
 #include "imsrg/basis/reference.hpp"
 #include "imsrg/basis/single_particle_basis.hpp"
+#include "imsrg/basis/three_body_channels.hpp"
 #include "imsrg/basis/two_body_channels.hpp"
 
 namespace imsrg::basis {
@@ -23,9 +25,11 @@ namespace imsrg::basis {
 /// channels). There are no back-pointers, so copying and moving are always correct (imsrg++'s
 /// ModelSpace copy is unsound, design/reference/01 section 9 B.20).
 ///
-/// Later milestones add the particle-hole (Pandya) channels, the optional three-body channels
-/// (`with_three_body`), device mirrors of the index tables, and the angular-momentum tables; the
-/// accessors below stay as they are.
+/// The particle-hole (Pandya) channel structure is always built (it is cheap); the three-body
+/// channels only on request (`with_three_body`). Device mirrors of the index tables are a
+/// separate object, `DeviceTables(const ModelSpace&)` (device_tables.hpp), so that building a
+/// ModelSpace never needs the Kokkos runtime (design/QUESTIONS.md M3-Q7). The angular-momentum
+/// tables are added by a later milestone.
 class ModelSpace {
  public:
   /// Assembles a model space from its parts and builds the two-body channels and ket subsets.
@@ -55,6 +59,10 @@ class ModelSpace {
   /// The per-channel ket subsets (pp, hh, ph, cc, vc, qc, vv, qv, qq) for this reference and
   /// partition.
   const TwoBodyKetSubsets& two_body_subsets() const noexcept { return *two_body_subsets_; }
+  /// The particle-hole (cross-coupled, Pandya) channels (independent of reference and partition).
+  const ParticleHoleChannels& particle_hole() const noexcept { return *particle_hole_; }
+  /// The three-body channels, or nullptr unless built with `with_three_body`.
+  const ThreeBodyChannels* three_body() const noexcept { return three_body_.get(); }
 
   /// Number of orbits.
   std::int32_t num_orbits() const noexcept { return basis_->num_orbits(); }
@@ -71,8 +79,12 @@ class ModelSpace {
   std::shared_ptr<const ModelSpace> with_reference_and_partition(Reference reference,
                                                                  Partition partition) const;
 
-  /// Structural equality: same basis, occupations and partition (operators defined on equal
-  /// model spaces may be combined).
+  /// The same model space with three-body channels for `cuts` (the 3B kets depend only on the
+  /// basis and the cuts, so derived model spaces share them). Cost: the 3B ket enumeration.
+  std::shared_ptr<const ModelSpace> with_three_body(const ThreeBodyCuts& cuts) const;
+
+  /// Structural equality: same basis, occupations and partition, and the same three-body cuts
+  /// (or both without three-body channels). Operators on equal model spaces may be combined.
   friend bool operator==(const ModelSpace& a, const ModelSpace& b) noexcept;
 
  private:
@@ -83,6 +95,8 @@ class ModelSpace {
   std::shared_ptr<const Partition> partition_;
   std::shared_ptr<const TwoBodyChannels> two_body_;
   std::shared_ptr<const TwoBodyKetSubsets> two_body_subsets_;
+  std::shared_ptr<const ParticleHoleChannels> particle_hole_;
+  std::shared_ptr<const ThreeBodyChannels> three_body_;  // may be null
 };
 
 }  // namespace imsrg::basis
