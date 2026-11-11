@@ -211,3 +211,10 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
   no switch for it. The `Elast`/norm divergence guards (|eta| > 1e12, |E| > 1e9) are harness
   additions. **Assumed meanwhile:** this is the intended IT-10 reference; O16 emax 2 converges
   with it, so no He4 substitute was needed (He4 emax 2 kept as extra).
+
+* **M7-Q1** (2026-11-12, M7 lead) - `tests/golden/commutator/README.md` calls the omitted
+  `Z_comm111ss__eta_white__H` rounding noise (~1e-16), but the term is ~1.4e-8 (the one-body
+  parts of eta_white and the HF H nearly commute, so the relative hermiticity check of the
+  reader, 1e-12 * max entry, rejects the dump). The tests compare comm111ss for that pair with
+  `Z_all` minus the other golden terms (deviation 3.9e-16). **Assumed meanwhile:** the README
+  wording is stale; the golden set is otherwise complete.
