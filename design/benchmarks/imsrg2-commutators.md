@@ -153,3 +153,94 @@ the causes named are hypotheses.
   mean and min agree within a few percent for the large terms), `OMP_PROC_BIND=false` on a
   heterogeneous CPU, the two codes are compiled with different native-architecture flags, and
   X, Y differ between the codes (different random generators; sizes and sparsity are identical).
+
+## After the first optimization pass (M7 T7, commit b202e81, 2026-11-12)
+
+Two exact work reductions, no change of results (all golden and fast-vs-reference tests
+unchanged, deviations below 2e-15): `comm122ss` now uses precomputed "lifted one-body" lists
+per (channel, ket) (target ket, orbit pair, normalization ratio times exchange phase), so each
+element is a short sum of direct block reads instead of ~32 index-computing lookups, and it
+computes the upper triangle and mirrors with hZ; `comm222_phss` fills XK and YK from one
+Pandya evaluation per (pair, ket) point using Xbar^T = hX Xbar and F Ybar F = hY Phi Ybar Phi
+(about 3x less fill work), and its inverse transform computes the upper triangle only.
+
+Same machine, same binaries and commands as above (ours rebuilt at b202e81 with
+`release-openmp -DIMSRG_BUILD_BENCH=ON`; imsrg++ harness unchanged), both codes run back to back
+in one script. The machine was shared with other builds (load average 6-8 on 18 cores), so
+expect a few percent of noise; one run per configuration.
+
+### emax 4, OMP_NUM_THREADS=1 (100 reps), after T7
+
+| term | ours mean ms | imsrg++ mean ms | ratio |
+|---|---:|---:|---:|
+| comm110ss | 0.0002 | 0.0004 | 0.50 |
+| comm220ss | 0.0345 | 0.0177 | 1.95 |
+| comm111ss | 0.0011 | 0.0027 | 0.41 |
+| comm121ss | 0.0181 | 0.0429 | 0.42 |
+| comm221ss | 0.5712 | 0.4573 | 1.25 |
+| comm122ss | 0.7624 | 0.7605 | 1.00 |
+| comm222_pp_hhss | 0.5601 | 0.3956 | 1.42 |
+| comm222_phss | 4.2988 | 3.8024 | 1.13 |
+| comm222_pp_hh_221ss | 0.5874 | 0.4846 | 1.21 |
+| commutator (full) | 5.7371 | 5.2293 | 1.10 |
+
+Workspace construction (ours): 0.88 ms.
+
+### emax 4, OMP_NUM_THREADS=6 (100 reps), after T7
+
+| term | ours mean ms | imsrg++ mean ms | ratio |
+|---|---:|---:|---:|
+| comm110ss | 0.0237 | 0.0004 | 59.25 |
+| comm220ss | 0.0205 | 0.0594 | 0.35 |
+| comm111ss | 0.0012 | 0.0027 | 0.44 |
+| comm121ss | 0.0210 | 0.0233 | 0.90 |
+| comm221ss | 0.2617 | 0.1955 | 1.34 |
+| comm122ss | 0.2113 | 0.3037 | 0.70 |
+| comm222_pp_hhss | 0.2847 | 0.1899 | 1.50 |
+| comm222_phss | 1.0386 | 0.7819 | 1.33 |
+| comm222_pp_hh_221ss | 0.3520 | 0.2187 | 1.61 |
+| commutator (full) | 1.6390 | 1.4469 | 1.13 |
+
+Workspace construction (ours): 1.54 ms.
+
+### emax 6, OMP_NUM_THREADS=1 (10 reps), after T7
+
+| term | ours mean ms | imsrg++ mean ms | ratio |
+|---|---:|---:|---:|
+| comm110ss | 0.0004 | 0.0006 | 0.67 |
+| comm220ss | 0.4347 | 0.1375 | 3.16 |
+| comm111ss | 0.0030 | 0.0135 | 0.22 |
+| comm121ss | 0.0884 | 0.1832 | 0.48 |
+| comm221ss | 9.5102 | 9.5468 | 1.00 |
+| comm122ss | 14.5002 | 6.8525 | 2.12 |
+| comm222_pp_hhss | 9.2844 | 9.1138 | 1.02 |
+| comm222_phss | 54.9399 | 47.6614 | 1.15 |
+| comm222_pp_hh_221ss | 9.6493 | 9.7740 | 0.99 |
+| commutator (full) | 79.7536 | 66.6579 | 1.20 |
+
+Workspace construction (ours): 6.52 ms.
+
+### emax 6, OMP_NUM_THREADS=6 (10 reps), after T7
+
+| term | ours mean ms | imsrg++ mean ms | ratio |
+|---|---:|---:|---:|
+| comm110ss | 0.0171 | 0.0007 | 24.43 |
+| comm220ss | 0.1090 | 0.1900 | 0.57 |
+| comm111ss | 0.0028 | 0.0135 | 0.21 |
+| comm121ss | 0.0360 | 0.0604 | 0.60 |
+| comm221ss | 2.6869 | 2.5739 | 1.04 |
+| comm122ss | 2.8853 | 2.4184 | 1.19 |
+| comm222_pp_hhss | 2.8795 | 2.6793 | 1.07 |
+| comm222_phss | 11.0953 | 8.6634 | 1.28 |
+| comm222_pp_hh_221ss | 2.7947 | 2.7710 | 1.01 |
+| commutator (full) | 16.7004 | 14.7446 | 1.13 |
+
+Workspace construction (ours): 7.56 ms.
+
+Summary after T7: the full commutator is 1.10-1.20x the imsrg++ time (emax 4: 5.7 vs 5.2 ms on
+one thread, 1.6 vs 1.4 ms on six; emax 6: 80 vs 67 ms on one thread, 16.7 vs 14.7 ms on six),
+down from 1.9-2.8x. Remaining gaps: `comm222_phss` (1.15-1.33x; next steps: precomputed sparse
+recoupling maps instead of per-entry 6j/index arithmetic, design/12 section 4.2, and fewer
+passes over W/ZB), `comm122ss` serially at emax 6 (2.1x; it scales better than imsrg++ with
+threads), and the ladder GEMMs at emax 4 with six threads (1.3-1.6x: per-call gathers and the
+symmetrization pass on small blocks). These are M12 (performance) items.
