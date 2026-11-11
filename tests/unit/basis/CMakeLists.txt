@@ -20,6 +20,12 @@ imsrg_add_test(NAME basis_two_body
   DEPS basis
   LABELS unit)
 
+# Particle-hole (cross-coupled) channels and three-body kets and channels.
+imsrg_add_test(NAME basis_channels
+  SOURCES test_particle_hole_channels.cpp test_three_body_channels.cpp
+  DEPS basis
+  LABELS unit)
+
 # The golden-file parser (a test helper), its self-test, and the record-by-record comparison of
 # the basis bookkeeping with every golden file (test_golden_basis.cpp).
 imsrg_add_test(NAME basis_golden_dump

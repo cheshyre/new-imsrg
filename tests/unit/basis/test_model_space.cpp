@@ -29,7 +29,7 @@ TEST(BasisModelSpace, FromNamesMatchesEveryGoldenFile) {
     SCOPED_TRACE(name);
     const auto g = read_golden_basis_dump(golden_basis_dir() / name);
     const auto ms =
-        ModelSpace::from_names(BasisTruncation{g.emax}, g.hw, g.reference, g.valence_space);
+        ModelSpace::from_names(BasisTruncation{g.emax, g.lmax}, g.hw, g.reference, g.valence_space);
     ASSERT_EQ(ms->num_orbits(), static_cast<int>(g.orbits.size()));
     for (const auto& go : g.orbits) {
       const OrbitIndex a{go.index};

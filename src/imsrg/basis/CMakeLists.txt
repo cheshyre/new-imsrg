@@ -11,5 +11,7 @@ imsrg_add_module(NAME basis
     valence_space.cpp
     partition.cpp
     two_body_channels.cpp
+    particle_hole_channels.cpp
+    three_body_channels.cpp
     model_space.cpp
   DEPS base exec)

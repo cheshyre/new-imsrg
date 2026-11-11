@@ -66,7 +66,7 @@ GoldenBasisDump read_golden_basis_dump(const std::filesystem::path& file);
 /// The directory of the golden basis files, `IMSRG_GOLDEN_DIR "/basis"` (compile definition).
 std::filesystem::path golden_basis_dir();
 
-/// File names (not paths) of the 12 golden basis files, sorted.
+/// File names (not paths) of the 14 golden basis files, sorted.
 std::vector<std::string> golden_basis_files();
 
 }  // namespace imsrg::basis::testing
