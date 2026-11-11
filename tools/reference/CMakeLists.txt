@@ -29,6 +29,7 @@ add_executable(refharness
   rh_hamiltonian.cpp
   rh_operator.cpp
   rh_commutator.cpp
+  rh_bench.cpp
   rh_flow.cpp
 )
 target_compile_features(refharness PRIVATE cxx_std_17)

@@ -16,7 +16,8 @@
 //   basis-transform IN C.txt OUT   HartreeFock::TransformToHFBasis with C read from a text file
 //                                                                     (rh_operator.cpp)
 //   commutator TERM X Y Z   evaluate one named commutator term        (rh_commutator.cpp)
-//   generator TYPE H ETA    imsrg++ generator eta(H) of a given type    (rh_commutator.cpp)
+//   bench-commutator emax=N reps=R  time the imsrg++ commutator terms        (rh_bench.cpp)
+//   generator TYPE H ETA   imsrg++ generator eta(H) of a given type    (rh_commutator.cpp)
 //   flow [--factorized]     full IMSRG pipeline with %.17g trajectory  (rh_flow.cpp)
 //
 // Common keys (imsrg++ names): emax e3max lmax hw reference valence_space A
@@ -248,6 +249,7 @@ int main(int argc, char** argv) {
     if (c == "normal-order") return rh::cmd_normal_order(a);
     if (c == "basis-transform") return rh::cmd_basis_transform(a);
     if (c == "commutator") return rh::cmd_commutator(a);
+    if (c == "bench-commutator") return rh::cmd_bench_commutator(a);
     if (c == "generator") return rh::cmd_generator(a);
     if (c == "flow") return rh::cmd_flow(a);
     std::cerr << "refharness: unknown subcommand '" << c << "'\n";

@@ -148,6 +148,7 @@ int cmd_hf(const Args& a);
 int cmd_roundtrip(const Args& a);
 int cmd_norms(const Args& a);
 int cmd_commutator(const Args& a);
+int cmd_bench_commutator(const Args& a);
 int cmd_generator(const Args& a);
 int cmd_flow(const Args& a);
 int cmd_normal_order(const Args& a);
