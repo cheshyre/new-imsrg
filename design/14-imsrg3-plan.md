@@ -50,8 +50,10 @@ as in the tests):
 * metrics: memory per operator, build time for the layout metadata, kernel time (OpenMP, 18
   threads), and agreement with each other and with imsrg-devel / brute force to 1e-10.
 
-Record the results in `design/benchmarks/imsrg3-layout.md`, choose the layout, and add a
-decision D-row to `00-requirements-and-decisions.md`. Keep the non-chosen prototypes out of the
+Record the results in `design/benchmarks/imsrg3-layout.md`. **The session chooses the layout
+itself** *(owner: "decide and continue")*: take the best speed at acceptable memory, document the
+reasoning and the numbers, add a decision D-row to `00-requirements-and-decisions.md`, and continue
+with the IMSRG(3) terms. Keep the non-chosen prototypes out of the
 production library (delete them or move them to `tools/bench/`).
 
 ## 3. Step 2: brute-force m-scheme reference (validation backbone)

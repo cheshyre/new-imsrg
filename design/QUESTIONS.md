@@ -7,15 +7,18 @@ option, write it under "Assumed meanwhile", and continue. The owner answers inli
 ## From the planning session (2026-11-11)
 
 ### Inputs and conventions
-* **Q1** — The 2N file `VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz` has no header, so its
-  e2max and lmax cannot be read from it. **Assumed meanwhile:** `file2e2max=28`, `file2lmax=14`
-  (the imsrg++ defaults for `file2e1max=14`). The reader validates the total value count, so a
-  wrong guess is detected.
-* **Q2** — NO2B file `..._ms6_12_18.stream.bin`: single precision (float) or half? **Assumed
-  meanwhile:** float (`no2b_precision=single`, the imsrg++ default). Check against the file size
-  (130,743,360 bytes) in M5.
-* **Q3** — Tolerances in `30-testing-and-validation.md` §2 (e.g. IMSRG(2) E0 to 1e-5 MeV, HF to
-  1e-7 MeV, single terms to 1e-10 relative): acceptable as "numerically equivalent within reason"?
+* **Q1** — The 2N file `VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz` has one header
+  comment line, `(*** nn_transforms v0.2.0 -- generated on 03/07/2022, 10:56:07 -- me2j-f2 ***)`,
+  that does not contain the truncations. **Answer (verified 2026-11-11):** the file holds exactly
+  168,066,656 values after the header line, which is the count the imsrg++ loop structure predicts
+  for `file2e1max=14 file2e2max=28 file2lmax=14` (e2max=24 would give 115,792,936; lmax=10 would
+  give 107,554,520). Use 28 and 14. Counting script: `tools/reference/me2j_value_count.py`.
+* **Q2** — NO2B file `..._ms6_12_18.stream.bin`: single precision (float) or half? **Answer
+  (owner):** single precision (float).
+* **Q3** — Tolerances. **Answer (owner):** keep the deterministic unit-level checks tight (reading,
+  Wigner symbols, single commutator terms ~1e-10 relative). Relax end-to-end acceptance to HF
+  1e-4 MeV and IMSRG E0 / valence-space elements 1e-3 MeV, and always log the actual deviation.
+  Applied in `30-testing-and-validation.md` §2.
 
 ### Architecture
 * **Q4** — Project and executable name. **Assumed meanwhile:** namespace `imsrg`, executable
@@ -25,15 +28,19 @@ option, write it under "Assumed meanwhile", and continue. The owner answers inli
 * **Q6** — May IMSRG(3) 3B blocks use `float` storage to halve memory, if the benchmark shows
   acceptable accuracy (e.g. ΔE0 < 1 keV)? **Assumed meanwhile:** `double` only.
 * **Q7** — In imsrg++ the generator's denominator floor (the minimum |denominator|) loses the
-  sign of the denominator (`reference/03` §4). Bug (fix) or intended? **Assumed meanwhile:** keep
-  the reference behaviour, flagged in code, until answered.
+  sign of the denominator (`reference/03` §4). Bug (fix) or intended? **Answer (owner):** bug.
+  Fix it (keep the sign), list it in the deviation log, and validate it (e.g. a unit test with a
+  negative near-zero denominator, and an end-to-end run where the floor never triggers matches
+  imsrg++).
 * **Q8** — Is HF DIIS needed (imsrg++'s version has off-by-one errors and dead code), or is plain
   density mixing enough? **Assumed meanwhile:** mixing only; DIIS later if convergence demands it.
-* **Q9** — Target clusters and their oldest compilers/toolchains (GCC, CUDA, ROCm versions)? This
-  decides the Kokkos pin (4.x vs 5.x). **Assumed meanwhile:** latest stable Kokkos release that
-  supports C++20; GCC ≥ 11, CUDA ≥ 12, ROCm ≥ 6.
-* **Q10** — Is there a GPU machine (NVIDIA/AMD) where a later session could compile and run the
-  CUDA/HIP builds?
+* **Q9** — Oldest toolchains to support? **Answer (owner):** GCC ≥ 11, CUDA ≥ 12, ROCm ≥ 6. Pin
+  the latest stable Kokkos release compatible with these (check its requirements at M0).
+* **Q10** — Is there a GPU machine for CUDA/HIP tests? **Answer (owner):** not now. Rely on the
+  device-code rules (`12-compute-backend.md` §5) and reviews; GPU testing comes later.
+* **Q10b** — After the IMSRG(3) layout benchmark, may the session choose the layout itself?
+  **Answer (owner):** yes. Decide from the data, document the reasoning and the numbers, and
+  continue with the IMSRG(3) terms.
 
 ### Config and CLI (from `16-config-and-cli.md`)
 * **Q11** — `nsteps=1` with a valence space uses only `core_generator` in imsrg++ (contrary to its

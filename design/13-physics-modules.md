@@ -42,11 +42,15 @@ implementing a module.**
 
 Phase-1 formats, in this order:
 
-1. **me2j** (gz or plain text). The loop order is in `reference/04` §4. The header is not read.
-   `file2e1max`, `file2e2max` (default 2·file2e1max) and `file2lmax` (default file2e1max)
-   must be given correctly or parsing silently desynchronizes, so we **validate the total
-   value count** against the expected count, where possible from the file size or at EOF. For
-   the test file: `file2e1max=14 file2e2max=28 file2lmax=14`. Reading stops after the prefix
+1. **me2j** (gz or plain text). The loop order is in `reference/04` §4 and in imsrg-devel
+   `ReadWrite.cc:832ff`. The first line is a comment (for the test file:
+   `(*** nn_transforms v0.2.0 -- generated on 03/07/2022, 10:56:07 -- me2j-f2 ***)`) that does
+   not contain the truncations. `file2e1max`, `file2e2max` (default 2·file2e1max) and
+   `file2lmax` (default file2e1max) must be given correctly or parsing silently desynchronizes.
+   Provide a `expected_value_count(e1max, e2max, lmax)` function (same loops, 4 values per J),
+   and when the whole file is read, check the count at EOF. For the test file,
+   `file2e1max=14 file2e2max=28 file2lmax=14`; **verified**: the file holds exactly 168,066,656
+   values after the header, which equals the predicted count for these truncations. Reading stops after the prefix
    needed for the calculation's emax. Values arrive in isospin form, 4 floats per J line
    (`T0 pn, nn, T1 pn, pp`); convert to pn exactly as `Set_pn_TBME_from_iso` does.
 2. **NO2B** (`*.stream.bin`, float, or half with `no2b_precision=half`). The test file is
@@ -111,8 +115,8 @@ Phase-1 formats, in this order:
   `shell-model-atan`, `shell-model-imaginary-time`, `hartree-fock`, `qtransfer` (exact block
   definitions in `reference/03` §4). Denominators: Epstein-Nesbet (default) and
   Møller-Plesset, plus `denominator_delta` (and its orbit-restricted variant). The denominator
-  floor in imsrg++ loses the sign; decide fix vs keep (QUESTIONS Q7), and keep the reference
-  behaviour until then.
+  floor in imsrg++ loses the sign of the denominator. **Owner: this is a bug, so fix it** (keep the
+  sign), add it to the deviation log, and test it (QUESTIONS Q7).
 * Two-step decoupling: the core generator first, then the valence generator, with a new Omega.
   imsrg++ doubles `smax` for the second Magnus stage; keep that.
 * Convergence: `‖η‖ < eta_criterion` or `s ≥ smax`.

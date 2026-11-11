@@ -22,19 +22,27 @@ uses a static incrementing seed, so its results depend on call order. Our genera
 requested Hermiticity and the symmetries of the channel structure. The same operator is written
 as an OperatorDump so imsrg-devel can read it (§3).
 
-## 2. Tolerances (defaults; tighten when possible, never loosen without a note in QUESTIONS.md)
+## 2. Tolerances *(owner-approved split, 2026-11-11)*
+
+Deterministic **unit-level** checks stay tight: both codes do the same arithmetic, so a looser
+tolerance there would only hide bugs. **End-to-end** acceptance is looser: the flows involve
+thresholds and step decisions, and agreement "within reason" is enough. Always **log the actual
+deviation** in test output and in the milestone report, even when a test passes. If an
+end-to-end deviation exceeds 1e-5 MeV, look for the cause briefly (e.g. a different step count)
+and note it in STATUS.md, but do not block on it.
 
 | Quantity | Tolerance |
 |----------|-----------|
 | Wigner 3j/6j/9j, CG, Moshinsky vs sympy exact | 1e-12 relative (absolute 1e-14 near 0) |
-| Read matrix elements (me2j/NO2B → pn operator) vs imsrg-devel dump | 1e-12 absolute |
+| Read matrix elements (me2j/NO2B → pn operator) vs imsrg-devel dump | 1e-10 absolute |
 | Single commutator term vs reference implementation or imsrg-devel | `max|ΔZ| ≤ 1e-10 · max(1, max|Z|)` |
-| HF energy | 1e-7 MeV; SPEs 1e-6 MeV |
-| MBPT(2)/(3) energies | 1e-7 MeV |
-| IMSRG(2) ground-state energy (same step rule) | 1e-5 MeV; also compare the first 10 flow steps' (s, E0, ‖η‖) to 1e-8 relative |
-| Valence-space 0B/1B/2B elements | 1e-5 MeV |
-| Transformed scalar operators (e.g. Rp2) | 1e-6 fm² |
-| IMSRG(3) variants at emax 2/3 (E0, triples energy) | 1e-5 MeV |
+| Norms, normal ordering, basis transformation on fixed inputs | 1e-10 relative |
+| HF energy and SPEs (end to end) | 1e-4 MeV |
+| MBPT(2)/(3) energies (end to end) | 1e-4 MeV |
+| IMSRG(2) ground-state energy (end to end) | 1e-3 MeV (log the deviation and the step counts of both codes) |
+| Valence-space 0B/1B/2B elements | 1e-3 MeV |
+| Transformed scalar operators (e.g. Rp2) | 1e-4 fm² |
+| IMSRG(3) variants at emax 2/3 (E0, triples energy) | 1e-3 MeV |
 | MPI rank-count invariance | 1e-10 relative |
 
 ## 3. Golden data from imsrg-devel
