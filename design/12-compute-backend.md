@@ -97,6 +97,11 @@ none computes a symbol inside a hot loop, and no table is a lazy cache.
 6. Every kernel has a name string, used for profiling.
 7. Later, a `tools/ci.sh --compile-only-cuda` job (on a machine with nvcc) catches violations;
    until then, reviewers check these rules explicitly.
+8. Device lambdas are never defined directly in a GoogleTest `TEST`/`TEST_F` body: its
+   `TestBody()` is a private member function, and nvcc/hipcc reject extended lambdas whose
+   enclosing function is private or protected. Tests call a free (namespace-scope) function that
+   launches the kernel (see `tests/smoke/kokkos_smoke_test.cpp`). The same holds for private or
+   protected member functions of our own classes.
 
 ## 6. MPI design (`imsrg::comm`)
 
