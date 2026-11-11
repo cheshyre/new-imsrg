@@ -1,0 +1,18 @@
+# imsrg rewrite: clang-format style.
+# Checked by tools/ci.sh with clang-format 23 (clang-format --dry-run).
+# Applies to src/ apps/ tests/ python/ tools/bench/ only.
+# Never applies to extern/, tools/reference/ or tests/golden/.
+BasedOnStyle: Google
+Language: Cpp
+Standard: c++20
+ColumnLimit: 100
+DerivePointerAlignment: false
+PointerAlignment: Left
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^[<"]imsrg/'       # project headers, last
+    Priority: 4
+  - Regex: '^<[a-z_0-9]+>$'    # C++ standard library
+    Priority: 2
+  - Regex: '.*'                # third-party and C system headers
+    Priority: 3
