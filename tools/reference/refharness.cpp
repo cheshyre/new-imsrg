@@ -11,6 +11,7 @@
 //   roundtrip IN OUT  read an OperatorDump and write it again         (rh_opdump.cpp)
 //   norms IN          norms of an OperatorDump as imsrg++ computes them (rh_opdump.cpp)
 //   commutator TERM X Y Z   evaluate one named commutator term        (rh_commutator.cpp)
+//   generator TYPE H ETA    imsrg++ generator eta(H) of a given type    (rh_commutator.cpp)
 //   flow [--factorized]     full IMSRG pipeline with %.17g trajectory  (rh_flow.cpp)
 //
 // Common keys (imsrg++ names): emax e3max lmax hw reference valence_space A
@@ -240,6 +241,7 @@ int main(int argc, char** argv) {
     if (c == "roundtrip") return rh::cmd_roundtrip(a);
     if (c == "norms") return rh::cmd_norms(a);
     if (c == "commutator") return rh::cmd_commutator(a);
+    if (c == "generator") return rh::cmd_generator(a);
     if (c == "flow") return rh::cmd_flow(a);
     std::cerr << "refharness: unknown subcommand '" << c << "'\n";
     return 2;

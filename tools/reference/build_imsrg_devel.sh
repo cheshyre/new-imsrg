@@ -24,6 +24,8 @@
 #   BUILD_JOBS              parallel jobs        (default: number of cores)
 #   FRESH=1                 reconfigure from scratch (cmake --fresh), e.g. after a toolchain change
 #   IMSRG_REFERENCE_SDK     macOS SDK path (default: probed, see pick_sdk below)
+#   HARNESS_BUILD_DIR       harness build dir (default $REF_ROOT/harness-build); use a separate
+#                           one per concurrent task (never two builds in one build dir)
 #
 # Toolchain that worked (2026-11-11, macOS 26 arm64): Apple clang 21, cmake 4.4.5, ninja,
 # Homebrew libomp (OpenMP via OpenMP_ROOT), openblas, gsl, boost 1.92 (headers), system zlib.
@@ -117,7 +119,7 @@ build_imsrg() {
 
 build_harness() {
   make_copy
-  local bdir="${REF_ROOT}/harness-build"
+  local bdir="${HARNESS_BUILD_DIR:-${REF_ROOT}/harness-build}"
   cmake -S "${HERE}" -B "${bdir}" "${common_args[@]}" \
         -DIMSRG_REFERENCE_SRC="${COPY}/src"
   cmake --build "${bdir}" --target refharness -j "${JOBS}"

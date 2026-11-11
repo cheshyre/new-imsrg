@@ -6,5 +6,6 @@
 namespace rh {
 
 int cmd_commutator(const Args&) { throw std::runtime_error("commutator: not implemented yet"); }
+int cmd_generator(const Args&) { throw std::runtime_error("generator: not implemented yet"); }
 
 }  // namespace rh
