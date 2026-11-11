@@ -1,0 +1,17 @@
+{
+  "source": "imsrg-devel src-sha256:ddcbf1aff166414e746113d5f3de2ddc1e72783fb7c201829cd58e317717f40f refharness flow",
+  "emax": 2,
+  "reference": "O16",
+  "generator": "atan",
+  "variant": "IMSRG3f2",
+  "smax": 200,
+  "EHF": -134.03044657048093,
+  "E0": -147.38945902158352,
+  "steps": 407,
+  "s_final": 200,
+  "norm_eta_final": 2.5380199147812489e-05,
+  "norm_omega_final": 0.00099017596303941822,
+  "diverged": false,
+  "omp_threads": 8,
+  "wall_time_s": 3.7555010318756104
+}

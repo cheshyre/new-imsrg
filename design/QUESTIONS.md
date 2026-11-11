@@ -199,3 +199,8 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
   `wigner` functions are validated on the emax-8 domain; at l ~ 30 the double <l1 0 l2 0|L 0>
   errs by ~1e-11. **Assumed meanwhile:** double-double only for the bracket tables (built once
   per run; ~3 s for all E <= 16 in a Debug build); raise the limits if larger spaces need them.
+* **M1-Q2** (2026-11-12, M1 flow) - "IMSRG(3f2)" in `refharness flow --factorized` means plain
+  IMSRG(2) (no 3B storage, `IMSRG3` off) plus `BCH::SetUseFactorizedCorrection(true)`; imsrg++ has
+  no switch for it. The `Elast`/norm divergence guards (|eta| > 1e12, |E| > 1e9) are harness
+  additions. **Assumed meanwhile:** this is the intended IT-10 reference; O16 emax 2 converges
+  with it, so no He4 substitute was needed (He4 emax 2 kept as extra).
