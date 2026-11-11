@@ -73,4 +73,29 @@ option, write it under "Assumed meanwhile", and continue. The owner answers inli
 
 ## Added during implementation
 
-(append here)
+Ids: milestone leads use `M<k>-Q<n>` (e.g. `M2-Q1`) so that parallel branches never collide;
+the orchestrator uses `O<n>`. Older entries from the first parallel leads may still read `Q20`,
+`Q21`, ...; they are renumbered at merge time if they collide.
+
+* **O1** (2026-11-11, orchestrator) — **How `develop` is advanced in this run.** The desktop app
+  started the session in a git worktree (`.claude/worktrees/imsrg-refactor-0e4f11`, branch
+  `claude/imsrg-refactor-overnight-800606`), while `develop` stays checked out in the main
+  checkout, where this session may not run git (the permission check denied it). Merges therefore
+  happen on the worktree branch, which serves as a staging copy of `develop`: `git merge --no-ff
+  feature/<x>`, then `tools/ci.sh dev-openmp` on that merge result, and only on PASS is `develop`
+  moved to the tested merge commit with `git update-ref refs/heads/develop <new> <old>` (old value
+  checked). History is identical to merging on `develop` directly. **Side effect, owner action
+  needed:** the main checkout's index and files still show the old `develop` (331b2d4), so `git
+  status` there lists the night's work as staged reversals. Do not commit there before syncing.
+  If you have no local edits in the main checkout, run
+  `git -C /Users/cheshyre/Downloads/new-imsrg read-tree -m -u 331b2d4 develop` (safe two-tree
+  fast-forward of index and files; it refuses if local edits conflict) or simply
+  `git -C /Users/cheshyre/Downloads/new-imsrg reset --hard` (HEAD is `develop`). **Assumed
+  meanwhile:** this is acceptable, since the owner asked for merges into local `develop`.
+* **O2** (2026-11-11, orchestrator) — Q19 follow-up: the Claude Code docs say `autoCompactWindow`
+  is an absolute token threshold and that Sonnet 5.5, Haiku 5.5 and Opus 5.x default to 1M-token
+  windows, so the planned 150000 meant ~15 %. Changed to 600000 (Sonnet/Haiku agents, ~60 %) and
+  800000 (`imsrg-lead`, ~80 %); see `41-agent-workflow.md` §5. The values take effect in the next
+  session (definitions load at startup). Combining them with `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` is
+  undocumented. **Assumed meanwhile:** keep the per-agent windows and recommend dropping the
+  percentage override from the proposed settings.
