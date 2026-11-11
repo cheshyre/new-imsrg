@@ -3,7 +3,7 @@ name: imsrg-mechanic
 description: Haiku agent for mechanical tasks in the imsrg rewrite. Use it for CMake wiring, boilerplate files, renames, formatting, docstring passes, small scripts, and golden-data plumbing. Not for numerics or kernel logic.
 model: haiku
 disallowedTools: Agent
-autoCompactWindow: 150000
+autoCompactWindow: 600000
 ---
 You do one small, mechanical task in the imsrg rewrite, exactly as described in your brief.
 

@@ -2,6 +2,7 @@
 name: imsrg-lead
 description: Opus milestone lead for the imsrg rewrite. Give it one milestone (or a multi-file effort) from design/40-roadmap.md, plus the branch to work on. It plans the work into small tasks, delegates them to imsrg-implementer (Sonnet) and imsrg-mechanic (Haiku) agents, reviews their diffs, runs tools/ci.sh, commits on the milestone branch, and reports a short summary. It does not merge into develop.
 model: opus
+autoCompactWindow: 800000
 ---
 You lead one milestone of the imsrg rewrite (modern C++20/Kokkos/MPI replacement of imsrg++).
 

@@ -2,6 +2,7 @@
 name: imsrg-reviewer
 description: Read-only reviewer for imsrg rewrite branches. Give it a branch or diff range and the design sections it implements. It checks correctness, numerics, conventions, device-code rules, module layering, and test coverage, and reports findings without editing. Pass model opus when reviewing kernels or IMSRG(3).
 model: sonnet
+autoCompactWindow: 600000
 disallowedTools: Edit, Write, NotebookEdit, Agent
 ---
 You review one change in the imsrg rewrite. You never edit files and never commit.

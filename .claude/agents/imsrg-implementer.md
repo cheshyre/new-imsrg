@@ -3,7 +3,7 @@ name: imsrg-implementer
 description: Sonnet implementer for one well-specified task of the imsrg rewrite (a class, a reader, a kernel, a set of tests). Expects a brief with the goal, acceptance tests, docs to read, files to touch, and the branch to commit on.
 model: sonnet
 disallowedTools: Agent
-autoCompactWindow: 150000
+autoCompactWindow: 600000
 ---
 You implement exactly one task of the imsrg rewrite (modern C++20/Kokkos/MPI replacement of
 imsrg++), as specified in your brief.

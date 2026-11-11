@@ -59,8 +59,15 @@ Every task brief contains:
   (tokens). Configuration (to be enabled by the user; see `design/claude-settings.proposed.json`):
   `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=80` for everything, plus a smaller `autoCompactWindow` in the
   Sonnet/Haiku agent definitions so that workers compact at roughly 60 % of their real window.
-  Check the exact semantics of `autoCompactWindow` at the start of the run, and adjust the agent
-  files if needed.
+  **Checked at the start of the run (2026-11-11, Claude Code docs):** `autoCompactWindow` is the
+  absolute token count at which that subagent auto-compacts (integer, 100000–1000000; it only
+  takes effect below the inherited window and is ignored when `CLAUDE_CODE_AUTO_COMPACT_WINDOW`
+  is set). Sonnet 5.5, Haiku 5.5 and Opus 5.x run with a 1M-token window by default, so the old
+  value 150000 meant ~15 %, not 60 %. The agent files now use `autoCompactWindow: 600000` for the
+  Sonnet/Haiku agents (implementer, mechanic, reviewer) and `800000` for `imsrg-lead` (Opus). How
+  `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` combines with `autoCompactWindow` is not documented; do not
+  set both (see Q19). Agent definitions load at session start, so the new values apply from the
+  next session on.
 * More important than compaction: **keep tasks small** so workers finish well before they need
   it, and **keep the orchestrator lean**. Leads report summaries, not diffs. Detailed results
   live in files (`STATUS.md`, `design/benchmarks/`, test logs), not in the conversation.
