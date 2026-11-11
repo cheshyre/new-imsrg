@@ -13,5 +13,10 @@ imsrg_add_module(NAME operator
     arithmetic.cpp
     norms.cpp
     operator_dump.cpp
+    normal_ordering.cpp
+    normal_ordering_no2b.cpp
+    no2b.cpp
+    basis_transform.cpp
+    random_operator.cpp
     kernels/part_kernels.cpp
   DEPS basis linalg angmom exec base)
