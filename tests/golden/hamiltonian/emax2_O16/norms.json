@@ -1,0 +1,45 @@
+{
+  "T": {
+    "zero_body": 0,
+    "one_body_norm": 148.11313243598624,
+    "two_body_norm": 51.244511901275764,
+    "three_body_norm": 0,
+    "norm": 156.72747047024012
+  },
+  "V2": {
+    "zero_body": 0,
+    "one_body_norm": 0,
+    "two_body_norm": 281.38771638438033,
+    "three_body_norm": 0,
+    "norm": 281.38771638438033
+  },
+  "H": {
+    "zero_body": 0,
+    "one_body_norm": 148.11313243598624,
+    "two_body_norm": 294.82904599602205,
+    "three_body_norm": 0,
+    "norm": 329.94191361954074
+  },
+  "V3_NO2B": {
+    "zero_body": -58.795424620310463,
+    "one_body_norm": 56.657321675773723,
+    "two_body_norm": 96.405897843960645,
+    "three_body_norm": 0,
+    "norm": 111.82195329438792
+  },
+  "Rp2": {
+    "zero_body": 0,
+    "one_body_norm": 4.1049762572235773,
+    "two_body_norm": 1.7379240641375464,
+    "three_body_norm": 0,
+    "norm": 4.4577135535022503
+  },
+  "random_H": {
+    "zero_body": 0,
+    "one_body_norm": 17.793783395486958,
+    "two_body_norm": 275.54764572726992,
+    "three_body_norm": 0,
+    "norm": 276.12157429901521
+  },
+  "wall_time_s": 0.014070987701416016
+}
