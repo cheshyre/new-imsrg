@@ -30,8 +30,17 @@ endif()
 
 if(NOT Kokkos_ROOT AND "$ENV{Kokkos_ROOT}" STREQUAL "" AND NOT Kokkos_DIR)
   set(Kokkos_ROOT "${IMSRG_DEPS_PREFIX}/kokkos-${IMSRG_KOKKOS_BACKEND}")
+  file(GLOB _imsrg_kokkos_config "${Kokkos_ROOT}/lib*/cmake/Kokkos/KokkosConfig.cmake")
+else()
+  set(_imsrg_kokkos_config "user-given")
 endif()
-find_package(Kokkos 5 CONFIG QUIET)
+if(_imsrg_kokkos_config)
+  # A Kokkos the user named, or one that is installed in the deps prefix, must load: falling back
+  # to an in-tree build would silently give a different configuration than requested.
+  find_package(Kokkos 5 CONFIG REQUIRED)
+else()
+  find_package(Kokkos 5 CONFIG QUIET)
+endif()
 
 if(Kokkos_FOUND)
   set(IMSRG_KOKKOS_SOURCE "installed: ${Kokkos_DIR}")
@@ -107,7 +116,7 @@ if(IMSRG_BUILD_TESTS)
   if(NOT Python3_EXECUTABLE AND EXISTS "${IMSRG_VENV}/bin/python3")
     set(Python3_EXECUTABLE "${IMSRG_VENV}/bin/python3")
   endif()
-  find_package(Python3 3.9 REQUIRED COMPONENTS Interpreter)
+  find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
 endif()
 
 # ---- Hooks for later milestones -------------------------------------------------------------------

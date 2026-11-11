@@ -56,6 +56,10 @@ if(IMSRG_VENV STREQUAL "")
   endif()
 endif()
 
+if(IMSRG_ENABLE_KOKKOS_KERNELS)
+  message(FATAL_ERROR "IMSRG_ENABLE_KOKKOS_KERNELS is not supported yet (design/00 D3)")
+endif()
+
 include(ImsrgCompilerFlags)  # ccache, sanitizers, native arch, imsrg::warnings
 include(ImsrgDependencies)   # Kokkos, MPI, fmt, toml++, CLI11, GoogleTest, Python
 include(ImsrgModule)         # imsrg_add_module()
