@@ -27,6 +27,7 @@ add_executable(refharness
   rh_basis.cpp
   rh_opdump.cpp
   rh_hamiltonian.cpp
+  rh_operator.cpp
   rh_commutator.cpp
   rh_flow.cpp
 )
