@@ -310,6 +310,7 @@ Operator read_operator_dump(std::istream& in, std::string_view name,
   }
   const std::int32_t norb = static_cast<std::int32_t>(hd.orbits.size());
   std::vector<OrbitIndex> map(hd.orbits.size());
+  std::vector<bool> mapped(static_cast<std::size_t>(ms->num_orbits()), false);
   for (std::int32_t i = 0; i < norb; ++i) {
     const auto& d = hd.orbits[static_cast<std::size_t>(i)];
     const int line = ph.orbit_lines[static_cast<std::size_t>(i)];
@@ -321,6 +322,10 @@ Operator read_operator_dump(std::istream& in, std::string_view name,
               "occupation " + fmt17(d.occupation) + " of orbit " + basis::orbit_label(d.orbit) +
                   " differs from the model-space reference");
     }
+    if (mapped[k->to_size()]) {
+      fail_at(name, line, "orbit " + basis::orbit_label(d.orbit) + " is listed twice");
+    }
+    mapped[k->to_size()] = true;
     map[static_cast<std::size_t>(i)] = *k;
   }
 
@@ -351,6 +356,15 @@ Operator read_operator_dump(std::istream& in, std::string_view name,
     const double v = f.next_double("value");
     f.expect_end();
     if (a < 0 || b < 0 || a >= norb || b >= norb) f.fail("orbit index out of range");
+    {
+      // A scalar one-body operator only connects orbits with equal (l, 2j, tz2); the norms and
+      // the normal ordering ignore other entries, so they must not be accepted silently.
+      const auto& oa = hd.orbits[static_cast<std::size_t>(a)].orbit;
+      const auto& ob = hd.orbits[static_cast<std::size_t>(b)].orbit;
+      if (hd.spec.is_scalar() && (oa.l != ob.l || oa.j2 != ob.j2 || oa.tz2 != ob.tz2)) {
+        f.fail("one-body entry between orbits of different (l, 2j, tz2) in a scalar operator");
+      }
+    }
     op.one_body().set_element(map[static_cast<std::size_t>(a)], map[static_cast<std::size_t>(b)],
                               v);
   }
@@ -438,12 +452,20 @@ void write_operator_dump(std::ostream& out, const Operator& op,
                          const OperatorDumpWriteOptions& options) {
   const basis::ModelSpace& ms = op.model_space();
   const auto& b = ms.basis();
+  const std::string& ref_name =
+      options.reference.empty() ? ms.reference().name() : options.reference;
+  if (options.source.find('\n') != std::string::npos) {
+    throw InputError("OperatorDump writer: the source text must not contain a newline");
+  }
+  if (ref_name.empty() || ref_name.find_first_of(" \t\n") != std::string::npos) {
+    throw InputError("OperatorDump writer: the reference name must be one non-empty word, got '" +
+                     ref_name + "'");
+  }
   out << kVersionLine << "\n";
   out << "source " << options.source << "\n";
   out << "basis emax " << b.emax() << " lmax " << b.lmax() << " hw " << fmt17(b.hbar_omega())
       << "\n";
-  out << "reference " << (options.reference.empty() ? ms.reference().name() : options.reference)
-      << "\n";
+  out << "reference " << ref_name << "\n";
   const std::int32_t norb = ms.num_orbits();
   out << "norbits " << norb << "\n";
   for (std::int32_t i = 0; i < norb; ++i) {
