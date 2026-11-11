@@ -8,7 +8,7 @@ CMakePresets.json         dev-serial, dev-openmp (default on macOS), release-ope
 cmake/                    helper modules (warnings, sanitizers, deps lookup, layering check)
 extern/                   git submodules (pinned release tags): kokkos, googletest, fmt, CLI11,
                           tomlplusplus, nanobind   [kokkos-kernels: optional, later]
-src/imsrg/<module>/       library code; headers included as <imsrg/<module>/x.hpp>
+src/imsrg/<module>/       library code; headers included as "imsrg/<module>/x.hpp"
 src/imsrg/<module>/kernels/   .cpp files that contain Kokkos kernels (only these include Kokkos)
 apps/imsrg/               the `imsrg` executable (CLI11, thin wrapper around imsrg::driver)
 python/src/               nanobind bindings (module imsrg._core)
@@ -18,8 +18,10 @@ tests/integration/        pytest end-to-end tests driving `imsrg` and comparing 
 tests/python/             pytest tests of the bindings
 tests/data/               small committed input files (synthetic, < 1 MB each)
 tests/golden/             small committed reference outputs produced by imsrg-devel
-tools/                    scripts: bootstrap_deps.sh, ci.sh, check_layering.py,
-                          reference/ (build old code, generate golden data)
+tests/smoke/              toolchain smoke tests (Kokkos backend, MPI launcher)
+tests/layering/           fixtures for the layering check's self-test
+tools/                    scripts: bootstrap_deps.sh, ci.sh, check_layering.py, lib/ (shared
+                          shell settings), reference/ (build old code, generate golden data)
 docs/                     user documentation (later: Doxygen + Sphinx)
 design/                   these design documents, STATUS.md, QUESTIONS.md
 ```
@@ -28,7 +30,8 @@ design/                   these design documents, STATUS.md, QUESTIONS.md
 
 Each module is one CMake library target `imsrg_<module>` (alias `imsrg::<module>`). A module may
 include headers **only** from the modules it lists as dependencies. `tools/check_layering.py`
-enforces this. It parses `#include <imsrg/...>` lines against the table below and runs as a CTest
+enforces this. It parses `#include "imsrg/..."` (and `<imsrg/...>`) lines against the table below
+and the module deps recorded by CMake, and runs as a CTest
 test, so a violation fails the build's test suite.
 
 ```

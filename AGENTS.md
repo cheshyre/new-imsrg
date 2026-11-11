@@ -38,16 +38,32 @@ we do not port it line by line.
 9. Scripts and globs work on `git ls-files`: the main checkout root also holds untracked
    `imsrg-devel/` and `.claude/worktrees/`.
 
-## Build and test (available after milestone M0)
+## Build and test (since milestone M0; details in `design/20-build-and-tooling.md`)
 
 ```bash
-tools/bootstrap_deps.sh            # once per machine/backend: builds Kokkos into ~/.cache/imsrg-deps
+tools/bootstrap_deps.sh            # once per machine (idempotent): Kokkos openmp+serial and the venv
 cmake --preset dev-openmp          # or dev-serial, release-openmp, asan
 cmake --build --preset dev-openmp
 ctest --preset dev-openmp -L unit  # labels: unit, integration, mpi, slow, reference
-tools/ci.sh dev-openmp             # the full pre-merge check; prints PASS/FAIL
+tools/ci.sh dev-openmp             # the full pre-merge check; last line: CI PASS/FAIL <preset>
 ```
-Python: `CMAKE_ARGS="-DKokkos_ROOT=$HOME/.cache/imsrg-deps/kokkos-openmp -DOpenMP_ROOT=$(brew --prefix libomp)" .venv/bin/pip install -e . --no-build-isolation`,
+* **Shared per-machine state (one rule):** `IMSRG_DEPS_PREFIX` (default `~/.cache/imsrg-deps`)
+  holds the Kokkos installs `kokkos-<backend>/`; `IMSRG_VENV` (default `$IMSRG_DEPS_PREFIX/venv`)
+  is the one Python venv (numpy, pytest, sympy, scikit-build-core) for all worktrees.
+  `tools/bootstrap_deps.sh` and `tools/ci.sh` link it as `.venv` in each worktree (gitignored).
+  Never create a venv per worktree.
+* **Several tasks in one checkout:** give each its own build tree:
+  `cmake --preset dev-openmp -B build/<task>`, `cmake --build build/<task>`,
+  `ctest --test-dir build/<task> -L unit`, and `IMSRG_BUILD_DIR=build/<task> tools/ci.sh dev-openmp`.
+* **New module:** add `src/imsrg/<m>/CMakeLists.txt` with `imsrg_add_module(NAME <m> SOURCES ...
+  DEPS ...)` and `tests/unit/<m>/CMakeLists.txt` with `imsrg_add_test(NAME ... SOURCES ...
+  DEPS <m> LABELS unit)`. Both directories are discovered automatically; no shared CMake file
+  changes. Include project headers as `"imsrg/<module>/x.hpp"`.
+* macOS: the default SDK of this machine does not link; CMake works around it by itself
+  (`cmake/ImsrgAppleSdk.cmake`). For compiles outside CMake, export
+  `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk`.
+
+Python (from M11): `CMAKE_ARGS="-DKokkos_ROOT=$HOME/.cache/imsrg-deps/kokkos-openmp -DOpenMP_ROOT=$(brew --prefix libomp)" .venv/bin/pip install -e . --no-build-isolation`,
 then `.venv/bin/pytest tests/python`.
 
 ## Code conventions

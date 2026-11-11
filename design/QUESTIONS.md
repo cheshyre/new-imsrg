@@ -74,3 +74,26 @@ option, write it under "Assumed meanwhile", and continue. The owner answers inli
 ## Added during implementation
 
 (append here)
+* **Q20** (2026-11-12, M0) — Kokkos 5.3.0 (pinned as instructed: latest 5.x) requires NVCC ≥ 12.2
+  and HIPCC ≥ 6.2 (`extern/kokkos/cmake/kokkos_compiler_id.cmake`), slightly above the baseline of
+  Q9/D20 (CUDA ≥ 12, ROCm ≥ 6); its GCC ≥ 10.4 meets GCC ≥ 11. Options: raise the baseline to
+  CUDA 12.2 and ROCm 6.2; or pin a Kokkos 4.x release for clusters with older toolkits (its
+  minimums would need checking). **Assumed meanwhile:** keep Kokkos 5.3.0; CMake asks for
+  `find_package(Kokkos 5)`. Moving the pin is a one-line change (`extern/README.md`).
+* **Q21** (2026-11-12, M0) — Include style for project headers: `10-architecture.md` §1 said
+  `<imsrg/<module>/x.hpp>`, the M0 brief said `"imsrg/<module>/..."`. **Assumed meanwhile:** quotes
+  (Google style; `.clang-format` sorts them into the last include group); `10` §1/§2 updated. The
+  layering check accepts both forms, so either choice is safe.
+* **Q22** (2026-11-12, M0) — The `kokkos-serial` deps build enables `Kokkos_ENABLE_DEBUG` and
+  `Kokkos_ENABLE_DEBUG_BOUNDS_CHECK`, because dev-serial and asan are the debugging builds. So
+  dev-serial differs from dev-openmp in more than the backend, and Serial runs are slower.
+  **Assumed meanwhile:** keep it; removing the two options in `tools/bootstrap_deps.sh` rebuilds
+  Kokkos automatically (the stamp changes).
+* **Q23** (2026-11-12, M0) — The Python venv is shared by all worktrees at `$IMSRG_DEPS_PREFIX/venv`
+  (`IMSRG_VENV`), with a gitignored `.venv` symlink per worktree, instead of one `.venv` per
+  checkout. **Assumed meanwhile:** shared, as the M0 brief asked; `IMSRG_VENV` can point anywhere.
+* **Q24** (2026-11-12, M0) — Owner action, optional: the Command Line Tools on the dev machine make
+  `xcrun` pick `MacOSX27.0.sdk`, which `ld-1267` cannot link against (`20` §8). CMake works around
+  it automatically; updating or reinstalling the Command Line Tools would make the workaround
+  unnecessary. **Assumed meanwhile:** keep the workaround (it switches itself off once the default
+  SDK links).
