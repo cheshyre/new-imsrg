@@ -283,3 +283,19 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
 * **M11-Q2** (2026-11-12, M11 python) - `tests/golden/basis/*.txt` header documents `channel idx
   2J parity 2Tz nkets` but stores J and Tz. **Assumed meanwhile:** tests compare with `two_j/2`,
   `two_tz/2`; the harness comment should be corrected.
+* **M8-Q1** (2026-11-12, M8 lead) - M8a-Q1 resolved by a 1:1 mapping: `flow::GeneratorKind`
+  mirrors `driver::Generator` (incl. ShellModelAtanNpnh and OnePa, which throw
+  NotImplementedError), and `driver/run.cpp` maps the enums with a switch. **Assumed
+  meanwhile:** the driver enum stays the schema enum; flow has no dependency on driver.
+* **M8-Q2** (2026-11-12, M8 lead) - The flow CSV has no MP2 column (design/13 section 7 lists
+  one) because `mbpt` (M9) does not exist yet; results.json has no EMP2 either.
+  **Assumed meanwhile:** M9 adds the column (cheap, per step) and the IT-1 MBPT numbers.
+* **M8-Q3** (2026-11-12, M8 lead) - The Omega stack is always kept in memory:
+  `imsrg.omega.storage = "scratch"`/`"discard"` are accepted but behave like "memory" (at
+  emax <= 6 an Omega is a few MB). HF mixing is always linear (the imsrg++ default): the schema
+  has no key to select DIIS yet. **Assumed meanwhile:** add `hartree_fock.mixing` and real
+  scratch storage in a follow-up; both are numerics-neutral for the IT goldens.
+* **M8-Q4** (2026-11-12, M8 lead) - imsrg++ prints "pushing back another Omega" via stdout;
+  ours logs it at info level, and the flow lines go to the log as well as to the CSV. Output
+  file names differ from imsrg++ (`<stem>.snt`, `<stem>_<op>.snt`, `results.json`).
+  **Assumed meanwhile:** fine (design/16 output section); the ITs compare numerically.
