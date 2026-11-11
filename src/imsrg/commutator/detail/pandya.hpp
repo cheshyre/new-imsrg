@@ -95,7 +95,8 @@ struct PandyaData {
 /// Builds the Pandya data of `ms`: the cc ket lists, the pair lists K (from the reference
 /// occupations of `ms`), device copies of the cc index tables and the scratch buffers with their
 /// block offsets. Needs an initialized `exec::Runtime`. All allocation of the term happens
-/// here. Memory O(sum over cc channels of Ncc (nk + 4 Ncc)).
+/// here. Memory O(sum over cc channels of Ncc (2 nk + 4 Ncc)) doubles: XK (Ncc nk) + YK (2 Ncc nk)
+/// + W and ZB (2 Ncc^2 each), i.e. Ncc (3 nk + 4 Ncc); `scratch_bytes()` reports it.
 PandyaData build_pandya_data(const basis::ModelSpace& ms);
 
 }  // namespace imsrg::commutator::detail

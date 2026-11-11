@@ -69,7 +69,9 @@ void comm220ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Wo
 void comm111ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Workspace& ws);
 
 /// Z_ij += sum_ab sum_J (2J+1)/(2 j_i + 1) (n_a - n_b) (X_ab Y^J_biaj - Y_ab X^J_biaj), for i, j
-/// with equal (l, 2j, 2tz). O(norb^2 * orbits per one-body channel * J range).
+/// with equal (l, 2j, 2tz). O(E norb c Jr): E = norb c one-body-channel entries (i, j), the sum
+/// over a runs over norb orbits, b over the c orbits of a's one-body channel, J over Jr <= jmax + 1
+/// values; X1 Y2 and X2 Y1 are each evaluated only if the two-body operand exists.
 void comm121ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Workspace& ws);
 
 /// Z_ij += 1/2 sum_abc sum_J (2J+1)/(2 j_i + 1) (n_a n_b nbar_c + nbar_a nbar_b n_c)
@@ -98,6 +100,8 @@ void comm222_pp_hhss(const op::Operator& X, const op::Operator& Y, op::Operator&
 void comm222_phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Workspace& ws);
 
 /// comm222_pp_hhss + comm221ss with shared intermediates (imsrg++ `comm222_pp_hh_221ss`).
+/// O(sum over channels of N^3), the cost of one ladder pair (the 221 part is a lower-order
+/// contraction of the same intermediates).
 void comm222_pp_hh_221ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                          Workspace& ws);
 
