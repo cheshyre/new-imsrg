@@ -135,12 +135,6 @@ stdout). Commands, key numbers, wall times and the investigation of the divergin
 (IT-4/IT-5 with the contact-only 3N file, IT-8 at emax 2) with the replacement goldens
 `IT-4/smax10`, `IT-5/smax10`, `IT-8/He4_emax2`: see `e2e/README.md`.
 
-### `operator/emax2/` (M4) — `tools/reference/gen_golden_operator.sh`
-
-Normal ordering (`Operator::DoNormalOrdering` / `UndoNormalOrdering`) and the HF-basis
-transformation (`HartreeFock::TransformToHFBasis`) of the old code. Commands, contents and
-numbers: see `operator/README.md`.
-
 ### `e2e/IT-2/trajectory.csv`, `e2e/IT-10/` — `tools/reference/gen_golden_flow.sh`
 
 `refharness flow` (a copy of `IMSRGSolver::Solve_magnus_euler` using the old library, `%.17g`
@@ -148,6 +142,12 @@ CSV `step,s,E0,norm_eta,norm_omega`). IT-2 reproduces the executable (256 steps,
 124.45796230102064, E0 -164.6487723082966, |dE0| = 3e-10 vs `IT-2/result.json`);
 `IT-2/trajectory.csv` has steps 0-9 and the last step. IT-10 (IMSRG(3f2), `--factorized`):
 `O16_emax2`, `He4_emax2`, `O16_emax3` (full trajectories, `result.json`). See `e2e/README.md`.
+
+### `operator/emax2/` (M4) — `tools/reference/gen_golden_operator.sh`
+
+Normal ordering (`Operator::DoNormalOrdering` / `UndoNormalOrdering`) and the HF-basis
+transformation (`HartreeFock::TransformToHFBasis`) of the old code. Commands, contents and
+numbers: see `operator/README.md`.
 
 ## Missing (not produced in M1)
 

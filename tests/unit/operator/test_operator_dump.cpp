@@ -30,7 +30,8 @@ double val(std::size_t ch, std::size_t i, std::size_t j) {
 }
 
 /// Fills `op` with values obeying its hermiticity (H: symmetric, A: antisymmetric with zero
-/// diagonal, N: no relation), written with explicit raw sets.
+/// diagonal, N: no relation) and the scalar one-body selection rule, written with explicit raw
+/// sets.
 void fill(Operator& op) {
   const auto sgn = hermiticity_sign(op.spec().hermiticity);
   const auto& ms = op.model_space();
@@ -43,6 +44,10 @@ void fill(Operator& op) {
       if (sgn == -1 && a == b) v = 0.0;
       if (a == 1 && b == 4) v = 0.0;  // exercise the nonzero-only filter
       if (sgn != 0 && a == 4 && b == 1) v = 0.0;
+      // Scalar selection rule: only orbits with equal (l, 2j, tz2) are connected.
+      const auto& oa = ms.basis().orbit(OrbitIndex{static_cast<std::int32_t>(a)});
+      const auto& ob = ms.basis().orbit(OrbitIndex{static_cast<std::int32_t>(b)});
+      if (oa.l != ob.l || oa.j2 != ob.j2 || oa.tz2 != ob.tz2) v = 0.0;
       op.one_body().set_element(OrbitIndex{static_cast<std::int32_t>(a)},
                                 OrbitIndex{static_cast<std::int32_t>(b)}, v);
     }
@@ -334,6 +339,31 @@ TEST_F(DumpErrors, ThreeBodyNotImplemented) {
 TEST_F(DumpErrors, MissingEnd) {
   lines.pop_back();
   expect_error_at(join_lines(lines), lines.size() + 1, ms);
+}
+
+TEST_F(DumpErrors, OneBodyEntryBetweenDifferentLjtz) {
+  // Orbits 0 (p0s1) and 2 (p0p3): a scalar operator cannot connect them.
+  const auto k = find_line(lines, "one_body ");
+  lines[k + 1] = "0 2 1.0";
+  expect_error_at(join_lines(lines), k + 2, ms);
+}
+
+TEST_F(DumpErrors, DuplicateOrbitRecord) {
+  const auto k = find_line(lines, "orbit 1 ");
+  lines[k] = "orbit 1 0 0 1 -1 1";  // the quantum numbers of orbit 0 again
+  expect_error_at(join_lines(lines), k + 1, ms);
+}
+
+TEST(OperatorDump, WriterRejectsMalformedSourceAndReference) {
+  const auto ms = make_ms();
+  const Operator op = make_op(ms, 2, Hermiticity::Hermitian);
+  std::ostringstream os;
+  OperatorDumpWriteOptions o;
+  o.source = "two\nlines";
+  EXPECT_THROW(write_operator_dump(os, op, o), InputError);
+  o.source = "fine";
+  o.reference = "two words";
+  EXPECT_THROW(write_operator_dump(os, op, o), InputError);
 }
 
 }  // namespace

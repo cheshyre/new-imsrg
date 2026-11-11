@@ -2,7 +2,9 @@
 /// @file
 /// Linear algebra on operators: axpy, scaling and the arithmetic operators (design/10 section
 /// 3.3). Whole parts are combined with flat device kernels (the blocks of two operators on the
-/// same model space with the same symmetry have identical layouts).
+/// same model space with the same symmetry have identical layouts). Results follow the memory
+/// model of `Operator` (device data current; host mirrors stale on GPU backends until
+/// `sync_to_host()`).
 #include "imsrg/operator/operator.hpp"
 
 namespace imsrg::op {
@@ -38,7 +40,8 @@ Operator operator*(double a, const Operator& x);
 Operator operator*(const Operator& x, double a);
 /// x / a. Precondition: a != 0.
 Operator operator/(const Operator& x, double a);
-/// O + c (adds c to the zero-body part; imsrg++ `operator+=(double)`).
+/// O + c (adds c to the zero-body part; imsrg++ `operator+=(double)`). A nonzero c makes an
+/// anti-Hermitian operator non-Hermitian.
 Operator& operator+=(Operator& x, double c);
 /// O - c (subtracts c from the zero-body part).
 Operator& operator-=(Operator& x, double c);

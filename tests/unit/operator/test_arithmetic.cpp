@@ -337,3 +337,19 @@ TEST(OperatorArithmetic, BlockSymmetryIsPreserved) {
 }
 
 }  // namespace
+
+TEST(OperatorArithmeticScalarAdd, ConstantMakesAntiHermitianNonHermitian) {
+  const auto ms = imsrg::basis::ModelSpace::from_names(imsrg::basis::BasisTruncation{.emax = 1},
+                                                       16.0, "O16", "O16");
+  using imsrg::Hermiticity;
+  imsrg::op::Operator a(ms, imsrg::op::OperatorSpec::scalar(2, Hermiticity::AntiHermitian));
+  a += 0.0;
+  EXPECT_EQ(a.hermiticity(), Hermiticity::AntiHermitian);
+  a += 1.5;
+  EXPECT_EQ(a.hermiticity(), Hermiticity::NonHermitian);
+  EXPECT_EQ(a.zero_body(), 1.5);
+  imsrg::op::Operator h(ms, imsrg::op::OperatorSpec::scalar(2, Hermiticity::Hermitian));
+  h -= 2.0;
+  EXPECT_EQ(h.hermiticity(), Hermiticity::Hermitian);
+  EXPECT_EQ(h.zero_body(), -2.0);
+}
