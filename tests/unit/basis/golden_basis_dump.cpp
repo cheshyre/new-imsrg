@@ -283,6 +283,8 @@ std::vector<std::string> golden_basis_files() {
       names.push_back(std::string(e) + "_" + s + ".txt");
     }
   }
+  names.push_back("emax4_O16_e3max7.txt");
+  names.push_back("emax4_Ne20_sd-shell_lmax2_e3max8.txt");
   std::sort(names.begin(), names.end());
   return names;
 }

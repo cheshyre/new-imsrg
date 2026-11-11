@@ -29,3 +29,16 @@ for emax in 2 4; do
     echo "wrote ${f} ($(wc -l < "${f}") lines)"
   done
 done
+
+# Cases with active cuts (added in M3): an E3max cut, and an lmax cut (truncated orbit indexing).
+extra=(
+  "emax4_O16_e3max7                  emax=4 e3max=7 reference=O16 valence_space=O16"
+  "emax4_Ne20_sd-shell_lmax2_e3max8  emax=4 e3max=8 lmax=2 reference=Ne20 valence_space=sd-shell"
+)
+for c in "${extra[@]}"; do
+  read -r name args <<<"${c}"
+  f="${OUT}/${name}.txt"
+  # shellcheck disable=SC2086
+  "${RH}" dump-basis ${args} hw=16 out="${f}" > /dev/null
+  echo "wrote ${f} ($(wc -l < "${f}") lines)"
+done

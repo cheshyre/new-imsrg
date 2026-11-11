@@ -29,7 +29,7 @@ TEST(BasisModelSpace, FromNamesMatchesEveryGoldenFile) {
     SCOPED_TRACE(name);
     const auto g = read_golden_basis_dump(golden_basis_dir() / name);
     const auto ms =
-        ModelSpace::from_names(BasisTruncation{g.emax}, g.hw, g.reference, g.valence_space);
+        ModelSpace::from_names(BasisTruncation{g.emax, g.lmax}, g.hw, g.reference, g.valence_space);
     ASSERT_EQ(ms->num_orbits(), static_cast<int>(g.orbits.size()));
     for (const auto& go : g.orbits) {
       const OrbitIndex a{go.index};
@@ -51,6 +51,38 @@ TEST(BasisModelSpace, FromNamesMatchesEveryGoldenFile) {
           << "channel " << gc.ch;
     }
   }
+}
+
+// The particle-hole channels are always built and the three-body channels on request; both
+// reproduce the golden counts.
+TEST(BasisModelSpace, ParticleHoleAndThreeBodyMatchGolden) {
+  for (const std::string& name : golden_basis_files()) {
+    SCOPED_TRACE(name);
+    const auto g = read_golden_basis_dump(golden_basis_dir() / name);
+    const auto ms =
+        ModelSpace::from_names(BasisTruncation{g.emax, g.lmax}, g.hw, g.reference, g.valence_space);
+    EXPECT_EQ(ms->three_body(), nullptr);
+    ASSERT_EQ(ms->particle_hole().num_channels(), static_cast<int>(g.ph_channels.size()));
+    for (const auto& gp : g.ph_channels) {
+      EXPECT_EQ(ms->particle_hole().channel(ChannelIndex{gp.ch}).num_kets, gp.nkets);
+    }
+    const auto ms3 = ms->with_three_body(ThreeBodyCuts{g.e3max});
+    ASSERT_NE(ms3->three_body(), nullptr);
+    EXPECT_EQ(ms3->three_body()->num_kets(), g.nkets3);
+    EXPECT_EQ(ms3->three_body()->sum_channel_kets(), g.sum_channel_kets3);
+    EXPECT_EQ(ms3->three_body()->num_channels(), static_cast<int>(g.channels3.size()));
+    EXPECT_EQ(&ms3->two_body(), &ms->two_body());
+    EXPECT_FALSE(*ms3 == *ms);  // with vs without three-body channels
+  }
+}
+
+TEST(BasisModelSpace, DerivedSpacesShareThreeBodyAndParticleHole) {
+  const auto ms = o16_emax2()->with_three_body(ThreeBodyCuts{6});
+  const auto ms2 = ms->with_reference(Reference::from_nucleus(ms->basis(), Nucleus::parse("Ne20")));
+  EXPECT_EQ(ms2->three_body(), ms->three_body());
+  EXPECT_EQ(&ms2->particle_hole(), &ms->particle_hole());
+  EXPECT_TRUE(*o16_emax2()->with_three_body(ThreeBodyCuts{6}) == *ms);
+  EXPECT_FALSE(*o16_emax2()->with_three_body(ThreeBodyCuts{5}) == *ms);
 }
 
 TEST(BasisModelSpace, WithReferenceSharesBasisAndChannels) {

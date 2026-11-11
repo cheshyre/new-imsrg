@@ -1,8 +1,8 @@
 // Record-by-record comparison of the basis bookkeeping (orbits, reference, partition, two-body
-// channels and ket subsets) with every imsrg-basis-dump v1 golden file. Only the header records
-// of each file are used to build our objects; every comparison is exact (integers equal, doubles
-// with ==, since the files carry %.17g round-trip values). The ph channels and the three-body
-// records are compared by later tasks.
+// channels, ket subsets, cross-coupled channels and three-body channels) with every
+// imsrg-basis-dump v1 golden file. Only the header records of each file are used to build our
+// objects; every comparison is exact (integers equal, doubles with ==, since the files carry %.17g
+// round-trip values).
 #include <algorithm>
 #include <cstddef>
 #include <filesystem>
@@ -16,9 +16,11 @@
 #include "imsrg/base/types.hpp"
 #include "imsrg/basis/nucleus.hpp"
 #include "imsrg/basis/orbit.hpp"
+#include "imsrg/basis/particle_hole_channels.hpp"
 #include "imsrg/basis/partition.hpp"
 #include "imsrg/basis/reference.hpp"
 #include "imsrg/basis/single_particle_basis.hpp"
+#include "imsrg/basis/three_body_channels.hpp"
 #include "imsrg/basis/two_body_channels.hpp"
 #include "imsrg/basis/valence_space.hpp"
 
@@ -43,7 +45,7 @@ struct Built {
 
 Built build(const GoldenBasisDump& g) {
   SingleParticleBasis basis =
-      SingleParticleBasis::harmonic_oscillator(BasisTruncation{g.emax}, g.hw);
+      SingleParticleBasis::harmonic_oscillator(BasisTruncation{g.emax, g.lmax}, g.hw);
   const Nucleus nucleus = g.reference == "default" ? default_reference_nucleus(g.valence_space)
                                                    : Nucleus::parse(g.reference);
   Reference ref = Reference::from_nucleus(basis, nucleus);
@@ -147,6 +149,38 @@ TEST_P(GoldenBasis, KetSubsets) {
           << ") record 'channel_subset' " << name;
     }
   }
+}
+
+TEST_P(GoldenBasis, PhChannels) {
+  const ParticleHoleChannels ph(b_->ch);
+  ASSERT_EQ(static_cast<int>(g_.ph_channels.size()), ph.num_channels()) << "ph channel count";
+  for (const auto& gc : g_.ph_channels) {
+    const std::string where = "ph channel " + std::to_string(gc.ch);
+    const ChannelIndex c{gc.ch};
+    const TwoBodyChannel& ours = ph.channel(c);
+    ASSERT_EQ(gc.J, ours.J()) << where << " J";
+    ASSERT_EQ(gc.parity, static_cast<int>(ours.parity)) << where << " parity";
+    ASSERT_EQ(gc.Tz, ours.Tz()) << where << " Tz";
+    ASSERT_EQ(gc.nkets, ours.num_kets) << where << " nkets";
+    ASSERT_EQ(gc.kets, values_of(ph.channel_kets(c))) << where << " ph_channel_kets";
+  }
+}
+
+TEST_P(GoldenBasis, ThreeBodyChannels) {
+  const ThreeBodyChannels tb(b_->basis, ThreeBodyCuts{g_.e3max});
+  ASSERT_EQ(static_cast<int>(g_.channels3.size()), tb.num_channels()) << "threebody channel count";
+  for (const auto& gc : g_.channels3) {
+    const std::string where = "threebody channel " + std::to_string(gc.ch);
+    const Channel3Index c{gc.ch};
+    const ThreeBodyChannel& ours = tb.channel(c);
+    ASSERT_EQ(gc.twoJ, ours.two_j.twice) << where << " twoJ";
+    ASSERT_EQ(gc.parity, static_cast<int>(ours.parity)) << where << " parity";
+    ASSERT_EQ(gc.twoTz, ours.two_tz.twice) << where << " twoTz";
+    ASSERT_EQ(static_cast<long long>(gc.nkets), static_cast<long long>(ours.num_kets))
+        << where << " nkets";
+  }
+  EXPECT_EQ(g_.nkets3, tb.num_kets()) << "record 'nkets3'";
+  EXPECT_EQ(g_.sum_channel_kets3, tb.sum_channel_kets()) << "record 'sum_channel_kets3'";
 }
 
 std::string case_name(const ::testing::TestParamInfo<std::string>& info) {

@@ -29,7 +29,7 @@ bool is_partition(const std::vector<const std::vector<int>*>& parts, int n) {
 void check_dump(const GoldenBasisDump& d) {
   const int norb = static_cast<int>(d.orbits.size());
   ASSERT_GT(norb, 0);
-  EXPECT_EQ(norb, (d.emax + 1) * (d.emax + 2));
+  if (d.lmax >= d.emax) EXPECT_EQ(norb, (d.emax + 1) * (d.emax + 2));
   EXPECT_EQ(d.hw, 16.0);
 
   int max_j2 = 0;
@@ -132,9 +132,9 @@ void check_dump(const GoldenBasisDump& d) {
   EXPECT_GT(d.nkets3, 0);
 }
 
-TEST(GoldenBasisDump, ThereAreTwelveFiles) {
+TEST(GoldenBasisDump, ThereAreFourteenFiles) {
   const auto files = golden_basis_files();
-  ASSERT_EQ(files.size(), 12u);
+  ASSERT_EQ(files.size(), 14u);
   EXPECT_TRUE(std::is_sorted(files.begin(), files.end()));
   for (const auto& f : files) {
     EXPECT_TRUE(std::filesystem::exists(golden_basis_dir() / f)) << f;
@@ -148,7 +148,8 @@ TEST(GoldenBasisDump, SelfConsistentAndMatchesHarmonicOscillatorBasis) {
     check_dump(d);
     EXPECT_TRUE(d.source.find("imsrg-devel") != std::string::npos);
 
-    const auto spb = SingleParticleBasis::harmonic_oscillator(BasisTruncation{d.emax}, d.hw);
+    const auto spb =
+        SingleParticleBasis::harmonic_oscillator(BasisTruncation{d.emax, d.lmax}, d.hw);
     ASSERT_EQ(spb.num_orbits(), static_cast<int>(d.orbits.size()));
     for (std::size_t i = 0; i < d.orbits.size(); ++i) {
       const Orbit& o = spb.orbits()[i];

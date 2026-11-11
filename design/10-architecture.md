@@ -111,47 +111,59 @@ enum class Parity : std::uint8_t { Even = 0, Odd = 1 };
 enum class Hermiticity : std::uint8_t { Hermitian, AntiHermitian, NonHermitian };
 ```
 
-### 3.2 Model space (module `basis`)
+### 3.2 Model space (module `basis`, as implemented in M3)
+
+Headers in `src/imsrg/basis/`; the docstrings are authoritative. Orderings are imsrg++'s (D11),
+verified record by record against the 14 golden basis dumps (`tests/golden/basis/`).
 
 ```cpp
-struct Orbit { int n; int l; TwoJ j2; TwoTz tz2; int shell_e; /* 2n+l */ };
-
-class SingleParticleBasis {      // immutable; orbits in imsrg++ index order (D11)
-  static SingleParticleBasis harmonic_oscillator(int emax, int lmax, double hw_MeV);
-  std::span<const Orbit> orbits() const;
-  OrbitIndex index_of(int n, int l, TwoJ j2, TwoTz tz2) const;
+struct Orbit { int32 n, l; TwoJ j2; TwoTz tz2; e(); parity(); };     // trivially copyable
+struct BasisTruncation { int32 emax, lmax = -1, emax_unocc = -1, lmax_unocc = -1; };
+class SingleParticleBasis {      // immutable; orbits in imsrg++ index order
+  static SingleParticleBasis harmonic_oscillator(const BasisTruncation&, double hw_MeV);
+  std::span<const Orbit> orbits() const;  std::optional<OrbitIndex> find(const Orbit&) const;
 };
-
-class Reference {                // occupations n_a in [0,1] per orbit; Z, N; name ("O16")
-  static Reference from_nucleus(const SingleParticleBasis&, std::string_view name, FillingRule);
-  static Reference from_occupations(const SingleParticleBasis&, std::vector<double> occ);
+struct Nucleus { double A, Z; static Nucleus parse(std::string_view); };   // "O16", "mix_A4.5_Z2.5"
+std::vector<OrbitOccupation> naive_filling(const Nucleus&, int32 emax, std::span<const Orbit> skip);
+class Reference {                // occupations in [0,1]; holes/particles; A, Z; e_fermi
+  static Reference from_nucleus(const SingleParticleBasis&, const Nucleus&);
+  static Reference from_occupations(const SingleParticleBasis&, std::vector<double>, std::string);
+  static Reference from_orbit_occupations(const SingleParticleBasis&, span<const OrbitOccupation>, ...);
 };
-
-class Partition {                // per orbit: Core / Valence / QSpace (and hole/particle via Reference)
-  static Partition single_reference(const Reference&);
-  static Partition valence_space(const SingleParticleBasis&, std::string_view space /* "sd-shell" */, ...);
+ValenceSpaceDefinition define_valence_space(std::string_view spec, const SingleParticleBasis&,
+                                            const Nucleus& reference);  // imsrg++ valence strings
+class Partition {                // OrbitClass Core/Valence/QSpace per orbit (imsrg++ cvq)
+  static Partition from_definition(const SingleParticleBasis&, const ValenceSpaceDefinition&);
+  static Partition with_holes_as_core(const Partition&, const Reference&, const SingleParticleBasis&);
 };
-
-class TwoBodyChannels;           // channel list (J, P, Tz), kets per channel, global<->local maps,
-                                 // per-channel index subsets (hh, ph, pp, vv, qq, ...) given a Partition
-class ThreeBodyChannels;         // (J3, P, Tz3) channels, 3B kets with Jab and E3max/dE3max cuts
-class ParticleHoleChannels;      // Pandya-transformed channel structure and precomputed recoupling maps
+class TwoBodyChannels;           // kets p<=q (Index2), channels 6J+2(Tz+1)+P, global<->local maps
+class TwoBodyKetSubsets;         // per channel: pp hh ph cc vc qc vv qv qq (+ occupation products)
+class ParticleHoleChannels;      // cross-coupled channels (Tz = |tz2_p-tz2_q|/2), pair_index
+class ThreeBodyChannels;         // (2J, P, 2Tz) channels, kets |pqr;Jpq> with E3max + Pauli cuts
+class DeviceTables;              // device mirrors (raw-pointer POD views) of orbit/2B/subset tables
 
 class ModelSpace {               // immutable bundle, shared via std::shared_ptr<const ModelSpace>
-  const SingleParticleBasis& basis() const;
-  const Reference& reference() const;
-  const Partition& partition() const;
-  const TwoBodyChannels& two_body() const;
-  const ThreeBodyChannels* three_body() const;   // only if built (IMSRG(3) / 3N storage)
-  const angmom::Tables& angmom() const;          // precomputed, read-only
-  // Changing the reference or partition creates a NEW ModelSpace that shares the heavy parts:
-  std::shared_ptr<const ModelSpace> with_reference(Reference) const;
+  static std::shared_ptr<const ModelSpace> create(SingleParticleBasis, Reference, Partition);
+  static std::shared_ptr<const ModelSpace> from_names(const BasisTruncation&, double hw,
+                                                      std::string_view reference, std::string_view valence);
+  const SingleParticleBasis& basis() const;  const Reference& reference() const;
+  const Partition& partition() const;        const TwoBodyChannels& two_body() const;
+  const TwoBodyKetSubsets& two_body_subsets() const;
+  const ParticleHoleChannels& particle_hole() const;
+  const ThreeBodyChannels* three_body() const;   // only after with_three_body(cuts)
+  std::shared_ptr<const ModelSpace> with_reference(Reference) const;   // shares basis/channels
+  std::shared_ptr<const ModelSpace> with_reference_and_partition(Reference, Partition) const;
+  std::shared_ptr<const ModelSpace> with_three_body(const ThreeBodyCuts&) const;
+  // later: const angmom::Tables& angmom() const;
 };
 ```
 
-* Heavy pieces (channels, tables) are held by `shared_ptr<const ...>`, so `with_reference` is cheap.
+* Heavy, occupation-independent pieces (basis, two-body, ph and 3B channels) are held by
+  `shared_ptr<const ...>`, so `with_reference` is cheap.
 * Copy, move and assign are trivially correct because there are no raw back-pointers (imsrg++'s
   `ModelSpace` copy is unsound; see `reference/01` §9).
+* `DeviceTables` is not owned by the ModelSpace (building a ModelSpace never needs Kokkos;
+  QUESTIONS M3-Q7). The 6j-weighted Pandya maps belong to the commutator module (M3-Q6).
 
 ### 3.3 Operators (module `operator`)
 
