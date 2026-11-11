@@ -24,6 +24,15 @@ namespace imsrg::op {
 /// they use by default. Combining two operators checks that their model spaces are the same
 /// object or structurally equal (`same_model_space`).
 ///
+/// Memory model at API boundaries (design/12 section 2): between calls the DEVICE data of the
+/// parts are authoritative. Library functions (arithmetic, norms, normal ordering, basis
+/// transformation, the dump writer, ...) read the device data of their operator arguments and
+/// return results whose device data are current; their host mirrors may be stale. The host
+/// element accessors of the parts (`get`, `set`, `set_normalized`, `host_view`, ...) work on the
+/// host mirror: call `sync_to_host()` before host reads that follow a library call, and
+/// `sync_to_device()` after host writes, before the operator is passed on. On Serial/OpenMP the
+/// mirror aliases the device data and both calls are fences only.
+///
 /// Regular value type: copy = deep copy of all parts, move = cheap (the model space is shared).
 /// The parts keep the shapes given at construction: assigning a part of another shape through
 /// the mutable accessors is a precondition violation. Needs an initialized `exec::Runtime` (except

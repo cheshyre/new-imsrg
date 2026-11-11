@@ -158,13 +158,6 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
   applied when the 3B kets are enumerated (imsrg++ enumerates with E3max only and applies them in
   the commutators); `ThreeBodyChannels::passes_configuration_cut` evaluates them per ket.
   **Assumed meanwhile:** M10 decides whether its layout drops those kets or masks them.
-* **M4-Q1** (2026-11-12, M4 lead) — The `operator` module cannot use the namespace
-  `imsrg::operator` (C++ keyword). **Assumed meanwhile:** `imsrg::op`; the CMake target and the
-  include path stay `imsrg::operator` / `imsrg/operator/...` (design/10 §3.3 updated).
-* **M4-Q2** (2026-11-12, M4 lead) — An OperatorDump records occupations but no valence space.
-  **Assumed meanwhile:** `model_space_for_dump` builds the partition with the holes
-  (n >= OCC_CUT) as core and every other orbit as q-space; the reader rejects occupations that
-  differ from the target model space unless `check_occupations = false`.
 * **M2-Q1** (2026-11-12, M2) — Logging needs process-wide output configuration (level, "only rank
   0 prints"), while AGENTS.md forbids mutable globals. `base` provides explicit, thread-safe
   `log::Logger` objects plus one `log::default_logger()` behind `imsrg::log::info(...)` (design/10
@@ -211,7 +204,13 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
   no switch for it. The `Elast`/norm divergence guards (|eta| > 1e12, |E| > 1e9) are harness
   additions. **Assumed meanwhile:** this is the intended IT-10 reference; O16 emax 2 converges
   with it, so no He4 substitute was needed (He4 emax 2 kept as extra).
-
+* **M4-Q1** (2026-11-12, M4 lead) — The `operator` module cannot use the namespace
+  `imsrg::operator` (C++ keyword). **Assumed meanwhile:** `imsrg::op`; the CMake target and the
+  include path stay `imsrg::operator` / `imsrg/operator/...` (design/10 §3.3 updated).
+* **M4-Q2** (2026-11-12, M4 lead) — An OperatorDump records occupations but no valence space.
+  **Assumed meanwhile:** `model_space_for_dump` builds the partition with the holes
+  (n >= OCC_CUT) as core and every other orbit as q-space; the reader rejects occupations that
+  differ from the target model space unless `check_occupations = false`.
 * **M7-Q1** (2026-11-12, M7 lead) - `tests/golden/commutator/README.md` calls the omitted
   `Z_comm111ss__eta_white__H` rounding noise (~1e-16), but the term is ~1.4e-8 (the one-body
   parts of eta_white and the HF H nearly commute, so the relative hermiticity check of the

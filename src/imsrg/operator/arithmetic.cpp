@@ -88,14 +88,16 @@ Operator operator/(const Operator& x, double a) {
   return r;
 }
 
+// A nonzero constant is Hermitian, so adding it to an anti-Hermitian operator gives a
+// non-Hermitian one.
 Operator& operator+=(Operator& x, double c) {
   x.zero_body() += c;
+  if (c != 0.0 && x.hermiticity() == Hermiticity::AntiHermitian) {
+    x.set_hermiticity(Hermiticity::NonHermitian);
+  }
   return x;
 }
 
-Operator& operator-=(Operator& x, double c) {
-  x.zero_body() -= c;
-  return x;
-}
+Operator& operator-=(Operator& x, double c) { return x += -c; }
 
 }  // namespace imsrg::op

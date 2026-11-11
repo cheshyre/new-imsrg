@@ -11,9 +11,12 @@
   IT-1..IT-10, incl. the %.17g IT-2 trajectory from `refharness flow`);
   M3 (basis: orbits, references, valence spaces, partitions, 2B/ph/3B channels, ModelSpace,
   DeviceTables; all 14 golden basis files match exactly); M2 (base, exec, comm, linalg with
-  Accelerate BLAS/LAPACK, angmom: Wigner/CG vs sympy, Moshinsky in double-double).
-* **In progress:** M4 (`feature/m4-operator`). Next: M5+M6 (one lead) and M7 from M4's
-  `m4-api-ready` tag.
+  Accelerate BLAS/LAPACK, angmom: Wigner/CG vs sympy, Moshinsky in double-double);
+  M4 (operator: spec, 1B/2B parts, arithmetic, norms, OperatorDump, normal ordering incl.
+  fractional occupations and NO2B, basis transformation, random generator; namespace `imsrg::op`).
+* **In progress:** M8a (`feature/m8a-config-cli`), M5+M6 (`feature/m56-io-hf`), M7
+  (`feature/m7-commutator`). Next: M8 flow from M7's `m7-api-ready` tag, then
+  the driver pipeline and the integration tests.
 * **Interruption:** all agents stopped on the 5-hour usage limit from about 01:30 to 02:30 JST and
   were resumed. Usage budget, not wall time, is the binding constraint of the night.
 * **Toolchain:** Homebrew cmake 4.4.5, ninja 1.13.2, ccache 4.14.3, Open MPI 5.0.11, libomp
@@ -37,3 +40,4 @@
 | 2026-11-12 03:00 | feature/m3-basis → develop | `basis`: Orbit/HO basis/nucleus filling, Reference (fractional occupations), named valence spaces, Partition, TwoBodyChannels + 9 subsets, ParticleHoleChannels, ThreeBodyChannels (e3max + Pauli cuts), ModelSpace, DeviceTables; golden parser and record-by-record comparison; 2 extra goldens with active cuts. Brings M2's `m2-api-ready` commits (base, exec, comm) | 310 tests; ci.sh dev-openmp + dev-serial PASS (lead); dev-openmp PASS on the merge | Deviations M3-1..6 in `30` §6; M3-Q1..Q9 (6j Pandya maps left to M7; 3B device tables; dE3max/OccNat cuts per ket) |
 | 2026-11-12 03:05 | feature/m2-foundations → develop | Rest of M2 after `m2-api-ready`: exec review fixes, `linalg` (MatrixView, BlockSparseMatrix, gemm/grouped_gemm, eigh; Accelerate with `ACCELERATE_NEW_LAPACK`), `angmom` (3j/6j/9j/CG exhaustively vs sympy up to emax 8, generated at build time: 571,800 values, worst abs. error 1.5e-14; Moshinsky in double-double vs an exact rational construction, 405,537 brackets E ≤ 16, plus 3,027 brackets/2,493 TalmiB spot-checked vs libIMSRG within 4.4e-13; Talmi) | 120 unit + 3 MPI tests, ci.sh dev-openmp + dev-serial PASS (lead); dev-openmp PASS on the merge | Deviation: imsrg++ double-precision Moshinsky is off by up to 7.8e-11 rel. for 22 brackets (`30` §6). M2-Q1..Q7. OpenBLAS fallback untested |
 | 2026-11-12 03:10 | feature/m1-refharness-flow → develop | `refharness flow [--imsrg3 --n7 --factorized]` (verbatim copy of `Solve_magnus_euler`, %.17g per step); IT-2 trajectory; IT-10 (3f2) goldens: O16 emax 2 E0 −147.389459022 (407 steps, reached smax 200), He4 emax 2 −25.153996210 (193), O16 emax 3 −157.777153257 (152) | Harness reproduces the imsrg++ IT-2 golden: 256 steps, \|ΔE0\| = 3e-10 MeV; CI dev-openmp PASS on the merge | M1-Q2: "3f2" taken as IMSRG(2) + `BCH::SetUseFactorizedCorrection(true)` (to be confirmed by M10); no unit tests for refharness |
+| 2026-11-12 03:40 | feature/m4-operator → develop | `operator` (`imsrg::op`): OperatorSpec (scalar; designed for tensor/parity/Tz/odd-A), OneBody, TwoBody on BlockSparseMatrix, Operator, arithmetic, D12 norms, OperatorDump v1 read/write, 2B normal ordering with fractional occupations and undo, NO2B container + NO2B→0B/1B/2B normal ordering, unitary basis transformation, seeded random generator; refharness `normal-order`/`basis-transform` + `tests/golden/operator/` | 504 unit + 1 integration + 3 MPI tests, dev-openmp + dev-serial PASS (lead); dev-openmp PASS on the merge. Max deviations: norms of 37 dumps 4.1e-16 rel., NO 5.8e-15, Ne20 random NO 2.7e-15, HF transform 1.8e-15, NO2B NO 4.4e-15 | Bug fix M4-1 (AddToTBME anti-Hermitian partner sign). M4-Q1, M4-Q2. Perf follow-ups: per-channel norm reductions; `No2bThreeBody::get_pn` linear scan + CG recomputation |
