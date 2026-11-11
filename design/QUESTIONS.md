@@ -217,3 +217,9 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
   reader, 1e-12 * max entry, rejects the dump). The tests compare comm111ss for that pair with
   `Z_all` minus the other golden terms (deviation 3.9e-16). **Assumed meanwhile:** the README
   wording is stale; the golden set is otherwise complete.
+* **M7-Q2** (2026-11-12, M7 T3a) - The T3a kernels need a declaration beyond the public headers:
+  `detail::check_term_inputs(X, Y, Z, ws)` in `commutator/detail/workspace_impl.hpp` (model-space
+  compatibility and NonHermitian guard, shared by all term kernels). The term functions are
+  declared in `commutator.hpp` under `commutator::terms`. T3b/T4 reuse the same guard.
+  **Assumed meanwhile:** no public signature changed; `comm111ss` runs two host GEMMs on the
+  one-body device views (fence first), as the one-body block is tiny.
