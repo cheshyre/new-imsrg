@@ -211,12 +211,11 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
   **Assumed meanwhile:** `model_space_for_dump` builds the partition with the holes
   (n >= OCC_CUT) as core and every other orbit as q-space; the reader rejects occupations that
   differ from the target model space unless `check_occupations = false`.
-* **M7-Q1** (2026-11-12, M7 lead) - `tests/golden/commutator/README.md` calls the omitted
+* **M7-Q1** (2026-11-12, M7 lead) - The golden README called the omitted
   `Z_comm111ss__eta_white__H` rounding noise (~1e-16), but the term is ~1.4e-8 (the one-body
   parts of eta_white and the HF H nearly commute, so the relative hermiticity check of the
-  reader, 1e-12 * max entry, rejects the dump). The tests compare comm111ss for that pair with
-  `Z_all` minus the other golden terms (deviation 3.9e-16). **Assumed meanwhile:** the README
-  wording is stale; the golden set is otherwise complete.
+  reader, 1e-12 * max entry, rejects the dump). **Resolved in M7:** README wording corrected;
+  the tests compare comm111ss for that pair with `Z_all` minus the other golden terms (3.9e-16).
 * **M7-Q2** (2026-11-12, M7 lead) - The fast IMSRG(2) kernels support X and Y that are each
   Hermitian or anti-Hermitian; a NonHermitian input throws NotImplementedError (the ladder and
   Pandya paths use X^T = hX X; imsrg++ silently returns wrong numbers, reference/02 P-9).

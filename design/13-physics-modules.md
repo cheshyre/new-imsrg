@@ -111,6 +111,24 @@ Phase-1 formats, in this order:
   named presets: `imsrg2`, `imsrg3_n7`, `imsrg3_full`. IMSRG(3f2) is **not** a TermMask preset:
   it acts at the BCH level (it reuses the nested commutator from two steps back, `BCH.cc:182-191`)
   and is switched on with `BchOptions::factorized` (`[imsrg3] factorized = true`).
+* **As implemented (M7, tag `m7-api-ready`):** headers `imsrg/commutator/{options,workspace,
+  commutator}.hpp`. `commutator(X, Y, Z, opts, ws)` overwrites Z (reusing its storage when the
+  spec matches) and an allocating overload returns Z; `terms::comm*ss` add one term each;
+  `commutator_spec` gives Z's spec (rank max of the inputs, hermiticity rule of imsrg++). The
+  `Workspace` (one per model space, eagerly built, one call at a time) holds the device tables,
+  the dense 6j table, the ladder ket lists and the Pandya data, and all scratch. Every fast term
+  writes every element of its output part (no final symmetrization); X and Y must each be
+  Hermitian or anti-Hermitian (NotImplementedError otherwise, QUESTIONS M7-Q2), and Z must
+  carry the hermiticity `commutator_spec` gives. Ladders: per channel gathered GEMMs
+  `X P Y` with P = diag(nbar nbar) and diag(n n), symmetrized with `Y P X = hX hY (X P Y)^T`,
+  shared with the 221 term. Particle-hole: Pandya transform of X and Y into the cross-coupled
+  channels (6j from the table), one GEMM `Ncc x nk x 2Ncc` per channel over the ordered pairs
+  with n_a != n_b, and an inverse transform that reads only the stored half of Zbar through
+  the flip symmetry `F W F = -hX hY Phi W Phi` (so, unlike imsrg++, it does not depend on the
+  lexicographic ket order, reference/02 P-12). `commutator_ref` (tests only) evaluates the same
+  formulas with plain loops for any hermiticity. Validation: imsrg-devel goldens at emax 1-2
+  (all hermiticity pairs, closed and open shell) and fast vs reference on random operators,
+  all deviations below 2e-15 relative; benchmark in `design/benchmarks/imsrg2-commutators.md`.
 
 ## 7. flow (reference: `reference/03`)
 

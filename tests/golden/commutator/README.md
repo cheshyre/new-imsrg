@@ -38,9 +38,10 @@ Hermiticity of every Z: A,A or H,H gives A; H,A or A,H gives H. Here both pairs 
 **every Z file has hermiticity H** (header `hermiticity H`), including partial terms.
 
 `norms.json`: imsrg++ norms (`refharness norms`) of every dump, keyed by file stem. One dump,
-`Z_comm111ss__eta_white__H`, is deliberately absent: its entries are rounding noise (~1e-16, the
-term vanishes for this pair) and it fails the reader's relative hermiticity check (1e-12 * max
-entry), so it cannot be read back. The generator script drops any dump that fails that check.
+`Z_comm111ss__eta_white__H`, is deliberately absent: its entries are small (~1e-8: the one-body
+parts of eta_white and the HF H nearly commute; M7 measured this, design/QUESTIONS.md M7-Q1) and
+it fails the reader's relative hermiticity check (1e-12 * max entry), so it cannot be read back.
+The tests check this term against `Z_all` minus the other terms. The generator script drops any dump that fails that check.
 
 ## Consistency checks (computed on the dumps, all matrix elements)
 
