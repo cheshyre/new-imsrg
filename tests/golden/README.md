@@ -77,6 +77,12 @@ default, lmax = 99999 = no cut), < 1 s each:
 | `emax{2,4}_sd-shell.txt` | default | sd-shell | core O16, valence sd |
 | `emax{2,4}_p-shell.txt` | default | p-shell | core He4, valence p |
 | `emax{2,4}_Ne20_sd-shell.txt` | Ne20 | sd-shell | reference ≠ core (IT-7 setup) |
+| `emax4_O16_e3max7.txt` | O16 | O16 | `e3max=7`: an active E3max cut on the 3B kets (added in M3) |
+| `emax4_Ne20_sd-shell_lmax2_e3max8.txt` | Ne20 | sd-shell | `lmax=2 e3max=8`: truncated orbit indexing (index ≠ hash), open shell, E3max cut (added in M3) |
+
+The e3max 12 files never cut 3B kets (3·emax ≤ 12), hence the two extra cases (same command with
+the extra `e3max=`/`lmax=` arguments; the ph channel `Tz` field is the channel-index slot, so the
+empty Tz = -1 slots print -1).
 
 ### `hamiltonian/emax2_O16/` (M4, M5) — `tools/reference/gen_golden_hamiltonian.sh`
 
