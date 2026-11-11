@@ -125,6 +125,26 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
 * **M1-Q1** (2026-11-12, M1) — The brief's IT-4/IT-5 command line (`3bme_type=no2b` with the `NO2B_ThBME_..._ms6_12_18.stream.bin` file, emax=4) gives an unphysical old-code result: E_HF = -313.17 MeV (e3hf = -201.9) and a magnus flow that diverges to E0 ~ -1e9 after ~37 time units; IT-8 (emax=2, no 3N) diverges the same way. Is the 3N setup (file/e3max/no2b type) or the shifted-Magnus step control meant to be different for these goldens? **Assumed meanwhile:** the commands are run exactly as in the brief and the diverged runs are committed as-is, documented in tests/golden/e2e/README.md; IT-4/5 comparisons should use the early flow steps and HF numbers only.
 * **M3-Q1** (2026-11-12, M3) — imsrg++ `GetjjSpace` indexes out of range for a proton or neutron count outside the tabulated closures. **Assumed meanwhile:** `define_valence_space("jj-shell", ...)` throws `InputError` for counts outside [2, 258); in-range behaviour is unchanged.
 * **M3-Q2** (2026-11-12, M3 golden tests) — tests/golden/README.md says the ph (Pandya) channel field is Tz = |tz2_p - tz2_q|/2 (non-negative), but the dump files contain Tz in {-1, 0, 1} for ph_channel records, and their ch index obeys 6J + 2(Tz+1) + parity (same formula as pp channels). Is the README wording stale? **Assumed meanwhile:** the files are authoritative; the golden parser checks the index formula and does not constrain the sign.
-* **M3-Q-ph3-1** (2026-11-12, M3 ph/3B channels) — imsrg++ `ModelSpace::GetLocalIndex` (Pandya) returns `NumberKets-1` for an absent swapped ket instead of signalling absence. **Assumed meanwhile:** `ParticleHoleChannels::pair_index` and `local_index` return `std::nullopt` for absent kets (the golden files never exercise the buggy case); callers must handle the empty optional.
-* **M3-Q-ph3-2** (2026-11-12, M3 ph/3B channels) — `ThreeBodyChannel::CheckChannel_ket` contains stretched-state rules the reference itself marks "TODO Put these back in" (redundant). **Assumed meanwhile:** `ThreeBodyChannels` copies all of them exactly, so membership matches the golden files; dropping the redundant rules is left to a later cleanup.
-* **M3-Q-ph3-3** (2026-11-12, M3 golden tests) — The 14-file golden set includes an lmax=2 basis with 22 orbits, so the "norb = (emax+1)(emax+2)" assertion in test_golden_basis_dump.cpp is now restricted to files with lmax >= emax. This corrects a test assumption; the golden comparisons are unchanged. **Assumed meanwhile:** as described.
+* **M3-Q3** (2026-11-12, M3 ph/3B channels) — imsrg++ `ModelSpace::GetLocalIndex` (Pandya) returns `NumberKets-1` for an absent swapped ket instead of signalling absence. **Assumed meanwhile:** `ParticleHoleChannels::pair_index` and `local_index` return `std::nullopt` for absent kets (the golden files never exercise the buggy case); callers must handle the empty optional.
+* **M3-Q4** (2026-11-12, M3 ph/3B channels) — `ThreeBodyChannel::CheckChannel_ket` contains stretched-state rules the reference itself marks "TODO Put these back in" (redundant). **Assumed meanwhile:** `ThreeBodyChannels` copies all of them exactly, so membership matches the golden files; dropping the redundant rules is left to a later cleanup.
+* **M3-Q5** (2026-11-12, M3 golden tests) — The 14-file golden set includes an lmax=2 basis with 22 orbits, so the "norb = (emax+1)(emax+2)" assertion in test_golden_basis_dump.cpp is now restricted to files with lmax >= emax. This corrects a test assumption; the golden comparisons are unchanged. **Assumed meanwhile:** as described.
+* **M3-Q6** (2026-11-12, M3 lead) — The 6j-weighted Pandya recoupling maps are not built in
+  `basis`. `ParticleHoleChannels` provides the cross-coupled channel structure, `pair_index` (the
+  2·nkets ordered-pair index) and flat tables; an elementwise precomputed map is
+  O(n_cc² × n_J) per channel, far too large at emax 12-14, so its layout has to be designed with
+  the comm222_ph kernel (design/12 §4.2). **Assumed meanwhile:** M7 (commutator) builds the maps
+  from `ParticleHoleChannels` and the angmom 6j tables.
+* **M3-Q7** (2026-11-12, M3 lead) — `ModelSpace` does not own its device mirror: `DeviceTables`
+  is a separate object (`DeviceTables(const ModelSpace&)`), so that building a ModelSpace (and
+  every host-only test of later modules) never needs an initialized Kokkos runtime, and the
+  `m3-api-ready` behaviour of `ModelSpace::create` stays unchanged. **Assumed meanwhile:**
+  consumers (operator/commutator) hold a `DeviceTables`; M4 may add a shared cache to the bundle.
+* **M3-Q8** (2026-11-12, M3 lead) — Input checks stricter than imsrg++: a nucleus that does not
+  fit into emax throws (imsrg++ prints "Trouble!" and continues with a partial filling), a core or
+  hole orbit outside the basis throws (imsrg++ exits in `SetLmax`), while valence orbits outside
+  the basis are dropped with a warning (as imsrg++ does); orbit labels accept multi-digit n
+  (imsrg++ misreads them). **Assumed meanwhile:** keep the checks; none changes a valid run.
+* **M3-Q9** (2026-11-12, M3 lead) — The IMSRG(3) configuration cuts (dE3max, OccNat3Cut) are not
+  applied when the 3B kets are enumerated (imsrg++ enumerates with E3max only and applies them in
+  the commutators); `ThreeBodyChannels::passes_configuration_cut` evaluates them per ket.
+  **Assumed meanwhile:** M10 decides whether its layout drops those kets or masks them.

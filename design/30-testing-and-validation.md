@@ -106,3 +106,9 @@ covers the fixed behaviour.
 | # | Reference location | Bug | Our behaviour | Validated by |
 |---|--------------------|-----|---------------|--------------|
 | (fill in during implementation) | | | | |
+| M3-1 | `TwoBodyChannel.cc:70-76` (`GetLocalIndex`, p > q) | An absent swapped ket returns `NumberKets-1`, a valid-looking index | `ParticleHoleChannels::pair_index` returns `nullopt` | `basis_channels` unit tests (absent pair, both orders) |
+| M3-2 | `ModelSpace.cc:1010` vs `1209-1234` | Holes are `occ >= OCC_CUT` but the hh/ph subsets test `occ > OCC_CUT`, so an orbit with occ = 1e-6 exactly is in no subset | Holes are `occ >= 1e-6` everywhere (`TwoBodyKetSubsets`) | All 14 golden basis files (subsets identical; no golden orbit sits at 1e-6) |
+| M3-3 | `ModelSpace.cc:609-650` (`GetOrbitsAZ`) | A nucleus that does not fit into emax prints "Trouble!" and continues with a partial filling | `InputError` | `basis_core` (Ca48 at emax 2) |
+| M3-4 | `ModelSpace.cc:696-747` (`GetjjSpace`) | Proton/neutron counts outside [2, 258) index outside the closure table | `InputError` (M3-Q1) | `basis_reference` valence-space tests |
+| M3-5 | `ModelSpace.cc:528-543` (`String2Qnumbers`) | Two-digit n is misparsed | Strict parser, multi-digit n accepted | `basis_core` label tests |
+| M3-6 | `ModelSpace.cc:81-159, 853-960` | Copies keep `Orbit*` into the source; `operator=` drops members | Value types; `ModelSpace` parts are `shared_ptr<const ...>`, no back-pointers | `basis_model_space` (derived spaces share parts, equality) |
