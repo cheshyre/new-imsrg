@@ -35,3 +35,21 @@ if(TARGET imsrg)
     "IMSRG_EXE_PATH=\"$<TARGET_FILE:imsrg>\"" "IMSRG_SOURCE_DIR=\"${PROJECT_SOURCE_DIR}\"")
   add_dependencies(driver_cli imsrg)
 endif()
+
+# Pipeline stage 1 (model space, interaction, HF, normal ordering) against the HF goldens; needs
+# the input files in IMSRG_TEST_DATA_DIR and skips without them.
+imsrg_add_test(NAME driver_pipeline_hamiltonian
+  SOURCES test_pipeline_hamiltonian.cpp ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cpp
+  DEPS driver LABELS integration NO_GTEST_MAIN)
+target_compile_definitions(driver_pipeline_hamiltonian PRIVATE
+  "IMSRG_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden\""
+  "IMSRG_TEST_DATA_DIR=\"${IMSRG_TEST_DATA_DIR}\"")
+
+# End-to-end integration tests IT-2, IT-3, IT-4, IT-6, IT-7, IT-12 (design/30 section 4): run the
+# pipeline in process and compare with tests/golden/e2e; skip without the input files.
+imsrg_add_test(NAME driver_integration
+  SOURCES test_integration.cpp ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cpp
+  DEPS driver LABELS integration NO_GTEST_MAIN)
+target_compile_definitions(driver_integration PRIVATE
+  "IMSRG_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden\""
+  "IMSRG_TEST_DATA_DIR=\"${IMSRG_TEST_DATA_DIR}\"")
