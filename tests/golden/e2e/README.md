@@ -100,3 +100,26 @@ IT-8/He4_emax2 (E0 and dE_triples at emax 2) and IT-8/emax3 (O16).
 * Flow-file columns run together for large values (a plain `split()` fails); parser uses number formats.
 * The single-reference run only writes the operator file `intRp2.snt`, no Hamiltonian file.
 * `perturbative_triples=true` after a diverged flow prints `-inf` rather than failing.
+
+## Trajectories and IT-10 (refharness flow)
+
+`bash tools/reference/gen_golden_flow.sh [refharness]`, `OMP_NUM_THREADS=8`. `refharness flow` runs the
+imsrg++ pipeline (me2j 14/28/14, hw=16, HF, normal ordering, Magnus with the executable's default
+step control, atan generator) with a verbatim copy of `Solve_magnus_euler` and prints every step as
+`step,s,E0,norm_eta,norm_omega` (`%.17g`). Options: `emax reference valence_space generator smax
+--imsrg3 --n7 --factorized`.
+
+* **IT-2 check:** `refharness flow emax=4 reference=O16 valence_space=O16 hw=16`: 256 steps, s =
+  124.45796230102064, E0 = -164.6487723082966 vs golden -164.648772308: |dE0| = 3e-10 (<= 1e-8).
+  Wall 6.3 s (8 threads, includes file read). `IT-2/trajectory.csv` = steps 0-9 + step 256;
+  `IT-2/refharness_result.json` is the harness result.
+* **IT-10** (IMSRG(3f2) = IMSRG(2) + `BCH::SetUseFactorizedCorrection(true)`; no executable switch):
+
+| case | E_HF | E0 | steps / s_final | wall (s) |
+|---|---|---|---|---|
+| IT-10/O16_emax2 | -134.03044657 | -147.389459022 | 407 / 200 (smax reached) | 3.8 |
+| IT-10/He4_emax2 | -22.98970175 | -25.153996210 | 193 / 95.90493 (|eta| < 1e-6) | 2.1 |
+| IT-10/O16_emax3 | -147.43333256 | -157.777153257 | 152 / 73.38877 (|eta| < 1e-6) | 5.0 |
+
+O16 emax 2 does NOT diverge with 3f2 (unlike 2N-only IMSRG(2)); it needs the full smax = 200 and
+ends with |eta| = 2.5e-5, i.e. slow tail convergence. He4 emax 2 is kept as an extra case.

@@ -37,3 +37,35 @@ else()
   message(WARNING "imsrg: sympy not available for ${Python3_EXECUTABLE}; "
                   "angmom_wigner_reference will be skipped")
 endif()
+
+# --- Moshinsky brackets ----------------------------------------------------------------------
+# angmom_moshinsky compares against exact rational-arithmetic values generated at build time
+# (stdlib-only script, no sympy needed) and against committed imsrg++ samples.
+set(_mgen "${CMAKE_CURRENT_SOURCE_DIR}/reference/gen_moshinsky_exact.py")
+set(_mref "${CMAKE_CURRENT_BINARY_DIR}/moshinsky_exact_e16.txt")
+set(_msamples "${CMAKE_CURRENT_SOURCE_DIR}/data/moshinsky_imsrgpp_samples.txt")
+
+imsrg_add_test(NAME angmom_moshinsky
+  SOURCES moshinsky_test.cpp
+          ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cpp
+  DEPS angmom exec
+  LABELS unit
+  NO_GTEST_MAIN)
+add_custom_command(OUTPUT "${_mref}"
+  COMMAND "${Python3_EXECUTABLE}" "${_mgen}" --emax-e 16 --out "${_mref}"
+  DEPENDS "${_mgen}"
+  COMMENT "Generating exact Moshinsky reference data (once per build tree)"
+  VERBATIM)
+add_custom_target(angmom_moshinsky_reference_data ALL DEPENDS "${_mref}")
+add_dependencies(angmom_moshinsky angmom_moshinsky_reference_data)
+target_compile_definitions(angmom_moshinsky PRIVATE
+  IMSRG_MOSHINSKY_EXACT_FILE="${_mref}"
+  IMSRG_MOSHINSKY_SAMPLES_FILE="${_msamples}")
+
+# --- Angular-momentum tables (device views; own main initializes the exec runtime) --------------
+imsrg_add_test(NAME angmom_tables
+  SOURCES tables_test.cpp tables_kernels.cpp
+          ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cpp
+  DEPS angmom exec
+  LABELS unit
+  NO_GTEST_MAIN)
