@@ -78,3 +78,11 @@ __pycache__/
 
 # Generated reference/golden data that is too large to commit
 tests/golden/generated/
+
+# Reference code and large test inputs live untracked in the main checkout root; never commit them
+/imsrg-devel/
+*.me2j
+*.me2j.gz
+*.me3j
+*.me3j.gz
+*.stream.bin
