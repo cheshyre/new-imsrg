@@ -144,11 +144,17 @@ answers recorded in `design/QUESTIONS.md` since the first run). The most importa
   `git update-ref refs/heads/develop <new> <old>`. The session may not run git in the main
   checkout. Putting the STATUS entry into the merge commit keeps `develop`'s first-parent history
   to merges only.
+  Chain the ref update to the CI exit status itself (`tools/ci.sh dev-openmp && git update-ref
+  ...`), never to a grep of its log: run 1 once advanced `develop` after a failed CI that way.
 * **Phrase deadlines unambiguously** ("keep working; your final report is due by 09:30"): one lead
   read "report by 09:00" as "stop now".
 * After an agent's work is merged, stop it (`TaskStop`) if it is still waiting on background work,
   and check the shared venv for editable installs (`~/.cache/imsrg-deps/venv/bin/pip list | grep
   imsrg`); remove them, because they shadow in-tree builds in other worktrees.
+* Tests must not share fixed file names in the system temp directory: ctest runs every test in
+  its own process in parallel (run 1 hit such a race in the io tests). Use per-process names (the
+  pattern in `tests/unit/driver/integration/run_support.hpp`) or, better, a shared helper; the
+  remaining fixed names are listed in the last `STATUS.md` log entry.
 * Reading inputs is fast (me2j emax-4 prefix 3.6 ms, whole file 9 s; NO2B 0.05 s at emax 4): no
   caches are needed.
 
