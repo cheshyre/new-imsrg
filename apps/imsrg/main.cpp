@@ -9,11 +9,13 @@
 #include <CLI/CLI.hpp>
 
 #include "imsrg/base/error.hpp"
+#include "imsrg/comm/environment.hpp"
 #include "imsrg/driver/config/load_config.hpp"
 #include "imsrg/driver/config/writer.hpp"
 #include "imsrg/driver/legacy/legacy_parameters.hpp"
 #include "imsrg/driver/operators/operator_request.hpp"
 #include "imsrg/driver/run.hpp"
+#include "imsrg/exec/runtime.hpp"
 
 namespace {
 
@@ -130,6 +132,10 @@ int main(int argc, char** argv) {
   }
 
   try {
+    // MPI first, Kokkos second (design/10 section 4); both live only around the pipeline, which
+    // destroys all operators before they finalize.
+    imsrg::comm::Environment environment(argc, argv);
+    imsrg::exec::Runtime runtime(argc, argv);
     imsrg::driver::run(config);
   } catch (const imsrg::ConfigError& e) {
     std::cerr << "imsrg: " << e.what() << "\n";

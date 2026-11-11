@@ -122,7 +122,7 @@ TEST(DriverCli, ExamplesTomlAndLegacyResolveIdentically) {
   }
 }
 
-TEST(DriverCli, ValidateWritesNothingAndRunStopsAtPipelineStub) {
+TEST(DriverCli, ValidateWritesNothingAndRunStopsOnPlaceholderInput) {
   TempDir d;
   const std::string a = example("a_o16_imsrg2.toml");
   const Result v = d.run("--validate --config " + a);
@@ -130,9 +130,12 @@ TEST(DriverCli, ValidateWritesNothingAndRunStopsAtPipelineStub) {
   EXPECT_TRUE(contains(v.out, "configuration is valid"));
   EXPECT_FALSE(fs::exists(d.path() / "output"));
 
+  // Since M8 the pipeline runs: the one-byte placeholder me2j file passes the V-14 preflight but
+  // is not an interaction, so the reader stops the run with an input error (exit 3) after the
+  // resolved config was written.
   const Result r = d.run("--config " + a);
-  EXPECT_EQ(r.code, 2);
-  EXPECT_TRUE(contains(r.err, "E-PLANNED")) << r.err;
+  EXPECT_EQ(r.code, 3) << r.err;
+  EXPECT_TRUE(contains(r.err, "data ended")) << r.err;
   EXPECT_TRUE(fs::exists(d.path() / "output" / "resolved_config.toml"));
 
   const Result again = d.run("--validate --config output/resolved_config.toml");
