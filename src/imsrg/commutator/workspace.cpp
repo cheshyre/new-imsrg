@@ -13,7 +13,8 @@ Workspace::Impl::Impl(const std::shared_ptr<const basis::ModelSpace>& ms)
     : tables(*ms),
       sixj(ms->basis().emax()),
       ladder(detail::build_ladder_data(*ms)),
-      pandya(detail::build_pandya_data(*ms)) {
+      pandya(detail::build_pandya_data(*ms)),
+      lifted(detail::build_lifted_data(*ms)) {
   const std::size_t norb = static_cast<std::size_t>(ms->num_orbits());
 
   // One-body channel CSR: orbits with equal (l, 2j, 2tz).

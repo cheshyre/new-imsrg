@@ -13,6 +13,7 @@
 #include "imsrg/basis/device_tables.hpp"
 #include "imsrg/commutator/detail/device_views.hpp"
 #include "imsrg/commutator/detail/ladder.hpp"
+#include "imsrg/commutator/detail/lifted.hpp"
 #include "imsrg/commutator/detail/pandya.hpp"
 #include "imsrg/commutator/workspace.hpp"
 #include "imsrg/exec/device_buffer.hpp"
@@ -44,6 +45,7 @@ struct Workspace::Impl {
 
   detail::LadderData ladder;  ///< Data of the pp/hh ladder terms (T3b).
   detail::PandyaData pandya;  ///< Data of the particle-hole term (T4).
+  detail::LiftedData lifted;  ///< Lifted one-body lists of comm122ss.
 
   /// View of the one-body channel CSR. O(1).
   detail::OneBodyChannelView one_body_channels() const noexcept {
