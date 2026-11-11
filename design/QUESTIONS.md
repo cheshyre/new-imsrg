@@ -158,3 +158,10 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
   applied when the 3B kets are enumerated (imsrg++ enumerates with E3max only and applies them in
   the commutators); `ThreeBodyChannels::passes_configuration_cut` evaluates them per ket.
   **Assumed meanwhile:** M10 decides whether its layout drops those kets or masks them.
+* **M4-Q1** (2026-11-12, M4 lead) — The `operator` module cannot use the namespace
+  `imsrg::operator` (C++ keyword). **Assumed meanwhile:** `imsrg::op`; the CMake target and the
+  include path stay `imsrg::operator` / `imsrg/operator/...` (design/10 §3.3 updated).
+* **M4-Q2** (2026-11-12, M4 lead) — An OperatorDump records occupations but no valence space.
+  **Assumed meanwhile:** `model_space_for_dump` builds the partition with the holes
+  (n >= OCC_CUT) as core and every other orbit as q-space; the reader rejects occupations that
+  differ from the target model space unless `check_occupations = false`.
