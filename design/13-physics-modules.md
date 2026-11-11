@@ -64,16 +64,20 @@ Phase-1 formats, in this order:
    spec; then 0B, 1B, 2B blocks), used for golden data and debugging. imsrg-devel gets a small
    companion dumper (in `tools/reference/`, built against the old library) that writes the same
    format.
-5. Later: full me3j (isospin), Navratil/Miyagi operator formats, binary scratch and checkpoint
-   files (with a magic number, version and endianness tag; imsrg++ has none).
+5. Later: full me3j (isospin), Navratil/Miyagi operator formats (needed, per the owner),
+   binary scratch and checkpoint files (with a magic number, version and endianness tag; imsrg++
+   has none).
+6. **Dropped** *(owner)*: HDF5 3N, Oslo, OakRidge, "Jason", "Takayuki" and the other older readers.
 
 ## 4. hf (reference: `reference/04` §1)
 
 * Algorithm to match: Fock matrix from the monopole of V (plus the 3N monopole from NO2B),
   per-channel `eigh`, a sign fix making the diagonal of C positive, density mixing with weight
   0.8 on the new density (check this in the code; record the exact scheme), convergence on
-  `‖Δε‖_F / norb < 1e-8`, at most 1000 iterations. DIIS exists in imsrg++ but has off-by-one
-  and dead-code issues; implement it later, optionally.
+  `‖Δε‖_F / norb < 1e-8`, at most 1000 iterations. imsrg++'s DIIS has off-by-one and dead-code
+  issues. **Owner: DIIS from the start.** Implement a correct DIIS (Pulay, on the commutator
+  [F, ρ] error vectors) in M6, keep plain mixing selectable (needed to compare against imsrg++'s
+  default path), and test that both reach the same HF solution within 1e-8 MeV.
 * Output: `HFResult {E_HF, spe, C, occupations, iterations, converged}` plus the
   normal-ordered H in the HF basis (`D^T (V2 + V3NO) D` for the 2B part; 3B → NO2B).
 * Known reference bugs: the dE3max cut uses `op->l` for all three orbits (HartreeFock.cc:1368);

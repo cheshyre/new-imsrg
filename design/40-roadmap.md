@@ -82,9 +82,10 @@ started if time allows. Keep going down the list for as long as the session runs
   imsrg-devel dump (tolerance `30` §2); writers reproduce imsrg-devel files numerically.
 
 ## M6 — opslib (scalar) and hf
-* T_int / Tcm / HCM / Rp2 / Rn2 / Rm2 (as needed by the tests); HF with 2N and NO2B 3N;
-  HF-basis transformation and normal ordering.
-* **Accept**: IT-1 and the HF part of IT-4 pass.
+* T_int / Tcm / HCM / Rp2 / Rn2 / Rm2 (as needed by the tests); HF with 2N and NO2B 3N, plain
+  density mixing (the imsrg++ path) **and a correct DIIS** *(owner)*; HF-basis transformation and
+  normal ordering.
+* **Accept**: IT-1 and the HF part of IT-4 pass; mixing and DIIS converge to the same solution.
 
 ## M7 — IMSRG(2) commutators
 * All scalar IMSRG(2) terms; `commutator_ref`; CommutatorOptions/TermMask; Workspace; first

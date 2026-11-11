@@ -21,8 +21,8 @@ option, write it under "Assumed meanwhile", and continue. The owner answers inli
   Applied in `30-testing-and-validation.md` §2.
 
 ### Architecture
-* **Q4** — Project and executable name. **Assumed meanwhile:** namespace `imsrg`, executable
-  `imsrg`, Python package `imsrg`.
+* **Q4** — Project and executable name. **Answer (owner):** keep `imsrg` (namespace, executable,
+  Python package).
 * **Q5** — Tensor operators: store only `ch_bra <= ch_ket` blocks (as imsrg++ does; half the
   memory) or all blocks (simpler kernels)? Decide when tensor operators are implemented.
 * **Q6** — May IMSRG(3) 3B blocks use `float` storage to halve memory, if the benchmark shows
@@ -32,8 +32,10 @@ option, write it under "Assumed meanwhile", and continue. The owner answers inli
   Fix it (keep the sign), list it in the deviation log, and validate it (e.g. a unit test with a
   negative near-zero denominator, and an end-to-end run where the floor never triggers matches
   imsrg++).
-* **Q8** — Is HF DIIS needed (imsrg++'s version has off-by-one errors and dead code), or is plain
-  density mixing enough? **Assumed meanwhile:** mixing only; DIIS later if convergence demands it.
+* **Q8** — Is HF DIIS needed (imsrg++'s version has off-by-one errors and dead code)? **Answer
+  (owner):** DIIS from the start. Implement a correct DIIS in M6, keep plain density mixing as an
+  option (it is the imsrg++ default path, needed for comparisons), and test that both converge to
+  the same HF solution.
 * **Q9** — Oldest toolchains to support? **Answer (owner):** GCC ≥ 11, CUDA ≥ 12, ROCm ≥ 6. Pin
   the latest stable Kokkos release compatible with these (check its requirements at M0).
 * **Q10** — Is there a GPU machine for CUDA/HIP tests? **Answer (owner):** not now. Rely on the
@@ -59,8 +61,9 @@ option, write it under "Assumed meanwhile", and continue. The owner answers inli
   `StaleHostError` unless `sync_to_host()` was called? **Assumed meanwhile:** yes.
 * **Q17** — Minimum Python version. The stable ABI needs ≥ 3.12. **Assumed meanwhile:** 3.10+,
   without the stable ABI.
-* **Q18** — Legacy readers not planned: Oslo, OakRidge, "Jason", "Takayuki", Antoine formats. Any of
-  them needed?
+* **Q18** — Which legacy input formats are needed? **Answer (owner):** me2j (2N), NO2B and me3j
+  (3N), and the Navratil/Miyagi operator formats (`OperatorsFromFile`, two-body currents). Dropped:
+  HDF5 3N, Oslo, OakRidge, "Jason", "Takayuki" and the other older readers.
 
 ### Process
 * **Q19** — Agent compaction: Claude Code exposes a global `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` and a

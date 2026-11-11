@@ -96,3 +96,4 @@ Implementation order:
 | D21 | The generator's denominator floor keeps the sign of the denominator *(user: imsrg++ loses it, which is a bug)*. | Deviation logged in `30` §6. | user |
 | D22 | NO2B test file is single precision (float) *(user)*; the me2j test file truncations are e1max=14, e2max=28, lmax=14 (verified by value count). | Input facts. | user + verified |
 | D23 | After the IMSRG(3) layout benchmark, the session **chooses the layout itself** and continues *(user)*. | Keeps the overnight run moving. | user |
+| D24 | Name stays `imsrg` *(user)*. Input formats *(user)*: me2j, NO2B, me3j, plus Navratil/Miyagi operator files. HDF5 3N, Oslo, OakRidge and the other older readers are dropped. HF gets a correct DIIS from the start *(user)*, with plain mixing kept for comparisons. | Owner's actual workflows. | user |
