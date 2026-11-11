@@ -112,11 +112,19 @@ if(IMSRG_BUILD_TESTS)
   set(BUILD_GMOCK ON CACHE BOOL "" FORCE)
   add_subdirectory("${PROJECT_SOURCE_DIR}/extern/googletest" extern/googletest SYSTEM
                    EXCLUDE_FROM_ALL)
-  # Python runs the layering check (stdlib only) and, later, pytest; prefer the shared venv.
+endif()
+
+# Python: the layering check and pytest need an interpreter (prefer the shared venv); the nanobind
+# module needs the Development.Module component too (python/CMakeLists.txt finds nanobind itself).
+if(IMSRG_BUILD_TESTS OR IMSRG_BUILD_PYTHON)
   if(NOT Python3_EXECUTABLE AND EXISTS "${IMSRG_VENV}/bin/python3")
     set(Python3_EXECUTABLE "${IMSRG_VENV}/bin/python3")
   endif()
-  find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
+  set(_imsrg_py_components Interpreter)
+  if(IMSRG_BUILD_PYTHON)
+    list(APPEND _imsrg_py_components Development.Module)
+  endif()
+  find_package(Python3 3.10 REQUIRED COMPONENTS ${_imsrg_py_components})
 endif()
 
 # ---- Hooks for later milestones -------------------------------------------------------------------

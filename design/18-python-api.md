@@ -459,3 +459,21 @@ The old code stays buildable (read-only tree) and is the oracle for the first mi
 4. Python generator callbacks cost a host sync per step; accept as prototyping-only, or provide a Kokkos-aware GeneratorFn in C++ later?
 5. Old reader formats dropped (Oslo, OakRidge, Jason, Takayuki, Antoine): confirm with users before removal.
 6. Stable-ABI wheels need Python >= 3.12; confirm minimum supported Python version (proposal: 3.10 with per-version wheels, stable ABI optional).
+
+## 8. Implementation status (M11 phase 1, 2026-11-12)
+
+Built: `imsrg._core` with `Runtime` (lazy `ensure()`, context manager, atexit finalize through
+`imsrg/__init__.py`), `Orbit`, `Channel`, `ModelSpace` (shared-pointer wrapper, identity
+equality), `Operator`/`OperatorSpec` (zero-copy F-ordered numpy views of the one-body matrix and
+two-body blocks, read-only unless `writable=True`; arithmetic, norms, normal ordering),
+`random_operator`, operator dump read/write, `RunConfig` and `load_config` (to_toml, to_dict,
+warnings), and the exception hierarchy (`ImsrgError` > `InputError` > `ConfigError`, plus
+`InvariantError`, `NumericalError`, `RuntimeError`, `NotImplementedError`). The GIL is released in
+arithmetic, normal ordering and dump I/O. Sources: `python/src/{module,runtime,basis,operator,config}.cc`.
+Not yet bound: hf, mbpt, commutators, flow, pipeline run, angmom (later phases).
+
+Notes: nanobind comes from the submodule; `python/CMakeLists.txt` must call `find_package(Python
+... Development.Module)` itself (the include dirs must be visible in that directory scope).
+Operators must be released before `Runtime` finalizes; the atexit hook runs `gc.collect()` first.
+Golden basis files store pair J and Tz (not 2J, 2Tz) in `channel` lines. Tests: `tests/python`
+(basis golden, H/T/V2 dump norms at 1e-10, numpy views, config examples); `tools/ci.sh` runs them.

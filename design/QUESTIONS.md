@@ -234,3 +234,40 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
   linearly and recomputes the isospin CG coefficients on every call (noted by M4). HF with 3N
   at emax 4 still solves in < 0.1 s. **Assumed meanwhile:** fine for emax <= 6; M12 adds an
   orbit-index cache and a CG table if profiles show it.
+* **M8a-Q1** (2026-11-12, M8a config) - `Generator` and `Method` enums (with their canonical TOML
+  spellings) live in `driver/config/schema.hpp`, since `flow` does not exist yet. **Assumed
+  meanwhile:** M8 makes `flow` reuse them or maps them 1:1 in the driver; the spellings are fixed.
+* **M8a-Q2** (2026-11-12, M8a config) - design/16 2.7 marks methods `flow` (DP45) and `flow_rk4`
+  as P1, but V-46 says "methods other than magnus are PL". **Assumed meanwhile:** the table wins
+  (roadmap M8 lists flow-RK4/DP45): `magnus`, `flow`, `flow_rk4` are P1, the rest `E-PLANNED`.
+* **M8a-Q3** (2026-11-12, M8a config) - With `imsrg.steps = 1` the stage-2 generator is inert:
+  `resolve` resets `generator.valence` to its default and `resolved_config.toml` omits it, so V-41
+  (explicit `generator.valence` + one stage + valence space = TOML error) and the round trip both
+  hold. **Assumed meanwhile:** fine; revisit with the Q1 HUMAN decision of design/16 3.6.
+* **M8a-Q4** (2026-11-12, M8a legacy) - Legacy `valence_space=<nucleus>` with an explicit,
+  different `reference=<nucleus>` (imsrg++: core filled as the first nucleus, normal ordering
+  w.r.t. the second, no valence orbits) cannot be expressed in the TOML schema. **Assumed
+  meanwhile:** `E-LEGACY-NS`; add a schema key if anyone needs it.
+* **M8a-Q5** (2026-11-12, M8a CLI) - Exit codes: `--print-config` runs the full validation
+  including the V-14 input-file preflight (exit 3 if inputs are missing); exit 3 only if every
+  error is V-14 or E-FILE; the pipeline stub `driver::run` throws `ConfigError("E-PLANNED ...")`
+  (exit 2) after writing `resolved_config.toml`. Relative input paths are relative to the working
+  directory (as imsrg++), not to the config file. **Assumed meanwhile:** as described.
+* **M8a-Q6** (2026-11-12, M8a operators) - The particle ranks of the P1 operator catalog are best
+  guesses, and orbit parameters (`OneOcc_<orb>`, `AllOcc_<orb>`, `OBD_<orb>_<orb>`) use imsrg++
+  orbit labels such as `p0s1`, while R05 1.2 reads `OneOcc` via a ModelSpace string (e.g. `1p3`)
+  and `AllOcc` via l, j, tz. **Assumed meanwhile:** labels as in design/16 4.1; opslib (M5/M6)
+  and M8 confirm ranks and the old spellings, and the catalog follows.
+* **M8a-Q7** (2026-11-12, M8a legacy) - `dE3max` not given maps to "absent" (no cut) instead of
+  the old 99; with emax <= 6 every 3-body energy is far below 99, so the numerics agree.
+  **Assumed meanwhile:** M8/M10 treat an absent `imsrg3.de3max` as no cut (e.g. in the
+  `new_E3max` rule of `imsrg3_at_end`). `valence.custom` is stored as a string; its orbit-list
+  format is for M8 to define and check.
+* **M11-Q1** (2026-11-12, M11 python) - Operators alive at interpreter exit block `Runtime`
+  finalization; the atexit hook runs `gc.collect()` first, but reference cycles holding operators
+  in user code could still keep one alive. **Assumed meanwhile:** `_atexit()` finalizes only if no
+  operators remain, otherwise leaves Kokkos to process exit; a C++ `Runtime` API to force
+  finalize would be cleaner.
+* **M11-Q2** (2026-11-12, M11 python) - `tests/golden/basis/*.txt` header documents `channel idx
+  2J parity 2Tz nkets` but stores J and Tz. **Assumed meanwhile:** tests compare with `two_j/2`,
+  `two_tz/2`; the harness comment should be corrected.
