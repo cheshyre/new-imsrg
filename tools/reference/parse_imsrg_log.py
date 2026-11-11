@@ -215,10 +215,14 @@ def main():
     if m:
         res["core_energy"] = float(m.group(1))
         res["core_energy_str"] = m.group(1)
-    m = first(r"^Perturbative triples:\s+(" + NUM + r") -> (" + NUM + ")", out_text, re.M)
+    m = first(r"^Perturbative triples:\s+(\S+) -> (\S+)", out_text, re.M)
     if m:
-        res["perturbative_triples"] = {"dE": float(m.group(1)), "dE_str": m.group(1),
-                                       "E0_plus_dE": float(m.group(2)),
+        # inf/nan are not valid JSON numbers: keep only the printed string then
+        def fin(t):
+            v = float(t)
+            return v if v - v == 0 else None
+        res["perturbative_triples"] = {"dE": fin(m.group(1)), "dE_str": m.group(1),
+                                       "E0_plus_dE": fin(m.group(2)),
                                        "E0_plus_dE_str": m.group(2)}
     norms3 = re.findall(r"^Norm of 3-body = (" + NUM + ")", out_text, re.M)
     if norms3:
