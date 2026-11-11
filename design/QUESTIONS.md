@@ -75,4 +75,14 @@ option, write it under "Assumed meanwhile", and continue. The owner answers inli
 
 (append here)
 
-Q1 (2026-11-12, M1) — The brief's IT-4/IT-5 command line (`3bme_type=no2b` with the `NO2B_ThBME_..._ms6_12_18.stream.bin` file, emax=4) gives an unphysical old-code result: E_HF = -313.17 MeV (e3hf = -201.9) and a magnus flow that diverges to E0 ~ -1e9 after ~37 time units; IT-8 (emax=2, no 3N) diverges the same way. Is the 3N setup (file/e3max/no2b type) or the shifted-Magnus step control meant to be different for these goldens? **Assumed meanwhile:** the commands are run exactly as in the brief and the diverged runs are committed as-is, documented in tests/golden/e2e/README.md; IT-4/5 comparisons should use the early flow steps and HF numbers only.
+* **M1-Q1** (2026-11-12, M1) — IT-4/IT-5 (2N + `NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_...` file)
+  give E_HF(O16, emax 4) = -313.17 MeV (e3hf = -201.9) and a diverging Magnus flow; IT-8 (O16,
+  emax 2, 2N only) diverges too. **Investigated (M1 lead):** the 3N file is a contact-only (cE)
+  component file: all its T = 3/2 matrix elements vanish (`tools/reference/no2b_isospin_scan.py`),
+  the reader layout matches, and no LEC scaling applies to no2b input, so the numbers are genuine
+  for this Hamiltonian. The O16 emax-2 divergence is a genuine IMSRG(2) instability (same with the
+  White generator and MP denominators; He4 emax 2, O16 emax 3 and IMSRG(3) at emax 2 converge).
+  Details: `tests/golden/e2e/README.md`. Question for the owner: is a full N2LO 3N file (all LEC
+  terms) available, or was the cE component intended? **Assumed meanwhile:** keep this file as a
+  code-path test input; IT-4/IT-5 compare HF numbers and the flow stopped at s = 10
+  (`IT-4/smax10`, `IT-5/smax10`); IT-8 compares He4 at emax 2 and O16 at emax 3.

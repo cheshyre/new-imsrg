@@ -29,7 +29,11 @@ C=(2bme="${F2}" file2e1max=14 file2e2max=28 file2lmax=14 hw=16)
 N=(3bme="${F3}" 3bme_type=no2b file3e1max=6 file3e2max=12 file3e3max=18)
 
 # jobs in run order (slow emax-3 jobs last); job_args prints the job-specific arguments
-declare -a JOBS=(IT-1 IT-2 IT-3 IT-4 IT-5 IT-6 IT-7 IT-8/emax2 IT-9/He4_emax2 IT-9/O16_emax2
+# IT-4/smax10, IT-5/smax10: the full IT-4/IT-5 flows diverge (cE-only 3N file, see
+# tests/golden/e2e/README.md), so the comparable golden is the flow stopped at s = 10, well before
+# the runaway (s ~ 25). IT-8/He4_emax2: O16 at emax 2 is unstable in IMSRG(2), He4 converges.
+declare -a JOBS=(IT-1 IT-2 IT-3 IT-4 IT-4/smax10 IT-5 IT-5/smax10 IT-6 IT-7 IT-8/emax2
+                 IT-8/He4_emax2 IT-9/He4_emax2 IT-9/O16_emax2
                  IT-8/emax3 IT-9/He4_emax3 IT-9/O16_emax3)
 job_args() {
   case "$1" in
@@ -37,10 +41,13 @@ job_args() {
     IT-2) echo emax=4 reference=O16 valence_space=O16 method=magnus ;;
     IT-3) echo emax=4 reference=O16 valence_space=sd-shell method=magnus ;;
     IT-4) echo emax=4 reference=O16 valence_space=O16 method=magnus "${N[@]}" ;;
+    IT-4/smax10) echo emax=4 reference=O16 valence_space=O16 method=magnus smax=10 "${N[@]}" ;;
     IT-5) echo emax=4 reference=O16 valence_space=O16 basis=NAT method=magnus "${N[@]}" ;;
+    IT-5/smax10) echo emax=4 reference=O16 valence_space=O16 basis=NAT method=magnus smax=10 "${N[@]}" ;;
     IT-6) echo emax=4 reference=O16 valence_space=O16 method=magnus Operators=Rp2 ;;
     IT-7) echo emax=4 reference=Ne20 valence_space=sd-shell method=magnus ;;
     IT-8/emax2) echo emax=2 reference=O16 valence_space=O16 method=magnus perturbative_triples=true ;;
+    IT-8/He4_emax2) echo emax=2 reference=He4 valence_space=He4 method=magnus perturbative_triples=true ;;
     IT-8/emax3) echo emax=3 reference=O16 valence_space=O16 method=magnus perturbative_triples=true ;;
     IT-9/He4_emax2) echo emax=2 IMSRG3=true imsrg3_n7=true method=magnus reference=He4 valence_space=He4 ;;
     IT-9/O16_emax2) echo emax=2 IMSRG3=true imsrg3_n7=true method=magnus reference=O16 valence_space=O16 ;;
