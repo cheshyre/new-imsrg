@@ -1,0 +1,52 @@
+{
+  "_comment": "PROPOSAL ONLY. Review, then copy to .claude/settings.json (project) or settings.local.json before the unattended run. CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=80 makes every session compact at 80% of its window; Sonnet/Haiku agent definitions additionally set autoCompactWindow=150000 so workers compact earlier (about 60% of a 200k window). The deny list blocks pushing and the shared git stash.",
+  "env": {
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "80"
+  },
+  "permissions": {
+    "allow": [
+      "Edit",
+      "Write",
+      "Bash(cmake *)",
+      "Bash(ctest *)",
+      "Bash(ninja *)",
+      "Bash(make *)",
+      "Bash(ccache *)",
+      "Bash(mpirun *)",
+      "Bash(clang-format *)",
+      "Bash(tools/*)",
+      "Bash(./tools/*)",
+      "Bash(build*/*)",
+      "Bash(brew install *)",
+      "Bash(brew list*)",
+      "Bash(brew --prefix*)",
+      "Bash(python3 -m venv *)",
+      "Bash(.venv/bin/pip *)",
+      "Bash(.venv/bin/python *)",
+      "Bash(.venv/bin/pytest *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git checkout *)",
+      "Bash(git switch *)",
+      "Bash(git branch *)",
+      "Bash(git merge *)",
+      "Bash(git rebase *)",
+      "Bash(git revert *)",
+      "Bash(git worktree *)",
+      "Bash(git submodule *)",
+      "Bash(git rev-parse *)",
+      "Bash(git -C *)"
+    ],
+    "deny": [
+      "Bash(git push*)",
+      "Bash(git stash*)",
+      "Bash(sudo *)",
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf ~*)"
+    ]
+  }
+}

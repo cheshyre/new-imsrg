@@ -66,3 +66,15 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# Claude Code local state (worktrees are created under .claude/worktrees in the main checkout)
+.claude/worktrees/
+.claude/settings.local.json
+
+# Python
+.venv/
+__pycache__/
+*.egg-info/
+
+# Generated reference/golden data that is too large to commit
+tests/golden/generated/
