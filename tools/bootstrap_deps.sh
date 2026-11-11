@@ -39,19 +39,41 @@ log() { echo "bootstrap_deps: $*"; }
 mkdir -p "$IMSRG_DEPS_PREFIX/build"
 
 # ---- lock ------------------------------------------------------------------------------------
+# mkdir is atomic. The owner writes its pid and host into the lock directory right away. A lock is
+# stale if its owner (on this host) is dead, or if it has no pid file and is older than a minute
+# (the owner died between mkdir and writing the pid). Only one waiter at a time may break a stale
+# lock (it holds $lock_dir.break and re-checks inside), so two waiters cannot both break it and
+# then remove each other's fresh lock. Locks of other hosts are never broken.
 lock_dir="$IMSRG_DEPS_PREFIX/.bootstrap.lock"
+this_host=$(hostname)
+
+lock_is_stale() {
+  local pid host
+  pid=$(cat "$lock_dir/pid" 2>/dev/null || true)
+  host=$(cat "$lock_dir/host" 2>/dev/null || true)
+  if [ -n "$pid" ]; then
+    [ "$host" = "$this_host" ] && ! kill -0 "$pid" 2>/dev/null
+  else
+    [ -n "$(find "$lock_dir" -maxdepth 0 -mmin +1 2>/dev/null)" ]
+  fi
+}
+
 waited=0
 while ! mkdir "$lock_dir" 2>/dev/null; do
-  owner_pid=$(cat "$lock_dir/pid" 2>/dev/null || true)
-  owner_host=$(cat "$lock_dir/host" 2>/dev/null || true)
-  if [ -n "$owner_pid" ] && [ "$owner_host" = "$(hostname)" ] && ! kill -0 "$owner_pid" 2>/dev/null
-  then
-    log "removing stale lock of dead process $owner_pid"
-    rm -rf "$lock_dir"
+  if [ -n "$(find "$lock_dir.break" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then
+    rmdir "$lock_dir.break" 2>/dev/null || true  # a breaker died; its marker is empty
+  fi
+  if lock_is_stale && mkdir "$lock_dir.break" 2>/dev/null; then
+    if lock_is_stale; then
+      log "removing stale lock $lock_dir (pid $(cat "$lock_dir/pid" 2>/dev/null || echo none))"
+      rm -rf "$lock_dir"
+    fi
+    rmdir "$lock_dir.break"
     continue
   fi
   if [ $((waited % 60)) -eq 0 ]; then
-    log "waiting for the lock $lock_dir (held by pid ${owner_pid:-?} on ${owner_host:-?})"
+    log "waiting for the lock $lock_dir (held by pid $(cat "$lock_dir/pid" 2>/dev/null ||
+      echo '?') on $(cat "$lock_dir/host" 2>/dev/null || echo '?'))"
   fi
   if [ "$waited" -ge 3600 ]; then
     log "gave up waiting for the lock after ${waited}s; remove $lock_dir if it is stale" >&2
@@ -60,9 +82,9 @@ while ! mkdir "$lock_dir" 2>/dev/null; do
   sleep 5
   waited=$((waited + 5))
 done
-echo $$ > "$lock_dir/pid"
-hostname > "$lock_dir/host"
 trap 'rm -rf "$lock_dir"' EXIT
+echo $$ > "$lock_dir/pid"
+echo "$this_host" > "$lock_dir/host"
 
 # ---- Kokkos ----------------------------------------------------------------------------------
 sm_status=$(git -C "$repo_root" submodule status extern/kokkos)
@@ -136,9 +158,15 @@ build_kokkos() {
   rm -rf "$stage_dir"
   DESTDIR="$stage_dir" cmake --install "$build_dir" >/dev/null
   printf '%s\n' "$stamp" > "$stage_dir$install_dir/.imsrg-stamp"
+  # Two renames: a concurrent configure sees the old install, the new one, or (for an instant)
+  # none, never a partial one. If the second rename fails, the old install is put back.
   rm -rf "$install_dir.old"
   if [ -e "$install_dir" ]; then mv "$install_dir" "$install_dir.old"; fi
-  mv "$stage_dir$install_dir" "$install_dir"
+  if ! mv "$stage_dir$install_dir" "$install_dir"; then
+    if [ -e "$install_dir.old" ]; then mv "$install_dir.old" "$install_dir"; fi
+    log "could not move the new kokkos-$backend into place" >&2
+    return 1
+  fi
   rm -rf "$install_dir.old" "$stage_dir"
   log "installed kokkos-$backend into $install_dir in $(( $(date +%s) - t0 ))s"
 }
