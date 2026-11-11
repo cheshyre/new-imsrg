@@ -1,0 +1,3 @@
+# Large golden outputs regenerated on demand by tools/reference/gen_golden_*.sh (never committed)
+generated/
+*.log
