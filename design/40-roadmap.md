@@ -46,8 +46,8 @@ started if time allows. Keep going down the list for as long as the session runs
 * Run the old executable for IT-1 … IT-10 configurations and store the golden outputs.
   IMSRG(3) runs are emax 2 and 3 only.
 * Write `tools/reference/refharness.cpp` with the subcommands in `30-testing-and-validation.md`
-  §3. The OperatorDump format spec is shared with M4: write the spec first, in
-  `docs/operator-dump-format.md`.
+  §3. It writes the OperatorDump format exactly as specified in `15-operator-dump-format.md`,
+  which M4 implements too.
 * **Accept**: golden files and `tests/golden/README.md` committed (small files only); harness
   builds against the old library and round-trips an OperatorDump.
 

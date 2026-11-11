@@ -11,6 +11,7 @@ Reading order for a new agent or developer:
 | `12-compute-backend.md` | Kokkos facade, linalg, kernel strategy, device-code rules, MPI plan |
 | `13-physics-modules.md` | Per-module specification and what must match imsrg++ |
 | `14-imsrg3-plan.md` | IMSRG(3): layout benchmark, brute-force validation, N7 / 3f2 / triples |
+| `15-operator-dump-format.md` | Text format for exchanging operators with imsrg-devel (golden data) |
 | `16-config-and-cli.md` | TOML schema, legacy `key=value` mapping of every old parameter, operator-name grammar |
 | `18-python-api.md` | nanobind Python API plan and the mapping from the old pyIMSRG |
 | `20-build-and-tooling.md` | Dependencies, CMake structure, presets, scripts, reference build, Makefile |
