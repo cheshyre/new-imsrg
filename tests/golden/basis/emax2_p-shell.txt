@@ -1,0 +1,631 @@
+# imsrg-basis-dump v1
+source imsrg-devel src-sha256:ddcbf1aff166414e746113d5f3de2ddc1e72783fb7c201829cd58e317717f40f refharness dump-basis
+basis emax 2 e2max 4 e3max 12 lmax 2 hw 16
+reference default valence_space p-shell
+counts Aref 4 Zref 2 Acore 4 Zcore 2 target_mass 4 target_Z 2
+norbits 12
+orbit 0 0 0 1 -1 1 0
+orbit 1 0 0 1 1 1 0
+orbit 2 0 1 3 -1 0 1
+orbit 3 0 1 3 1 0 1
+orbit 4 0 1 1 -1 0 1
+orbit 5 0 1 1 1 0 1
+orbit 6 0 2 5 -1 0 2
+orbit 7 0 2 5 1 0 2
+orbit 8 0 2 3 -1 0 2
+orbit 9 0 2 3 1 0 2
+orbit 10 1 0 1 -1 0 2
+orbit 11 1 0 1 1 0 2
+holes 2 0 1
+particles 10 2 3 4 5 6 7 8 9 10 11
+core 2 0 1
+valence 4 2 3 4 5
+qspace 6 6 7 8 9 10 11
+nkets 78
+ket 0 0 0
+ket 1 0 1
+ket 2 0 2
+ket 3 0 3
+ket 4 0 4
+ket 5 0 5
+ket 6 0 6
+ket 7 0 7
+ket 8 0 8
+ket 9 0 9
+ket 10 0 10
+ket 11 0 11
+ket 12 1 1
+ket 13 1 2
+ket 14 1 3
+ket 15 1 4
+ket 16 1 5
+ket 17 1 6
+ket 18 1 7
+ket 19 1 8
+ket 20 1 9
+ket 21 1 10
+ket 22 1 11
+ket 23 2 2
+ket 24 2 3
+ket 25 2 4
+ket 26 2 5
+ket 27 2 6
+ket 28 2 7
+ket 29 2 8
+ket 30 2 9
+ket 31 2 10
+ket 32 2 11
+ket 33 3 3
+ket 34 3 4
+ket 35 3 5
+ket 36 3 6
+ket 37 3 7
+ket 38 3 8
+ket 39 3 9
+ket 40 3 10
+ket 41 3 11
+ket 42 4 4
+ket 43 4 5
+ket 44 4 6
+ket 45 4 7
+ket 46 4 8
+ket 47 4 9
+ket 48 4 10
+ket 49 4 11
+ket 50 5 5
+ket 51 5 6
+ket 52 5 7
+ket 53 5 8
+ket 54 5 9
+ket 55 5 10
+ket 56 5 11
+ket 57 6 6
+ket 58 6 7
+ket 59 6 8
+ket 60 6 9
+ket 61 6 10
+ket 62 6 11
+ket 63 7 7
+ket 64 7 8
+ket 65 7 9
+ket 66 7 10
+ket 67 7 11
+ket 68 8 8
+ket 69 8 9
+ket 70 8 10
+ket 71 8 11
+ket 72 9 9
+ket 73 9 10
+ket 74 9 11
+ket 75 10 10
+ket 76 10 11
+ket 77 11 11
+ntwobody_channels 36
+channel 0 0 0 -1 7
+channel_kets 0 0 10 23 42 57 68 75
+channel_subset 0 pp 5 2 3 4 5 6
+channel_subset 0 hh 1 0
+channel_subset 0 ph 1 1
+channel_subset 0 cc 1 0
+channel_subset 0 vc 0
+channel_subset 0 qc 1 1
+channel_subset 0 vv 2 2 3
+channel_subset 0 qv 0
+channel_subset 0 qq 3 4 5 6
+channel 1 0 1 -1 3
+channel_kets 1 4 29 48
+channel_subset 1 pp 2 1 2
+channel_subset 1 hh 0
+channel_subset 1 ph 1 0
+channel_subset 1 cc 0
+channel_subset 1 vc 1 0
+channel_subset 1 qc 0
+channel_subset 1 vv 0
+channel_subset 1 qv 2 1 2
+channel_subset 1 qq 0
+channel 2 0 0 0 8
+channel_kets 2 1 11 21 24 43 58 69 76
+channel_subset 2 pp 5 3 4 5 6 7
+channel_subset 2 hh 1 0
+channel_subset 2 ph 2 1 2
+channel_subset 2 cc 1 0
+channel_subset 2 vc 0
+channel_subset 2 qc 2 1 2
+channel_subset 2 vv 2 3 4
+channel_subset 2 qv 0
+channel_subset 2 qq 3 5 6 7
+channel 3 0 1 0 6
+channel_kets 3 5 15 30 38 49 55
+channel_subset 3 pp 4 2 3 4 5
+channel_subset 3 hh 0
+channel_subset 3 ph 2 0 1
+channel_subset 3 cc 0
+channel_subset 3 vc 2 0 1
+channel_subset 3 qc 0
+channel_subset 3 vv 0
+channel_subset 3 qv 4 2 3 4 5
+channel_subset 3 qq 0
+channel 4 0 0 1 7
+channel_kets 4 12 22 33 50 63 72 77
+channel_subset 4 pp 5 2 3 4 5 6
+channel_subset 4 hh 1 0
+channel_subset 4 ph 1 1
+channel_subset 4 cc 1 0
+channel_subset 4 vc 0
+channel_subset 4 qc 1 1
+channel_subset 4 vv 2 2 3
+channel_subset 4 qv 0
+channel_subset 4 qq 3 4 5 6
+channel 5 0 1 1 3
+channel_kets 5 16 39 56
+channel_subset 5 pp 2 1 2
+channel_subset 5 hh 0
+channel_subset 5 ph 1 0
+channel_subset 5 cc 0
+channel_subset 5 vc 1 0
+channel_subset 5 qc 0
+channel_subset 5 vv 0
+channel_subset 5 qv 2 1 2
+channel_subset 5 qq 0
+channel 6 1 0 -1 5
+channel_kets 6 8 10 25 59 70
+channel_subset 6 pp 3 2 3 4
+channel_subset 6 hh 0
+channel_subset 6 ph 2 0 1
+channel_subset 6 cc 0
+channel_subset 6 vc 0
+channel_subset 6 qc 2 0 1
+channel_subset 6 vv 1 2
+channel_subset 6 qv 0
+channel_subset 6 qq 2 3 4
+channel 7 1 1 -1 7
+channel_kets 7 2 4 27 29 31 46 48
+channel_subset 7 pp 5 2 3 4 5 6
+channel_subset 7 hh 0
+channel_subset 7 ph 2 0 1
+channel_subset 7 cc 0
+channel_subset 7 vc 2 0 1
+channel_subset 7 qc 0
+channel_subset 7 vv 0
+channel_subset 7 qv 5 2 3 4 5 6
+channel_subset 7 qq 0
+channel 8 1 0 0 16
+channel_kets 8 1 9 11 19 21 24 26 34 43 58 60 64 69 71 73 76
+channel_subset 8 pp 11 5 6 7 8 9 10 11 12 13 14 15
+channel_subset 8 hh 1 0
+channel_subset 8 ph 4 1 2 3 4
+channel_subset 8 cc 1 0
+channel_subset 8 vc 0
+channel_subset 8 qc 4 1 2 3 4
+channel_subset 8 vv 4 5 6 7 8
+channel_subset 8 qv 0
+channel_subset 8 qq 7 9 10 11 12 13 14 15
+channel 9 1 1 0 14
+channel_kets 9 3 5 13 15 28 30 32 36 38 40 47 49 53 55
+channel_subset 9 pp 10 4 5 6 7 8 9 10 11 12 13
+channel_subset 9 hh 0
+channel_subset 9 ph 4 0 1 2 3
+channel_subset 9 cc 0
+channel_subset 9 vc 4 0 1 2 3
+channel_subset 9 qc 0
+channel_subset 9 vv 0
+channel_subset 9 qv 10 4 5 6 7 8 9 10 11 12 13
+channel_subset 9 qq 0
+channel 10 1 0 1 5
+channel_kets 10 20 22 35 65 74
+channel_subset 10 pp 3 2 3 4
+channel_subset 10 hh 0
+channel_subset 10 ph 2 0 1
+channel_subset 10 cc 0
+channel_subset 10 vc 0
+channel_subset 10 qc 2 0 1
+channel_subset 10 vv 1 2
+channel_subset 10 qv 0
+channel_subset 10 qq 2 3 4
+channel 11 1 1 1 7
+channel_kets 11 14 16 37 39 41 54 56
+channel_subset 11 pp 5 2 3 4 5 6
+channel_subset 11 hh 0
+channel_subset 11 ph 2 0 1
+channel_subset 11 cc 0
+channel_subset 11 vc 2 0 1
+channel_subset 11 qc 0
+channel_subset 11 vv 0
+channel_subset 11 qv 5 2 3 4 5 6
+channel_subset 11 qq 0
+channel 12 2 0 -1 9
+channel_kets 12 6 8 23 25 57 59 61 68 70
+channel_subset 12 pp 7 2 3 4 5 6 7 8
+channel_subset 12 hh 0
+channel_subset 12 ph 2 0 1
+channel_subset 12 cc 0
+channel_subset 12 vc 0
+channel_subset 12 qc 2 0 1
+channel_subset 12 vv 2 2 3
+channel_subset 12 qv 0
+channel_subset 12 qq 5 4 5 6 7 8
+channel 13 2 1 -1 6
+channel_kets 13 2 27 29 31 44 46
+channel_subset 13 pp 5 1 2 3 4 5
+channel_subset 13 hh 0
+channel_subset 13 ph 1 0
+channel_subset 13 cc 0
+channel_subset 13 vc 1 0
+channel_subset 13 qc 0
+channel_subset 13 vv 0
+channel_subset 13 qv 5 1 2 3 4 5
+channel_subset 13 qq 0
+channel 14 2 0 0 15
+channel_kets 14 7 9 17 19 24 26 34 58 60 62 64 66 69 71 73
+channel_subset 14 pp 11 4 5 6 7 8 9 10 11 12 13 14
+channel_subset 14 hh 0
+channel_subset 14 ph 4 0 1 2 3
+channel_subset 14 cc 0
+channel_subset 14 vc 0
+channel_subset 14 qc 4 0 1 2 3
+channel_subset 14 vv 3 4 5 6
+channel_subset 14 qv 0
+channel_subset 14 qq 8 7 8 9 10 11 12 13 14
+channel 15 2 1 0 12
+channel_kets 15 3 13 28 30 32 36 38 40 45 47 51 53
+channel_subset 15 pp 10 2 3 4 5 6 7 8 9 10 11
+channel_subset 15 hh 0
+channel_subset 15 ph 2 0 1
+channel_subset 15 cc 0
+channel_subset 15 vc 2 0 1
+channel_subset 15 qc 0
+channel_subset 15 vv 0
+channel_subset 15 qv 10 2 3 4 5 6 7 8 9 10 11
+channel_subset 15 qq 0
+channel 16 2 0 1 9
+channel_kets 16 18 20 33 35 63 65 67 72 74
+channel_subset 16 pp 7 2 3 4 5 6 7 8
+channel_subset 16 hh 0
+channel_subset 16 ph 2 0 1
+channel_subset 16 cc 0
+channel_subset 16 vc 0
+channel_subset 16 qc 2 0 1
+channel_subset 16 vv 2 2 3
+channel_subset 16 qv 0
+channel_subset 16 qq 5 4 5 6 7 8
+channel 17 2 1 1 6
+channel_kets 17 14 37 39 41 52 54
+channel_subset 17 pp 5 1 2 3 4 5
+channel_subset 17 hh 0
+channel_subset 17 ph 1 0
+channel_subset 17 cc 0
+channel_subset 17 vc 1 0
+channel_subset 17 qc 0
+channel_subset 17 vv 0
+channel_subset 17 qv 5 1 2 3 4 5
+channel_subset 17 qq 0
+channel 18 3 0 -1 3
+channel_kets 18 6 59 61
+channel_subset 18 pp 2 1 2
+channel_subset 18 hh 0
+channel_subset 18 ph 1 0
+channel_subset 18 cc 0
+channel_subset 18 vc 0
+channel_subset 18 qc 1 0
+channel_subset 18 vv 0
+channel_subset 18 qv 0
+channel_subset 18 qq 2 1 2
+channel 19 3 1 -1 3
+channel_kets 19 27 29 44
+channel_subset 19 pp 3 0 1 2
+channel_subset 19 hh 0
+channel_subset 19 ph 0
+channel_subset 19 cc 0
+channel_subset 19 vc 0
+channel_subset 19 qc 0
+channel_subset 19 vv 0
+channel_subset 19 qv 3 0 1 2
+channel_subset 19 qq 0
+channel 20 3 0 0 9
+channel_kets 20 7 17 24 58 60 62 64 66 69
+channel_subset 20 pp 7 2 3 4 5 6 7 8
+channel_subset 20 hh 0
+channel_subset 20 ph 2 0 1
+channel_subset 20 cc 0
+channel_subset 20 vc 0
+channel_subset 20 qc 2 0 1
+channel_subset 20 vv 1 2
+channel_subset 20 qv 0
+channel_subset 20 qq 6 3 4 5 6 7 8
+channel 21 3 1 0 6
+channel_kets 21 28 30 36 38 45 51
+channel_subset 21 pp 6 0 1 2 3 4 5
+channel_subset 21 hh 0
+channel_subset 21 ph 0
+channel_subset 21 cc 0
+channel_subset 21 vc 0
+channel_subset 21 qc 0
+channel_subset 21 vv 0
+channel_subset 21 qv 6 0 1 2 3 4 5
+channel_subset 21 qq 0
+channel 22 3 0 1 3
+channel_kets 22 18 65 67
+channel_subset 22 pp 2 1 2
+channel_subset 22 hh 0
+channel_subset 22 ph 1 0
+channel_subset 22 cc 0
+channel_subset 22 vc 0
+channel_subset 22 qc 1 0
+channel_subset 22 vv 0
+channel_subset 22 qv 0
+channel_subset 22 qq 2 1 2
+channel 23 3 1 1 3
+channel_kets 23 37 39 52
+channel_subset 23 pp 3 0 1 2
+channel_subset 23 hh 0
+channel_subset 23 ph 0
+channel_subset 23 cc 0
+channel_subset 23 vc 0
+channel_subset 23 qc 0
+channel_subset 23 vv 0
+channel_subset 23 qv 3 0 1 2
+channel_subset 23 qq 0
+channel 24 4 0 -1 2
+channel_kets 24 57 59
+channel_subset 24 pp 2 0 1
+channel_subset 24 hh 0
+channel_subset 24 ph 0
+channel_subset 24 cc 0
+channel_subset 24 vc 0
+channel_subset 24 qc 0
+channel_subset 24 vv 0
+channel_subset 24 qv 0
+channel_subset 24 qq 2 0 1
+channel 25 4 1 -1 1
+channel_kets 25 27
+channel_subset 25 pp 1 0
+channel_subset 25 hh 0
+channel_subset 25 ph 0
+channel_subset 25 cc 0
+channel_subset 25 vc 0
+channel_subset 25 qc 0
+channel_subset 25 vv 0
+channel_subset 25 qv 1 0
+channel_subset 25 qq 0
+channel 26 4 0 0 3
+channel_kets 26 58 60 64
+channel_subset 26 pp 3 0 1 2
+channel_subset 26 hh 0
+channel_subset 26 ph 0
+channel_subset 26 cc 0
+channel_subset 26 vc 0
+channel_subset 26 qc 0
+channel_subset 26 vv 0
+channel_subset 26 qv 0
+channel_subset 26 qq 3 0 1 2
+channel 27 4 1 0 2
+channel_kets 27 28 36
+channel_subset 27 pp 2 0 1
+channel_subset 27 hh 0
+channel_subset 27 ph 0
+channel_subset 27 cc 0
+channel_subset 27 vc 0
+channel_subset 27 qc 0
+channel_subset 27 vv 0
+channel_subset 27 qv 2 0 1
+channel_subset 27 qq 0
+channel 28 4 0 1 2
+channel_kets 28 63 65
+channel_subset 28 pp 2 0 1
+channel_subset 28 hh 0
+channel_subset 28 ph 0
+channel_subset 28 cc 0
+channel_subset 28 vc 0
+channel_subset 28 qc 0
+channel_subset 28 vv 0
+channel_subset 28 qv 0
+channel_subset 28 qq 2 0 1
+channel 29 4 1 1 1
+channel_kets 29 37
+channel_subset 29 pp 1 0
+channel_subset 29 hh 0
+channel_subset 29 ph 0
+channel_subset 29 cc 0
+channel_subset 29 vc 0
+channel_subset 29 qc 0
+channel_subset 29 vv 0
+channel_subset 29 qv 1 0
+channel_subset 29 qq 0
+channel 30 5 0 -1 0
+channel_kets 30
+channel_subset 30 pp 0
+channel_subset 30 hh 0
+channel_subset 30 ph 0
+channel_subset 30 cc 0
+channel_subset 30 vc 0
+channel_subset 30 qc 0
+channel_subset 30 vv 0
+channel_subset 30 qv 0
+channel_subset 30 qq 0
+channel 31 5 1 -1 0
+channel_kets 31
+channel_subset 31 pp 0
+channel_subset 31 hh 0
+channel_subset 31 ph 0
+channel_subset 31 cc 0
+channel_subset 31 vc 0
+channel_subset 31 qc 0
+channel_subset 31 vv 0
+channel_subset 31 qv 0
+channel_subset 31 qq 0
+channel 32 5 0 0 1
+channel_kets 32 58
+channel_subset 32 pp 1 0
+channel_subset 32 hh 0
+channel_subset 32 ph 0
+channel_subset 32 cc 0
+channel_subset 32 vc 0
+channel_subset 32 qc 0
+channel_subset 32 vv 0
+channel_subset 32 qv 0
+channel_subset 32 qq 1 0
+channel 33 5 1 0 0
+channel_kets 33
+channel_subset 33 pp 0
+channel_subset 33 hh 0
+channel_subset 33 ph 0
+channel_subset 33 cc 0
+channel_subset 33 vc 0
+channel_subset 33 qc 0
+channel_subset 33 vv 0
+channel_subset 33 qv 0
+channel_subset 33 qq 0
+channel 34 5 0 1 0
+channel_kets 34
+channel_subset 34 pp 0
+channel_subset 34 hh 0
+channel_subset 34 ph 0
+channel_subset 34 cc 0
+channel_subset 34 vc 0
+channel_subset 34 qc 0
+channel_subset 34 vv 0
+channel_subset 34 qv 0
+channel_subset 34 qq 0
+channel 35 5 1 1 0
+channel_kets 35
+channel_subset 35 pp 0
+channel_subset 35 hh 0
+channel_subset 35 ph 0
+channel_subset 35 cc 0
+channel_subset 35 vc 0
+channel_subset 35 qc 0
+channel_subset 35 vv 0
+channel_subset 35 qv 0
+channel_subset 35 qq 0
+nph_channels 36
+ph_channel 0 0 0 -1 0
+ph_channel_kets 0
+ph_channel 1 0 1 -1 0
+ph_channel_kets 1
+ph_channel 2 0 0 0 14
+ph_channel_kets 2 0 10 12 22 23 33 42 50 57 63 68 72 75 77
+ph_channel 3 0 1 0 6
+ph_channel_kets 3 4 16 29 39 48 56
+ph_channel 4 0 0 1 8
+ph_channel_kets 4 1 11 21 24 43 58 69 76
+ph_channel 5 0 1 1 6
+ph_channel_kets 5 5 15 30 38 49 55
+ph_channel 6 1 0 -1 0
+ph_channel_kets 6
+ph_channel 7 1 1 -1 0
+ph_channel_kets 7
+ph_channel 8 1 0 0 22
+ph_channel_kets 8 0 8 10 12 20 22 23 25 33 35 42 50 57 59 63 65 68 70 72 74 75 77
+ph_channel 9 1 1 0 14
+ph_channel_kets 9 2 4 14 16 27 29 31 37 39 41 46 48 54 56
+ph_channel 10 1 0 1 16
+ph_channel_kets 10 1 9 11 19 21 24 26 34 43 58 60 64 69 71 73 76
+ph_channel 11 1 1 1 14
+ph_channel_kets 11 3 5 13 15 28 30 32 36 38 40 47 49 53 55
+ph_channel 12 2 0 -1 0
+ph_channel_kets 12
+ph_channel 13 2 1 -1 0
+ph_channel_kets 13
+ph_channel 14 2 0 0 18
+ph_channel_kets 14 6 8 18 20 23 25 33 35 57 59 61 63 65 67 68 70 72 74
+ph_channel 15 2 1 0 12
+ph_channel_kets 15 2 14 27 29 31 37 39 41 44 46 52 54
+ph_channel 16 2 0 1 15
+ph_channel_kets 16 7 9 17 19 24 26 34 58 60 62 64 66 69 71 73
+ph_channel 17 2 1 1 12
+ph_channel_kets 17 3 13 28 30 32 36 38 40 45 47 51 53
+ph_channel 18 3 0 -1 0
+ph_channel_kets 18
+ph_channel 19 3 1 -1 0
+ph_channel_kets 19
+ph_channel 20 3 0 0 12
+ph_channel_kets 20 6 18 23 33 57 59 61 63 65 67 68 72
+ph_channel 21 3 1 0 6
+ph_channel_kets 21 27 29 37 39 44 52
+ph_channel 22 3 0 1 9
+ph_channel_kets 22 7 17 24 58 60 62 64 66 69
+ph_channel 23 3 1 1 6
+ph_channel_kets 23 28 30 36 38 45 51
+ph_channel 24 4 0 -1 0
+ph_channel_kets 24
+ph_channel 25 4 1 -1 0
+ph_channel_kets 25
+ph_channel 26 4 0 0 4
+ph_channel_kets 26 57 59 63 65
+ph_channel 27 4 1 0 2
+ph_channel_kets 27 27 37
+ph_channel 28 4 0 1 3
+ph_channel_kets 28 58 60 64
+ph_channel 29 4 1 1 2
+ph_channel_kets 29 28 36
+ph_channel 30 5 0 -1 0
+ph_channel_kets 30
+ph_channel 31 5 1 -1 0
+ph_channel_kets 31
+ph_channel 32 5 0 0 2
+ph_channel_kets 32 57 63
+ph_channel 33 5 1 0 0
+ph_channel_kets 33
+ph_channel 34 5 0 1 1
+ph_channel_kets 34 58
+ph_channel 35 5 1 1 0
+ph_channel_kets 35
+nthreebody_channels 56
+threebody_channel 0 1 0 -3 30
+threebody_channel 1 1 0 -1 79
+threebody_channel 2 1 0 1 83
+threebody_channel 3 1 0 3 30
+threebody_channel 4 1 1 -3 27
+threebody_channel 5 1 1 -1 73
+threebody_channel 6 1 1 1 75
+threebody_channel 7 1 1 3 27
+threebody_channel 8 3 0 -3 40
+threebody_channel 9 3 0 -1 109
+threebody_channel 10 3 0 1 113
+threebody_channel 11 3 0 3 40
+threebody_channel 12 3 1 -3 42
+threebody_channel 13 3 1 -1 108
+threebody_channel 14 3 1 1 110
+threebody_channel 15 3 1 3 42
+threebody_channel 16 5 0 -3 39
+threebody_channel 17 5 0 -1 101
+threebody_channel 18 5 0 1 106
+threebody_channel 19 5 0 3 39
+threebody_channel 20 5 1 -3 34
+threebody_channel 21 5 1 -1 92
+threebody_channel 22 5 1 1 94
+threebody_channel 23 5 1 3 34
+threebody_channel 24 7 0 -3 20
+threebody_channel 25 7 0 -1 60
+threebody_channel 26 7 0 1 64
+threebody_channel 27 7 0 3 20
+threebody_channel 28 7 1 -3 21
+threebody_channel 29 7 1 -1 58
+threebody_channel 30 7 1 1 59
+threebody_channel 31 7 1 3 21
+threebody_channel 32 9 0 -3 12
+threebody_channel 33 9 0 -1 30
+threebody_channel 34 9 0 1 32
+threebody_channel 35 9 0 3 12
+threebody_channel 36 9 1 -3 10
+threebody_channel 37 9 1 -1 26
+threebody_channel 38 9 1 1 26
+threebody_channel 39 9 1 3 10
+threebody_channel 40 11 0 -3 2
+threebody_channel 41 11 0 -1 8
+threebody_channel 42 11 0 1 10
+threebody_channel 43 11 0 3 2
+threebody_channel 44 11 1 -3 3
+threebody_channel 45 11 1 -1 8
+threebody_channel 46 11 1 1 8
+threebody_channel 47 11 1 3 3
+threebody_channel 48 13 0 -3 0
+threebody_channel 49 13 0 -1 2
+threebody_channel 50 13 0 1 3
+threebody_channel 51 13 0 3 0
+threebody_channel 52 13 1 -3 0
+threebody_channel 53 13 1 -1 1
+threebody_channel 54 13 1 1 1
+threebody_channel 55 13 1 3 0
+nkets3 836 sum_channel_kets3 2099
+end
