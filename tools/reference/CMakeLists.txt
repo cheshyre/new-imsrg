@@ -28,6 +28,7 @@ add_executable(refharness
   rh_opdump.cpp
   rh_hamiltonian.cpp
   rh_operator.cpp
+  rh_valence.cpp
   rh_commutator.cpp
   rh_flow.cpp
 )

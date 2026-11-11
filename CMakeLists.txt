@@ -38,6 +38,8 @@ set(IMSRG_VENV "" CACHE PATH "Shared Python venv (empty: $IMSRG_VENV, else <deps
 set(IMSRG_TEST_DATA_DIR "/Users/cheshyre/Downloads/new-imsrg" CACHE PATH
     "Directory with the big me2j/NO2B inputs; integration tests are skipped if they are absent")
 set(IMSRG_REFERENCE_DIR "" CACHE PATH "imsrg-devel build, for golden-data generation (optional)")
+set(IMSRG_GENERATED_GOLDEN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/golden-generated" CACHE PATH
+    "Golden data regenerated on demand (emax-4 dumps, tools/reference/gen_golden_generated.sh); tests that need it are skipped if it is absent")
 # IMSRG_ENABLE_MPI is defined in ImsrgDependencies.cmake (default: ON if MPI is found).
 
 # The same defaulting rule as tools/lib/imsrg_env.sh (see AGENTS.md).

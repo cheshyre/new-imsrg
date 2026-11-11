@@ -173,5 +173,7 @@ if(_imsrg_blas_accel)
   target_compile_definitions(imsrg_blas_lapack INTERFACE ACCELERATE_NEW_LAPACK)
 endif()
 message(STATUS "BLAS/LAPACK backend: ${_imsrg_blas_name} (${BLAS_LIBRARIES})")
-# M5 (io): find_package(ZLIB REQUIRED) goes here.
+# M5 (io): gzip streams over zlib (D4: no Boost.Iostreams).
+find_package(ZLIB REQUIRED)
+message(STATUS "zlib: ${ZLIB_LIBRARIES} (${ZLIB_VERSION_STRING})")
 # M11 (python): nanobind is added from extern/nanobind in the top-level python hook.
