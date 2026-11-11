@@ -1,6 +1,7 @@
 // Config loading entry point: sources -> raw tree -> resolved, validated RunConfig.
 #include "imsrg/driver/config/load_config.hpp"
 
+#include <algorithm>
 #include <ctime>
 #include <string>
 #include <utility>
@@ -51,10 +52,16 @@ Expected<RunConfig, ConfigIssues> load_config(const ConfigSources& src, const Lo
   std::vector<std::string> applied_rules;
   const bool legacy = !src.legacy_args.empty();
 
-  if (src.config_file) {
-    append(issues, read_toml_file(*src.config_file, tree));
-  } else if (src.config_text) {
-    append(issues, read_toml_string(*src.config_text, src.config_text_name, tree));
+  if (src.config_file || src.config_text) {
+    append(issues, src.config_file
+                       ? read_toml_file(*src.config_file, tree)
+                       : read_toml_string(*src.config_text, src.config_text_name, tree));
+    // An unreadable or unparsable document yields no tree: resolving it would only add
+    // consequential errors (missing required keys) to the one that matters.
+    const bool unreadable = std::any_of(issues.begin(), issues.end(), [](const ConfigIssue& i) {
+      return i.code == "E-FILE" || i.code == "E-TOML-SYNTAX";
+    });
+    if (unreadable) return Unexpected<ConfigIssues>{std::move(issues)};
   } else if (legacy) {
     auto t = translate_legacy(std::span<const std::string>(src.legacy_args));
     tree = std::move(t.tree);
