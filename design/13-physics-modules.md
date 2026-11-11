@@ -77,6 +77,21 @@ Phase-1 formats, in this order:
    has none).
 6. **Dropped** *(owner)*: HDF5 3N, Oslo, OakRidge, "Jason", "Takayuki" and the other older readers.
 
+**As implemented (M5).** `imsrg/io/input_stream.hpp` (`TextInput`: zlib `gzread` for plain and
+gzip text alike, tokens parsed straight to `float`; `GzipWriter`), `imsrg/io/me2j.hpp`
+(`me2j_value_count`, `read_me2j(path, {Me2jTruncation{e1max, e2max, lmax}, read_whole_file}, ms)`
+returning a new Hermitian rank-2 operator), `imsrg/io/no2b.hpp` (`no2b_value_count`,
+`read_no2b(path, {No2bFileTruncation, No2bPrecision}, op::No2bThreeBody&)`; binary when the
+file name contains `stream.bin`, size checked against the count; the container is M4's
+`op::No2bThreeBody`). Only the prefix needed for the model space is decoded: emax 4 reads 27,336
+me2j values in 4 ms and 2.7 M NO2B values in 0.05 s; the whole me2j file (168,066,656 values,
+count check) takes 9 s (test label `slow`). No caching is needed.
+Writers: `imsrg/io/valence_writers.hpp` (`write_tokyo`, `write_nushellx_int`,
+`write_nushellx_sps`; `ValenceWriteOptions` carries the provenance of the header lines and the
+mode `Hamiltonian` or `IsospinAveragedOperator` = imsrg++ `"op"`). Golden files from the new
+harness subcommand `refharness write-valence` (`tests/golden/io/`, HF HNO at emax 2 in the
+sd shell): every number identical to imsrg++, comment lines identical except the version line.
+
 ## 4. hf (reference: `reference/04` §1)
 
 * Algorithm to match: Fock matrix from the monopole of V (plus the 3N monopole from NO2B),
@@ -90,6 +105,14 @@ Phase-1 formats, in this order:
   normal-ordered H in the HF basis (`D^T (V2 + V3NO) D` for the 2B part; 3B → NO2B).
 * Known reference bugs: the dE3max cut uses `op->l` for all three orbits (HartreeFock.cc:1368);
   the SCF uses `std::rand()`. Fix both and document.
+* **As implemented (M6).** `imsrg/hf/hartree_fock.hpp`: `hf::solve(H, const op::No2bThreeBody*
+  v3, HFOptions) -> HFResult {e_hf, e1, e2, e3, iterations, converged, spe, C, rho, F,
+  occupations, ediff_history}`; `Mixing::Linear` reproduces imsrg++ (weight 0.2 on the old
+  density, `FillLowestOrbits` schedule, convergence `‖Δε‖_F / norb < 1e-8`, unfrozen occupations
+  by default) and `Mixing::Diis` is Pulay DIIS on the Fock matrix (error F ρ − ρ F, metric
+  weighted by 2j+1, `diis_start` = 2, subspace 8, history reset when occupations change). The
+  NO2B monopole uses `No2bThreeBody::get_pn` with the `e3max` cut (imsrg++ `ModelSpace` E3max,
+  default 12). Deviations M6-1/M6-2 in `30` §6 (rescue path beyond iteration 100 only).
 
 ## 5. mbpt (reference: `reference/04` §2)
 
@@ -162,6 +185,13 @@ Phase 1 (scalar): kinetic energy T (with A-dependence, `A` parameter), intrinsic
 `Trel`, `Tcm`, `HCM` (Lawson term `BetaCM`, `hwBetaCM`), `Rp2`, `Rn2`, `Rm2`, `Rso`/Darwin-Foldy
 pieces as in imsrg++, `OBD`/`TBD` (later). Later: tensor (E2, M1, GT, Fermi), dagger, M0nu,
 DM NREFT. The name grammar and legacy names are in `16-config-and-cli.md`.
+
+**As implemented (M6).** Namespace `imsrg::opslib`, every physics parameter explicit (no hidden
+model-space state): `kinetic_energy(ms)` (Tlab), `t_cm(ms, A)`, `t_rel(ms, A)` (T_int used in
+H), `r2_cm(ms, A)`, `h_cm(ms, A, hw_trap)`, `r2_one_body/r2_two_body(ms, Species)`,
+`rp2(ms, A, Z, include_spin_orbit = true)` (imsrg++ "Rp2" includes `RpSpinOrbitCorrection`,
+M6-Q1), `rn2(ms, A, Z)`, `rm2(ms, A)`. Equal to the imsrg-devel dumps within 1.1e-14 (emax 2
+and 4); emax 6 builds take 0.4 s (t_rel) and 0.7 s (rp2).
 
 ## 9. driver
 

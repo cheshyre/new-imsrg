@@ -15,6 +15,8 @@
 //                     DoNormalOrdering / UndoNormalOrdering)           (rh_operator.cpp)
 //   basis-transform IN C.txt OUT   HartreeFock::TransformToHFBasis with C read from a text file
 //                                                                     (rh_operator.cpp)
+//   write-valence IN valence_space=NAME out=PREFIX   tokyo .snt and NuShellX .int/.sp writers
+//                                                                     (rh_valence.cpp)
 //   commutator TERM X Y Z   evaluate one named commutator term        (rh_commutator.cpp)
 //   bench-commutator emax=N reps=R  time the imsrg++ commutator terms        (rh_bench.cpp)
 //   generator TYPE H ETA   imsrg++ generator eta(H) of a given type    (rh_commutator.cpp)
@@ -248,6 +250,7 @@ int main(int argc, char** argv) {
     if (c == "norms") return rh::cmd_norms(a);
     if (c == "normal-order") return rh::cmd_normal_order(a);
     if (c == "basis-transform") return rh::cmd_basis_transform(a);
+    if (c == "write-valence") return rh::cmd_write_valence(a);
     if (c == "commutator") return rh::cmd_commutator(a);
     if (c == "bench-commutator") return rh::cmd_bench_commutator(a);
     if (c == "generator") return rh::cmd_generator(a);

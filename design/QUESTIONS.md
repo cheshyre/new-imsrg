@@ -231,6 +231,29 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
   6x) are allocated eagerly; at emax 12 that would be ~11-13 GB (reviewer estimate). Fine for
   emax <= 6 (all tests and runs, AGENTS.md rule 3). **Assumed meanwhile:** keep the eager
   allocation; M12 (performance) can share ZB with W, gather in place, and stream channels.
+* **M6-Q1** (2026-11-12, opslib) - The golden `Rp2.dump` includes the spin-orbit term
+  (`RpSpinOrbitCorrection`), contradicting the brief. **Assumed meanwhile:** `rp2` includes it by
+  default (matches the golden to 6e-16); `include_spin_orbit = false` excludes it.
+* **M6-Q2** (2026-11-12, opslib) - imsrg++ quirks reproduced: `t_cm`'s two-body part drops
+  entries with |v| <= 1e-7 (R2CM and the radius terms keep all); the E2max skip in the
+  `Calculate_p1p2`/`r1r2` loops is moot because the two-body ket basis is already E2max-limited.
+  **Assumed meanwhile:** reproduced as is; not silently fixed.
+* **M5-Q1** (2026-11-12, M5/M6 lead) - Input format detection: me2j text is read through zlib
+  `gzread`, which detects gzip by content (any extension works); the me2j `.bin` variant (raw
+  floats after a 255-byte header) is not implemented. NO2B is binary when the file NAME (last path
+  component) contains `stream.bin` (imsrg++ tests the whole path), else plain or gzip text with a
+  header line. **Assumed meanwhile:** sufficient for the owner's files; add me2j `.bin` on demand.
+* **M6-Q3** (2026-11-12, M5/M6 lead) - HF DIIS design (owner: "a correct DIIS"): Pulay
+  extrapolation of the Fock matrix with error F rho - rho F, the B matrix in the m-scheme metric
+  (rows weighted by 2j+1), first extrapolation at iteration 2, subspace 8, history reset when
+  the occupations change; the same convergence test as imsrg++ so iteration counts compare
+  (golden cases: 8-10 DIIS iterations vs 20-30 linear). imsrg++'s own DIIS rescue (after 100
+  linear iterations) is replaced by this one (`30` §6 M6-1). **Assumed meanwhile:** these
+  defaults; revisit if open-shell or natural-orbital references converge poorly.
+* **M6-Q4** (2026-11-12, M5/M6 lead) - `op::No2bThreeBody::get_pn` scans the isospin orbits
+  linearly and recomputes the isospin CG coefficients on every call (noted by M4). HF with 3N
+  at emax 4 still solves in < 0.1 s. **Assumed meanwhile:** fine for emax <= 6; M12 adds an
+  orbit-index cache and a CG table if profiles show it.
 * **M8a-Q1** (2026-11-12, M8a config) - `Generator` and `Method` enums (with their canonical TOML
   spellings) live in `driver/config/schema.hpp`, since `flow` does not exist yet. **Assumed
   meanwhile:** M8 makes `flow` reuse them or maps them 1:1 in the driver; the spellings are fixed.
@@ -260,3 +283,11 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
   **Assumed meanwhile:** M8/M10 treat an absent `imsrg3.de3max` as no cut (e.g. in the
   `new_E3max` rule of `imsrg3_at_end`). `valence.custom` is stored as a string; its orbit-list
   format is for M8 to define and check.
+* **M11-Q1** (2026-11-12, M11 python) - Operators alive at interpreter exit block `Runtime`
+  finalization; the atexit hook runs `gc.collect()` first, but reference cycles holding operators
+  in user code could still keep one alive. **Assumed meanwhile:** `_atexit()` finalizes only if no
+  operators remain, otherwise leaves Kokkos to process exit; a C++ `Runtime` API to force
+  finalize would be cleaner.
+* **M11-Q2** (2026-11-12, M11 python) - `tests/golden/basis/*.txt` header documents `channel idx
+  2J parity 2Tz nkets` but stores J and Tz. **Assumed meanwhile:** tests compare with `two_j/2`,
+  `two_tz/2`; the harness comment should be corrected.

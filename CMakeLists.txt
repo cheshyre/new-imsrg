@@ -22,7 +22,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # ---- Options (design/20 section 2) ----------------------------------------------------------------
 option(IMSRG_BUILD_TESTS "Build the tests (GoogleTest, CTest)" ON)
 option(IMSRG_BUILD_BENCH "Build the micro-benchmarks in tools/bench (use a release preset)" OFF)
-option(IMSRG_BUILD_PYTHON"Build the nanobind module imsrg._core (once python/ exists, M11)" ON)
+option(IMSRG_BUILD_PYTHON "Build the nanobind module imsrg._core (python/, design/18)" ON)
 option(IMSRG_ENABLE_KOKKOS_KERNELS "Use Kokkos Kernels (not supported yet)" OFF)
 option(IMSRG_UNITY_BUILD "Unity builds for the imsrg module libraries" OFF)
 option(IMSRG_WERROR "Treat warnings in imsrg targets as errors (ON in tools/ci.sh)" OFF)
@@ -39,6 +39,8 @@ set(IMSRG_VENV "" CACHE PATH "Shared Python venv (empty: $IMSRG_VENV, else <deps
 set(IMSRG_TEST_DATA_DIR "/Users/cheshyre/Downloads/new-imsrg" CACHE PATH
     "Directory with the big me2j/NO2B inputs; integration tests are skipped if they are absent")
 set(IMSRG_REFERENCE_DIR "" CACHE PATH "imsrg-devel build, for golden-data generation (optional)")
+set(IMSRG_GENERATED_GOLDEN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/build/golden-generated" CACHE PATH
+    "Golden data regenerated on demand (emax-4 dumps, tools/reference/gen_golden_generated.sh); tests that need it are skipped if it is absent")
 # IMSRG_ENABLE_MPI is defined in ImsrgDependencies.cmake (default: ON if MPI is found).
 
 # The same defaulting rule as tools/lib/imsrg_env.sh (see AGENTS.md).
@@ -69,6 +71,11 @@ if(IMSRG_BUILD_TESTS)
   include(ImsrgTesting)      # imsrg_add_test()
 endif()
 
+# The module libraries are linked into the shared object imsrg._core, so they need PIC.
+if(IMSRG_BUILD_PYTHON)
+  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif()
+
 add_subdirectory(src)
 if(EXISTS "${PROJECT_SOURCE_DIR}/apps/CMakeLists.txt")
   add_subdirectory(apps)
@@ -77,13 +84,7 @@ if(IMSRG_BUILD_BENCH AND EXISTS "${PROJECT_SOURCE_DIR}/tools/bench/CMakeLists.tx
   add_subdirectory(tools/bench)
 endif()
 if(IMSRG_BUILD_PYTHON)
-  if(EXISTS "${PROJECT_SOURCE_DIR}/python/CMakeLists.txt")
-    # Hook for M11: find Python (Interpreter + Development.Module) and nanobind
-    # (add_subdirectory(extern/nanobind)) here, then add python/.
-    message(FATAL_ERROR "python/ exists but the nanobind wiring is not written yet (M11)")
-  else()
-    message(STATUS "imsrg: IMSRG_BUILD_PYTHON=ON, but python/ does not exist yet (M11)")
-  endif()
+  add_subdirectory(python)  # nanobind module imsrg._core (design/18 section 2)
 endif()
 if(IMSRG_BUILD_TESTS)
   add_subdirectory(tests)

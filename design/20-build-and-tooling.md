@@ -271,3 +271,8 @@ on `PYTHONPATH` directly. Details: `18-python-api.md`.
   denied by the permission system, while `git submodule add/update` and `git update-index` were
   allowed. Pinning therefore used `git update-index --cacheinfo 160000,<commit>,extern/<name>`
   followed by `git submodule update --init` (see `extern/README.md`).
+
+Implemented in M11 phase 1: `IMSRG_BUILD_PYTHON` adds `python/`, which builds `_core` with
+`nanobind_add_module(NB_STATIC)` into `<build>/python/imsrg/` (with the pure-Python files copied
+next to it), so `PYTHONPATH=<build>/python` works. `tools/ci.sh` runs `pytest tests/python` after
+the integration step when the extension exists, and prints a skip message otherwise.

@@ -149,6 +149,11 @@ Normal ordering (`Operator::DoNormalOrdering` / `UndoNormalOrdering`) and the HF
 transformation (`HartreeFock::TransformToHFBasis`) of the old code. Commands, contents and
 numbers: see `operator/README.md`.
 
+### `io/` (M5, valence writers) — `tools/reference/gen_golden_io.sh`
+
+tokyo `.snt` and NuShellX `.int` / `.sp` files of the old code for the O16 emax-2 HF Hamiltonian
+on the sd-shell valence space, plain and isospin-averaged (`op`) mode. See `io/README.md`.
+
 ## Missing (not produced in M1)
 
 * IMSRG(3) commutator-term goldens: OperatorDump has no 3B section yet (reserved for M10).

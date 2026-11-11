@@ -153,5 +153,6 @@ int cmd_generator(const Args& a);
 int cmd_flow(const Args& a);
 int cmd_normal_order(const Args& a);
 int cmd_basis_transform(const Args& a);
+int cmd_write_valence(const Args& a);
 
 }  // namespace rh
