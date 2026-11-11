@@ -2,4 +2,6 @@
 imsrg_add_module(NAME angmom
   SOURCES
     wigner.cpp
+    moshinsky.cpp
+    tables.cpp
   DEPS base exec)

@@ -14,10 +14,11 @@
 /// Every function returns exactly 0.0 for arguments that do not form a valid symbol (a triangle
 /// condition fails, |m| > j, j and m of different integrality, projections that do not sum
 /// correctly, or a negative 2j). Evaluation is host-only, in double precision with Racah's
-/// single-sum formulas over a factorial table; the absolute error is below about 1e-15 for all
-/// 2j <= 51 (validated against sympy's exact values, tests/unit/angmom). Precondition: every
-/// factorial argument stays <= 170, which holds for all 2j <= 100. Kernels never evaluate symbols:
-/// they read precomputed tables (design/12 section 4.4).
+/// single-sum formulas over a factorial table. Accuracy, validated against sympy's exact values
+/// for every argument needed up to emax 8 (tests/unit/angmom): |error| <= max(1e-12 |x|, 1e-14)
+/// (typically ~1e-16 absolute; ~1e-14 for <l1 0 l2 0|L 0> with l <= 16); it degrades for larger
+/// j (~1e-11 at l ~ 30). Arguments whose factorials would exceed 170! give 0. Kernels never
+/// evaluate symbols: they read precomputed tables (design/12 section 4.4).
 
 #include "imsrg/base/device.hpp"
 #include "imsrg/base/types.hpp"
@@ -51,7 +52,8 @@ double wigner_9j(TwoJ j11, TwoJ j12, TwoJ j13, TwoJ j21, TwoJ j22, TwoJ j23, Two
 
 /// Normalized 9j symbol: sqrt((2 j13 + 1)(2 j23 + 1)(2 j31 + 1)(2 j32 + 1)) times the 9j symbol,
 /// as imsrg++ `AngMom::NormNineJ` (`AngMom.cc:132-135`); e.g. the LS-jj recoupling coefficient
-/// <(la lb) L, (sa sb) S; J | (la sa) ja, (lb sb) jb; J> = norm_9j(la, sa, ja, lb, sb, jb, L, S, J).
+/// <(la lb) L, (sa sb) S; J | (la sa) ja, (lb sb) jb; J> = norm_9j(la, sa, ja, lb, sb, jb, L, S,
+/// J).
 double norm_9j(TwoJ j11, TwoJ j12, TwoJ j13, TwoJ j21, TwoJ j22, TwoJ j23, TwoJ j31, TwoJ j32,
                TwoJ j33) noexcept;
 
