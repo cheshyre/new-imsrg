@@ -105,6 +105,13 @@ answers recorded in `design/QUESTIONS.md` since the first run). The most importa
   scratch Omega storage; a `hartree_fock.mixing` key (mixing is fixed to linear in the driver);
   MP2 column in the results; NAT basis / IT-5 in the driver; `Denominators` copies H every step.
 * **Not started:** M10 (IMSRG(3)), M11 phase 2, M12 (MPI + performance), M13 (Makefile, docs).
+* **Owner answers since run 1 (2026-11-13; QUESTIONS Q5, Q6, Q11–Q17; decisions D25–D29):**
+  tensor operators store only `ch_bra ≤ ch_ket` blocks (D25; the one-word answer "Yes" was read
+  as this option, confirm before implementing tensor operators); IMSRG(3) 3B blocks stay `double`,
+  no `float` storage (D26); legacy quirks Q11/Q12/Q14 are kept with warnings, already implemented
+  (D27); TOML requires `emax`, `hw` and the file `e1max` values, already implemented (D28);
+  Python: context manager plus lazy default (implemented), `StaleHostError` for stale host views
+  (still to implement for device builds), and **minimum Python 3.12** with the stable ABI (D29).
 
 ## Plan for this run (in order; at most 3 leads at once)
 
@@ -117,7 +124,10 @@ answers recorded in `design/QUESTIONS.md` since the first run). The most importa
    the decision row in `00-requirements-and-decisions.md`, then the brute-force m-scheme reference,
    perturbative triples (IT-8), IMSRG(3)-N7 (IT-9), IMSRG(3f2) (IT-10; check the definition in
    M1-Q2 against the owner's answer). This is the top priority after M8.
-4. In parallel with M10 (one lead or one Sonnet implementer each): **M11 phase 2** (bind io, hf,
+4. In parallel with M10 (one lead or one Sonnet implementer each): **M11 phase 2** (first apply
+   D29: `requires-python = ">=3.12"` in `pyproject.toml`, `find_package(Python 3.12 ...)` in
+   `cmake/ImsrgDependencies.cmake` and `python/CMakeLists.txt`, `STABLE_ABI` in
+   `nanobind_add_module`, and the `StaleHostError` state machine of `18` §2.2; then bind io, hf,
    mbpt, commutators, flow, pipeline; `18-python-api.md`), **M12** (MPI distribution, IT-11;
    performance follow-ups: sparse Pandya maps and Workspace memory (M7-Q4), per-channel norm
    reductions, `op::No2bThreeBody::get_pn` (M6-Q4)), then **M13** if time remains.

@@ -38,9 +38,10 @@ Prompts for what comes next: `design/NEXT_SESSION_PROMPT.md` (run 2) and
    genuine for this Hamiltonian; IT-4/IT-5 therefore compare HF plus the flow stopped at s = 10. Is a
    full N2LO file available, or was the component intended?
 3. **Answer the open questions**, ideally with the interview session (`design/INTERVIEW_PROMPT.md`):
-   about 50 entries with "Assumed meanwhile" (Q5, Q6, Q11–Q17, Q19–Q24, O1–O2, M1-Q1..Q2,
+   about 50 entries with "Assumed meanwhile" (Q19–Q24, O1–O2, M1-Q1..Q2,
    M2-Q1..Q7, M3-Q1..Q9, M4-Q1..Q2, M5-Q1, M6-Q1..Q4, M7-Q1..Q4, M8-Q1..Q4, M8a-Q1..Q7,
-   M9-Q1..Q4, M11-Q1..Q2).
+   M9-Q1..Q4, M11-Q1..Q2). *Addendum 2026-11-13:* the owner answered Q5, Q6 and Q11–Q17
+   (decisions D25–D29 in `00-requirements-and-decisions.md`).
 
 ## 3. Validation against imsrg-devel (actual deviations)
 
