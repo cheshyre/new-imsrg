@@ -6,7 +6,7 @@ build-backend = "scikit_build_core.build"
 name = "imsrg"
 version = "0.1.0"
 description = "Python bindings of the imsrg rewrite (nanobind)"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = ["numpy"]
 
 [project.optional-dependencies]
@@ -14,6 +14,8 @@ test = ["pytest"]
 
 [tool.scikit-build]
 cmake.build-type = "Release"
+# One stable-ABI wheel (cp312-abi3) serves every CPython >= 3.12 (design/00 D29).
+wheel.py-api = "cp312"
 wheel.packages = []
 build-dir = "build/skbuild"
 

@@ -458,7 +458,7 @@ The old code stays buildable (read-only tree) and is the oracle for the first mi
 3. Should `Operator` expose `block()` as *writable by default* (numpy semantics expectations) with an automatic dirty mark, instead of read-only by default? Proposed: read-only default.
 4. Python generator callbacks cost a host sync per step; accept as prototyping-only, or provide a Kokkos-aware GeneratorFn in C++ later?
 5. Old reader formats dropped (Oslo, OakRidge, Jason, Takayuki, Antoine): confirm with users before removal.
-6. Minimum Python version. **Decided (owner, 2026-11-13; QUESTIONS Q17, D29):** 3.12, with stable-ABI wheels. Follow-up: `pyproject.toml` `requires-python`, `find_package(Python 3.12 ...)` in `cmake/ImsrgDependencies.cmake` and `python/CMakeLists.txt`, and `STABLE_ABI` in `nanobind_add_module`.
+6. Minimum Python version. **Decided (owner, 2026-11-13; QUESTIONS Q17, D29):** 3.12, with stable-ABI wheels. Done the same day: see §8.
 
 ## 8. Implementation status (M11 phase 1, 2026-11-12)
 
@@ -471,6 +471,13 @@ warnings), and the exception hierarchy (`ImsrgError` > `InputError` > `ConfigErr
 `InvariantError`, `NumericalError`, `RuntimeError`, `NotImplementedError`). The GIL is released in
 arithmetic, normal ordering and dump I/O. Sources: `python/src/{module,runtime,basis,operator,config}.cc`.
 Not yet bound: hf, mbpt, commutators, flow, pipeline run, angmom (later phases).
+
+Stable ABI (2026-11-13, D29): Python ≥ 3.12; `_core` is built with nanobind's `STABLE_ABI` as
+`_core.abi3.so` (needs CMake ≥ 3.26 for `Development.SABIModule`; with 3.25 it falls back to a
+version-specific build), and `pyproject.toml` sets `wheel.py-api = "cp312"`, so `pip wheel` gives
+one `cp312-abi3` wheel per platform. Configure removes stale `_core.*` files with another suffix
+(Python's import would prefer them). Still to do: the `StaleHostError` state machine of §2.2 for
+device-resident data (host-only builds keep the state `BOTH`).
 
 Notes: nanobind comes from the submodule; `python/CMakeLists.txt` must call `find_package(Python
 ... Development.Module)` itself (the include dirs must be visible in that directory scope).
