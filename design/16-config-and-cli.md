@@ -674,8 +674,8 @@ Errors are collected; each rule has an id used in tests. TOML = strict; "legacy:
 
 ### 6.4 Open items for a human decision
 
-* Q1: `steps=1` with a valence space: keep "uses `generator.core`" or switch to `generator.valence` (intended meaning in `Parameters.hh`).
-* Q11: `imsrg3_at_end` without `IMSRG3` drops the input 3N; fix by normal ordering at rank 3 whenever `at_end` is set?
-* TOML requiredness of `basis.emax`, `basis.hw`, `file e1max` (safer) versus old defaults (6, 20.0, 12).
+* Q1: `steps=1` with a valence space. **Decided (owner, 2026-11-13; QUESTIONS Q11, D27):** keep "uses `generator.core`" with the `W-NSTEPS1` warning; legacy parameters will be re-evaluated later.
+* Q11: `imsrg3_at_end` without `IMSRG3` drops the input 3N. **Decided (owner, 2026-11-13; QUESTIONS Q12, D27):** keep it, with the `W-Q11` warning.
+* TOML requiredness of `basis.emax`, `basis.hw`, `file e1max`. **Decided (owner, 2026-11-13; QUESTIONS Q13, D28):** required in TOML; the legacy layer keeps the old defaults (6, 20.0, 12) and warns. (Q3, `denominator_delta` without an orbit: kept with the `W-Q3` warning, QUESTIONS Q14, D27.)
 * Strictness split (TOML strict, legacy lenient with warnings) versus uniform strictness.
 * Whether `ds_0` should be rejected under `method=magnus` once imaginary-time/Wegner generators are implemented (currently it gates the step-limit override).

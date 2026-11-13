@@ -198,8 +198,8 @@ Operator transform_basis(const Operator&, const UnitaryTransform& C);    // e.g.
 * `TwoBody` stores **all** blocks of a scalar operator densely (both triangles) in one contiguous
   `DeviceBuffer<double>` with an offset table. That makes the whole-operator operations (axpy,
   scale, norms, generators) single flat kernels, and the per-channel products (grouped) GEMMs.
-  For tensor operators we will decide between storing only `ch_bra <= ch_ket` (as imsrg++ does)
-  and storing both; we will decide when tensor operators are implemented.
+  Tensor operators store only the `ch_bra <= ch_ket` blocks, as imsrg++ does (D25, owner
+  2026-11-13; confirm the reading of the answer before implementing).
 * Combining operators checks that their `ModelSpace` pointers are identical or that the spaces
   are structurally equal (fast hash). An operator normal-ordered with respect to another
   reference cannot be mixed in by accident.

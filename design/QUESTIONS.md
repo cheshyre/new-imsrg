@@ -25,8 +25,10 @@ option, write it under "Assumed meanwhile", and continue. The owner answers inli
   Python package).
 * **Q5** — Tensor operators: store only `ch_bra <= ch_ket` blocks (as imsrg++ does; half the
   memory) or all blocks (simpler kernels)? Decide when tensor operators are implemented.
+  **Answer (owner, 2026-11-13):** Yes, read as the first option: store only `ch_bra <= ch_ket` blocks, as imsrg++ does (half the memory). This reading of a one-word answer to an either/or question is to be confirmed before tensor operators are implemented. Recorded as D25.
 * **Q6** — May IMSRG(3) 3B blocks use `float` storage to halve memory, if the benchmark shows
   acceptable accuracy (e.g. ΔE0 < 1 keV)? **Assumed meanwhile:** `double` only.
+  **Answer (owner, 2026-11-13):** No: IMSRG(3) three-body blocks stay `double`; no `float` storage (D26).
 * **Q7** — In imsrg++ the generator's denominator floor (the minimum |denominator|) loses the
   sign of the denominator (`reference/03` §4). Bug (fix) or intended? **Answer (owner):** bug.
   Fix it (keep the sign), list it in the deviation log, and validate it (e.g. a unit test with a
@@ -47,20 +49,27 @@ option, write it under "Assumed meanwhile", and continue. The owner answers inli
 ### Config and CLI (from `16-config-and-cli.md`)
 * **Q11** — `nsteps=1` with a valence space uses only `core_generator` in imsrg++ (contrary to its
   comment). **Assumed meanwhile:** keep it, with a warning.
+  **Answer (owner, 2026-11-13):** Keep the imsrg++ behaviour, with a warning (implemented as `W-NSTEPS1`). Which legacy parameters are actually useful will be re-evaluated later (D27).
 * **Q12** — `imsrg3_at_end` without `IMSRG3=true` rebuilds H from the normal-ordered input and
   drops the input 3N. **Assumed meanwhile:** keep it, with a warning.
+  **Answer (owner, 2026-11-13):** Keep, with a warning (implemented as `W-Q11` in `driver/config/validate.cpp`) (D27).
 * **Q13** — The new TOML config requires `emax`, `hw` and the file e1max values explicitly (no
   silent defaults); the legacy `key=value` layer keeps the old defaults and warns. OK?
+  **Answer (owner, 2026-11-13):** OK (implemented: V-03 for `basis.emax`, `basis.hw` and `interaction.*.e1max` in TOML; the legacy layer keeps the old defaults and warns) (D28).
 * **Q14** — `denominator_delta` without `denominator_delta_orbit` is silently ignored in imsrg++.
   **Assumed meanwhile:** keep it, with a warning.
+  **Answer (owner, 2026-11-13):** Keep, with a warning (implemented as `W-Q3`; the key is dropped) (D27).
 
 ### Python (from `18-python-api.md`)
 * **Q15** — Python runtime initialization: lazy on first use, or explicit `imsrg.Runtime()` context
   manager? **Assumed meanwhile:** explicit context manager, plus a lazy default for interactive use.
+  **Answer (owner, 2026-11-13):** OK: explicit `imsrg.Runtime()` context manager plus a lazy default (implemented in M11 phase 1) (D29).
 * **Q16** — Host access to device-resident blocks: read-only zero-copy host views that raise
   `StaleHostError` unless `sync_to_host()` was called? **Assumed meanwhile:** yes.
+  **Answer (owner, 2026-11-13):** Yes. `sync_to_host()` exists; raising `StaleHostError` for device-resident data is still to be implemented and matters only for GPU builds (D29).
 * **Q17** — Minimum Python version. The stable ABI needs ≥ 3.12. **Assumed meanwhile:** 3.10+,
   without the stable ABI.
+  **Answer (owner, 2026-11-13):** 3.12 is the minimum Python version, which allows nanobind's stable ABI. Follow-up: `requires-python`, the two `find_package(Python ...)` calls and `STABLE_ABI` (D29).
 * **Q18** — Which legacy input formats are needed? **Answer (owner):** me2j (2N), NO2B and me3j
   (3N), and the Navratil/Miyagi operator formats (`OperatorsFromFile`, two-body currents). Dropped:
   HDF5 3N, Oslo, OakRidge, "Jason", "Takayuki" and the other older readers.

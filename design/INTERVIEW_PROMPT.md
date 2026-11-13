@@ -38,6 +38,9 @@ consequence.
 
 ## Agenda, part 1: open questions (ids from `design/QUESTIONS.md`)
 
+Already answered by the owner on 2026-11-13 (do not re-ask): Q6, Q11, Q12, Q13, Q14, Q15, Q16,
+Q17 (decisions D26–D29); Q5 needs only the confirmation listed under B.
+
 **A. Owner facts and actions (ask first)**
 * **O1**: was the main checkout synced? Should future unsupervised runs start in the main checkout
   on `develop` (simplest) or in an app worktree (merge via staging branch + `update-ref`)?
@@ -56,10 +59,10 @@ consequence.
 **B. Physics and numerics (high impact)**
 * **M1-Q2**: is IMSRG(3f2) ("factorized") what the run assumed, i.e. IMSRG(2) plus
   `BCH::SetUseFactorizedCorrection(true)`? The IT-10 goldens were made that way.
-* **Q6**: may IMSRG(3) 3B blocks use `float` storage when the benchmark shows ΔE0 < ~1 keV?
 * **M3-Q9**: the dE3max/OccNat 3B cuts are applied per ket, not when enumerating kets (memory vs
   imsrg++ behaviour).
-* **Q5**: tensor operators: store only `ch_bra ≤ ch_ket` blocks (half memory) or all blocks?
+* **Q5** (answered "Yes" on 2026-11-13, recorded as D25): confirm that it means storing only the
+  `ch_bra ≤ ch_ket` blocks of tensor operators, as imsrg++ does.
 * **M6-Q1, M6-Q2**: imsrg++ quirks kept on purpose: Rp2 includes the spin-orbit correction; Tcm's
   two-body part drops entries with |v| ≤ 1e-7. Keep (comparability) or fix?
 * **M2-Q3**: imsrg++'s `INVSQRT2` has 13 digits (6.7e-14 relative error). Copy exactly or use full
@@ -76,21 +79,15 @@ consequence.
   M8-3 (a diverging flow throws `NumericalError`). Confirm.
 
 **C. Configuration and CLI**
-* **Q13**: must the TOML config state `basis.emax`, `basis.hw` and the file e1max values
-  explicitly (no silent defaults), while the legacy CLI keeps the old defaults?
 * **M8a-Q1..Q7**: generator/method enum placement; `flow`/`flow_rk4` as P1; `steps = 1` with a
   valence space; legacy `valence_space=<nucleus>` with a different `reference`; exit codes;
   particle ranks and orbit spellings of the operator catalog; `dE3max` absent instead of 99.
 * **M8-Q1..Q4**: mapping of the config enums to `flow`; no MP2 column yet; Omega always kept in
   memory and HF mixing fixed to linear in the driver; log and output-file-name differences from
   imsrg++.
-* **Q11, Q12, Q14**: legacy quirks (`nsteps=1` with a valence space, `imsrg3_at_end` without
-  `IMSRG3`, `denominator_delta` without an orbit).
 
 **D. Python**
-* **Q15, Q16, Q17, M11-Q1**: runtime initialization (explicit `imsrg.Runtime()` vs lazy), host
-  views of device data, minimum Python version (3.10 without stable ABI?), finalization with live
-  operators at interpreter exit.
+* **M11-Q1**: finalization with live operators at interpreter exit.
 
 **E. Low-impact confirmations (summarize one line each and ask the owner to flag any to revisit)**
 Q21, Q22, Q23, M2-Q1, M2-Q2, M2-Q4, M2-Q5, M2-Q6, M3-Q1..M3-Q8, M4-Q1, M4-Q2, M5-Q1, M6-Q4, M7-Q1,

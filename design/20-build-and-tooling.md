@@ -14,7 +14,7 @@
 | GoogleTest | submodule `extern/googletest` | tests only | |
 | nanobind | submodule `extern/nanobind` (with its robin_map submodule) | python only | `git submodule update --init --recursive` |
 | OpenMP runtime | `brew install libomp` on macOS (Apple clang needs `-Xpreprocessor -fopenmp`, handled by Kokkos' CMake when `OpenMP_ROOT` points at libomp), native on Linux | Kokkos OpenMP backend | |
-| Python ≥ 3.10 + numpy, pytest, sympy, scikit-build-core | shared venv `$IMSRG_VENV` (default `$IMSRG_DEPS_PREFIX/venv`), made by `tools/bootstrap_deps.sh` from `tools/requirements-dev.txt`; every worktree links it as `.venv` | | sympy provides exact Wigner symbols for the angmom tests. |
+| Python ≥ 3.12 (D29) + numpy, pytest, sympy, scikit-build-core | shared venv `$IMSRG_VENV` (default `$IMSRG_DEPS_PREFIX/venv`), made by `tools/bootstrap_deps.sh` from `tools/requirements-dev.txt`; every worktree links it as `.venv` | | sympy provides exact Wigner symbols for the angmom tests. |
 
 **Pinned in M0 (2026-11-11, details in `extern/README.md`):** kokkos 5.3.0 (tagged 2026-11-10,
 newer than Homebrew's 5.2.2), googletest v1.18.0, fmt 12.2.1, CLI11 v2.7.2, toml++ v3.4.0,
