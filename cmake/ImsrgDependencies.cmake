@@ -124,7 +124,7 @@ if(IMSRG_BUILD_TESTS OR IMSRG_BUILD_PYTHON)
   if(IMSRG_BUILD_PYTHON)
     list(APPEND _imsrg_py_components Development.Module)
   endif()
-  find_package(Python3 3.10 REQUIRED COMPONENTS ${_imsrg_py_components})
+  find_package(Python3 3.12 REQUIRED COMPONENTS ${_imsrg_py_components})  # D29: Python >= 3.12
 endif()
 
 # ---- Hooks for later milestones -------------------------------------------------------------------
