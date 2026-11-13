@@ -69,7 +69,7 @@ option, write it under "Assumed meanwhile", and continue. The owner answers inli
   **Answer (owner, 2026-11-13):** Yes. `sync_to_host()` exists; raising `StaleHostError` for device-resident data is still to be implemented and matters only for GPU builds (D29).
 * **Q17** — Minimum Python version. The stable ABI needs ≥ 3.12. **Assumed meanwhile:** 3.10+,
   without the stable ABI.
-  **Answer (owner, 2026-11-13):** 3.12 is the minimum Python version, which allows nanobind's stable ABI. Follow-up: `requires-python`, the two `find_package(Python ...)` calls and `STABLE_ABI` (D29).
+  **Answer (owner, 2026-11-13):** 3.12 is the minimum Python version, which allows nanobind's stable ABI (D29). **Done 2026-11-13** (`feature/python-312-stable-abi`): `requires-python >=3.12`, `wheel.py-api = "cp312"`, both CMake lookups ask for 3.12, `_core` is built with `STABLE_ABI` (`_core.abi3.so`; wheel tag `cp312-abi3`).
 * **Q18** — Which legacy input formats are needed? **Answer (owner):** me2j (2N), NO2B and me3j
   (3N), and the Navratil/Miyagi operator formats (`OperatorsFromFile`, two-body currents). Dropped:
   HDF5 3N, Oslo, OakRidge, "Jason", "Takayuki" and the other older readers.

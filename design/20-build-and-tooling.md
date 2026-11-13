@@ -235,7 +235,9 @@ executable. Note: the inherited `.gitignore` ignores `Makefile` everywhere; M13 
 pointing at the Kokkos deps prefix and `OpenMP_ROOT=$(brew --prefix libomp)`) builds the
 `_core` extension through the same CMake project (`IMSRG_BUILD_PYTHON=ON`,
 `IMSRG_BUILD_TESTS=OFF`). For development, the in-tree build's `python/` directory can be put
-on `PYTHONPATH` directly. Details: `18-python-api.md`.
+on `PYTHONPATH` directly. Python ≥ 3.12 (D29); the extension is a stable-ABI module
+(`_core.abi3.so`, CMake ≥ 3.26) and `wheel.py-api = "cp312"` makes `pip wheel` produce one
+`cp312-abi3` wheel per platform. Details: `18-python-api.md` §8.
 
 ## 8. Toolchain notes and workarounds (macOS arm64, found in M0, 2026-11-12)
 
