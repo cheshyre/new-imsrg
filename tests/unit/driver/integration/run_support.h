@@ -161,13 +161,16 @@ inline RunResult Execute(const driver::ConfigSources& sources,
 /// TOML text for an O16/Ne20 run at hw = 16, emax = 4 with the 2N file, writing
 /// into `dir`. `extra` is appended verbatim (further tables such as `[valence]`
 /// or `[operators]`); keys of tables already open at the end must not be
-/// repeated there.
+/// repeated there. `basis_kind` ("hf", "nat", ...) sets `basis.kind` when not
+/// empty.
 inline std::string TomlText(const std::filesystem::path& dir,
                             const std::string& nucleus,
                             const std::string& extra, bool three_body = false,
-                            const std::string& smax = "") {
+                            const std::string& smax = "",
+                            const std::string& basis_kind = "") {
   std::ostringstream t;
-  t << "[basis]\nemax = 4\nhw = 16.0\n\n"
+  t << "[basis]\nemax = 4\nhw = 16.0\n"
+    << (basis_kind.empty() ? "" : "kind = \"" + basis_kind + "\"\n") << "\n"
     << "[reference]\nnucleus = \"" << nucleus << "\"\n\n"
     << "[interaction.two_body]\nfile = \"" << DataFile(TwoBodyName()).string()
     << "\"\n"
@@ -176,6 +179,10 @@ inline std::string TomlText(const std::filesystem::path& dir,
     t << "[interaction.three_body]\nfile = \""
       << DataFile(ThreeBodyName()).string() << "\"\n"
       << "type = \"no2b\"\ne1max = 6\ne2max = 12\ne3max = 18\n\n";
+  // The integration tests reproduce imsrg++ step counts and trajectories, so
+  // they use its linear HF mixing; the TOML default (diis, D37) reaches the
+  // same solution only to the HF tolerance.
+  t << "[hartree_fock]\nmixing = \"linear\"\n\n";
   t << "[imsrg]\nmethod = \"magnus\"\n\n";
   if (!smax.empty()) t << "[imsrg.step]\nsmax = " << smax << "\n\n";
   t << extra << "\n[output]\ndirectory = \"" << dir.string() << "\"\n";

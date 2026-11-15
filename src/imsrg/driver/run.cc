@@ -22,6 +22,7 @@
 #include "imsrg/driver/pipeline/hamiltonian.h"
 #include "imsrg/flow/magnus.h"
 #include "imsrg/io/valence_writers.h"
+#include "imsrg/mbpt/energies.h"
 #include "imsrg/operator/normal_ordering.h"
 
 namespace imsrg::driver {
@@ -42,7 +43,6 @@ void RejectPlanned(const RunConfig& c) {
   if (c.run.task == Task::kFciExport) Planned("run.task = \"fci_export\"");
   if (c.imsrg.method != Method::kMagnus)
     Planned("imsrg.method other than \"magnus\"");
-  if (c.imsrg.omega.hunter_gatherer) Planned("imsrg.omega.hunter_gatherer");
   if (c.imsrg.use_brueckner_bch) Planned("imsrg.use_brueckner_bch");
   if (c.imsrg.goose_tank) Planned("imsrg.goose_tank");
   if (c.imsrg.perturbative_triples) Planned("imsrg.perturbative_triples");
@@ -170,19 +170,31 @@ class FlowLog {
       throw InputError("cannot write the flow file '" + path.string() + "'");
     out_ << "stage,istep,s,ds,E0,norm_H,norm_eta_1b,norm_eta_2b,norm_eta,norm_"
             "omega_1b,"
-            "norm_omega_2b,norm_omega,num_omegas,wall_s\n";
+            "norm_omega_2b,norm_omega,num_omegas,E_MP2,wall_s\n";
     log::Info(
         "{:>5} {:>5} {:>12} {:>18} {:>14} {:>14} {:>14} {:>14} {:>4} {:>10}",
         "stage", "step", "s", "E0", "|eta_1b|", "|eta_2b|", "|Omega_1b|",
         "|Omega_2b|", "nOm", "wall(s)");
   }
+  /// The solver whose current Hamiltonian the `E_MP2` column evaluates.
+  void set_solver(const flow::MagnusSolver* solver) { solver_ = solver; }
+
   void operator()(const flow::FlowStatus& st) {
+    // imsrg++'s flow file column E(MP2): the MBPT(2) correlation energy of the
+    // current Hamiltonian H(s) (IMSRGSolver.cc:1273). Mp2Energy syncs its
+    // argument to the host, so it works on a copy.
+    double e_mp2 = std::nan("");
+    if (solver_ != nullptr) {
+      op::Operator h = solver_->hamiltonian();
+      e_mp2 = mbpt::Mp2Energy(h);
+    }
     out_ << st.stage << ',' << st.istep << ',' << Fmt17(st.s) << ','
          << Fmt17(st.ds) << ',' << Fmt17(st.e0) << ',' << Fmt17(st.norm_h)
          << ',' << Fmt17(st.norm_eta_1b) << ',' << Fmt17(st.norm_eta_2b) << ','
          << Fmt17(st.norm_eta) << ',' << Fmt17(st.norm_omega_1b) << ','
          << Fmt17(st.norm_omega_2b) << ',' << Fmt17(st.norm_omega) << ','
-         << st.num_omegas << ',' << Fmt17(st.wall_seconds) << '\n';
+         << st.num_omegas << ',' << Fmt17(e_mp2) << ','
+         << Fmt17(st.wall_seconds) << '\n';
     out_.flush();
     log::Info(
         "{:>5} {:>5} {:>12.5f} {:>18.9f} {:>14.9f} {:>14.9f} {:>14.9f} "
@@ -194,6 +206,7 @@ class FlowLog {
 
  private:
   std::ofstream out_;
+  const flow::MagnusSolver* solver_ = nullptr;
 };
 
 struct StageRecord {
@@ -273,14 +286,20 @@ void WriteValenceFile(const fs::path& path, op::Operator O, const RunConfig& c,
   }
 }
 
+/// Version of the `results.json` layout (design/16 section 2.10: the schema
+/// table and its changelog). Bump it with every change of the written keys.
+constexpr int kResultsSchemaVersion = 1;
+
 void WriteResults(const fs::path& path, const pipeline::PreparedHamiltonian& ph,
                   const std::vector<StageRecord>& stages, double e0,
-                  std::size_t num_omegas,
+                  std::size_t num_omegas, int num_gathers,
                   const std::vector<OperatorRecord>& ops,
                   const std::string& valence_file) {
   std::ofstream out(path);
   if (!out) throw InputError("cannot write '" + path.string() + "'");
-  out << "{\n  \"e_reference\": " << Fmt17(ph.e_reference) << ",\n";
+  out << "{\n  \"schema_version\": " << kResultsSchemaVersion
+      << ",\n  \"e_reference\": " << Fmt17(ph.e_reference)
+      << ",\n  \"e_mp2\": " << Fmt17(ph.e_mp2) << ",\n";
   if (ph.hf) {
     out << "  \"hf\": {\"e_hf\": " << Fmt17(ph.hf->e_hf)
         << ", \"e1\": " << Fmt17(ph.hf->e1) << ", \"e2\": " << Fmt17(ph.hf->e2)
@@ -290,12 +309,14 @@ void WriteResults(const fs::path& path, const pipeline::PreparedHamiltonian& ph,
         << "},\n";
   }
   out << "  \"imsrg\": {\"e0\": " << Fmt17(e0)
-      << ", \"num_omegas\": " << num_omegas << ", \"stages\": [";
+      << ", \"num_omegas\": " << num_omegas
+      << ", \"num_gathers\": " << num_gathers << ", \"stages\": [";
   for (std::size_t i = 0; i < stages.size(); ++i) {
     const StageRecord& st = stages[i];
     out << (i ? ", " : "") << "{\"stage\": " << st.stage
         << ", \"generator\": " << JsonString(st.generator)
         << ", \"steps\": " << st.result.steps
+        << ", \"num_gathers\": " << st.result.num_gathers
         << ", \"s\": " << Fmt17(st.result.s)
         << ", \"e0\": " << Fmt17(st.result.e0)
         << ", \"norm_eta\": " << Fmt17(st.result.norm_eta)
@@ -322,7 +343,7 @@ void Run(const RunConfig& config) {
 
   const pipeline::PreparedHamiltonian ph = pipeline::PrepareHamiltonian(config);
   if (config.run.task == Task::kHf) {
-    WriteResults(dir / "results.json", ph, {}, ph.e_reference, 0, {}, "");
+    WriteResults(dir / "results.json", ph, {}, ph.e_reference, 0, 0, {}, "");
     return;
   }
   const basis::ModelSpace& ms = ph.hno.model_space();
@@ -336,6 +357,7 @@ void Run(const RunConfig& config) {
   so.ds_0 = step.ds_0;
   so.domega = step.domega;
   so.omega_norm_max = step.omega_norm_max;
+  so.hunter_gatherer = config.imsrg.omega.hunter_gatherer;
   so.eta_criterion = step.eta_criterion;
   const Generator core_gen = config.imsrg.generator.core;
   SmallStepsForStiffGenerators(core_gen, so);
@@ -345,6 +367,7 @@ void Run(const RunConfig& config) {
                        : fs::path(config.output.flow_file));
   flow::MagnusSolver solver(ph.hno, so,
                             MakeGeneratorOptions(config, core_gen, ms));
+  flow_log.set_solver(&solver);
   std::vector<StageRecord> stages;
   log::Info("Setting generator to {}", ToString(core_gen));
   stages.push_back(
@@ -357,19 +380,22 @@ void Run(const RunConfig& config) {
     // imsrg++.cc:1122-1143: smax doubled for the second Magnus stage, new
     // Omega.
     const Generator val_gen = config.imsrg.generator.valence;
-    flow::SolverOptions so2 = so;
+    // Derived from the solver's options so that the domega bump persists.
+    flow::SolverOptions so2 = solver.solver_options();
     so2.smax = 2.0 * step.smax;
     SmallStepsForStiffGenerators(val_gen, so2);
     log::Info("Setting generator to {}", ToString(val_gen));
     solver.set_generator(MakeGeneratorOptions(config, val_gen, ms));
-    solver.set_smax(so2.smax);
+    solver.set_solver_options(so2);
     stages.push_back(
         {2, std::string(ToString(val_gen)), solver.Solve(std::ref(flow_log))});
   }
   for (const StageRecord& st : stages) {
-    log::Info("stage {} ({}): {} steps, s = {}, E0 = {:.9f}, stop: {}",
-              st.stage, st.generator, st.result.steps, st.result.s,
-              st.result.e0, StopName(st.result.reason));
+    log::Info(
+        "stage {} ({}): {} steps, {} Omega gathers, s = {}, E0 = {:.9f}, "
+        "stop: {}",
+        st.stage, st.generator, st.result.steps, st.result.num_gathers,
+        st.result.s, st.result.e0, StopName(st.result.reason));
   }
   const bool diverged =
       stages.back().result.reason == flow::StopReason::kDiverged;
@@ -416,7 +442,7 @@ void Run(const RunConfig& config) {
   }
 
   WriteResults(dir / "results.json", ph, stages, e0, solver.omegas().size(),
-               ops, valence_file);
+               solver.num_gathers(), ops, valence_file);
   if (diverged) {
     throw NumericalError(
         "the IMSRG flow diverged (see the flow log); results.json was written");

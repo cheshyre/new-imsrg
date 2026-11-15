@@ -18,6 +18,7 @@
 #include "imsrg/driver/config/load_config.h"
 #include "imsrg/driver/operators/operator_request.h"
 #include "imsrg/driver/pipeline/hamiltonian.h"
+#include "imsrg/operator/compare.h"
 
 namespace imsrg::driver::pipeline {
 namespace {
@@ -86,6 +87,25 @@ TEST(PipelineHamiltonian, O16TwoBody) {
   EXPECT_EQ(ph.proton_number, 8);
 }
 
+TEST(PipelineHamiltonian, HartreeFockMixingDiisAndLinearReachTheSameSolution) {
+  if (!Have(kVnn)) GTEST_SKIP() << "missing " << kVnn;
+  const std::string head = "[hartree_fock]\nmixing = \"";
+  const RunConfig diis = Load(Toml(kO16, false) + head + "diis\"\n");
+  const RunConfig dflt = Load(Toml(kO16, false));
+  const RunConfig lin = Load(Toml(kO16, false) + head + "linear\"\n");
+  EXPECT_EQ(dflt.hartree_fock.mixing, HartreeFockMixing::kDiis);
+  const PreparedHamiltonian pd = PrepareHamiltonian(diis);
+  const PreparedHamiltonian pl = PrepareHamiltonian(lin);
+  ASSERT_TRUE(pd.hf.has_value());
+  ASSERT_TRUE(pl.hf.has_value());
+  std::cout << "[dev] O16 2N E_HF diis - linear = " << pd.hf->e_hf - pl.hf->e_hf
+            << ", iterations diis " << pd.hf->iterations << " linear "
+            << pl.hf->iterations << "\n";
+  EXPECT_NEAR(pd.hf->e_hf, pl.hf->e_hf, 1.0e-6);
+  EXPECT_LT(pd.hf->iterations, pl.hf->iterations);
+  EXPECT_TRUE(pd.hf->converged);
+}
+
 TEST(PipelineHamiltonian, O16WithNo2b) {
   if (!Have(kVnn) || !Have(kV3))
     GTEST_SKIP() << "missing input files in " << IMSRG_TEST_DATA_DIR;
@@ -127,9 +147,25 @@ TEST(PipelineHamiltonian, Rp2ZeroBodyMatchesIt6) {
   EXPECT_EQ(rp2.model_space_ptr(), ph.hno.model_space_ptr());
 }
 
+// D35: Rso is its own catalog operator. Its reference expectation value for
+// the closed-shell O16 vanishes (the spin-orbit pairs j = l +- 1/2 cancel in
+// every filled shell, so the HF value of Rp2 is the one without Rso as well),
+// while the operator itself is nonzero.
+TEST(PipelineHamiltonian, RsoIsAnOperatorAndVanishesForClosedShells) {
+  if (!Have(kVnn)) GTEST_SKIP() << "missing " << kVnn;
+  const RunConfig cfg = Load(Toml(kO16, false));
+  const PreparedHamiltonian ph = PrepareHamiltonian(cfg);
+  const op::Operator rso = PrepareOperator(Request("Rso"), ph, cfg);
+  std::cout << "[dev] Rso zero body (O16) = " << rso.zero_body() << "\n";
+  EXPECT_NEAR(rso.zero_body(), 0.0, 1.0e-10);
+  EXPECT_GT(op::MaxAbs(rso).one_body, 0.05);
+  EXPECT_EQ(rso.model_space_ptr(), ph.hno.model_space_ptr());
+}
+
 TEST(PipelineHamiltonian, PlannedOptionsThrow) {
   const std::string base = Toml(kO16, false);
-  const RunConfig nat = Load(Toml(kO16, false, "kind = \"nat\""));
+  const RunConfig nat = Load(Toml(kO16, false, "kind = \"nat\"") +
+                             "[natural_orbitals]\nuse_occupations = true\n");
   EXPECT_THROW(PrepareHamiltonian(nat), ConfigError);
   try {
     PrepareHamiltonian(nat);

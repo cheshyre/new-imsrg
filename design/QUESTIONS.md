@@ -439,3 +439,64 @@ further design decisions (D30–D42 in `00-requirements-and-decisions.md`; repor
   has no local edits, else `read-tree -m -u <old> develop`). **Assumed meanwhile:** acceptable, as in
   run 1. To start a run in the main checkout, the session has to be opened there without a
   worktree (app setting).
+
+### M8-Q10 (hunter-gatherer, `H(s)` after the final gather)
+imsrg++ `GatherOmega` rebuilds `H_saved` from `H_0` through the gathered Omega but leaves `H(s)`
+untouched, so after a hunter-gatherer solve `H(s)` and `Transform(H_0)` differ at the truncation level
+of the BCH product (up to 2e-3 in the O16 emax 2 unit test (4 gathers; E0 1e-4, see its printout)); stage 2's
+first eta comes from the pre-gather `H(s)`. **Assumed:** copy imsrg++ (orchestrator decision), because
+the IT-10 and `IT-2/hunter_gatherer` goldens depend on it. A cleaner variant (re-evaluate `H(s)` from
+the gatherer, or gather before the next stage) would be an option with a deviation entry.
+
+### M8-Q11 (hunter-gatherer, gather count and `set_generator`)
+`SolveResult::num_gathers` counts the loop gathers plus the final gather (as the `gathering Omega.`
+log lines of imsrg++; the goldens' `n_gathers`). A gather inside `set_generator` (hunter non-zero,
+which cannot happen after a hunter-gatherer `Solve`) is counted in `MagnusSolver::num_gathers()` only.
+`results.json` has `imsrg.num_gathers` (solver total) and `imsrg.stages[].num_gathers`.
+`imsrg.omega.hunter_gatherer` is rejected nowhere any more; `imsrg.omega.storage = scratch/discard`
+with hunter-gatherer is unchanged (not implemented either way).
+
+### M8-Q12 (flow fixes: ds with `magnus_adaptive = false`, divergence on NaN)
+(1) imsrg++'s member `ds` is set by `SetDs(ds_0)` and capped by `SetDsmax`; with `magnus_adaptive = false`
+the Magnus loop uses `ds` unchanged (then `min(ds, smax - s)`). **Assumed/implemented:** the solver
+starts each `Solve` with `ds = min(ds_0, dsmax)`; adaptive mode is untouched (golden flows identical).
+(2) A NaN/inf ||eta|| or E0 is `StopReason::kDiverged` (the driver then throws `NumericalError`, M8-3);
+unlike imsrg++ (`FlowingOps[0] *= 1.0/0.0`) H is left as it is. (3) `denominator_cutoff <= 0` is
+rejected by `ComputeGenerator` with `InputError` (0 would disable the floor and give inf/NaN).
+(4) `imsrg.omega.storage = scratch|discard` is `Phase::kPlanned` in the enum table (E-PLANNED at
+validation); the round-trip tests use `memory`.
+* **M8-Q20** (2026-11-15, M8 D35 task) - D35 asks that "wherever the code computes a charge radius" the
+  Rso contribution is added. The code has no charge-radius computation yet (design/16 section 6 assigns
+  `PROTON_RCH2`, `NEUTRON_RCH2`, `DARWIN_FOLDY` to the output stage), so only the catalog operator `Rso`
+  (`PrepareOperator`) was added and the contract is documented (`opslib::Rp2` docstring, design/13,
+  design/30 D35-2): charge radius = Rp2 + Rso/Z + nucleon-size terms. **Assumed meanwhile:** the
+  output-stage task implements it that way. Not blocking.
+* **M8-Q21** (2026-11-15, M8 D35 task) - The gitignored emax-4 dumps in `build/golden-generated` (read
+  through `IMSRG_GENERATED_GOLDEN_DIR` by `opslib_golden`, `hf_*`, `io_*` emax-4 tests) must come from the
+  patched build too; with dumps from the pristine build `Emax4TrelAndRp2` fails (Rp2 differs by 0.063).
+  **Assumed meanwhile:** after merging, run `REFHARNESS=<ref root>/harness-build-d35/refharness
+  tools/reference/gen_golden_generated.sh` once per checkout (also done by `regen_golden_d35.sh` into
+  `<ref root>/golden-generated-d35`). Alternative: make the script default to the patched harness.
+* **M8-Q22** (2026-11-15, M8 D35 task) - `tools/reference/refharness.cpp` and `gen_golden_flow.sh` were
+  edited (a few lines each: `IMSRG_REFERENCE_SHA_FILE`, `IMSRG_GOLDEN_E2E_OUT`, `FLOW_JOBS`); the
+  hunter-gatherer task edits the same two files, so the merge may need a manual resolution of
+  neighbouring hunks. **Assumed meanwhile:** the orchestrator resolves it (both changes are independent). **Resolved at the merge (orchestrator, 2026-11-15):** `gen_golden_flow.sh` taken from the hunter-gatherer branch, which already contains the D35 overrides; `refharness.cpp` merged automatically.
+* **M8-Q30** (2026-11-15, M8 config/driver task) - Relative paths (D37): a TOML *file*'s values resolve
+  against the file's directory, but the **default** `output.directory = "output"` (no key in the file)
+  and `--set` values resolve against the working directory. Alternative: default relative to the config
+  directory too. **Assumed meanwhile:** working directory (an output default is not a path "in the
+  config"); implemented in `LoadConfig` and documented in design/16 1.8. The TOML examples name their
+  inputs without a directory, so they run from a directory that holds the data (`examples/config/README.md`).
+* **M8-Q31** (2026-11-15, M8 config/driver task) - `results.json` schema version: the layout was
+  already new in run 2 (nothing released), so `schema_version = 1` covers the table as documented,
+  including `e_mp2`, `imsrg.num_gathers` and the NAT-basis meaning of `e_reference`/`e_mp2`. **Assumed:**
+  bump to 2 only for the first change after a release; the table test fails on any undocumented key.
+* **M8-Q32** (2026-11-15, M8 config/driver task) - `hartree_fock.mixing = "diis"` (the new TOML default)
+  stops at the same HF tolerance with fewer iterations but changes E_HF at the 1e-8 MeV level and may
+  change flow step counts relative to imsrg++. **Assumed:** the integration tests that reproduce
+  imsrg++ step counts (IT-2..IT-7, IT-12, hunter-gatherer) set `mixing = "linear"` explicitly; legacy
+  command lines get `linear` automatically.
+* **M8-Q33** (2026-11-15, M8 config/driver task) - NAT basis in the driver covers `natural_orbitals`
+  defaults only: `use_occupations = true` and `order = "energy"` are `E-PLANNED` (M9-Q3, D36). The NAT
+  reference occupations are those of the HF solution (closed shells; ensemble references untested).
+  New `hf::SolutionInBasis` is the public API replacing the test-only `hf::detail` coupling (M9-Q1).

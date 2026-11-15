@@ -20,7 +20,7 @@ imsrg_add_module(NAME driver
     operators/operator_request.cc
     pipeline/hamiltonian.cc
     run.cc
-  DEPS base exec comm basis operator io opslib hf commutator flow
+  DEPS base exec comm basis operator io opslib hf mbpt commutator flow
   PRIVATE_LIBS tomlplusplus::tomlplusplus)
 
 # Version and git hash for the provenance record, on the one file that uses them (a new commit

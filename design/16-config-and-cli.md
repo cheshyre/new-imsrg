@@ -15,6 +15,7 @@ Legacy source (read-only): `/Users/cheshyre/Downloads/new-imsrg/imsrg-devel/src/
 5. **Unknown keys are hard errors** (TOML and legacy). Old behaviour (print "Unkown parameter", continue) hid typos.
 6. **Policy for old quirks:** fix genuine bugs and document; keep behaviour that defines the numerics (Magnus step-size rule, norm conventions, BCH thresholds). Exception: the generator denominator floor keeps the sign of the denominator (D21, owner decision). Where the old code *tolerated* something harmless/no-op, the TOML schema is strict (error) but the legacy layer downgrades to a **warning** and reproduces the old numerics, so existing scripts keep running (section 3.4).
 7. **Provenance.** `resolved_config.toml` is written at the start of the run (after validation, before the HF step) so failed runs still leave it. It contains all keys with defaults filled, canonical enum spellings, and a `[provenance]` table (version, git hash, date, original command line, legacy args verbatim, translation warnings, applied rules).
+8. **Relative paths** (D37). Path-valued keys (`interaction.two_body.file`, `interaction.three_body.file`, `reference.occupations_file`, `run.scratch_dir`, `output.directory`, `output.flow_file`, `operators.from_file[].file_2b/file_3b`) written in a TOML *file* resolve against **the directory of that file**, so a config can be moved and run from anywhere together with its data. Legacy `key=value` values, `--set` assignments, TOML text that does not come from a file (`config_text`, the Python API), and the **default** of `output.directory` resolve against the **working directory**. Resolution is lexical (no symlink resolution) and happens in `LoadConfig` (TOML-file values before the overrides are applied); `RunConfig`, `resolved_config.toml` and the `.snt` headers hold absolute paths, so a `resolved_config.toml` reproduces the run from any directory. The example configs of 2.11 name their input files without a directory: run them from, or copy them to, a directory that holds the data (the legacy equivalents resolve the same names against the working directory).
 
 Terminology: "legacy layer" = `LegacyParameters`; "TOML schema" = the new canonical config.
 
@@ -43,7 +44,7 @@ Conventions: keys are `snake_case`; enum values are lower `snake_case` strings (
 | `lmax3` | opt int >= 1 | none | l cut for the three-body interaction. |
 | `emax_unocc` | opt int >= 1 | none | separate emax for (l,j) orbits that are unoccupied in the reference. |
 | `mass_number` | opt int >= 1 | A of the reference nucleus (or core, see 5.4) | `A` used in the intrinsic kinetic energy and radius operators. |
-| `kind` | enum `hf`, `oscillator`, `nat` | `hf` | basis the Hamiltonian is normal ordered in. `nat` = natural orbitals from MBPT(2) density. |
+| `kind` | enum `hf`, `oscillator`, `nat` | `hf` | basis the Hamiltonian is normal ordered in. `nat` = natural orbitals of the MBPT(2) density matrix of the HF-basis Hamiltonian (P1; `results.json` `e_reference` and `e_mp2` then refer to the NAT basis, `hf` to the HF solution; operators are transformed with C_ho2nat). |
 
 ### 2.3 `[reference]` and `[valence]`
 
@@ -99,10 +100,10 @@ For single-reference runs set only `reference.nucleus`.
 
 | key | type | default | meaning |
 |---|---|---|---|
-| `hartree_fock.mixing` | enum `diis`, `linear` | `diis` (TOML); the legacy layer sets `linear` | HF update: Pulay DIIS on the Fock matrix (M6-Q3) or imsrg++'s linear density mixing (for reproducing imsrg++ iteration counts). Both reach the same solution. *(owner, 2026-11-15, D37; to be implemented in run 2, the driver uses linear today)* |
+| `hartree_fock.mixing` | enum `diis`, `linear` | `diis` (TOML); an absent key resolves to `linear` for a legacy command line | HF update: Pulay DIIS on the Fock matrix (M6-Q3) or imsrg++'s linear density mixing (weight 0.2 of the old density; reproduces imsrg++ iteration counts). Both reach the same solution to the HF tolerance (1e-8 on the single-particle energies), so energies differ at the 1e-9 MeV level and flow step counts may differ from imsrg++ with `diis`. An explicit key (also `--set`) wins in both modes; `resolved_config.toml` always records the resolved value. *(owner, 2026-11-15, D37; implemented in run 2)* |
 | `hartree_fock.freeze_occupations` | bool | `false` | keep reference occupations fixed (default: fractional/ensemble occupations may follow HF energies). Ignored for `basis.kind="oscillator"`. |
-| `natural_orbitals.use_occupations` | bool | `false` | use NAT occupations for the reference. |
-| `natural_orbitals.order` | enum `occupation`, `energy` | `occupation` | orbit labelling order. Only valid with `basis.kind="nat"`. |
+| `natural_orbitals.use_occupations` | bool | `false` | use NAT occupations for the reference (PL: `E-PLANNED`, M9-Q3). |
+| `natural_orbitals.order` | enum `occupation`, `energy` | `occupation` | orbit labelling order. Only valid with `basis.kind="nat"`; `energy` is PL (`E-PLANNED`, M9-Q3). |
 
 ### 2.7 `[imsrg]`
 
@@ -202,11 +203,65 @@ Old `OperatorsRPA`/`OperatorsTDA`: not supported (no schema key).
 | `write_ho_ops`, `write_hf_ops` | bool | `false` | write operators before the HF transformation / before the IMSRG flow (PL). |
 | `spwf` | array of strings | `[]` | orbits whose HF/NAT single-particle wave functions are written; `"valence"` = all valence orbits. |
 
-`results.json` (written to `directory`) carries an integer `schema_version` (starting at 1); its
-schema is documented in a table in this section and every change is listed in a changelog next to it
-*(owner, 2026-11-15, D37; to be added in run 2)*. Only the tokyo and NuShellX valence-space files must
-stay file-compatible with imsrg++ (D39); the other outputs use our formats. Two new output formats,
-`me2jp` and `me3jp`, come later (specification from the owner, D39).
+#### `results.json` schema
+
+`results.json` (written to `output.directory`, next to `resolved_config.toml`) is one JSON object
+whose top-level integer `schema_version` identifies the layout *(owner, 2026-11-15, D37)*. Every
+change of the written keys bumps the version and is listed in the changelog below; consumers should
+check `schema_version` first. Floating-point numbers are written with 17 significant digits
+(round-trip exact), energies in MeV, `r^2` operators in fm^2. In the first column
+`[]` marks the elements of an array, `<name>` an object member whose name is data (here the
+canonical operator name). The test `ResultsSchema.WrittenKeysMatchTheDocumentedTable` extracts the
+first column of this table and compares it with the keys of a real run, so the table cannot drift.
+
+| key | type | present | meaning |
+|---|---|---|---|
+| `schema_version` | int | always | layout version of this table (currently 1). |
+| `e_reference` | number | always | reference energy: E_HF in the basis of the flow (HF or NAT basis) or the zero-body part of the normal-ordered Hamiltonian (oscillator basis); Lawson constant not included. |
+| `e_mp2` | number | always | MBPT(2) correlation energy of the normal-ordered Hamiltonian that enters the flow (HF or NAT basis; imsrg++ `EMP2`), MeV. Equals the `E_MP2` of flow-file step 0. *(added in run 2)* |
+| `hf` | object | `basis.kind = "hf"` | the Hartree-Fock solution. |
+| `hf.e_hf` | number | with `hf` | E_HF. |
+| `hf.e1` | number | with `hf` | one-body part of E_HF. |
+| `hf.e2` | number | with `hf` | two-body part. |
+| `hf.e3` | number | with `hf` | three-body part (0 without a 3N interaction). |
+| `hf.iterations` | int | with `hf` | HF iterations. |
+| `hf.converged` | bool | with `hf` | HF reached its tolerance. |
+| `imsrg` | object | always | the flow; with `run.task = "hf"` it holds `e0 = e_reference` and an empty `stages`. |
+| `imsrg.e0` | number | always | zero-body part of the final Hamiltonian (core energy). |
+| `imsrg.num_omegas` | int | always | Omega operators on the stack after the flow (0 for `task = "hf"`). |
+| `imsrg.num_gathers` | int | always | hunter-gatherer gathers over all stages. |
+| `imsrg.stages` | array | always | one entry per decoupling stage. |
+| `imsrg.stages[].stage` | int | per stage | 1 or 2. |
+| `imsrg.stages[].generator` | string | per stage | canonical generator spelling. |
+| `imsrg.stages[].steps` | int | per stage | accepted solver steps. |
+| `imsrg.stages[].num_gathers` | int | per stage | gathers in this stage. |
+| `imsrg.stages[].s` | number | per stage | final flow parameter. |
+| `imsrg.stages[].e0` | number | per stage | E0 at the end of the stage. |
+| `imsrg.stages[].norm_eta` | number | per stage | norm of the generator at the end. |
+| `imsrg.stages[].stop` | string | per stage | `converged`, `smax` or `diverged`. |
+| `operators` | object | always | transformed operators by canonical name (empty if none requested). |
+| `operators.<name>` | object | per operator | one entry per requested operator. |
+| `operators.<name>.reference` | number | per operator | zero-body part before the flow (HF basis, normal ordered). |
+| `operators.<name>.imsrg` | number | per operator | zero-body part after the flow. |
+| `operators.<name>.file` | string | per operator | path of the written operator file. |
+| `valence_interaction` | string or null | always | path of the valence-space interaction file, `null` without a valence space. |
+
+The flow file (`output.flow_file`, CSV with a header line) has one row per solver step, `istep = 0`
+being the initial state of each stage. Columns: `stage, istep, s, ds, E0, norm_H, norm_eta_1b,
+norm_eta_2b, norm_eta, norm_omega_1b, norm_omega_2b, norm_omega, num_omegas, E_MP2, wall_s`.
+`E_MP2` is the MBPT(2) correlation energy of the current Hamiltonian H(s), as in imsrg++'s flow
+file (`E(MP2)` column); it costs one MP2 evaluation per step.
+
+Changelog (newest first):
+
+* **1** (run 2, 2026-11-15): first documented layout; `schema_version` added. The keys are those of the
+  table above, including `imsrg.num_gathers` and `imsrg.stages[].num_gathers` of the hunter-gatherer
+  Magnus solver. Nothing was released before, so later additions of the same run (MP2 energy) are part
+  of version 1 and are marked in the table.
+
+Only the tokyo and NuShellX valence-space files must stay file-compatible with imsrg++ (D39); the
+other outputs use our formats. Two new output formats, `me2jp` and `me3jp`, come later
+(specification from the owner, D39).
 
 ### 2.11 Example configs
 
@@ -496,7 +551,7 @@ Columns: old key (type) | new key | type / enum | old default | status | notes. 
 | `HCM_<hw>` built internally for `BetaCM` | done by the Hamiltonian-assembly stage from `hamiltonian.beta_cm*`, not via the operator list | S |
 | `help`, `-help`, `--help` | CLI11 help | S |
 
-### 3.6 Quirk decisions (Q1-Q16)
+### 3.6 Quirk decisions (Q1-Q17)
 
 Default = keep numerics; "fix" = behaviour changed deliberately. "Legacy" column = what the legacy layer does. Items marked **HUMAN** want a decision.
 
@@ -518,6 +573,7 @@ Default = keep numerics; "fix" = behaviour changed deliberately. "Legacy" column
 | Q14 | `eta_criterion`, `ode_tolerance` pass through `float` | fix (double); effect on thresholds ~1e-8 relative | -- | -- |
 | Q15 | `NSmagnus`/`brueckner*` overwrite `omega_norm_max` | keep | n/a | override + warning if user value differs |
 | Q16 | `write_omega` writes nothing without `scratch` | fix | always writes | same |
+| Q17 | imsrg++ has no HF-accelerator key: it always uses linear density mixing (D37) | add `hartree_fock.mixing` | default `diis` | default `linear` (absent key); an explicit `--set hartree_fock.mixing=diis` is honoured |
 
 Legacy warning rules: **L1** an explicitly given key that the old code ignored in this context (e.g. `valence_generator` with `nsteps=1`) -> warning, key dropped or kept inert; **L2** an explicitly given `imsrg3_*`/`only_2b_*`/`dE3max` key while no IMSRG(3)/perturbative-triples is active -> warning, key dropped; **L3** deprecated-but-working spellings -> no warning. Warnings are printed and stored in `provenance.warnings`.
 
@@ -576,7 +632,7 @@ Catalog entry (static table, one row per operator family): `{ name, n_params, pa
 **Rp2 and Rso (owner, 2026-11-15, D35):** `Rp2` is the point-proton mean-square radius **without**
 the spin-orbit correction (imsrg++'s `Rp2_corrected_Op` includes it); the correction is the separate
 operator `Rso` (imsrg++ `RpSpinOrbitCorrection`), added explicitly for charge radii. `opslib::Rp2`
-loses its `include_spin_orbit` parameter (run 2).
+has no `include_spin_orbit` parameter (done, run 2); `Rso` is implemented in `PrepareOperator`.
 
 | phase | operators |
 |---|---|

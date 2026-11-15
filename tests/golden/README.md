@@ -19,6 +19,20 @@ for how the tests use them and §2 for the tolerances.
   26.5 (the default SDK 27.0 does not link, see `design/20-build-and-tooling.md` §5), no Python
   bindings. Executables: `new-imsrg-reference/build/imsrg++` and
   `new-imsrg-reference/harness-build/refharness` (`tools/reference/refharness.cpp` + `rh_*.cpp`).
+* **Patched build (owner decision D35, 2026-11-15).** The goldens that contain T_int = T - Tcm or Rp2
+  (`hamiltonian/emax2_O16/{T,H,Rp2,Rso}.dump`, `hf/*`, `operator/emax2/H_*`, `io/*`, `e2e/IT-1..IT-7`,
+  `IT-8/emax2`, `IT-2/trajectory.csv`) come from a patched imsrg-devel build
+  (`tools/reference/patches/imsrg-devel-d35.patch`: `TCM_Op` without the 1e-7 two-body threshold,
+  `Rp2_corrected_Op` without `RpSpinOrbitCorrection`, which is the operator `Rso`). Version string of
+  those files: `imsrg-devel src-sha256:ddcbf1aff166414e746113d5f3de2ddc1e72783fb7c201829cd58e317717f40f+d35-patch:cb9d11ba30f579d4`.
+  Build `tools/reference/build_imsrg_devel.sh patched` (binaries `build-d35/imsrg++` and
+  `harness-build-d35/refharness`), regenerate with `tools/reference/regen_golden_d35.sh`. Effect: roundoff
+  (<= 1e-13) everywhere except Rp2 (one-body diagonal up to 0.038 fm^2 at emax 2; IT-6 `intRp2.snt` zero
+  body 4.45016791 -> 4.45025883), all step counts identical (`design/30` section 6, D35-1/2). The
+  gitignored emax-4 dumps in `build/golden-generated` must come from the same build:
+  `REFHARNESS=<root>/harness-build-d35/refharness tools/reference/gen_golden_generated.sh`.
+  Goldens not listed here (V2, V3_NO2B, random_H, commutator, basis, IT-8/9/10 other jobs) still come from
+  the pristine build.
 * **Inputs** (never copied into the repo), in `/Users/cheshyre/Downloads/new-imsrg/`:
   2N `VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz` (`file2e1max=14 file2e2max=28
   file2lmax=14`), 3N `NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin`
@@ -88,7 +102,7 @@ empty Tz = -1 slots print -1).
 
 `refharness dump-hamiltonian emax=2 reference=O16 valence_space=O16 hw=16 2bme=<2N file>
 file2e1max=14 file2e2max=28 file2lmax=14 3bme=<3N file> 3bme_type=no2b file3e1max=6
-file3e2max=12 file3e3max=18 ops=Rp2,random_H random_seed=1` (~1 s). HO basis, reference O16:
+file3e2max=12 file3e3max=18 ops=Rp2,Rso,random_H random_seed=1` (~1 s). HO basis, reference O16:
 
 | File | Content |
 |------|---------|
@@ -96,7 +110,8 @@ file3e2max=12 file3e3max=18 ops=Rp2,random_H random_seed=1` (~1 s). HO basis, re
 | `V2.dump` | 2N interaction from the me2j file (`ReadWrite::ReadBareTBME_Darmstadt`) |
 | `H.dump` | bare H = T + V2, as `imsrg++` builds it without 3N |
 | `V3_NO2B.dump` | 3N alone (no2b storage) normal ordered w.r.t. O16 in the HO basis: its 0B, 1B, 2B parts (`Operator::DoNormalOrdering`) |
-| `Rp2.dump` | `imsrg_util::OperatorFromString(ms, "Rp2")` (point-proton radius², HO basis, not normal ordered) |
+| `Rp2.dump` | `imsrg_util::OperatorFromString(ms, "Rp2")` of the D35-patched build (point-proton radius² **without** the spin-orbit term, HO basis, not normal ordered) |
+| `Rso.dump` | `OperatorFromString(ms, "Rso")` = `RpSpinOrbitCorrection` (one-body, diagonal; the old Rp2 was the new Rp2 + Rso/Z, to 3.5e-17) |
 | `random_H.dump` | `UnitTest::RandomOp(ms, 0, 0, 0, 2, +1)` after `SetRandomSeed(1)` (Hermitian random 1B + 2B) |
 | `norms.json` | imsrg++ norms of each of the above |
 

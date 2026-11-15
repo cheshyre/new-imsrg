@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Golden data for M4 (operator), M5 (io), M6 (hf) and MBPT from `refharness`:
 #   tests/golden/hamiltonian/emax2_O16/   T, V2, H (= T + V2, bare, HO basis), V3_NO2B (3N
-#                                          normal ordered w.r.t. O16, HO basis), Rp2, random_H
+#                                          normal ordered w.r.t. O16, HO basis), Rp2, Rso (D35: the
+#                                          spin-orbit term, separate from Rp2), random_H
 #                                          OperatorDumps + norms.json
 #   tests/golden/hf/emax{2,4}_O16_{2N,2N3N}/hf.json   E_HF, SPEs, iterations, C, MP2, MP3
 #   tests/golden/hf/emax2_O16_{2N,2N3N}/HNO.dump      HF-basis normal-ordered H (NO2B)
@@ -33,7 +34,7 @@ run() {  # run <dir> <args...>; logs stdout/stderr of the old code to <dir>/../<
 
 # --- bare Hamiltonian pieces at emax 2 (committed)
 run "${G}/hamiltonian/emax2_O16" dump-hamiltonian emax=2 reference=O16 valence_space=O16 \
-    "${common[@]}" 3bme="${F3}" ops=Rp2,random_H random_seed=1
+    "${common[@]}" 3bme="${F3}" ops=Rp2,Rso,random_H random_seed=1
 
 # --- HF + MBPT
 for emax in 2 4; do

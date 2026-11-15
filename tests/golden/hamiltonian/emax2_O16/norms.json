@@ -29,10 +29,17 @@
   },
   "Rp2": {
     "zero_body": 0,
-    "one_body_norm": 4.1049762572235773,
+    "one_body_norm": 4.1025916825735491,
     "two_body_norm": 1.7379240641375464,
     "three_body_norm": 0,
-    "norm": 4.4577135535022503
+    "norm": 4.4555177663914698
+  },
+  "Rso": {
+    "zero_body": 0,
+    "one_body_norm": 1.1191870892070332,
+    "two_body_norm": 0,
+    "three_body_norm": 0,
+    "norm": 1.1191870892070332
   },
   "random_H": {
     "zero_body": 0,
@@ -41,5 +48,5 @@
     "three_body_norm": 0,
     "norm": 276.12157429901521
   },
-  "wall_time_s": 0.014070987701416016
+  "wall_time_s": 0.011864900588989258
 }

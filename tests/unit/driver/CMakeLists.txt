@@ -14,6 +14,9 @@ imsrg_add_test(NAME driver_reader SOURCES test_toml_reader.cc test_writer.cc DEP
 imsrg_add_test(NAME driver_resolve SOURCES test_resolve.cc test_validate.cc DEPS driver
                LABELS unit)
 
+# Relative-path rules of load_config (config-file directory vs working directory, D37).
+imsrg_add_test(NAME driver_paths SOURCES test_paths.cc DEPS driver LABELS unit)
+
 # Legacy key=value translation (items 1-5); data/legacy_keys.txt lists the 85 old keys.
 imsrg_add_test(NAME driver_legacy SOURCES test_legacy_parameters.cc DEPS driver LABELS unit)
 target_compile_definitions(driver_legacy PRIVATE
@@ -48,8 +51,10 @@ target_compile_definitions(driver_pipeline_hamiltonian PRIVATE
 # End-to-end integration tests IT-2, IT-3, IT-4, IT-6, IT-7, IT-12 (design/30 section 4): run the
 # pipeline in process and compare with tests/golden/e2e; skip without the input files.
 imsrg_add_test(NAME driver_integration
-  SOURCES test_integration.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
+  SOURCES test_integration.cc test_hunter_gatherer.cc test_stage_two_options.cc test_results_schema.cc
+  ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
   DEPS driver LABELS integration NO_GTEST_MAIN)
 target_compile_definitions(driver_integration PRIVATE
+  "IMSRG_SOURCE_DIR=\"${PROJECT_SOURCE_DIR}\""
   "IMSRG_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden\""
   "IMSRG_TEST_DATA_DIR=\"${IMSRG_TEST_DATA_DIR}\"")

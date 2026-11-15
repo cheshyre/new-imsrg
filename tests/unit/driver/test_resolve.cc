@@ -90,6 +90,30 @@ TEST(Resolve, defaults_equal_default_config_except_required_and_derived) {
   EXPECT_TRUE(r.config == expect);
 }
 
+TEST(Resolve, hf_mixing_defaults_to_diis_in_toml_and_linear_in_legacy) {
+  // D37: the TOML default is DIIS; the legacy layer keeps imsrg++'s linear
+  // density mixing.
+  EXPECT_EQ(ResolveTree(Minimal()).config.hartree_fock.mixing,
+            HartreeFockMixing::kDiis);
+  EXPECT_EQ(ResolveTree(Minimal(), /*legacy=*/true).config.hartree_fock.mixing,
+            HartreeFockMixing::kLinear);
+}
+
+TEST(Resolve, hf_mixing_explicit_value_wins_in_both_modes) {
+  const auto lin = With(Minimal(), {{"hartree_fock.mixing", S("linear")}});
+  const auto diis = With(Minimal(), {{"hartree_fock.mixing", S("diis")}});
+  EXPECT_EQ(ResolveTree(lin).config.hartree_fock.mixing,
+            HartreeFockMixing::kLinear);
+  EXPECT_EQ(ResolveTree(diis, true).config.hartree_fock.mixing,
+            HartreeFockMixing::kDiis);
+}
+
+TEST(Resolve, hf_mixing_unknown_spelling_is_v01) {
+  const auto r =
+      ResolveTree(With(Minimal(), {{"hartree_fock.mixing", S("dis")}}));
+  EXPECT_NE(FindIssue(r.issues, "V-01", "hartree_fock.mixing"), nullptr);
+}
+
 TEST(Resolve, mass_number_from_reference_and_valence_core) {
   EXPECT_EQ(ResolveTree(Minimal()).config.basis.mass_number, 16);
   auto t = Minimal();

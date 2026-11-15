@@ -105,7 +105,7 @@ op::Operator RpSpinOrbitCorrection(
 }
 
 op::Operator Rp2(const std::shared_ptr<const basis::ModelSpace>& ms, int A,
-                 int Z, bool include_spin_orbit) {
+                 int Z) {
   if (Z == 0) {
     return ZeroOperator(ms);
   }
@@ -114,9 +114,6 @@ op::Operator Rp2(const std::shared_ptr<const basis::ModelSpace>& ms, int A,
   op::Operator r = R2Cm(ms, A);
   op::Axpy((dA - 2.0) / (dA * dZ), R2OneBody(ms, Species::kProton), r);
   op::Axpy(-4.0 / (dA * dZ), R2TwoBody(ms, Species::kProton), r);
-  if (include_spin_orbit) {
-    op::Axpy(1.0 / dZ, RpSpinOrbitCorrection(ms), r);
-  }
   return r;
 }
 
