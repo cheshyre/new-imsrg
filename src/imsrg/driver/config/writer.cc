@@ -156,7 +156,7 @@ struct LineWriter {
     if (section) body(*section);
   }
 
- private:
+  /// Appends the line of one key (a helper of `Field`).
   template <class T>
   void Emit(const KeyInfo& key, const T& value) {
     const std::string_view path = key.path;
