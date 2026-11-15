@@ -43,9 +43,12 @@ struct LadderProjector {
       gather_offset;              ///< Device copy of `gather_offset_host`.
   exec::DeviceBuffer<double> xg;  ///< Gathered X operands, all channels.
   exec::DeviceBuffer<double> yg;  ///< Gathered Y operands, all channels.
-  exec::DeviceBuffer<double>
-      product;  ///< W = X P Y (`LadderProducts`), antisymmetrized in place
-                ///< to Mpp or Mhh by the ladder terms; two-body layout.
+  /// W = X P Y (`LadderProducts`), antisymmetrized in place to Mpp or Mhh by
+  /// the ladder terms; two-body layout. Blocks of channels without listed kets
+  /// are never written by the ladder and must stay zero. The pp buffer is also
+  /// the scratch of comm122ss (kernels/simple_terms.cc), which leaves it all
+  /// zero.
+  exec::DeviceBuffer<double> product;
 };
 
 /// Device-resident data of the ladder terms.
