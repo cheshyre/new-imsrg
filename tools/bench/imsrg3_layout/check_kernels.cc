@@ -236,6 +236,34 @@ TEST(Comm223Ref, O16Emax3De3max3) {
   CheckSpace("O16 emax3 E3max9 de3max3", "O16", 3, 9, 3.0, false);
 }
 
+// K0 against imsrg++ itself: values printed by `refharness comm223` (old
+// imsrg-devel library, tools/reference/rh_imsrg3.cpp) for the same operators
+// (seeds 1 and 2, written with `imsrg3_layout_bench --write-dumps`) on
+// 2026-11-15: the three-body norm of comm223ss and its perturbative-triples
+// energy.
+TEST(Comm223Ref, MatchesImsrgDevel) {
+  struct Golden {
+    const char* ref;
+    int emax;
+    int e3max;
+    double norm;
+    double triples;
+  };
+  const Golden cases[] = {
+      {"O16", 2, 6, 340.71339955428823, -64.610022003823062},
+      {"He4", 2, 6, 340.71339955428823, -3.1864715462234221},
+      {"O16", 3, 9, 2174.8102180586943, -1451.9275912120786}};
+  for (const Golden& g : cases) {
+    KFixture f(g.ref, g.emax, g.e3max, 1.0e10);
+    const op::Operator X = Random(f, Hermiticity::kAntiHermitian, 1);
+    const op::Operator Y = Random(f, Hermiticity::kHermitian, 2);
+    const std::vector<double> z = K0(f, X, Y, false, nullptr);
+    EXPECT_NEAR(ImsrgppNorm(f.space, z) / g.norm, 1.0, 1.0e-12) << g.ref;
+    const double e = TriplesReference(f.ctx, X, Y, Epsilon(f));
+    EXPECT_NEAR(e / g.triples, 1.0, 1.0e-12) << g.ref << " " << g.emax;
+  }
+}
+
 TEST(TriplesRef, RejectsWrongEpsilonSize) {
   KFixture f("He4", 2, 6, 1.0e10);
   const op::Operator X = Random(f, Hermiticity::kAntiHermitian, 1);
