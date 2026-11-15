@@ -9,10 +9,13 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cinttypes>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -78,6 +81,28 @@ std::vector<N7Inputs> BruteForceCases() {
   return cases;
 }
 
+// Z = comm232ss(X, Y) through the element-wise reference.
+op::Operator EvaluateReference(const op::Operator& X, const op::Operator& Y,
+                               const ThreeBodyContext& ctx) {
+  op::Operator z = testing::ZeroN7Output(X, Y, ctx.model_space_ptr());
+  detail::Comm232ssReference(X, Y, z, ctx);
+  return z;
+}
+
+// Largest |a - b| over the two-body elements, relative to max(1, max |b|).
+double TwoBodyDeviation(const op::Operator& a, const op::Operator& b) {
+  const std::vector<double> va = a.two_body().matrix().buffer().ToVector();
+  const std::vector<double> vb = b.two_body().matrix().buffer().ToVector();
+  EXPECT_EQ(va.size(), vb.size());
+  double scale = 1.0;
+  double worst = 0.0;
+  for (std::size_t k = 0; k < va.size() && k < vb.size(); ++k) {
+    scale = std::max(scale, std::abs(vb[k]));
+    worst = std::max(worst, std::abs(va[k] - vb[k]));
+  }
+  return worst / scale;
+}
+
 TEST(N7Comm232, MatchesBruteForce) {
   for (N7Inputs& c : BruteForceCases()) {
     const op::Operator z = EvaluateN7Term(Term::kComm232ss, c.x, c.y, *c.ctx);
@@ -88,6 +113,40 @@ TEST(N7Comm232, MatchesBruteForce) {
     EXPECT_LE(dev, kTol) << c.ms3->reference().name();
     std::printf("comm232ss %s: relative deviation from the brute force %.3g\n",
                 std::string(c.ms3->reference().name()).c_str(), dev);
+  }
+}
+
+// Three-body cuts define the kept space (D34): E3max 2 (He4 at emax 1 drops
+// the ppp kets) and dE3max 1 (C12, e_F = 1: at most one 0s orbit per ket)
+// drop kets, and both paths match the brute force on the remaining space.
+TEST(N7Comm232, MatchesBruteForceWithCuts) {
+  basis::ThreeBodyCuts e3;
+  e3.e3max = 2;
+  basis::ThreeBodyCuts de3;
+  de3.de3max = 1.0;
+  const basis::ThreeBodyCuts full;
+  for (const auto& [ref, cuts] :
+       {std::pair<const char*, basis::ThreeBodyCuts>{"He4", e3},
+        std::pair<const char*, basis::ThreeBodyCuts>{"C12", de3}}) {
+    N7Inputs c =
+        RandomN7Inputs(testing::MakeThreeBodySpace(1, ref, cuts),
+                       Hermiticity::kNonHermitian, Hermiticity::kHermitian, 31);
+    const std::int64_t kept = c.ms3->three_body_space()->NumRows();
+    EXPECT_GT(kept, 0);
+    EXPECT_LT(kept, testing::MakeThreeBodySpace(1, ref, full)
+                        ->three_body_space()
+                        ->NumRows());
+    const op::Operator bf = BruteForceN7Term(Term::kComm232ss, c.x, c.y, c.ms3);
+    const op::Operator fast =
+        EvaluateN7Term(Term::kComm232ss, c.x, c.y, *c.ctx);
+    const op::Operator slow = EvaluateReference(c.x, c.y, *c.ctx);
+    EXPECT_GT(op::TwoBodyNorm(bf), 1.0);
+    EXPECT_LE(RelativeDeviation(fast, bf), kTol) << ref;
+    EXPECT_LE(RelativeDeviation(slow, bf), kTol) << ref;
+    std::printf("comm232ss %s e3max %d de3max %g (%" PRId64
+                " kept rows): deviation from the brute force %.3g\n",
+                ref, cuts.e3max, cuts.de3max, kept,
+                RelativeDeviation(fast, bf));
   }
 }
 
@@ -122,28 +181,6 @@ TEST(N7Comm232, MatchesImsrgDevel) {
   }
 }
 
-// Z = comm232ss(X, Y) through the element-wise reference.
-op::Operator EvaluateReference(const op::Operator& X, const op::Operator& Y,
-                               const ThreeBodyContext& ctx) {
-  op::Operator z = testing::ZeroN7Output(X, Y, ctx.model_space_ptr());
-  detail::Comm232ssReference(X, Y, z, ctx);
-  return z;
-}
-
-// Largest |a - b| over the two-body elements, relative to max(1, max |b|).
-double TwoBodyDeviation(const op::Operator& a, const op::Operator& b) {
-  const std::vector<double> va = a.two_body().matrix().buffer().ToVector();
-  const std::vector<double> vb = b.two_body().matrix().buffer().ToVector();
-  EXPECT_EQ(va.size(), vb.size());
-  double scale = 1.0;
-  double worst = 0.0;
-  for (std::size_t k = 0; k < va.size() && k < vb.size(); ++k) {
-    scale = std::max(scale, std::abs(vb[k]));
-    worst = std::max(worst, std::abs(va[k] - vb[k]));
-  }
-  return worst / scale;
-}
-
 // The pair-third path (terms::Comm232ss) against the element-wise reference
 // (golden inputs, both E3max; the brute-force cases with non-Hermitian
 // operands).
@@ -172,6 +209,28 @@ TEST(N7Comm232, PairThirdMatchesReference) {
     const op::Operator slow = EvaluateReference(c.x, c.y, *c.ctx);
     EXPECT_LE(TwoBodyDeviation(fast, slow), 1.0e-12)
         << c.ms3->reference().name();
+  }
+}
+
+// Channel batching: a budget of one byte (one channel per batch) gives the
+// result of the default budget (one batch at emax 2).
+TEST(N7Comm232, BatchesAgree) {
+  const N7Inputs in = GoldenN7Inputs(2, "O16", 6);
+  op::Operator one = testing::ZeroN7Output(in.x, in.y, in.ms3);
+  op::Operator many = testing::ZeroN7Output(in.x, in.y, in.ms3);
+  detail::Comm232ssPairThird(in.x, in.y, one, *in.ctx,
+                             detail::kComm232MaxBlockBytes);
+  detail::Comm232ssPairThird(in.x, in.y, many, *in.ctx, 1);
+  EXPECT_GT(op::TwoBodyNorm(one), 1.0);
+  EXPECT_LE(TwoBodyDeviation(many, one), 1.0e-13);
+  // Non-Hermitian operands (two block sets per operand).
+  for (N7Inputs& c : BruteForceCases()) {
+    op::Operator a = testing::ZeroN7Output(c.x, c.y, c.ms3);
+    op::Operator b = testing::ZeroN7Output(c.x, c.y, c.ms3);
+    detail::Comm232ssPairThird(c.x, c.y, a, *c.ctx,
+                               detail::kComm232MaxBlockBytes);
+    detail::Comm232ssPairThird(c.x, c.y, b, *c.ctx, 1);
+    EXPECT_LE(TwoBodyDeviation(b, a), 1.0e-13) << c.ms3->reference().name();
   }
 }
 
