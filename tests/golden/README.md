@@ -29,8 +29,12 @@ for how the tests use them and §2 for the tolerances.
   `harness-build-d35/refharness`), regenerate with `tools/reference/regen_golden_d35.sh`. Effect: roundoff
   (<= 1e-13) everywhere except Rp2 (one-body diagonal up to 0.038 fm^2 at emax 2; IT-6 `intRp2.snt` zero
   body 4.45016791 -> 4.45025883), all step counts identical (`design/30` section 6, D35-1/2). The
-  gitignored emax-4 dumps in `build/golden-generated` must come from the same build:
-  `REFHARNESS=<root>/harness-build-d35/refharness tools/reference/gen_golden_generated.sh`.
+  gitignored emax-4 dumps in `build/golden-generated` (read through `IMSRG_GENERATED_GOLDEN_DIR`) must come
+  from the same build. In every checkout, after `tools/reference/build_imsrg_devel.sh patched-harness`, run
+  `tools/reference/gen_golden_generated.sh` once (it now defaults to the patched harness; about 2 s, and the
+  `source` lines then carry the `+d35-patch` version string). Why: with dumps from the pristine build the
+  test `OpslibGolden.Emax4TrelAndRp2` fails (Rp2 differs by 0.063), and the emax-4 tests skip when the
+  directory is absent (a fresh checkout has none).
   Goldens not listed here (V2, V3_NO2B, random_H, commutator, basis, IT-8/9/10 other jobs) still come from
   the pristine build.
 * **Default build of the generation scripts (D35).** Every `tools/reference/gen_golden_*.sh` that runs
@@ -139,8 +143,8 @@ dump_hno=<e==2>` (HF as imsrg++ with `basis=HF`, occupations unfrozen, plain den
 Each holds `hf.json`; the emax-2 directories also hold `HNO.dump` (the HF-basis normal-ordered H,
 `HartreeFock::GetNormalOrderedH(2)`). Cross-check: `imsrg++ ... emax=4 method=MP3` with the 3N file
 prints `EHF = -313.1684814`, `EMP2 = -16.30552947`, `EMP3 = -2.50739061` (identical).
-The emax-4 dumps (`hamiltonian`, `HNO`) are regenerated on demand into `generated/` (gitignored)
-with `gen_golden_hamiltonian.sh --generated`.
+The emax-4 dumps read by the tests are `build/golden-generated` (see above, `gen_golden_generated.sh`).
+`gen_golden_hamiltonian.sh --generated` writes an older copy into `generated/` (gitignored) that no test reads.
 
 ### `commutator/emax2_O16/` (M7) — `tools/reference/gen_golden_commutator.sh`
 
