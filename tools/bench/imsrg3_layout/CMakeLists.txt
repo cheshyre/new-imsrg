@@ -8,6 +8,7 @@ add_library(imsrg3_layout_proto STATIC
   pair_third.cc
   layouts.cc
   kernel_context.cc
+  cost_model.cc
   kernels/comm223_ref.cc
   kernels/comm223_tiled.cc
   kernels/triples.cc)
