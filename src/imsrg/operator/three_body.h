@@ -17,7 +17,15 @@ namespace imsrg::op {
 /// Three-nucleon INPUT interactions do not use this type: they live in separate
 /// input containers (NO2B, me3j) that are converted by explicit functions
 /// (D15).
-class ThreeBody {};
+class ThreeBody {
+ public:
+  ThreeBody() = default;
+
+  ThreeBody(const ThreeBody&) = default;
+  ThreeBody& operator=(const ThreeBody&) = default;
+  ThreeBody(ThreeBody&&) = default;
+  ThreeBody& operator=(ThreeBody&&) = default;
+};
 
 }  // namespace imsrg::op
 

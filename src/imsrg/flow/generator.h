@@ -128,6 +128,11 @@ class Denominators {
   /// Reads H's device data (const-correct copies), so it is valid right after
   /// library calls.
   Denominators(const op::Operator& H, const GeneratorOptions& opts);
+
+  Denominators(const Denominators&) = default;
+  Denominators& operator=(const Denominators&) = default;
+  Denominators(Denominators&&) = default;
+  Denominators& operator=(Denominators&&) = default;
   /// One-body denominator Delta(i, j) (floored).
   double one_body(OrbitIndex i, OrbitIndex j) const;
   /// Two-body denominator of bra = local ket `ibra`, ket = local ket `iket` of

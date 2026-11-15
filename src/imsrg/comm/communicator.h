@@ -38,6 +38,11 @@ class Communicator {
   /// communicator with a safe default.
   Communicator() : Communicator(Serial()) {}
 
+  Communicator(const Communicator&) = default;
+  Communicator& operator=(const Communicator&) = default;
+  Communicator(Communicator&&) = default;
+  Communicator& operator=(Communicator&&) = default;
+
   /// The one-rank communicator (rank 0, size 1). Makes no MPI calls, so it is
   /// also usable in MPI builds without an `Environment`.
   static Communicator Serial();

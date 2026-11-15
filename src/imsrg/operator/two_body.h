@@ -56,6 +56,11 @@ class TwoBody {
   TwoBody(std::shared_ptr<const basis::ModelSpace> ms,
           const OperatorSpec& spec);
 
+  TwoBody(const TwoBody&) = default;
+  TwoBody& operator=(const TwoBody&) = default;
+  TwoBody(TwoBody&&) = default;
+  TwoBody& operator=(TwoBody&&) = default;
+
   /// True if the part has blocks (particle_rank >= 2).
   bool allocated() const noexcept { return matrix_.num_blocks() > 0; }
   /// The two-body channels (kets, channel labels, local indices). Precondition:

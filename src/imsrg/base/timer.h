@@ -37,6 +37,12 @@ class TimerRegistry {
     std::int64_t count;  ///< Number of recorded calls.
   };
 
+  TimerRegistry() = default;
+  TimerRegistry(const TimerRegistry&) = delete;
+  TimerRegistry& operator=(const TimerRegistry&) = delete;
+  TimerRegistry(TimerRegistry&&) = delete;
+  TimerRegistry& operator=(TimerRegistry&&) = delete;
+
   /// Adds `seconds` and `count` calls to region `name` (created on first use).
   /// Thread-safe.
   void Add(std::string_view name, double seconds, std::int64_t count = 1);
@@ -84,6 +90,8 @@ class ScopedTimer {
   ~ScopedTimer();
   ScopedTimer(const ScopedTimer&) = delete;
   ScopedTimer& operator=(const ScopedTimer&) = delete;
+  ScopedTimer(ScopedTimer&&) = delete;
+  ScopedTimer& operator=(ScopedTimer&&) = delete;
 
  private:
   TimerRegistry& registry_;

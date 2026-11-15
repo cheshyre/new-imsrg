@@ -53,6 +53,11 @@ namespace detail {
 class JsonParser {
  public:
   explicit JsonParser(const std::string& s) : s_(s) {}
+
+  JsonParser(const JsonParser&) = default;
+  JsonParser& operator=(const JsonParser&) = delete;
+  JsonParser(JsonParser&&) = default;
+  JsonParser& operator=(JsonParser&&) = delete;
   Json Parse() {
     Json v = value();
     Skip();

@@ -58,6 +58,11 @@ class Matrix {
   /// `rows x cols` zero matrix. Precondition: rows, cols >= 0 (IMSRG_CHECK).
   Matrix(std::int64_t rows, std::int64_t cols);
 
+  Matrix(const Matrix&) = default;
+  Matrix& operator=(const Matrix&) = default;
+  Matrix(Matrix&&) = default;
+  Matrix& operator=(Matrix&&) = default;
+
   /// Number of rows.
   std::int64_t rows() const noexcept { return rows_; }
   /// Number of columns.

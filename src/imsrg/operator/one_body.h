@@ -39,6 +39,11 @@ class OneBody {
   /// Precondition: num_orbits >= 0 (IMSRG_CHECK).
   OneBody(std::int32_t num_orbits, Hermiticity hermiticity);
 
+  OneBody(const OneBody&) = default;
+  OneBody& operator=(const OneBody&) = default;
+  OneBody(OneBody&&) = default;
+  OneBody& operator=(OneBody&&) = default;
+
   /// Number of orbits (the matrix dimension).
   std::int32_t num_orbits() const noexcept { return n_; }
   /// The hermiticity used by `set` and `add`.

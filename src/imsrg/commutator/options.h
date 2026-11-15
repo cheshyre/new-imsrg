@@ -48,6 +48,11 @@ class TermMask {
   /// The empty set.
   constexpr TermMask() noexcept = default;
 
+  TermMask(const TermMask&) = default;
+  TermMask& operator=(const TermMask&) = default;
+  TermMask(TermMask&&) = default;
+  TermMask& operator=(TermMask&&) = default;
+
   /// The empty set.
   static constexpr TermMask None() noexcept { return TermMask(); }
 

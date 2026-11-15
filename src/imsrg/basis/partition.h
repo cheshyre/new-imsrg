@@ -37,6 +37,11 @@ std::string_view OrbitClassName(OrbitClass c) noexcept;
 /// Stores no pointer to the basis.
 class Partition {
  public:
+  Partition(const Partition&) = default;
+  Partition& operator=(const Partition&) = default;
+  Partition(Partition&&) = default;
+  Partition& operator=(Partition&&) = default;
+
   /// Explicit classes, one per orbit of `basis` in index order.
   /// @throws InputError if the size differs from basis.num_orbits().
   static Partition FromClasses(const SingleParticleBasis& basis,

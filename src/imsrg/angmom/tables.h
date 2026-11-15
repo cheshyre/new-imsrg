@@ -83,6 +83,11 @@ class SixJTable {
   /// in Debug). Precondition: emax >= 0.
   explicit SixJTable(int emax);
 
+  SixJTable(const SixJTable&) = default;
+  SixJTable& operator=(const SixJTable&) = default;
+  SixJTable(SixJTable&&) = default;
+  SixJTable& operator=(SixJTable&&) = default;
+
   /// The maximum single-particle shell: 2j <= 2 emax + 1.
   int emax() const noexcept { return emax_; }
   /// Number of stored doubles.
@@ -154,6 +159,11 @@ class NineJLSjjTable {
   /// lmax+1) (2 lmax + 2) evaluations; well under 0.1 s at lmax 6).
   /// Precondition: lmax >= 0.
   explicit NineJLSjjTable(int lmax);
+
+  NineJLSjjTable(const NineJLSjjTable&) = default;
+  NineJLSjjTable& operator=(const NineJLSjjTable&) = default;
+  NineJLSjjTable(NineJLSjjTable&&) = default;
+  NineJLSjjTable& operator=(NineJLSjjTable&&) = default;
 
   /// The maximum orbital angular momentum l.
   int lmax() const noexcept { return lmax_; }
@@ -227,6 +237,11 @@ class MoshinskyTable {
   /// Cost is dominated by O(e^5) per bracket; measured about 0.1 s at e2max 12
   /// in a Debug build (parity and triangle pruning). Precondition: e2max >= 0.
   explicit MoshinskyTable(int e2max);
+
+  MoshinskyTable(const MoshinskyTable&) = default;
+  MoshinskyTable& operator=(const MoshinskyTable&) = default;
+  MoshinskyTable(MoshinskyTable&&) = default;
+  MoshinskyTable& operator=(MoshinskyTable&&) = default;
 
   /// Largest HO energy E stored.
   int e2max() const noexcept { return e2max_; }

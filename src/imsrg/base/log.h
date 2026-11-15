@@ -41,6 +41,8 @@ class Logger {
 
   Logger(const Logger&) = delete;
   Logger& operator=(const Logger&) = delete;
+  Logger(Logger&&) = delete;
+  Logger& operator=(Logger&&) = delete;
 
   /// Sets the minimum level that is written.
   void set_level(Level level) noexcept {

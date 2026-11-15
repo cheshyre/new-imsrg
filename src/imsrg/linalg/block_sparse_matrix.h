@@ -65,6 +65,11 @@ class BlockSparseMatrix {
   explicit BlockSparseMatrix(const std::vector<BlockShape>& shapes,
                              std::string label = "imsrg::BlockSparseMatrix");
 
+  BlockSparseMatrix(const BlockSparseMatrix&) = default;
+  BlockSparseMatrix& operator=(const BlockSparseMatrix&) = default;
+  BlockSparseMatrix(BlockSparseMatrix&&) = default;
+  BlockSparseMatrix& operator=(BlockSparseMatrix&&) = default;
+
   /// Number of blocks.
   std::size_t num_blocks() const noexcept { return blocks_.size(); }
   /// Block layouts in storage order.

@@ -57,6 +57,11 @@ struct BasisTruncation {
 /// Value type: copies are independent and compare equal.
 class SingleParticleBasis {
  public:
+  SingleParticleBasis(const SingleParticleBasis&) = default;
+  SingleParticleBasis& operator=(const SingleParticleBasis&) = default;
+  SingleParticleBasis(SingleParticleBasis&&) = default;
+  SingleParticleBasis& operator=(SingleParticleBasis&&) = default;
+
   /// The harmonic-oscillator basis with truncation `trunc` and oscillator
   /// frequency `hw_MeV` (hbar*omega in MeV; it does not change the orbit list).
   /// O(number of orbits).

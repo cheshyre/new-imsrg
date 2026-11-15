@@ -39,6 +39,11 @@ class PairEngine {
   /// in MeV (> 0). Cost: a few ms at emax 6 (Moshinsky table up to E = 2 emax).
   PairEngine(int emax, int lmax, double hbar_omega);
 
+  PairEngine(const PairEngine&) = default;
+  PairEngine& operator=(const PairEngine&) = default;
+  PairEngine(PairEngine&&) = default;
+  PairEngine& operator=(PairEngine&&) = default;
+
   /// Reproduces imsrg++ `Calculate_p1p2` (Momentum) / `Calculate_r1r2`
   /// (Position) for the bra |a b; J> and ket |c d; J>: LS coupling, Moshinsky
   /// transformation to (N Lambda, n lambda), the (T_cm - T_rel)-type sum, and

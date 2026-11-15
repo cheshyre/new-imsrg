@@ -41,6 +41,11 @@ class Monopole2B {
   /// Complexity O(K^2 J) with K the number of pairs (memory O(K^2)).
   explicit Monopole2B(const op::Operator& H);
 
+  Monopole2B(const Monopole2B&) = default;
+  Monopole2B& operator=(const Monopole2B&) = default;
+  Monopole2B(Monopole2B&&) = default;
+  Monopole2B& operator=(Monopole2B&&) = default;
+
   /// Mean-field potential (imsrg++ `UpdateF`, 2-body part):
   ///   Vij(i,j) = 1/(2j_i+1) sum_{ab} rho(a,b) Vmon[(i,a),(j,b)]
   /// for i, j in the same (l, 2j, tz) channel, symmetrized from the upper
@@ -73,6 +78,11 @@ class Monopole3B {
   /// channel size.
   Monopole3B(const op::Operator& H, const op::No2bThreeBody& v3,
              std::int32_t e3max);
+
+  Monopole3B(const Monopole3B&) = default;
+  Monopole3B& operator=(const Monopole3B&) = default;
+  Monopole3B(Monopole3B&&) = default;
+  Monopole3B& operator=(Monopole3B&&) = default;
 
   /// Three-body mean-field potential (imsrg++ `UpdateF`, 3-body part):
   ///   V3ij(i,j) = sum_keys rho(a,b) rho(c,d) value,

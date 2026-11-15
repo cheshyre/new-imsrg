@@ -91,6 +91,11 @@ class No2bThreeBody {
   /// @throws InputError if a truncation is negative.
   explicit No2bThreeBody(const No2bTruncation& truncation);
 
+  No2bThreeBody(const No2bThreeBody&) = default;
+  No2bThreeBody& operator=(const No2bThreeBody&) = default;
+  No2bThreeBody(No2bThreeBody&&) = default;
+  No2bThreeBody& operator=(No2bThreeBody&&) = default;
+
   /// The truncations given at construction.
   const No2bTruncation& truncation() const noexcept { return trunc_; }
   /// The isospin orbits in storage order.

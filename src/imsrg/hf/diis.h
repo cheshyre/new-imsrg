@@ -27,6 +27,11 @@ class PulayDiis {
   /// (the oldest pair is dropped when it is exceeded).
   PulayDiis(std::vector<double> weights, std::size_t max_vectors);
 
+  PulayDiis(const PulayDiis&) = default;
+  PulayDiis& operator=(const PulayDiis&) = default;
+  PulayDiis(PulayDiis&&) = default;
+  PulayDiis& operator=(PulayDiis&&) = default;
+
   /// Appends the pair (F, e), both N x N. Drops the oldest pair if the subspace
   /// is full.
   void Push(const linalg::Matrix<double>& F, const linalg::Matrix<double>& e);

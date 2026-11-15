@@ -58,6 +58,11 @@ class Operator {
   Operator(std::shared_ptr<const basis::ModelSpace> ms,
            const OperatorSpec& spec);
 
+  Operator(const Operator&) = default;
+  Operator& operator=(const Operator&) = default;
+  Operator(Operator&&) = default;
+  Operator& operator=(Operator&&) = default;
+
   /// True for a default-constructed (or moved-from) operator.
   bool empty() const noexcept { return ms_ == nullptr; }
   /// Rank and symmetry description.

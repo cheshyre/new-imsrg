@@ -54,6 +54,11 @@ struct Json {
 class JsonParser {
  public:
   explicit JsonParser(std::string text) : s_(std::move(text)) {}
+
+  JsonParser(const JsonParser&) = default;
+  JsonParser& operator=(const JsonParser&) = default;
+  JsonParser(JsonParser&&) = default;
+  JsonParser& operator=(JsonParser&&) = default;
   Json Parse() { return value(); }
 
  private:

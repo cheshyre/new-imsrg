@@ -86,6 +86,11 @@ class ThreeBodyChannels {
   explicit ThreeBodyChannels(const SingleParticleBasis& basis,
                              const ThreeBodyCuts& cuts = {});
 
+  ThreeBodyChannels(const ThreeBodyChannels&) = default;
+  ThreeBodyChannels& operator=(const ThreeBodyChannels&) = default;
+  ThreeBodyChannels(ThreeBodyChannels&&) = default;
+  ThreeBodyChannels& operator=(ThreeBodyChannels&&) = default;
+
   /// The cuts used, with `emax_3body` resolved (never negative).
   const ThreeBodyCuts& cuts() const noexcept { return cuts_; }
 

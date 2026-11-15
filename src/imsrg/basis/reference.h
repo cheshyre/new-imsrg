@@ -39,6 +39,11 @@ namespace imsrg::basis {
 /// sizes agree. Value type: copies are independent.
 class Reference {
  public:
+  Reference(const Reference&) = default;
+  Reference& operator=(const Reference&) = default;
+  Reference(Reference&&) = default;
+  Reference& operator=(Reference&&) = default;
+
   /// The naive shell-model filling of `nucleus` (`NaiveFilling(nucleus,
   /// basis.emax())`), as imsrg++ builds the reference from a nucleus name
   /// (ModelSpace.cc:213-221). `name()` is `nucleus.name()`.

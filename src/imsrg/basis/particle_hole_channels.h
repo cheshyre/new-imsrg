@@ -38,6 +38,11 @@ class ParticleHoleChannels {
   /// over kets of (j_p + j_q - |j_p - j_q| + 1)).
   explicit ParticleHoleChannels(const TwoBodyChannels& two_body);
 
+  ParticleHoleChannels(const ParticleHoleChannels&) = default;
+  ParticleHoleChannels& operator=(const ParticleHoleChannels&) = default;
+  ParticleHoleChannels(ParticleHoleChannels&&) = default;
+  ParticleHoleChannels& operator=(ParticleHoleChannels&&) = default;
+
   /// Number of orbits.
   std::int32_t num_orbits() const noexcept { return num_orbits_; }
   /// Number of global kets (the same as the normal channels).

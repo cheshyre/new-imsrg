@@ -48,6 +48,11 @@ class StrongIndex {
   IMSRG_INLINE_FUNCTION constexpr explicit StrongIndex(Rep v) noexcept
       : value_(v) {}
 
+  StrongIndex(const StrongIndex&) = default;
+  StrongIndex& operator=(const StrongIndex&) = default;
+  StrongIndex(StrongIndex&&) = default;
+  StrongIndex& operator=(StrongIndex&&) = default;
+
   /// The raw value.
   IMSRG_INLINE_FUNCTION constexpr Rep value() const noexcept { return value_; }
   /// The raw value as `std::size_t`, for indexing arrays. Precondition:

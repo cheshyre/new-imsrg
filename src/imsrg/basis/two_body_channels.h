@@ -110,6 +110,11 @@ class TwoBodyChannels {
   /// TwoBodyChannel.cc:19-152).
   explicit TwoBodyChannels(const SingleParticleBasis& basis);
 
+  TwoBodyChannels(const TwoBodyChannels&) = default;
+  TwoBodyChannels& operator=(const TwoBodyChannels&) = default;
+  TwoBodyChannels(TwoBodyChannels&&) = default;
+  TwoBodyChannels& operator=(TwoBodyChannels&&) = default;
+
   /// Number of orbits of the basis.
   std::int32_t num_orbits() const noexcept {
     return static_cast<std::int32_t>(orbits_.size());
@@ -263,6 +268,11 @@ class TwoBodyKetSubsets {
                     const Partition& partition)
       : TwoBodyKetSubsets(channels, reference.occupations(),
                           partition.classes()) {}
+
+  TwoBodyKetSubsets(const TwoBodyKetSubsets&) = default;
+  TwoBodyKetSubsets& operator=(const TwoBodyKetSubsets&) = default;
+  TwoBodyKetSubsets(TwoBodyKetSubsets&&) = default;
+  TwoBodyKetSubsets& operator=(TwoBodyKetSubsets&&) = default;
 
   /// Number of channels.
   std::int32_t num_channels() const noexcept { return num_channels_; }

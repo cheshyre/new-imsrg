@@ -39,6 +39,11 @@ namespace imsrg::basis {
 /// by a later milestone.
 class ModelSpace {
  public:
+  ModelSpace(const ModelSpace&) = default;
+  ModelSpace& operator=(const ModelSpace&) = default;
+  ModelSpace(ModelSpace&&) = default;
+  ModelSpace& operator=(ModelSpace&&) = default;
+
   /// Assembles a model space from its parts and builds the two-body channels
   /// and ket subsets.
   /// @throws InputError if `reference` or `partition` does not have one entry

@@ -58,6 +58,13 @@ struct RawValue {
 /// value.
 class RawTree {
  public:
+  RawTree() = default;
+
+  RawTree(const RawTree&) = default;
+  RawTree& operator=(const RawTree&) = default;
+  RawTree(RawTree&&) = default;
+  RawTree& operator=(RawTree&&) = default;
+
   /// The underlying ordered map (paths in lexicographic order).
   using Map = std::map<std::string, RawValue, std::less<>>;
 
