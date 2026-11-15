@@ -4,12 +4,16 @@
 #include "imsrg/linalg/blas.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <numeric>
 #include <string>
+#include <vector>
 
 #include "imsrg/base/assert.h"
 #include "imsrg/base/error.h"
+#include "imsrg/exec/host_parallel.h"
 #include "imsrg/linalg/detail/blas.h"
 
 namespace imsrg::linalg {
@@ -33,9 +37,11 @@ int Lead(std::int64_t ld) {
   return static_cast<int>(std::max<std::int64_t>(ld, 1));
 }
 
+/// Checks the views and shapes of C = alpha op(A) op(B) + beta C (throws
+/// InvariantError) and returns the flop count 2 m n k. No BLAS call.
 template <class T>
-void GemmImpl(T alpha, MatrixView<const T> A, Op opA, MatrixView<const T> B,
-              Op opB, T beta, MatrixView<T> C) {
+double CheckGemm(MatrixView<const T> A, Op opA, MatrixView<const T> B, Op opB,
+                 MatrixView<T> C) {
   CheckView(A, "gemm A");
   CheckView(B, "gemm B");
   CheckView(C, "gemm C");
@@ -48,6 +54,19 @@ void GemmImpl(T alpha, MatrixView<const T> A, Op opA, MatrixView<const T> B,
   IMSRG_CHECK(k == kb, "gemm: inner dimensions of op(A) and op(B) differ");
   IMSRG_CHECK(C.rows == m && C.cols == n,
               "gemm: C shape does not match op(A) op(B)");
+  return 2.0 * static_cast<double>(m) * static_cast<double>(n) *
+         static_cast<double>(k);
+}
+
+/// The gemm itself on views already checked by `CheckGemm` (does not throw).
+template <class T>
+void GemmChecked(T alpha, MatrixView<const T> A, Op opA, MatrixView<const T> B,
+                 Op opB, T beta, MatrixView<T> C) noexcept {
+  const bool ta = opA == Op::kTrans;
+  const bool tb = opB == Op::kTrans;
+  const std::int64_t m = ta ? A.cols : A.rows;
+  const std::int64_t k = ta ? A.rows : A.cols;
+  const std::int64_t n = tb ? B.rows : B.cols;
   if (m == 0 || n == 0) return;
   if (k == 0) {
     // Pure scaling of C; beta == 0 must not read C.
@@ -60,6 +79,17 @@ void GemmImpl(T alpha, MatrixView<const T> A, Op opA, MatrixView<const T> B,
                   static_cast<int>(k), alpha, A.data, Lead(A.ld), B.data,
                   Lead(B.ld), beta, C.data, Lead(C.ld));
 }
+
+template <class T>
+void GemmImpl(T alpha, MatrixView<const T> A, Op opA, MatrixView<const T> B,
+              Op opB, T beta, MatrixView<T> C) {
+  CheckGemm<T>(A, opA, B, opB, C);
+  GemmChecked<T>(alpha, A, opA, B, opB, beta, C);
+}
+
+/// Groups with fewer total flops run sequentially (thread start-up costs
+/// more than it saves).
+constexpr double kConcurrentGemmMinFlops = 1.0e6;
 
 }  // namespace
 
@@ -75,8 +105,34 @@ void Gemm(float alpha, MatrixView<const float> A, Op opA,
 }
 
 void GroupedGemm(std::span<const GemmProblem> problems) {
-  for (const GemmProblem& p : problems)
-    Gemm(p.alpha, p.A, p.opA, p.B, p.opB, p.beta, p.C);
+  // Validate everything first: nothing may throw inside the parallel region.
+  std::vector<double> flops(problems.size());
+  double total = 0.0;
+  for (std::size_t i = 0; i < problems.size(); ++i) {
+    const GemmProblem& p = problems[i];
+    flops[i] = CheckGemm<double>(p.A, p.opA, p.B, p.opB, p.C);
+    total += flops[i];
+  }
+  if (problems.size() < 2 || total < kConcurrentGemmMinFlops ||
+      exec::HostConcurrency() < 2) {
+    for (const GemmProblem& p : problems)
+      GemmChecked<double>(p.alpha, p.A, p.opA, p.B, p.opB, p.beta, p.C);
+    return;
+  }
+  // One problem per item, the largest first (dynamic scheduling balances the
+  // rest). The C matrices are disjoint, and each gemm is one BLAS call made
+  // inside the parallel region, so the results do not depend on the order.
+  std::vector<std::size_t> order(problems.size());
+  std::iota(order.begin(), order.end(), std::size_t{0});
+  std::stable_sort(
+      order.begin(), order.end(),
+      [&](std::size_t a, std::size_t b) { return flops[a] > flops[b]; });
+  exec::HostParallelForDynamic(
+      "linalg::grouped_gemm", static_cast<std::int64_t>(order.size()),
+      [&](std::int64_t i) {
+        const GemmProblem& p = problems[order[static_cast<std::size_t>(i)]];
+        GemmChecked<double>(p.alpha, p.A, p.opA, p.B, p.opB, p.beta, p.C);
+      });
 }
 
 void Eigh(MatrixView<const double> A, std::span<double> eigenvalues,

@@ -49,10 +49,14 @@ struct GemmProblem {
 };
 
 /// Runs a group of independent gemms (e.g. one per block / channel). The C
-/// matrices must be pairwise disjoint. First implementation: a sequential loop
-/// over `gemm`; later versions may batch (MKL/cuBLAS grouped gemm, or threads
-/// over problems, design/12 section 3) behind the same signature. Complexity:
-/// sum of the individual costs.
+/// matrices must be pairwise disjoint. All problems are checked first (throws
+/// InvariantError before any gemm runs); then, if the host execution space
+/// has several threads and the group has at least ~1 Mflop, the problems run
+/// concurrently, one BLAS call per thread at a time, the largest first
+/// (design/12 section 3; M12a: at emax 8 the sequential loop left the other
+/// threads idle for a third of the commutator). Each C is written by exactly
+/// one BLAS call, so the result does not depend on the scheduling.
+/// Complexity: sum of the individual costs.
 void GroupedGemm(std::span<const GemmProblem> problems);
 
 /// Eigen-decomposition of a real symmetric n x n matrix (LAPACK dsyevd). Only
