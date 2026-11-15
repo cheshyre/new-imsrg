@@ -226,10 +226,11 @@ double LayoutImsrgppNorm(const L& l, std::span<const double> blocks) {
   const CanonicalView v = s.host_view();
   std::vector<double> canonical(static_cast<std::size_t>(s.total_size()));
   for (std::int32_t ch = 0; ch < s.num_channels(); ++ch) {
-    const std::int64_t lo = l.BlockOffsets()[ch];
-    const std::int64_t ln = l.BlockOffsets()[ch + 1] - lo;
-    const std::int64_t co = v.ch_block_offset[ch];
-    const std::int64_t cn = v.ch_block_offset[ch + 1] - co;
+    const auto c = static_cast<std::size_t>(ch);
+    const auto lo = static_cast<std::size_t>(l.BlockOffsets()[c]);
+    const auto ln = static_cast<std::size_t>(l.BlockOffsets()[c + 1]) - lo;
+    const auto co = static_cast<std::size_t>(v.ch_block_offset[ch]);
+    const auto cn = static_cast<std::size_t>(v.ch_block_offset[ch + 1]) - co;
     l.ToCanonical(ch, blocks.subspan(lo, ln),
                   std::span<double>(canonical).subspan(co, cn));
   }
