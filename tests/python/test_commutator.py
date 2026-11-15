@@ -164,6 +164,9 @@ def test_host_edits_are_pushed_before_the_commutator(he4):
     w[0, 0] += 1.0
     assert a.residency == imsrg.Residency.HostCurrent
     edited = comm.commutator(a, h)
+    assert a.residency == imsrg.Residency.HostCurrent  # the writable view is alive
+    del w
+    comm.commutator(a, h)
     assert a.residency == imsrg.Residency.Both
     assert (edited - ref).norm() > 1e-6
 

@@ -40,17 +40,20 @@ using StatusFn = std::function<void(const flow::FlowStatus&)>;
 /// solver's `Solve` (the solver is left at a step boundary) and is re-raised
 /// by `solve()`.
 StatusFn WrapCallback(const std::optional<nb::callable>& cb) {
-  if (!cb) return {};
-  nb::object fn = *cb;
-  auto holder = std::make_shared<nb::object>(std::move(fn));
+  std::shared_ptr<nb::object> holder;
+  if (cb) holder = std::make_shared<nb::object>(*cb);
   return [holder](const flow::FlowStatus& st) {
     nb::gil_scoped_acquire gil;
-    (*holder)(st);
+    // Ctrl-C: the Python handlers run here (a step boundary); a pending
+    // KeyboardInterrupt aborts the solve and is re-raised by `solve()`.
+    ThrowIfSignalPending();
+    if (holder) (*holder)(st);
   };
 }
 
 /// A Magnus solver owned by Python (releasable with the Runtime).
 struct PyMagnus : Releasable {
+  BusyFlag busy;  ///< one thread at a time
   std::unique_ptr<flow::MagnusSolver> s;
   bool CanRelease() const noexcept override { return true; }
   void Release() noexcept override { s.reset(); }
@@ -62,6 +65,7 @@ struct PyMagnus : Releasable {
 
 /// An ODE solver owned by Python.
 struct PyOde : Releasable {
+  BusyFlag busy;  ///< one thread at a time
   std::unique_ptr<flow::OdeSolver> s;
   bool CanRelease() const noexcept override { return true; }
   void Release() noexcept override { s.reset(); }
@@ -170,7 +174,7 @@ void BindFlow(nb::module_& m) {
       "compute_generator",
       [](const PyOperator& h, const flow::GeneratorOptions& options) {
         const op::Operator& x = Input(h);
-        nb::gil_scoped_release r;
+        GilFree r;
         return Result(flow::ComputeGenerator(x, options));
       },
       nb::arg("hamiltonian"), nb::arg("options") = flow::GeneratorOptions{},
@@ -340,9 +344,10 @@ void BindFlow(nb::module_& m) {
       .def(
           "solve",
           [](PyMagnus& self, std::optional<nb::callable> on_status) {
+            BusyScope busy_(self.busy);
             flow::MagnusSolver& s = self.get();
             const StatusFn cb = WrapCallback(on_status);
-            nb::gil_scoped_release r;
+            GilFree r;
             return s.Solve(cb);
           },
           nb::arg("on_status").none() = nb::none(),
@@ -353,44 +358,76 @@ void BindFlow(nb::module_& m) {
       .def(
           "transform",
           [](PyMagnus& self, const PyOperator& o) {
+            BusyScope busy_(self.busy);
             flow::MagnusSolver& s = self.get();
             const op::Operator& x = Input(o);
-            nb::gil_scoped_release r;
+            GilFree r;
             return Result(s.Transform(x));
           },
           nb::arg("operator"),
           "Applies the accumulated Omega stack e^Omega O e^-Omega to an "
           "operator on the solver's model space.")
-      .def("set_generator",
-           [](PyMagnus& self, const flow::GeneratorOptions& g) {
-             self.get().set_generator(g);
-           })
-      .def("set_smax", [](PyMagnus& self, double v) { self.get().set_smax(v); })
-      .def("set_solver_options",
-           [](PyMagnus& self, const flow::SolverOptions& o) {
-             self.get().set_solver_options(o);
-           })
+      .def(
+          "set_generator",
+          [](PyMagnus& self, const flow::GeneratorOptions& g) {
+            BusyScope busy_(self.busy);
+            self.get().set_generator(g);
+          },
+          "Changes the generator for the next solve (a second stage).")
+      .def(
+          "set_smax",
+          [](PyMagnus& self, double v) {
+            BusyScope busy_(self.busy);
+            self.get().set_smax(v);
+          },
+          "Changes smax for the next solve.")
+      .def(
+          "set_solver_options",
+          [](PyMagnus& self, const flow::SolverOptions& o) {
+            BusyScope busy_(self.busy);
+            self.get().set_solver_options(o);
+          },
+          "Replaces the step options for the next solve.")
       .def_prop_ro(
           "hamiltonian",
-          [](PyMagnus& self) { return PyOperator(self.get().hamiltonian()); },
+          [](PyMagnus& self) {
+            BusyScope busy_(self.busy);
+            return PyOperator(self.get().hamiltonian());
+          },
           "A copy of H(s).")
       .def_prop_ro(
-          "eta", [](PyMagnus& self) { return PyOperator(self.get().eta()); },
+          "eta",
+          [](PyMagnus& self) {
+            BusyScope busy_(self.busy);
+            return PyOperator(self.get().eta());
+          },
           "A copy of eta(s).")
       .def_prop_ro(
           "omegas",
           [](PyMagnus& self) {
+            BusyScope busy_(self.busy);
             std::vector<PyOperator> out;
             for (const auto& o : self.get().omegas()) out.emplace_back(o);
             return out;
           },
           "Copies of the Omega stack, oldest first.")
-      .def_prop_ro("s", [](PyMagnus& self) { return self.get().s(); })
+      .def_prop_ro("s",
+                   [](PyMagnus& self) {
+                     BusyScope busy_(self.busy);
+                     return self.get().s();
+                   })
       .def_prop_ro("num_gathers",
-                   [](PyMagnus& self) { return self.get().num_gathers(); })
+                   [](PyMagnus& self) {
+                     BusyScope busy_(self.busy);
+                     return self.get().num_gathers();
+                   })
       .def_prop_ro("solver_options",
-                   [](PyMagnus& self) { return self.get().solver_options(); })
+                   [](PyMagnus& self) {
+                     BusyScope busy_(self.busy);
+                     return self.get().solver_options();
+                   })
       .def_prop_ro("generator_options", [](PyMagnus& self) {
+        BusyScope busy_(self.busy);
         return self.get().generator_options();
       });
 
@@ -424,30 +461,44 @@ void BindFlow(nb::module_& m) {
       .def(
           "solve",
           [](PyOde& self, std::optional<nb::callable> on_status) {
+            BusyScope busy_(self.busy);
             flow::OdeSolver& s = self.get();
             const StatusFn cb = WrapCallback(on_status);
-            nb::gil_scoped_release r;
+            GilFree r;
             return s.Solve(cb);
           },
           nb::arg("on_status").none() = nb::none(),
           "Integrates from the current s to smax (Rk4: or until converged).")
-      .def("set_generator",
-           [](PyOde& self, const flow::GeneratorOptions& g) {
-             self.get().set_generator(g);
-           })
-      .def("set_solver_options",
-           [](PyOde& self, const flow::SolverOptions& o) {
-             self.get().set_solver_options(o);
-           })
+      .def(
+          "set_generator",
+          [](PyOde& self, const flow::GeneratorOptions& g) {
+            BusyScope busy_(self.busy);
+            self.get().set_generator(g);
+          },
+          "Changes the generator for the next solve (a second stage).")
+      .def(
+          "set_solver_options",
+          [](PyOde& self, const flow::SolverOptions& o) {
+            BusyScope busy_(self.busy);
+            self.get().set_solver_options(o);
+          },
+          "Replaces the step options for the next solve.")
       .def_prop_ro(
           "hamiltonian",
-          [](PyOde& self) { return PyOperator(self.get().hamiltonian()); },
+          [](PyOde& self) {
+            BusyScope busy_(self.busy);
+            return PyOperator(self.get().hamiltonian());
+          },
           "A copy of H(s).")
       .def_prop_ro("num_operators",
-                   [](PyOde& self) { return self.get().num_operators(); })
+                   [](PyOde& self) {
+                     BusyScope busy_(self.busy);
+                     return self.get().num_operators();
+                   })
       .def(
           "flowing_operator",
           [](PyOde& self, std::size_t i) {
+            BusyScope busy_(self.busy);
             flow::OdeSolver& s = self.get();
             if (i >= s.num_operators())
               throw imsrg::InputError("operator index out of range");
@@ -455,8 +506,14 @@ void BindFlow(nb::module_& m) {
           },
           nb::arg("i"), "A copy of the i-th flowing operator O_i(s).")
       .def_prop_ro("eta",
-                   [](PyOde& self) { return PyOperator(self.get().eta()); })
-      .def_prop_ro("s", [](PyOde& self) { return self.get().s(); });
+                   [](PyOde& self) {
+                     BusyScope busy_(self.busy);
+                     return PyOperator(self.get().eta());
+                   })
+      .def_prop_ro("s", [](PyOde& self) {
+        BusyScope busy_(self.busy);
+        return self.get().s();
+      });
 
   m.def(
       "bch_transform",
@@ -465,8 +522,9 @@ void BindFlow(nb::module_& m) {
          std::shared_ptr<PyWorkspace> workspace) {
         const op::Operator& xi = Input(x);
         const op::Operator& oi = Input(omega);
+        RequireSameModelSpace(xi, oi);
         if (!workspace) workspace = WorkspaceFor(xi.model_space_ptr());
-        nb::gil_scoped_release r;
+        GilFree r;
         std::lock_guard lock(workspace->mutex());
         flow::BchReport report;
         op::Operator z =
@@ -488,8 +546,9 @@ void BindFlow(nb::module_& m) {
          std::shared_ptr<PyWorkspace> workspace) {
         const op::Operator& xi = Input(x);
         const op::Operator& yi = Input(y);
+        RequireSameModelSpace(xi, yi);
         if (!workspace) workspace = WorkspaceFor(xi.model_space_ptr());
-        nb::gil_scoped_release r;
+        GilFree r;
         std::lock_guard lock(workspace->mutex());
         return Result(flow::BchProduct(xi, yi, bch, comm, workspace->ws()));
       },
