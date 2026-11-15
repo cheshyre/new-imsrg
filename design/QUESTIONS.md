@@ -647,3 +647,9 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   would need tens of GB. **Assumed meanwhile:** as imsrg++ (the triples are a post-processing step
   and `imsrg3.de3max` bounds the space). Follow-up if triples at emax >= 8 are wanted: build R per
   tile inside the kernel (it is a few 6j products per entry) and skip E for the triples context.
+
+- **M12-Q1 (norms):** `TwoBodyNorm` now relies on `BlockSparseMatrix` blocks being contiguous and in
+  storage order (IMSRG_CHECKed). **Assumed:** that stays the layout. Per call the kernel allocates two
+  small device buffers (offsets, weights); at 1 thread the single reduction is about as fast as 84
+  small ones (0.73 vs 0.68 ms at emax 6), the gain is at >1 thread. Caching the buffers on the
+  operator would remove the allocation if it matters.
