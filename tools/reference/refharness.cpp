@@ -19,6 +19,8 @@
 //                                                                     (rh_valence.cpp)
 //   commutator TERM X Y Z   evaluate one named commutator term        (rh_commutator.cpp)
 //   bench-commutator emax=N reps=R  time the imsrg++ commutator terms        (rh_bench.cpp)
+//   comm223 emax=N e3max=M x=X.dump y=Y.dump [epsilon=F] [reps=R]   imsrg++ comm223ss norm,
+//                     perturbative-triples energy and timing (M10 benchmark)   (rh_imsrg3.cpp)
 //   generator TYPE H ETA   imsrg++ generator eta(H) of a given type    (rh_commutator.cpp)
 //   flow [--factorized]     full IMSRG pipeline with %.17g trajectory  (rh_flow.cpp)
 //   factorized PART ETA GAMMA Z   factorized double commutator parts   (rh_factorized.cpp)
@@ -269,6 +271,7 @@ int main(int argc, char** argv) {
     if (c == "write-valence") return rh::cmd_write_valence(a);
     if (c == "commutator") return rh::cmd_commutator(a);
     if (c == "bench-commutator") return rh::cmd_bench_commutator(a);
+    if (c == "comm223") return rh::cmd_comm223(a);
     if (c == "generator") return rh::cmd_generator(a);
     if (c == "flow") return rh::cmd_flow(a);
     if (c == "factorized") return rh::cmd_factorized(a);

@@ -542,3 +542,18 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   and the hunter-gatherer `H_saved` rebuild; `BchOptions::factorized` does the same (the solver passes
   one `BchOptions` to all its BCH calls). **Assumed meanwhile:** intended (it is what the IT-10
   goldens contain for H); say if operators should be transformed without the correction.
+* **M10-Q1** (2026-11-15, M10 layout benchmark) - The emax rule (IMSRG(3) only at emax 2 and 3) was
+  read as covering operators and kernels, not basis bookkeeping: the layout memory at the production
+  target (emax 10-12) comes from `imsrg3_layout_bench --count-only`, which enumerates kets and triples
+  only (no operator, no 6j table; 30-50 ms at emax 12). **Assumed meanwhile:** allowed, like the me2j
+  value count at emax 14. Alternative: extrapolate the emax-2/3 counts with a fitted power law.
+* **M10-Q2** (2026-11-15, M10 layout benchmark) - The memory gate of the layout decision assumes 4
+  nodes x 256 GB with at most 50 % for the 3B operators of an N7 Magnus step (about six operators plus
+  scratch). Which E3max/dE3max does the owner use at emax 10-12, and how much node memory? At E3max
+  14 layout A needs 38-40 GB per operator (packed), at E3max 16 without a dE3max cut 157-177 GB,
+  with dE3max 8 only 4.4 GB (`design/benchmarks/imsrg3-layout.md` section 4). **Assumed meanwhile:**
+  the gate above; the layout choice (A) holds for every case, only the node count changes.
+* **M10-Q3** (2026-11-15, M10 layout benchmark) - Layout A is chosen with **packed** channel blocks
+  (upper triangle, as imsrg++), which halves the memory; unpacking a channel for GEMM-type terms cost
+  4 % of a [2,2]->3 evaluation at emax 3 (0.40 of 9 ms). **Assumed meanwhile:** packed storage, dense
+  scratch per channel inside kernels. Alternative: dense blocks (simpler kernels, twice the memory).
