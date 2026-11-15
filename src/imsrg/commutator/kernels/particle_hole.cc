@@ -464,14 +464,12 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
     // Item (c, beta), beta = ket (k, j) of cc channel c: for every pair kappa
     // = (a, b) of K one fused evaluation xbar = Xbar(kappa, beta), ybar =
     // Ybar(kappa, beta) (`PandyaBarXY`) fills
-    //   XK(beta, kappa)            = D_kappa hX xbar  (Xbar^T = hX Xbar),
-    //   YK(kappa, beta)            = ybar,
-    //   YK(flip kappa, beta + Ncc) = hY phi_kappa phi_beta ybar
-    //                                (F Ybar F = hY Phi Ybar Phi).
-    // The flipped pair (b, a) of K index kappa is kappa ^ 1 (K is built in
-    // flipped pairs), and the flip is a bijection, so every target element is
-    // written exactly once. Columns of YK are contiguous; the row of XK is
-    // strided by Ncc but reused by the neighbouring items.
+    //   XK(beta, kappa) = D_kappa hX xbar  (Xbar^T = hX Xbar),
+    //   YK(kappa, beta) = ybar.
+    // (The flipped-pair half YK(kappa ^ 1, beta + Ncc) = hY phi_kappa phi_beta
+    // ybar of F Ybar F = hY Phi Ybar Phi is not stored: see the flip below.)
+    // Columns of YK are contiguous; the row of XK is strided by Ncc but reused
+    // by the neighbouring items.
     exec::ParallelForDynamic(
         "commutator::comm222_phss::fill", cc_kets,
         IMSRG_LAMBDA(const exec::Index e) {
@@ -483,12 +481,9 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
           const int k = a.pv.ket_p[e];
           const int j = a.pv.ket_q[e];
           const int two_Jp = 2 * (c / 6);
-          const int* j2 = a.zv.tb.orbit_j2;
-          const int phase_beta = (j2[k] + j2[j]) / 2;
           double* xk = a.pv.xk + a.pv.xk_off[c] + beta;
-          double* yk = a.pv.yk + a.pv.yk_off[c];
-          double* yk_l = yk + static_cast<std::int64_t>(beta) * nk;
-          double* yk_r = yk + static_cast<std::int64_t>(beta + n) * nk;
+          double* yk =
+              a.pv.yk + a.pv.yk_off[c] + static_cast<std::int64_t>(beta) * nk;
           const int koff = a.pv.k_off[c];
           for (int kappa = 0; kappa < nk; ++kappa) {
             const int ka = koff + kappa;
@@ -497,11 +492,9 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
             double xbar = 0.0;
             double ybar = 0.0;
             PandyaBarXY(a, ia, ib, k, j, two_Jp, xbar, ybar);
-            const double phi = ParitySign((j2[ia] + j2[ib]) / 2 + phase_beta);
             xk[static_cast<std::int64_t>(kappa) * n] =
                 a.pv.k_d[ka] * a.hx * xbar;
-            yk_l[kappa] = ybar;
-            yk_r[kappa ^ 1] = a.hy * phi * ybar;
+            yk[kappa] = ybar;
           }
         });
   }
@@ -510,12 +503,40 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   IMSRG_CHECK(pd.w.host_is_device(),
               "comm222_phss: host BLAS on device memory; needs a device gemm "
               "(GPU backends)");
-  linalg::GroupedGemm(pd.gemms);
+  linalg::GroupedGemm(pd.gemms);  // left halves: W(:, 0 .. Ncc) = XK YK
+
+  // The right half of W needs YK_R(kappa ^ 1, beta) = hY phi_kappa phi_beta
+  // YK(kappa, beta). With YK'(kappa, beta) = phi_kappa YK(kappa ^ 1, beta)
+  // (row pairs swapped in place, phi_kappa = phi_{kappa ^ 1}),
+  //   [XK YK_R](alpha, beta) = hY phi_beta [XK YK'](alpha, beta),
+  // so a second GEMM writes W'(:, Ncc + beta) = [XK YK'](:, beta) and the
+  // combine below applies hY phi_beta. Item (c, beta) flips column beta.
+  exec::ParallelForDynamic(
+      "commutator::comm222_phss::flip", cc_kets,
+      IMSRG_LAMBDA(const exec::Index e) {
+        const int c = detail::FindBlock(ket_off, num_cc, e);
+        const int nk = a.pv.nk[c];
+        if (nk == 0) return;
+        const std::int64_t beta = e - ket_off[c];
+        double* yk = a.pv.yk + a.pv.yk_off[c] + beta * nk;
+        const int* ka = a.pv.k_a + a.pv.k_off[c];
+        const int* kb = a.pv.k_b + a.pv.k_off[c];
+        const int* j2 = a.zv.tb.orbit_j2;
+        for (int kappa = 0; kappa < nk; kappa += 2) {
+          const double phi = ParitySign((j2[ka[kappa]] + j2[kb[kappa]]) / 2);
+          const double y0 = yk[kappa];
+          yk[kappa] = phi * yk[kappa + 1];
+          yk[kappa + 1] = phi * y0;
+        }
+      });
+  exec::Fence("commutator::comm222_phss::flip");
+  linalg::GroupedGemm(pd.gemms_right);  // W'(:, Ncc .. 2 Ncc) = XK YK'
 
   // Combine W in place into the stored half of the Pandya-transformed result:
   //   left block  (beta < Ncc):  W(alpha, beta) - hX hY W(beta, alpha),
-  //   right block (Ncc + bb):    W(alpha, Ncc + bb)
-  //                              + phi_alpha phi_bb W(bb, Ncc + alpha).
+  //   right block (Ncc + bb):    W_R(alpha, bb) + phi_alpha phi_bb W_R(bb,
+  //                              alpha) = hY phi_bb (W'(alpha, Ncc + bb) +
+  //                              W'(bb, Ncc + alpha)) with W_R = hY phi W'.
   // Item (c, beta) owns the pairs {(alpha, beta), (beta, alpha)} and
   // {(alpha, Ncc + beta), (beta, Ncc + alpha)} for alpha <= beta, so every
   // element is read and written by exactly one item (no separate ZB buffer).
@@ -543,8 +564,8 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
           const std::int64_t br = beta + (n + alpha) * n;
           const double u = w[ar];
           const double v = w[br];
-          w[ar] = u + phi_a * phi_b * v;
-          if (alpha != beta) w[br] = v + phi_b * phi_a * u;
+          w[ar] = a.hy * phi_b * (u + v);
+          if (alpha != beta) w[br] = a.hy * phi_a * (v + u);
         }
       });
   exec::Fence("commutator::comm222_phss::combine");

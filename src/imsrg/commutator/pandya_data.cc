@@ -72,7 +72,7 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
     k_off[cs + 1] = k_off[cs] + nk;
     d.xk_off_host[cs + 1] = d.xk_off_host[cs] + n * nk;
     d.yk_off_host[cs + 1] =
-        d.yk_off_host[cs] + static_cast<std::int64_t>(nk) * 2 * n;
+        d.yk_off_host[cs] + static_cast<std::int64_t>(nk) * n;
     d.w_off_host[cs + 1] = d.w_off_host[cs] + n * 2 * n;
   }
 
@@ -158,16 +158,19 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
     // (zero-initialized, never written). The problems run on host BLAS (see the
     // host_is_device check in comm222_phss, design/12 section 3).
     if (n == 0 || nk == 0) continue;
+    // W(:, 0 .. Ncc) = XK YK, and after the in-place row-pair flip of YK
+    // W(:, Ncc .. 2 Ncc) = XK YK' (see the scratch layout in pandya.h).
     linalg::GemmProblem g;
     g.alpha = 1.0;
     g.A = linalg::MatrixView<const double>{v.xk + d.xk_off_host[cs], n, nk, n};
     g.opA = linalg::Op::kNoTrans;
-    g.B = linalg::MatrixView<const double>{v.yk + d.yk_off_host[cs], nk, 2 * n,
-                                           nk};
+    g.B = linalg::MatrixView<const double>{v.yk + d.yk_off_host[cs], nk, n, nk};
     g.opB = linalg::Op::kNoTrans;
     g.beta = 0.0;
-    g.C = linalg::MatrixView<double>{v.w + d.w_off_host[cs], n, 2 * n, n};
+    g.C = linalg::MatrixView<double>{v.w + d.w_off_host[cs], n, n, n};
     d.gemms.push_back(g);
+    g.C = linalg::MatrixView<double>{v.w + d.w_off_host[cs] + n * n, n, n, n};
+    d.gemms_right.push_back(g);
   }
   return d;
 }

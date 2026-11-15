@@ -24,10 +24,15 @@
 ///
 /// Scratch layout (all column-major; element (r, s) of an R-row block at offset
 /// + r + s R):
-///   XK : Ncc x nk,   YK : nk x 2 Ncc,   W : Ncc x 2 Ncc.
-/// The GEMM writes W = XK YK; a pairwise in-place pass then turns W into the
-/// stored half of the Pandya-transformed result (ZB in imsrg++ terms), which
-/// the inverse transform reads (no separate ZB buffer, M7-Q4).
+///   XK : Ncc x nk,   YK : nk x Ncc,   W : Ncc x 2 Ncc.
+/// W's left half is XK YK. Its right half needs YK's flipped-pair partner,
+/// which is a signed row permutation of YK (F Ybar F = hY Phi Ybar Phi): after
+/// the first GEMM the row pairs (kappa, kappa ^ 1) of YK are swapped in place
+/// (sign phi_kappa) and a second GEMM writes XK YK' into the right half, which
+/// is the right half of XK [YK | YK_R] up to the column signs hY phi_beta. A
+/// pairwise in-place pass then turns W into the stored half of the
+/// Pandya-transformed result (ZB in imsrg++ terms), which the inverse
+/// transform reads (no separate ZB buffer and no second YK half, M7-Q4).
 
 #include <cstddef>
 #include <cstdint>
@@ -137,6 +142,9 @@ struct PandyaData {
       class_offset;  ///< Kets by class (see `PandyaView::class_kets`).
   std::int64_t num_class_kets = 0;  ///< Size of `class_kets`.
 
+  /// One GEMM W_left = XK YK per channel with Ncc > 0 and |K| > 0 (pointers
+  /// into the scratch); `gemms_right` writes the right halves after the flip.
+  std::vector<linalg::GemmProblem> gemms_right;
   /// One GEMM W = XK YK per channel with Ncc > 0 and |K| > 0 (pointers into the
   /// scratch).
   std::vector<linalg::GemmProblem> gemms;
@@ -162,8 +170,8 @@ struct PandyaData {
 /// reference occupations of `ms`), device copies of the cc index tables and the
 /// scratch buffers with their block offsets. Needs an initialized
 /// `exec::Runtime`. All allocation of the (anti-)Hermitian path happens here.
-/// Memory: sum over cc channels of Ncc (3 nk + 2 Ncc) doubles, XK (Ncc nk) +
-/// YK (2 Ncc nk) + W (2 Ncc^2); `scratch_bytes()` reports it.
+/// Memory: sum over cc channels of Ncc (2 nk + 2 Ncc) doubles, XK (Ncc nk) +
+/// YK (Ncc nk) + W (2 Ncc^2); `scratch_bytes()` reports it.
 PandyaData BuildPandyaData(const basis::ModelSpace& ms);
 
 /// Allocates (once) the scratch of the general particle-hole path for the
@@ -175,8 +183,8 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms);
 /// that share the operand buffers: Z (2Ncc x 2Ncc) = A0 B0 + A1 B1, A (2Ncc x
 /// nk) and B (nk x 2Ncc), all column-major (A, B at the offset `g_off`, each 2
 /// Ncc nk doubles; Z at `gz_off`, 4 Ncc^2). Memory sum over cc channels of Ncc
-/// (4 nk + 4 Ncc) doubles, at most twice the Hermitian scratch of
-/// Ncc (3 nk + 2 Ncc); 4x the flops. Paid only by
+/// (4 nk + 4 Ncc) doubles, twice the Hermitian scratch of Ncc (2 nk + 2
+/// Ncc); 4x the flops. Paid only by
 /// programs that use general operators; included in `scratch_bytes()` once
 /// allocated. Idempotent; strongly exception safe (a throwing allocation
 /// leaves the scratch unallocated). Needs an initialized `exec::Runtime`.
