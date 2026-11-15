@@ -23,6 +23,18 @@ TEST(ExecKernels, ParallelForWritesTwiceIndex) {
   }
 }
 
+TEST(ExecKernels, ParallelForDynamicWritesOddNumbers) {
+  for (const std::int64_t n : {0, 12345}) {
+    DeviceBuffer<std::int64_t> a(static_cast<std::size_t>(n));
+    t::FillOddDynamic(a);
+    const auto v = a.ToVector();
+    ASSERT_EQ(v.size(), static_cast<std::size_t>(n));
+    for (std::size_t i = 0; i < v.size(); ++i) {
+      ASSERT_EQ(v[i], 2 * static_cast<std::int64_t>(i) + 1);
+    }
+  }
+}
+
 TEST(ExecKernels, ReduceSumIsExact) {
   const std::int64_t n = 10000;
   std::vector<std::int64_t> h(static_cast<std::size_t>(n));

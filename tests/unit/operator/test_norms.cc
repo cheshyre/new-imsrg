@@ -6,12 +6,17 @@
 #include <cmath>
 #include <cstdint>
 #include <memory>
+#include <span>
+#include <vector>
 
 #include <gtest/gtest.h>
 
 #include "imsrg/basis/model_space.h"
+#include "imsrg/exec/device_buffer.h"
 #include "imsrg/operator/arithmetic.h"
+#include "imsrg/operator/detail/part_kernels.h"
 #include "imsrg/operator/norms.h"
+#include "imsrg/operator/random_operator.h"
 
 namespace imsrg::op {
 namespace {
@@ -180,6 +185,80 @@ TEST(OperatorNorms, HomogeneousUnderScaling) {
     ExpectRel(Norm(s), std::abs(a) * Norm(o));
     ExpectRel(OneBodyNorm(s), std::abs(a) * OneBodyNorm(o));
     ExpectRel(TwoBodyNorm(s), std::abs(a) * TwoBodyNorm(o));
+  }
+}
+
+double HostWeightedSum(const std::vector<double>& x,
+                       const std::vector<std::int64_t>& off,
+                       const std::vector<double>& w) {
+  double sum = 0.0;
+  for (std::size_t b = 0; b + 1 < off.size(); ++b) {
+    double s = 0.0;
+    for (std::int64_t i = off[b]; i < off[b + 1]; ++i) {
+      s += x[static_cast<std::size_t>(i)] * x[static_cast<std::size_t>(i)];
+    }
+    sum += w[b] * s;
+  }
+  return sum;
+}
+
+void ExpectWeightedSum(const std::vector<std::int64_t>& off,
+                       const std::vector<double>& w, std::size_t n) {
+  Lcg rng(7);
+  std::vector<double> x(n);
+  for (double& v : x) v = rng.Next();
+  exec::DeviceBuffer<double> buf(n);
+  buf.CopyFromHost(std::span<const double>(x));
+  const double ref = HostWeightedSum(x, off, w);
+  const double got = detail::WeightedBlockSumOfSquares(buf, off, w);
+  EXPECT_NEAR(got, ref, 1.0e-14 * std::abs(ref));
+}
+
+TEST(WeightedBlockSumOfSquares, EmptyBlocksBigBlocksAndChunkBoundaries) {
+  // chunk size is 4096: block 2 is larger than a chunk, block 4 ends exactly on
+  // a chunk boundary, empty blocks sit at the start, middle and end.
+  const std::vector<std::int64_t> off = {
+      0, 0, 5, 5, 4000, 12000, 12288, 12288, 12290, 20000, 20000};
+  std::vector<double> w(off.size() - 1);
+  for (std::size_t b = 0; b < w.size(); ++b)
+    w[b] = 1.0 + 0.5 * static_cast<double>(b);
+  ExpectWeightedSum(off, w, 20500);
+}
+
+TEST(WeightedBlockSumOfSquares, SingleBlockAndTinyBlocks) {
+  ExpectWeightedSum({0, 10000}, {3.0}, 10000);
+  ExpectWeightedSum({0, 1}, {2.0}, 1);
+  ExpectWeightedSum({0, 1, 2, 3, 4097, 4098}, {1.0, 2.0, 3.0, 4.0, 5.0}, 4100);
+}
+
+TEST(WeightedBlockSumOfSquares, NoBlocksIsZero) {
+  const exec::DeviceBuffer<double> buf(4);
+  EXPECT_EQ(detail::WeightedBlockSumOfSquares(buf, {}, {}), 0.0);
+}
+
+TEST(OperatorNorms, TwoBodyNormMatchesPerBlockFormulaOnRandomOperators) {
+  for (const int emax : {2, 4}) {
+    const auto ms = basis::ModelSpace::FromNames(
+        basis::BasisTruncation{.emax = emax}, 16.0, "O16", "O16");
+    const Operator o = RandomOperator(ms, OperatorSpec::Scalar(2),
+                                      RandomOperatorOptions{.seed = 11});
+    const std::vector<double> data = o.two_body().matrix().buffer().ToVector();
+    const auto channels = o.two_body().channels().channels();
+    double sum = 0.0;
+    for (const auto& info : o.two_body().matrix().blocks()) {
+      double s = 0.0;
+      for (std::int64_t i = 0; i < info.rows * info.cols; ++i) {
+        const double v = data[static_cast<std::size_t>(info.offset + i)];
+        s += v * v;
+      }
+      const double w =
+          2.0 * channels[static_cast<std::size_t>(info.row_block.value())].J() +
+          1.0;
+      sum += w * w * s;
+    }
+    const double ref = std::sqrt(sum);
+    ASSERT_GT(ref, 1.0);
+    EXPECT_NEAR(TwoBodyNorm(o), ref, 1.0e-14 * ref);
   }
 }
 

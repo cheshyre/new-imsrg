@@ -4,10 +4,13 @@
 // Construction of the Pandya data of the particle-hole term (design/12 section
 // 4.2). Host-side only; no Kokkos.
 
+#include <algorithm>
 #include <cstdint>
 #include <utility>
 #include <vector>
 
+#include "imsrg/base/assert.h"
+#include "imsrg/basis/two_body_channels.h"
 #include "imsrg/commutator/detail/pandya.h"
 
 namespace imsrg::commutator::detail {
@@ -25,6 +28,9 @@ exec::DeviceBuffer<T> Upload(const std::vector<T>& v, const char* label) {
 }  // namespace
 
 PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
+  IMSRG_CHECK(2 * ms.basis().emax() + 2 <= kPandyaMaxJp,
+              "BuildPandyaData: emax too large for the J' buffers of the "
+              "particle-hole inverse transform (kPandyaMaxJp)");
   const auto& ph = ms.particle_hole();
   const auto& tb = ms.two_body();
   const auto occ = ms.reference().occupations();
@@ -72,7 +78,7 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
     k_off[cs + 1] = k_off[cs] + nk;
     d.xk_off_host[cs + 1] = d.xk_off_host[cs] + n * nk;
     d.yk_off_host[cs + 1] =
-        d.yk_off_host[cs] + static_cast<std::int64_t>(nk) * 2 * n;
+        d.yk_off_host[cs] + static_cast<std::int64_t>(nk) * n;
     d.w_off_host[cs + 1] = d.w_off_host[cs] + n * 2 * n;
   }
 
@@ -95,13 +101,80 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
   d.local_index_table = Upload(std::vector<std::int32_t>(lt.begin(), lt.end()),
                                "pandya::local_index_table");
 
+  // Kets by class (parity, Tz): class = 3 parity + Tz + 1, ascending ket
+  // order inside each class. The inverse transform over pairs of these kets
+  // needs every two-body channel to list its kets in ascending global order
+  // (then b >= a is the upper triangle of each block): checked here.
+  for (std::int32_t ch = 0; ch < tb.num_channels(); ++ch) {
+    const auto kets = tb.channel_kets(ChannelIndex{ch});
+    for (std::size_t i = 1; i < kets.size(); ++i)
+      IMSRG_CHECK(kets[i - 1].value() < kets[i].value(),
+                  "BuildPandyaData: two-body channel kets are not in "
+                  "ascending global order");
+  }
+  {
+    constexpr std::int32_t kNumClasses = 6;
+    std::vector<std::vector<std::int32_t>> lists(kNumClasses);
+    const auto& orbits = ms.basis();
+    for (std::int32_t k = 0; k < tb.num_kets(); ++k) {
+      const auto& ket = tb.ket(KetIndex{k});
+      const auto& a = orbits.orbit(ket.p);
+      const auto& b = orbits.orbit(ket.q);
+      const std::int32_t parity = (a.l + b.l) % 2;
+      const std::int32_t tz = (a.tz2.twice + b.tz2.twice) / 2;
+      lists[static_cast<std::size_t>(3 * parity + tz + 1)].push_back(k);
+    }
+    std::vector<std::int32_t> flat;
+    std::vector<std::int32_t> offsets{0};
+    for (const auto& l : lists) {
+      flat.insert(flat.end(), l.begin(), l.end());
+      offsets.push_back(static_cast<std::int32_t>(flat.size()));
+    }
+    d.num_class_kets = static_cast<std::int64_t>(flat.size());
+    d.class_kets = Upload(flat, "pandya::class_kets");
+    d.class_offset = Upload(offsets, "pandya::class_offset");
+    d.kernel_view.num_classes = kNumClasses;
+  }
+
+  // Descriptors of the cc ket of every ordered orbit pair (inverse transform).
+  {
+    const auto& sp = ms.basis();
+    const std::int32_t norb = sp.num_orbits();
+    const auto jo_host = ph.ket_J_offsets();
+    std::vector<std::int32_t> pairs(4 * static_cast<std::size_t>(norb) *
+                                    static_cast<std::size_t>(norb));
+    for (std::int32_t p = 0; p < norb; ++p) {
+      for (std::int32_t q = 0; q < norb; ++q) {
+        const auto& op = sp.orbit(OrbitIndex{p});
+        const auto& oq = sp.orbit(OrbitIndex{q});
+        const std::int32_t jp = op.j2.twice, jq = oq.j2.twice;
+        const std::int32_t jmin = (jp > jq ? jp - jq : jq - jp) / 2;
+        const std::int32_t k =
+            basis::ImsrgppKetIndex(OrbitIndex{std::min(p, q)},
+                                   OrbitIndex{std::max(p, q)}, norb)
+                .value();
+        const std::int32_t dtz = op.tz2.twice - oq.tz2.twice;
+        const std::int32_t cls =
+            (dtz < 0 ? -dtz : dtz) + 2 + ((op.l + oq.l) & 1);
+        std::int32_t* e =
+            pairs.data() +
+            4 * (static_cast<std::size_t>(p) * static_cast<std::size_t>(norb) +
+                 static_cast<std::size_t>(q));
+        e[0] = jo_host[static_cast<std::size_t>(k)] - jmin;
+        e[1] = jmin;
+        e[2] = (jp + jq) / 2;
+        e[3] = cls + 256 * (((jp + jq) / 2) & 1);
+      }
+    }
+    d.cc_pair = Upload(pairs, "pandya::cc_pair");
+  }
+
   const auto sz = [](const std::vector<std::int64_t>& off) {
     return static_cast<std::size_t>(off.back());
   };
   d.xk = exec::DeviceBuffer<double>(sz(d.xk_off_host), "pandya::XK");
   d.yk = exec::DeviceBuffer<double>(sz(d.yk_off_host), "pandya::YK");
   d.w = exec::DeviceBuffer<double>(sz(d.w_off_host), "pandya::W");
-  d.zb = exec::DeviceBuffer<double>(sz(d.w_off_host), "pandya::ZB");
 
   PandyaView& v = d.kernel_view;
   v.num_cc = ncc;
@@ -122,7 +195,9 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
   v.xk = d.xk.device_data();
   v.yk = d.yk.device_data();
   v.w = d.w.device_data();
-  v.zb = d.zb.device_data();
+  v.class_kets = d.class_kets.device_data();
+  v.class_offset = d.class_offset.device_data();
+  v.cc_pair = d.cc_pair.device_data();
 
   for (std::int32_t c = 0; c < ncc; ++c) {
     const auto cs = static_cast<std::size_t>(c);
@@ -132,16 +207,19 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
     // (zero-initialized, never written). The problems run on host BLAS (see the
     // host_is_device check in comm222_phss, design/12 section 3).
     if (n == 0 || nk == 0) continue;
+    // W(:, 0 .. Ncc) = XK YK, and after the in-place row-pair flip of YK
+    // W(:, Ncc .. 2 Ncc) = XK YK' (see the scratch layout in pandya.h).
     linalg::GemmProblem g;
     g.alpha = 1.0;
     g.A = linalg::MatrixView<const double>{v.xk + d.xk_off_host[cs], n, nk, n};
     g.opA = linalg::Op::kNoTrans;
-    g.B = linalg::MatrixView<const double>{v.yk + d.yk_off_host[cs], nk, 2 * n,
-                                           nk};
+    g.B = linalg::MatrixView<const double>{v.yk + d.yk_off_host[cs], nk, n, nk};
     g.opB = linalg::Op::kNoTrans;
     g.beta = 0.0;
-    g.C = linalg::MatrixView<double>{v.w + d.w_off_host[cs], n, 2 * n, n};
+    g.C = linalg::MatrixView<double>{v.w + d.w_off_host[cs], n, n, n};
     d.gemms.push_back(g);
+    g.C = linalg::MatrixView<double>{v.w + d.w_off_host[cs] + n * n, n, n, n};
+    d.gemms_right.push_back(g);
   }
   return d;
 }

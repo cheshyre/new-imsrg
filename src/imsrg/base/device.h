@@ -28,4 +28,14 @@
 
 #define IMSRG_INLINE_FUNCTION IMSRG_FUNCTION inline
 
+/// `IMSRG_INLINE_FUNCTION` that the compiler must inline (like
+/// `KOKKOS_FORCEINLINE_FUNCTION`): for small helpers called in the inner loops
+/// of kernels, where the compiler's heuristics otherwise leave a call.
+#if defined(__GNUC__) || defined(__clang__)
+#define IMSRG_FORCEINLINE_FUNCTION \
+  IMSRG_FUNCTION inline __attribute__((always_inline))
+#else
+#define IMSRG_FORCEINLINE_FUNCTION IMSRG_INLINE_FUNCTION
+#endif
+
 #endif  // IMSRG_BASE_DEVICE_H_

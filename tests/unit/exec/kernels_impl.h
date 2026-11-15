@@ -21,6 +21,8 @@ struct Pod {
 
 /// a[i] = 2 i.
 void FillTwiceIndex(DeviceBuffer<double>& a);
+/// a[i] = 2 i + 1 (integer valued), via ParallelForDynamic.
+void FillOddDynamic(DeviceBuffer<std::int64_t>& a);
 /// Exact sum of a[i] (integer valued).
 std::int64_t Sum(const DeviceBuffer<std::int64_t>& a);
 /// Maximum of a[i]; the lowest int64 for an empty buffer.

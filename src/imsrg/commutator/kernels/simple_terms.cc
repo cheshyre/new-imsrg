@@ -84,6 +84,11 @@ void Comm220ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   const TwoBodyView yv = impl.two_body_view(Y);
   const double* occ = impl.tables.orbits().occupation;
   const std::int32_t* entry_channel = impl.entry_channel.device_data();
+  // The kets k with (1 - n_p)(1 - n_q) != 0 of each channel, ascending: the
+  // ladder's pp list (the same exact test), so the loop below visits the
+  // non-zero terms of the full loop over k in the same order (M12a).
+  const std::int32_t* pp_list = impl.ladder.pp.list.device_data();
+  const std::int64_t* pp_offset = impl.ladder.pp.list_offset.device_data();
   const exec::Index nentries =
       static_cast<exec::Index>(impl.entry_channel.size());
   double sum = 0.0;
@@ -100,8 +105,10 @@ void Comm220ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
         const int pi = xv.tb.ket_p[kets[i]];
         const int qi = xv.tb.ket_q[kets[i]];
         const double nn_i = occ[pi] * occ[qi];
+        if (nn_i == 0.0) return;  // every term of the row vanishes
         double s = 0.0;
-        for (int k = 0; k < n; ++k) {
+        for (std::int64_t m = pp_offset[ch]; m < pp_offset[ch + 1]; ++m) {
+          const int k = pp_list[m];
           const int pk = xv.tb.ket_p[kets[k]];
           const int qk = xv.tb.ket_q[kets[k]];
           const double nb_k = (1.0 - occ[pk]) * (1.0 - occ[qk]);
@@ -263,42 +270,63 @@ void Comm122ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   }
   const double hz =
       static_cast<double>(detail::CommutatorHermiticitySign(X, Y));
-  // One thread per element (r, c) with r <= c. B(r, c) is the bra part (lifted
-  // one-body list of row r acting on column c of X, Y); the ket part of Z(r, c)
-  // is hZ B(c, r) by hermiticity of X, Y, and Z(c, r) = hZ Z(r, c). No
-  // division or sqrt.
-  exec::ParallelFor(
-      "commutator::comm122ss", total, IMSRG_LAMBDA(const exec::Index e) {
-        const int ch = detail::FindBlock(block_offset, nch, e);
+  // Two passes over the columns of every block (M12a):
+  //  1. B(r, c) for all r, c: the bra part, i.e. the lifted one-body list of
+  //     row r acting on column c of X and Y (gathers inside one contiguous
+  //     column), stored in a scratch with the layout of a two-body operator;
+  //  2. Z(r, c) += B(r, c) + hZ B(c, r) for r <= c and Z(c, r) = hZ times
+  //     that (the ket part of Z(r, c) is hZ B(c, r) by hermiticity of X, Y).
+  // Reading B(c, r) from the scratch replaces the strided reads of rows of X
+  // and Y that a single pass needs. The per-element arithmetic is unchanged.
+  // The scratch is the ladder's pp product buffer, which no other term needs
+  // at this point; pass 2 sets every element it reads back to zero, so the
+  // buffer is all zero afterwards (the ladder terms rely on the blocks they
+  // do not write being zero, detail/ladder.h).
+  double* bsc = ws.impl().ladder.pp.product.device_data();
+  const std::int32_t* entry_channel = impl.entry_channel.device_data();
+  const std::int32_t* channel_ket_offset = xv.tb.channel_ket_offset;
+  const auto columns = static_cast<exec::Index>(impl.entry_channel.size());
+  exec::ParallelForDynamic(
+      "commutator::comm122ss::bra", columns, IMSRG_LAMBDA(const exec::Index e) {
+        const int ch = entry_channel[e];
+        const int c = static_cast<int>(e - channel_ket_offset[ch]);
         const std::int64_t off = block_offset[ch];
-        const std::int64_t local = e - off;
-        const int n = num_kets[ch];
-        const int r = static_cast<int>(local % n);
-        const int c = static_cast<int>(local / n);
-        if (r > c) return;
+        const std::int64_t n = num_kets[ch];
         const int rb = row_base[ch];
-        double b_rc = 0.0;
-        double b_cr = 0.0;
-        for (int side = 0; side < 2; ++side) {
-          const int row = side == 0 ? r : c;
-          const std::int64_t col = side == 0 ? c : r;
-          double acc = 0.0;
-          for (int t = entry_offset[rb + row]; t < entry_offset[rb + row + 1];
+        double* bcol = bsc + off + c * n;
+        for (int r = 0; r < n; ++r) {
+          double b = 0.0;
+          for (int t = entry_offset[rb + r]; t < entry_offset[rb + r + 1];
                ++t) {
-            const std::int64_t idx = off + lm[t] + col * n;
+            const std::int64_t idx = off + lm[t] + c * n;
             double v = 0.0;
             if (yd != nullptr) v += x1(lfrom[t], lto[t]) * yd[idx];
             if (xd != nullptr) v -= y1(lfrom[t], lto[t]) * xd[idx];
-            acc += lcoef[t] * v;
+            b += lcoef[t] * v;
           }
-          if (side == 0)
-            b_rc = acc;
-          else
-            b_cr = acc;
+          bcol[r] = b;
         }
-        const double z = b_rc + hz * b_cr;
-        z2[off + r + static_cast<std::int64_t>(c) * n] += z;
-        if (r < c) z2[off + c + static_cast<std::int64_t>(r) * n] += hz * z;
+      });
+  exec::Fence("commutator::comm122ss::bra");
+  exec::ParallelForDynamic(
+      "commutator::comm122ss", columns, IMSRG_LAMBDA(const exec::Index e) {
+        const int ch = entry_channel[e];
+        const std::int64_t c = e - channel_ket_offset[ch];
+        const std::int64_t off = block_offset[ch];
+        const std::int64_t n = num_kets[ch];
+        double* zb = z2 + off;
+        double* bb = bsc + off;
+        for (std::int64_t r = 0; r <= c; ++r) {
+          const double b_rc = bb[r + c * n];
+          const double b_cr = bb[c + r * n];
+          const double z = b_rc + hz * b_cr;
+          zb[r + c * n] += z;
+          bb[r + c * n] = 0.0;
+          if (r < c) {
+            zb[c + r * n] += hz * z;
+            bb[c + r * n] = 0.0;
+          }
+        }
       });
   exec::Fence("commutator::comm122ss");
 }

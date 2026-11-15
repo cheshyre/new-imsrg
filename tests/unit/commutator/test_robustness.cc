@@ -233,5 +233,38 @@ TEST(commutator_robustness, scratch_footprint) {
   }
 }
 
+// Closed-shell reference: the pp projector has direct channels (no gathered
+// operands) and the hh gather stays; the scratch is smaller than the fully
+// gathered layout. The results of the direct and gathered paths against
+// commutator_ref are covered by commutator_ladder_terms / commutator_general
+// (O16 and the fractional-occupation references there).
+TEST(commutator_robustness, ladder_direct_channels) {
+  const auto ms = imsrg::testing::MakeModelSpace(4, "O16");
+  Workspace ws(ms);
+  const auto& pp = ws.impl().ladder.pp;
+  int num_direct = 0;
+  std::int64_t full = 0;
+  for (std::size_t ch = 0; ch < pp.count_host.size(); ++ch) {
+    const std::int32_t k0 = pp.direct_first_host[ch];
+    if (k0 < 0) continue;
+    ++num_direct;
+    EXPECT_GT(pp.count_host[ch], 0);
+    EXPECT_EQ(pp.gather_offset_host[ch + 1], pp.gather_offset_host[ch]);
+    const auto n =
+        static_cast<std::int64_t>(ms->two_body().channels()[ch].num_kets);
+    full += n * pp.count_host[ch];
+  }
+  EXPECT_GT(num_direct, 0);
+  EXPECT_GT(full, 0);
+  EXPECT_EQ(static_cast<std::int64_t>(pp.xg.size()), [&] {
+    std::int64_t t = 0;
+    for (std::size_t ch = 0; ch < pp.count_host.size(); ++ch)
+      if (pp.direct_first_host[ch] < 0)
+        t += ms->two_body().channels()[ch].num_kets *
+             static_cast<std::int64_t>(pp.count_host[ch]);
+    return t;
+  }());
+}
+
 }  // namespace
 }  // namespace imsrg

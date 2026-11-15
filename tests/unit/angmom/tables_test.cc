@@ -48,6 +48,32 @@ TEST(AngmomTables, SixJEqualsWignerExhaustively) {
   EXPECT_GT(checked, 0);
 }
 
+TEST(AngmomTables, SixJRowMatchesElementLookup) {
+  const int emax = 3;
+  const SixJTable t(emax);
+  const auto view = t.host_view();
+  const int tmax = 2 * emax + 1;
+  std::int64_t checked = 0;
+  for (int a = 1; a <= tmax; a += 2) {
+    for (int b = 1; b <= tmax; b += 2) {
+      for (int c = 1; c <= tmax; c += 2) {
+        for (int d = 1; d <= tmax; d += 2) {
+          for (int J = 0; J <= 2 * tmax; J += 2) {
+            const double* row =
+                view.row(TwoJ{a}, TwoJ{b}, TwoJ{J}, TwoJ{c}, TwoJ{d});
+            for (int Jp = 0; Jp <= 2 * tmax; Jp += 2) {
+              ASSERT_EQ(row[Jp / 2], view(TwoJ{a}, TwoJ{b}, TwoJ{J}, TwoJ{c},
+                                          TwoJ{d}, TwoJ{Jp}));
+              ++checked;
+            }
+          }
+        }
+      }
+    }
+  }
+  EXPECT_GT(checked, 0);
+}
+
 TEST(AngmomTables, SixJInvalidArgumentsAreZero) {
   const SixJTable t(3);
   // Parity-valid arguments beyond the coverage throw (host lookup) or give NaN

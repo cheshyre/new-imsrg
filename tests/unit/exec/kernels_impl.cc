@@ -25,6 +25,14 @@ void FillTwiceIndex(DeviceBuffer<double>& a) {
   Fence("test::fill_twice_index");
 }
 
+void FillOddDynamic(DeviceBuffer<std::int64_t>& a) {
+  auto v = View(a);
+  ParallelForDynamic(
+      "test::fill_odd_dynamic", static_cast<Index>(v.extent(0)),
+      IMSRG_LAMBDA(const Index i) { v(i) = 2 * i + 1; });
+  Fence("test::fill_odd_dynamic");
+}
+
 std::int64_t Sum(const DeviceBuffer<std::int64_t>& a) {
   auto v = View(a);
   std::int64_t result = 0;
