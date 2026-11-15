@@ -15,6 +15,7 @@
 #include "imsrg/angmom/sixj3_table.h"
 #include "imsrg/basis/device_tables.h"
 #include "imsrg/basis/model_space.h"
+#include "imsrg/commutator/detail/comm232.h"
 #include "imsrg/commutator/detail/n7_views.h"
 #include "imsrg/commutator/detail/three_body_tiles.h"
 #include "imsrg/commutator/three_body.h"
@@ -79,6 +80,9 @@ struct ThreeBodyContext::Impl {
   exec::DeviceBuffer<std::int32_t> row_two_jab, row_triple;
   exec::DeviceBuffer<std::int64_t> two_body_offset;
   exec::DeviceBuffer<std::int32_t> ob_offsets, ob_orbits;
+
+  /// The sorted pair-third tables of comm232ss (detail/comm232.h).
+  detail::Comm232Tables comm232;
 
   /// The kernel views of the tables (operands, output and epsilon unset).
   /// O(1).

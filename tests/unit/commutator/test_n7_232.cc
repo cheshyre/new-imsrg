@@ -24,6 +24,7 @@
 #include "imsrg/base/types.h"
 #include "imsrg/basis/three_body_channels.h"
 #include "imsrg/commutator/detail/comm232.h"
+#include "imsrg/commutator/detail/three_body_impl.h"
 #include "imsrg/commutator/imsrg3.h"
 #include "imsrg/commutator/options.h"
 #include "imsrg/commutator/three_body.h"
@@ -245,7 +246,7 @@ TEST(N7Comm232, PairThirdMatchesReference) {
   }
 }
 
-// Channel batching: a budget of one byte (one channel per batch) gives the
+// Column batching: a budget of one byte (one column per batch) gives the
 // result of the default budget (one batch at emax 2).
 TEST(N7Comm232, BatchesAgree) {
   const N7Inputs in = GoldenN7Inputs(2, "O16", 6);
@@ -265,6 +266,45 @@ TEST(N7Comm232, BatchesAgree) {
     detail::Comm232ssPairThird(c.x, c.y, b, *c.ctx, 1);
     EXPECT_LE(TwoBodyDeviation(b, a), 1.0e-13) << c.ms3->reference().name();
   }
+}
+
+// A tiny scratch budget (1/40 of one block set) splits the largest channels
+// over several column tiles and runs dozens of batches; the result matches
+// the element-wise reference (emax 2) and, with one column per batch
+// (budget 1 byte), the brute force (emax 1, non-Hermitian cases included).
+TEST(N7Comm232, TinyBudgetSplitsChannels) {
+  for (const char* ref : {"He4", "O16"}) {
+    const N7Inputs in = GoldenN7Inputs(2, ref, 6);
+    const std::vector<std::int64_t>& w_off = in.ctx->impl().comm232.w_off_host;
+    std::int64_t largest = 0;
+    for (std::size_t ch = 0; ch + 1 < w_off.size(); ++ch) {
+      largest = std::max(largest, w_off[ch + 1] - w_off[ch]);
+    }
+    const std::int64_t per_set = w_off.back() / 40;  // doubles per block set
+    ASSERT_LT(per_set, largest);  // the largest channel is split
+    // X3 and Y3 have definite hermiticity: two block sets.
+    const auto bytes = per_set * 2 * static_cast<std::int64_t>(sizeof(double));
+    op::Operator tiled = testing::ZeroN7Output(in.x, in.y, in.ms3);
+    detail::Comm232ssPairThird(in.x, in.y, tiled, *in.ctx, bytes);
+    const op::Operator slow = EvaluateReference(in.x, in.y, *in.ctx);
+    EXPECT_GT(op::TwoBodyNorm(slow), 1.0);
+    EXPECT_LE(TwoBodyDeviation(tiled, slow), 1.0e-12) << ref;
+  }
+  for (N7Inputs& c : BruteForceCases()) {
+    op::Operator tiled = testing::ZeroN7Output(c.x, c.y, c.ms3);
+    detail::Comm232ssPairThird(c.x, c.y, tiled, *c.ctx, 1);
+    const op::Operator bf = BruteForceN7Term(Term::kComm232ss, c.x, c.y, c.ms3);
+    EXPECT_LE(RelativeDeviation(tiled, bf), kTol) << c.ms3->reference().name();
+  }
+}
+
+// The sorted pair-third tables live in the context and count in TableBytes.
+TEST(N7Comm232, TablesLiveInTheContext) {
+  const N7Inputs in = GoldenN7Inputs(2, "O16", 6);
+  const detail::Comm232Tables& t = in.ctx->impl().comm232;
+  EXPECT_GT(t.Bytes(), 0);
+  EXPECT_GT(in.ctx->TableBytes(), t.Bytes());
+  EXPECT_EQ(t.ch_begin_host.back(), in.ctx->impl().pair_third.num_states());
 }
 
 // Timing of the pair-third path (printed; repeated calls on fresh outputs).
