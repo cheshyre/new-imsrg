@@ -132,10 +132,15 @@ IMSRG_INLINE_FUNCTION constexpr Perm SortOrbits(int a_in, int b_in, int c_in,
 /// two-body J (not doubled), `two_J` is the doubled three-body J. Returns 0.0
 /// unless triangle(ja, jb, Jab) and triangle(jc, J, Jab) hold, and for BCA/CBA
 /// triangle(ja, J, Jab_in) and triangle(jc, jb, Jab_in), for CAB/ACB
-/// triangle(jb, J, Jab_in) and triangle(jc, ja, Jab_in). O(1).
-IMSRG_INLINE_FUNCTION double RecouplingCoefficient(
-    Perm p, TwoJ ja, TwoJ jb, TwoJ jc, int Jab_in, int Jab, TwoJ two_J,
-    const SixJ3View& sixj) noexcept {
+/// triangle(jb, J, Jab_in) and triangle(jc, ja, Jab_in). O(1). `SixJ` is
+/// `SixJ3View` in kernels; host code may pass any type with the same
+/// `operator()(j1, j2, J12, j3, J, J23)` and `Hat(J)` (e.g. one that calls
+/// `angmom::Wigner6j`, for counts at large emax without a table).
+template <class SixJ = SixJ3View>
+IMSRG_INLINE_FUNCTION double RecouplingCoefficient(Perm p, TwoJ ja, TwoJ jb,
+                                                   TwoJ jc, int Jab_in, int Jab,
+                                                   TwoJ two_J,
+                                                   const SixJ& sixj) noexcept {
   const int a2 = ja.twice;
   const int b2 = jb.twice;
   const int c2 = jc.twice;
