@@ -4,14 +4,14 @@
 #include <string>
 #include <vector>
 
-#include "bindings.hpp"
+#include "bindings.h"
 #include <nanobind/ndarray.h>
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
 
-#include "imsrg/base/error.hpp"
-#include "imsrg/basis/orbit.hpp"
+#include "imsrg/base/error.h"
+#include "imsrg/basis/orbit.h"
 
 namespace imsrg::py {
 namespace {

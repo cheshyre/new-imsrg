@@ -3,7 +3,7 @@
 # and the HF energy. C++ namespace: imsrg::hf. Host-only (the one-body problem is tiny).
 imsrg_add_module(NAME hf
   SOURCES
-    monopole.cpp
-    diis.cpp
-    hartree_fock.cpp
+    monopole.cc
+    diis.cc
+    hartree_fock.cc
   DEPS operator linalg basis)

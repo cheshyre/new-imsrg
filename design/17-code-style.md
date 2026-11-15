@@ -66,7 +66,7 @@ Python names do not change: the bindings name every function explicitly (snake_c
 
 | Rule | Today |
 |------|-------|
-| Static-storage objects must be trivially destructible | ~14 (e.g. `static const std::vector<std::string>` tables in `driver/config/resolve.cpp`, `static const DdTables` in `angmom/moshinsky.cpp`) → `constexpr std::array<std::string_view, N>` or `static const auto& x = *new T(...)` |
+| Static-storage objects must be trivially destructible | ~14 (e.g. `static const std::vector<std::string>` tables in `driver/config/resolve.cc`, `static const DdTables` in `angmom/moshinsky.cc`) → `constexpr std::array<std::string_view, N>` or `static const auto& x = *new T(...)` |
 | Classes declare their copy/move operations explicitly | 38 of 48 classes in headers do not |
 | Structs only for passive data | 36 of 213 structs have member functions (review), 1 has private members |
 | Inline function bodies in headers ≤ ~10 lines | 24 longer (templates excepted) → `.cc` |

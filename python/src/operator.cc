@@ -5,19 +5,19 @@
 #include <string>
 #include <vector>
 
-#include "bindings.hpp"
+#include "bindings.h"
 #include <nanobind/ndarray.h>
 #include <nanobind/stl/filesystem.h>
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
 
-#include "imsrg/base/error.hpp"
-#include "imsrg/operator/arithmetic.hpp"
-#include "imsrg/operator/normal_ordering.hpp"
-#include "imsrg/operator/norms.hpp"
-#include "imsrg/operator/operator_dump.hpp"
-#include "imsrg/operator/random_operator.hpp"
+#include "imsrg/base/error.h"
+#include "imsrg/operator/arithmetic.h"
+#include "imsrg/operator/normal_ordering.h"
+#include "imsrg/operator/norms.h"
+#include "imsrg/operator/operator_dump.h"
+#include "imsrg/operator/random_operator.h"
 
 namespace imsrg::py {
 namespace {

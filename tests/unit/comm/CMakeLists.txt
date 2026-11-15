@@ -1,11 +1,11 @@
 imsrg_add_test(NAME comm_serial
-  SOURCES comm_serial_test.cpp
+  SOURCES comm_serial_test.cc
   DEPS comm
   LABELS unit)
 
 # Two source files: the serial-semantics tests need a gtest main; the MPI test owns main().
 imsrg_add_test(NAME comm_mpi_2ranks
-  SOURCES comm_mpi_test.cpp
+  SOURCES comm_mpi_test.cc
   DEPS comm
   MPI_RANKS 2
   LABELS mpi
@@ -13,7 +13,7 @@ imsrg_add_test(NAME comm_mpi_2ranks
   TIMEOUT 120)
 
 imsrg_add_test(NAME comm_mpi_4ranks
-  SOURCES comm_mpi_test.cpp
+  SOURCES comm_mpi_test.cc
   DEPS comm
   MPI_RANKS 4
   LABELS mpi

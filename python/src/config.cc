@@ -5,15 +5,15 @@
 #include <filesystem>
 #include <string>
 
-#include "bindings.hpp"
+#include "bindings.h"
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
 
-#include "imsrg/base/error.hpp"
-#include "imsrg/driver/config/config_issue.hpp"
-#include "imsrg/driver/config/load_config.hpp"
-#include "imsrg/driver/config/writer.hpp"
+#include "imsrg/base/error.h"
+#include "imsrg/driver/config/config_issue.h"
+#include "imsrg/driver/config/load_config.h"
+#include "imsrg/driver/config/writer.h"
 
 namespace imsrg::py {
 

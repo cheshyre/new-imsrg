@@ -661,14 +661,14 @@ Errors are collected; each rule has an id used in tests. TOML = strict; "legacy:
 ### 6.1 Module placement
 
 * Library `imsrg_driver` (depends on `imsrg_flow`, `imsrg_hf`, `imsrg_io`, ... downward only; nothing depends on it except the app and Python bindings):
-  * `config/schema.hpp`: the `RunConfig` struct tree and enums (generator/method enums live in the solver library and are reused; config-only enums live here). No toml++ types in public headers.
-  * `config/toml_reader.cpp` (toml++ private): TOML -> raw tree with source locations; unknown-key detection by walking the schema description.
-  * `config/schema_table.cpp`: single static description of every key (path, type, default, enum values, docs, validator) used for reading, defaults, `--legacy-keys`/docs generation, did-you-mean candidates and the resolved-config writer, so there is exactly one place per key.
-  * `config/resolve.cpp`: defaults, derived values (effective e2max/lmax, mass number, steps, output stem, `hamiltonian.kinetic`), then `validate.cpp` (rules V-xx, accumulating `ConfigErrors`).
-  * `config/writer.cpp`: `RunConfig` -> `resolved_config.toml` (deterministic key order, 17-digit doubles, provenance table).
-  * `legacy/legacy_parameters.cpp`: static table `{ old_key, kind (string/double/int/vector), old_default, apply(RawTree&, value, Context&) }` covering all 85 keys of `Parameters.hh`; the translator (`translate(std::span<std::string_view>) -> Expected<RawTree + warnings>`) plus the shorthand logic of 3.5 and the sentinel conversions of 3.2/3.3. No parsing of operator names here (delegated to `operators/operator_request.cpp`).
-  * `operators/operator_request.cpp` and its catalog table (section 4); `--list-operators` prints it.
-* App `apps/imsrg/main.cpp`: the only place that includes CLI11. It collects `--config`, `--set`, positional tokens, flags; calls `driver::load_config(sources) -> Expected<RunConfig>`; prints errors with exit code 2; calls `driver::run(const RunConfig&)`. Python bindings call the same `load_config` from a dict/TOML string, never the legacy path.
+  * `config/schema.h`: the `RunConfig` struct tree and enums (generator/method enums live in the solver library and are reused; config-only enums live here). No toml++ types in public headers.
+  * `config/toml_reader.cc` (toml++ private): TOML -> raw tree with source locations; unknown-key detection by walking the schema description.
+  * `config/schema_table.cc`: single static description of every key (path, type, default, enum values, docs, validator) used for reading, defaults, `--legacy-keys`/docs generation, did-you-mean candidates and the resolved-config writer, so there is exactly one place per key.
+  * `config/resolve.cc`: defaults, derived values (effective e2max/lmax, mass number, steps, output stem, `hamiltonian.kinetic`), then `validate.cc` (rules V-xx, accumulating `ConfigErrors`).
+  * `config/writer.cc`: `RunConfig` -> `resolved_config.toml` (deterministic key order, 17-digit doubles, provenance table).
+  * `legacy/legacy_parameters.cc`: static table `{ old_key, kind (string/double/int/vector), old_default, apply(RawTree&, value, Context&) }` covering all 85 keys of `Parameters.hh`; the translator (`translate(std::span<std::string_view>) -> Expected<RawTree + warnings>`) plus the shorthand logic of 3.5 and the sentinel conversions of 3.2/3.3. No parsing of operator names here (delegated to `operators/operator_request.cc`).
+  * `operators/operator_request.cc` and its catalog table (section 4); `--list-operators` prints it.
+* App `apps/imsrg/main.cc`: the only place that includes CLI11. It collects `--config`, `--set`, positional tokens, flags; calls `driver::load_config(sources) -> Expected<RunConfig>`; prints errors with exit code 2; calls `driver::run(const RunConfig&)`. Python bindings call the same `load_config` from a dict/TOML string, never the legacy path.
 * `--set` is applied on the raw tree before resolution, so `resolved_config.toml` always reflects the effective values.
 
 ### 6.2 Error type

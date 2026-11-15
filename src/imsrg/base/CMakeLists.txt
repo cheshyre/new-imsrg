@@ -3,7 +3,7 @@
 # the only third-party library (logging).
 imsrg_add_module(NAME base
   SOURCES
-    assert.cpp
-    log.cpp
-    timer.cpp
+    assert.cc
+    log.cc
+    timer.cc
   LIBS fmt::fmt)

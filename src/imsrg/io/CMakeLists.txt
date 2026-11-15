@@ -3,9 +3,9 @@
 # dependency: no zlib header is included from a public header. C++ namespace: imsrg::io.
 imsrg_add_module(NAME io
   SOURCES
-    input_stream.cpp
-    me2j.cpp
-    no2b.cpp
-    valence_writers.cpp
+    input_stream.cc
+    me2j.cc
+    no2b.cc
+    valence_writers.cc
   DEPS operator basis base
   PRIVATE_LIBS ZLIB::ZLIB)

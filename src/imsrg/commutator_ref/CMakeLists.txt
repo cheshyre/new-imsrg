@@ -2,5 +2,5 @@
 # imsrg++ ReferenceImplementations. Test-only: no production target links it (design/10 section 2).
 imsrg_add_module(NAME commutator_ref
   SOURCES
-    commutator_ref.cpp
+    commutator_ref.cc
   DEPS operator angmom)

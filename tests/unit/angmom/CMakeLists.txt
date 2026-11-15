@@ -15,11 +15,11 @@ if(Python3_EXECUTABLE)
 endif()
 
 imsrg_add_test(NAME angmom_wigner_reference
-  SOURCES wigner_reference_test.cpp
+  SOURCES wigner_reference_test.cc
   DEPS angmom
   LABELS unit)
 imsrg_add_test(NAME angmom_wigner_identities
-  SOURCES wigner_identities_test.cpp
+  SOURCES wigner_identities_test.cc
   DEPS angmom
   LABELS unit)
 
@@ -46,8 +46,8 @@ set(_mref "${CMAKE_CURRENT_BINARY_DIR}/moshinsky_exact_e16.txt")
 set(_msamples "${CMAKE_CURRENT_SOURCE_DIR}/data/moshinsky_imsrgpp_samples.txt")
 
 imsrg_add_test(NAME angmom_moshinsky
-  SOURCES moshinsky_test.cpp
-          ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cpp
+  SOURCES moshinsky_test.cc
+          ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
   DEPS angmom exec
   LABELS unit
   NO_GTEST_MAIN)
@@ -64,8 +64,8 @@ target_compile_definitions(angmom_moshinsky PRIVATE
 
 # --- Angular-momentum tables (device views; own main initializes the exec runtime) --------------
 imsrg_add_test(NAME angmom_tables
-  SOURCES tables_test.cpp tables_kernels.cpp
-          ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cpp
+  SOURCES tables_test.cc tables_kernels.cc
+          ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
   DEPS angmom exec
   LABELS unit
   NO_GTEST_MAIN)

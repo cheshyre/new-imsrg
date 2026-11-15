@@ -59,7 +59,7 @@ tools/bootstrap_deps.sh       # once per machine: Kokkos (openmp, serial) + the 
   `<build>/src` (generated headers), links the `imsrg::warnings` set privately, and records the
   DEPS; `imsrg_write_module_deps()` writes them to `<build>/imsrg_module_deps.json` for the layering
   check. No SOURCES = header-only (INTERFACE) module. Project headers are included as
-  `"imsrg/<module>/x.hpp"` (the layering check also accepts `<imsrg/...>`; QUESTIONS Q21).
+  `"imsrg/<module>/x.h"` (the layering check also accepts `<imsrg/...>`; QUESTIONS Q21).
 * `src/` and `tests/unit/` **discover** module directories (`file(GLOB ... CONFIGURE_DEPENDS)` over
   `*/CMakeLists.txt`): a milestone adds `src/imsrg/<m>/` and `tests/unit/<m>/` without editing a
   shared CMake file, so parallel milestones do not conflict. The layering check rejects directories
@@ -162,7 +162,7 @@ As implemented in M0:
   `IMSRG_INLINE_FUNCTION`; `base` types must be usable in kernels) cannot come from Kokkos
   headers, which `base` cannot see anyway. Define them without Kokkos (keyed on
   `__CUDACC__`/`__HIPCC__`, i.e. `__host__ __device__` there and empty otherwise); `IMSRG_LAMBDA`
-  is needed only in kernel files and can come from `exec/kokkos_backend.hpp`.
+  is needed only in kernel files and can come from `exec/kokkos_backend.h`.
 * `tools/ci.sh` and `tools/check_layering.py` operate on `git ls-files` only: the main checkout
   root also holds untracked `imsrg-devel/` and `.claude/worktrees/`. pytest uses
   `testpaths = ["tests/python", "tests/integration"]`.

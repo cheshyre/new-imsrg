@@ -8,7 +8,7 @@ CMakePresets.json         dev-serial, dev-openmp (default on macOS), release-ope
 cmake/                    helper modules (warnings, sanitizers, deps lookup, layering check)
 extern/                   git submodules (pinned release tags): kokkos, googletest, fmt, CLI11,
                           tomlplusplus, nanobind   [kokkos-kernels: optional, later]
-src/imsrg/<module>/       library code; headers included as "imsrg/<module>/x.hpp"
+src/imsrg/<module>/       library code; headers included as "imsrg/<module>/x.h"
                           ("x.h" after the run-2 Google-style conversion: .h/.cc files, D38)
 src/imsrg/<module>/kernels/   .cpp files that contain Kokkos kernels (only these include Kokkos)
 apps/imsrg/               the `imsrg` executable (CLI11, thin wrapper around imsrg::driver)
@@ -88,7 +88,7 @@ Rules:
 All names are tentative; implementers may refine them and record the change in the module's
 docstring and here.
 
-### 3.1 Quantum numbers and indices (module `base`, header `imsrg/base/types.hpp`)
+### 3.1 Quantum numbers and indices (module `base`, header `imsrg/base/types.h`)
 
 ```cpp
 template <class Tag, class Rep = std::int32_t>
@@ -253,10 +253,10 @@ Operator transform_basis(const Operator&, const UnitaryTransform& C);    // e.g.
 
 ## 5. Header and compile-time policy
 
-* Public headers stay light: no Kokkos, no MPI, no toml/CLI headers. `exec/device_buffer.hpp`
+* Public headers stay light: no Kokkos, no MPI, no toml/CLI headers. `exec/device_buffer.h`
   exposes `DeviceBuffer<T>` (pimpl) with explicit instantiations for `double`, `float`,
   `std::int32_t`, `std::uint16_t`. Only `src/imsrg/*/kernels/*.cpp` and `exec/*.cpp` include
-  `<Kokkos_Core.hpp>` through `imsrg/exec/kokkos_backend.hpp`.
+  `<Kokkos_Core.hpp>` through `imsrg/exec/kokkos_backend.h`.
 * One commutator term family per `.cpp` file, so editing one kernel recompiles one file.
 * Templates are explicitly instantiated in `.cpp` files where possible.
 * `ccache` is picked up automatically if present. Unity builds are optional

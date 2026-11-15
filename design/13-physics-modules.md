@@ -77,16 +77,16 @@ Phase-1 formats, in this order:
    has none).
 6. **Dropped** *(owner)*: HDF5 3N, Oslo, OakRidge, "Jason", "Takayuki" and the other older readers.
 
-**As implemented (M5).** `imsrg/io/input_stream.hpp` (`TextInput`: zlib `gzread` for plain and
-gzip text alike, tokens parsed straight to `float`; `GzipWriter`), `imsrg/io/me2j.hpp`
+**As implemented (M5).** `imsrg/io/input_stream.h` (`TextInput`: zlib `gzread` for plain and
+gzip text alike, tokens parsed straight to `float`; `GzipWriter`), `imsrg/io/me2j.h`
 (`me2j_value_count`, `read_me2j(path, {Me2jTruncation{e1max, e2max, lmax}, read_whole_file}, ms)`
-returning a new Hermitian rank-2 operator), `imsrg/io/no2b.hpp` (`no2b_value_count`,
+returning a new Hermitian rank-2 operator), `imsrg/io/no2b.h` (`no2b_value_count`,
 `read_no2b(path, {No2bFileTruncation, No2bPrecision}, op::No2bThreeBody&)`; binary when the
 file name contains `stream.bin`, size checked against the count; the container is M4's
 `op::No2bThreeBody`). Only the prefix needed for the model space is decoded: emax 4 reads 27,336
 me2j values in 4 ms and 2.7 M NO2B values in 0.05 s; the whole me2j file (168,066,656 values,
 count check) takes 9 s (test label `slow`). No caching is needed.
-Writers: `imsrg/io/valence_writers.hpp` (`write_tokyo`, `write_nushellx_int`,
+Writers: `imsrg/io/valence_writers.h` (`write_tokyo`, `write_nushellx_int`,
 `write_nushellx_sps`; `ValenceWriteOptions` carries the provenance of the header lines and the
 mode `Hamiltonian` or `IsospinAveragedOperator` = imsrg++ `"op"`). Golden files from the new
 harness subcommand `refharness write-valence` (`tests/golden/io/`, HF HNO at emax 2 in the
@@ -105,7 +105,7 @@ sd shell): every number identical to imsrg++, comment lines identical except the
   normal-ordered H in the HF basis (`D^T (V2 + V3NO) D` for the 2B part; 3B → NO2B).
 * Known reference bugs: the dE3max cut uses `op->l` for all three orbits (HartreeFock.cc:1368);
   the SCF uses `std::rand()`. Fix both and document.
-* **As implemented (M6).** `imsrg/hf/hartree_fock.hpp`: `hf::solve(H, const op::No2bThreeBody*
+* **As implemented (M6).** `imsrg/hf/hartree_fock.h`: `hf::solve(H, const op::No2bThreeBody*
   v3, HFOptions) -> HFResult {e_hf, e1, e2, e3, iterations, converged, spe, C, rho, F,
   occupations, ediff_history}`; `Mixing::Linear` reproduces imsrg++ (weight 0.2 on the old
   density, `FillLowestOrbits` schedule, convergence `‖Δε‖_F / norb < 1e-8`, unfrozen occupations
@@ -132,7 +132,7 @@ sd shell): every number identical to imsrg++, comment lines identical except the
 `natural_orbitals` (per-channel `eigh`, descending occupation, columns signed so C(i,i) >= 0,
 trace check against A), `reference_density_ho`, `matmul`, `to_nat_basis`. mbpt does not depend on
 hf: the NAT-basis Hamiltonian is assembled by the caller from a modified `HFResult` (see
-M9-Q1 and `tests/unit/mbpt/mbpt_test_support.hpp`). Not implemented: `use_NAT_occupations`,
+M9-Q1 and `tests/unit/mbpt/mbpt_test_support.h`). Not implemented: `use_NAT_occupations`,
 `NAT_order` energy/mp2 (M9-Q3; owner: not now, added when a job needs them, D36). Verified: MP2/MP3 at emax 2 (2N and 2N+3N) to 1e-15; IT-1 EMP2
 to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9.
 

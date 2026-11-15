@@ -1,16 +1,16 @@
 /// @file
 /// imsrg.Runtime: process singleton for Kokkos (and optionally MPI), design/18 section 4.3.
 
-#include "imsrg/exec/runtime.hpp"
+#include "imsrg/exec/runtime.h"
 
 #include <memory>
 #include <mutex>
 
-#include "bindings.hpp"
+#include "bindings.h"
 #include <nanobind/stl/string.h>
 
-#include "imsrg/base/error.hpp"
-#include "imsrg/comm/environment.hpp"
+#include "imsrg/base/error.h"
+#include "imsrg/comm/environment.h"
 
 namespace imsrg::py {
 namespace {
