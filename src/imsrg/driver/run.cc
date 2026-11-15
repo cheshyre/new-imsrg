@@ -22,6 +22,7 @@
 #include "imsrg/driver/pipeline/hamiltonian.h"
 #include "imsrg/flow/magnus.h"
 #include "imsrg/io/valence_writers.h"
+#include "imsrg/mbpt/energies.h"
 #include "imsrg/operator/normal_ordering.h"
 
 namespace imsrg::driver {
@@ -169,19 +170,31 @@ class FlowLog {
       throw InputError("cannot write the flow file '" + path.string() + "'");
     out_ << "stage,istep,s,ds,E0,norm_H,norm_eta_1b,norm_eta_2b,norm_eta,norm_"
             "omega_1b,"
-            "norm_omega_2b,norm_omega,num_omegas,wall_s\n";
+            "norm_omega_2b,norm_omega,num_omegas,E_MP2,wall_s\n";
     log::Info(
         "{:>5} {:>5} {:>12} {:>18} {:>14} {:>14} {:>14} {:>14} {:>4} {:>10}",
         "stage", "step", "s", "E0", "|eta_1b|", "|eta_2b|", "|Omega_1b|",
         "|Omega_2b|", "nOm", "wall(s)");
   }
+  /// The solver whose current Hamiltonian the `E_MP2` column evaluates.
+  void set_solver(const flow::MagnusSolver* solver) { solver_ = solver; }
+
   void operator()(const flow::FlowStatus& st) {
+    // imsrg++'s flow file column E(MP2): the MBPT(2) correlation energy of the
+    // current Hamiltonian H(s) (IMSRGSolver.cc:1273). Mp2Energy syncs its
+    // argument to the host, so it works on a copy.
+    double e_mp2 = std::nan("");
+    if (solver_ != nullptr) {
+      op::Operator h = solver_->hamiltonian();
+      e_mp2 = mbpt::Mp2Energy(h);
+    }
     out_ << st.stage << ',' << st.istep << ',' << Fmt17(st.s) << ','
          << Fmt17(st.ds) << ',' << Fmt17(st.e0) << ',' << Fmt17(st.norm_h)
          << ',' << Fmt17(st.norm_eta_1b) << ',' << Fmt17(st.norm_eta_2b) << ','
          << Fmt17(st.norm_eta) << ',' << Fmt17(st.norm_omega_1b) << ','
          << Fmt17(st.norm_omega_2b) << ',' << Fmt17(st.norm_omega) << ','
-         << st.num_omegas << ',' << Fmt17(st.wall_seconds) << '\n';
+         << st.num_omegas << ',' << Fmt17(e_mp2) << ','
+         << Fmt17(st.wall_seconds) << '\n';
     out_.flush();
     log::Info(
         "{:>5} {:>5} {:>12.5f} {:>18.9f} {:>14.9f} {:>14.9f} {:>14.9f} "
@@ -193,6 +206,7 @@ class FlowLog {
 
  private:
   std::ofstream out_;
+  const flow::MagnusSolver* solver_ = nullptr;
 };
 
 struct StageRecord {
@@ -284,7 +298,8 @@ void WriteResults(const fs::path& path, const pipeline::PreparedHamiltonian& ph,
   std::ofstream out(path);
   if (!out) throw InputError("cannot write '" + path.string() + "'");
   out << "{\n  \"schema_version\": " << kResultsSchemaVersion
-      << ",\n  \"e_reference\": " << Fmt17(ph.e_reference) << ",\n";
+      << ",\n  \"e_reference\": " << Fmt17(ph.e_reference)
+      << ",\n  \"e_mp2\": " << Fmt17(ph.e_mp2) << ",\n";
   if (ph.hf) {
     out << "  \"hf\": {\"e_hf\": " << Fmt17(ph.hf->e_hf)
         << ", \"e1\": " << Fmt17(ph.hf->e1) << ", \"e2\": " << Fmt17(ph.hf->e2)
@@ -352,6 +367,7 @@ void Run(const RunConfig& config) {
                        : fs::path(config.output.flow_file));
   flow::MagnusSolver solver(ph.hno, so,
                             MakeGeneratorOptions(config, core_gen, ms));
+  flow_log.set_solver(&solver);
   std::vector<StageRecord> stages;
   log::Info("Setting generator to {}", ToString(core_gen));
   stages.push_back(

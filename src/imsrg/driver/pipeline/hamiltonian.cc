@@ -18,6 +18,7 @@
 #include "imsrg/driver/operators/operator_request.h"
 #include "imsrg/io/me2j.h"
 #include "imsrg/io/no2b.h"
+#include "imsrg/mbpt/energies.h"
 #include "imsrg/operator/arithmetic.h"
 #include "imsrg/operator/basis_transform.h"
 #include "imsrg/operator/no2b.h"
@@ -140,6 +141,13 @@ PreparedHamiltonian PrepareHamiltonian(const RunConfig& config) {
     out.hno = v3p ? op::NormalOrder(H, *v3p) : op::NormalOrder(H);
     out.e_reference = out.hno.zero_body();
     log::Info("Oscillator basis: E_ref = {:.8f} MeV", out.e_reference);
+  }
+  {
+    // MBPT(2) correlation energy of the Hamiltonian entering the flow
+    // (imsrg++.cc:739); Mp2Energy syncs its argument, so use a copy.
+    op::Operator h = out.hno;
+    out.e_mp2 = mbpt::Mp2Energy(h);
+    log::Info("EMP2 = {:.8f} MeV", out.e_mp2);
   }
   if (lawson) out.hno -= 1.5 * beta * config.hamiltonian.beta_cm_hw;
   return out;

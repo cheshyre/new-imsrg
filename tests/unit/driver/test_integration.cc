@@ -15,7 +15,7 @@
 //                  "valence_interaction": path | null}
 //   <stem>.flow   CSV, header stage,istep,s,ds,E0,norm_H,norm_eta_1b,
 //                 norm_eta_2b,norm_eta,norm_omega_1b,norm_omega_2b,
-//                 norm_omega,num_omegas,wall_s; istep 0 included
+//                 norm_omega,num_omegas,E_MP2,wall_s; istep 0 included
 //   <stem>.snt    valence-space Hamiltonian (tokyo); operators in
 //                 <stem>_<name>.snt
 // While `Run()` still throws E-PLANNED the tests skip with a message.
@@ -26,7 +26,9 @@
 #include <cstdint>
 #include <cstdio>
 #include <filesystem>
+#include <fstream>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -119,6 +121,50 @@ TEST(DriverIntegration, IT2_O16_Magnus_Atan) {
   EXPECT_LE(dev_e, 1.0e-6);
   EXPECT_LE(dev_eta, 1.0e-6);
   EXPECT_LE(dev_om, 1.0e-6);
+}
+
+// -----------------------------------------------------------------------------
+// IT-1 / IT-2: MBPT(2) energy (results.json `e_mp2`, flow CSV `E_MP2`).
+// -----------------------------------------------------------------------------
+
+/// E_MP2 column (13th whitespace-separated field) of the first `n` data rows of
+/// an imsrg++ flow file; empty if the file is missing.
+std::vector<double> GoldenFlowMp2(const std::filesystem::path& path,
+                                  std::size_t n) {
+  std::vector<double> out;
+  std::ifstream in(path);
+  std::string line;
+  while (out.size() < n && std::getline(in, line)) {
+    std::istringstream ss(line);
+    std::vector<std::string> f;
+    for (std::string t; ss >> t;) f.push_back(t);
+    if (f.size() > 12) out.push_back(std::strtod(f[12].c_str(), nullptr));
+  }
+  return out;
+}
+
+TEST(DriverIntegration, IT1_Mp2Energy) {
+  const RunResult* r = SharedIt2Run();
+  if (r == nullptr) GTEST_SKIP() << "missing 2N input file";
+  IMSRG_IT_REQUIRE_RUN(*r);
+  const double golden = -15.57911378;  // IT-1 EMP2
+  const double emp2 = r->results["e_mp2"].number;
+  std::printf("[IT-1] EMP2 = %.10f  golden %.8f  dEMP2 = %.3e MeV\n", emp2,
+              golden, emp2 - golden);
+  EXPECT_NEAR(emp2, golden, 1.0e-4);
+
+  // Flow CSV: E_MP2 at step 0 is the same number; later rows follow the
+  // imsrg++ flow file column.
+  ASSERT_FALSE(r->flow.rows.empty());
+  EXPECT_EQ(r->flow.at(0, "E_MP2"), emp2);
+  const auto gold_rows = GoldenFlowMp2(GoldenFile("IT-2/flow.dat"), 10);
+  IMSRG_IT_REQUIRE_FILE(GoldenFile("IT-2/flow.dat"));
+  ASSERT_EQ(gold_rows.size(), 10u);
+  double dev = 0.0;
+  for (std::size_t i = 0; i < gold_rows.size(); ++i)
+    dev = std::max(dev, std::abs(r->flow.at(i, "E_MP2") - gold_rows[i]));
+  std::printf("[IT-2] flow E_MP2 first 10 rows: max dev %.3e MeV\n", dev);
+  EXPECT_LE(dev, 1.0e-4);
 }
 
 // -----------------------------------------------------------------------------

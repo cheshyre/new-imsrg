@@ -36,6 +36,10 @@ struct PreparedHamiltonian {
   /// E_HF (or the zero-body part of the normal-ordered oscillator-basis H),
   /// MeV.
   double e_reference = 0.0;
+  /// MBPT(2) correlation energy (MeV) of `hno` (imsrg++ `EMP2`): in the HF
+  /// basis, or the oscillator basis for basis.kind = oscillator (there the
+  /// Fock matrix is not diagonal and the value is only indicative).
+  double e_mp2 = 0.0;
   /// Mass number used for the kinetic energy (config basis.mass_number).
   int mass_number = 0;
   /// Proton number of the reference (for Rp2 and friends).

@@ -218,6 +218,7 @@ first column of this table and compares it with the keys of a real run, so the t
 |---|---|---|---|
 | `schema_version` | int | always | layout version of this table (currently 1). |
 | `e_reference` | number | always | reference energy: E_HF (HF basis) or the zero-body part of the normal-ordered Hamiltonian (oscillator basis); Lawson constant not included. |
+| `e_mp2` | number | always | MBPT(2) correlation energy of the normal-ordered Hamiltonian that enters the flow (HF or NAT basis; imsrg++ `EMP2`), MeV. Equals the `E_MP2` of flow-file step 0. *(added in run 2)* |
 | `hf` | object | `basis.kind = "hf"` | the Hartree-Fock solution. |
 | `hf.e_hf` | number | with `hf` | E_HF. |
 | `hf.e1` | number | with `hf` | one-body part of E_HF. |
@@ -244,6 +245,12 @@ first column of this table and compares it with the keys of a real run, so the t
 | `operators.<name>.imsrg` | number | per operator | zero-body part after the flow. |
 | `operators.<name>.file` | string | per operator | path of the written operator file. |
 | `valence_interaction` | string or null | always | path of the valence-space interaction file, `null` without a valence space. |
+
+The flow file (`output.flow_file`, CSV with a header line) has one row per solver step, `istep = 0`
+being the initial state of each stage. Columns: `stage, istep, s, ds, E0, norm_H, norm_eta_1b,
+norm_eta_2b, norm_eta, norm_omega_1b, norm_omega_2b, norm_omega, num_omegas, E_MP2, wall_s`.
+`E_MP2` is the MBPT(2) correlation energy of the current Hamiltonian H(s), as in imsrg++'s flow
+file (`E(MP2)` column); it costs one MP2 evaluation per step.
 
 Changelog (newest first):
 
