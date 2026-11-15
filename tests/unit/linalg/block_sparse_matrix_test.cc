@@ -3,6 +3,8 @@
 
 #include "imsrg/linalg/block_sparse_matrix.h"
 
+#include <vector>
+
 #include <gtest/gtest.h>
 
 #include "imsrg/base/error.h"

@@ -10,9 +10,9 @@
 
 #include <gtest/gtest.h>
 
-#include "device_tables_kernels.h"
 #include "imsrg/basis/device_tables.h"
 #include "imsrg/basis/model_space.h"
+#include "tests/unit/basis/device_tables_kernels.h"
 
 namespace imsrg::basis {
 namespace {

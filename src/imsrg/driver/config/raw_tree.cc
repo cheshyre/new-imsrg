@@ -3,6 +3,9 @@
 
 #include "imsrg/driver/config/raw_tree.h"
 
+#include <string>
+#include <utility>
+
 namespace imsrg::driver {
 
 std::string_view RawValue::type_name() const noexcept {

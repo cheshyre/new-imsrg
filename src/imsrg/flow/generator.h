@@ -47,7 +47,9 @@
 /// * floor: |Delta| < denominator_cutoff -> Delta = sign(Delta) * cutoff (sign
 ///   of 0 is +). **Deviation (design/00 D21, design/30 section 6):** imsrg++
 ///   sets Delta = +cutoff, losing the sign of small negative denominators.
+#include <memory>
 #include <optional>
+#include <vector>
 
 #include "imsrg/base/types.h"
 #include "imsrg/operator/operator.h"

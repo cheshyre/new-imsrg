@@ -2,6 +2,7 @@
 // Copyright 2026 The imsrg authors
 
 // Tests of the operator arithmetic and of the flat part kernels it is built on.
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <memory>

@@ -4,7 +4,9 @@
 #include "imsrg/linalg/block_sparse_matrix.h"
 
 #include <algorithm>
+#include <string>
 #include <utility>
+#include <vector>
 
 #include "imsrg/base/assert.h"
 

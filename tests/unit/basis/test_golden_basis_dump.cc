@@ -7,12 +7,13 @@
 #include <fstream>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
 
-#include "golden_basis_dump.h"
 #include "imsrg/basis/single_particle_basis.h"
+#include "tests/unit/basis/golden_basis_dump.h"
 
 namespace imsrg::basis::testing {
 namespace {

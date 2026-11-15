@@ -3,6 +3,8 @@
 
 #include "imsrg/opslib/center_of_mass.h"
 
+#include <memory>
+
 #include "imsrg/base/constants.h"
 #include "imsrg/operator/arithmetic.h"
 #include "imsrg/opslib/detail/pair_engine.h"

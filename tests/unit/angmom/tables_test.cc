@@ -15,7 +15,7 @@
 
 #include "imsrg/angmom/moshinsky.h"
 #include "imsrg/angmom/wigner.h"
-#include "tables_kernels.h"
+#include "tests/unit/angmom/tables_kernels.h"
 
 namespace {
 

@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <set>
 #include <string>
+#include <vector>
 
 #include <gtest/gtest.h>
 

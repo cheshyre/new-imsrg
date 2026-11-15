@@ -5,6 +5,8 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <utility>
+#include <vector>
 
 #include "imsrg/base/assert.h"
 #include "imsrg/basis/orbit.h"

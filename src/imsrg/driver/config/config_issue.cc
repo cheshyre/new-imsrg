@@ -4,7 +4,9 @@
 #include "imsrg/driver/config/config_issue.h"
 
 #include <algorithm>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace imsrg::driver {
 

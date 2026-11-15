@@ -5,6 +5,7 @@
 // 9).
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>

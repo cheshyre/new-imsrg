@@ -3,11 +3,13 @@
 
 // IT-1 (EMP2, emax 4, 2N) and IT-5 (NAT-basis E_HF, emax 4, 2N + NO2B 3N) from
 // the real inputs.
+#include <iostream>
+
 #include "imsrg/basis/model_space.h"
 #include "imsrg/io/me2j.h"
 #include "imsrg/operator/arithmetic.h"
 #include "imsrg/opslib/center_of_mass.h"
-#include "mbpt_test_support.h"
+#include "tests/unit/mbpt/mbpt_test_support.h"
 
 namespace {
 

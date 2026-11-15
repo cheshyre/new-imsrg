@@ -8,7 +8,6 @@ imsrg_add_test(NAME commutator_ref_golden
   DEPS commutator_ref operator
   LABELS unit
   NO_GTEST_MAIN)
-target_include_directories(commutator_ref_golden PRIVATE ${PROJECT_SOURCE_DIR}/tests/support)
 target_compile_definitions(commutator_ref_golden PRIVATE
   IMSRG_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/tests/golden")
 
@@ -17,6 +16,5 @@ imsrg_add_test(NAME commutator_ref_properties
   DEPS commutator_ref operator
   LABELS unit
   NO_GTEST_MAIN)
-target_include_directories(commutator_ref_properties PRIVATE ${PROJECT_SOURCE_DIR}/tests/support)
 target_compile_definitions(commutator_ref_properties PRIVATE
   IMSRG_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/tests/golden")

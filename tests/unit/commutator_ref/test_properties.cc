@@ -15,10 +15,10 @@
 
 #include <gtest/gtest.h>
 
-#include "commutator_test_support.h"
 #include "imsrg/commutator_ref/commutator_ref.h"
 #include "imsrg/operator/arithmetic.h"
 #include "imsrg/operator/operator.h"
+#include "tests/support/commutator_test_support.h"
 
 namespace {
 

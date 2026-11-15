@@ -3,9 +3,12 @@
 
 // Pulay DIIS mixing must reach the same Hartree-Fock solution as the imsrg++
 // linear mixing.
+#include <algorithm>
 #include <functional>
+#include <iostream>
+#include <string>
 
-#include "hf_test_support.h"
+#include "tests/unit/hf/hf_test_support.h"
 
 namespace {
 

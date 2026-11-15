@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <memory>
 #include <optional>
 #include <string>
 #include <utility>

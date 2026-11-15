@@ -7,6 +7,8 @@
 #include <cmath>
 #include <memory>
 #include <numeric>
+#include <utility>
+#include <vector>
 
 #include "imsrg/base/assert.h"
 #include "imsrg/base/error.h"

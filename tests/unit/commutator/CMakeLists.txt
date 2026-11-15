@@ -9,8 +9,6 @@ foreach(_t options simple_terms ladder_terms particle_hole dispatch robustness)
     DEPS commutator commutator_ref operator
     LABELS unit
     NO_GTEST_MAIN)
-  target_include_directories(commutator_${_t} PRIVATE
-    ${PROJECT_SOURCE_DIR}/tests/support ${CMAKE_CURRENT_SOURCE_DIR})
   target_compile_definitions(commutator_${_t} PRIVATE
     IMSRG_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/tests/golden")
 endforeach()

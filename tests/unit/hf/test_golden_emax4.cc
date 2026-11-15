@@ -4,8 +4,9 @@
 // Hartree-Fock at emax 4, O16, with and without the NO2B three-body
 // interaction.
 #include <chrono>
+#include <iostream>
 
-#include "hf_test_support.h"
+#include "tests/unit/hf/hf_test_support.h"
 
 namespace {
 

@@ -2,7 +2,12 @@
 // Copyright 2026 The imsrg authors
 
 // Structural properties of the converged Hartree-Fock state (emax 2, O16, 2N).
-#include "hf_test_support.h"
+#include <algorithm>
+#include <iostream>
+#include <memory>
+#include <utility>
+
+#include "tests/unit/hf/hf_test_support.h"
 
 namespace {
 

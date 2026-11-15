@@ -12,11 +12,11 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
 
-#include "golden_basis_dump.h"
 #include "imsrg/base/types.h"
 #include "imsrg/basis/nucleus.h"
 #include "imsrg/basis/orbit.h"
@@ -27,6 +27,7 @@
 #include "imsrg/basis/three_body_channels.h"
 #include "imsrg/basis/two_body_channels.h"
 #include "imsrg/basis/valence_space.h"
+#include "tests/unit/basis/golden_basis_dump.h"
 
 namespace imsrg::basis {
 namespace {

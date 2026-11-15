@@ -4,8 +4,9 @@
 // Hartree-Fock (linear mixing, 2N only) against the imsrg++ harness output at
 // emax 2, O16.
 #include <chrono>
+#include <iostream>
 
-#include "hf_test_support.h"
+#include "tests/unit/hf/hf_test_support.h"
 
 namespace {
 

@@ -7,6 +7,7 @@
 #include <array>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include <fmt/format.h>
 

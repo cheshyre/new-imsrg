@@ -5,8 +5,8 @@
 /// Module definition of imsrg._core: exception hierarchy and the binding
 /// groups.
 
-#include "bindings.h"
 #include "imsrg/base/error.h"
+#include "python/src/bindings.h"
 
 namespace imsrg::py {
 

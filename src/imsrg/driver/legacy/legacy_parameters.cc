@@ -10,10 +10,12 @@
 #include <charconv>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "imsrg/base/error.h"
 #include "imsrg/basis/nucleus.h"

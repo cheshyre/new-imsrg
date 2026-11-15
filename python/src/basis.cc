@@ -13,9 +13,9 @@
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
 
-#include "bindings.h"
 #include "imsrg/base/error.h"
 #include "imsrg/basis/orbit.h"
+#include "python/src/bindings.h"
 
 namespace imsrg::py {
 namespace {

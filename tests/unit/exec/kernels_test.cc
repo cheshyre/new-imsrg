@@ -7,7 +7,7 @@
 
 #include <gtest/gtest.h>
 
-#include "kernels_impl.h"
+#include "tests/unit/exec/kernels_impl.h"
 
 namespace {
 

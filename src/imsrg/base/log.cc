@@ -5,6 +5,7 @@
 
 #include <cstdio>
 #include <string>
+#include <utility>
 
 namespace imsrg::log {
 

@@ -5,6 +5,7 @@
 // elements.
 #include <unistd.h>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>

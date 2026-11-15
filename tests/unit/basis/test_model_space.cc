@@ -10,9 +10,9 @@
 
 #include <gtest/gtest.h>
 
-#include "golden_basis_dump.h"
 #include "imsrg/base/error.h"
 #include "imsrg/basis/model_space.h"
+#include "tests/unit/basis/golden_basis_dump.h"
 
 namespace {
 

@@ -9,11 +9,12 @@
 /// density in the oscillator basis, F = T + V2[rho] + 1/2 V3[rho], E_HF for
 /// rho) and passed to hf::NormalOrderedHamiltonian.
 #include <memory>
+#include <utility>
 
-#include "../hf/hf_test_support.h"
 #include "imsrg/hf/monopole.h"
 #include "imsrg/mbpt/energies.h"
 #include "imsrg/mbpt/natural_orbitals.h"
+#include "tests/unit/hf/hf_test_support.h"
 
 namespace imsrg::mbtest {
 

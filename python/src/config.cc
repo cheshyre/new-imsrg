@@ -7,16 +7,18 @@
 
 #include <filesystem>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
 
-#include "bindings.h"
 #include "imsrg/base/error.h"
 #include "imsrg/driver/config/config_issue.h"
 #include "imsrg/driver/config/load_config.h"
 #include "imsrg/driver/config/writer.h"
+#include "python/src/bindings.h"
 
 namespace imsrg::py {
 

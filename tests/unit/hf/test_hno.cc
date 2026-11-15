@@ -4,9 +4,11 @@
 // Normal-ordered Hamiltonian in the HF basis and basis transformation against
 // imsrg++ goldens.
 #include <chrono>
+#include <iostream>
+#include <string>
 
-#include "hf_test_support.h"
 #include "imsrg/operator/compare.h"
+#include "tests/unit/hf/hf_test_support.h"
 
 namespace {
 

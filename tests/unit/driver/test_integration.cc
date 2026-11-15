@@ -30,9 +30,9 @@
 
 #include <gtest/gtest.h>
 
-#include "integration/mini_json.h"
-#include "integration/run_support.h"
-#include "integration/snt_compare.h"
+#include "tests/unit/driver/integration/mini_json.h"
+#include "tests/unit/driver/integration/run_support.h"
+#include "tests/unit/driver/integration/snt_compare.h"
 
 namespace {
 

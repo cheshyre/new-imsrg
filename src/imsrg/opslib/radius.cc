@@ -3,6 +3,9 @@
 
 #include "imsrg/opslib/radius.h"
 
+#include <memory>
+#include <string>
+
 #include "imsrg/base/constants.h"
 #include "imsrg/base/error.h"
 #include "imsrg/operator/arithmetic.h"

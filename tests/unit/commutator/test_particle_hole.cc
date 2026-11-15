@@ -11,12 +11,12 @@
 
 #include <gtest/gtest.h>
 
-#include "commutator_test_cases.h"
-#include "commutator_test_support.h"
 #include "imsrg/base/error.h"
 #include "imsrg/commutator/commutator.h"
 #include "imsrg/commutator/detail/pandya.h"
 #include "imsrg/commutator_ref/commutator_ref.h"
+#include "tests/support/commutator_test_support.h"
+#include "tests/unit/commutator/commutator_test_cases.h"
 
 namespace {
 

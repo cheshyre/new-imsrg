@@ -3,6 +3,7 @@
 
 #include "imsrg/linalg/matrix_view.h"
 
+#include <algorithm>
 #include <type_traits>
 
 #include <gtest/gtest.h>

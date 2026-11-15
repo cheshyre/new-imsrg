@@ -7,18 +7,19 @@
 // scratch footprint of a Workspace.
 #include <cstdint>
 #include <cstdio>
+#include <memory>
 #include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
 
-#include "commutator_test_cases.h"
-#include "commutator_test_support.h"
 #include "imsrg/base/error.h"
 #include "imsrg/commutator/commutator.h"
 #include "imsrg/commutator/detail/workspace_impl.h"
 #include "imsrg/commutator_ref/commutator_ref.h"
 #include "imsrg/operator/arithmetic.h"
+#include "tests/support/commutator_test_support.h"
+#include "tests/unit/commutator/commutator_test_cases.h"
 
 namespace {
 

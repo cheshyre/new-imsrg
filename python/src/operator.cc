@@ -6,6 +6,7 @@
 /// arithmetic, norms), normal ordering, random operators, OperatorDump I/O
 /// (design/18 sections 3 and 4).
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -15,13 +16,13 @@
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
 
-#include "bindings.h"
 #include "imsrg/base/error.h"
 #include "imsrg/operator/arithmetic.h"
 #include "imsrg/operator/normal_ordering.h"
 #include "imsrg/operator/norms.h"
 #include "imsrg/operator/operator_dump.h"
 #include "imsrg/operator/random_operator.h"
+#include "python/src/bindings.h"
 
 namespace imsrg::py {
 namespace {

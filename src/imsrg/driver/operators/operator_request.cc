@@ -12,7 +12,10 @@
 #include <map>
 #include <set>
 #include <sstream>
+#include <string>
 #include <system_error>
+#include <utility>
+#include <vector>
 
 #include "imsrg/base/error.h"
 #include "imsrg/basis/orbit.h"

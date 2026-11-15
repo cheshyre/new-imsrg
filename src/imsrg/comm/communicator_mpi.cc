@@ -5,7 +5,9 @@
 // makes no MPI calls.
 #include <algorithm>
 #include <cstring>
+#include <memory>
 #include <string>
+#include <vector>
 
 #include <mpi.h>
 

@@ -4,8 +4,9 @@
 // MBPT(2) density matrix and natural orbitals at emax 2 (O16, 2N): structural
 // invariants.
 #include <algorithm>
+#include <iostream>
 
-#include "mbpt_test_support.h"
+#include "tests/unit/mbpt/mbpt_test_support.h"
 
 namespace {
 

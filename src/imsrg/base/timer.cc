@@ -4,6 +4,8 @@
 #include "imsrg/base/timer.h"
 
 #include <algorithm>
+#include <string>
+#include <vector>
 
 #include <fmt/format.h>
 

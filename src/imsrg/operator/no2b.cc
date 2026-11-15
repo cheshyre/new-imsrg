@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <utility>
 
 #include "imsrg/angmom/wigner.h"
 #include "imsrg/base/assert.h"

@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <tuple>
+#include <vector>
 
 #include "imsrg/base/assert.h"
 

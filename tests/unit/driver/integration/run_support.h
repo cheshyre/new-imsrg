@@ -19,11 +19,12 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "imsrg/driver/config/load_config.h"
 #include "imsrg/driver/run.h"
-#include "mini_json.h"
+#include "tests/unit/driver/integration/mini_json.h"
 
 namespace imsrg::it {
 

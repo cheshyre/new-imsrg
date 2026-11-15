@@ -5,6 +5,7 @@
 // 4.
 #include <filesystem>
 #include <iostream>
+#include <memory>
 #include <string>
 
 #include <gtest/gtest.h>

@@ -4,7 +4,7 @@
 // Kernels evaluating the device accessors of DeviceTables. Free functions only
 // (design/12 s5); lambdas capture the (trivially copyable) views and raw output
 // pointers by value.
-#include "device_tables_kernels.h"
+#include "tests/unit/basis/device_tables_kernels.h"
 
 #include "imsrg/exec/kokkos_backend.h"
 

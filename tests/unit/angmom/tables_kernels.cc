@@ -3,7 +3,7 @@
 
 // Kernels reading the angmom table device views. Free functions only (design/12
 // section 5).
-#include "tables_kernels.h"
+#include "tests/unit/angmom/tables_kernels.h"
 
 #include <cstdint>
 

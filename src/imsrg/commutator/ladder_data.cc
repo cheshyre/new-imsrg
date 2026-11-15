@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <span>
 #include <string>
+#include <vector>
 
 #include "imsrg/commutator/detail/ladder.h"
 

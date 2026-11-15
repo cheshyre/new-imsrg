@@ -3,6 +3,8 @@
 
 #include "imsrg/opslib/kinetic.h"
 
+#include <memory>
+
 #include "imsrg/opslib/detail/pair_engine.h"
 
 namespace imsrg::opslib {

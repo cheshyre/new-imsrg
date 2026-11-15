@@ -5,12 +5,14 @@
 // input files (me2j + NO2B + relative kinetic energy) instead of a dump, as in
 // integration tests IT-1/IT-4.
 #include <chrono>
+#include <iostream>
+#include <string>
 
-#include "hf_test_support.h"
 #include "imsrg/basis/model_space.h"
 #include "imsrg/io/me2j.h"
 #include "imsrg/operator/arithmetic.h"
 #include "imsrg/opslib/center_of_mass.h"
+#include "tests/unit/hf/hf_test_support.h"
 
 namespace {
 

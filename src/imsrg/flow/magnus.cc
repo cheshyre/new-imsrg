@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <memory>
 #include <utility>
 
 #include "imsrg/base/assert.h"

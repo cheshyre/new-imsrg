@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <string>
+#include <vector>
 
 #include "imsrg/base/assert.h"
 #include "imsrg/base/error.h"

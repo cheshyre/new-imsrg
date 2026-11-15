@@ -4,7 +4,9 @@
 #include "imsrg/basis/reference.h"
 
 #include <cmath>
+#include <string>
 #include <utility>
+#include <vector>
 
 #include <fmt/format.h>
 

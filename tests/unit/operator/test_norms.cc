@@ -2,6 +2,7 @@
 // Copyright 2026 The imsrg authors
 
 // Tests of the operator norms against brute-force sums.
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <memory>

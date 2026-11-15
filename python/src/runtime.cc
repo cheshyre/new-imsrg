@@ -12,9 +12,9 @@
 
 #include <nanobind/stl/string.h>
 
-#include "bindings.h"
 #include "imsrg/base/error.h"
 #include "imsrg/comm/environment.h"
+#include "python/src/bindings.h"
 
 namespace imsrg::py {
 namespace {

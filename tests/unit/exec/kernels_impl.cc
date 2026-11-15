@@ -3,7 +3,7 @@
 
 // Kernels written against the exec facade. Free functions only (design/12
 // section 5).
-#include "kernels_impl.h"
+#include "tests/unit/exec/kernels_impl.h"
 
 #include <cstdint>
 #include <limits>

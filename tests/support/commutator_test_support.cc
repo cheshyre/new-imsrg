@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-#include "commutator_test_support.h"
+#include "tests/support/commutator_test_support.h"
 
 #include <algorithm>
+#include <memory>
 #include <random>
+#include <utility>
 #include <vector>
 
 #include "imsrg/basis/reference.h"

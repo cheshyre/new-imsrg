@@ -4,6 +4,9 @@
 // Communicator in a build without MPI: only the one-rank communicator exists.
 #include <algorithm>
 #include <cstring>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include "imsrg/base/assert.h"
 #include "imsrg/comm/communicator.h"

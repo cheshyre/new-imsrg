@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-#include "golden_basis_dump.h"
+#include "tests/unit/basis/golden_basis_dump.h"
 
 #include <algorithm>
 #include <cerrno>
@@ -9,6 +9,9 @@
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace imsrg::basis::testing {
 

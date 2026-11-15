@@ -4,6 +4,7 @@
 #include "imsrg/basis/partition.h"
 
 #include <utility>
+#include <vector>
 
 #include <fmt/format.h>
 

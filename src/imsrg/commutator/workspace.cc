@@ -4,6 +4,7 @@
 #include "imsrg/commutator/workspace.h"
 
 #include <cstddef>
+#include <memory>
 #include <utility>
 #include <vector>
 

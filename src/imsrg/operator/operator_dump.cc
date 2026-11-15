@@ -10,9 +10,12 @@
 #include <cstdlib>
 #include <fstream>
 #include <istream>
+#include <memory>
 #include <optional>
 #include <ostream>
+#include <string>
 #include <utility>
+#include <vector>
 
 #include "imsrg/base/assert.h"
 #include "imsrg/base/error.h"

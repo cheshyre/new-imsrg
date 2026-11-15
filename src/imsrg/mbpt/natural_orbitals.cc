@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <vector>
 
 #include "imsrg/base/error.h"
 #include "imsrg/linalg/blas.h"
