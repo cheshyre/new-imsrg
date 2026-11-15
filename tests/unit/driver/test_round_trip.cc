@@ -168,7 +168,7 @@ eta_criterion = 1e-5
 ode_tolerance = 1e-7
 
 [imsrg.omega]
-storage = "scratch"
+storage = "memory"  # scratch/discard are E-PLANNED
 hunter_gatherer = true
 
 [imsrg.space]
@@ -415,10 +415,7 @@ class Gen {
     if (Coin()) t << "ode_tolerance = " << Num(Decade() / 100.0) << "\n";
     t << "[imsrg.omega]\n";
     if (Coin()) {
-      t << "storage = \""
-        << (scratch ? Pick<std::string>({"memory", "scratch", "discard"})
-                    : Pick<std::string>({"memory", "discard"}))
-        << "\"\n";
+      t << "storage = \"memory\"\n";  // scratch/discard: E-PLANNED
     }
     if (Coin())
       t << "hunter_gatherer = " << (Coin() ? "true" : "false") << "\n";

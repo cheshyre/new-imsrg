@@ -359,12 +359,13 @@ void Run(const RunConfig& config) {
     // imsrg++.cc:1122-1143: smax doubled for the second Magnus stage, new
     // Omega.
     const Generator val_gen = config.imsrg.generator.valence;
-    flow::SolverOptions so2 = so;
+    // Derived from the solver's options so that the domega bump persists.
+    flow::SolverOptions so2 = solver.solver_options();
     so2.smax = 2.0 * step.smax;
     SmallStepsForStiffGenerators(val_gen, so2);
     log::Info("Setting generator to {}", ToString(val_gen));
     solver.set_generator(MakeGeneratorOptions(config, val_gen, ms));
-    solver.set_smax(so2.smax);
+    solver.set_solver_options(so2);
     stages.push_back(
         {2, std::string(ToString(val_gen)), solver.Solve(std::ref(flow_log))});
   }

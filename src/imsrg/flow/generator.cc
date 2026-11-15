@@ -93,6 +93,11 @@ double FloorDenominator(double delta, double cutoff) noexcept {
 Denominators::Denominators(const op::Operator& H, const GeneratorOptions& opts)
     : ms_(H.model_space_ptr()), opts_(opts) {
   IMSRG_CHECK(!H.empty(), "Denominators: empty operator");
+  // cutoff <= 0 would disable the floor and divide by ~0 (inf/NaN).
+  if (!(std::isfinite(opts.denominator_cutoff) &&
+        opts.denominator_cutoff > 0.0)) {
+    throw InputError("denominator_cutoff must be positive and finite");
+  }
   op::Operator Hh(H);
   Hh.SyncToHost();
   const basis::SingleParticleBasis& sp = ms_->basis();
