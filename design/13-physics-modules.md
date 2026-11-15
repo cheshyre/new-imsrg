@@ -148,6 +148,21 @@ to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9. In the driver (run 2): IT
   3f2 recipe (D32): hunter-gatherer Magnus, `omega_norm_max` 0.1, 1b intermediates on, 2b
   intermediates off; `factorized = true` sets these as defaults (`16` §2.8). Implemented in M10 3f2
   (kernels, `BchOptions`, config keys V-56/V-57, driver wiring, IT-10).
+* **As implemented (M10 3f2):** header `imsrg/commutator/factorized.h`:
+  `FactorizedDoubleCommutator(eta, gamma, Z, FactorizedOptions, ws)` (overwrites Z, rank 2, gamma's
+  hermiticity; eta anti-Hermitian) evaluates imsrg++'s `comm223_231_chi1b` + `comm223_232_chi1b`
+  through two ladder-product pairs `eta P eta`, `gamma P eta` (`detail::LadderProducts`, shared with
+  the ladder terms), comm221ss-like contractions into four one-body intermediates, a comm121ss-shaped
+  one-body pass and a comm122ss-shaped two-body pass over the lifted lists (no Pandya, no 6j; about
+  half a commutator). `FactorizedEta` holds the eta-only intermediates so a BCH series computes them
+  once. 2b intermediates throw NotImplementedError (D32 has them off). imsrg++'s occupation skip
+  thresholds are not applied (`30` §6 M10-3f2-1). Validation: imsrg++ goldens
+  (`tests/golden/factorized/`, `refharness factorized d32`) <= 6.7e-16; the plain-loop transcription
+  `commutator_ref::FactorizedDoubleCommutator` (also <= 2.7e-16 against the goldens) agrees with the
+  fast form to 5.2e-16 on closed-shell and fractional references. Cost (release-openmp, 8 threads,
+  O16 emax 4, 2N): 35.6 ms per 3f2 Magnus step against 32.5 ms per plain hunter-gatherer IMSRG(2)
+  step (1.10x; imsrg++ He4 emax 2: 1.6x); 3f2 converges there in 205 steps (E0 -164.158 MeV) against
+  298 (-165.001).
 * **As implemented (M7, tag `m7-api-ready`):** headers `imsrg/commutator/{options,workspace,
   commutator}.h`. `Commutator(X, Y, Z, opts, ws)` overwrites Z (reusing its storage when the
   spec matches) and an allocating overload returns Z; `terms::Comm*ss` add one term each;
@@ -193,6 +208,12 @@ to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9. In the driver (run 2): IT
   truncation level (unit test `HunterGathererDocumentsImsrgSemantics`; the replay test holds for the
   split stack only). Goldens: `tests/golden/e2e/IT-2/hunter_gatherer`. A **prerequisite of
   IMSRG(3f2)** (D32).
+* IMSRG(3f2) (`BchOptions::factorized`, M10 3f2): `BchTransform` adds F(Omega, nested_{i-2}) to
+  every nested term from the second on (before the series update and the epsilon test);
+  `BchProduct` adds F(X, Y)/12 to the 1/12 term and F(Y, N_{k-2}) (N_0 = X) to N_k for k >= 2, as
+  imsrg++ BCH.cc:153-191, 312-359. Magnus steps, gathers and operator transforms all inherit it.
+  Validated against `refharness bch` goldens (<= 2e-17) and IT-10 (|dE0| <= 1.1e-13 MeV, identical
+  step and gather counts).
 * BCH transform: nested commutators with 1/i!, terminating on a threshold epsilon, at most 40
   terms. BCH product: implement exactly the terms imsrg++ includes; its comment lists a
   −1/24 [Y,[X,[X,Y]]] term that the code does **not** implement. That is a truncation choice,
