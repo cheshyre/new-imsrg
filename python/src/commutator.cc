@@ -62,6 +62,26 @@ std::shared_ptr<PyWorkspace> WorkspaceFor(
   return w;
 }
 
+void PurgeWorkspaceCache() {
+  auto& c = GetCache();
+  std::vector<std::shared_ptr<PyWorkspace>> dead;
+  {
+    std::unique_lock lock(c.mutex, std::try_to_lock);
+    if (!lock.owns_lock()) return;  // a lookup is running; purge next time
+    auto it = c.entries.begin();
+    while (it != c.entries.end()) {
+      // Held by the cache alone, and the model space only by the workspace
+      // (PyWorkspace and commutator::Workspace each keep one reference).
+      if (it->use_count() == 1 && (*it)->model_space().use_count() <= 2) {
+        dead.push_back(std::move(*it));
+        it = c.entries.erase(it);
+      } else {
+        ++it;
+      }
+    }
+  }
+}
+
 void ClearWorkspaceCache() {
   auto& c = GetCache();
   std::vector<std::shared_ptr<PyWorkspace>> old;
@@ -133,7 +153,7 @@ void BindCommutator(nb::module_& m) {
       .def(
           "reset", [](TermMask& mk, Term t) { mk.reset(t); }, nb::arg("term"),
           "Removes `term`.")
-      .def("empty", &TermMask::empty)
+      .def("empty", &TermMask::empty, "True for the empty set.")
       .def_prop_ro("bits", &TermMask::bits)
       .def(
           "terms",
@@ -203,9 +223,13 @@ void BindCommutator(nb::module_& m) {
             new (self) PyWorkspace(ms.ms);
           },
           nb::arg("model_space"))
-      .def_prop_ro("model_space", [](const PyWorkspace& w) {
-        return PyModelSpace{w.model_space()};
-      });
+      .def_prop_ro(
+          "model_space",
+          [](PyWorkspace& w) {
+            w.ws();  // raises StaleHostError if released
+            return PyModelSpace{w.model_space()};
+          },
+          "The model space the workspace was built for.");
 
   m.def("clear_workspace_cache", &ClearWorkspaceCache,
         "Drops the workspaces cached by commutator() and the BCH functions.");
@@ -217,9 +241,13 @@ void BindCommutator(nb::module_& m) {
          std::shared_ptr<PyWorkspace> workspace) {
         const op::Operator& xi = Input(x);
         const op::Operator& yi = Input(y);
+        RequireSameModelSpace(xi, yi);
         if (!workspace) workspace = WorkspaceFor(xi.model_space_ptr());
-        nb::gil_scoped_release r;
+        GilFree r;
         std::lock_guard lock(workspace->mutex());
+        if (!workspace->ws().Compatible(xi))
+          throw ModelSpaceError(
+              "the workspace was built for another model space");
         return Result(commutator::Commutator(xi, yi, options, workspace->ws()));
       },
       nb::arg("x"), nb::arg("y"), nb::kw_only(),
@@ -238,9 +266,13 @@ void BindCommutator(nb::module_& m) {
          std::shared_ptr<PyWorkspace> workspace) {
         const op::Operator& e = Input(eta);
         const op::Operator& g = Input(gamma);
+        RequireSameModelSpace(e, g);
         if (!workspace) workspace = WorkspaceFor(e.model_space_ptr());
-        nb::gil_scoped_release r;
+        GilFree r;
         std::lock_guard lock(workspace->mutex());
+        if (!workspace->ws().Compatible(e))
+          throw ModelSpaceError(
+              "the workspace was built for another model space");
         op::Operator z;
         commutator::FactorizedDoubleCommutator(e, g, z, options,
                                                workspace->ws());

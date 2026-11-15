@@ -471,6 +471,8 @@ validation); the round-trip tests use `memory`.
   (`PrepareOperator`) was added and the contract is documented (`opslib::Rp2` docstring, design/13,
   design/30 D35-2): charge radius = Rp2 + Rso/Z + nucleon-size terms. **Assumed meanwhile:** the
   output-stage task implements it that way. Not blocking.
+  **Resolved (run 2, M8 charge-radius task):** implemented in `driver/pipeline/charge_radius.h`, written to
+  `results.json` as `charge_radius` (schema version 3), see design/13 section 8 and M8-Q50..Q52.
 * **M8-Q21** (2026-11-15, M8 D35 task) - The gitignored emax-4 dumps in `build/golden-generated` (read
   through `IMSRG_GENERATED_GOLDEN_DIR` by `opslib_golden`, `hf_*`, `io_*` emax-4 tests) must come from the
   patched build too; with dumps from the pristine build `Emax4TrelAndRp2` fails (Rp2 differs by 0.063).
@@ -661,3 +663,39 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
 * **M10-Q62** (2026-11-16, M10 step 3) - `imsrg3.occ_nat3_cut` with IMSRG(3), `variant = "full"` and
   `"mp4"`, `at_end`, `only_2b_omega` stay E-PLANNED: the cut needs the NAT occupations in the
   three-body space (`ThreeBodyCuts::natural_occupations`) which the driver does not pass yet.
+* **M8-Q50** (2026-11-15, M8 charge radius / two-stage ODE task) - (1) The charge radius needs `Rso`; if it was
+  not requested the driver adds it as one more operator that flows alongside H (ODE methods) or is replayed
+  with the Omega stack (Magnus). For the adaptive `flow` method the error norm of the step control includes
+  every flowing operator, so the step sequence differs from imsrg++'s (which flowed a single Rp2 that
+  contained the spin-orbit term): the end results agree (O16 emax 3: E0 within 4e-8, radius within 5e-8 fm) but
+  the flow file of the driver-level adaptive tests is no longer line-by-line comparable (`He4Emax2AdaptiveDriver`
+  and `O16Emax3AdaptiveDriver` compare final quantities; the solver-level test still compares the trajectory).
+  **Assumed meanwhile:** fine. Alternative: let `OdeSolver` exclude "passive" operators from the error norm (a
+  `flow/` change). (2) imsrg++'s adaptive `flow` restarts s at 0 in stage 2 (M8-Q40), integrating [0, smax]
+  again even if stage 1 ran to smax; with a continuing s our stage 2 would be empty then (He4 p-shell, stage 1
+  reaches smax = 200). **Assumed/implemented:** for `imsrg.method = "flow"` stage 2 gets `smax_2 = s_after_stage_1
+  + smax` (the equation is autonomous). `flow_rk4` keeps imsrg++'s behaviour (continuing s, same smax). Matches
+  the golden `IT-15/He4_emax2_pshell_flow` (E0 3.5e-9, `.snt` 4e-9).
+* **M8-Q51** (2026-11-15, M8 charge radius) - The charge radius is produced only for the plain `Rp2` operator,
+  not for `Rp2Z_<Z>`/`Rp2AZ_<A>_<Z>` (those would need their own Z, A and an Rso with that Z) and not for
+  `run.task = "hf"` (no operators are evaluated there). `Rch` is `null` when `Rch2 < 0`; imsrg++'s HF printout
+  returns 0 for `|Rp2| < 1e-6` (not copied). N/Z uses the mass number of the Rp2 operator (`basis.mass_number`),
+  imsrg++ uses the target mass of the model space (the same number unless `A` is overridden). **Assumed meanwhile:**
+  as stated; trivial to extend.
+* **M8-Q52** (2026-11-15, M8 charge radius) - The pristine imsrg++ prints a charge radius only for non-Magnus
+  methods ("HF charge radius" and "IMSRG charge radius", `imsrg++.cc:845,1367`), so the IT-6 (Magnus) golden has no
+  imsrg++ radius to compare with. The validation uses the pristine build on `flow_RK4`/`flow` runs (He4 emax 2,
+  O16 emax 3: agreement 2e-9 fm HF, within the 6 printed decimals after the flow); the Magnus radius uses the same
+  code path with the replayed operators. **Assumed meanwhile:** sufficient; no Magnus-path radius number from
+  imsrg++ exists.
+* **M11-Q15** (2026-11-16, M11 python hardening) - Ctrl-C: the solvers poll Python signals at every status
+  line (a step boundary) and raise `KeyboardInterrupt`; the pipeline driver (`driver::Run`) has no
+  cancellation hook, so `pipeline.run` lets Ctrl-C stop the process (SIGINT default action) while the run
+  is in progress instead of ignoring it. **Assumed meanwhile:** fine for scripts; a cancel flag in
+  `driver::Run` would allow a clean `KeyboardInterrupt`.
+* **M11-Q16** (2026-11-16, M11 python hardening) - `SymmetryError` and `ConvergenceError` exist as classes
+  (design/18): `ConvergenceError` is raised by `pipeline.run` on divergence and by
+  `hf.solve(raise_on_failure=True)` (default False, so existing results stay reportable); `SymmetryError` is
+  reserved until tensor operators exist. A missing file raises `InputFileNotFoundError` (an `InputError`
+  and a `FileNotFoundError`), malformed content `FileFormatError`, operands on different model spaces
+  `ModelSpaceError`. **Assumed meanwhile:** as described.

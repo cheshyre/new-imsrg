@@ -29,7 +29,7 @@ void BindOpslib(nb::module_& m) {
       "t_cm",
       [](const PyModelSpace& ms, int mass_number) {
         EnsureRuntime();
-        nb::gil_scoped_release r;
+        GilFree r;
         return Result(opslib::TCm(ms.ms, mass_number));
       },
       nb::arg("model_space"), nb::arg("mass_number"),
@@ -38,7 +38,7 @@ void BindOpslib(nb::module_& m) {
       "t_rel",
       [](const PyModelSpace& ms, int mass_number) {
         EnsureRuntime();
-        nb::gil_scoped_release r;
+        GilFree r;
         return Result(opslib::TRel(ms.ms, mass_number));
       },
       nb::arg("model_space"), nb::arg("mass_number"),
@@ -48,7 +48,7 @@ void BindOpslib(nb::module_& m) {
       "r2_cm",
       [](const PyModelSpace& ms, int mass_number) {
         EnsureRuntime();
-        nb::gil_scoped_release r;
+        GilFree r;
         return Result(opslib::R2Cm(ms.ms, mass_number));
       },
       nb::arg("model_space"), nb::arg("mass_number"),
@@ -58,7 +58,7 @@ void BindOpslib(nb::module_& m) {
       [](const PyModelSpace& ms, int mass_number,
          std::optional<double> hbar_omega_trap) {
         EnsureRuntime();
-        nb::gil_scoped_release r;
+        GilFree r;
         return Result(opslib::HCm(ms.ms, mass_number, hbar_omega_trap));
       },
       nb::arg("model_space"), nb::arg("mass_number"),
@@ -69,7 +69,7 @@ void BindOpslib(nb::module_& m) {
       "rp2",
       [](const PyModelSpace& ms, int mass_number, int proton_number) {
         EnsureRuntime();
-        nb::gil_scoped_release r;
+        GilFree r;
         return Result(opslib::Rp2(ms.ms, mass_number, proton_number));
       },
       nb::arg("model_space"), nb::arg("mass_number"), nb::arg("proton_number"),
@@ -79,7 +79,7 @@ void BindOpslib(nb::module_& m) {
       "rn2",
       [](const PyModelSpace& ms, int mass_number, int proton_number) {
         EnsureRuntime();
-        nb::gil_scoped_release r;
+        GilFree r;
         return Result(opslib::Rn2(ms.ms, mass_number, proton_number));
       },
       nb::arg("model_space"), nb::arg("mass_number"), nb::arg("proton_number"),
@@ -88,7 +88,7 @@ void BindOpslib(nb::module_& m) {
       "rm2",
       [](const PyModelSpace& ms, int mass_number) {
         EnsureRuntime();
-        nb::gil_scoped_release r;
+        GilFree r;
         return Result(opslib::Rm2(ms.ms, mass_number));
       },
       nb::arg("model_space"), nb::arg("mass_number"),

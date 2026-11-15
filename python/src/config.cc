@@ -78,7 +78,7 @@ void BindConfig(nb::module_& m) {
       "run_config",
       [](const RunConfig& c) {
         EnsureRuntime();
-        nb::gil_scoped_release r;
+        GilFree r;
         driver::Run(c);
       },
       nb::arg("config"),
@@ -93,7 +93,10 @@ void BindConfig(nb::module_& m) {
          std::vector<std::string> set, bool check_files) {
         driver::ConfigSources src;
         if (text) src.config_text = *text;
-        if (file) src.config_file = std::filesystem::path(*file);
+        if (file) {
+          RequireFile(*file);
+          src.config_file = std::filesystem::path(*file);
+        }
         src.set_overrides = std::move(set);
         src.command_line = "python imsrg.load_config";
         driver::LoadOptions opt;

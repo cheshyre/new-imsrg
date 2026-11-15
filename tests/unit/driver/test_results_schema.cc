@@ -123,7 +123,7 @@ TEST(ResultsSchema, WrittenKeysMatchTheDocumentedTable) {
 
   // The version.
   ASSERT_TRUE(full.results.has("schema_version"));
-  EXPECT_EQ(full.results["schema_version"].number, 2.0);
+  EXPECT_EQ(full.results["schema_version"].number, 3.0);
 
   // HF-only run: a subset of the table that includes every "always" key.
   const auto dir_hf = FreshDir("schema_hf");

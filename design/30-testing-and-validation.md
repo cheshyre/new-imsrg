@@ -123,6 +123,7 @@ file3e1max=6 file3e2max=12 file3e3max=18`. **Never emax > 6. IMSRG(3) only at em
 | IT-11 | IT-2 with `mpirun -n 2` and `-n 4` | identical to IT-2 within 1e-10 relative |
 | IT-12 | IT-2 driven through legacy `key=value` arguments vs TOML config | identical results |
 | IT-14 | ODE flow methods `flow_rk4` and `flow` (adaptive dopri5) with `Operators=Rp2` flowing alongside H: He4 emax 2, O16 emax 3 and 4, 2N only (goldens from the patched `imsrg++`, D42) | step and flow-line counts identical (the flow file of `flow` has one line per right-hand-side evaluation), every line within 5e-8 (printing precision), E0 within 1e-6 (acceptance 1e-3), Rp2 within 1e-6; O16 emax 4 under `slow` |
+| IT-15 | two decoupling stages with an ODE method: `flow_rk4` and `flow` with the p-shell valence space, He4 emax 2, 2N only (O16 emax 2 diverges in IMSRG(2); goldens from the patched `imsrg++`, D42) | `flow_rk4`: per-stage step counts (196, 96) identical, flow file within 1e-6 (measured 1e-7), E0 and the `.snt` elements within 1e-3 (measured 4e-9); `flow`: imsrg++ restarts s at 0 in stage 2 (M8-Q40), so only E0 and the `.snt` elements are compared |
 | IT-13 | emax 6 O16 IMSRG(2), release build (label `slow`, `perf`) | E0 vs golden, wall time vs imsrg-devel (recorded, not asserted) |
 
 ## 5. Performance tracking
