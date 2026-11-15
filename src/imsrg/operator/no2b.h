@@ -164,6 +164,10 @@ class No2bThreeBody {
   No2bTruncation trunc_;
   std::vector<IsospinOrbit> orbits_;
   std::vector<Channel> channels_;
+  // Dense (n, l, 2j - 2l + 1 in {0, 2}) -> isospin orbit index or -1.
+  std::vector<std::int32_t> orbit_lookup_;
+  std::int32_t orbit_stride_l_ = 2;
+  std::int32_t orbit_stride_n_ = 0;
   std::vector<std::int32_t>
       channel_lookup_;  // dense (J2, P2, J1, P1, T3) -> channel or -1
   std::vector<float> values_;

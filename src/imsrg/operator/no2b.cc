@@ -42,6 +42,56 @@ std::size_t LookupIndex(std::int32_t J2, std::int32_t P2, std::int32_t J1,
           static_cast<std::size_t>((T3 - 1) / 2));
 }
 
+// Isospin Clebsch-Gordan tables for get_pn, filled once by the same
+// angmom::ClebschGordan calls (same arguments) as a direct evaluation, so the
+// values are bitwise identical. Indices: m = +-1/2 -> (2m + 1) / 2; zab = -2,
+// 0, 2 -> (zab + 2) / 2; t in {0, 1}; (2T - 1) / 2 for T in {1/2, 3/2}.
+struct IsospinCgTables {
+  // (1/2 ma 1/2 mb | t zab): [ma][mb][t].
+  double pair[2][2][2];
+  // (t zab 1/2 mc | T z3): [t][zab][mc][T].
+  double couple[2][3][2][2];
+};
+
+const IsospinCgTables& IsospinCg() {
+  static const IsospinCgTables* const kTables = [] {
+    auto* tab = new IsospinCgTables{};
+    const TwoJ half{1};
+    for (std::int32_t ia = 0; ia < 2; ++ia) {
+      for (std::int32_t ib = 0; ib < 2; ++ib) {
+        for (std::int32_t t = 0; t < 2; ++t) {
+          const std::int32_t ma = 2 * ia - 1;
+          const std::int32_t mb = 2 * ib - 1;
+          const std::int32_t zab = ma + mb;
+          tab->pair[ia][ib][t] =
+              std::abs(zab) > 2 * t
+                  ? 0.0
+                  : angmom::ClebschGordan(half, TwoM{ma}, half, TwoM{mb},
+                                          TwoJ{2 * t}, TwoM{zab});
+        }
+      }
+    }
+    for (std::int32_t t = 0; t < 2; ++t) {
+      for (std::int32_t iz = 0; iz < 3; ++iz) {
+        for (std::int32_t ic = 0; ic < 2; ++ic) {
+          for (std::int32_t iT = 0; iT < 2; ++iT) {
+            const std::int32_t zab = 2 * iz - 2;
+            const std::int32_t mc = 2 * ic - 1;
+            tab->couple[t][iz][ic][iT] =
+                std::abs(zab) > 2 * t
+                    ? 0.0
+                    : angmom::ClebschGordan(TwoJ{2 * t}, TwoM{zab}, half,
+                                            TwoM{mc}, TwoJ{2 * iT + 1},
+                                            TwoM{zab + mc});
+          }
+        }
+      }
+    }
+    return tab;
+  }();
+  return *kTables;
+}
+
 }  // namespace
 
 No2bThreeBody::No2bThreeBody(const No2bTruncation& t) : trunc_(t) {
@@ -57,6 +107,16 @@ No2bThreeBody::No2bThreeBody(const No2bTruncation& t) : trunc_(t) {
     }
   }
   const auto norb = static_cast<std::int32_t>(orbits_.size());
+  orbit_stride_l_ = 2;
+  orbit_stride_n_ = (t.lmax + 1) * 2;
+  orbit_lookup_.assign(
+      static_cast<std::size_t>((t.emax / 2 + 1) * orbit_stride_n_), -1);
+  for (std::int32_t i = 0; i < norb; ++i) {
+    const auto& o = orbits_[static_cast<std::size_t>(i)];
+    orbit_lookup_[static_cast<std::size_t>(o.n * orbit_stride_n_ +
+                                           o.l * orbit_stride_l_ +
+                                           (o.j2.twice - 2 * o.l + 1) / 2)] = i;
+  }
   const std::int32_t j2max = std::min(2 * t.lmax + 1, t.e2max + 1);
   channel_lookup_.assign(static_cast<std::size_t>(j2max + 1) * 2 *
                              static_cast<std::size_t>(t.lmax + 1) * 2 * 2,
@@ -122,12 +182,18 @@ No2bThreeBody::No2bThreeBody(const No2bTruncation& t) : trunc_(t) {
 
 std::optional<std::int32_t> No2bThreeBody::isospin_orbit_index(
     std::int32_t n, std::int32_t l, TwoJ j2) const noexcept {
-  for (std::size_t i = 0; i < orbits_.size(); ++i) {
-    if (orbits_[i].n == n && orbits_[i].l == l && orbits_[i].j2 == j2) {
-      return static_cast<std::int32_t>(i);
-    }
+  if (n < 0 || l < 0 || orbit_lookup_.empty()) return std::nullopt;
+  const std::int32_t d =
+      j2.twice - 2 * l + 1;  // 0 for j = l - 1/2, 2 for l+1/2
+  if (d != 0 && d != 2) return std::nullopt;
+  if (l > trunc_.lmax ||
+      n >= static_cast<std::int32_t>(orbit_lookup_.size()) / orbit_stride_n_) {
+    return std::nullopt;
   }
-  return std::nullopt;
+  const std::int32_t i = orbit_lookup_[static_cast<std::size_t>(
+      n * orbit_stride_n_ + l * orbit_stride_l_ + d / 2)];
+  if (i < 0) return std::nullopt;
+  return i;
 }
 
 std::optional<std::int32_t> No2bThreeBody::channel_index(
@@ -236,7 +302,15 @@ double No2bThreeBody::get_pn(const basis::Orbit& a, const basis::Orbit& b,
   if (!i1 || !i2 || !i3 || !i4 || !i5 || !i6) return 0.0;
   const std::int32_t zab = a.tz2.twice + b.tz2.twice;
   const std::int32_t zde = d.tz2.twice + e.tz2.twice;
-  const TwoJ half{1};
+  const auto& cg = IsospinCg();
+  const auto ma = static_cast<std::size_t>((a.tz2.twice + 1) / 2);
+  const auto mb = static_cast<std::size_t>((b.tz2.twice + 1) / 2);
+  const auto md = static_cast<std::size_t>((d.tz2.twice + 1) / 2);
+  const auto me = static_cast<std::size_t>((e.tz2.twice + 1) / 2);
+  const auto mc = static_cast<std::size_t>((c.tz2.twice + 1) / 2);
+  const auto mf = static_cast<std::size_t>((f.tz2.twice + 1) / 2);
+  const auto iab = static_cast<std::size_t>((zab + 2) / 2);
+  const auto ide = static_cast<std::size_t>((zde + 2) / 2);
   double vout = 0.0;
   for (std::int32_t t12 : {0, 1}) {
     if (std::abs(zab) > 2 * t12) continue;
@@ -246,16 +320,9 @@ double No2bThreeBody::get_pn(const basis::Orbit& a, const basis::Orbit& b,
            twoT += 2) {
         const double w =
             get_isospin(*i1, *i2, *i3, t12, *i4, *i5, *i6, t45, J2, twoT);
-        vout +=
-            w *
-            angmom::ClebschGordan(half, TwoM{a.tz2.twice}, half,
-                                  TwoM{b.tz2.twice}, TwoJ{2 * t12}, TwoM{zab}) *
-            angmom::ClebschGordan(half, TwoM{d.tz2.twice}, half,
-                                  TwoM{e.tz2.twice}, TwoJ{2 * t45}, TwoM{zde}) *
-            angmom::ClebschGordan(TwoJ{2 * t12}, TwoM{zab}, half,
-                                  TwoM{c.tz2.twice}, TwoJ{twoT}, TwoM{z3}) *
-            angmom::ClebschGordan(TwoJ{2 * t45}, TwoM{zde}, half,
-                                  TwoM{f.tz2.twice}, TwoJ{twoT}, TwoM{z3});
+        const auto iT = static_cast<std::size_t>((twoT - 1) / 2);
+        vout += w * cg.pair[ma][mb][t12] * cg.pair[md][me][t45] *
+                cg.couple[t12][iab][mc][iT] * cg.couple[t45][ide][mf][iT];
       }
     }
   }
