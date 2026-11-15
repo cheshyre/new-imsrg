@@ -45,3 +45,34 @@ def golden():
 @pytest.fixture(scope="session")
 def o16_emax2():
     return imsrg.ModelSpace(2, "O16", "O16", hw=16.0)
+
+
+def _data_dir():
+    cands = []
+    if os.environ.get("IMSRG_TEST_DATA_DIR"):
+        cands.append(Path(os.environ["IMSRG_TEST_DATA_DIR"]))
+    cands += [ROOT.parents[2], Path("/Users/cheshyre/Downloads/new-imsrg")]
+    for c in cands:
+        if (c / "VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz").exists():
+            return c
+    return None
+
+
+ME2J_NAME = "VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz"
+NO2B_NAME = "NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin"
+
+
+@pytest.fixture(scope="session")
+def me2j_file():
+    d = _data_dir()
+    if d is None:
+        pytest.skip("big 2N input file not found (set IMSRG_TEST_DATA_DIR)")
+    return d / ME2J_NAME
+
+
+@pytest.fixture(scope="session")
+def no2b_file():
+    d = _data_dir()
+    if d is None or not (d / NO2B_NAME).exists():
+        pytest.skip("big 3N input file not found (set IMSRG_TEST_DATA_DIR)")
+    return d / NO2B_NAME
