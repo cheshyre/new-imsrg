@@ -1,0 +1,37 @@
+{
+  "Z_d32__random_A1__random_A2": {
+    "zero_body": 0,
+    "one_body_norm": 1049.186472949283,
+    "two_body_norm": 85321.94808644023,
+    "three_body_norm": 0,
+    "norm": 85328.39865789245
+  },
+  "Z_d32__random_A1__random_H1": {
+    "zero_body": 0,
+    "one_body_norm": 2937.287775883763,
+    "two_body_norm": 90102.08211732472,
+    "three_body_norm": 0,
+    "norm": 90149.94654105727
+  },
+  "random_A1": {
+    "zero_body": 0,
+    "one_body_norm": 6.173407274565,
+    "two_body_norm": 229.88960994656532,
+    "three_body_norm": 0,
+    "norm": 229.9724846992822
+  },
+  "random_A2": {
+    "zero_body": 0,
+    "one_body_norm": 1.9009391561525735,
+    "two_body_norm": 240.09836365286986,
+    "three_body_norm": 0,
+    "norm": 240.10588872091648
+  },
+  "random_H1": {
+    "zero_body": 0,
+    "one_body_norm": 11.53398154978301,
+    "two_body_norm": 249.36647601149272,
+    "three_body_norm": 0,
+    "norm": 249.63307490951817
+  }
+}
