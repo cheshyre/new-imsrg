@@ -545,8 +545,8 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
 * **M7-Q10** (2026-11-15, M7 general paths) - The general (NonHermitian) paths are chosen by the
   hermiticity FLAG of X or Y, not by inspecting the data: an operator flagged NonHermitian but
   holding Hermitian data gives the same numbers as the symmetric paths (tested, 4e-16) at higher
-  cost (about 2x ladder flops, 4x particle-hole flops, scratch 4x the Pandya scratch, allocated on
-  first use). **Assumed meanwhile:** callers who know the symmetry set the flag (the flow does).
+  cost (about 2x ladder flops and 4x particle-hole flops; the Pandya scratch grows by at most
+  4/3, allocated on first use; the ladders need no extra memory). **Assumed meanwhile:** callers who know the symmetry set the flag (the flow does).
 * **M7-Q11** (2026-11-15, M7 general paths) - The brief asked to test `commutator_ref` for general
   operators against a dense (m-scheme) brute force if the reference did not support them. It does:
   every term is bilinear, the reference matches imsrg++ goldens and the symmetry-based fast kernels

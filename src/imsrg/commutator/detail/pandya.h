@@ -7,7 +7,8 @@
 /// @file
 /// Precomputed data of the particle-hole term comm222_phss (design/12 section
 /// 4.2; imsrg++ `comm222_phss`, reference/02 P-12). Everything is allocated
-/// once per model space by `BuildPandyaData`; a call of the term only fills
+/// once per model space by `BuildPandyaData` (the scratch of the general path
+/// at its first use, `EnsureGeneralScratch`); a call of the term only fills
 /// the scratch buffers. No Kokkos.
 ///
 /// Conventions. For every cross-coupled (Pandya) channel c of the model space
@@ -137,19 +138,21 @@ struct PandyaData {
   /// The kernel view. O(1).
   const PandyaView& view() const noexcept { return kernel_view; }
 
-  /// Total size of the four scratch buffers in bytes (XK + YK + W + ZB). O(1).
+  /// Total size of the scratch buffers in bytes (XK + YK + W + ZB, plus the
+  /// general-path scratch once allocated). O(1).
   std::size_t scratch_bytes() const noexcept {
-    return (xk.size() + yk.size() + w.size() + zb.size()) * sizeof(double);
+    return (xk.size() + yk.size() + w.size() + zb.size()) * sizeof(double) +
+           general.scratch_bytes();
   }
 };
 
 /// Builds the Pandya data of `ms`: the cc ket lists, the pair lists K (from the
 /// reference occupations of `ms`), device copies of the cc index tables and the
 /// scratch buffers with their block offsets. Needs an initialized
-/// `exec::Runtime`. All allocation of the term happens here. Memory O(sum over
-/// cc channels of Ncc (2 nk + 4 Ncc)) doubles: XK (Ncc nk) + YK (2 Ncc nk) + W
-/// and ZB (2 Ncc^2 each), i.e. Ncc (3 nk + 4 Ncc); `scratch_bytes()` reports
-/// it.
+/// `exec::Runtime`. All allocation of the (anti-)Hermitian path happens here.
+/// Memory O(sum over cc channels of Ncc (2 nk + 4 Ncc)) doubles: XK (Ncc nk) +
+/// YK (2 Ncc nk) + W and ZB (2 Ncc^2 each), i.e. Ncc (3 nk + 4 Ncc);
+/// `scratch_bytes()` reports it.
 PandyaData BuildPandyaData(const basis::ModelSpace& ms);
 
 /// Allocates (once) the scratch of the general particle-hole path for the
@@ -157,14 +160,15 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms);
 /// work, so the path computes the Pandya-transformed result for all ordered
 /// pairs on both sides: Zbar(alpha, beta) = sum_kappa D_kappa (Xbar(alpha,
 /// kappa) Ybar(kappa, beta) - Ybar(alpha, kappa) Xbar(kappa, beta)) for alpha,
-/// beta in the 2 Ncc ordered pairs of the channel, as ONE GEMM per channel
-///   Z (2Ncc x 2Ncc) = A (2Ncc x 2nk) B (2nk x 2Ncc),
-///   A = [ D Xbar(alpha, kappa) | -D Ybar(alpha, kappa) ],
-///   B = [ Ybar(kappa, beta) ; Xbar(kappa, beta) ]   (stacked rows),
-/// all column-major (A, B at the same offset `g_off`, each 4 Ncc nk doubles; Z
-/// at `gz_off`, 4 Ncc^2). Memory O(sum over cc channels of Ncc (8 nk + 4
-/// Ncc)) doubles, about 4x the Hermitian scratch, paid only by programs that
-/// use general operators. Idempotent. Needs an initialized `exec::Runtime`.
+/// beta in the 2 Ncc ordered pairs of the channel, as TWO GEMMs per channel
+/// that share the operand buffers: Z (2Ncc x 2Ncc) = A0 B0 + A1 B1, A (2Ncc x
+/// nk) and B (nk x 2Ncc), all column-major (A, B at the offset `g_off`, each 2
+/// Ncc nk doubles; Z at `gz_off`, 4 Ncc^2). Memory sum over cc channels of Ncc
+/// (4 nk + 4 Ncc) doubles, at most 4/3 of the
+/// Hermitian scratch of Ncc (3 nk + 4 Ncc); 4x the flops. Paid only by
+/// programs that use general operators; included in `scratch_bytes()` once
+/// allocated. Idempotent; strongly exception safe (a throwing allocation
+/// leaves the scratch unallocated). Needs an initialized `exec::Runtime`.
 void EnsureGeneralScratch(PandyaData& pd);
 
 }  // namespace imsrg::commutator::detail

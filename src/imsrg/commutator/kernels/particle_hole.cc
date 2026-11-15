@@ -176,61 +176,60 @@ void Comm222PhssGeneral(const op::Operator& X, const op::Operator& Y,
 
   const int num_cc = pd.num_cc;
   const auto g_total = static_cast<exec::Index>(pd.general.g_off_host.back());
-  if (g_total > 0) {
-    // One thread per position e of the A/B blocks fills A(alpha, kcol) and
-    // B(krow, beta) (the two blocks have the same size 4 Ncc nk): with kappa =
-    // (a, b) a pair of K and an ordered cc pair (p, q) of the channel,
-    //   A(alpha, kappa)      =  D_kappa Xbar(alpha-pair, kappa),
-    //   A(alpha, nk + kappa) = -D_kappa Ybar(alpha-pair, kappa),
-    //   B(kappa, beta)       =  Ybar(kappa, beta-pair),
-    //   B(nk + kappa, beta)  =  Xbar(kappa, beta-pair).
-    exec::ParallelFor(
-        "commutator::comm222_phss_general::fill", g_total,
-        IMSRG_LAMBDA(const exec::Index e) {
-          const PhArgs& a = g.ph;
-          const int c = detail::FindBlock(g.g_off, num_cc, e);
-          const std::int64_t local = e - g.g_off[c];
-          const int n = a.pv.ncc[c];
-          const int nk = a.pv.nk[c];
-          const int two_Jp = 2 * (c / 6);
-          const int* kp = a.pv.ket_p + a.pv.ket_off[c];
-          const int* kq = a.pv.ket_q + a.pv.ket_off[c];
-          // A element (row alpha < 2n, column kcol < 2nk).
-          {
-            const int alpha = static_cast<int>(local % (2 * n));
-            const int kcol = static_cast<int>(local / (2 * n));
-            const int kappa = kcol % nk;
-            const int ka = a.pv.k_off[c] + kappa;
-            const int pa = alpha < n ? kp[alpha] : kq[alpha - n];
-            const int qa = alpha < n ? kq[alpha] : kp[alpha - n];
-            const double d = a.pv.k_d[ka];
-            g.a[e] = kcol < nk
-                         ? d * PandyaBar(a.xv, a.sj, pa, qa, a.pv.k_a[ka],
-                                         a.pv.k_b[ka], two_Jp)
-                         : -d * PandyaBar(a.yv, a.sj, pa, qa, a.pv.k_a[ka],
-                                          a.pv.k_b[ka], two_Jp);
-          }
-          // B element (row krow < 2nk, column beta < 2n).
-          {
-            const int krow = static_cast<int>(local % (2 * nk));
-            const int beta = static_cast<int>(local / (2 * nk));
-            const int kappa = krow % nk;
-            const int ka = a.pv.k_off[c] + kappa;
-            const int rb = beta < n ? kp[beta] : kq[beta - n];
-            const int sb = beta < n ? kq[beta] : kp[beta - n];
-            g.b[e] = krow < nk ? PandyaBar(a.yv, a.sj, a.pv.k_a[ka],
-                                           a.pv.k_b[ka], rb, sb, two_Jp)
-                               : PandyaBar(a.xv, a.sj, a.pv.k_a[ka],
-                                           a.pv.k_b[ka], rb, sb, two_Jp);
-          }
-        });
-  }
-  exec::Fence("commutator::comm222_phss_general::fill");
   // Host BLAS only; device backends need a device gemm (design/12 section 3).
   IMSRG_CHECK(pd.general.z.host_is_device(),
               "comm222_phss: host BLAS on device memory; needs a device gemm "
               "(GPU backends)");
-  linalg::GroupedGemm(pd.general.gemms);
+  // Two passes share the A and B scratch (each 2 Ncc x nk): Z = A0 B0 + A1 B1
+  // with, for kappa = (a, b) a pair of K and ordered cc pairs (p, q),
+  //   pass 0: A0(alpha, kappa) =  D_kappa Xbar(alpha-pair, kappa),
+  //           B0(kappa, beta)  =  Ybar(kappa, beta-pair),
+  //   pass 1: A1(alpha, kappa) = -D_kappa Ybar(alpha-pair, kappa),
+  //           B1(kappa, beta)  =  Xbar(kappa, beta-pair),
+  // the second GEMM accumulating (beta = 1) into Z.
+  for (int pass = 0; pass < 2; ++pass) {
+    if (g_total > 0) {
+      exec::ParallelFor(
+          "commutator::comm222_phss_general::fill", g_total,
+          IMSRG_LAMBDA(const exec::Index e) {
+            const PhArgs& a = g.ph;
+            const int c = detail::FindBlock(g.g_off, num_cc, e);
+            const std::int64_t local = e - g.g_off[c];
+            const int n = a.pv.ncc[c];
+            const int nk = a.pv.nk[c];
+            if (nk == 0) return;
+            const int two_Jp = 2 * (c / 6);
+            const int* kp = a.pv.ket_p + a.pv.ket_off[c];
+            const int* kq = a.pv.ket_q + a.pv.ket_off[c];
+            const TwoBodyView& first = pass == 0 ? a.xv : a.yv;
+            const TwoBodyView& second = pass == 0 ? a.yv : a.xv;
+            // A element (row alpha < 2n, column kappa < nk).
+            {
+              const int alpha = static_cast<int>(local % (2 * n));
+              const int kappa = static_cast<int>(local / (2 * n));
+              const int ka = a.pv.k_off[c] + kappa;
+              const int pa = alpha < n ? kp[alpha] : kq[alpha - n];
+              const int qa = alpha < n ? kq[alpha] : kp[alpha - n];
+              const double d = pass == 0 ? a.pv.k_d[ka] : -a.pv.k_d[ka];
+              g.a[e] = d * PandyaBar(first, a.sj, pa, qa, a.pv.k_a[ka],
+                                     a.pv.k_b[ka], two_Jp);
+            }
+            // B element (row kappa < nk, column beta < 2n).
+            {
+              const int kappa = static_cast<int>(local % nk);
+              const int beta = static_cast<int>(local / nk);
+              const int ka = a.pv.k_off[c] + kappa;
+              const int rb = beta < n ? kp[beta] : kq[beta - n];
+              const int sb = beta < n ? kq[beta] : kp[beta - n];
+              g.b[e] = PandyaBar(second, a.sj, a.pv.k_a[ka], a.pv.k_b[ka], rb,
+                                 sb, two_Jp);
+            }
+          });
+    }
+    exec::Fence("commutator::comm222_phss_general::fill");
+    for (auto& gemm : pd.general.gemms) gemm.beta = pass == 0 ? 0.0 : 1.0;
+    linalg::GroupedGemm(pd.general.gemms);
+  }
 
   double* z2 = Z.two_body().matrix().buffer().device_data();
   const std::int64_t* block_offset = impl.block_offsets.device_data();

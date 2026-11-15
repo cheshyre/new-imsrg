@@ -179,10 +179,10 @@ to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9. In the driver (run 2): IT
   with n_a != n_b, and an inverse transform that reads only the stored half of Zbar through
   the flip symmetry `F W F = -hX hY Phi W Phi` (so, unlike imsrg++, it does not depend on the
   lexicographic ket order, reference/02 P-12). General paths (either input NonHermitian): the
-  ladders take both products `X P Y` and `Y P X` (second buffer allocated at the first general
-  call) and `M = W - W'`; the particle-hole term fills the Pandya matrices for all `2 Ncc`
-  ordered pairs on both sides (`A = [D Xbar | -D Ybar]`, `B = [Ybar; Xbar]`, one GEMM `2Ncc x
-  2nk x 2Ncc` per channel, lazily allocated scratch) and inverse-transforms every stored element
+  ladders take both products `X P Y` and `Y P X` (the second GEMM accumulates with alpha = -1, no extra
+  buffer); the particle-hole term fills the Pandya matrices for all `2 Ncc`
+  ordered pairs on both sides (two GEMMs `2Ncc x nk x 2Ncc` per channel into one result, `A0 = D Xbar, B0 = Ybar`, then
+  `A1 = -D Ybar, B1 = Xbar`, lazily allocated scratch) and inverse-transforms every stored element
   without mirroring; comm122 applies the lifted one-body list to the bra and, with the one-body
   matrix transposed, to the ket; comm110/220 keep their sums for a general Z (they vanish only
   for an anti-Hermitian Z). The (anti-)Hermitian paths are unchanged. `commutator_ref` (tests only) evaluates the same

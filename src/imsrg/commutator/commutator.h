@@ -24,9 +24,10 @@
 /// work in the ladder and particle-hole terms, one triangle per two-body
 /// block); a NonHermitian input takes the general paths, which evaluate the
 /// explicit products X P Y - Y P X and every stored element independently (the
-/// ladder terms need a second product, the particle-hole term works with the
-/// Pandya matrices of all 2 Ncc ordered pairs: about 2x and 4x the flops, with
-/// scratch allocated at the first general call). The test-only module
+/// ladder terms need a second product accumulated into the first, the
+/// particle-hole term works with the Pandya matrices of all 2 Ncc ordered
+/// pairs: about 2x and 4x the flops, with its extra scratch, at most 4/3 of the
+/// Hermitian one, allocated at the first general call). The test-only module
 /// `commutator_ref` evaluates the same expressions without symmetry tricks and
 /// is the oracle of the general paths (design/00 D36, M7-Q2).
 

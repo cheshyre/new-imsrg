@@ -12,7 +12,8 @@
 /// with P_pp = diag((1 - n_p)(1 - n_q)) and P_hh = diag(n_p n_q) over the
 /// normalized kets. P_pp and P_hh are non-zero only on the kets of the lists Kp
 /// and Kh, so the products are small dense gemms on gathered operands. All
-/// buffers are allocated once, when the workspace is built.
+/// buffers are allocated once, when the workspace is built (the general path
+/// needs no additional ones).
 
 #include <cstdint>
 #include <vector>
@@ -45,10 +46,6 @@ struct LadderProjector {
   exec::DeviceBuffer<double>
       product;  ///< W = X P Y (`LadderProducts`), antisymmetrized in place
                 ///< to Mpp or Mhh by the ladder terms; two-body layout.
-  exec::DeviceBuffer<double>
-      product_yx;  ///< W' = Y P X, general operators only: empty until the
-                   ///< first `LadderProductsGeneral` call (lazy allocation, so
-                   ///< (anti-)Hermitian flows never pay for it).
 };
 
 /// Device-resident data of the ladder terms.
@@ -89,7 +86,8 @@ void LadderProducts(const op::Operator& X, const op::Operator& Y,
 /// General (non-Hermitian) form of the ladder intermediates: afterwards
 /// `impl.ladder.{pp,hh}.product` hold Mpp = X P_pp Y - Y P_pp X and Mhh = X
 /// P_hh Y - Y P_hh X directly (no use of X^T = hX X). Preconditions as for
-/// `LadderProducts`. Allocates the `product_yx` scratch on first use. The
+/// `LadderProducts`. Needs no extra scratch (the second product accumulates
+/// into the first with alpha = -1). The
 /// results are complete when it returns. Complexity: twice that of
 /// `LadderProducts` plus one elementwise pass.
 void LadderProductsGeneral(const op::Operator& X, const op::Operator& Y,

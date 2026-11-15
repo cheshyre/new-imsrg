@@ -20,6 +20,7 @@
 
 #include "imsrg/base/error.h"
 #include "imsrg/commutator/commutator.h"
+#include "imsrg/commutator/detail/workspace_impl.h"
 #include "imsrg/commutator_ref/commutator_ref.h"
 #include "imsrg/operator/arithmetic.h"
 #include "tests/support/commutator_test_support.h"
@@ -262,6 +263,52 @@ TEST(commutator_general, one_body_and_masked_terms) {
   commutator_ref::Comm221ss(X2, Y2, Zr);
   commutator_ref::Comm222Phss(X2, Y2, Zr);
   EXPECT_LE(RelativeDeviation(Zm, Zr), kGeneralTol);
+}
+
+// The general scratch is allocated lazily: (anti-)Hermitian use leaves it
+// empty, the first general call allocates it (counted in scratch_bytes()), and
+// later calls reuse it.
+TEST(commutator_general, scratch_is_lazy) {
+  const auto ms = imsrg::testing::MakeModelSpace(1, "He4");
+  Workspace ws(ms);
+  const Operator A = RandomOperator(ms, kA, 41);
+  const Operator H = RandomOperator(ms, kH, 42);
+  const Operator N = RandomOperator(ms, kN, 43);
+  (void)commutator::Commutator(A, H, CommutatorOptions{}, ws);
+  const auto& pd = ws.impl().pandya;
+  EXPECT_FALSE(pd.general.allocated());
+  EXPECT_EQ(pd.general.scratch_bytes(), 0u);
+  const std::size_t before = pd.scratch_bytes();
+  (void)commutator::Commutator(N, H, CommutatorOptions{}, ws);
+  EXPECT_TRUE(pd.general.allocated());
+  EXPECT_GT(pd.general.scratch_bytes(), 0u);
+  EXPECT_EQ(pd.scratch_bytes(), before + pd.general.scratch_bytes());
+  EXPECT_LE(pd.general.scratch_bytes(), before * 4 / 3 + 64);
+  const double* z = pd.general.z.device_data();
+  (void)commutator::Commutator(H, N, CommutatorOptions{}, ws);
+  EXPECT_EQ(pd.general.z.device_data(), z);
+}
+
+// Z must carry the hermiticity of [X, Y]: general for a general input, and not
+// general for definite inputs.
+TEST(commutator_general, wrong_z_hermiticity_throws) {
+  const auto ms = imsrg::testing::MakeModelSpace(1, "He4");
+  Workspace ws(ms);
+  const Operator N = RandomOperator(ms, kN, 51);
+  const Operator H = RandomOperator(ms, kH, 52);
+  const Operator A = RandomOperator(ms, kA, 53);
+  for (const Hermiticity hz : {kH, kA}) {
+    Operator Z(ms, op::OperatorSpec::Scalar(2, hz));
+    for (const auto& t : kTerms) {
+      EXPECT_THROW(t.fast(N, H, Z, ws), InvariantError) << t.name;
+      EXPECT_THROW(t.fast(A, N, Z, ws), InvariantError) << t.name;
+    }
+  }
+  Operator Zg(ms, op::OperatorSpec::Scalar(2, kN));
+  for (const auto& t : kTerms) {
+    EXPECT_THROW(t.fast(A, H, Zg, ws), InvariantError) << t.name;
+    EXPECT_THROW(t.fast(H, H, Zg, ws), InvariantError) << t.name;
+  }
 }
 
 }  // namespace

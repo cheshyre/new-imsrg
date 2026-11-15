@@ -112,11 +112,11 @@ namespace detail {
 
 namespace {
 
-/// W = A P B per channel and projector into `p->*out` (`product` or
-/// `product_yx`) for the gathered A, B. See `LadderProducts`.
+/// product = alpha X P Y + beta product per channel and projector for the
+/// gathered operands (beta = 0: overwrite, beta = 1: accumulate). See
+/// `LadderProducts`.
 void ProductsInto(const op::Operator& X, const op::Operator& Y,
-                  Workspace::Impl& impl,
-                  exec::DeviceBuffer<double> LadderProjector::* out) {
+                  Workspace::Impl& impl, double alpha, double beta) {
   auto& lad = impl.ladder;
   const TwoBodyView xv = impl.two_body_view(X);
   const TwoBodyView yv = impl.two_body_view(Y);
@@ -130,7 +130,7 @@ void ProductsInto(const op::Operator& X, const op::Operator& Y,
   lad.problems.clear();
   const int nch = xv.tb.num_channels;
   for (LadderProjector* p : {&lad.pp, &lad.hh}) {
-    double* prod = (p->*out).device_data();
+    double* prod = p->product.device_data();
     const double* xg = p->xg.device_data();
     const double* yg = p->yg.device_data();
     for (int ch = 0; ch < nch; ++ch) {
@@ -145,10 +145,10 @@ void ProductsInto(const op::Operator& X, const op::Operator& Y,
       const std::int64_t goff =
           p->gather_offset_host[static_cast<std::size_t>(ch)];
       linalg::GemmProblem g;
-      g.alpha = 1.0;
+      g.alpha = alpha;
       g.A = MatrixView<const double>{xg + goff, dim, k, dim};
       g.B = MatrixView<const double>{yg + goff, k, dim, k};
-      g.beta = 0.0;
+      g.beta = beta;
       g.C = MatrixView<double>{
           prod + impl.block_offsets_host[static_cast<std::size_t>(ch)], dim,
           dim, dim};
@@ -166,30 +166,15 @@ void ProductsInto(const op::Operator& X, const op::Operator& Y,
 
 void LadderProducts(const op::Operator& X, const op::Operator& Y,
                     Workspace::Impl& impl) {
-  ProductsInto(X, Y, impl, &LadderProjector::product);
+  ProductsInto(X, Y, impl, 1.0, 0.0);
 }
 
 void LadderProductsGeneral(const op::Operator& X, const op::Operator& Y,
                            Workspace::Impl& impl) {
-  auto& lad = impl.ladder;
-  for (LadderProjector* p : {&lad.pp, &lad.hh}) {
-    if (p->product_yx.size() != p->product.size())
-      p->product_yx =
-          exec::DeviceBuffer<double>(p->product.size(), "ladder_product_yx");
-  }
-  ProductsInto(X, Y, impl, &LadderProjector::product);     // X P Y
-  ProductsInto(Y, X, impl, &LadderProjector::product_yx);  // Y P X
-  // Blocks without listed kets are skipped by both products: they stay zero,
-  // and 0 - 0 = 0.
-  for (LadderProjector* p : {&lad.pp, &lad.hh}) {
-    double* w = p->product.device_data();
-    const double* wyx = p->product_yx.device_data();
-    exec::ParallelFor(
-        "commutator::ladder_general_difference",
-        static_cast<exec::Index>(impl.two_body_size),
-        IMSRG_LAMBDA(const exec::Index e) { w[e] -= wyx[e]; });
-  }
-  exec::Fence("commutator::ladder_general_difference");
+  // M = X P Y - Y P X: the second grouped gemm accumulates with alpha = -1.
+  // Blocks without listed kets are skipped by both: they stay zero.
+  ProductsInto(X, Y, impl, 1.0, 0.0);
+  ProductsInto(Y, X, impl, -1.0, 1.0);
 }
 
 }  // namespace detail
