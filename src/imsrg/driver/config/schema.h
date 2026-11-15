@@ -61,6 +61,8 @@ enum class ThreeBodyType { kFull, kNo2b, kMono };
 enum class ThreeBodyFormat { kMe3j, kNavratil };
 /// `interaction.three_body.no2b_precision`.
 enum class No2bPrecision { kSingle, kHalf };
+/// `hartree_fock.mixing`: how the HF iteration combines successive iterates.
+enum class HartreeFockMixing { kDiis, kLinear };
 /// `natural_orbitals.order`.
 enum class NatOrder { kOccupation, kEnergy };
 /// `imsrg.method`: the solver.
@@ -211,6 +213,9 @@ IMSRG_DRIVER_ENUM_TRAITS(ThreeBodyFormat, "three-body format",
 IMSRG_DRIVER_ENUM_TRAITS(No2bPrecision, "NO2B precision",
                          {No2bPrecision::kSingle, "single"},
                          {No2bPrecision::kHalf, "half"});
+IMSRG_DRIVER_ENUM_TRAITS(HartreeFockMixing, "Hartree-Fock mixing",
+                         {HartreeFockMixing::kDiis, "diis"},
+                         {HartreeFockMixing::kLinear, "linear"});
 IMSRG_DRIVER_ENUM_TRAITS(NatOrder, "natural-orbital order",
                          {NatOrder::kOccupation, "occupation"},
                          {NatOrder::kEnergy, "energy"});
@@ -380,6 +385,9 @@ struct InteractionConfig {
 
 /// `[hartree_fock]`.
 struct HartreeFockConfig {
+  /// Pulay DIIS in TOML; the legacy layer resolves an absent key to `kLinear`
+  /// (imsrg++ density mixing, D37).
+  HartreeFockMixing mixing = HartreeFockMixing::kDiis;
   bool freeze_occupations = false;
   friend bool operator==(const HartreeFockConfig&,
                          const HartreeFockConfig&) = default;

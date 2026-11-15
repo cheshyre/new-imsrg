@@ -87,6 +87,25 @@ TEST(PipelineHamiltonian, O16TwoBody) {
   EXPECT_EQ(ph.proton_number, 8);
 }
 
+TEST(PipelineHamiltonian, HartreeFockMixingDiisAndLinearReachTheSameSolution) {
+  if (!Have(kVnn)) GTEST_SKIP() << "missing " << kVnn;
+  const std::string head = "[hartree_fock]\nmixing = \"";
+  const RunConfig diis = Load(Toml(kO16, false) + head + "diis\"\n");
+  const RunConfig dflt = Load(Toml(kO16, false));
+  const RunConfig lin = Load(Toml(kO16, false) + head + "linear\"\n");
+  EXPECT_EQ(dflt.hartree_fock.mixing, HartreeFockMixing::kDiis);
+  const PreparedHamiltonian pd = PrepareHamiltonian(diis);
+  const PreparedHamiltonian pl = PrepareHamiltonian(lin);
+  ASSERT_TRUE(pd.hf.has_value());
+  ASSERT_TRUE(pl.hf.has_value());
+  std::cout << "[dev] O16 2N E_HF diis - linear = " << pd.hf->e_hf - pl.hf->e_hf
+            << ", iterations diis " << pd.hf->iterations << " linear "
+            << pl.hf->iterations << "\n";
+  EXPECT_NEAR(pd.hf->e_hf, pl.hf->e_hf, 1.0e-6);
+  EXPECT_LT(pd.hf->iterations, pl.hf->iterations);
+  EXPECT_TRUE(pd.hf->converged);
+}
+
 TEST(PipelineHamiltonian, O16WithNo2b) {
   if (!Have(kVnn) || !Have(kV3))
     GTEST_SKIP() << "missing input files in " << IMSRG_TEST_DATA_DIR;
@@ -145,7 +164,8 @@ TEST(PipelineHamiltonian, RsoIsAnOperatorAndVanishesForClosedShells) {
 
 TEST(PipelineHamiltonian, PlannedOptionsThrow) {
   const std::string base = Toml(kO16, false);
-  const RunConfig nat = Load(Toml(kO16, false, "kind = \"nat\""));
+  const RunConfig nat = Load(Toml(kO16, false, "kind = \"nat\"") +
+                             "[natural_orbitals]\nuse_occupations = true\n");
   EXPECT_THROW(PrepareHamiltonian(nat), ConfigError);
   try {
     PrepareHamiltonian(nat);

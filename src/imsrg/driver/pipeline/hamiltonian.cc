@@ -12,12 +12,15 @@
 #include <utility>
 #include <variant>
 
+#include "imsrg/base/assert.h"
 #include "imsrg/base/error.h"
 #include "imsrg/base/log.h"
 #include "imsrg/basis/model_space.h"
 #include "imsrg/driver/operators/operator_request.h"
 #include "imsrg/io/me2j.h"
 #include "imsrg/io/no2b.h"
+#include "imsrg/mbpt/energies.h"
+#include "imsrg/mbpt/natural_orbitals.h"
 #include "imsrg/operator/arithmetic.h"
 #include "imsrg/operator/basis_transform.h"
 #include "imsrg/operator/no2b.h"
@@ -39,7 +42,12 @@ void RejectPlanned(const RunConfig& c) {
   if (c.reference.occupations_file) Planned("reference.occupations_file");
   if (c.valence.custom) Planned("valence.custom");
   if (c.basis.emax_unocc) Planned("basis.emax_unocc");
-  if (c.basis.kind == BasisKind::kNat) Planned("basis.kind = \"nat\"");
+  if (c.natural_orbitals.use_occupations) {
+    Planned("natural_orbitals.use_occupations");
+  }
+  if (c.natural_orbitals.order != NatOrder::kOccupation) {
+    Planned("natural_orbitals.order other than \"occupation\"");
+  }
   if (c.hamiltonian.trap_hw) Planned("hamiltonian.trap_hw");
   if (c.interaction.two_body.format != TwoBodyFormat::kMe2j) {
     Planned("interaction.two_body.format other than me2j");
@@ -48,6 +56,29 @@ void RejectPlanned(const RunConfig& c) {
       c.interaction.three_body->type != ThreeBodyType::kNo2b) {
     Planned("interaction.three_body.type other than no2b");
   }
+}
+
+/// basis.kind = "nat" (imsrg++ `HFMBPT::GetNaturalOrbitals` +
+/// `GetNormalOrderedH`): natural orbitals of the MBPT(2) density matrix of the
+/// HF-basis Hamiltonian in `out`, the mean-field state of the reference
+/// occupations in that basis (`hf::SolutionInBasis`) and the Hamiltonian
+/// normal ordered in it. Replaces `out.hno` and `out.e_reference` and fills
+/// `out.nat` (its C maps the oscillator basis to the NAT basis).
+void ToNaturalOrbitalBasis(const op::Operator& H, const op::No2bThreeBody* v3,
+                           const hf::HFOptions& ho, PreparedHamiltonian& out) {
+  IMSRG_CHECK(out.hf.has_value(), "the NAT basis is built on an HF solution");
+  op::Operator hno = out.hno;  // Mbpt2DensityMatrix syncs its argument
+  const linalg::Matrix<double> rho_hf = mbpt::Mbpt2DensityMatrix(hno);
+  const mbpt::NaturalOrbitals nat =
+      mbpt::ComputeNaturalOrbitals(rho_hf, out.hno.model_space());
+  const linalg::Matrix<double> c_ho2nat = mbpt::Matmul(out.hf->C, nat.c_hf2nat);
+  hf::HFResult r =
+      hf::SolutionInBasis(H, v3, c_ho2nat, out.hf->occupations, ho);
+  out.hno = hf::NormalOrderedHamiltonian(H, v3, r, ho);
+  out.e_reference = r.e_hf;
+  log::Info("NAT basis: E_HF = {:.8f} MeV (HF basis {:.8f} MeV)", r.e_hf,
+            out.hf->e_hf);
+  out.nat = std::move(r);
 }
 
 }  // namespace
@@ -120,8 +151,11 @@ PreparedHamiltonian PrepareHamiltonian(const RunConfig& config) {
   out.mass_number = b.mass_number;
   out.proton_number = ms->reference().target_Z();
 
-  if (b.kind == BasisKind::kHf) {
+  if (b.kind == BasisKind::kHf || b.kind == BasisKind::kNat) {
     hf::HFOptions ho;
+    ho.mixing = config.hartree_fock.mixing == HartreeFockMixing::kDiis
+                    ? hf::Mixing::kDiis
+                    : hf::Mixing::kLinear;
     ho.freeze_occupations = config.hartree_fock.freeze_occupations;
     ho.e3max = b.e3max;
     hf::HFResult r = hf::Solve(H, v3p, ho);
@@ -133,10 +167,18 @@ PreparedHamiltonian PrepareHamiltonian(const RunConfig& config) {
     out.hno = hf::NormalOrderedHamiltonian(H, v3p, r, ho);
     out.e_reference = r.e_hf;
     out.hf = std::move(r);
+    if (b.kind == BasisKind::kNat) ToNaturalOrbitalBasis(H, v3p, ho, out);
   } else {
     out.hno = v3p ? op::NormalOrder(H, *v3p) : op::NormalOrder(H);
     out.e_reference = out.hno.zero_body();
     log::Info("Oscillator basis: E_ref = {:.8f} MeV", out.e_reference);
+  }
+  {
+    // MBPT(2) correlation energy of the Hamiltonian entering the flow
+    // (imsrg++.cc:739); Mp2Energy syncs its argument, so use a copy.
+    op::Operator h = out.hno;
+    out.e_mp2 = mbpt::Mp2Energy(h);
+    log::Info("EMP2 = {:.8f} MeV", out.e_mp2);
   }
   if (lawson) out.hno -= 1.5 * beta * config.hamiltonian.beta_cm_hw;
   return out;
@@ -180,7 +222,11 @@ op::Operator PrepareOperator(const OperatorRequest& request,
         Planned("operator '" + request.canonical_name + "'");
     }
   }();
-  if (ph.hf) o = hf::ToHfBasis(o, *ph.hf);
+  if (ph.nat) {
+    o = hf::ToHfBasis(o, *ph.nat);
+  } else if (ph.hf) {
+    o = hf::ToHfBasis(o, *ph.hf);
+  }
   const auto hno_ms = ph.hno.model_space_ptr();
   if (hno_ms != o.model_space_ptr()) o = op::WithModelSpace(o, hno_ms);
   return op::NormalOrder(o);

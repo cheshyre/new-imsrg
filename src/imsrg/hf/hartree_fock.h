@@ -101,6 +101,23 @@ struct HFResult {
 HFResult Solve(const op::Operator& H, const op::No2bThreeBody* v3,
                const HFOptions& options = {});
 
+/// The mean-field state of a *given* orthogonal basis (no iteration): for the
+/// natural-orbital basis of the driver, `c_ho2basis` = C_ho2hf C_hf2nat
+/// (oscillator orbit x basis orbit, block diagonal in (l, j, tz)) and
+/// `occupations` the occupations of the reference orbits in that basis. The
+/// result has rho(a,b) = sum_alpha n_alpha C(a,alpha) C(b,alpha) in the
+/// oscillator basis, F = T + V2[rho] + 1/2 V3[rho] (so not diagonal in the
+/// basis), the energies e1, e2, e3, E_HF of that rho, `spe` = the diagonal of
+/// C^T F C, `iterations` = 0 and `converged` = true. It can be passed to
+/// `NormalOrderedHamiltonian` and `ToHfBasis` like a solved `HFResult`. `H` and
+/// `v3` as in `Solve` (`options.e3max` cut; the other options are unused).
+/// Complexity: one Fock build, O(N^2 c^2 N) plus the 3N monopole.
+/// @throws InvariantError if the shapes do not match H's model space.
+HFResult SolutionInBasis(const op::Operator& H, const op::No2bThreeBody* v3,
+                         const linalg::Matrix<double>& c_ho2basis,
+                         const std::vector<double>& occupations,
+                         const HFOptions& options = {});
+
 /// The Hamiltonian in the Hartree-Fock basis and normal ordered with respect to
 /// the HF reference, with the three-body part truncated at the normal-ordered
 /// two-body level (imsrg++ `HartreeFock::GetNormalOrderedH(2)`): E0 = E_HF, f =
