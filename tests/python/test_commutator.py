@@ -60,7 +60,8 @@ def test_all_terms_equal_the_sum_of_the_terms(he4):
     full = comm.commutator(x, y)
     assert full.spec.hermiticity == imsrg.Hermiticity.Hermitian  # (A, H) -> H
     total = None
-    for t in Term.__members__.values():
+    # The IMSRG(2) terms (the IMSRG(3) ones need a three-body space).
+    for t in TermMask.imsrg2().terms():
         zt = comm.commutator(x, y, terms=[t])
         total = zt if total is None else total + zt
     assert _rel_dev(total, full) < 1e-12
