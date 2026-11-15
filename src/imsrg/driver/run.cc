@@ -13,6 +13,7 @@
 #include <fstream>
 #include <functional>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <string>
 #include <utility>
@@ -21,7 +22,11 @@
 
 #include "imsrg/base/error.h"
 #include "imsrg/base/log.h"
+#include "imsrg/basis/model_space.h"
 #include "imsrg/basis/orbit.h"
+#include "imsrg/basis/three_body_channels.h"
+#include "imsrg/basis/three_body_space.h"
+#include "imsrg/commutator/options.h"
 #include "imsrg/driver/config/writer.h"
 #include "imsrg/driver/pipeline/hamiltonian.h"
 #include "imsrg/flow/magnus.h"
@@ -29,6 +34,7 @@
 #include "imsrg/flow/triples.h"
 #include "imsrg/io/valence_writers.h"
 #include "imsrg/mbpt/energies.h"
+#include "imsrg/operator/basis_transform.h"
 #include "imsrg/operator/normal_ordering.h"
 
 namespace imsrg::driver {
@@ -63,7 +69,17 @@ void RejectPlanned(const RunConfig& c) {
     Planned("imsrg3.occ_nat3_cut with imsrg.perturbative_triples");
   }
   if (c.imsrg.space) Planned("[imsrg.space] (IMSRG model-space truncation)");
-  if (c.imsrg3.active()) Planned("IMSRG(3) ([imsrg3])");
+  if (c.imsrg3.at_end) Planned("imsrg3.at_end");
+  if (c.imsrg3.in_flow) {
+    if (c.imsrg3.variant != Imsrg3Variant::kN7) {
+      Planned("imsrg3.variant other than \"n7\"");
+    }
+    if (c.imsrg3.only_2b_omega) Planned("imsrg3.only_2b_omega");
+    if (c.imsrg3.occ_nat3_cut) Planned("imsrg3.occ_nat3_cut with IMSRG(3)");
+    if (c.imsrg.perturbative_triples) {
+      Planned("imsrg.perturbative_triples with imsrg3.in_flow");
+    }
+  }
   if (c.imsrg3.factorized && c.imsrg3.factorized_2b_intermediates) {
     Planned("imsrg3.factorized_2b_intermediates");
   }
@@ -73,6 +89,22 @@ void RejectPlanned(const RunConfig& c) {
   if (c.output.write_omega) Planned("output.write_omega");
   if (!c.operators.first_order.empty()) Planned("operators.first_order");
   if (!c.operators.from_file.empty()) Planned("operators.from_file");
+}
+
+/// The zero-, one- and two-body parts of `O` as a particle-rank-2 operator
+/// (imsrg++.cc:1177-1180, 1256-1260 throw the residual 3-body part away);
+/// `O` itself if its rank is below 3.
+op::Operator TwoBodyPart(const op::Operator& O) {
+  if (O.spec().particle_rank < 3) return O;
+  O.SyncToHost();
+  op::OperatorSpec spec = O.spec();
+  spec.particle_rank = 2;
+  op::Operator out(O.model_space_ptr(), spec);
+  out.zero_body() = O.zero_body();
+  out.one_body() = O.one_body();
+  out.two_body() = O.two_body();
+  out.SyncToDevice();
+  return out;
 }
 
 /// driver::Generator -> flow::GeneratorKind (the enums list the same
@@ -127,6 +159,7 @@ flow::GeneratorOptions MakeGeneratorOptions(const RunConfig& c, Generator g,
       break;
   }
   o.qtransfer_n = c.imsrg.generator.qtransfer_n;
+  o.only_2b_eta = c.imsrg3.in_flow && c.imsrg3.only_2b_eta;
   o.denominator_delta = c.imsrg.denominator.delta;
   if (const auto& orb = c.imsrg.denominator.delta_orbit) {
     if (*orb == "all") {
@@ -182,14 +215,17 @@ const char* StopName(flow::StopReason r) {
 /// step.
 class FlowLog {
  public:
-  explicit FlowLog(const fs::path& path) {
+  /// `three_body`: add the columns norm_eta_3b and norm_omega_3b (IMSRG(3)).
+  FlowLog(const fs::path& path, bool three_body) : three_body_(three_body) {
     if (path.has_parent_path()) fs::create_directories(path.parent_path());
     out_.open(path);
     if (!out_)
       throw InputError("cannot write the flow file '" + path.string() + "'");
-    out_ << "stage,istep,s,ds,E0,norm_H,norm_eta_1b,norm_eta_2b,norm_eta,norm_"
-            "omega_1b,"
-            "norm_omega_2b,norm_omega,num_omegas,E_MP2,wall_s\n";
+    out_ << "stage,istep,s,ds,E0,norm_H,norm_eta_1b,norm_eta_2b,"
+         << (three_body_ ? "norm_eta_3b," : "")
+         << "norm_eta,norm_omega_1b,norm_omega_2b,"
+         << (three_body_ ? "norm_omega_3b," : "")
+         << "norm_omega,num_omegas,E_MP2,wall_s\n";
     log::Info(
         "{:>5} {:>5} {:>12} {:>18} {:>14} {:>14} {:>14} {:>14} {:>4} {:>10}",
         "stage", "step", "s", "E0", "|eta_1b|", "|eta_2b|", "|Omega_1b|",
@@ -211,11 +247,13 @@ class FlowLog {
     }
     out_ << st.stage << ',' << st.istep << ',' << Fmt17(st.s) << ','
          << Fmt17(st.ds) << ',' << Fmt17(st.e0) << ',' << Fmt17(st.norm_h)
-         << ',' << Fmt17(st.norm_eta_1b) << ',' << Fmt17(st.norm_eta_2b) << ','
-         << Fmt17(st.norm_eta) << ',' << Fmt17(st.norm_omega_1b) << ','
-         << Fmt17(st.norm_omega_2b) << ',' << Fmt17(st.norm_omega) << ','
-         << st.num_omegas << ',' << Fmt17(e_mp2) << ','
-         << Fmt17(st.wall_seconds) << '\n';
+         << ',' << Fmt17(st.norm_eta_1b) << ',' << Fmt17(st.norm_eta_2b) << ',';
+    if (three_body_) out_ << Fmt17(st.norm_eta_3b) << ',';
+    out_ << Fmt17(st.norm_eta) << ',' << Fmt17(st.norm_omega_1b) << ','
+         << Fmt17(st.norm_omega_2b) << ',';
+    if (three_body_) out_ << Fmt17(st.norm_omega_3b) << ',';
+    out_ << Fmt17(st.norm_omega) << ',' << st.num_omegas << ',' << Fmt17(e_mp2)
+         << ',' << Fmt17(st.wall_seconds) << '\n';
     out_.flush();
     log::Info(
         "{:>5} {:>5} {:>12.5f} {:>18.9f} {:>14.9f} {:>14.9f} {:>14.9f} "
@@ -226,6 +264,7 @@ class FlowLog {
   }
 
  private:
+  bool three_body_ = false;
   std::ofstream out_;
   std::function<const op::Operator&()> current_h_;
 };
@@ -452,9 +491,11 @@ void Run(const RunConfig& config) {
   const Generator core_gen = config.imsrg.generator.core;
   SmallStepsForStiffGenerators(core_gen, so);
 
+  const bool imsrg3 = config.imsrg3.in_flow;
   FlowLog flow_log(config.output.flow_file.empty()
                        ? dir / "flow.csv"
-                       : fs::path(config.output.flow_file));
+                       : fs::path(config.output.flow_file),
+                   imsrg3);
   // The ODE methods evolve the requested operators alongside H, so these are
   // built first (imsrg++.cc:1074); Magnus replays its Omega stack afterwards.
   const bool magnus = config.imsrg.method == Method::kMagnus;
@@ -478,8 +519,31 @@ void Run(const RunConfig& config) {
       config.imsrg3.factorized_2b_intermediates;
   const flow::GeneratorOptions core_opts =
       MakeGeneratorOptions(config, core_gen, ms);
+  // IMSRG(3)-N7 (imsrg++.cc:704-725, 1048-1050): the IMSRG model space gets
+  // the three-body space and H the (zero) three-body part; the MagnusSolver
+  // promotes it to rank 3 because the commutator options select IMSRG(3).
+  commutator::CommutatorOptions copts;
+  op::Operator h_start = ph.hno;
+  std::shared_ptr<const basis::ModelSpace> ms_flow = ph.hno.model_space_ptr();
+  if (imsrg3) {
+    basis::ThreeBodyCuts cuts;
+    cuts.e3max = config.basis.e3max;
+    cuts.emax_3body = -1;
+    if (config.imsrg3.de3max) cuts.de3max = *config.imsrg3.de3max;
+    const std::shared_ptr<const basis::ModelSpace> ms3 =
+        ph.hno.model_space_ptr()->WithThreeBody(cuts);
+    log::Info(
+        "IMSRG(3)-N7: e3max = {}, dE3max = {}, 3-body states kept: {} out of "
+        "{}",
+        cuts.e3max, cuts.de3max, ms3->three_body_space()->NumRows(),
+        ms3->three_body()->SumChannelKets());
+    ms_flow = ms3;
+    h_start = op::WithModelSpace(ph.hno, ms3);
+    copts.terms = commutator::TermMask::Imsrg3N7();
+    copts.threebody_threshold = config.imsrg3.threebody_threshold;
+  }
   Engine solver =
-      magnus ? Engine(flow::MagnusSolver(ph.hno, so, core_opts, bch))
+      magnus ? Engine(flow::MagnusSolver(h_start, so, core_opts, bch, copts))
              : Engine(flow::OdeSolver(config.imsrg.method == Method::kFlowRk4
                                           ? flow::OdeMethod::kRk4
                                           : flow::OdeMethod::kDopri5,
@@ -540,8 +604,9 @@ void Run(const RunConfig& config) {
   // ---- Final Hamiltonian, re-normal ordered w.r.t. the core for ensemble
   // references.
   const bool renormal = NeedsRenormalOrdering(ms);
-  op::Operator h_final = renormal ? RenormalOrderToCore(solver.hamiltonian())
-                                  : solver.hamiltonian();
+  // IMSRG(3): the residual three-body part is dropped here, as in imsrg++.
+  const op::Operator h_flow = TwoBodyPart(solver.hamiltonian());
+  op::Operator h_final = renormal ? RenormalOrderToCore(h_flow) : h_flow;
   const double e0 = solver.hamiltonian().zero_body();
   if (config.valence.has_valence_space()) {
     log::Info("Core Energy = {:.6f} (valence-space zero body {:.6f})", e0,
@@ -573,7 +638,8 @@ void Run(const RunConfig& config) {
       ops.push_back(rec);
     }
     OperatorRecord& rec = ops.at(i);
-    op::Operator O = solver.Transformed(i, hf);
+    if (imsrg3 && magnus) hf = op::WithModelSpace(hf, ms_flow);
+    op::Operator O = TwoBodyPart(solver.Transformed(i, hf));
     if (renormal) O = RenormalOrderToCore(O);
     rec.imsrg = O.zero_body();
     log::Info("{}   IMSRG: {:.8f}", rec.name, rec.imsrg);
