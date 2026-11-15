@@ -83,6 +83,26 @@ struct SixJView {
     return data[i];
   }
 
+  /// The row {ja jb J; jc jd J'} for J' = 0, 1, ..., 2 emax + 1: element J'
+  /// of the returned array equals `(*this)(ja, jb, J, jc, jd, TwoJ{2 J'})`,
+  /// so kernels that sum over J' read contiguous memory. Unchecked fast path:
+  /// preconditions are a non-null table, odd 2j in [1, 2 emax + 1] for ja,
+  /// jb, jc, jd and even 2J in [0, 2 (2 emax + 1)] (no NaN guard). O(1).
+  IMSRG_INLINE_FUNCTION const double* row(TwoJ ja, TwoJ jb, TwoJ J, TwoJ jc,
+                                          TwoJ jd) const noexcept {
+    const std::int32_t nj = emax + 1;
+    const std::int32_t nJ = 2 * emax + 2;
+    return data + ((((static_cast<std::int64_t>((ja.twice - 1) / 2) * nj +
+                      (jb.twice - 1) / 2) *
+                         nJ +
+                     J.twice / 2) *
+                        nj +
+                    (jc.twice - 1) / 2) *
+                       nj +
+                   (jd.twice - 1) / 2) *
+                      nJ;
+  }
+
  private:
   // Parity-valid but uncovered: odd t above tmax / even t above tmax.
   static IMSRG_INLINE_FUNCTION constexpr bool BeyondOdd(

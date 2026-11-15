@@ -26,7 +26,7 @@
 /// explicit products X P Y - Y P X and every stored element independently (the
 /// ladder terms need a second product accumulated into the first, the
 /// particle-hole term works with the Pandya matrices of all 2 Ncc ordered
-/// pairs: about 2x and 4x the flops, with its extra scratch, at most 4/3 of the
+/// pairs: about 2x and 4x the flops, with its extra scratch, at most twice the
 /// Hermitian one, allocated at the first general call). The test-only module
 /// `commutator_ref` evaluates the same expressions without symmetry tricks and
 /// is the oracle of the general paths (design/00 D36, M7-Q2).

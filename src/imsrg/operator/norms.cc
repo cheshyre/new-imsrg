@@ -39,18 +39,22 @@ double TwoBodyNorm(const Operator& op) {
     return 0.0;
   }
   const auto channels = tb.channels().channels();
-  const auto& buffer = tb.matrix().buffer();
-  double sum = 0.0;
+  std::vector<std::int64_t> offsets;
+  std::vector<double> weights;
+  offsets.reserve(tb.matrix().blocks().size() + 1);
+  weights.reserve(tb.matrix().blocks().size());
+  offsets.push_back(0);
   for (const auto& info : tb.matrix().blocks()) {
-    const std::int64_t count = info.rows * info.cols;
-    if (count == 0) {
-      continue;
-    }
-    const double s = detail::SumOfSquares(buffer, info.offset, count);
+    // BlockSparseMatrix stores its blocks contiguously, in block order.
+    IMSRG_CHECK(info.offset == offsets.back(),
+                "two_body_norm: blocks are not contiguous");
     const double w = static_cast<double>(
         2 * channels[static_cast<std::size_t>(info.row_block.value())].J() + 1);
-    sum += w * w * s;
+    weights.push_back(w * w);
+    offsets.push_back(info.offset + info.rows * info.cols);
   }
+  const double sum =
+      detail::WeightedBlockSumOfSquares(tb.matrix().buffer(), offsets, weights);
   return std::sqrt(sum);
 }
 

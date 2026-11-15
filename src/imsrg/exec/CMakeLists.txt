@@ -6,5 +6,6 @@ imsrg_add_module(NAME exec
   SOURCES
     runtime.cc
     device_buffer.cc
+    host_parallel.cc
   DEPS base
   LIBS Kokkos::kokkos)

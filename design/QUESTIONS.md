@@ -273,6 +273,9 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
   emax <= 6 (all tests and runs, AGENTS.md rule 3). **Assumed meanwhile:** keep the eager
   allocation; M12 (performance) can share ZB with W, gather in place, and stream channels.
   **Answer (owner, 2026-11-15):** confirmed as assumed (low-impact batch).
+  **Done in M12a (2026-11-16):** ZB folded into W, YK stored for one pair order, closed-shell
+  ladder operands read in place: Workspace scratch at O16 emax 6 from 10.4x to 5.5x a two-body
+  operator (`design/benchmarks/imsrg2-performance.md`).
 * **M6-Q1** (2026-11-12, opslib) - The golden `Rp2.dump` includes the spin-orbit term
   (`RpSpinOrbitCorrection`), contradicting the brief. **Assumed meanwhile:** `rp2` includes it by
   default (matches the golden to 6e-16); `include_spin_orbit = false` excludes it.
@@ -301,6 +304,8 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
   at emax 4 still solves in < 0.1 s. **Assumed meanwhile:** fine for emax <= 6; M12 adds an
   orbit-index cache and a CG table if profiles show it.
   **Answer (owner, 2026-11-15):** confirmed as assumed (low-impact batch).
+  **Done in M12a (2026-11-16):** dense orbit table and tabulated isospin CGs, bitwise identical
+  (M12-Q1 for the remaining hash lookups).
 * **M8a-Q1** (2026-11-12, M8a config) - `Generator` and `Method` enums (with their canonical TOML
   spellings) live in `driver/config/schema.hpp`, since `flow` does not exist yet. **Assumed
   meanwhile:** M8 makes `flow` reuse them or maps them 1:1 in the driver; the spellings are fixed.
@@ -723,3 +728,53 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   reserved until tensor operators exist. A missing file raises `InputFileNotFoundError` (an `InputError`
   and a `FileNotFoundError`), malformed content `FileFormatError`, operands on different model spaces
   `ModelSpaceError`. **Assumed meanwhile:** as described.
+
+* **M12-Q1** (2026-11-15, M12a get_pn) - M6-Q4 is resolved for the orbit scan and the CGs
+  (dense (n, l, 2j) table, tabulated isospin CGs, bitwise identical). In a release build `get_pn`
+  on calls passing the cheap filters drops from 183 to 65 ns; the remainder is the six
+  `channel.states.find` hash lookups in `get_isospin`. **Assumed:** left as is (no layout change
+  was allowed); a dense per-channel state table would remove it if HF-with-3N profiles still show it.
+
+* **M12-Q2** (2026-11-15, M12a norms) - `TwoBodyNorm` now relies on `BlockSparseMatrix` blocks
+  being contiguous and in storage order (IMSRG_CHECKed). **Assumed:** that stays the layout. Per call
+  the kernel allocates two small device buffers (offsets, weights); at 1 thread the single
+  reduction is about as fast as 84 small ones (0.73 vs 0.68 ms at emax 6), the gain is at > 1
+  thread (1.73 -> 0.17 ms at 6 threads). Caching the buffers on the operator would remove the
+  allocation if it matters.
+
+* **M12-Q3** (2026-11-15, M12a ladder) - `tests/python/test_flow.py::test_solve_releases_the_gil`
+  fails in dev-serial already at 7f92c7e (before the ladder change; repeatably, 5-6 ticks vs the
+  required 20): the O16 solve finishes in about 5 ms, shorter than the test's 20 ms tick window, so
+  the test is wall-time fragile and gets worse as the commutator gets faster. **Assumed:** not
+  loosened here; the test needs a longer solve (e.g. larger smax or a bigger fixture) or a
+  deterministic hook (event set inside a callback) instead of counting ticks.
+  **Resolved by the M12a lead:** the test now solves to smax 20 (35 ms serial) and requires at least
+  a quarter of the ticks the measured solve time allows (and at least 5); a GIL-holding solve gives
+  about one. Same check, independent of the solver speed. (A time-stamp variant was rejected: the
+  GIL hand-off at a callback's entry also produces stamps inside the windows.)
+  **Revised (2026-11-16):** tick counting still failed in dev-serial at load ~38 (another lead's
+  slow tests; the main thread woke only every ~14 ms). The test now passes the builtin
+  `list.append` as the status callback and has the main thread poll the number of calls: it must
+  see a count strictly between 0 and the final one. A builtin runs no bytecode, so a GIL-holding
+  solve could not hand the GIL over between its first and last callback (negative control: a
+  GIL-holding C loop calling `list.append` 3e6 times gives no intermediate count; a GIL-releasing
+  loop gives ~47 of 50). The check needs a single main-thread wake-up during the solve (smax 40,
+  88 steps): 25/25 passes at normal load and 25/25 with 40-64 busy processes.
+
+* **M12-Q4** (2026-11-16, M12a ladder-direct) - Direct channels (contiguous listed kets, all weights
+  exactly 1.0) skip the gather and the gemm reads X and Y in place with leading dimension N. The
+  hh projector of a closed shell is direct only for channels where the hole kets happen to be
+  contiguous (e.g. a single listed ket); the check is generic. Assumption: exact `== 1.0` on the
+  weight, so a channel with a fractionally occupied orbit in a listed ket never takes the direct path
+  (fractional references can still have direct channels whose pp kets use only empty orbits, which is
+  exact; review note). Benchmark checksums (emax 2, 4;
+  T 1, 4) are bitwise identical to before; the ladder scratch of O16 shrank from 3.75x to 2.0x of
+  a two-body operator at emax 6. No open decision.
+
+* **M12-Q5** (2026-11-16, M12a lead) - `linalg::GroupedGemm` runs its problems concurrently on the
+  host threads only with Accelerate (one BLAS call per item; measured faster at emax 8 and
+  schedule-independent). With OpenBLAS (pthreads) or MKL a call inside the parallel region would use
+  the library's own threads (oversubscription) and MKL's rounding may depend on its thread count.
+  **Assumed meanwhile:** other BLAS libraries keep the sequential loop; enabling them needs
+  single-threaded calls per item (MKL `mkl_set_num_threads_local(1)`, OpenBLAS built with OpenMP or
+  `OPENBLAS_NUM_THREADS=1`) and a determinism check, to be decided with the cluster builds (M12b/M14).

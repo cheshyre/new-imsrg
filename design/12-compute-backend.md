@@ -21,6 +21,8 @@ Kernels use a restricted vocabulary, so a future port has to replace only the fa
 | `DeviceBuffer<T>` | pimpl around `Kokkos::View<T*>` | Lives in public headers without Kokkos. `host_span()` gives a `std::span<T>` on host; `sync_to_host()` / `sync_to_device()` are explicit (fence-only when the mirror aliases the device data). Copy = deep copy (replaces a free `deep_copy`). |
 | `exec::view(buf)` | returns the raw `Kokkos::View` | Only in kernel TUs. |
 | `exec::ParallelFor(name, n, f)` | `Kokkos::parallel_for(RangePolicy)` | `f` must be an `IMSRG_LAMBDA` (= `KOKKOS_LAMBDA`). |
+| `exec::ParallelForDynamic(name, n, f)` | `RangePolicy` with `Schedule<Dynamic>` | Ragged items (one per row/column of the two-body blocks, M12a); device backends ignore the hint. |
+| `exec::HostParallelForDynamic(name, n, f)` (`exec/host_parallel.h`, no Kokkos in the header) | host-space `RangePolicy`, `Schedule<Dynamic>`, chunk 1 | Plain host code per item (e.g. one BLAS call); `f` must not throw. |
 | `exec::ParallelForMd(name, n0, n1, f)` | `MDRangePolicy<Rank<2>>` | |
 | `exec::ParallelReduce(name, n, f, result)`, `exec::ParallelReduceMax(...)` | `Kokkos::parallel_reduce` | Sum and max reducers. |
 | `exec::TeamFor(name, league, team, scratch_bytes, f)` | `TeamPolicy` with scratch | For ragged channel loops; `f` runs on every team thread. |
@@ -35,10 +37,11 @@ must compile and run on clusters later. Threads is optional.
   matching BLAS and imsrg++/Armadillo, which simplifies comparisons.
 * `BlockSparseMatrix<T>`: the storage behind `TwoBody` and future 3B blocks. It holds one
   contiguous `DeviceBuffer<T>` and a block table `{row_channel, col_channel, rows, cols, offset}`.
-* Operations: `gemm(alpha, A, opA, B, opB, beta, C)`, `grouped_gemm(span<GemmProblem>)` (the
-  first implementation loops over `gemm`; later versions may use streams, MAGMA vbatched or
-  cuBLAS grouped GEMM), `eigh` (host LAPACK `dsyevd`, used for HF and small problems),
-  `solve`/`lstsq` for DIIS.
+* Operations: `gemm(alpha, A, opA, B, opB, beta, C)`, `grouped_gemm(span<GemmProblem>)` (checks
+  all problems, then, with Accelerate and at least ~1 Mflop, runs them concurrently on the host
+  threads, one BLAS call per item, largest first (M12a); otherwise a sequential loop, M12-Q5; later
+  versions may use streams, MAGMA vbatched or cuBLAS grouped GEMM), `eigh` (host LAPACK `dsyevd`,
+  used for HF and small problems), `solve`/`lstsq` for DIIS.
 * Backends are chosen at configure time. A test runs every op against a naive reference loop.
 * Threading: BLAS calls made inside parallel regions run single-threaded
   (`VECLIB_MAXIMUM_THREADS=1`, `OPENBLAS_NUM_THREADS=1`, or MKL sequential); large standalone GEMMs
@@ -60,7 +63,7 @@ Details are in `reference/02-commutators.md`.
 |------|----------|
 | comm110, comm111, comm121, comm221-like 1B outputs | Small; flat kernels over orbit pairs with precomputed ket lists. |
 | comm122, comm222_pp_hh (ladders) | Per channel: `Z_ch += X_ch P Y_ch - ...`, where `P` is a diagonal occupation weighting. Use grouped GEMM over channels with occupation-scaled copies. |
-| comm222_ph | Forward Pandya transform as a **precomputed sparse recoupling map** (6j-weighted gather), then grouped GEMM in the ph channels, then inverse Pandya (scatter-add, or gather from the output side to avoid atomics). The map is built once per ModelSpace. |
+| comm222_ph | Forward Pandya transform (6j-weighted gather), then grouped GEMM in the ph channels, then inverse Pandya (gather from the output side, no atomics). **As implemented (M12a):** no stored element-wise recoupling map (for the inverse it would cost several two-body operators of memory); instead the kernels read 6j values from contiguous table rows (`SixJView::row`), resolve the cc kets of orbit pairs from a small per-pair descriptor table (norb^2 entries), fill XK/YK per cc ket with the X and Y transforms fused, store YK for one pair order only (second GEMM after an in-place row-pair flip), combine W in place (no ZB buffer), and run the inverse over pairs of kets with all J at once. |
 
 Implementation phases for every kernel:
 1. Make it correct and simple: a straightforward Kokkos kernel (or host loop) that mirrors the

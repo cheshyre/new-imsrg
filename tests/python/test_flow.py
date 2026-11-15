@@ -171,23 +171,33 @@ def test_solver_option_validation(o16):
 
 
 def test_solve_releases_the_gil(o16):
-    s = flow.MagnusSolver(o16["H"], solver=flow.SolverOptions(smax=4.0))
+    # The main thread polls how many status callbacks the solver thread has
+    # made. It can see a count strictly between 0 and the final one only if
+    # solve() releases the GIL between steps: the callback is the builtin
+    # list.append, which runs no bytecode, so a GIL-holding solve would never
+    # hand the GIL over between its first and last callback. Unlike counting
+    # 1 ms ticks, this does not depend on the solver speed or on how busy the
+    # machine is; it only needs the main thread to run once during the solve
+    # (smax 40: 88 steps, tens of ms in the serial build; M12-Q3).
+    s = flow.MagnusSolver(o16["H"], solver=flow.SolverOptions(smax=40.0))
+    calls = []
     done = threading.Event()
-    t = threading.Thread(target=lambda: (s.solve(), done.set()))
-    ticks = 0
-    t0 = time.perf_counter()
+
+    def work():
+        try:
+            s.solve(calls.append)
+        finally:
+            done.set()  # never leave the main loop waiting
+
+    seen = set()
+    t = threading.Thread(target=work)
     t.start()
     while not done.is_set():
-        ticks += 1
+        seen.add(len(calls))
         done.wait(0.001)
     t.join()
-    elapsed_ms = (time.perf_counter() - t0) * 1e3
-    # The main thread ran while the solver worked: up to one tick per ms with
-    # the GIL released, one or two in total without. The emax-1 solve takes
-    # only ~10-50 ms on the Serial backend (part of it with the GIL held for
-    # setup and the per-step signal polling), so the bound scales with its
-    # duration (design/QUESTIONS.md M10-Q67).
-    assert ticks > max(2.0, min(20.0, elapsed_ms / 10.0)), (ticks, elapsed_ms)
+    assert len(calls) > 2
+    assert any(0 < n < len(calls) for n in seen)  # the main thread ran meanwhile
 
 
 def test_hunter_gatherer_he4_matches_imsrgpp(golden, he4_emax2):

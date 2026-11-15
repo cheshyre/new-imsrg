@@ -114,6 +114,23 @@ IMSRG_INLINE_FUNCTION int FindBlock(const std::int64_t* offsets, int num_blocks,
   return lo;
 }
 
+/// `FindBlock` for 32-bit offsets (e.g. the per-channel ket offsets of the
+/// Pandya data). Same preconditions; O(log num_blocks).
+IMSRG_INLINE_FUNCTION int FindBlock(const std::int32_t* offsets, int num_blocks,
+                                    std::int64_t e) noexcept {
+  int lo = 0;
+  int hi = num_blocks - 1;
+  while (lo < hi) {
+    const int mid = lo + (hi - lo + 1) / 2;
+    if (offsets[mid] <= e) {
+      lo = mid;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return lo;
+}
+
 }  // namespace imsrg::commutator::detail
 
 #endif  // IMSRG_COMMUTATOR_DETAIL_DEVICE_VIEWS_H_

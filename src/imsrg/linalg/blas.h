@@ -13,7 +13,8 @@
 /// calls made from inside a parallel region (OpenMP/Kokkos host threads) must
 /// run with a single-threaded BLAS (e.g. OPENBLAS_NUM_THREADS=1 /
 /// `openblas_set_num_threads(1)`; Accelerate manages this itself), otherwise
-/// threads oversubscribe the cores. The wrappers here neither spawn nor control
+/// threads oversubscribe the cores. Only `GroupedGemm` spawns threads, and only
+/// with Accelerate (see there); the other wrappers neither spawn nor control
 /// threads. Dimension limit: the LP64 BLAS interface restricts every dimension
 /// and leading dimension to < 2^31; violations throw InvariantError.
 
@@ -48,11 +49,19 @@ struct GemmProblem {
   MatrixView<double> C;
 };
 
-/// Runs a group of independent gemms (e.g. one per block / channel). The C
-/// matrices must be pairwise disjoint. First implementation: a sequential loop
-/// over `gemm`; later versions may batch (MKL/cuBLAS grouped gemm, or threads
-/// over problems, design/12 section 3) behind the same signature. Complexity:
-/// sum of the individual costs.
+/// Runs a group of independent gemms (e.g. one per block / channel).
+/// Preconditions: the C matrices are pairwise disjoint, and no A or B overlaps
+/// another problem's C. All problems are checked first (throws InvariantError
+/// before any gemm runs). With Accelerate (`IMSRG_BLAS_ACCELERATE`), if the
+/// host execution space has several threads (needs an initialized
+/// `exec::Runtime`) and the group has at least ~1 Mflop, the problems then run
+/// concurrently, one BLAS call per item, the largest first (design/12 section
+/// 3; M12a: at emax 8 the sequential loop left the other threads idle for a
+/// third of the commutator); each C is written by exactly one BLAS call, so
+/// the result does not depend on the scheduling. Other BLAS libraries run the
+/// loop sequentially, each call with the library's own threading, until
+/// single-threaded calls inside the parallel region are arranged for them
+/// (M12-Q5). Complexity: sum of the individual costs.
 void GroupedGemm(std::span<const GemmProblem> problems);
 
 /// Eigen-decomposition of a real symmetric n x n matrix (LAPACK dsyevd). Only

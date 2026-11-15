@@ -62,6 +62,18 @@ void ParallelFor(const char* name, Index n, const F& f) {
   Kokkos::parallel_for(name, RangePolicy(0, n), f);
 }
 
+/// `ParallelFor` with dynamic scheduling (`Kokkos::Schedule<Dynamic>`): for
+/// ragged work items whose costs differ a lot (e.g. one item per column of
+/// the two-body blocks); host backends then hand out items on demand instead
+/// of in equal contiguous chunks. Device backends ignore the hint.
+template <class F>
+void ParallelForDynamic(const char* name, Index n, const F& f) {
+  using Policy = Kokkos::RangePolicy<DefaultExecSpace, Kokkos::IndexType<Index>,
+                                     Kokkos::Schedule<Kokkos::Dynamic>>;
+  IMSRG_CHECK(n >= 0, name);
+  Kokkos::parallel_for(name, Policy(0, n), f);
+}
+
 /// Runs `f(i, j)` for i in [0, n0), j in [0, n1) (MDRangePolicy, rank 2).
 template <class F>
 void ParallelForMd(const char* name, Index n0, Index n1, const F& f) {
