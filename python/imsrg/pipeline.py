@@ -65,7 +65,8 @@ class RunResult:
 
     @property
     def e0(self):
-        """Zero-body part of the evolved Hamiltonian (MeV), or None for an HF-only task."""
+        """Zero-body part of the evolved Hamiltonian (MeV); the reference energy
+        for an HF-only task (no flow stages), None if the run wrote no flow result."""
         imsrg = self.results.get("imsrg")
         return None if imsrg is None else imsrg["e0"]
 

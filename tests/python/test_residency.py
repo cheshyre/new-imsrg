@@ -198,3 +198,36 @@ def test_force_finalize_frees_live_operators():
     assert "finalized: True" in lines
     assert lines.count("stale") == 4
     assert "repr: Operator(<released>)" in lines
+
+
+_FAILED_CTOR_SCRIPT = """
+import imsrg
+from imsrg import flow
+ms = imsrg.ModelSpace(1, "He4", "He4", hw=16.0)
+h = imsrg.random_operator(ms)
+for make in (
+    lambda: flow.MagnusSolver(h, solver=flow.SolverOptions(dsmax=0.0)),
+    lambda: flow.OdeSolver(flow.OdeMethod.Rk4, h, ode_tolerance=-1.0),
+    lambda: flow.OdeSolver(flow.OdeMethod.Rk4, h, solver=flow.SolverOptions(dsmax=0.0)),
+):
+    try:
+        make()
+    except imsrg.InputError:
+        pass
+    else:
+        raise SystemExit("no error")
+print("live", imsrg._core.live_objects())
+"""
+
+
+def test_failed_solver_constructors_leave_no_registry_entry():
+    """Regression: a constructor that threw after registering left a dangling entry
+    that crashed the exit hook (ReleaseAllLive) with a segmentation fault."""
+    env = dict(os.environ)
+    root = str(Path(imsrg.__file__).resolve().parent.parent)
+    env["PYTHONPATH"] = root + os.pathsep + env.get("PYTHONPATH", "")
+    out = subprocess.run(
+        [sys.executable, "-c", _FAILED_CTOR_SCRIPT], env=env, capture_output=True, text=True, timeout=120
+    )
+    assert out.returncode == 0, (out.returncode, out.stderr[-2000:])
+    assert "live 1" in out.stdout  # only the operator h

@@ -323,9 +323,12 @@ void BindFlow(nb::module_& m) {
              const commutator::CommutatorOptions& comm) {
             EnsureRuntime();
             op::Operator h = Input(h0);
-            new (self) PyMagnus();
-            self->s = std::make_unique<flow::MagnusSolver>(
+            // Build first: if this throws, nanobind never runs the destructor
+            // of `self`, so it must not be registered yet.
+            auto solver_ptr = std::make_unique<flow::MagnusSolver>(
                 std::move(h), solver, generator, bch, comm);
+            new (self) PyMagnus();
+            self->s = std::move(solver_ptr);
           },
           nb::arg("h0"), nb::kw_only(),
           nb::arg("solver") = flow::SolverOptions{},
@@ -406,10 +409,11 @@ void BindFlow(nb::module_& m) {
             EnsureRuntime();
             op::Operator h = Input(h0);
             std::vector<op::Operator> ops = Inputs(operators);
-            new (self) PyOde();
-            self->s = std::make_unique<flow::OdeSolver>(
+            auto solver_ptr = std::make_unique<flow::OdeSolver>(
                 method, std::move(h), std::move(ops), solver, ode_tolerance,
                 generator, comm);
+            new (self) PyOde();
+            self->s = std::move(solver_ptr);
           },
           nb::arg("method"), nb::arg("h0"), nb::kw_only(),
           nb::arg("operators") = std::vector<PyOperator>{},
