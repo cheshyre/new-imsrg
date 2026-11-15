@@ -35,6 +35,11 @@ struct SolverOptions {
       1.0e-6;  ///< Converged when ||eta|| < this (compared as a float, P7).
   bool magnus_adaptive =
       true;  ///< Recompute ds every step (imsrg++ `magnus_adaptive`).
+  /// Hunter-gatherer Omega (imsrg++ `hunter_gatherer`, D32): keep two Omegas,
+  /// the hunter (the one being built) and the gatherer, and gather instead of
+  /// splitting when ||hunter|| > omega_norm_max; gather once more at the end
+  /// of every `Solve`. See `MagnusSolver::Solve`.
+  bool hunter_gatherer = false;
 };
 
 /// One line of the flow log: the state after the step (istep 0 = the initial
@@ -71,13 +76,17 @@ struct SolveResult {
   double s = 0.0;   ///< Final s.
   double e0 = 0.0;  ///< Final zero-body part of H(s).
   double norm_eta = 0.0;
+  /// Omega gathers of this call (hunter-gatherer only, else 0), counted as the
+  /// `gathering Omega.` lines of imsrg++: the gathers inside the loop plus the
+  /// final one.
+  int num_gathers = 0;
   StopReason reason = StopReason::kSmaxReached;
 };
 
 /// Magnus solver state: H_0, H(s), eta(s), the Omega stack and s (imsrg++
-/// `IMSRGSolver` with method magnus, Omega kept in memory, no hunter-gatherer).
-/// Owns a commutator `Workspace` for H_0's model space. Not copyable (the
-/// workspace is not); movable.
+/// `IMSRGSolver` with method magnus, Omega kept in memory, hunter-gatherer
+/// optional). Owns a commutator `Workspace` for H_0's model space. Not copyable
+/// (the workspace is not); movable.
 class MagnusSolver {
  public:
   /// Callback receiving every flow-log line (istep 0 and each step).
@@ -98,7 +107,8 @@ class MagnusSolver {
 
   /// Changes the generator for the next `solve` (imsrg++ `SetGenerator`): if
   /// ||last Omega|| > 1e-6 a new (zero) Omega is pushed and H_saved = H(s), so
-  /// a second stage starts a new Omega.
+  /// a second stage starts a new Omega (hunter-gatherer: the Omega is gathered
+  /// instead; after a `Solve` the hunter is zero and nothing happens).
   void set_generator(const GeneratorOptions& generator);
   /// Changes smax for the next `solve` (imsrg++ doubles it for the second
   /// Magnus stage; the driver does that).
@@ -111,13 +121,24 @@ class MagnusSolver {
   ///   loop: stop if ||eta|| < eta_criterion (converged) or ||eta|| > 1e12
   ///         or |E0_last| > 1e9;
   ///     if ||Omega_last|| > omega_norm_max:
-  ///       push a new zero Omega, H_saved = H, ||Omega|| = 0;
+  ///       push a new zero Omega, H_saved = H, ||Omega|| = 0
+  ///       (hunter-gatherer: GatherOmega, see below);
   ///     ds = min(domega/||eta||, domega/||eta||/(||Omega||+1e-9),
   ///              (omega_norm_max+1e-5)/||eta||, dsmax) (if magnus_adaptive);
   ///     ds = min(ds, smax - s); s += ds;
   ///     Omega_last = BchProduct(eta ds, Omega_last);
   ///     H = BchTransform(stack size < 2 ? H_0 : H_saved, Omega_last);
   ///     eta = generator(H).
+  /// Hunter-gatherer (`SolverOptions::hunter_gatherer`, imsrg++ `GatherOmega`,
+  /// IMSRGSolver.cc:98-122 and :236-239), reproduced exactly: the stack is
+  /// {gatherer, hunter}. GatherOmega with a one-entry stack appends a zero
+  /// hunter (the old Omega becomes the gatherer); otherwise
+  /// gatherer = BchProduct(hunter, gatherer) if ||hunter|| > 1e-12; then the
+  /// hunter is zeroed and H_saved = H_0 transformed by the gatherer. H(s)
+  /// itself is NOT touched, so it differs from `Transform(H_0)` at the
+  /// truncation level of the BCH product and transform. `Solve` gathers once
+  /// more after the loop (also after divergence), and counts that in
+  /// `SolveResult::num_gathers`.
   /// `on_status` (optional) receives the istep-0 line and one line per step.
   SolveResult Solve(const StatusCallback& on_status = {});
 
@@ -132,6 +153,8 @@ class MagnusSolver {
   const op::Operator& eta() const noexcept { return eta_; }
   /// The Omega stack, oldest first; the last entry is the one being built.
   const std::vector<op::Operator>& omegas() const noexcept { return omegas_; }
+  /// Number of Omega gathers over the solver's lifetime (hunter-gatherer).
+  int num_gathers() const noexcept { return num_gathers_; }
   /// Current flow parameter.
   double s() const noexcept { return s_; }
   /// Current step options.
@@ -147,6 +170,10 @@ class MagnusSolver {
  private:
   FlowStatus Status(int istep, double ds) const;
   void PushOmega();
+  /// imsrg++ `GatherOmega`; see `Solve`.
+  void GatherOmega();
+  /// A split (`PushOmega`) or, in hunter-gatherer mode, a gather.
+  void StartNewPiece();
 
   SolverOptions solver_;
   GeneratorOptions generator_;
@@ -159,6 +186,7 @@ class MagnusSolver {
   op::Operator eta_;
   std::vector<op::Operator> omegas_;
   double s_ = 0.0;
+  int num_gathers_ = 0;
   int stage_ = 0;
   double t_start_ = 0.0;
 };

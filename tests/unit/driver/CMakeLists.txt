@@ -48,7 +48,7 @@ target_compile_definitions(driver_pipeline_hamiltonian PRIVATE
 # End-to-end integration tests IT-2, IT-3, IT-4, IT-6, IT-7, IT-12 (design/30 section 4): run the
 # pipeline in process and compare with tests/golden/e2e; skip without the input files.
 imsrg_add_test(NAME driver_integration
-  SOURCES test_integration.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
+  SOURCES test_integration.cc test_hunter_gatherer.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
   DEPS driver LABELS integration NO_GTEST_MAIN)
 target_compile_definitions(driver_integration PRIVATE
   "IMSRG_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden\""

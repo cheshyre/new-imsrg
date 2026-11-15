@@ -113,6 +113,80 @@ TEST(MagnusSolver, ReplayOfOmegaStackReproducesH) {
       << d.zero_body << " " << d.one_body << " " << d.two_body;
 }
 
+// Hunter-gatherer (imsrg++ GatherOmega semantics, D32): the stack is
+// {gatherer, hunter}, the final gather leaves H(s) untouched, so H(s) differs
+// from the replay of the gathered Omega on H_0 at the truncation level of the
+// BCH product/transform (unlike the split stack, see the test above).
+TEST(MagnusSolver, HunterGathererDocumentsImsrgSemantics) {
+  op::Operator h0 = Emax2Hno();
+  flow::SolverOptions o = ShortFlow(1.5);
+  o.hunter_gatherer = true;
+  flow::MagnusSolver solver(h0, o, flow::GeneratorOptions{});
+  std::vector<flow::FlowStatus> lines;
+  const flow::SolveResult r =
+      solver.Solve([&](const flow::FlowStatus& st) { lines.push_back(st); });
+  ASSERT_GT(lines.size(), 3u);
+  // Gather count: the loop gathers (whenever the hunter was > omega_norm_max)
+  // plus the final one.
+  int loop_gathers = 0;
+  for (std::size_t i = 1; i < lines.size(); ++i) {
+    if (lines[i].norm_omega_2b + lines[i].norm_omega_1b > 0 &&
+        lines[i].norm_omega < lines[i - 1].norm_omega) {
+      ++loop_gathers;
+    }
+  }
+  EXPECT_GE(r.num_gathers, 2);
+  EXPECT_EQ(solver.num_gathers(), r.num_gathers);
+  EXPECT_EQ(loop_gathers + 1, r.num_gathers);
+  // {gatherer, zero hunter}; the Omega stack never grows beyond two.
+  EXPECT_EQ(solver.omegas().size(), 2u);
+  for (const auto& st : lines) EXPECT_LE(st.num_omegas, 2u);
+  EXPECT_EQ(op::Norm(solver.omegas().back()), 0.0);
+  EXPECT_GT(op::Norm(solver.omegas().front()), 0.25);
+  // H(s) is untouched by the final gather.
+  EXPECT_EQ(solver.hamiltonian().zero_body(), lines.back().e0);
+  EXPECT_EQ(r.e0, lines.back().e0);
+  // Replay of the gathered Omega: close to, but not equal to, H(s).
+  const op::Operator replayed = solver.Transform(h0);
+  const op::PartMaxima d = op::MaxAbsDifference(replayed, solver.hamiltonian());
+  std::printf(
+      "[magnus HG] %d gathers; replay vs H(s): E0 %.3e, 1b %.3e, 2b %.3e\n",
+      r.num_gathers, d.zero_body, d.one_body, d.two_body);
+  EXPECT_LT(d.max(), 1.0e-2);
+  // A second stage gathers nothing in set_generator (the hunter is zero) and
+  // keeps the stack at two entries.
+  solver.set_generator(flow::GeneratorOptions{});
+  EXPECT_EQ(solver.omegas().size(), 2u);
+  EXPECT_EQ(solver.num_gathers(), r.num_gathers);
+}
+
+// Review item 5: with omega_norm_max == domega the imsrg++ solver raises domega
+// by 1e-4 (once; the bump persists).
+TEST(MagnusSolver, DomegaBumpWhenEqualToOmegaNormMax) {
+  flow::SolverOptions o = ShortFlow(0.2);
+  o.omega_norm_max = 0.1;
+  o.domega = 0.1;
+  flow::MagnusSolver solver(Emax2Hno(), o, flow::GeneratorOptions{});
+  solver.Solve();
+  EXPECT_DOUBLE_EQ(solver.solver_options().domega, 0.1 + 1.0e-4);
+  solver.set_smax(0.4);
+  solver.Solve();
+  EXPECT_DOUBLE_EQ(solver.solver_options().domega, 0.1 + 1.0e-4);
+  // Different values: no bump.
+  flow::SolverOptions o2 = ShortFlow(0.1);
+  flow::MagnusSolver other(Emax2Hno(), o2, flow::GeneratorOptions{});
+  other.Solve();
+  EXPECT_DOUBLE_EQ(other.solver_options().domega, 0.1);
+}
+
+// Review item 5: set_generator on a zero Omega does not open a new one.
+TEST(MagnusSolver, SetGeneratorWithoutOmegaKeepsStack) {
+  flow::MagnusSolver solver(Emax2Hno(), ShortFlow(0.5),
+                            flow::GeneratorOptions{});
+  solver.set_generator(flow::GeneratorOptions{});
+  EXPECT_EQ(solver.omegas().size(), 1u);
+}
+
 TEST(MagnusSolver, SecondStageOpensNewOmegaAndContinuesS) {
   flow::MagnusSolver solver(Emax2Hno(), ShortFlow(0.8),
                             flow::GeneratorOptions{});

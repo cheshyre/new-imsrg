@@ -439,3 +439,19 @@ further design decisions (D30–D42 in `00-requirements-and-decisions.md`; repor
   has no local edits, else `read-tree -m -u <old> develop`). **Assumed meanwhile:** acceptable, as in
   run 1. To start a run in the main checkout, the session has to be opened there without a
   worktree (app setting).
+
+### M8-Q10 (hunter-gatherer, `H(s)` after the final gather)
+imsrg++ `GatherOmega` rebuilds `H_saved` from `H_0` through the gathered Omega but leaves `H(s)`
+untouched, so after a hunter-gatherer solve `H(s)` and `Transform(H_0)` differ at the truncation level
+of the BCH product (up to 2e-3 in the O16 emax 2 unit test (4 gathers; E0 1e-4, see its printout)); stage 2's
+first eta comes from the pre-gather `H(s)`. **Assumed:** copy imsrg++ (orchestrator decision), because
+the IT-10 and `IT-2/hunter_gatherer` goldens depend on it. A cleaner variant (re-evaluate `H(s)` from
+the gatherer, or gather before the next stage) would be an option with a deviation entry.
+
+### M8-Q11 (hunter-gatherer, gather count and `set_generator`)
+`SolveResult::num_gathers` counts the loop gathers plus the final gather (as the `gathering Omega.`
+log lines of imsrg++; the goldens' `n_gathers`). A gather inside `set_generator` (hunter non-zero,
+which cannot happen after a hunter-gatherer `Solve`) is counted in `MagnusSolver::num_gathers()` only.
+`results.json` has `imsrg.num_gathers` (solver total) and `imsrg.stages[].num_gathers`.
+`imsrg.omega.hunter_gatherer` is rejected nowhere any more; `imsrg.omega.storage = scratch/discard`
+with hunter-gatherer is unchanged (not implemented either way).
