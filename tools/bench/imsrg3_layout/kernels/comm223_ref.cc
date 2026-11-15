@@ -6,7 +6,7 @@
 
 namespace imsrg::layout3 {
 
-// Stub (task T3 implements it).
+// Stubs (task T3a implements them).
 void Comm223Reference(const KernelContext& ctx, const op::Operator& X,
                       const op::Operator& Y, std::span<double> z,
                       bool both_triangles) {
@@ -16,6 +16,16 @@ void Comm223Reference(const KernelContext& ctx, const op::Operator& X,
   (void)z;
   (void)both_triangles;
   throw NotImplementedError("Comm223Reference: not implemented yet");
+}
+
+double TriplesReference(const KernelContext& ctx, const op::Operator& X,
+                        const op::Operator& Y,
+                        std::span<const double> epsilon) {
+  (void)ctx;
+  (void)X;
+  (void)Y;
+  (void)epsilon;
+  throw NotImplementedError("TriplesReference: not implemented yet");
 }
 
 }  // namespace imsrg::layout3

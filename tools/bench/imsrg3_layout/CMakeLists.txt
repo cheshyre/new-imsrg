@@ -28,7 +28,7 @@ target_link_libraries(imsrg3_layout_bench PRIVATE imsrg3_layout_proto
 if(IMSRG_BUILD_TESTS)
   imsrg_add_test(NAME imsrg3_layout_check
     SOURCES imsrg3_layout_check.cc check_pair_third.cc check_layouts.cc
-            check_kernels.cc
+            check_kernels.cc check_tiled.cc
             "${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc"
     LIBS imsrg3_layout_proto
     LABELS slow
