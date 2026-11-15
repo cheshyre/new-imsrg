@@ -272,6 +272,10 @@ void WriteValenceFile(const fs::path& path, op::Operator O, const RunConfig& c,
   }
 }
 
+/// Version of the `results.json` layout (design/16 section 2.10: the schema
+/// table and its changelog). Bump it with every change of the written keys.
+constexpr int kResultsSchemaVersion = 1;
+
 void WriteResults(const fs::path& path, const pipeline::PreparedHamiltonian& ph,
                   const std::vector<StageRecord>& stages, double e0,
                   std::size_t num_omegas, int num_gathers,
@@ -279,7 +283,8 @@ void WriteResults(const fs::path& path, const pipeline::PreparedHamiltonian& ph,
                   const std::string& valence_file) {
   std::ofstream out(path);
   if (!out) throw InputError("cannot write '" + path.string() + "'");
-  out << "{\n  \"e_reference\": " << Fmt17(ph.e_reference) << ",\n";
+  out << "{\n  \"schema_version\": " << kResultsSchemaVersion
+      << ",\n  \"e_reference\": " << Fmt17(ph.e_reference) << ",\n";
   if (ph.hf) {
     out << "  \"hf\": {\"e_hf\": " << Fmt17(ph.hf->e_hf)
         << ", \"e1\": " << Fmt17(ph.hf->e1) << ", \"e2\": " << Fmt17(ph.hf->e2)

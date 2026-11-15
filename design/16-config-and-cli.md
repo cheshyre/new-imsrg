@@ -203,11 +203,58 @@ Old `OperatorsRPA`/`OperatorsTDA`: not supported (no schema key).
 | `write_ho_ops`, `write_hf_ops` | bool | `false` | write operators before the HF transformation / before the IMSRG flow (PL). |
 | `spwf` | array of strings | `[]` | orbits whose HF/NAT single-particle wave functions are written; `"valence"` = all valence orbits. |
 
-`results.json` (written to `directory`) carries an integer `schema_version` (starting at 1); its
-schema is documented in a table in this section and every change is listed in a changelog next to it
-*(owner, 2026-11-15, D37; to be added in run 2)*. Only the tokyo and NuShellX valence-space files must
-stay file-compatible with imsrg++ (D39); the other outputs use our formats. Two new output formats,
-`me2jp` and `me3jp`, come later (specification from the owner, D39).
+#### `results.json` schema
+
+`results.json` (written to `output.directory`, next to `resolved_config.toml`) is one JSON object
+whose top-level integer `schema_version` identifies the layout *(owner, 2026-11-15, D37)*. Every
+change of the written keys bumps the version and is listed in the changelog below; consumers should
+check `schema_version` first. Floating-point numbers are written with 17 significant digits
+(round-trip exact), energies in MeV, `r^2` operators in fm^2. In the first column
+`[]` marks the elements of an array, `<name>` an object member whose name is data (here the
+canonical operator name). The test `ResultsSchema.WrittenKeysMatchTheDocumentedTable` extracts the
+first column of this table and compares it with the keys of a real run, so the table cannot drift.
+
+| key | type | present | meaning |
+|---|---|---|---|
+| `schema_version` | int | always | layout version of this table (currently 1). |
+| `e_reference` | number | always | reference energy: E_HF (HF basis) or the zero-body part of the normal-ordered Hamiltonian (oscillator basis); Lawson constant not included. |
+| `hf` | object | `basis.kind = "hf"` | the Hartree-Fock solution. |
+| `hf.e_hf` | number | with `hf` | E_HF. |
+| `hf.e1` | number | with `hf` | one-body part of E_HF. |
+| `hf.e2` | number | with `hf` | two-body part. |
+| `hf.e3` | number | with `hf` | three-body part (0 without a 3N interaction). |
+| `hf.iterations` | int | with `hf` | HF iterations. |
+| `hf.converged` | bool | with `hf` | HF reached its tolerance. |
+| `imsrg` | object | always | the flow; with `run.task = "hf"` it holds `e0 = e_reference` and an empty `stages`. |
+| `imsrg.e0` | number | always | zero-body part of the final Hamiltonian (core energy). |
+| `imsrg.num_omegas` | int | always | Omega operators on the stack after the flow (0 for `task = "hf"`). |
+| `imsrg.num_gathers` | int | always | hunter-gatherer gathers over all stages. |
+| `imsrg.stages` | array | always | one entry per decoupling stage. |
+| `imsrg.stages[].stage` | int | per stage | 1 or 2. |
+| `imsrg.stages[].generator` | string | per stage | canonical generator spelling. |
+| `imsrg.stages[].steps` | int | per stage | accepted solver steps. |
+| `imsrg.stages[].num_gathers` | int | per stage | gathers in this stage. |
+| `imsrg.stages[].s` | number | per stage | final flow parameter. |
+| `imsrg.stages[].e0` | number | per stage | E0 at the end of the stage. |
+| `imsrg.stages[].norm_eta` | number | per stage | norm of the generator at the end. |
+| `imsrg.stages[].stop` | string | per stage | `converged`, `smax` or `diverged`. |
+| `operators` | object | always | transformed operators by canonical name (empty if none requested). |
+| `operators.<name>` | object | per operator | one entry per requested operator. |
+| `operators.<name>.reference` | number | per operator | zero-body part before the flow (HF basis, normal ordered). |
+| `operators.<name>.imsrg` | number | per operator | zero-body part after the flow. |
+| `operators.<name>.file` | string | per operator | path of the written operator file. |
+| `valence_interaction` | string or null | always | path of the valence-space interaction file, `null` without a valence space. |
+
+Changelog (newest first):
+
+* **1** (run 2, 2026-11-15): first documented layout; `schema_version` added. The keys are those of the
+  table above, including `imsrg.num_gathers` and `imsrg.stages[].num_gathers` of the hunter-gatherer
+  Magnus solver. Nothing was released before, so later additions of the same run (MP2 energy) are part
+  of version 1 and are marked in the table.
+
+Only the tokyo and NuShellX valence-space files must stay file-compatible with imsrg++ (D39); the
+other outputs use our formats. Two new output formats, `me2jp` and `me3jp`, come later
+(specification from the owner, D39).
 
 ### 2.11 Example configs
 
