@@ -4,4 +4,5 @@ imsrg_add_module(NAME angmom
     wigner.cc
     moshinsky.cc
     tables.cc
+    sixj3_table.cc
   DEPS base exec)

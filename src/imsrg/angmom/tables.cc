@@ -71,6 +71,23 @@ SixJTable::SixJTable(int emax)
   values_.SyncToDevice();
 }
 
+double SixJTable::operator()(TwoJ ja, TwoJ jb, TwoJ J, TwoJ jc, TwoJ jd,
+                             TwoJ Jp) const {
+  const int tmax = 2 * emax_ + 1;
+  const auto covered_j = [tmax](TwoJ j) {
+    return (j.twice & 1) == 0 || j.twice <= tmax;
+  };
+  const auto covered_J = [tmax](TwoJ J_) {
+    return (J_.twice & 1) == 1 || J_.twice <= 2 * tmax;
+  };
+  IMSRG_CHECK(covered_j(ja) && covered_j(jb) && covered_j(jc) &&
+                  covered_j(jd) && covered_J(J) && covered_J(Jp),
+              "SixJTable: argument beyond the table's coverage (single-"
+              "particle 2j <= 2 emax + 1, integer J <= 2 emax + 1); use "
+              "SixJ3Table for three-body total J");
+  return host_view()(ja, jb, J, jc, jd, Jp);
+}
+
 SixJTable::View SixJTable::host_view() const noexcept {
   return View{values_.host_span().data(), emax_};
 }
