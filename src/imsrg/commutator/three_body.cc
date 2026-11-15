@@ -89,9 +89,9 @@ Hermiticity CommutatorHermiticity(const op::Operator& X,
 }
 
 /// The operand checks of `Comm223` and `PerturbativeTriplesEnergy`.
-void CheckOperand(const op::Operator& op, const char* name,
+void CheckOperand(const char* caller, const op::Operator& op, const char* name,
                   const ThreeBodyContext& ctx) {
-  const std::string who = std::string("Comm223: ") + name;
+  const std::string who = std::string(caller) + ": " + name;
   if (op.empty()) throw InputError(who + " is an empty operator");
   if (!op.spec().is_scalar() || !op.spec().is_number_conserving()) {
     throw NotImplementedError(who +
@@ -440,8 +440,8 @@ const ThreeBodyContext::Impl& ThreeBodyContext::impl() const {
 op::ThreeBody Comm223(const op::Operator& X, const op::Operator& Y,
                       const ThreeBodyContext& ctx) {
   const ThreeBodyContext::Impl& impl = ctx.impl();
-  CheckOperand(X, "X", ctx);
-  CheckOperand(Y, "Y", ctx);
+  CheckOperand("Comm223", X, "X", ctx);
+  CheckOperand("Comm223", Y, "Y", ctx);
   const Hermiticity h = CommutatorHermiticity(X, Y);
   op::ThreeBody z(ctx.model_space_ptr(), h);
   const std::vector<std::int64_t>& expected =
@@ -468,8 +468,8 @@ double PerturbativeTriplesEnergy(const op::Operator& X, const op::Operator& Y,
                                  std::span<const double> epsilon,
                                  const ThreeBodyContext& ctx) {
   const ThreeBodyContext::Impl& impl = ctx.impl();
-  CheckOperand(X, "X", ctx);
-  CheckOperand(Y, "Y", ctx);
+  CheckOperand("PerturbativeTriplesEnergy", X, "X", ctx);
+  CheckOperand("PerturbativeTriplesEnergy", Y, "Y", ctx);
   const std::int32_t norb = ctx.model_space_ptr()->num_orbits();
   if (static_cast<std::int64_t>(epsilon.size()) != norb) {
     throw InputError("PerturbativeTriplesEnergy: epsilon has " +

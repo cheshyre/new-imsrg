@@ -85,6 +85,11 @@ none computes a symbol inside a hot loop, and no table is a lazy cache.
 
 1. Device lambdas use `IMSRG_LAMBDA` and capture **by value** only. They capture views and
    PODs, never `this`, and never containers (`std::vector`, `std::string`, `std::map`).
+   Exception: the nested lambdas of hierarchical parallelism (`TeamThreadRange`,
+   `ThreadVectorRange`, `single`) inside an already running kernel may capture by reference
+   (`[&]`), the standard Kokkos idiom; they execute on the device within the outer lambda's
+   frame, so the references never cross the host-device boundary (first used by
+   `commutator/kernels/comm223.cc`, M10).
 2. Functions called from kernels are `IMSRG_FUNCTION` (= `KOKKOS_FUNCTION`), `constexpr`, or
    both, and use no exceptions, no `std::` math other than what Kokkos provides
    (`Kokkos::sqrt`, ...), no virtual calls, no recursion, and no dynamic allocation.

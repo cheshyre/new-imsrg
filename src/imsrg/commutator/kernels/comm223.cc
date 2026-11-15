@@ -32,6 +32,7 @@ struct Thirds {
   std::int32_t n = 0;
   std::int32_t orbit[kMaxThirds] = {-1, -1, -1};
 };
+static_assert(std::is_trivially_copyable_v<Thirds>);
 
 /// The distinct orbits among (a, b, c). O(1).
 IMSRG_INLINE_FUNCTION Thirds DistinctOrbits(std::int32_t a, std::int32_t b,
@@ -185,8 +186,8 @@ IMSRG_INLINE_FUNCTION double TileSum(const std::int32_t* jp, std::int32_t ij_lo,
 
 /// The work of one team: bra triple `T` against its ket triples (by `mode`),
 /// adding the triples energy of the team to `acc` (kTriples) or writing Z.
-/// Barriers separate the phases of a tile (design/12 section 5; with team
-/// size 1, as on OpenMP, they are no-ops).
+/// Barriers separate the phases of a tile (design/12 section 5), so any team
+/// size is correct; with team size 1 they are no-ops.
 IMSRG_INLINE_FUNCTION void TeamTiles(const Member& team, const TileViews& v,
                                      TileMode mode, std::int32_t T, int level,
                                      double& acc) {

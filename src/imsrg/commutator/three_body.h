@@ -111,7 +111,8 @@ class ThreeBodyContext {
 /// non-Hermitian (all tiles, dense blocks). Device data of the result are
 /// current (memory model of `op::Operator`).
 /// @throws NotImplementedError for non-scalar or non-number-conserving X or Y.
-/// @throws InputError if X or Y has no two-body part (particle rank < 2).
+/// @throws InputError if X or Y is empty or has no two-body part (particle
+///         rank < 2).
 /// @throws InvariantError if X or Y lives on a model space whose basis,
 ///         reference or partition differs from the context's, or the context
 ///         was moved from.

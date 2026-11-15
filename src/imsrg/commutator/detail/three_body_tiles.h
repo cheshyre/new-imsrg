@@ -110,6 +110,7 @@ struct TileScratchCounts {
   std::int64_t doubles = 0;  ///< Bra cache, ket legs, W, U, hats.
   std::int64_t int32s = 0;   ///< Per-state index tables.
 };
+static_assert(std::is_trivially_copyable_v<TileScratchCounts>);
 
 /// Number of per-state int32 tables in the team scratch (rows: J1', index of
 /// z, 6j offset c3 J1' + c4 (2 j_z - 1) / 2; columns: J2', index of w, cache
@@ -119,7 +120,8 @@ inline constexpr std::int64_t kStateTables = 7;
 /// The scratch counts for `ext`: bra cache kBraSlots m S 2, ket legs
 /// kMaxThirds m S 2, W m^2, U m k, two hat tables of m (m = m_max, S = s_max,
 /// k = k_max) doubles; kStateTables m int32. O(1).
-inline TileScratchCounts ScratchCounts(const TileExtents& ext) {
+IMSRG_INLINE_FUNCTION constexpr TileScratchCounts ScratchCounts(
+    const TileExtents& ext) noexcept {
   const std::int64_t m = ext.m_max;
   const std::int64_t s = ext.s_max;
   const std::int64_t k = ext.k_max;
