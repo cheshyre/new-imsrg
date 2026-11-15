@@ -16,8 +16,9 @@
 #include <string>
 
 #include <Kokkos_Core.hpp>
-#include <fmt/format.h>
-#include <gtest/gtest.h>
+#include <fmt/format.h>   // NOLINT(build/include_order): cpplint counts
+#include <gtest/gtest.h>  // NOLINT(build/include_order): <Kokkos_Core.hpp>
+                          // as a project header; clang-format orders these.
 
 namespace imsrg_smoke {
 

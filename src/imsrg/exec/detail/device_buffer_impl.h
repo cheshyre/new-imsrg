@@ -167,8 +167,7 @@ void DeviceBuffer<T>::resize(std::size_t n) {
   const std::size_t keep = std::min(n, impl_->dev.extent(0));
   auto fresh = std::make_unique<Impl>(impl_->label, n);
   if (keep > 0) {
-    const auto range =
-        std::make_pair<std::size_t, std::size_t>(0, std::size_t(keep));
+    const auto range = std::pair<std::size_t, std::size_t>(0, keep);
     Kokkos::deep_copy(Kokkos::subview(fresh->dev, range),
                       Kokkos::subview(impl_->dev, range));
   }

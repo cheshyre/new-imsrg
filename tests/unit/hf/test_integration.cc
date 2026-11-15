@@ -14,10 +14,8 @@
 #include "imsrg/opslib/center_of_mass.h"
 #include "tests/unit/hf/hf_test_support.h"
 
+namespace imsrg::hftest {
 namespace {
-
-using namespace imsrg;
-using namespace imsrg::hftest;
 
 double SecondsSince(std::chrono::steady_clock::time_point t0) {
   return std::chrono::duration<double>(std::chrono::steady_clock::now() - t0)
@@ -87,3 +85,4 @@ TEST(HfIntegration, IT4_TwoPlusThreeNucleon) {
 }
 
 }  // namespace
+}  // namespace imsrg::hftest

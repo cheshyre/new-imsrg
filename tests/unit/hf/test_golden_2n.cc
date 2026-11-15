@@ -8,10 +8,8 @@
 
 #include "tests/unit/hf/hf_test_support.h"
 
+namespace imsrg::hftest {
 namespace {
-
-using namespace imsrg;
-using namespace imsrg::hftest;
 
 TEST(HfGolden2N, Emax2O16Linear) {
   const op::Operator H =
@@ -34,3 +32,4 @@ TEST(HfGolden2N, Emax2O16Linear) {
 }
 
 }  // namespace
+}  // namespace imsrg::hftest

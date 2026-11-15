@@ -9,6 +9,7 @@
 // round-trip values).
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -194,8 +195,8 @@ TEST_P(GoldenBasis, ThreeBodyChannels) {
     ASSERT_EQ(gc.twoJ, ours.two_j.twice) << where << " twoJ";
     ASSERT_EQ(gc.parity, static_cast<int>(ours.parity)) << where << " parity";
     ASSERT_EQ(gc.twoTz, ours.two_tz.twice) << where << " twoTz";
-    ASSERT_EQ(static_cast<long long>(gc.nkets),
-              static_cast<long long>(ours.num_kets))
+    ASSERT_EQ(static_cast<std::int64_t>(gc.nkets),
+              static_cast<std::int64_t>(ours.num_kets))
         << where << " nkets";
   }
   EXPECT_EQ(g_.nkets3, tb.num_kets()) << "record 'nkets3'";

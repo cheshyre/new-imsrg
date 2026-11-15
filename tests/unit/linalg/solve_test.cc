@@ -10,7 +10,7 @@
 #include "imsrg/base/error.h"
 #include "imsrg/linalg/blas.h"
 
-using namespace imsrg::linalg;
+namespace imsrg::linalg {
 
 namespace {
 double Frob(const Matrix<double>& m) {
@@ -67,3 +67,5 @@ TEST(LinalgSolve, ShapeErrorsAndEmpty) {
   Matrix<double> E(0, 0), EB(0, 2);
   EXPECT_NO_THROW(Solve(E.const_view(), EB.view()));
 }
+
+}  // namespace imsrg::linalg

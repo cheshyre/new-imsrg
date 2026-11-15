@@ -21,7 +21,9 @@
 // While `Run()` still throws E-PLANNED the tests skip with a message.
 
 #include <algorithm>
+#include <cinttypes>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <filesystem>
 #include <optional>
@@ -34,9 +36,9 @@
 #include "tests/unit/driver/integration/run_support.h"
 #include "tests/unit/driver/integration/snt_compare.h"
 
+namespace imsrg::it {
 namespace {
 
-using namespace imsrg::it;
 namespace driver = imsrg::driver;
 
 /// Skips the current test when `path` does not exist.
@@ -51,10 +53,10 @@ namespace driver = imsrg::driver;
   } while (0)
 
 /// Total number of steps over all stages of a run, from results.json.
-long TotalSteps(const Json& results) {
-  long n = 0;
+std::int64_t TotalSteps(const Json& results) {
+  std::int64_t n = 0;
   for (const auto& st : results["imsrg"]["stages"].items)
-    n += static_cast<long>(st["steps"].number);
+    n += static_cast<std::int64_t>(st["steps"].number);
   return n;
 }
 
@@ -86,7 +88,7 @@ TEST(DriverIntegration, IT2_O16_Magnus_Atan) {
   const double e0 = r->results["imsrg"]["e0"].number;
   std::printf("[IT-2] E0 = %.9f  golden %.9f  dE0 = %.3e\n", e0, golden_e0,
               e0 - golden_e0);
-  std::printf("[IT-2] steps = %ld  golden 256  (stages %zu)\n",
+  std::printf("[IT-2] steps = %" PRId64 "  golden 256  (stages %zu)\n",
               TotalSteps(r->results), r->results["imsrg"]["stages"].size());
   EXPECT_NEAR(e0, golden_e0, 1.0e-3);
 
@@ -189,8 +191,8 @@ TEST(DriverIntegration, IT12_Legacy_Matches_Toml) {
   const double e0b = legacy.results["imsrg"]["e0"].number;
   std::printf("[IT-12] E0 toml %.17g legacy %.17g  diff %.3e\n", e0a, e0b,
               e0a - e0b);
-  std::printf("[IT-12] steps toml %ld legacy %ld\n", TotalSteps(toml->results),
-              TotalSteps(legacy.results));
+  std::printf("[IT-12] steps toml %" PRId64 " legacy %" PRId64 "\n",
+              TotalSteps(toml->results), TotalSteps(legacy.results));
   EXPECT_EQ(e0a, e0b);
   EXPECT_EQ(TotalSteps(toml->results), TotalSteps(legacy.results));
 
@@ -230,7 +232,7 @@ TEST(DriverIntegration, IT4_ThreeBody_NO2B_Smax10) {
               e_hf + 313.1684814);
   std::printf("[IT-4] E0(s=10) = %.9f  golden -343.761780688  dev %.3e\n", e0,
               e0 + 343.761780688);
-  std::printf("[IT-4] steps = %ld  golden 29\n", TotalSteps(r.results));
+  std::printf("[IT-4] steps = %" PRId64 "  golden 29\n", TotalSteps(r.results));
   EXPECT_NEAR(e_hf, -313.1684814, 1.0e-4);
   EXPECT_NEAR(e0, -343.761780688, 1.0e-3);
 }
@@ -241,7 +243,7 @@ TEST(DriverIntegration, IT4_ThreeBody_NO2B_Smax10) {
 // -----------------------------------------------------------------------------
 
 void RunValenceCase(const char* tag, const char* nucleus,
-                    const char* golden_rel, long golden_steps) {
+                    const char* golden_rel, std::int64_t golden_steps) {
   IMSRG_IT_REQUIRE_FILE(DataFile(TwoBodyName()));
   const auto golden_path = GoldenFile(golden_rel);
   IMSRG_IT_REQUIRE_FILE(golden_path);
@@ -254,8 +256,10 @@ void RunValenceCase(const char* tag, const char* nucleus,
   const auto& stages = r.results["imsrg"]["stages"];
   std::string per_stage;
   for (const auto& st : stages.items)
-    per_stage += " " + std::to_string(static_cast<long>(st["steps"].number));
-  std::printf("[%s] stages %zu, steps per stage:%s  total %ld  golden %ld\n",
+    per_stage +=
+        " " + std::to_string(static_cast<std::int64_t>(st["steps"].number));
+  std::printf("[%s] stages %zu, steps per stage:%s  total %" PRId64
+              "  golden %" PRId64 "\n",
               tag, stages.size(), per_stage.c_str(), TotalSteps(r.results),
               golden_steps);
 
@@ -309,3 +313,4 @@ TEST(DriverIntegration, IT7_Ne20_SdShell_Valence) {
 }
 
 }  // namespace
+}  // namespace imsrg::it

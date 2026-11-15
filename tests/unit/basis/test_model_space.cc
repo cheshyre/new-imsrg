@@ -14,10 +14,9 @@
 #include "imsrg/basis/model_space.h"
 #include "tests/unit/basis/golden_basis_dump.h"
 
+namespace imsrg::basis {
 namespace {
 
-using namespace imsrg;
-using namespace imsrg::basis;
 using imsrg::basis::testing::GoldenBasisDir;
 using imsrg::basis::testing::GoldenBasisFiles;
 using imsrg::basis::testing::ReadGoldenBasisDump;
@@ -167,3 +166,4 @@ TEST(BasisModelSpace, BadNamesThrow) {
 }
 
 }  // namespace
+}  // namespace imsrg::basis

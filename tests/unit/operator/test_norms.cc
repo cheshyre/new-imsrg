@@ -13,10 +13,8 @@
 #include "imsrg/operator/arithmetic.h"
 #include "imsrg/operator/norms.h"
 
+namespace imsrg::op {
 namespace {
-
-using namespace imsrg;
-using namespace imsrg::op;
 
 std::shared_ptr<const basis::ModelSpace> MakeMs() {
   return basis::ModelSpace::FromNames(basis::BasisTruncation{.emax = 2}, 16.0,
@@ -186,3 +184,4 @@ TEST(OperatorNorms, HomogeneousUnderScaling) {
 }
 
 }  // namespace
+}  // namespace imsrg::op

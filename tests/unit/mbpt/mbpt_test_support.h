@@ -18,8 +18,6 @@
 
 namespace imsrg::mbtest {
 
-using namespace imsrg::hftest;
-
 struct NatResult {
   op::Operator h_nat;             ///< normal-ordered H in the NAT basis
   mbpt::NaturalOrbitals nat;      ///< NAT orbitals in the HF basis

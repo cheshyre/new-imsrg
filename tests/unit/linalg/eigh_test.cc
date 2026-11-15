@@ -11,7 +11,7 @@
 #include "imsrg/base/error.h"
 #include "imsrg/linalg/blas.h"
 
-using namespace imsrg::linalg;
+namespace imsrg::linalg {
 
 TEST(LinalgEigh, RandomSymmetricSizes) {
   std::mt19937_64 rng(42);
@@ -89,3 +89,5 @@ TEST(LinalgEigh, ReadsOnlyLowerTriangleAndEmpty) {
   std::vector<double> w(2);
   EXPECT_THROW(Eigh(R.const_view(), w, V.view()), imsrg::InvariantError);
 }
+
+}  // namespace imsrg::linalg

@@ -17,10 +17,8 @@
 #include "imsrg/operator/compare.h"
 #include "imsrg/operator/detail/part_kernels.h"
 
+namespace imsrg::op {
 namespace {
-
-using namespace imsrg;
-using namespace imsrg::op;
 
 std::shared_ptr<const basis::ModelSpace> MakeMs(const char* ref = "O16") {
   return basis::ModelSpace::FromNames(basis::BasisTruncation{.emax = 2}, 16.0,
@@ -369,3 +367,5 @@ TEST(OperatorArithmeticScalarAdd, ConstantMakesAntiHermitianNonHermitian) {
   EXPECT_EQ(h.hermiticity(), Hermiticity::kHermitian);
   EXPECT_EQ(h.zero_body(), -2.0);
 }
+
+}  // namespace imsrg::op

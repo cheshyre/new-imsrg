@@ -6,6 +6,7 @@
 // Jacobi identity for one-body operators and consistency for non-Hermitian
 // operands.
 #include <algorithm>
+#include <cinttypes>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -129,16 +130,16 @@ TEST(commutator_ref_properties, antisymmetry) {
           const Operator zxy = Apply(t, X, Y);
           const Operator zyx = Apply(t, Y, X);
           const double dev = RelativeDeviation(zxy, -zyx);
-          std::printf("[prop] antisym %s %s seed %llu %s: %.3e\n",
-                      c.name.c_str(), hp.name,
-                      static_cast<unsigned long long>(seed), t.name, dev);
+          std::printf("[prop] antisym %s %s seed %" PRIu64 " %s: %.3e\n",
+                      c.name.c_str(), hp.name, static_cast<std::uint64_t>(seed),
+                      t.name, dev);
           EXPECT_LE(dev, kTol) << c.name << " " << hp.name << " " << t.name;
         }
         const double dev =
             RelativeDeviation(cr::Commutator(X, Y), -cr::Commutator(Y, X));
-        std::printf("[prop] antisym %s %s seed %llu full: %.3e\n",
-                    c.name.c_str(), hp.name,
-                    static_cast<unsigned long long>(seed), dev);
+        std::printf("[prop] antisym %s %s seed %" PRIu64 " full: %.3e\n",
+                    c.name.c_str(), hp.name, static_cast<std::uint64_t>(seed),
+                    dev);
         EXPECT_LE(dev, kTol) << c.name << " " << hp.name << " full";
       }
     }
@@ -157,9 +158,9 @@ TEST(commutator_ref_properties, linearity) {
           const Operator lhs = Apply(t, Xs, Y);
           const Operator rhs = 0.7 * Apply(t, X1, Y) - 1.3 * Apply(t, X2, Y);
           const double dev = RelativeDeviation(lhs, rhs);
-          std::printf("[prop] linear %s %s seed %llu %s: %.3e\n",
-                      c.name.c_str(), hp.name,
-                      static_cast<unsigned long long>(seed), t.name, dev);
+          std::printf("[prop] linear %s %s seed %" PRIu64 " %s: %.3e\n",
+                      c.name.c_str(), hp.name, static_cast<std::uint64_t>(seed),
+                      t.name, dev);
           EXPECT_LE(dev, kTol) << c.name << " " << hp.name << " " << t.name;
         }
       }
@@ -181,9 +182,9 @@ TEST(commutator_ref_properties, hermiticity) {
               std::string(t.name) == "comm220ss")
             continue;
           const double dev = HermiticityViolation(Z, h);
-          std::printf("[prop] herm %s %s seed %llu %s: %.3e\n", c.name.c_str(),
-                      hp.name, static_cast<unsigned long long>(seed), t.name,
-                      dev);
+          std::printf("[prop] herm %s %s seed %" PRIu64 " %s: %.3e\n",
+                      c.name.c_str(), hp.name, static_cast<std::uint64_t>(seed),
+                      t.name, dev);
           EXPECT_LE(dev, kTol) << c.name << " " << hp.name << " " << t.name;
         }
         const Operator Z = cr::Commutator(X, Y);
@@ -208,8 +209,8 @@ TEST(commutator_ref_properties, jacobi_one_body) {
       J += cr::Commutator(W, cr::Commutator(X, Y));
       Operator zero(c.ms, J.spec());
       const double dev = RelativeDeviation(J, zero);
-      std::printf("[prop] jacobi %s seed %llu: %.3e\n", c.name.c_str(),
-                  static_cast<unsigned long long>(seed), dev);
+      std::printf("[prop] jacobi %s seed %" PRIu64 ": %.3e\n", c.name.c_str(),
+                  static_cast<std::uint64_t>(seed), dev);
       EXPECT_LE(dev, kTol) << c.name;
     }
   }
@@ -234,8 +235,9 @@ TEST(commutator_ref_properties, non_hermitian_consistency) {
           part.set_hermiticity(Hermiticity::kNonHermitian);
           rhs += part;
           const double dev = RelativeDeviation(lhs, rhs);
-          std::printf("[prop] nonherm %s seed %llu %s: %.3e\n", c.name.c_str(),
-                      static_cast<unsigned long long>(seed), t.name, dev);
+          std::printf("[prop] nonherm %s seed %" PRIu64 " %s: %.3e\n",
+                      c.name.c_str(), static_cast<std::uint64_t>(seed), t.name,
+                      dev);
           EXPECT_LE(dev, kTol) << c.name << " " << t.name;
         }
         EXPECT_EQ(cr::Commutator(X, Y).hermiticity(),

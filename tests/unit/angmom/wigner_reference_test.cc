@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -29,8 +30,8 @@ using imsrg::TwoJ;
 using imsrg::TwoM;
 
 struct FamilyStats {
-  long count = 0;
-  long failures = 0;
+  std::int64_t count = 0;
+  std::int64_t failures = 0;
   double max_abs = 0.0;
   double max_rel = 0.0;
 };
@@ -74,7 +75,7 @@ TEST(WignerReference, AgainstSympyExact) {
   std::map<std::string, FamilyStats> stats;
   std::vector<std::string> failure_lines;
   std::string line;
-  long total = 0;
+  std::int64_t total = 0;
   while (std::getline(in, line)) {
     if (line.empty()) continue;
     std::istringstream is(line);
@@ -110,7 +111,7 @@ TEST(WignerReference, AgainstSympyExact) {
   const char* const expected_families[] = {"cg_sp",   "cg_ls",     "cg_l0",
                                            "3j_sp",   "6j_pandya", "6j_3b",
                                            "9j_lsjj", "9j_sample"};
-  long failures = 0;
+  std::int64_t failures = 0;
   std::cout
       << "Wigner reference comparison (tolerance max(1e-12 rel, 1e-14 abs)):\n";
   for (const char* f : expected_families) {

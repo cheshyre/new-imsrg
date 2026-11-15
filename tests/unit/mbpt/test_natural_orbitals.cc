@@ -8,10 +8,11 @@
 
 #include "tests/unit/mbpt/mbpt_test_support.h"
 
-namespace {
+namespace imsrg::mbtest {
 
-using namespace imsrg;
-using namespace imsrg::mbtest;
+namespace fs = std::filesystem;
+using hftest::LoadHamiltonian;
+namespace {
 
 TEST(MbptNaturalOrbitals, Emax2Invariants) {
   op::Operator H =
@@ -56,3 +57,4 @@ TEST(MbptNaturalOrbitals, Emax2Invariants) {
 }
 
 }  // namespace
+}  // namespace imsrg::mbtest

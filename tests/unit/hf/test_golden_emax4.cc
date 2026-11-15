@@ -8,10 +8,8 @@
 
 #include "tests/unit/hf/hf_test_support.h"
 
+namespace imsrg::hftest {
 namespace {
-
-using namespace imsrg;
-using namespace imsrg::hftest;
 
 fs::path Emax4Dir() {
   return fs::path(IMSRG_GENERATED_GOLDEN_DIR) / "hamiltonian/emax4_O16";
@@ -58,3 +56,4 @@ TEST(HfGoldenEmax4, TwoPlusThreeNucleon) {
 }
 
 }  // namespace
+}  // namespace imsrg::hftest

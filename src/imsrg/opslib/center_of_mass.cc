@@ -52,7 +52,7 @@ op::Operator R2Cm(const std::shared_ptr<const basis::ModelSpace>& ms, int A) {
   op::Operator r(ms, op::OperatorSpec::Scalar(2, Hermiticity::kHermitian));
   const double b2 = constants::kHbarc * constants::kHbarc /
                     constants::kMNucleon / ms->basis().hbar_omega();
-  detail::AddOscillatorOneBody(r, b2 / (double(A) * A), -1.0,
+  detail::AddOscillatorOneBody(r, b2 / (static_cast<double>(A) * A), -1.0,
                                [](const basis::Orbit&) { return true; });
   const detail::PairEngine engine = MakeEngine(*ms);
   detail::AddTwoBody(
@@ -62,7 +62,7 @@ op::Operator R2Cm(const std::shared_ptr<const basis::ModelSpace>& ms, int A) {
         return 2.0 *
                engine.Element(detail::PairKind::kPosition, a, b, c, d,
                               ch.two_j) /
-               (double(A) * A);
+               (static_cast<double>(A) * A);
       });
   r.SyncToDevice();
   return r;

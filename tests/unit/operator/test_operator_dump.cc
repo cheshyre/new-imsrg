@@ -19,10 +19,8 @@
 #include "imsrg/operator/compare.h"
 #include "imsrg/operator/operator_dump.h"
 
+namespace imsrg::op {
 namespace {
-
-using namespace imsrg;
-using namespace imsrg::op;
 
 std::shared_ptr<const basis::ModelSpace> MakeMs(int emax = 1) {
   return basis::ModelSpace::FromNames(basis::BasisTruncation{.emax = emax},
@@ -390,3 +388,4 @@ TEST(OperatorDump, WriterRejectsMalformedSourceAndReference) {
 }
 
 }  // namespace
+}  // namespace imsrg::op

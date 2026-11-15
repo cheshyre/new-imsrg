@@ -22,10 +22,9 @@
 #include "imsrg/operator/norms.h"
 #include "imsrg/operator/operator_dump.h"
 
+namespace imsrg::op {
 namespace {
 
-using namespace imsrg;
-using namespace imsrg::op;
 namespace fs = std::filesystem;
 
 const fs::path kFile =
@@ -186,3 +185,4 @@ TEST(No2bReaderGolden, FullEmax6ReadIsFast) {
 }
 
 }  // namespace
+}  // namespace imsrg::op

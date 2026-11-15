@@ -20,10 +20,9 @@
 #include "imsrg/base/error.h"
 #include "imsrg/io/input_stream.h"
 
+namespace imsrg::io {
 namespace {
 
-using namespace imsrg;
-using namespace imsrg::io;
 namespace fs = std::filesystem;
 
 fs::path TempPath(const std::string& name) {
@@ -214,3 +213,4 @@ TEST(InputStream, FloatParsingIsBitIdenticalToIstreamExtraction) {
 }
 
 }  // namespace
+}  // namespace imsrg::io

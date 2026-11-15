@@ -22,10 +22,9 @@
 #include "imsrg/operator/operator_dump.h"
 #include "imsrg/operator/random_operator.h"
 
+namespace imsrg::op {
 namespace {
 
-using namespace imsrg;
-using namespace imsrg::op;
 namespace fs = std::filesystem;
 
 std::shared_ptr<const basis::ModelSpace> MakeMs(const char* ref = "O16") {
@@ -204,3 +203,5 @@ TEST(OperatorWithModelSpace, RejectsDifferentOrbitList) {
   EXPECT_THROW(WithModelSpace(A, bigger), InvariantError);
   EXPECT_THROW(WithModelSpace(A, nullptr), InvariantError);
 }
+
+}  // namespace imsrg::op

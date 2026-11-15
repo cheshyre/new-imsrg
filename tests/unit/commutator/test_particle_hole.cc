@@ -18,9 +18,9 @@
 #include "tests/support/commutator_test_support.h"
 #include "tests/unit/commutator/commutator_test_cases.h"
 
+namespace imsrg {
 namespace {
 
-using namespace imsrg;
 using commutator::Workspace;
 using commutator_test::kTol;
 using imsrg::testing::RandomOperator;
@@ -115,3 +115,4 @@ TEST(commutator_particle_hole, Timing) {
 }
 
 }  // namespace
+}  // namespace imsrg

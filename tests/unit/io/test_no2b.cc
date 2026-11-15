@@ -20,10 +20,9 @@
 #include "imsrg/io/no2b.h"
 #include "imsrg/operator/no2b.h"
 
+namespace imsrg::io {
 namespace {
 
-using namespace imsrg;
-using namespace imsrg::io;
 namespace fs = std::filesystem;
 
 /// A half-exact deterministic value: multiples of 1/64 in [-1.6, 1.6], with
@@ -222,3 +221,4 @@ TEST(No2bRead, MissingFileThrows) {
 }
 
 }  // namespace
+}  // namespace imsrg::io

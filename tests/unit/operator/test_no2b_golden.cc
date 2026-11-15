@@ -30,10 +30,8 @@
 #error "IMSRG_TEST_DATA_DIR must be defined"
 #endif
 
+namespace imsrg::op {
 namespace {
-
-using namespace imsrg;
-using namespace imsrg::op;
 
 struct FileOrbit {
   std::int32_t n, l, j, e;
@@ -201,3 +199,4 @@ TEST(No2bGolden, V3NormalOrderedO16) {
 }
 
 }  // namespace
+}  // namespace imsrg::op

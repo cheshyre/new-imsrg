@@ -13,9 +13,9 @@
 #include "imsrg/operator/compare.h"
 #include "imsrg/operator/operator_dump.h"
 
+namespace imsrg {
 namespace {
 
-using namespace imsrg;
 namespace fs = std::filesystem;
 
 const fs::path kMe2j = fs::path(IMSRG_TEST_DATA_DIR) /
@@ -57,3 +57,4 @@ TEST(Me2jGolden, Emax4MatchesTheGeneratedV2Dump) {
 }
 
 }  // namespace
+}  // namespace imsrg

@@ -9,7 +9,7 @@
 
 #include "imsrg/base/error.h"
 
-using namespace imsrg::linalg;
+namespace imsrg::linalg {
 
 namespace {
 BlockIndex B(int v) { return BlockIndex{v}; }
@@ -81,3 +81,5 @@ TEST(LinalgBlockSparse, NegativeSizeRejectedAndFloat) {
   f.host_block(0)(0, 0) = 1.5f;
   EXPECT_EQ(f.host_block(0)(0, 0), 1.5f);
 }
+
+}  // namespace imsrg::linalg

@@ -12,10 +12,8 @@
 #include "imsrg/basis/model_space.h"
 #include "imsrg/operator/operator.h"
 
+namespace imsrg::op {
 namespace {
-
-using namespace imsrg;
-using namespace imsrg::op;
 
 std::shared_ptr<const basis::ModelSpace> MakeMs(int emax,
                                                 const char* nucleus = "O16") {
@@ -140,3 +138,4 @@ TEST(Operator, MovedFromIsEmpty) {
 }
 
 }  // namespace
+}  // namespace imsrg::op

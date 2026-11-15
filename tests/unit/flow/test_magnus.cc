@@ -20,9 +20,8 @@
 #include "imsrg/operator/norms.h"
 #include "imsrg/operator/operator_dump.h"
 
+namespace imsrg {
 namespace {
-
-using namespace imsrg;
 
 /// One line of an imsrg++ flow file (columns istep s E0 |H| err |Om1| |Om2|
 /// |Om3| |Eta1| |Eta2|).
@@ -147,3 +146,4 @@ TEST(MagnusSolver, StopsWhenConverged) {
 }
 
 }  // namespace
+}  // namespace imsrg

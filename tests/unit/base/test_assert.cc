@@ -8,9 +8,8 @@
 #include "imsrg/base/assert.h"
 #include "imsrg/base/error.h"
 
+namespace imsrg {
 namespace {
-
-using namespace imsrg;
 
 TEST(Assert, CheckPassesSilently) {
   EXPECT_NO_THROW(IMSRG_CHECK(1 + 1 == 2));
@@ -57,3 +56,4 @@ TEST(Assert, AssertActiveInDebugBuild) {
 }
 
 }  // namespace
+}  // namespace imsrg

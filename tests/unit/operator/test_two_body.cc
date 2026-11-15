@@ -13,10 +13,8 @@
 #include "imsrg/basis/model_space.h"
 #include "imsrg/operator/two_body.h"
 
+namespace imsrg::op {
 namespace {
-
-using namespace imsrg;
-using namespace imsrg::op;
 
 std::shared_ptr<const basis::ModelSpace> Ms2() {
   static const auto kMs = basis::ModelSpace::FromNames(
@@ -317,3 +315,4 @@ TEST(TwoBody, SetHermiticityAffectsLaterWrites) {
 }
 
 }  // namespace
+}  // namespace imsrg::op

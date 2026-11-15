@@ -14,10 +14,8 @@
 #include "imsrg/operator/compare.h"
 #include "imsrg/operator/random_operator.h"
 
+namespace imsrg::op {
 namespace {
-
-using namespace imsrg;
-using namespace imsrg::op;
 
 std::shared_ptr<const basis::ModelSpace> MakeMs() {
   return basis::ModelSpace::FromNames(basis::BasisTruncation{.emax = 2}, 16.0,
@@ -150,3 +148,5 @@ TEST(OperatorRandom, OneBodyOnlySpecHasNoTwoBody) {
   EXPECT_FALSE(o.two_body().allocated());
   EXPECT_GT(MaxAbs(o).one_body, 0.0);
 }
+
+}  // namespace imsrg::op

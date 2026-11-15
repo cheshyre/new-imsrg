@@ -12,7 +12,7 @@
 #include "imsrg/base/error.h"
 #include "imsrg/linalg/blas.h"
 
-using namespace imsrg::linalg;
+namespace imsrg::linalg {
 
 namespace {
 
@@ -58,10 +58,13 @@ void RunCase(std::mt19937_64& rng, std::int64_t m, std::int64_t n,
   Matrix<T> B = ob == Op::kTrans ? RandomMatrix<T>(rng, n, k)
                                  : RandomMatrix<T>(rng, k, n);
   Matrix<T> C = RandomMatrix<T>(rng, m, n);
-  if (nan_c)
-    for (std::int64_t j = 0; j < n; ++j)
-      for (std::int64_t i = 0; i < m; ++i)
+  if (nan_c) {
+    for (std::int64_t j = 0; j < n; ++j) {
+      for (std::int64_t i = 0; i < m; ++i) {
         C(i, j) = std::numeric_limits<T>::quiet_NaN();
+      }
+    }
+  }
   Matrix<double> ref = Naive<T>(alpha, A.const_view(), oa, B.const_view(), ob,
                                 beta, C.const_view());
   Gemm(alpha, A.const_view(), oa, B.const_view(), ob, beta, C.view());
@@ -200,3 +203,5 @@ TEST(LinalgGroupedGemm, Mix) {
     for (int i = 0; i < 2; ++i) EXPECT_NEAR(C1(i, j), r1(i, j), 1.0e-12);
   GroupedGemm({});
 }
+
+}  // namespace imsrg::linalg

@@ -9,10 +9,8 @@
 
 #include "tests/unit/hf/hf_test_support.h"
 
+namespace imsrg::hftest {
 namespace {
-
-using namespace imsrg;
-using namespace imsrg::hftest;
 
 struct State {
   op::Operator H;
@@ -116,3 +114,4 @@ TEST_F(HfProperties, EnergyEqualsSumOfParts) {
 }
 
 }  // namespace
+}  // namespace imsrg::hftest

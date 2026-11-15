@@ -15,10 +15,8 @@
 #include "imsrg/base/error.h"
 #include "imsrg/operator/no2b.h"
 
+namespace imsrg::op {
 namespace {
-
-using namespace imsrg;
-using namespace imsrg::op;
 
 struct BfOrbit {
   int e, l, tj;
@@ -251,3 +249,4 @@ TEST(No2b, PnAgainstHandCgProducts) {
 }
 
 }  // namespace
+}  // namespace imsrg::op

@@ -17,10 +17,9 @@
 #include "imsrg/basis/orbit.h"
 #include "imsrg/operator/operator_dump.h"
 
+namespace imsrg::op {
 namespace {
 
-using namespace imsrg;
-using namespace imsrg::op;
 namespace fs = std::filesystem;
 
 const char* const kDirs[] = {"hamiltonian/emax2_O16", "hf/emax2_O16_2N",
@@ -97,3 +96,4 @@ TEST_F(GoldenH, TwoBodyNormalizedInBothOrbitOrders) {
 }
 
 }  // namespace
+}  // namespace imsrg::op

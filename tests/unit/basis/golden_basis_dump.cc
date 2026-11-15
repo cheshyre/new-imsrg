@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <cstdint>
 #include <cstdlib>
 #include <fstream>
 #include <sstream>
@@ -62,17 +63,19 @@ class Reader {
   int ToInt(const std::string& s) const {
     char* end = nullptr;
     errno = 0;
-    const long v = std::strtol(s.c_str(), &end, 10);
+    const std::int64_t v =
+        static_cast<std::int64_t>(std::strtol(s.c_str(), &end, 10));
     if (s.empty() || *end != '\0' || errno != 0 || v < -2147483647L ||
         v > 2147483647L) {
       Fail("not an integer: '" + s + "'");
     }
     return static_cast<int>(v);
   }
-  long long ToLl(const std::string& s) const {
+  std::int64_t ToLl(const std::string& s) const {
     char* end = nullptr;
     errno = 0;
-    const long long v = std::strtoll(s.c_str(), &end, 10);
+    const std::int64_t v =
+        static_cast<std::int64_t>(std::strtoll(s.c_str(), &end, 10));
     if (s.empty() || *end != '\0' || errno != 0)
       Fail("not an integer: '" + s + "'");
     return v;

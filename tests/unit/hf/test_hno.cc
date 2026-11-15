@@ -10,10 +10,8 @@
 #include "imsrg/operator/compare.h"
 #include "tests/unit/hf/hf_test_support.h"
 
+namespace imsrg::hftest {
 namespace {
-
-using namespace imsrg;
-using namespace imsrg::hftest;
 
 /// Compares `hno` with the dump `file`, prints the deviations and returns the
 /// maximum.
@@ -89,3 +87,4 @@ TEST(HfHnoReference, Emax4TwoPlusThreeNucleon) {
 }
 
 }  // namespace
+}  // namespace imsrg::hftest

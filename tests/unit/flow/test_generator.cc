@@ -25,9 +25,9 @@
 #include "imsrg/operator/operator_dump.h"
 #include "imsrg/operator/random_operator.h"
 
+namespace imsrg {
 namespace {
 
-using namespace imsrg;
 using basis::OrbitClass;
 using flow::Denominators;
 using flow::GeneratorKind;
@@ -654,3 +654,4 @@ TEST(GeneratorReuse, SecondCallDoesNotReallocate) {
 }
 
 }  // namespace
+}  // namespace imsrg

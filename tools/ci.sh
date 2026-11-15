@@ -177,9 +177,8 @@ step_format() {
   echo "$files" | tr '\n' '\0' | xargs -0 clang-format --dry-run --Werror
 }
 
-# cpplint with the repository's CPPLINT.cfg (design/17 section 4). Advisory until the
-# Google-style conversion has fixed the findings (design/17 section 5, step 8): it reports them
-# but does not fail.
+# cpplint with the repository's CPPLINT.cfg (design/17 section 4); fails on any finding.
+# Justified exceptions carry `// NOLINT(<category>): <reason>` in the code.
 step_cpplint() {
   local cpplint=$IMSRG_VENV/bin/cpplint files out n
   if [ ! -x "$cpplint" ]; then
@@ -191,15 +190,16 @@ step_cpplint() {
   if [ -z "$files" ]; then echo "no .h/.cc sources"; return 0; fi
   echo "checking $(echo "$files" | wc -l | tr -d ' ') files"
   out=$(echo "$files" | tr '\n' '\0' | xargs -0 "$cpplint" --quiet 2>&1)
+  if echo "$out" | grep -q 'Traceback'; then
+    echo "$out"; echo "cpplint crashed"; return 1
+  fi
   n=$(echo "$out" | grep -c -E '\[[a-z_+0-9/]+\] \[[0-9]\]$')
   if [ "$n" -gt 0 ]; then
-    echo "$out" | grep -E '\[[a-z_+0-9/]+\] \[[0-9]\]$' \
-      | sed -E 's/.*\[([a-z_+0-9/]+)\] \[[0-9]\]$/\1/' | sort | uniq -c | sort -rn
-    echo "cpplint: $n findings (advisory)"
-  else
-    echo "cpplint: no findings"
+    echo "$out" | grep -E '\[[a-z_+0-9/]+\] \[[0-9]\]$'
+    echo "cpplint: $n findings"
+    return 1
   fi
-  return 0
+  echo "cpplint: no findings"
 }
 
 run_step submodules step_submodules

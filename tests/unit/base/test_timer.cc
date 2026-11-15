@@ -10,9 +10,8 @@
 
 #include "imsrg/base/timer.h"
 
+namespace imsrg {
 namespace {
-
-using namespace imsrg;
 
 std::vector<std::string>& Events() {
   static std::vector<std::string> e;
@@ -103,3 +102,4 @@ TEST(Timer, HooksCalledInOrder) {
 }
 
 }  // namespace
+}  // namespace imsrg

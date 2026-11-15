@@ -22,8 +22,8 @@
 #include "imsrg/operator/operator_dump.h"
 
 namespace fs = std::filesystem;
-using namespace imsrg;
 
+namespace imsrg {
 namespace {
 
 struct GoldenNorms {
@@ -120,3 +120,5 @@ TEST(OperatorGoldenNorms, EveryGoldenDumpMatchesImsrgDevelNorms) {
   std::printf("[golden norms] %zu dumps, max relative deviation %.3g (%s)\n",
               cases.size(), worst, worst_name.c_str());
 }
+
+}  // namespace imsrg

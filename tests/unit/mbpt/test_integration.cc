@@ -11,10 +11,15 @@
 #include "imsrg/opslib/center_of_mass.h"
 #include "tests/unit/mbpt/mbpt_test_support.h"
 
-namespace {
+namespace imsrg::mbtest {
 
-using namespace imsrg;
-using namespace imsrg::mbtest;
+namespace fs = std::filesystem;
+using hftest::Json;
+using hftest::LoadHamiltonian;
+using hftest::LoadV3;
+using hftest::No2bFile;
+using hftest::ReadJson;
+namespace {
 
 op::Operator BuildHamiltonian(const fs::path& me2j) {
   const auto ms = basis::ModelSpace::FromNames({.emax = 4}, 16.0, "O16", "O16");
@@ -69,3 +74,4 @@ TEST(MbptIntegration, IT5_NatBasis) {
 }
 
 }  // namespace
+}  // namespace imsrg::mbtest

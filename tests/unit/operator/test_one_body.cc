@@ -8,10 +8,8 @@
 
 #include "imsrg/operator/one_body.h"
 
+namespace imsrg::op {
 namespace {
-
-using namespace imsrg;
-using namespace imsrg::op;
 
 OrbitIndex Oi(int i) { return OrbitIndex{i}; }
 
@@ -128,3 +126,4 @@ TEST(OneBody, CopyIsDeepMoveIsCheap) {
 }
 
 }  // namespace
+}  // namespace imsrg::op

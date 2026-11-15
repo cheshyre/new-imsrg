@@ -4,6 +4,7 @@
 // Self-consistency of the golden basis files (imsrg-basis-dump v1) through the
 // strict parser, and agreement of the harmonic-oscillator orbit list with them.
 #include <algorithm>
+#include <cstdint>
 #include <fstream>
 #include <set>
 #include <string>
@@ -139,7 +140,7 @@ void CheckDump(const GoldenBasisDump& d) {
   }
 
   // Three-body channels.
-  long long sum3 = 0;
+  std::int64_t sum3 = 0;
   for (std::size_t c = 0; c < d.channels3.size(); ++c) {
     EXPECT_EQ(d.channels3[c].ch, static_cast<int>(c));
     EXPECT_GE(d.channels3[c].nkets, 0);

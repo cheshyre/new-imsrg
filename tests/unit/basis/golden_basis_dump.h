@@ -10,6 +10,7 @@
 /// (Pandya) channels and three-body channel sizes of the reference code
 /// (imsrg++), against which the basis module is checked.
 
+#include <cstdint>
 #include <filesystem>
 #include <map>
 #include <string>
@@ -62,7 +63,7 @@ struct GoldenBasisDump {
   std::vector<GoldenChannel> channels;
   std::vector<GoldenPhChannel> ph_channels;
   std::vector<GoldenChannel3> channels3;
-  long long nkets3 = 0, sum_channel_kets3 = 0;
+  std::int64_t nkets3 = 0, sum_channel_kets3 = 0;
 };
 
 /// Parses `file` strictly: mandatory first line, records in the documented

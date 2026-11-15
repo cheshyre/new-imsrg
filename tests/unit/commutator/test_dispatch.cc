@@ -19,9 +19,9 @@
 #include "tests/support/commutator_test_support.h"
 #include "tests/unit/commutator/commutator_test_cases.h"
 
+namespace imsrg {
 namespace {
 
-using namespace imsrg;
 using commutator::CommutatorOptions;
 using commutator::Term;
 using commutator::TermMask;
@@ -197,3 +197,4 @@ TEST(commutator_dispatch, incompatible_model_space_throws) {
 }
 
 }  // namespace
+}  // namespace imsrg

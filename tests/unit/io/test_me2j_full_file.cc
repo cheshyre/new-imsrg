@@ -12,9 +12,9 @@
 #include "imsrg/basis/model_space.h"
 #include "imsrg/io/me2j.h"
 
+namespace imsrg {
 namespace {
 
-using namespace imsrg;
 namespace fs = std::filesystem;
 
 TEST(Me2jFullFile, WholeFileHasTheExpectedValueCount) {
@@ -34,3 +34,4 @@ TEST(Me2jFullFile, WholeFileHasTheExpectedValueCount) {
 }
 
 }  // namespace
+}  // namespace imsrg

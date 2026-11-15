@@ -27,10 +27,9 @@
 #include "imsrg/io/input_stream.h"
 #include "imsrg/io/me2j.h"
 
+namespace imsrg::io {
 namespace {
 
-using namespace imsrg;
-using namespace imsrg::io;
 namespace fs = std::filesystem;
 
 // -----------------------------------------------------------------------------
@@ -328,3 +327,4 @@ TEST_F(Me2jSynthetic, MalformedTokenAndMissingFileThrowInputError) {
 }
 
 }  // namespace
+}  // namespace imsrg::io

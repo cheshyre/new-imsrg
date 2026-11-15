@@ -8,6 +8,7 @@
 /// is the maximum over ranks, so a failure on any rank fails the CTest test.
 /// Uses MPI directly because the imsrg::Comm facade arrives in M2.
 
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -34,12 +35,12 @@ TEST(MpiSmoke, AllreduceSumsRanks) {
   ASSERT_EQ(MPI_Comm_size(MPI_COMM_WORLD, &size), MPI_SUCCESS);
   EXPECT_GE(rank, 0);
   EXPECT_LT(rank, size);
-  long long mine = rank + 1;
-  long long total = 0;
+  std::int64_t mine = rank + 1;
+  std::int64_t total = 0;
   ASSERT_EQ(
-      MPI_Allreduce(&mine, &total, 1, MPI_LONG_LONG, MPI_SUM, MPI_COMM_WORLD),
+      MPI_Allreduce(&mine, &total, 1, MPI_INT64_T, MPI_SUM, MPI_COMM_WORLD),
       MPI_SUCCESS);
-  const long long n = size;
+  const std::int64_t n = size;
   EXPECT_EQ(total, n * (n + 1) / 2);
 }
 

@@ -8,10 +8,8 @@
 #include "imsrg/mbpt/energies.h"
 #include "tests/unit/hf/hf_test_support.h"
 
+namespace imsrg::hftest {
 namespace {
-
-using namespace imsrg;
-using namespace imsrg::hftest;
 
 void Check(const fs::path& ham_dir, const fs::path& hfjson,
            const op::No2bThreeBody* v3, const std::string& tag, double tol) {
@@ -50,3 +48,4 @@ TEST(MbptEnergies, Emax2TwoPlusThreeNucleon) {
 }
 
 }  // namespace
+}  // namespace imsrg::hftest

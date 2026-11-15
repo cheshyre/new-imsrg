@@ -35,11 +35,8 @@ double DdCg0(int a, int b, int c);
 double DdNinej(int a, int b, int c, int d, int e, int f, int g, int h, int i);
 }  // namespace imsrg::angmom::detail
 
+namespace imsrg::angmom {
 namespace {
-
-using namespace imsrg::angmom;
-using imsrg::TwoJ;
-using imsrg::TwoM;
 
 bool Within(double got, double exact) {
   return std::abs(got - exact) <= std::max(1.0e-12 * std::abs(exact), 1.0e-14);
@@ -48,8 +45,8 @@ bool Within(double got, double exact) {
 struct Dev {
   double max_abs = 0.0;
   double max_rel = 0.0;
-  long count = 0;
-  long failures = 0;
+  std::int64_t count = 0;
+  std::int64_t failures = 0;
   void Add(double got, double exact) {
     const double d = std::abs(got - exact);
     max_abs = std::max(max_abs, d);
@@ -161,7 +158,7 @@ TEST(AngmomMoshinsky, OrthogonalityExhaustiveUpToE12) {
   const int e2max = 12;
   const MoshinskyTable t(e2max);
   double worst = 0.0;
-  long ones = 0;
+  std::int64_t ones = 0;
   for (int E = 0; E <= e2max; ++E) {
     // Enumerate the tuples exactly like the table does.
     std::vector<std::array<int, 4>> tup;
@@ -235,7 +232,7 @@ TEST(AngmomMoshinsky, TalmiSumRules) {
   double worst_sum = 0.0, worst_diag = 0.0, worst_off = 0.0,
          worst_off_flipped = 0.0;
   double worst_zero = 0.0;
-  long bad = 0;
+  std::int64_t bad = 0;
   const auto ratio = [](double got, double expect, double mag) {
     return std::abs(got - expect) / (1.0e-13 * mag + 1.0e-14);
   };
@@ -290,7 +287,9 @@ TEST(AngmomMoshinsky, TalmiSumRules) {
 }
 
 TEST(AngmomDoubleDouble, Arithmetic) {
-  using namespace imsrg::angmom::detail;
+  using detail::DD;
+  using detail::Dd;
+  using detail::DdSqrt;
   // (1/3)*3 == 1 to dd precision.
   const DD third = Dd(1.0) / Dd(3.0);
   const DD one = third * Dd(3.0);
@@ -388,3 +387,4 @@ TEST(Moshinsky, BeyondMaxEnergyIsNaNAndTableRefuses) {
 }
 
 }  // namespace
+}  // namespace imsrg::angmom

@@ -26,10 +26,8 @@
 #error "IMSRG_GOLDEN_DIR must be defined"
 #endif
 
+namespace imsrg::op {
 namespace {
-
-using namespace imsrg;
-using namespace imsrg::op;
 
 std::filesystem::path Golden(const std::string& rel) {
   return std::filesystem::path(IMSRG_GOLDEN_DIR) / rel;
@@ -365,3 +363,4 @@ TEST(NormalOrderNo2b, RejectsBadArguments) {
 }
 
 }  // namespace
+}  // namespace imsrg::op

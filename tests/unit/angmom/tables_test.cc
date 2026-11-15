@@ -17,17 +17,15 @@
 #include "imsrg/angmom/wigner.h"
 #include "tests/unit/angmom/tables_kernels.h"
 
+namespace imsrg::angmom {
 namespace {
-
-using namespace imsrg;
-using namespace imsrg::angmom;
 
 TEST(AngmomTables, SixJEqualsWignerExhaustively) {
   const int emax = 6;
   const SixJTable t(emax);
   EXPECT_EQ(t.emax(), emax);
   const int tmax = 2 * emax + 1;
-  long checked = 0;
+  std::int64_t checked = 0;
   for (int a = 1; a <= tmax; a += 2) {
     for (int b = 1; b <= tmax; b += 2) {
       for (int J = 0; J <= tmax; J += 2) {
@@ -236,3 +234,4 @@ TEST(AngmomTables, DeviceViewsReproduceHostSums) {
 }
 
 }  // namespace
+}  // namespace imsrg::angmom

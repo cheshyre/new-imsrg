@@ -8,9 +8,8 @@
 
 #include "imsrg/base/types.h"
 
+namespace imsrg {
 namespace {
-
-using namespace imsrg;
 
 static_assert(!std::is_convertible_v<int, OrbitIndex>);
 static_assert(!std::is_convertible_v<OrbitIndex, int>);
@@ -85,3 +84,4 @@ TEST(Types, ParityProduct) {
 }
 
 }  // namespace
+}  // namespace imsrg

@@ -20,9 +20,9 @@
 #include "imsrg/opslib/kinetic.h"
 #include "imsrg/opslib/radius.h"
 
+namespace imsrg {
 namespace {
 
-using namespace imsrg;
 namespace fs = std::filesystem;
 
 constexpr int kA = 16;
@@ -147,3 +147,4 @@ TEST(OpslibProperties, SpeciesStringsAndEdgeCases) {
 }
 
 }  // namespace
+}  // namespace imsrg

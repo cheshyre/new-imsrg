@@ -15,6 +15,7 @@
 // the same table.
 
 #include <chrono>
+#include <cinttypes>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -129,12 +130,12 @@ int main(int argc, char** argv) {
 
   const char* omp = std::getenv("OMP_NUM_THREADS");
   std::printf("# commutator_bench (this code)\n");
-  std::printf(
-      "emax %d  reference %s  orbits %d  2B elements %lld  OMP_NUM_THREADS %s  "
-      "git %s\n",
-      emax, reference.c_str(), static_cast<int>(ms->num_orbits()),
-      static_cast<long long>(X.two_body().matrix().total_size()),
-      omp ? omp : "(unset)", IMSRG_BENCH_GIT_HASH);
+  std::printf("emax %d  reference %s  orbits %d  2B elements %" PRId64
+              "  OMP_NUM_THREADS %s  "
+              "git %s\n",
+              emax, reference.c_str(), static_cast<int>(ms->num_orbits()),
+              static_cast<std::int64_t>(X.two_body().matrix().total_size()),
+              omp ? omp : "(unset)", IMSRG_BENCH_GIT_HASH);
   std::printf("reps %d\nworkspace construction: %.3f ms\n", reps, ws_ms);
 
   const Named named[] = {

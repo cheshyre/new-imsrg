@@ -69,7 +69,7 @@ double SecondsSince(std::chrono::steady_clock::time_point t0) {
 
 bool Have(const fs::path& p) { return fs::exists(p); }
 
-const std::string kO16 = "[reference]\nnucleus = \"O16\"\n";
+constexpr char kO16[] = "[reference]\nnucleus = \"O16\"\n";
 
 TEST(PipelineHamiltonian, O16TwoBody) {
   if (!Have(kVnn)) GTEST_SKIP() << "missing " << kVnn;

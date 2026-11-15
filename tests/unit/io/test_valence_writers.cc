@@ -22,9 +22,9 @@
 #include "imsrg/io/valence_writers.h"
 #include "imsrg/operator/operator_dump.h"
 
+namespace imsrg {
 namespace {
 
-using namespace imsrg;
 namespace fs = std::filesystem;
 
 const fs::path kGolden = fs::path(IMSRG_GOLDEN_DIR);
@@ -159,3 +159,4 @@ TEST(ValenceWriters, UnwritablePathThrows) {
 }
 
 }  // namespace
+}  // namespace imsrg

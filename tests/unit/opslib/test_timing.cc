@@ -13,9 +13,8 @@
 #include "imsrg/opslib/center_of_mass.h"
 #include "imsrg/opslib/radius.h"
 
+namespace imsrg {
 namespace {
-
-using namespace imsrg;
 
 TEST(OpslibTiming, Emax6TrelAndRp2) {
   const auto ms = basis::ModelSpace::FromNames({.emax = 6}, 16.0, "O16", "O16");
@@ -33,3 +32,4 @@ TEST(OpslibTiming, Emax6TrelAndRp2) {
 }
 
 }  // namespace
+}  // namespace imsrg

@@ -10,10 +10,8 @@
 #include "imsrg/basis/model_space.h"
 #include "imsrg/operator/compare.h"
 
+namespace imsrg::op {
 namespace {
-
-using namespace imsrg;
-using namespace imsrg::op;
 
 std::shared_ptr<const basis::ModelSpace> MakeMs(const char* nucleus = "O16") {
   return basis::ModelSpace::FromNames(basis::BasisTruncation{.emax = 1}, 16.0,
@@ -105,3 +103,4 @@ TEST(OperatorCompare, MismatchedSymmetryThrows) {
 }
 
 }  // namespace
+}  // namespace imsrg::op

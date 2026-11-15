@@ -10,10 +10,8 @@
 
 #include "tests/unit/hf/hf_test_support.h"
 
+namespace imsrg::hftest {
 namespace {
-
-using namespace imsrg;
-using namespace imsrg::hftest;
 
 void CompareModes(const op::Operator& H, const op::No2bThreeBody* v3,
                   const std::string& tag) {
@@ -69,3 +67,4 @@ TEST(HfDiis, Emax4) {
 }
 
 }  // namespace
+}  // namespace imsrg::hftest

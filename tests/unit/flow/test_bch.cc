@@ -5,6 +5,7 @@
 // against dense matrix exponentials, invertibility, the BCH product against
 // expm(X) expm(Y), the thresholds and hermiticity.
 #include <algorithm>
+#include <cinttypes>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -22,9 +23,9 @@
 #include "imsrg/operator/norms.h"
 #include "imsrg/operator/random_operator.h"
 
+namespace imsrg {
 namespace {
 
-using namespace imsrg;
 using commutator::CommutatorOptions;
 using commutator::Workspace;
 using flow::BchOptions;
@@ -179,11 +180,11 @@ TEST(flow_bch, one_body_exactness) {
               (Zref(a, a) - X1(a, a));
       const double dev0 = std::abs(Z.zero_body() - e0);
       const double eps0 = op::Norm(X) * std::exp(-0.6) * 1.0e-12 / 0.6;
-      std::printf(
-          "[bch one-body] rank %d seed %llu: n_comm %d, dev1 %.2e dev0 %.2e "
-          "(eps0 %.2e)\n",
-          rank, static_cast<unsigned long long>(seed), rep.nested_commutators,
-          dev1, dev0, eps0);
+      std::printf("[bch one-body] rank %d seed %" PRIu64
+                  ": n_comm %d, dev1 %.2e dev0 %.2e "
+                  "(eps0 %.2e)\n",
+                  rank, static_cast<std::uint64_t>(seed),
+                  rep.nested_commutators, dev1, dev0, eps0);
       EXPECT_LT(dev1, 1.0e-10);
       EXPECT_LT(dev0, 1.0e-10 * std::max(1.0, std::abs(e0)));
       EXPECT_LT(dev1, eps0);
@@ -246,10 +247,10 @@ TEST(flow_bch, product_one_body) {
     const double dev = MaxAbsDiff(Expm(Zd), Mul(Expm(Xd), Expm(Yd)));
     // The omitted term of the exact series is -1/24 [Y,[X,[X,Y]]].
     const double omitted = MaxAbs(Comm(Yd, Comm(Xd, Comm(Xd, Yd)))) / 24.0;
-    std::printf(
-        "[bch product] seed %llu: max|expm(Z)-eXeY| = %.2e, omitted 1/24 term "
-        "%.2e\n",
-        static_cast<unsigned long long>(seed), dev, omitted);
+    std::printf("[bch product] seed %" PRIu64
+                ": max|expm(Z)-eXeY| = %.2e, omitted 1/24 term "
+                "%.2e\n",
+                static_cast<std::uint64_t>(seed), dev, omitted);
     // Deviation = the omitted -1/24 term + the higher terms dropped by the 1e-4
     // threshold and the fixed order (observed ~1e-7, dominated by the latter,
     // e.g. O(X^3 Y)); both are far below the product_threshold of 1e-4, which
@@ -349,3 +350,4 @@ TEST(flow_bch, hermiticity) {
 }
 
 }  // namespace
+}  // namespace imsrg

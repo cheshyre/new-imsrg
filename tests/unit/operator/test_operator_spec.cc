@@ -7,10 +7,8 @@
 #include "imsrg/base/error.h"
 #include "imsrg/operator/operator_spec.h"
 
+namespace imsrg::op {
 namespace {
-
-using namespace imsrg;
-using namespace imsrg::op;
 
 TEST(OperatorSpec, HermiticityCodesRoundTrip) {
   EXPECT_EQ(HermiticityCode(Hermiticity::kHermitian), 'H');
@@ -80,3 +78,4 @@ TEST(OperatorSpec, UnimplementedFeaturesThrowNotImplemented) {
 }
 
 }  // namespace
+}  // namespace imsrg::op

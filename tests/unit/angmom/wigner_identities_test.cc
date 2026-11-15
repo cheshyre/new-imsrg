@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <vector>
@@ -52,7 +53,7 @@ TEST(WignerIdentities, ThreeJOrthogonalityOverM) {
   // sum_{m1 m2} (2J+1) (ja jb J; m1 m2 M)(ja jb J'; m1 m2 M') = delta_JJ'
   // delta_MM'.
   double max_dev = 0.0;
-  long checks = 0;
+  std::int64_t checks = 0;
   for (int ta : SpOrbits()) {
     for (int tb : SpOrbits()) {
       for (int tJ = std::abs(ta - tb); tJ <= ta + tb; tJ += 2) {
@@ -122,7 +123,7 @@ TEST(WignerIdentities, SixJOrthogonalityPandyaRange) {
   // sum_x (2x+1)(2j3+1) {j1 j2 x; j4 j5 j3}{j1 j2 x; j4 j5 j3'} = delta(j3,
   // j3'); j1,j2,j4,j5 single-particle, j3 and j3' two-body J.
   double max_dev = 0.0;
-  long checks = 0;
+  std::int64_t checks = 0;
   const auto sp = SpOrbits();
   const auto js = TwoBodyJs();
   for (int t1 : sp) {
@@ -163,7 +164,7 @@ TEST(WignerIdentities, SixJOrthogonalityPandyaRange) {
 TEST(WignerIdentities, SixJSymmetries) {
   // Column permutations and exchange of upper/lower entries in two columns,
   // over the Pandya range and the three-body recoupling range.
-  long checks = 0, bad = 0;
+  std::int64_t checks = 0, bad = 0;
   auto check = [&](int a, int b, int c, int d, int e, int f) {
     const double v =
         am::Wigner6j(TwoJ{a}, TwoJ{b}, TwoJ{c}, TwoJ{d}, TwoJ{e}, TwoJ{f});
@@ -203,7 +204,7 @@ TEST(WignerIdentities, SixJSymmetries) {
             }
           }
   // Three-body range, sampled with a stride to bound the run time.
-  long n = 0;
+  std::int64_t n = 0;
   for (int ja : sp)
     for (int jb : sp)
       for (int jc : sp)
@@ -225,7 +226,7 @@ TEST(WignerIdentities, SixJSymmetries) {
 }
 
 TEST(WignerIdentities, ThreeJSymmetries) {
-  long checks = 0, bad = 0;
+  std::int64_t checks = 0, bad = 0;
   for (int ta : SpOrbits()) {
     for (int tb : SpOrbits()) {
       for (int tc : TwoBodyJs()) {
@@ -351,7 +352,8 @@ TEST(WignerIdentities, SpecialValues) {
       for (int tc = 0; tc <= kTwoJMaxSp; ++tc) {
         if (!am::Triangle(TwoJ{ta}, TwoJ{tb}, TwoJ{tc})) continue;
         const double exact =
-            Sgn((ta + tb + tc) / 2) / std::sqrt(double((tb + 1) * (tc + 1)));
+            Sgn((ta + tb + tc) / 2) /
+            std::sqrt(static_cast<double>((tb + 1) * (tc + 1)));
         const double got = am::Wigner6j(TwoJ{ta}, TwoJ{tb}, TwoJ{tc}, TwoJ{0},
                                         TwoJ{tc}, TwoJ{tb});
         max_dev = std::max(max_dev, std::fabs(got - exact));
@@ -366,13 +368,15 @@ TEST(WignerIdentities, SpecialValues) {
   // 3j.
   for (int tj = 0; tj <= 2 * kTwoJMaxSp; ++tj) {
     for (int tm = -tj; tm <= tj; tm += 2) {
-      const double exact = Sgn((tj - tm) / 2) / std::sqrt(double(tj + 1));
+      const double exact =
+          Sgn((tj - tm) / 2) / std::sqrt(static_cast<double>(tj + 1));
       EXPECT_TRUE(Close(am::ClebschGordan(TwoJ{tj}, TwoM{tm}, TwoJ{tj},
                                           TwoM{-tm}, TwoJ{0}, TwoM{0}),
                         exact));
-      EXPECT_TRUE(Close(am::Wigner3j(TwoJ{tj}, TwoJ{tj}, TwoJ{0}, TwoM{tm},
-                                     TwoM{-tm}, TwoM{0}),
-                        Sgn((tj - tm) / 2) / std::sqrt(double(tj + 1))));
+      EXPECT_TRUE(
+          Close(am::Wigner3j(TwoJ{tj}, TwoJ{tj}, TwoJ{0}, TwoM{tm}, TwoM{-tm},
+                             TwoM{0}),
+                Sgn((tj - tm) / 2) / std::sqrt(static_cast<double>(tj + 1))));
     }
   }
 
@@ -406,7 +410,7 @@ TEST(WignerIdentities, SpecialValues) {
 
 TEST(WignerIdentities, NineJWithZeroReducesToSixJ) {
   // {a b e; c d e; f f 0} = (-1)^(b+c+e+f) / sqrt((2e+1)(2f+1)) {a b e; d c f}.
-  long checks = 0;
+  std::int64_t checks = 0;
   double max_dev = 0.0;
   for (int ta = 0; ta <= 8; ++ta)
     for (int tb = 0; tb <= 8; ++tb)
@@ -421,10 +425,11 @@ TEST(WignerIdentities, NineJWithZeroReducesToSixJ) {
                 continue;
               const int ph2 = tb + tc + te + tf;
               ASSERT_EQ(ph2 % 2, 0);
-              const double exact = Sgn(ph2 / 2) /
-                                   std::sqrt(double((te + 1) * (tf + 1))) *
-                                   am::Wigner6j(TwoJ{ta}, TwoJ{tb}, TwoJ{te},
-                                                TwoJ{td}, TwoJ{tc}, TwoJ{tf});
+              const double exact =
+                  Sgn(ph2 / 2) /
+                  std::sqrt(static_cast<double>((te + 1) * (tf + 1))) *
+                  am::Wigner6j(TwoJ{ta}, TwoJ{tb}, TwoJ{te}, TwoJ{td}, TwoJ{tc},
+                               TwoJ{tf});
               const double got =
                   am::Wigner9j(TwoJ{ta}, TwoJ{tb}, TwoJ{te}, TwoJ{tc}, TwoJ{td},
                                TwoJ{te}, TwoJ{tf}, TwoJ{tf}, TwoJ{0});
@@ -443,7 +448,7 @@ TEST(WignerIdentities, NormalizedNineJLsJjUnitarity) {
   // lb, L, S, J the squares summed over ja, jb = l +- 1/2 give 1 (when the (L S
   // J) channel exists).
   double max_dev = 0.0;
-  long checks = 0;
+  std::int64_t checks = 0;
   for (int la = 0; la <= kEmax; ++la) {
     for (int lb = 0; lb <= kEmax; ++lb) {
       for (int L = std::abs(la - lb); L <= la + lb; ++L) {

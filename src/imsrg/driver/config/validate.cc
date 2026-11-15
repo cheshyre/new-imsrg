@@ -92,8 +92,8 @@ class Checker {
   }
   static std::string Format(double v) {
     std::string s = std::to_string(v);
-    if (v == static_cast<double>(static_cast<long long>(v))) {
-      return std::to_string(static_cast<long long>(v));
+    if (v == static_cast<double>(static_cast<std::int64_t>(v))) {
+      return std::to_string(static_cast<std::int64_t>(v));
     }
     while (s.size() > 1 && s.back() == '0') s.pop_back();
     return s;
