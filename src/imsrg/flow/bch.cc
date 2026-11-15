@@ -87,12 +87,17 @@ op::Operator BchTransform(const op::Operator& X, const op::Operator& Omega,
   int corrections = 0;
   bool converged = false;
   FactorizedTerm f_omega(Omega, opts.factorized_terms, ws);
-  for (int i = 1; i <= opts.max_iterations; ++i) {
-    // IMSRG(3f2): nested_i += F(Omega, nested_{i-2}) for i >= 2. `next` holds
-    // the (corrected) nested_{i-2}, nested_0 = out at i = 2, until the
-    // commutator below overwrites it.
+  // With skip_first_commutator the loop index i runs one ahead of the nested
+  // commutator index j = i - 1 (imsrg++ BCH.cc:163): the i = 1 pass does
+  // nothing at all (no factorial division, no epsilon update), so the term
+  // added at i is nested_{i-1} / i!.
+  const int first = opts.skip_first_commutator ? 2 : 1;
+  for (int i = first; i <= opts.max_iterations; ++i) {
+    // IMSRG(3f2): nested_j += F(Omega, nested_{j-2}) for j >= 2, i.e. for
+    // i >= first + 1. `next` holds the (corrected) nested_{j-2}, nested_0 =
+    // out at j = 2, until the commutator below overwrites it.
     const bool factorized =
-        opts.factorized && i >= 2 && f_omega.Evaluate(next, corr);
+        opts.factorized && i >= first + 1 && f_omega.Evaluate(next, corr);
     commutator::Commutator(Omega, nested, next, copts, ws);
     std::swap(nested, next);
     if (factorized) {

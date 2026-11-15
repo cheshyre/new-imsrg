@@ -130,6 +130,39 @@ TEST(flow_bch_factorized, transform_series_by_hand) {
   }
 }
 
+// With skip_first_commutator the factorized series is Z = X + n1/2! + n2/3! +
+// n3/4!, with the same nested_j (F first enters at nested_2, imsrg++
+// `i_min_factorized = 2`).
+TEST(flow_bch_factorized, transform_skip_first_commutator_by_hand) {
+  const auto ms = imsrg::testing::FractionalModelSpace(2, "O16");
+  Workspace ws(ms);
+  const CommutatorOptions copts;
+  const Operator X = RandomOperator(ms, Hermiticity::kHermitian, 41);
+  const Operator R = RandomOperator(ms, Hermiticity::kAntiHermitian, 42);
+  const Operator omega = (0.3 / op::Norm(R)) * R;
+  const Operator n1 = commutator::Commutator(omega, X, copts, ws);
+  const Operator n2 = commutator::Commutator(omega, n1, copts, ws) +
+                      F(omega, flow::WithParticleRank(X, 2), ws);
+  const Operator n3 =
+      commutator::Commutator(omega, n2, copts, ws) + F(omega, n1, ws);
+  BchOptions opts;
+  opts.factorized = true;
+  opts.skip_first_commutator = true;
+  opts.transform_threshold = 1.0e-300;
+  for (const int iterations : {3, 4}) {  // loop passes, the first is skipped
+    opts.max_iterations = iterations;
+    BchReport report;
+    const Operator z = flow::BchTransform(X, omega, opts, copts, ws, &report);
+    Operator expected = X + 0.5 * n1 + (1.0 / 6) * n2;
+    if (iterations >= 4) expected = expected + (1.0 / 24) * n3;
+    const double dev = RelativeDeviation(z, expected);
+    std::printf("[by-hand] skip transform, %d passes: %.3e\n", iterations, dev);
+    EXPECT_LE(dev, 1.0e-14) << iterations;
+    EXPECT_EQ(report.nested_commutators, iterations - 1);
+    EXPECT_EQ(report.factorized_corrections, iterations - 2);
+  }
+}
+
 TEST(flow_bch_factorized, product_series_by_hand) {
   const auto ms = imsrg::testing::MakeModelSpace(2, "He6");
   Workspace ws(ms);
