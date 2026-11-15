@@ -91,6 +91,17 @@ void GemmImpl(T alpha, MatrixView<const T> A, Op opA, MatrixView<const T> B,
 /// more than it saves).
 constexpr double kConcurrentGemmMinFlops = 1.0e6;
 
+/// Whether `GroupedGemm` may run its problems concurrently: only with
+/// Accelerate, which keeps a call made inside a parallel region from
+/// oversubscribing the cores and whose results were measured to be
+/// independent of the schedule. OpenBLAS (pthreads) or MKL would need
+/// single-threaded calls per item first (M12-Q5).
+#if defined(IMSRG_BLAS_ACCELERATE) && IMSRG_BLAS_ACCELERATE
+constexpr bool kConcurrentGroupedGemm = true;
+#else
+constexpr bool kConcurrentGroupedGemm = false;
+#endif
+
 }  // namespace
 
 void Gemm(double alpha, MatrixView<const double> A, Op opA,
@@ -113,8 +124,8 @@ void GroupedGemm(std::span<const GemmProblem> problems) {
     flops[i] = CheckGemm<double>(p.A, p.opA, p.B, p.opB, p.C);
     total += flops[i];
   }
-  if (problems.size() < 2 || total < kConcurrentGemmMinFlops ||
-      exec::HostConcurrency() < 2) {
+  if (!kConcurrentGroupedGemm || problems.size() < 2 ||
+      total < kConcurrentGemmMinFlops || exec::HostConcurrency() < 2) {
     for (const GemmProblem& p : problems)
       GemmChecked<double>(p.alpha, p.A, p.opA, p.B, p.opB, p.beta, p.C);
     return;

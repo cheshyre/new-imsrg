@@ -15,8 +15,8 @@
 
 namespace imsrg::exec {
 
-/// Runs `f(i)` for i in [0, n) on the host execution space (the OpenMP
-/// threads of an OpenMP build, the calling thread otherwise), handing out
+/// Runs `f(i)` for i in [0, n) on the host execution space (its threads with
+/// the OpenMP or Threads backend, the calling thread with Serial), handing out
 /// one item at a time (dynamic scheduling), and returns when all items are
 /// done. `f` is plain host code; it must not throw (an exception inside the
 /// parallel region terminates the program) and must be safe to run

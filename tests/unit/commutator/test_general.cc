@@ -283,8 +283,8 @@ TEST(commutator_general, scratch_is_lazy) {
   EXPECT_TRUE(pd.general.allocated());
   EXPECT_GT(pd.general.scratch_bytes(), 0u);
   EXPECT_EQ(pd.scratch_bytes(), before + pd.general.scratch_bytes());
-  // General Ncc (4 nk + 4 Ncc) vs Hermitian Ncc (3 nk + 2 Ncc) doubles per cc
-  // channel (no separate ZB buffer since M12a): at most twice.
+  // General Ncc (4 nk + 4 Ncc) vs Hermitian Ncc (2 nk + 2 Ncc) doubles per cc
+  // channel (no ZB buffer and half of YK since M12a): exactly twice.
   EXPECT_LE(pd.general.scratch_bytes(), 2 * before + 64);
   const double* z = pd.general.z.device_data();
   (void)commutator::Commutator(H, N, CommutatorOptions{}, ws);

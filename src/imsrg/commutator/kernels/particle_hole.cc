@@ -18,12 +18,15 @@
 // an explicit sign for flipped bra pairs), so it needs no lexicographic ket
 // order.
 //
-// Performance (M12a): every kernel works on whole rows or columns (one item
-// per cc ket or per two-body column, dynamic scheduling) instead of one item
-// per element, so the block search and index divisions run once per item;
-// the 6j symbols of a J' (or J'') sum come from one contiguous table row; the
-// fill evaluates the X and Y transforms in one pass over the shared indices.
-// The arithmetic on every value is unchanged (bitwise identical results).
+// Performance (M12a): the fill, flip and combine kernels work on whole rows
+// or columns (one item per cc ket, dynamic scheduling) and the inverse on
+// pairs of kets (all J at once) instead of one item per element, so the block
+// search and index divisions run once per item; the 6j symbols of a J' (or
+// J'') sum come from one contiguous table row; the fill evaluates the X and Y
+// transforms in one pass over the shared indices; only half of YK is stored
+// (second GEMM after a row-pair flip). The arithmetic on every value is that
+// of the per-element kernels, except that the GEMMs now have n x n instead of
+// n x 2n shapes (round-off level differences where BLAS changes its path).
 
 #include <cmath>
 #include <cstdint>
@@ -65,9 +68,10 @@ IMSRG_INLINE_FUNCTION double ParitySign(int n) noexcept {
   return (n & 1) ? -1.0 : 1.0;
 }
 
-/// Capacity of the per-pair J' buffers of the inverse transform: J' <= 2 emax
-/// + 1, so emax <= 31 (checked on the host).
-constexpr int kMaxJp = 64;
+/// Capacity of the per-pair J' buffers of the inverse transform (checked by
+/// `BuildPandyaData`). On GPUs these 1 KiB per thread arrays would live in
+/// local memory; team scratch is the M14 alternative.
+constexpr int kMaxJp = detail::kPandyaMaxJp;
 
 /// Pandya transform xbar(p, q, r, s; J') = - sum_{J''} (2J''+1) {jp jq J'; jr
 /// js J''} X~^{J''}_{psrq} with X~ the unnormalized coupled element. `two_Jp`
@@ -579,8 +583,7 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   // its mirror hZ Z. The arithmetic per element is that of the per-element
   // kernel it replaced (bitwise identical). Writes are race free: item a
   // writes row a (columns >= a) and column a (rows > a) of every channel.
-  IMSRG_CHECK(2 * impl.sixj.emax() + 2 <= kMaxJp,
-              "comm222_phss: emax too large for the J' buffer of the inverse");
+  // (2 emax + 2 <= kMaxJp is checked when the Pandya data are built.)
   double* z2 = Z.two_body().matrix().buffer().device_data();
   const std::int64_t* block_offset = impl.block_offsets.device_data();
   exec::ParallelForDynamic(

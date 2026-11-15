@@ -183,9 +183,11 @@ def test_solve_releases_the_gil(o16):
 
     def work():
         t0 = time.perf_counter()
-        s.solve()
-        elapsed[0] = time.perf_counter() - t0
-        done.set()
+        try:
+            s.solve()
+        finally:
+            elapsed[0] = time.perf_counter() - t0
+            done.set()  # never leave the main loop waiting
 
     t = threading.Thread(target=work)
     ticks = 0

@@ -676,6 +676,16 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   exactly 1.0) skip the gather and the gemm reads X and Y in place with leading dimension N. The
   hh projector of a closed shell is direct only for channels where the hole kets happen to be
   contiguous (e.g. a single listed ket); the check is generic. Assumption: exact `== 1.0` on the
-  weight, so fractional references never take the direct path. Benchmark checksums (emax 2, 4;
+  weight, so a channel with a fractionally occupied orbit in a listed ket never takes the direct path
+  (fractional references can still have direct channels whose pp kets use only empty orbits, which is
+  exact; review note). Benchmark checksums (emax 2, 4;
   T 1, 4) are bitwise identical to before; the ladder scratch of O16 shrank from 3.75x to 2.0x of
   a two-body operator at emax 6. No open decision.
+
+* **M12-Q5** (2026-11-16, M12a lead) - `linalg::GroupedGemm` runs its problems concurrently on the
+  host threads only with Accelerate (one BLAS call per item; measured faster at emax 8 and
+  schedule-independent). With OpenBLAS (pthreads) or MKL a call inside the parallel region would use
+  the library's own threads (oversubscription) and MKL's rounding may depend on its thread count.
+  **Assumed meanwhile:** other BLAS libraries keep the sequential loop; enabling them needs
+  single-threaded calls per item (MKL `mkl_set_num_threads_local(1)`, OpenBLAS built with OpenMP or
+  `OPENBLAS_NUM_THREADS=1`) and a determinism check, to be decided with the cluster builds (M12b/M14).

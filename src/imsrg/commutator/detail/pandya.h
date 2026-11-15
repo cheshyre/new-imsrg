@@ -17,7 +17,7 @@
 /// q. The contraction runs over the list K of ordered pairs kappa = (a, b) with
 /// n_a != n_b (`nk` entries, built from the kets of the channel with both
 /// orders, weight D = n_a - n_b). K is stored in flipped pairs: the flip (b, a)
-/// of the K entry kappa is kappa ^ 1 (the fused fill of the kernel relies on
+/// of the K entry kappa is kappa ^ 1 (the YK flip of the kernel relies on
 /// it). Because of hermiticity and the flip symmetry only rows alpha of the
 /// kets (i <= l) are computed; the remaining rows follow from the symmetries,
 /// see `kernels/particle_hole.cc`.
@@ -44,6 +44,11 @@
 #include "imsrg/linalg/blas.h"
 
 namespace imsrg::commutator::detail {
+
+/// Capacity of the per-pair J' buffers of the inverse transform (one double
+/// per J' of a pair, J' <= 2 emax + 1): `BuildPandyaData` refuses model spaces
+/// with 2 emax + 2 > kPandyaMaxJp, i.e. emax > 31.
+inline constexpr int kPandyaMaxJp = 64;
 
 /// Trivially copyable, Kokkos-free view of the Pandya data for kernels. Arrays
 /// indexed by the cross-coupled channel index c in [0, num_cc) unless noted
@@ -142,12 +147,12 @@ struct PandyaData {
       class_offset;  ///< Kets by class (see `PandyaView::class_kets`).
   std::int64_t num_class_kets = 0;  ///< Size of `class_kets`.
 
-  /// One GEMM W_left = XK YK per channel with Ncc > 0 and |K| > 0 (pointers
-  /// into the scratch); `gemms_right` writes the right halves after the flip.
-  std::vector<linalg::GemmProblem> gemms_right;
-  /// One GEMM W = XK YK per channel with Ncc > 0 and |K| > 0 (pointers into the
-  /// scratch).
+  /// One GEMM W(:, 0 .. Ncc) = XK YK (the left half of W) per channel with
+  /// Ncc > 0 and |K| > 0 (pointers into the scratch).
   std::vector<linalg::GemmProblem> gemms;
+  /// The matching GEMMs W(:, Ncc .. 2 Ncc) = XK YK' (the right half), run
+  /// after the in-place row-pair flip YK -> YK'.
+  std::vector<linalg::GemmProblem> gemms_right;
 
   PandyaGeneralData general;  ///< Scratch of the general path (lazy).
 

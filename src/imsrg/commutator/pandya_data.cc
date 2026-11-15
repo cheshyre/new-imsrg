@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "imsrg/base/assert.h"
 #include "imsrg/commutator/detail/pandya.h"
 
 namespace imsrg::commutator::detail {
@@ -25,6 +26,9 @@ exec::DeviceBuffer<T> Upload(const std::vector<T>& v, const char* label) {
 }  // namespace
 
 PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
+  IMSRG_CHECK(2 * ms.basis().emax() + 2 <= kPandyaMaxJp,
+              "BuildPandyaData: emax too large for the J' buffers of the "
+              "particle-hole inverse transform (kPandyaMaxJp)");
   const auto& ph = ms.particle_hole();
   const auto& tb = ms.two_body();
   const auto occ = ms.reference().occupations();
