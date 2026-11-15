@@ -4,6 +4,7 @@
 // Tests of SixJ3Table, the three-body recoupling helpers and the guards of
 // SixJTable / SixJView against three-body J in a single-particle slot (the "6j
 // trap", design/benchmarks/imsrg3-layout.md section 7).
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
