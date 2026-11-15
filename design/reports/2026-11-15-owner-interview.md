@@ -75,8 +75,10 @@ questions; its prompt is `design/NEXT_SESSION_PROMPT.md`.
 1. Before run 2: sync the main checkout (`develop` moved again from worktrees):
    `git -C /Users/cheshyre/Downloads/new-imsrg read-tree -m -u 68c8927 develop`, or `git -C
    /Users/cheshyre/Downloads/new-imsrg reset --hard` if there are no local edits.
-2. Install `design/claude-settings.proposed.json` (updated compaction settings) and launch run 2 in
-   the main checkout right after a usage reset.
+2. Install the updated settings as `.claude/settings.local.json` in the main checkout (without the
+   `_comment` key) and rename the run-1 `.claude/settings.json` to `.claude/settings.json.bak`, whose
+   `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=80` would otherwise still apply (commands in the pre-flight of
+   `NEXT_SESSION_PROMPT.md`); then launch run 2 in the main checkout right after a usage reset.
 3. Later: the full N2LO 3N file, the me2jp/me3jp specification; the Command Line Tools update when
    Software Update offers it.
 

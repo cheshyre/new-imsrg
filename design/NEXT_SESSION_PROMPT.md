@@ -16,10 +16,16 @@ This prompt starts the second run. (The prompt of the first run is in the git hi
    `git -C /Users/cheshyre/Downloads/new-imsrg reset --hard` (HEAD is `develop`).
 2. Start the session (Opus) **in the main checkout on `develop`** (D31): merges then happen on
    `develop` directly. Agent definitions load at startup from `.claude/agents/`.
-3. Settings: `design/claude-settings.proposed.json` (D31: no `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`;
-   `"autoCompactWindow": 800000` for the orchestrator; pick a permission mode that does not stall).
-   **Launch right after a reset of your 5-hour usage window** (run 1 stopped 01:30–02:30 and
-   04:15–07:30).
+3. Settings (D31: no `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`; `"autoCompactWindow": 800000` for the
+   orchestrator). After step 1, in the main checkout: install the proposal as
+   `.claude/settings.local.json` (gitignored), without its `_comment` key, and rename the run-1 copy
+   `.claude/settings.json` (untracked, still setting `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=80`, which would
+   otherwise keep applying because settings files are merged) to `.claude/settings.json.bak`
+   (gitignored by `*.bak`):
+   `python3 -c "import json; d=json.load(open('design/claude-settings.proposed.json')); d.pop('_comment', None); json.dump(d, open('.claude/settings.local.json', 'w'), indent=2)"`
+   and `mv .claude/settings.json .claude/settings.json.bak`. Pick a permission mode that does not
+   stall in the app's permission-mode picker. **Launch right after a reset of your 5-hour usage
+   window** (run 1 stopped 01:30–02:30 and 04:15–07:30).
 4. Optional hard stop against pushing:
    `git -C /Users/cheshyre/Downloads/new-imsrg remote set-url --push origin DISABLED`.
 
@@ -78,7 +84,8 @@ the answers in `design/QUESTIONS.md`. The most important ones:
 
 * Repository: `/Users/cheshyre/Downloads/new-imsrg` (git), integration branch **`develop`**.
   Preflight: `git branch --show-current` prints `develop`; `git merge-base --is-ancestor
-  feature/design-plan develop` succeeds; `git status` is clean; then `tools/ci.sh dev-openmp` prints
+  feature/design-plan develop` succeeds; `git status --porcelain --untracked-files=no` prints nothing
+  (untracked ignored files such as the settings are fine); then `tools/ci.sh dev-openmp` prints
   `CI PASS dev-openmp`. If any check fails, write `PREFLIGHT_FAILED.md` at the repo root with the
   details and stop. If the `imsrg-*` agent types are unavailable, spawn `general-purpose` agents
   with the matching `model` and paste the body of the corresponding `.claude/agents/*.md` into their
