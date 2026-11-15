@@ -10,22 +10,26 @@ changed and what did not help. The M7 micro-benchmark that started this is
 ## Summary
 
 - **Commutator** (full IMSRG(2) commutator, random operators): this code is about 4x faster
-  than imsrg++ on one thread at emax 4-8, 2.3x / 3.0x / 3.2x on six threads at emax 4 / 6 / 8,
-  and 2.4-3.0x on 18 threads at emax 6-8 (table below). Before M12a (`develop`) it was 1.2-1.4x
-  slower than imsrg++.
-- **Full IMSRG(2) flow** (same step counts and E0 to all printed digits in both codes): 2.6-3.8x
+  than imsrg++ on one thread at emax 4-8 (3.9-4.5x), 2.3x / 3.0x / 3.2x on six threads at emax
+  4 / 6 / 8, and 2.4x / 3.1x on 18 threads at emax 6 / 8 (table below). Before M12a (`develop`)
+  it was 1.3-1.6x slower than imsrg++.
+- **Full IMSRG(2) flow** (same step counts and E0 to all printed digits in both codes): 2.7-3.7x
   faster than imsrg++ at emax 6 and 8 on 1, 6 and 18 threads (emax 8 on six threads: 60 s vs
-  192 s), 4x at emax 4 on one thread and 2.3x on six (table below).
+  188 s), 4x at emax 4 on one thread and 2.3x on six (table below).
 - **Attribution.** imsrg++ links Homebrew OpenBLAS, this code Accelerate. Built against the
   same OpenBLAS, this code is still 2.0-2.6x faster on the commutator at emax 6-8 (1.6x at emax
-  6 on six threads): the particle-hole term is 3.2x faster with the same BLAS. The ladder terms
-  are GEMM-bound: with OpenBLAS they take 0.7-0.8x imsrg++'s time, with Accelerate (AMX) they
-  are 4.5-6x faster on one thread.
+  6 on six threads); the particle-hole term is 1.7-3.2x faster with the same BLAS. The ladder
+  terms are GEMM-bound: with OpenBLAS they take 0.7-0.85x imsrg++'s time on one thread and
+  0.8-1.2x on six (the per-channel GEMMs then run one after another, M12-Q5); with Accelerate
+  (AMX) they are 4.4-6.9x faster than imsrg++ on one thread.
 - **Memory.** Workspace scratch at emax 6: 10.4x -> 5.5x a two-body operator (emax 8: 558 ->
-  288 MB). Peak RSS of the whole flow: 169 vs 431 MiB at emax 6, 1.10 vs 2.51 GB at emax 8 (this code vs imsrg++, six threads).
+  288 MB). Peak RSS of the whole flow on six threads: 169 vs 431-445 MiB at emax 6 and 1097 vs
+  2306-2551 MiB at emax 8 (this code vs imsrg++; imsrg++'s varies between runs).
 - **Threads.** On this machine (6 performance + 12 efficiency cores) 6 -> 18 threads gives
-  1.3-1.6x at emax 6-8 for both codes; at emax 4 the 18-thread runs are slower than the
-  6-thread ones in both codes (efficiency cores, many small kernels).
+  1.3-1.6x at emax 6-8 for both codes. At emax 4, 18 threads are about 2x slower than six for
+  this code (many small kernels, and every parallel launch costs more with 18 threads, see
+  comm110ss) but slightly faster for imsrg++, so the lead over imsrg++ shrinks to about 1.1x
+  there.
 
 Full commutator, ms per call (best of N; N and loads in the per-term tables):
 
@@ -38,8 +42,8 @@ Full commutator, ms per call (best of N; N and loads in the per-term tables):
 | 6 | 6 | 24.9 | 5.112 | 9.745 | 15.2 | 0.34 |
 | 6 | 18 | - | 3.887 | - | 9.470 | 0.41 |
 | 8 | 1 | 865.6 | 168.6 | 307.8 | 670.9 | 0.25 |
-| 8 | 6 | 198.7 | 49.1 | 77.3 | 154.8 | 0.32 |
-| 8 | 18 | - | 31.2 | - | 94.7 | 0.33 |
+| 8 | 6 | 198.7 | 48.9 | 77.3 | 154.8 | 0.32 |
+| 8 | 18 | - | 30.9 | - | 94.7 | 0.33 |
 
 Full IMSRG(2) Magnus flow, seconds (best of N):
 
@@ -51,8 +55,8 @@ Full IMSRG(2) Magnus flow, seconds (best of N):
 | 6 | 1 | 28.73 (max 30.90) | 89.74 (max 97.53) | 0.32 | 29.3 / 91.7 | 219 | -171.232126375 | 168 / 398 | 3 | 11.57/7.13/4.14; 4.44/9.15/12.00; 5.31/9.80/12.33; 7.07/5.66/3.35; 9.37/5.89/3.34 |
 | 6 | 6 | 7.87 (max 8.88) | 24.26 (max 24.27) | 0.32 | 8.4 / 25.0 | 219 | -171.232126375 | 169 / 445 | 2 | 4.01/10.63/12.79; 4.02/10.85/12.89; 5.00/10.32/12.61; 5.02/10.14/12.52 |
 | 6 | 18 | 6.26 | 16.68 | 0.38 | 6.8 / 17.3 | 219 | -171.232126375 | 170 / 485 | 1 | 3.60/7.61/11.12; 4.38/7.65/11.09 |
-| 8 | 6 | 59.79 | 192.31 | 0.31 | 65.3 / 197.5 | 209 | -172.796123845 | 1097 / 2507 | 1 | 3.23/6.17/10.03; 5.33/6.17/9.74 |
-| 8 | 18 | 40.49 | 153.18 | 0.26 | 46.1 / 157.1 | 209 | -172.796123845 | 1098 / 2590 | 1 | 13.98/8.72/9.86; 8.58/7.17/9.41 |
+| 8 | 6 | 59.79 (max 62.73) | 187.78 (max 222.84) | 0.32 | 65.3 / 193.7 | 209 | -172.796123845 | 1097 / 2306 | 3 | 12.29/8.41/8.74; 3.23/6.17/10.03; 3.80/4.67/8.07; 5.33/6.17/9.74; 8.52/7.48/8.49; 8.61/5.74/8.19 |
+| 8 | 18 | 40.49 (max 69.07) | 148.80 (max 196.88) | 0.27 | 46.1 / 153.2 | 209 | -172.796123845 | 1098 / 2551 | 3 | 13.25/13.31/11.02; 13.98/8.72/9.86; 22.11/16.47/12.43; 32.32/24.38/16.69; 33.95/26.98/18.39; 8.58/7.17/9.41 |
 
 ## Setup
 
@@ -178,50 +182,50 @@ and 18 threads comm110ss is dominated by the launch of a parallel region (16-60 
 | comm222_pp_hh_221ss | - | 0.867 (1.298) | - | 2.257 | 0.38 |
 | commutator (full) | - | 3.887 (5.417) | - | 9.470 | 0.41 |
 
-### emax 8, 1 thread (ms per call, best of 3; loads 3.01 12.14 13.46, 3.10 12.31 13.52, 7.38 3.60 2.24, 7.43 3.67 2.28, 7.54 3.81 2.34)
+### emax 8, 1 thread (ms per call, best of 4; loads 20.35 24.10 18.66, 3.01 12.14 13.46, 3.10 12.31 13.52, 7.38 3.60 2.24, 7.43 3.67 2.28, 7.54 3.81 2.34)
 
 | term | before (develop) | this code | this code, OpenBLAS | imsrg++ | ratio |
 |---|---:|---:|---:|---:|---:|
 | comm110ss | 0.000 | 0.000 (0.000) | 0.000 | 0.001 | 0.50 |
-| comm220ss | 3.188 | 0.031 (3.214) | 0.030 | 1.013 | 0.03 |
+| comm220ss | 3.188 | 0.031 (3.214) | 0.030 | 1.000 | 0.03 |
 | comm111ss | 0.011 | 0.011 (0.012) | 0.075 | 0.080 | 0.13 |
 | comm121ss | 0.348 | 0.305 (0.377) | 0.307 | 0.594 | 0.51 |
 | comm221ss | 84.7 | 19.7 (23.3) | 109.9 | 136.6 | 0.14 |
-| comm122ss | 149.6 | 37.9 (40.8) | 37.5 | 55.8 | 0.68 |
+| comm122ss | 149.6 | 37.9 (41.3) | 37.5 | 55.8 | 0.68 |
 | comm222_pp_hhss | 84.4 | 21.0 (25.2) | 111.3 | 135.6 | 0.16 |
 | comm222_phss | 627.5 | 104.1 (111.2) | 151.3 | 477.7 | 0.22 |
 | comm222_pp_hh_221ss | 85.4 | 22.6 (26.3) | 113.6 | 138.8 | 0.16 |
 | commutator (full) | 865.6 | 168.6 (185.0) | 307.8 | 670.9 | 0.25 |
 
-### emax 8, 6 threads (ms per call, best of 3; loads 2.93 11.97 13.39, 3.10 11.85 13.34, 8.84 4.28 2.53, 9.34 4.46 2.61)
+### emax 8, 6 threads (ms per call, best of 4; loads 17.76 23.42 18.48, 2.93 11.97 13.39, 3.10 11.85 13.34, 8.84 4.28 2.53, 9.34 4.46 2.61)
 
 | term | before (develop) | this code | this code, OpenBLAS | imsrg++ | ratio |
 |---|---:|---:|---:|---:|---:|
 | comm110ss | 0.017 | 0.015 (0.063) | 0.014 | 0.001 | 15.40 |
-| comm220ss | 0.731 | 0.037 (0.764) | 0.029 | 1.012 | 0.04 |
+| comm220ss | 0.731 | 0.029 (0.764) | 0.029 | 1.012 | 0.03 |
 | comm111ss | 0.012 | 0.011 (0.012) | 0.079 | 0.084 | 0.13 |
-| comm121ss | 0.094 | 0.104 (0.235) | 0.097 | 0.162 | 0.65 |
+| comm121ss | 0.094 | 0.101 (0.235) | 0.097 | 0.155 | 0.65 |
 | comm221ss | 31.4 | 10.4 (15.8) | 28.8 | 34.0 | 0.31 |
 | comm122ss | 30.5 | 9.215 | 8.077 | 20.1 | 0.46 |
 | comm222_pp_hhss | 31.3 | 10.6 (16.5) | 29.4 | 35.2 | 0.30 |
 | comm222_phss | 135.3 | 26.9 (29.0) | 36.9 | 91.8 | 0.29 |
 | comm222_pp_hh_221ss | 32.5 | 11.4 (16.6) | 28.7 | 34.8 | 0.33 |
-| commutator (full) | 198.7 | 49.1 (63.7) | 77.3 | 154.8 | 0.32 |
+| commutator (full) | 198.7 | 48.9 (63.7) | 77.3 | 154.8 | 0.32 |
 
-### emax 8, 18 threads (ms per call, best of 3; loads 10.05 4.77 2.74, 3.10 11.85 13.34, 9.71 4.61 2.67)
+### emax 8, 18 threads (ms per call, best of 4; loads 10.05 4.77 2.74, 16.50 23.07 18.39, 17.76 23.42 18.48, 3.10 11.85 13.34, 9.71 4.61 2.67)
 
 | term | before (develop) | this code | this code, OpenBLAS | imsrg++ | ratio |
 |---|---:|---:|---:|---:|---:|
-| comm110ss | - | 0.068 (0.139) | - | 0.001 | 112.83 |
-| comm220ss | - | 0.087 (0.411) | - | 1.086 | 0.08 |
+| comm110ss | - | 0.067 (0.139) | - | 0.001 | 111.00 |
+| comm220ss | - | 0.064 (0.411) | - | 1.080 | 0.06 |
 | comm111ss | - | 0.012 (0.034) | - | 0.146 | 0.08 |
-| comm121ss | - | 0.086 (0.184) | - | 0.109 | 0.79 |
+| comm121ss | - | 0.083 (0.184) | - | 0.105 | 0.79 |
 | comm221ss | - | 10.2 (19.1) | - | 23.8 | 0.43 |
 | comm122ss | - | 4.020 (5.082) | - | 18.8 | 0.21 |
-| comm222_pp_hhss | - | 10.8 (13.5) | - | 26.0 | 0.42 |
+| comm222_pp_hhss | - | 10.8 (13.5) | - | 25.7 | 0.42 |
 | comm222_phss | - | 15.2 (19.7) | - | 45.4 | 0.33 |
-| comm222_pp_hh_221ss | - | 12.1 (14.7) | - | 25.8 | 0.47 |
-| commutator (full) | - | 31.2 (41.1) | - | 94.7 | 0.33 |
+| comm222_pp_hh_221ss | - | 11.2 (14.7) | - | 25.8 | 0.43 |
+| commutator (full) | - | 30.9 (41.1) | - | 94.7 | 0.33 |
 
 ## Full IMSRG(2) flow
 
