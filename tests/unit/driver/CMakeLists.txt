@@ -48,13 +48,23 @@ target_compile_definitions(driver_pipeline_hamiltonian PRIVATE
   "IMSRG_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden\""
   "IMSRG_TEST_DATA_DIR=\"${IMSRG_TEST_DATA_DIR}\"")
 
-# End-to-end integration tests IT-2, IT-3, IT-4, IT-6, IT-7, IT-12 (design/30 section 4): run the
+# End-to-end integration tests IT-2, IT-3, IT-4, IT-6, IT-7, IT-10 (emax 2), IT-12 (design/30 section 4): run the
 # pipeline in process and compare with tests/golden/e2e; skip without the input files.
 imsrg_add_test(NAME driver_integration
   SOURCES test_integration.cc test_hunter_gatherer.cc test_stage_two_options.cc test_results_schema.cc
-  ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
+  test_imsrg3f2.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
   DEPS driver LABELS integration NO_GTEST_MAIN)
 target_compile_definitions(driver_integration PRIVATE
+  "IMSRG_SOURCE_DIR=\"${PROJECT_SOURCE_DIR}\""
+  "IMSRG_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden\""
+  "IMSRG_TEST_DATA_DIR=\"${IMSRG_TEST_DATA_DIR}\"")
+
+# IT-10 O16 emax 3 (IMSRG(3f2); slow in Debug): the same source compiled for the slow case only.
+# tools/ci.sh excludes the slow label.
+imsrg_add_test(NAME driver_integration_slow
+  SOURCES test_imsrg3f2.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
+  DEPS driver LABELS slow integration TIMEOUT 3600 NO_GTEST_MAIN)
+target_compile_definitions(driver_integration_slow PRIVATE IMSRG_IT10_SLOW
   "IMSRG_SOURCE_DIR=\"${PROJECT_SOURCE_DIR}\""
   "IMSRG_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden\""
   "IMSRG_TEST_DATA_DIR=\"${IMSRG_TEST_DATA_DIR}\"")

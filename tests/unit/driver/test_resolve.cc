@@ -114,6 +114,42 @@ TEST(Resolve, hf_mixing_unknown_spelling_is_v01) {
   EXPECT_NE(FindIssue(r.issues, "V-01", "hartree_fock.mixing"), nullptr);
 }
 
+TEST(Resolve, factorized_sets_the_3f2_recipe_defaults) {
+  const auto plain = ResolveTree(Minimal());
+  EXPECT_FALSE(plain.config.imsrg.omega.hunter_gatherer);
+  EXPECT_DOUBLE_EQ(plain.config.imsrg.step.omega_norm_max, 0.25);
+  EXPECT_TRUE(plain.config.imsrg3.factorized_1b_intermediates);
+  EXPECT_FALSE(plain.config.imsrg3.factorized_2b_intermediates);
+
+  const auto r = ResolveTree(With(Minimal(), {{"imsrg3.factorized", B(true)}}));
+  EXPECT_FALSE(HasErrors(r.issues));
+  EXPECT_TRUE(r.config.imsrg3.factorized);
+  EXPECT_TRUE(r.config.imsrg.omega.hunter_gatherer);
+  EXPECT_DOUBLE_EQ(r.config.imsrg.step.omega_norm_max, 0.1);
+  EXPECT_TRUE(r.config.imsrg3.factorized_1b_intermediates);
+  EXPECT_FALSE(r.config.imsrg3.factorized_2b_intermediates);
+}
+
+TEST(Resolve, explicit_keys_win_over_the_3f2_recipe) {
+  const auto r =
+      ResolveTree(With(Minimal(), {{"imsrg3.factorized", B(true)},
+                                   {"imsrg.omega.hunter_gatherer", B(false)},
+                                   {"imsrg.step.omega_norm_max", D(0.25)}}));
+  EXPECT_FALSE(r.config.imsrg.omega.hunter_gatherer);
+  EXPECT_DOUBLE_EQ(r.config.imsrg.step.omega_norm_max, 0.25);
+  const auto r2 =
+      ResolveTree(With(Minimal(), {{"imsrg3.factorized", B(true)},
+                                   {"imsrg.step.omega_norm_max", D(0.3)}}));
+  EXPECT_TRUE(r2.config.imsrg.omega.hunter_gatherer);
+  EXPECT_DOUBLE_EQ(r2.config.imsrg.step.omega_norm_max, 0.3);
+  const auto r3 = ResolveTree(
+      With(Minimal(), {{"imsrg3.factorized", B(true)},
+                       {"imsrg3.factorized_1b_intermediates", B(false)},
+                       {"imsrg3.factorized_2b_intermediates", B(true)}}));
+  EXPECT_FALSE(r3.config.imsrg3.factorized_1b_intermediates);
+  EXPECT_TRUE(r3.config.imsrg3.factorized_2b_intermediates);
+}
+
 TEST(Resolve, mass_number_from_reference_and_valence_core) {
   EXPECT_EQ(ResolveTree(Minimal()).config.basis.mass_number, 16);
   auto t = Minimal();

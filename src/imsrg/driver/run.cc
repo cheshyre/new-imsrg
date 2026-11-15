@@ -47,7 +47,10 @@ void RejectPlanned(const RunConfig& c) {
   if (c.imsrg.goose_tank) Planned("imsrg.goose_tank");
   if (c.imsrg.perturbative_triples) Planned("imsrg.perturbative_triples");
   if (c.imsrg.space) Planned("[imsrg.space] (IMSRG model-space truncation)");
-  if (c.imsrg3.active() || c.imsrg3.factorized) Planned("IMSRG(3) ([imsrg3])");
+  if (c.imsrg3.active()) Planned("IMSRG(3) ([imsrg3])");
+  if (c.imsrg3.factorized && c.imsrg3.factorized_2b_intermediates) {
+    Planned("imsrg3.factorized_2b_intermediates");
+  }
   if (c.output.valence_file_format == ValenceFileFormat::kAntoine) {
     Planned("output.valence_file_format = \"antoine\"");
   }
@@ -365,8 +368,14 @@ void Run(const RunConfig& config) {
   FlowLog flow_log(config.output.flow_file.empty()
                        ? dir / "flow.csv"
                        : fs::path(config.output.flow_file));
+  flow::BchOptions bch;
+  bch.factorized = config.imsrg3.factorized;
+  bch.factorized_terms.one_body_intermediates =
+      config.imsrg3.factorized_1b_intermediates;
+  bch.factorized_terms.two_body_intermediates =
+      config.imsrg3.factorized_2b_intermediates;
   flow::MagnusSolver solver(ph.hno, so,
-                            MakeGeneratorOptions(config, core_gen, ms));
+                            MakeGeneratorOptions(config, core_gen, ms), bch);
   flow_log.set_solver(&solver);
   std::vector<StageRecord> stages;
   log::Info("Setting generator to {}", ToString(core_gen));

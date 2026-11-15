@@ -276,6 +276,14 @@ void VisitSchema(Config& c, Visitor&& v) {
   v.Field(KeyInfo{"imsrg3.factorized", "IMSRG(3f2) factorized BCH correction",
                   "false"},
           c.imsrg3.factorized);
+  v.Field(KeyInfo{"imsrg3.factorized_1b_intermediates",
+                  "3f2: one-body intermediates of the factorized double "
+                  "commutator",
+                  "true"},
+          c.imsrg3.factorized_1b_intermediates);
+  v.Field(KeyInfo{"imsrg3.factorized_2b_intermediates",
+                  "3f2: two-body intermediates (not implemented yet)", "false"},
+          c.imsrg3.factorized_2b_intermediates);
   v.Field(KeyInfo{"imsrg3.no_qqq", "drop qqq terms", "false", false, false, PL},
           c.imsrg3.no_qqq);
   v.Field(KeyInfo{"imsrg3.only_2b_eta", "keep the generator 2-body", "false"},

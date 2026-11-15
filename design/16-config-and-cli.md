@@ -172,7 +172,7 @@ Whole table absent or all-default = IMSRG(2). Non-default keys without `in_flow`
 | `variant` | enum `full`, `n7`, `mp4` | `full` | which 3-body commutator terms (old `imsrg3_n7`, `imsrg3_mp4`; both set = error). |
 | `factorized` | bool | `false` | IMSRG(3f2): factorized double-commutator correction inside the BCH transform. imsrg++ exposes it only as `BCH::SetUseFactorizedCorrection` (pyIMSRG), with no executable parameter; here it maps to `BchOptions::factorized`, not to the commutator TermMask. **`true` sets the owner's 3f2 recipe as defaults (D32):** `imsrg.omega.hunter_gatherer = true`, `imsrg.step.omega_norm_max = 0.1`, `factorized_1b_intermediates = true`, `factorized_2b_intermediates = false`; explicitly given keys win, and `resolved_config.toml` writes all four out. |
 | `factorized_1b_intermediates` | bool | `true` | 3f2: use the one-body intermediates of the factorized double commutator (pyIMSRG `FactorizedDoubleCommutator::SetUse_1b_Intermediates`). *(D32, run 2)* |
-| `factorized_2b_intermediates` | bool | `false` with `factorized` (imsrg++ default `true`) | 3f2: use the two-body intermediates (`SetUse_2b_Intermediates`). *(D32, run 2)* |
+| `factorized_2b_intermediates` | bool | `false` (imsrg++ default `true`; `true` together with `factorized` is E-PLANNED, not implemented) | 3f2: use the two-body intermediates (`SetUse_2b_Intermediates`). *(D32, run 2)* |
 | `no_qqq` | bool | `false` | drop `qqq` terms (old `imsrg3_no_qqq`). |
 | `only_2b_eta` | bool | `false` | generator stays 2-body. |
 | `only_2b_omega` | bool | `false` | Omega stays 2-body. |
@@ -702,6 +702,8 @@ Errors are collected; each rule has an id used in tests. TOML = strict; "legacy:
 * V-53 `discard_residual_input_3n` or `three_body.type="no2b"` force normal-ordering rank 2: no error; documented. `in_flow` with `type="no2b"` is valid (induced 3-body only).
 * V-54 `de3max`, `occ_nat3_cut`, `only_2b_*` only with `in_flow`/`at_end`/`perturbative_triples`.
 * V-55 IMSRG(3) with `basis.e3max` smaller than 3-body states needed: warning with `CountThreeBodyStatesInsideCut`-style estimate (memory).
+* V-56 `factorized_1b_intermediates` or `factorized_2b_intermediates` at a non-default value while `factorized` is false: error (TOML), warning (legacy). *(M10 3f2)*
+* V-57 `factorized` together with `in_flow` or `at_end` (the correction would double count the explicit 3-body terms) or with a method other than `magnus`: error (TOML), warning (legacy). *(M10 3f2)*
 
 ### 5.7 Operators and output
 
