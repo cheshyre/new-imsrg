@@ -8,6 +8,7 @@
 /// buffers of operator parts, defined in `kernels/part_kernels.cc` (the only
 /// translation unit that sees Kokkos).
 #include <cstdint>
+#include <span>
 
 #include "imsrg/exec/device_buffer.h"
 
@@ -36,6 +37,20 @@ void AddScalar(double c, exec::DeviceBuffer<double>& x);
 /// lies inside x (IMSRG_CHECK). Blocking (device reduction). O(count).
 double SumOfSquares(const exec::DeviceBuffer<double>& x, std::int64_t offset,
                     std::int64_t count);
+
+/// sum over blocks b of block_weights[b] * (sum of x[i]^2 for i in
+/// [block_offsets[b], block_offsets[b + 1])), in ONE device reduction over
+/// fixed-size chunks (each chunk locates its first block by binary search and
+/// then walks its elements). `block_offsets` has num_blocks + 1 non-decreasing
+/// entries (empty blocks allowed); elements outside [front, back] of the
+/// offsets are ignored. Preconditions (IMSRG_CHECK): block_weights.size() + 1
+/// == block_offsets.size() (or both empty), offsets non-negative and
+/// non-decreasing, the last offset <= x.size(). Blocking. O(total elements);
+/// allocates two small device buffers per call. Differs from the per-block
+/// `SumOfSquares` loop only by floating-point reassociation.
+double WeightedBlockSumOfSquares(const exec::DeviceBuffer<double>& x,
+                                 std::span<const std::int64_t> block_offsets,
+                                 std::span<const double> block_weights);
 
 }  // namespace imsrg::op::detail
 

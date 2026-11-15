@@ -653,3 +653,10 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   on calls passing the cheap filters drops from 183 to 65 ns; the remainder is the six
   `channel.states.find` hash lookups in `get_isospin`. **Assumed:** left as is (no layout change
   was allowed); a dense per-channel state table would remove it if HF-with-3N profiles still show it.
+
+* **M12-Q2** (2026-11-15, M12a norms) - `TwoBodyNorm` now relies on `BlockSparseMatrix` blocks
+  being contiguous and in storage order (IMSRG_CHECKed). **Assumed:** that stays the layout. Per call
+  the kernel allocates two small device buffers (offsets, weights); at 1 thread the single
+  reduction is about as fast as 84 small ones (0.73 vs 0.68 ms at emax 6), the gain is at > 1
+  thread (1.73 -> 0.17 ms at 6 threads). Caching the buffers on the operator would remove the
+  allocation if it matters.
