@@ -306,6 +306,7 @@ lmax = 14
 mixing = "linear"
 [imsrg.step]
 smax = 5000.0
+eta_criterion = 1e-30
 [output]
 directory = "{tmp_path / 'out'}"
 '''
@@ -316,7 +317,8 @@ directory = "{tmp_path / 'out'}"
     )
     try:
         assert p.stdout.readline().strip() == "ready"
-        time.sleep(1.5)
+        time.sleep(2.5)
+        assert p.poll() is None, "the run ended before the signal (too fast for this test)"
         t0 = time.time()
         p.send_signal(signal.SIGINT)
         p.communicate(timeout=60)
