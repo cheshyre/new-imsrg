@@ -671,3 +671,11 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   a quarter of the ticks the measured solve time allows (and at least 5); a GIL-holding solve gives
   about one. Same check, independent of the solver speed. (A time-stamp variant was rejected: the
   GIL hand-off at a callback's entry also produces stamps inside the windows.)
+
+* **M12-Q4** (2026-11-16, M12a ladder-direct) - Direct channels (contiguous listed kets, all weights
+  exactly 1.0) skip the gather and the gemm reads X and Y in place with leading dimension N. The
+  hh projector of a closed shell is direct only for channels where the hole kets happen to be
+  contiguous (e.g. a single listed ket); the check is generic. Assumption: exact `== 1.0` on the
+  weight, so fractional references never take the direct path. Benchmark checksums (emax 2, 4;
+  T 1, 4) are bitwise identical to before; the ladder scratch of O16 shrank from 3.75x to 2.0x of
+  a two-body operator at emax 6. No open decision.

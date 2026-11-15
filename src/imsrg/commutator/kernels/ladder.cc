@@ -40,6 +40,7 @@ struct GatherArgs {
   const std::int64_t* gather_offset = nullptr;
   const std::int64_t* list_offset = nullptr;
   const std::int32_t* list = nullptr;
+  const std::int32_t* direct_first = nullptr;
   const double* weight = nullptr;
   const std::int64_t* block_offset = nullptr;
   const std::int32_t* ket_offset = nullptr;
@@ -58,7 +59,8 @@ static_assert(std::is_trivially_copyable_v<GatherArgs>);
 /// writes column j of Yg (k rows, a gather from the contiguous column j of Y)
 /// and, if j < k, column j of Xg (N rows, a weighted copy of the contiguous
 /// column K_j of X). Every element of Xg and Yg is written by exactly one item;
-/// the gather layouts (`gather_offset`) are unchanged. Dynamic scheduling: the
+/// direct channels (`direct_first >= 0`) are skipped (the gemm reads X and Y in
+/// place). Dynamic scheduling: the
 /// column costs differ by channel. Complexity O(sum_c N_c (N_c + k_c)).
 void Gather(const char* name, LadderProjector& p, const Workspace::Impl& impl,
             const TwoBodyView& xv, const TwoBodyView& yv) {
@@ -68,6 +70,7 @@ void Gather(const char* name, LadderProjector& p, const Workspace::Impl& impl,
   a.gather_offset = p.gather_offset.device_data();
   a.list_offset = p.list_offset.device_data();
   a.list = p.list.device_data();
+  a.direct_first = p.direct_first.device_data();
   a.weight = p.weight.device_data();
   a.block_offset = impl.block_offsets.device_data();
   a.ket_offset = xv.tb.channel_ket_offset;
@@ -82,7 +85,7 @@ void Gather(const char* name, LadderProjector& p, const Workspace::Impl& impl,
       IMSRG_LAMBDA(const exec::Index e) {
         const int ch = a.entry_channel[e];
         const std::int64_t k = a.list_offset[ch + 1] - a.list_offset[ch];
-        if (k == 0) return;
+        if (k == 0 || a.direct_first[ch] >= 0) return;  // direct: in place
         const std::int64_t j = e - a.ket_offset[ch];
         const std::int64_t n = a.num_kets[ch];
         const std::int32_t* kets = a.list + a.list_offset[ch];
@@ -157,8 +160,20 @@ void ProductsInto(const op::Operator& X, const op::Operator& Y,
           p->gather_offset_host[static_cast<std::size_t>(ch)];
       linalg::GemmProblem g;
       g.alpha = alpha;
-      g.A = MatrixView<const double>{xg + goff, dim, k, dim};
-      g.B = MatrixView<const double>{yg + goff, k, dim, k};
+      const std::int32_t k0 =
+          p->direct_first_host[static_cast<std::size_t>(ch)];
+      if (k0 >= 0) {
+        // Direct channel: Xg = X(:, K0 .. K0 + k - 1), Yg = Y(K0 .. , :).
+        const double* xb =
+            xv.data + impl.block_offsets_host[static_cast<std::size_t>(ch)];
+        const double* yb =
+            yv.data + impl.block_offsets_host[static_cast<std::size_t>(ch)];
+        g.A = MatrixView<const double>{xb + k0 * dim, dim, k, dim};
+        g.B = MatrixView<const double>{yb + k0, k, dim, dim};
+      } else {
+        g.A = MatrixView<const double>{xg + goff, dim, k, dim};
+        g.B = MatrixView<const double>{yg + goff, k, dim, k};
+      }
       g.beta = beta;
       g.C = MatrixView<double>{
           prod + impl.block_offsets_host[static_cast<std::size_t>(ch)], dim,

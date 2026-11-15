@@ -26,10 +26,13 @@ void FillProjector(LadderProjector& proj, const basis::ModelSpace& ms,
   std::vector<std::int64_t> list_offset(nch + 1, 0);
   proj.count_host.assign(nch, 0);
   proj.gather_offset_host.assign(nch + 1, 0);
+  proj.direct_first_host.assign(nch, -1);
   for (std::size_t ch = 0; ch < nch; ++ch) {
     const auto kets =
         channels.channel_kets(ChannelIndex{static_cast<std::int32_t>(ch)});
     std::int32_t count = 0;
+    bool direct = true;  // listed kets contiguous and every weight == 1.0
+    const auto first_entry = static_cast<std::int64_t>(list.size());
     for (std::size_t i = 0; i < kets.size(); ++i) {
       const auto& k = channels.ket(kets[i]);
       const double wk = weight(occ[static_cast<std::size_t>(k.p.value())],
@@ -37,15 +40,24 @@ void FillProjector(LadderProjector& proj, const basis::ModelSpace& ms,
       if (wk == 0.0)
         continue;  // exact test: fractional references keep every non-zero
                    // weight
+      if (static_cast<std::int64_t>(list.size()) != first_entry &&
+          static_cast<std::int32_t>(i) != list.back() + 1)
+        direct = false;
+      if (wk != 1.0) direct = false;
       list.push_back(static_cast<std::int32_t>(i));
       w.push_back(wk);
       ++count;
     }
     proj.count_host[ch] = count;
     list_offset[ch + 1] = static_cast<std::int64_t>(list.size());
+    if (count > 0 && direct)
+      proj.direct_first_host[ch] = list[static_cast<std::size_t>(first_entry)];
+    // Direct channels read X and Y in place: no gathered operands.
     proj.gather_offset_host[ch + 1] =
         proj.gather_offset_host[ch] +
-        static_cast<std::int64_t>(kets.size()) * count;
+        (proj.direct_first_host[ch] >= 0
+             ? 0
+             : static_cast<std::int64_t>(kets.size()) * count);
   }
 
   const std::string t = std::string("commutator::ladder_") + tag;
@@ -59,6 +71,10 @@ void FillProjector(LadderProjector& proj, const basis::ModelSpace& ms,
   proj.gather_offset = exec::DeviceBuffer<std::int64_t>(
       proj.gather_offset_host.size(), t + "_gather_offset");
   proj.gather_offset.CopyFromHost(proj.gather_offset_host);
+  proj.direct_first = exec::DeviceBuffer<std::int32_t>(
+      proj.direct_first_host.size(), t + "_direct_first");
+  if (!proj.direct_first_host.empty())
+    proj.direct_first.CopyFromHost(proj.direct_first_host);
   const auto gsize = static_cast<std::size_t>(proj.gather_offset_host.back());
   proj.xg = exec::DeviceBuffer<double>(gsize, t + "_xg");
   proj.yg = exec::DeviceBuffer<double>(gsize, t + "_yg");

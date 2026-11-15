@@ -30,19 +30,29 @@ namespace imsrg::commutator::detail {
 /// c has `count[c]` listed kets (local indices `list[list_offset[c] ..)` with
 /// weights `weight[..]`), and the operands Xg (N x count, column major, `Xg(i,
 /// m) = w_m X(i, K_m)`) and Yg (count x N, `Yg(m, j) = Y(K_m, j)`) at
-/// `gather_offset[c]` (both N * count elements).
+/// `gather_offset[c]` (both N * count elements). A "direct" channel (listed
+/// kets contiguous, `list[m] == list[0] + m`, and every weight exactly 1.0, as
+/// the pp projector of a closed-shell reference) is not gathered: Xg is the
+/// column range X(:, K0 .. K0 + count - 1) and Yg the row range of Y, which the
+/// gemm reads in place (leading dimension N). Its gathered size is zero.
 struct LadderProjector {
   std::vector<std::int32_t> count_host;          ///< Listed kets per channel.
   std::vector<std::int64_t> gather_offset_host;  ///< num_channels + 1 offsets
                                                  ///< of the gathered operands.
+  /// Per channel: the first local ket K0 of a direct channel, else -1 (also -1
+  /// for channels without listed kets).
+  std::vector<std::int32_t> direct_first_host;
+  exec::DeviceBuffer<std::int32_t> direct_first;  ///< Device copy.
   exec::DeviceBuffer<std::int32_t> list;  ///< Concatenated local ket indices.
   exec::DeviceBuffer<double> weight;  ///< Projector weight of each listed ket.
   exec::DeviceBuffer<std::int64_t>
       list_offset;  ///< num_channels + 1 offsets into `list`.
   exec::DeviceBuffer<std::int64_t>
-      gather_offset;              ///< Device copy of `gather_offset_host`.
-  exec::DeviceBuffer<double> xg;  ///< Gathered X operands, all channels.
-  exec::DeviceBuffer<double> yg;  ///< Gathered Y operands, all channels.
+      gather_offset;  ///< Device copy of `gather_offset_host`.
+  exec::DeviceBuffer<double>
+      xg;  ///< Gathered X operands (non-direct channels).
+  exec::DeviceBuffer<double>
+      yg;  ///< Gathered Y operands (non-direct channels).
   /// W = X P Y (`LadderProducts`), antisymmetrized in place to Mpp or Mhh by
   /// the ladder terms; two-body layout. Blocks of channels without listed kets
   /// are never written by the ladder and must stay zero. The pp buffer is also
@@ -60,7 +70,9 @@ struct LadderData {
   std::vector<linalg::GemmProblem> problems;
 
   /// Total size in bytes of the scratch buffers (Xg, Yg and product of both
-  /// projectors). O(1).
+  /// projectors; memory is 2 N_2 for the products plus the gathered operands
+  /// 2 sum_{c not direct} N_c k_c per projector, where N_2 = two-body size).
+  /// O(1).
   std::size_t scratch_bytes() const noexcept {
     std::size_t n = 0;
     for (const LadderProjector* p : {&pp, &hh})
