@@ -4,7 +4,7 @@
 // The pp/hh ladder terms (comm222_pp_hhss, comm221ss and their fusion
 // comm222_pp_hh_221ss) of the fast commutator: golden acceptance, comparison
 // with commutator_ref on random operators, fused versus separate evaluation, an
-// emax-4 timing report and the NonHermitian guard.
+// emax-4 timing report.
 #include <chrono>
 #include <cstdio>
 #include <filesystem>
@@ -126,18 +126,6 @@ TEST(commutator_ladder_terms, timing_emax4) {
   const auto t1 = std::chrono::steady_clock::now();
   std::printf("[timing] comm222_pp_hh_221ss emax 4 O16: %.1f ms\n",
               std::chrono::duration<double, std::milli>(t1 - t0).count());
-}
-
-TEST(commutator_ladder_terms, nonhermitian_input_throws) {
-  const auto ms = imsrg::testing::MakeModelSpace(1, "He4");
-  Workspace ws(ms);
-  const Operator X = RandomOperator(ms, Hermiticity::kNonHermitian, 3);
-  const Operator Y = RandomOperator(ms, Hermiticity::kHermitian, 4);
-  Operator Z(ms, op::OperatorSpec::Scalar(2, Hermiticity::kAntiHermitian));
-  for (const auto& t : kTerms) {
-    EXPECT_THROW(t.fast(X, Y, Z, ws), NotImplementedError) << t.name;
-    EXPECT_THROW(t.fast(Y, X, Z, ws), NotImplementedError) << t.name;
-  }
 }
 
 }  // namespace

@@ -3,7 +3,7 @@
 
 // The particle-hole (Pandya) term comm222_phss of the fast commutator: golden
 // acceptance, comparison with commutator_ref on random operators, a timing
-// print and the NonHermitian guard.
+// print (the general path is tested in test_general.cc).
 #include <chrono>
 #include <cstdio>
 #include <filesystem>
@@ -71,18 +71,6 @@ TEST(commutator_particle_hole, fast_vs_reference) {
     }
   }
   std::printf("[fast-vs-ref] comm222_phss max deviation: %.3e\n", worst);
-}
-
-TEST(commutator_particle_hole, nonhermitian_input_throws) {
-  const auto ms = imsrg::testing::MakeModelSpace(1, "He4");
-  Workspace ws(ms);
-  const Operator X = RandomOperator(ms, Hermiticity::kNonHermitian, 3);
-  const Operator Y = RandomOperator(ms, Hermiticity::kHermitian, 4);
-  Operator Z(ms, op::OperatorSpec::Scalar(2, Hermiticity::kAntiHermitian));
-  EXPECT_THROW(commutator::terms::Comm222Phss(X, Y, Z, ws),
-               NotImplementedError);
-  EXPECT_THROW(commutator::terms::Comm222Phss(Y, X, Z, ws),
-               NotImplementedError);
 }
 
 TEST(commutator_particle_hole, Timing) {

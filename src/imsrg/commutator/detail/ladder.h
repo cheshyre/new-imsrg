@@ -12,7 +12,8 @@
 /// with P_pp = diag((1 - n_p)(1 - n_q)) and P_hh = diag(n_p n_q) over the
 /// normalized kets. P_pp and P_hh are non-zero only on the kets of the lists Kp
 /// and Kh, so the products are small dense gemms on gathered operands. All
-/// buffers are allocated once, when the workspace is built.
+/// buffers are allocated once, when the workspace is built (the general path
+/// needs no additional ones).
 
 #include <cstdint>
 #include <vector>
@@ -81,6 +82,16 @@ LadderData BuildLadderData(const basis::ModelSpace& ms);
 /// (host BLAS). Complexity: grouped gemms of sum_c N_c^2 (|Kp| + |Kh|) flops.
 void LadderProducts(const op::Operator& X, const op::Operator& Y,
                     Workspace::Impl& impl);
+
+/// General (non-Hermitian) form of the ladder intermediates: afterwards
+/// `impl.ladder.{pp,hh}.product` hold Mpp = X P_pp Y - Y P_pp X and Mhh = X
+/// P_hh Y - Y P_hh X directly (no use of X^T = hX X). Preconditions as for
+/// `LadderProducts`. Needs no extra scratch (the second product accumulates
+/// into the first with alpha = -1). The
+/// results are complete when it returns. Complexity: twice that of
+/// `LadderProducts` plus one elementwise pass.
+void LadderProductsGeneral(const op::Operator& X, const op::Operator& Y,
+                           Workspace::Impl& impl);
 
 }  // namespace imsrg::commutator::detail
 

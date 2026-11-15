@@ -90,19 +90,23 @@ namespace detail {
 
 /// Shared precondition check of every `terms::` function and of `Commutator()`:
 /// X, Y and Z are non-empty on the workspace's model space
-/// (`Workspace::Compatible`), Z is neither X nor Y, and X, Y and Z have a
-/// definite hermiticity, and Z's hermiticity is that of [X, Y]
-/// (`CommutatorSpec`), so the kernels may derive it from X and Y alone.
+/// (`Workspace::Compatible`), Z is neither X nor Y, and Z's hermiticity is that
+/// of [X, Y] (`CommutatorSpec`: NonHermitian if X or Y is), so the kernels may
+/// derive it from X and Y alone.
 /// @throws InvariantError on a violated precondition (incl. a wrong hermiticity
-///         of Z),
-/// NotImplementedError if X or Y is
-///         NonHermitian (the fast kernels use the (anti-)Hermiticity). O(1).
+///         of Z). O(1).
 void CheckTermInputs(const op::Operator& X, const op::Operator& Y,
                      const op::Operator& Z, const Workspace& ws);
 
+/// True if X or Y is NonHermitian: the kernels then take their general paths
+/// (explicit X P Y - Y P X products, no use of X^T = hX X); otherwise they use
+/// the (anti-)Hermiticity of both. O(1).
+bool IsGeneral(const op::Operator& X, const op::Operator& Y);
+
 /// Hermiticity sign hZ = -hX hY (+1 Hermitian, -1 anti-Hermitian) of [X, Y] for
 /// X, Y of definite hermiticity: [X,Y]^dagger = hX hY [Y,X] = -hX hY [X,Y].
-/// Kernels use this instead of Z's flag.
+/// Kernels use this instead of Z's flag. Precondition: `!IsGeneral(X, Y)`
+/// (asserted in debug builds).
 int CommutatorHermiticitySign(const op::Operator& X, const op::Operator& Y);
 
 }  // namespace detail

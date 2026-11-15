@@ -11,6 +11,8 @@
 //   2. one grouped gemm W = Xg Yg per channel and projector,
 //   3. the in-place antisymmetrization M = W + h_Z W^T, valid because X^T = h_X
 //      X, Y^T = h_Y Y give Y P X = h_X h_Y (X P Y)^T and h_Z = -h_X h_Y.
+// For general X or Y (no such symmetry) step 2 also computes W' = Y P X
+// (`detail::LadderProductsGeneral`) and step 3 is M = W - W'.
 
 #include <algorithm>
 #include <cstdint>
@@ -108,8 +110,13 @@ static_assert(std::is_trivially_copyable_v<SymArgs>);
 
 namespace detail {
 
-void LadderProducts(const op::Operator& X, const op::Operator& Y,
-                    Workspace::Impl& impl) {
+namespace {
+
+/// product = alpha X P Y + beta product per channel and projector for the
+/// gathered operands (beta = 0: overwrite, beta = 1: accumulate). See
+/// `LadderProducts`.
+void ProductsInto(const op::Operator& X, const op::Operator& Y,
+                  Workspace::Impl& impl, double alpha, double beta) {
   auto& lad = impl.ladder;
   const TwoBodyView xv = impl.two_body_view(X);
   const TwoBodyView yv = impl.two_body_view(Y);
@@ -138,10 +145,10 @@ void LadderProducts(const op::Operator& X, const op::Operator& Y,
       const std::int64_t goff =
           p->gather_offset_host[static_cast<std::size_t>(ch)];
       linalg::GemmProblem g;
-      g.alpha = 1.0;
+      g.alpha = alpha;
       g.A = MatrixView<const double>{xg + goff, dim, k, dim};
       g.B = MatrixView<const double>{yg + goff, k, dim, k};
-      g.beta = 0.0;
+      g.beta = beta;
       g.C = MatrixView<double>{
           prod + impl.block_offsets_host[static_cast<std::size_t>(ch)], dim,
           dim, dim};
@@ -155,6 +162,21 @@ void LadderProducts(const op::Operator& X, const op::Operator& Y,
   linalg::GroupedGemm(lad.problems);
 }
 
+}  // namespace
+
+void LadderProducts(const op::Operator& X, const op::Operator& Y,
+                    Workspace::Impl& impl) {
+  ProductsInto(X, Y, impl, 1.0, 0.0);
+}
+
+void LadderProductsGeneral(const op::Operator& X, const op::Operator& Y,
+                           Workspace::Impl& impl) {
+  // M = X P Y - Y P X: the second grouped gemm accumulates with alpha = -1.
+  // Blocks without listed kets are skipped by both: they stay zero.
+  ProductsInto(X, Y, impl, 1.0, 0.0);
+  ProductsInto(Y, X, impl, -1.0, 1.0);
+}
+
 }  // namespace detail
 
 namespace terms {
@@ -162,11 +184,17 @@ namespace terms {
 namespace {
 
 /// Computes Mpp and Mhh for X and Y into `impl.ladder.{pp,hh}.product`. X and Y
-/// must have an allocated two-body part; `h_z` is the hermiticity sign of the
-/// commutator. Leaves the device idle (fenced). Complexity: two grouped gemms
-/// of sum_c N_c^2 (|Kp| + |Kh|) flops.
-void ComputeIntermediates(const op::Operator& X, const op::Operator& Y, int h_z,
+/// must have an allocated two-body part. (Anti-)Hermitian X, Y: one product and
+/// the antisymmetrization M = W + hZ W^T; general X or Y: both products
+/// (`detail::LadderProductsGeneral`). Leaves the device idle (fenced).
+/// Complexity: two grouped gemms of sum_c N_c^2 (|Kp| + |Kh|) flops.
+void ComputeIntermediates(const op::Operator& X, const op::Operator& Y,
                           Workspace::Impl& impl) {
+  if (detail::IsGeneral(X, Y)) {
+    detail::LadderProductsGeneral(X, Y, impl);
+    return;
+  }
+  const int h_z = detail::CommutatorHermiticitySign(X, Y);
   detail::LadderProducts(X, Y, impl);  // W = X P Y for P = P_pp, P_hh
 
   auto& lad = impl.ladder;
@@ -279,12 +307,6 @@ bool HasTwoBody(const op::Operator& X, const op::Operator& Y) {
   return X.two_body().allocated() && Y.two_body().allocated();
 }
 
-/// hZ = -hX hY from X and Y (Z's flag is validated against it by
-/// `CheckTermInputs`).
-int ZSign(const op::Operator& X, const op::Operator& Y) {
-  return detail::CommutatorHermiticitySign(X, Y);
-}
-
 }  // namespace
 
 void Comm222PpHhss(const op::Operator& X, const op::Operator& Y,
@@ -292,7 +314,7 @@ void Comm222PpHhss(const op::Operator& X, const op::Operator& Y,
   detail::CheckTermInputs(X, Y, Z, ws);
   if (!HasTwoBody(X, Y) || !Z.two_body().allocated()) return;
   auto& impl = ws.impl();
-  ComputeIntermediates(X, Y, ZSign(X, Y), impl);
+  ComputeIntermediates(X, Y, impl);
   AddLadderTwoBody(Z, impl);
 }
 
@@ -301,7 +323,7 @@ void Comm221ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   detail::CheckTermInputs(X, Y, Z, ws);
   if (!HasTwoBody(X, Y)) return;
   auto& impl = ws.impl();
-  ComputeIntermediates(X, Y, ZSign(X, Y), impl);
+  ComputeIntermediates(X, Y, impl);
   Add221(Z, impl, X);
 }
 
@@ -310,7 +332,7 @@ void Comm222PpHh221ss(const op::Operator& X, const op::Operator& Y,
   detail::CheckTermInputs(X, Y, Z, ws);
   if (!HasTwoBody(X, Y)) return;
   auto& impl = ws.impl();
-  ComputeIntermediates(X, Y, ZSign(X, Y), impl);
+  ComputeIntermediates(X, Y, impl);
   if (Z.two_body().allocated()) AddLadderTwoBody(Z, impl);
   Add221(Z, impl, X);
 }

@@ -18,11 +18,18 @@
 /// dividing by sqrt((1 + delta_ij)(1 + delta_kl)). Sums over a, b, c run over
 /// all orbits.
 ///
-/// Every function here supports X and Y that are each Hermitian or
-/// anti-Hermitian (the symmetry tricks of the fast kernels need it); a
-/// NonHermitian input throws NotImplementedError. The test-only module
-/// `commutator_ref` evaluates the same expressions without symmetry tricks, for
-/// any hermiticity.
+/// Every function here supports X and Y that are each Hermitian, anti-Hermitian
+/// or general (NonHermitian). Z is general if either input is. The
+/// (anti-)Hermitian inputs take the fast paths that use X^T = hX X (half the
+/// work in the ladder and particle-hole terms, one triangle per two-body
+/// block); a NonHermitian input takes the general paths, which evaluate the
+/// explicit products X P Y - Y P X and every stored element independently (the
+/// ladder terms need a second product accumulated into the first, the
+/// particle-hole term works with the Pandya matrices of all 2 Ncc ordered
+/// pairs: about 2x and 4x the flops, with its extra scratch, at most 4/3 of the
+/// Hermitian one, allocated at the first general call). The test-only module
+/// `commutator_ref` evaluates the same expressions without symmetry tricks and
+/// is the oracle of the general paths (design/00 D36, M7-Q2).
 
 #include "imsrg/commutator/options.h"
 #include "imsrg/commutator/workspace.h"
@@ -34,7 +41,7 @@ namespace imsrg::commutator {
 /// Spec of Z = [X, Y] for scalar, number-conserving X and Y: scalar,
 /// particle_rank max(x.particle_rank, y.particle_rank), hermiticity
 /// AntiHermitian if X and Y have the same (definite) hermiticity, Hermitian if
-/// they have opposite ones, NonHermitian otherwise (imsrg++
+/// they have opposite ones, NonHermitian if either is NonHermitian (imsrg++
 /// `CommutatorScalarScalar`, Commutator.cc:337-342).
 /// @throws NotImplementedError for non-scalar or non-number-conserving specs
 ///         and for particle_rank 3 (IMSRG(3), milestone M10).
@@ -49,8 +56,7 @@ op::OperatorSpec CommutatorSpec(const op::OperatorSpec& x,
 /// 222 ladder and the 221 term share their intermediates when both are selected
 /// (imsrg++ `comm222_pp_hh_221ss`). Preconditions (InvariantError): X, Y on the
 /// workspace's model space (`ws.compatible`); Z is neither X nor Y.
-/// @throws NotImplementedError for NonHermitian X or Y and for specs
-///         `CommutatorSpec` rejects.
+/// @throws NotImplementedError for specs `CommutatorSpec` rejects.
 /// Complexity: dominated by the 2B terms, O(sum over channels of N^3) GEMMs.
 void Commutator(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                 const CommutatorOptions& opts, Workspace& ws);
@@ -64,19 +70,20 @@ op::Operator Commutator(const op::Operator& X, const op::Operator& Y,
 /// final symmetrization step). Common preconditions (InvariantError): X, Y and
 /// Z on the workspace's model space, Z with spec `CommutatorSpec(X.spec(),
 /// Y.spec())` (or at least the part written allocated and the same
-/// hermiticity). Each throws NotImplementedError for NonHermitian X or Y. A
-/// term whose input parts are missing (particle_rank 1) adds nothing.
+/// hermiticity). A term whose input parts are missing (particle_rank 1) adds
+/// nothing.
 namespace terms {
 
 /// Z0 += sum_ab (2 j_a + 1) n_a nbar_b (X_ab Y_ba - Y_ab X_ba). Adds nothing if
-/// Z is anti-Hermitian (the term vanishes; imsrg++ returns early). O(norb^2).
+/// Z is anti-Hermitian (the term vanishes; imsrg++ returns early); a general Z
+/// gets the full sum. O(norb^2).
 void Comm110ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                Workspace& ws);
 
 /// Z0 += 1/4 sum_abcd sum_J (2J+1) n_a n_b nbar_c nbar_d (X^J_abcd Y^J_cdab -
 /// Y^J_abcd X^J_cdab); on normalized kets per channel: sum_J (2J+1) sum_{i,k}
 /// nn_i nbarnbar_k (X_ik Y_ki - Y_ik X_ki). Adds nothing if Z is
-/// anti-Hermitian. O(sum over channels of N^2).
+/// anti-Hermitian (a general Z gets the full sum). O(sum over channels of N^2).
 void Comm220ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                Workspace& ws);
 

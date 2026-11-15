@@ -557,3 +557,15 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   (upper triangle, as imsrg++), which halves the memory; unpacking a channel for GEMM-type terms cost
   4 % of a [2,2]->3 evaluation at emax 3 (0.40 of 9 ms). **Assumed meanwhile:** packed storage, dense
   scratch per channel inside kernels. Alternative: dense blocks (simpler kernels, twice the memory).
+* **M7-Q10** (2026-11-15, M7 general paths) - The general (NonHermitian) paths are chosen by the
+  hermiticity FLAG of X or Y, not by inspecting the data: an operator flagged NonHermitian but
+  holding Hermitian data gives the same numbers as the symmetric paths (tested, 4e-16) at higher
+  cost (about 2x ladder flops and 4x particle-hole flops; the Pandya scratch grows by at most
+  4/3, allocated on first use; the ladders need no extra memory). **Assumed meanwhile:** callers who know the symmetry set the flag (the flow does).
+* **M7-Q11** (2026-11-15, M7 general paths) - The brief asked to test `commutator_ref` for general
+  operators against a dense (m-scheme) brute force if the reference did not support them. It does:
+  every term is bilinear, the reference matches imsrg++ goldens and the symmetry-based fast kernels
+  for all (anti-)Hermitian pairs, which span every operator, and
+  `commutator_ref_properties.general_by_general_bilinearity` shows the reference respects the
+  bilinear decomposition for general X and Y. **Assumed meanwhile:** that is sufficient; a true
+  m-scheme brute force stays on the M10 list (needed there for 3B anyway, design/30 section 1).

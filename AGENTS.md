@@ -40,6 +40,11 @@ we do not port it line by line.
    build directory (`cmake --preset dev-openmp -B build/<task>`) or build one after another.
 9. Scripts and globs work on `git ls-files`: the main checkout root also holds untracked
    `imsrg-devel/` and `.claude/worktrees/`.
+10. **Stay inside the project directories.** File searches and listings (`find`, `du`, `ls -R`,
+    `grep -r`, globs) run only in the repository and its worktrees, `/Users/cheshyre/Downloads/new-imsrg-reference/`,
+    `~/.cache/imsrg-deps/`, the Homebrew prefix and temp/scratch directories. Never `find /`, `find ~`
+    or `mdfind`: a whole-disk search walks into other apps' private data (`~/Library/Containers`)
+    and triggers a macOS privacy prompt for the owner (2026-11-15).
 
 ## Build and test (since milestone M0; details in `design/20-build-and-tooling.md`)
 

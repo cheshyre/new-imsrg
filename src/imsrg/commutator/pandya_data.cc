@@ -5,6 +5,7 @@
 // 4.2). Host-side only; no Kokkos.
 
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 #include "imsrg/commutator/detail/pandya.h"
@@ -143,6 +144,51 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
     d.gemms.push_back(g);
   }
   return d;
+}
+
+void EnsureGeneralScratch(PandyaData& pd) {
+  if (pd.general.allocated()) return;
+  // Build into a local object and move-assign at the end: a throwing
+  // allocation leaves `pd.general` unallocated.
+  PandyaGeneralData g;
+  const auto ncc = static_cast<std::size_t>(pd.num_cc);
+  std::vector<std::int64_t> g_off(ncc + 1, 0);
+  std::vector<std::int64_t> gz_off(ncc + 1, 0);
+  for (std::size_t c = 0; c < ncc; ++c) {
+    const std::int64_t n = pd.ncc_host[c];
+    const std::int64_t nk = pd.nk_host[c];
+    g_off[c + 1] = g_off[c] + 2 * n * nk;
+    gz_off[c + 1] = gz_off[c] + 4 * n * n;
+  }
+  g.g_off = Upload(g_off, "pandya_general::g_off");
+  g.gz_off = Upload(gz_off, "pandya_general::gz_off");
+  g.a = exec::DeviceBuffer<double>(static_cast<std::size_t>(g_off.back()),
+                                   "pandya_general::A");
+  g.b = exec::DeviceBuffer<double>(static_cast<std::size_t>(g_off.back()),
+                                   "pandya_general::B");
+  g.z = exec::DeviceBuffer<double>(static_cast<std::size_t>(gz_off.back()),
+                                   "pandya_general::Z");
+  for (std::size_t c = 0; c < ncc; ++c) {
+    const std::int64_t n = pd.ncc_host[c];
+    const std::int64_t nk = pd.nk_host[c];
+    // nk == 0 blocks are skipped: their Z stays zero (never written).
+    if (n == 0 || nk == 0) continue;
+    linalg::GemmProblem p;
+    p.alpha = 1.0;
+    p.A = linalg::MatrixView<const double>{g.a.device_data() + g_off[c], 2 * n,
+                                           nk, 2 * n};
+    p.opA = linalg::Op::kNoTrans;
+    p.B = linalg::MatrixView<const double>{g.b.device_data() + g_off[c], nk,
+                                           2 * n, nk};
+    p.opB = linalg::Op::kNoTrans;
+    p.beta = 0.0;
+    p.C = linalg::MatrixView<double>{g.z.device_data() + gz_off[c], 2 * n,
+                                     2 * n, 2 * n};
+    g.gemms.push_back(p);
+  }
+  g.g_off_host = std::move(g_off);
+  g.gz_off_host = std::move(gz_off);
+  pd.general = std::move(g);
 }
 
 }  // namespace imsrg::commutator::detail

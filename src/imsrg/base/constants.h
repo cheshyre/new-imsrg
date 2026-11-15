@@ -4,10 +4,14 @@
 #ifndef IMSRG_BASE_CONSTANTS_H_
 #define IMSRG_BASE_CONSTANTS_H_
 /// @file
-/// Physical and mathematical constants, copied literally from imsrg++
-/// (`PhysicalConstants.hh`) so that numerical results can be reproduced bit for
-/// bit. Each constant cites its line in the reference file and its unit.
+/// Physical constants, copied literally from imsrg++ (`PhysicalConstants.hh`)
+/// so that numerical results can be reproduced bit for bit, and mathematical
+/// constants at full double precision (owner decision D36: imsrg++ truncates
+/// 1/sqrt(2) to 13 digits; that copy is `kImsrgppInvSqrt2`, for tests only).
+/// Each constant cites its line in the reference file and its unit.
 /// Energies are in MeV, lengths in fm unless noted.
+
+#include <numbers>
 
 namespace imsrg::constants {
 
@@ -54,11 +58,15 @@ inline constexpr double kDarwinFoldy = 0.033172;
 
 /// Square root of 2. PhysicalConstants.hh:41.
 inline constexpr double kSqrt2 = 1.41421356237309505;
-/// 1 / sqrt(2) as written in imsrg++: 0.7071067811865 is TRUNCATED to 13 digits
-/// (the exact value is 0.70710678118654752...). Kept only to reproduce
-/// reference numerics; new code should use `1.0 / sqrt2`.
-/// PhysicalConstants.hh:42.
-inline constexpr double kInvSqrt2 = 0.7071067811865;
+/// 1 / sqrt(2) at full double precision (the double nearest to
+/// 0.70710678118654752440...; halving is exact, so this is the correctly
+/// rounded value). A mathematical constant, hence NOT the imsrg++ literal
+/// (owner decision D36, M2-Q3): production code uses this one.
+inline constexpr double kInvSqrt2 = std::numbers::sqrt2 / 2.0;
+/// imsrg++'s `PhysConst::INVSQRT2`: 0.7071067811865 is TRUNCATED to 13 digits
+/// (relative error 6.7e-14). Only for tests that reproduce imsrg++'s exact
+/// numbers; never used in production code. PhysicalConstants.hh:42.
+inline constexpr double kImsrgppInvSqrt2 = 0.7071067811865;
 /// Natural logarithm of 2 (reference name LOG2). PhysicalConstants.hh:43.
 inline constexpr double kLn2 = 0.69314718055994530942;
 /// Pi. PhysicalConstants.hh:44.
