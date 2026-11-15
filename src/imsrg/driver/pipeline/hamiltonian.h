@@ -25,17 +25,27 @@ struct PreparedHamiltonian {
   /// Model space of the bare Hamiltonian (oscillator basis; reference
   /// occupations of the config).
   std::shared_ptr<const basis::ModelSpace> ms_bare;
-  /// Normal-ordered Hamiltonian in the HF basis (or the oscillator basis for
-  /// basis.kind = oscillator), on the model space whose occupations are those
-  /// of the HF solution (equal to `ms_bare` unless HF re-filled orbits). The
-  /// Lawson constant -1.5 beta_cm beta_cm_hw is already subtracted from its
-  /// zero-body part (imsrg++.cc:733).
+  /// Normal-ordered Hamiltonian in the HF basis (the natural-orbital basis for
+  /// basis.kind = "nat", the oscillator basis for "oscillator"), on the model
+  /// space whose occupations are those of the HF solution (equal to `ms_bare`
+  /// unless HF re-filled orbits). The Lawson constant -1.5 beta_cm beta_cm_hw
+  /// is already subtracted from its zero-body part (imsrg++.cc:733).
   op::Operator hno;
-  /// The HF solution (absent for basis.kind = oscillator).
+  /// The HF solution (absent for basis.kind = oscillator); for "nat" the
+  /// solution the natural orbitals were built from.
   std::optional<hf::HFResult> hf;
-  /// E_HF (or the zero-body part of the normal-ordered oscillator-basis H),
-  /// MeV.
+  /// For basis.kind = "nat": the mean-field state of the natural-orbital basis
+  /// (`hf::SolutionInBasis`); its `C` maps the oscillator basis to the NAT
+  /// basis and is what operators are transformed with. `hf` keeps the solution
+  /// in the HF basis.
+  std::optional<hf::HFResult> nat;
+  /// E_HF in the basis of `hno` (HF or NAT), or the zero-body part of the
+  /// normal-ordered oscillator-basis H, MeV.
   double e_reference = 0.0;
+  /// MBPT(2) correlation energy (MeV) of `hno` (imsrg++ `EMP2`): in the HF
+  /// basis, or the oscillator basis for basis.kind = oscillator (there the
+  /// Fock matrix is not diagonal and the value is only indicative).
+  double e_mp2 = 0.0;
   /// Mass number used for the kinetic energy (config basis.mass_number).
   int mass_number = 0;
   /// Proton number of the reference (for Rp2 and friends).
@@ -45,9 +55,9 @@ struct PreparedHamiltonian {
 /// Builds the model space, reads the interaction(s), adds the kinetic energy
 /// (intrinsic Trel with the config's A, or lab-frame T) and the Lawson term
 /// (|beta_cm| > 1e-6: beta_cm * HCM(hw = beta_cm_hw)), solves Hartree-Fock
-/// (linear mixing, occupations unfrozen unless hartree_fock.freeze_occupations)
-/// and returns the normal-ordered Hamiltonian (NO2B for a 3N input). Logs E_HF
-/// and its parts.
+/// (mixing as `hartree_fock.mixing`, occupations unfrozen unless
+/// hartree_fock.freeze_occupations) and returns the normal-ordered Hamiltonian
+/// (NO2B for a 3N input). Logs E_HF and its parts.
 /// @throws InputError for unreadable input files; ConfigError ("E-PLANNED ...")
 ///         for options that are not implemented yet (NAT basis, formats other
 ///         than me2j / no2b, ...).

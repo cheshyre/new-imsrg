@@ -144,6 +144,35 @@ class Solver {
     return res;
   }
 
+  /// The mean-field state of the orthogonal basis `C` (oscillator -> basis)
+  /// with occupations `occ` (see `hf::SolutionInBasis`).
+  HFResult InBasis(const Matrix<double>& C, const std::vector<double>& occ) {
+    C_ = C;
+    occ_ = occ;
+    rho_ = Density();
+    BuildFock(rho_, F_);
+    HFResult res;
+    Energy(res);
+    res.iterations = 0;
+    res.converged = true;
+    res.spe.assign(static_cast<std::size_t>(norb_), 0.0);
+    for (const auto& ch : channels_) {
+      for (const std::int32_t alpha : ch) {
+        double e = 0.0;
+        for (const std::int32_t a : ch) {
+          for (const std::int32_t b : ch)
+            e += C_(a, alpha) * F_(a, b) * C_(b, alpha);
+        }
+        res.spe[static_cast<std::size_t>(alpha)] = e;
+      }
+    }
+    res.C = C_;
+    res.rho = rho_;
+    res.F = F_;
+    res.occupations = occ_;
+    return res;
+  }
+
  private:
   /// rho(a,b) = sum_alpha n_alpha C(a,alpha) C(b,alpha) over the holes alpha.
   Matrix<double> Density() const {
@@ -302,6 +331,19 @@ HFResult Solve(const op::Operator& H, const op::No2bThreeBody* v3,
               "invalid Hartree-Fock options");
   Solver solver(H, v3, options);
   return solver.Run();
+}
+
+HFResult SolutionInBasis(const op::Operator& H, const op::No2bThreeBody* v3,
+                         const linalg::Matrix<double>& c_ho2basis,
+                         const std::vector<double>& occupations,
+                         const HFOptions& options) {
+  IMSRG_CHECK(!H.empty(), "hf::SolutionInBasis needs a non-empty Hamiltonian");
+  const std::int32_t norb = H.model_space().num_orbits();
+  IMSRG_CHECK(c_ho2basis.rows() == norb && c_ho2basis.cols() == norb &&
+                  static_cast<std::int32_t>(occupations.size()) == norb,
+              "SolutionInBasis: C and occupations must match the model space");
+  Solver solver(H, v3, options);
+  return solver.InBasis(c_ho2basis, occupations);
 }
 
 op::Operator ToHfBasis(const op::Operator& O, const HFResult& r) {

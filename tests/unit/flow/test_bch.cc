@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <limits>
 #include <memory>
 #include <vector>
 
@@ -325,6 +326,20 @@ TEST(flow_bch, thresholds_and_report) {
     EXPECT_TRUE(rep.converged);
     EXPECT_EQ(MaxDev(Z, X), 0.0);
   }
+}
+
+// A NaN Omega stops the transform after the first nested commutator instead
+// of running all max_iterations (flow review item 2).
+TEST(flow_bch, non_finite_omega_stops_the_series) {
+  const auto ms = MakeSpace(1, "He4");
+  Workspace ws(ms);
+  const Operator X = RandOp(ms, Hermiticity::kHermitian, 61, 2, 1.0);
+  Operator Om = RandOp(ms, Hermiticity::kAntiHermitian, 62, 2, 0.5);
+  op::Scale(Om, std::numeric_limits<double>::quiet_NaN());
+  BchReport rep;
+  flow::BchTransform(X, Om, BchOptions{}, CommutatorOptions{}, ws, &rep);
+  EXPECT_LE(rep.nested_commutators, 2);
+  EXPECT_FALSE(rep.converged);
 }
 
 TEST(flow_bch, hermiticity) {

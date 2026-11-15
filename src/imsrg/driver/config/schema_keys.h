@@ -181,6 +181,11 @@ void VisitSchema(Config& c, Visitor&& v) {
             t.discard_no2b_after_hf);
       });
   // [hartree_fock], [natural_orbitals]
+  v.Field(KeyInfo{"hartree_fock.mixing",
+                  "HF update: diis (Pulay on the Fock matrix) or linear "
+                  "(imsrg++ density mixing)",
+                  "diis (linear for legacy command lines)", false, true},
+          c.hartree_fock.mixing);
   v.Field(KeyInfo{"hartree_fock.freeze_occupations",
                   "keep reference occupations fixed", "false"},
           c.hartree_fock.freeze_occupations);

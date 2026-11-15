@@ -305,7 +305,8 @@ std::string Sanitize(const std::string& s) {
 
 /// Derived values (design/16 section 2). Never throws and never assumes reading
 /// succeeded.
-void Derive(const RawTree& tree, RunConfig& cfg, ConfigIssues& issues) {
+void Derive(const RawTree& tree, const ResolveOptions& options, RunConfig& cfg,
+            ConfigIssues& issues) {
   // Effective e3max.
   if (cfg.basis.emax >= 0)
     cfg.basis.e3max = std::min(cfg.basis.e3max, 3 * cfg.basis.emax);
@@ -346,6 +347,11 @@ void Derive(const RawTree& tree, RunConfig& cfg, ConfigIssues& issues) {
           SourceRef{SourceRef::Kind::kDerived, "basis.mass_number", 0, 0}));
     }
   }
+
+  // D37: DIIS for TOML configs, imsrg++'s linear mixing for legacy command
+  // lines (so that old command lines reproduce imsrg++ iteration counts).
+  if (options.legacy && !tree.contains("hartree_fock.mixing"))
+    cfg.hartree_fock.mixing = HartreeFockMixing::kLinear;
 
   if (!tree.contains("hamiltonian.beta_cm_hw"))
     cfg.hamiltonian.beta_cm_hw = cfg.basis.hw;
@@ -410,7 +416,7 @@ ResolveResult Resolve(const RawTree& tree, const ResolveOptions& options) {
   ResolveResult result;
   Reader reader(tree, result.config, result.issues);
   VisitSchema(result.config, reader);
-  Derive(tree, result.config, result.issues);
+  Derive(tree, options, result.config, result.issues);
   auto found = Validate(result.config, tree, options);
   for (auto& issue : found) result.issues.push_back(std::move(issue));
   return result;

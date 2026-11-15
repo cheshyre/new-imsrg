@@ -75,7 +75,8 @@ std::string He4Toml() {
   std::ostringstream t;
   t << "[basis]\nemax = 2\nhw = 16.0\n\n[reference]\nnucleus = \"He4\"\n\n"
     << "[interaction.two_body]\nfile = \"" << DataFile(TwoBodyName()).string()
-    << "\"\ne1max = 14\ne2max = 28\nlmax = 14\n";
+    << "\"\ne1max = 14\ne2max = 28\nlmax = 14\n"
+    << "\n[hartree_fock]\nmixing = \"linear\"\n";  // imsrg++ (D37)
   return t.str();
 }
 

@@ -455,6 +455,16 @@ which cannot happen after a hunter-gatherer `Solve`) is counted in `MagnusSolver
 `results.json` has `imsrg.num_gathers` (solver total) and `imsrg.stages[].num_gathers`.
 `imsrg.omega.hunter_gatherer` is rejected nowhere any more; `imsrg.omega.storage = scratch/discard`
 with hunter-gatherer is unchanged (not implemented either way).
+
+### M8-Q12 (flow fixes: ds with `magnus_adaptive = false`, divergence on NaN)
+(1) imsrg++'s member `ds` is set by `SetDs(ds_0)` and capped by `SetDsmax`; with `magnus_adaptive = false`
+the Magnus loop uses `ds` unchanged (then `min(ds, smax - s)`). **Assumed/implemented:** the solver
+starts each `Solve` with `ds = min(ds_0, dsmax)`; adaptive mode is untouched (golden flows identical).
+(2) A NaN/inf ||eta|| or E0 is `StopReason::kDiverged` (the driver then throws `NumericalError`, M8-3);
+unlike imsrg++ (`FlowingOps[0] *= 1.0/0.0`) H is left as it is. (3) `denominator_cutoff <= 0` is
+rejected by `ComputeGenerator` with `InputError` (0 would disable the floor and give inf/NaN).
+(4) `imsrg.omega.storage = scratch|discard` is `Phase::kPlanned` in the enum table (E-PLANNED at
+validation); the round-trip tests use `memory`.
 * **M8-Q20** (2026-11-15, M8 D35 task) - D35 asks that "wherever the code computes a charge radius" the
   Rso contribution is added. The code has no charge-radius computation yet (design/16 section 6 assigns
   `PROTON_RCH2`, `NEUTRON_RCH2`, `DARWIN_FOLDY` to the output stage), so only the catalog operator `Rso`
@@ -471,3 +481,22 @@ with hunter-gatherer is unchanged (not implemented either way).
   edited (a few lines each: `IMSRG_REFERENCE_SHA_FILE`, `IMSRG_GOLDEN_E2E_OUT`, `FLOW_JOBS`); the
   hunter-gatherer task edits the same two files, so the merge may need a manual resolution of
   neighbouring hunks. **Assumed meanwhile:** the orchestrator resolves it (both changes are independent). **Resolved at the merge (orchestrator, 2026-11-15):** `gen_golden_flow.sh` taken from the hunter-gatherer branch, which already contains the D35 overrides; `refharness.cpp` merged automatically.
+* **M8-Q30** (2026-11-15, M8 config/driver task) - Relative paths (D37): a TOML *file*'s values resolve
+  against the file's directory, but the **default** `output.directory = "output"` (no key in the file)
+  and `--set` values resolve against the working directory. Alternative: default relative to the config
+  directory too. **Assumed meanwhile:** working directory (an output default is not a path "in the
+  config"); implemented in `LoadConfig` and documented in design/16 1.8. The TOML examples name their
+  inputs without a directory, so they run from a directory that holds the data (`examples/config/README.md`).
+* **M8-Q31** (2026-11-15, M8 config/driver task) - `results.json` schema version: the layout was
+  already new in run 2 (nothing released), so `schema_version = 1` covers the table as documented,
+  including `e_mp2`, `imsrg.num_gathers` and the NAT-basis meaning of `e_reference`/`e_mp2`. **Assumed:**
+  bump to 2 only for the first change after a release; the table test fails on any undocumented key.
+* **M8-Q32** (2026-11-15, M8 config/driver task) - `hartree_fock.mixing = "diis"` (the new TOML default)
+  stops at the same HF tolerance with fewer iterations but changes E_HF at the 1e-8 MeV level and may
+  change flow step counts relative to imsrg++. **Assumed:** the integration tests that reproduce
+  imsrg++ step counts (IT-2..IT-7, IT-12, hunter-gatherer) set `mixing = "linear"` explicitly; legacy
+  command lines get `linear` automatically.
+* **M8-Q33** (2026-11-15, M8 config/driver task) - NAT basis in the driver covers `natural_orbitals`
+  defaults only: `use_occupations = true` and `order = "energy"` are `E-PLANNED` (M9-Q3, D36). The NAT
+  reference occupations are those of the HF solution (closed shells; ensemble references untested).
+  New `hf::SolutionInBasis` is the public API replacing the test-only `hf::detail` coupling (M9-Q1).

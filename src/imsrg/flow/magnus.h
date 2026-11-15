@@ -66,8 +66,9 @@ struct FlowStatus {
 enum class StopReason : std::uint8_t {
   kConverged,    ///< ||eta|| < eta_criterion.
   kSmaxReached,  ///< s >= smax.
-  kDiverged      ///< ||eta|| > 1e12 or |E0| > 1e9 (imsrg++ guard; imsrg++ then
-                 ///< fills H with inf).
+  kDiverged      ///< ||eta|| > 1e12, |E0| > 1e9 or a NaN/inf norm or energy
+                 ///< (imsrg++ guard, made NaN-safe; imsrg++ then fills H with
+                 ///< inf, we leave H as it is).
 };
 
 /// Summary of one `solve` call.
@@ -96,6 +97,9 @@ class MagnusSolver {
   /// normal ordered with respect to the reference of its model space): s = 0,
   /// Omega stack = {0}, eta not computed yet. Builds the commutator workspace
   /// (needs an initialized exec::Runtime).
+  /// @throws InputError if `solver.dsmax`, `domega`, `ds_0` or
+  ///   `omega_norm_max` is not a positive finite number, `smax` is not finite
+  ///   or `eta_criterion` is NaN (ds would be 0 or NaN and the loop endless).
   MagnusSolver(op::Operator H0, const SolverOptions& solver,
                const GeneratorOptions& generator, const BchOptions& bch = {},
                const commutator::CommutatorOptions& comm = {});
@@ -113,6 +117,13 @@ class MagnusSolver {
   /// Changes smax for the next `solve` (imsrg++ doubles it for the second
   /// Magnus stage; the driver does that).
   void set_smax(double smax) noexcept { solver_.smax = smax; }
+  /// Replaces the step options for the next `solve` (imsrg++.cc:1130-1140
+  /// sets Ds, Dsmax and Smax before the second stage). The bump of `domega`
+  /// already applied is NOT undone: pass options derived from
+  /// `solver_options()`.
+  /// @throws InputError for options that would loop forever or give NaN steps
+  ///   (see the constructor).
+  void set_solver_options(const SolverOptions& solver);
 
   /// Runs the Magnus loop until convergence, s >= smax or divergence (imsrg++
   /// `Solve_magnus_euler`):

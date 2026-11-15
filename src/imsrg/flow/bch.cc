@@ -64,7 +64,12 @@ op::Operator BchTransform(const op::Operator& X, const op::Operator& Omega,
     factorial_denom /= i;
     op::Axpy(factorial_denom, nested, out);
     epsilon *= i + 1;
-    if (op::Norm(nested) < epsilon) {
+    const double norm_nested = op::Norm(nested);
+    if (!std::isfinite(norm_nested)) {  // NaN/inf: stop, no 40 commutators
+      log::Warn("BCH transform: non-finite nested commutator, stopping");
+      break;
+    }
+    if (norm_nested < epsilon) {
       converged = true;
       break;
     }

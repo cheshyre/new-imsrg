@@ -87,7 +87,8 @@ enum class Partitioning : std::uint8_t {
 struct GeneratorOptions {
   GeneratorKind kind = GeneratorKind::kAtan;
   Partitioning partitioning = Partitioning::kEpsteinNesbet;
-  /// Floor of |Delta| (imsrg++ `denominator_cutoff`, default 1e-6).
+  /// Floor of |Delta| (imsrg++ `denominator_cutoff`, default 1e-6); must be
+  /// positive and finite (`ComputeGenerator` throws InputError otherwise).
   double denominator_cutoff = 1.0e-6;
   /// Constant added to denominators (imsrg++ `denominator_delta`); active only
   /// if `denominator_delta_all` or `denominator_delta_orbit` is set (imsrg++

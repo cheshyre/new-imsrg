@@ -9,12 +9,16 @@
 #include <cmath>
 #include <cstdio>
 #include <fstream>
+#include <limits>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
 
+#include "imsrg/base/error.h"
+#include "imsrg/base/types.h"
 #include "imsrg/flow/magnus.h"
 #include "imsrg/operator/compare.h"
 #include "imsrg/operator/norms.h"
@@ -206,6 +210,111 @@ TEST(MagnusSolver, SecondStageOpensNewOmegaAndContinuesS) {
   EXPECT_DOUBLE_EQ(lines.front().s, r1.s);
   EXPECT_DOUBLE_EQ(r2.s, 1.6);
   EXPECT_LT(r2.e0, r1.e0);
+}
+
+// ---- flow review items 1, 2, 5, 8: validation, NaN, ds cap, stage-2 options.
+
+TEST(MagnusSolver, InvalidStepOptionsThrowInputError) {
+  using Mutator = void (*)(flow::SolverOptions&);
+  const Mutator bad[] = {
+      [](flow::SolverOptions& o) { o.dsmax = 0.0; },
+      [](flow::SolverOptions& o) { o.dsmax = -1.0; },
+      [](flow::SolverOptions& o) { o.domega = 0.0; },
+      [](flow::SolverOptions& o) { o.ds_0 = 0.0; },
+      [](flow::SolverOptions& o) { o.omega_norm_max = -0.1; },
+      [](flow::SolverOptions& o) {
+        o.dsmax = std::numeric_limits<double>::quiet_NaN();
+      },
+      [](flow::SolverOptions& o) {
+        o.smax = std::numeric_limits<double>::infinity();
+      },
+  };
+  for (const Mutator m : bad) {
+    flow::SolverOptions o = ShortFlow(0.5);
+    m(o);
+    EXPECT_THROW(flow::MagnusSolver(Emax2Hno(), o, flow::GeneratorOptions{}),
+                 InputError);
+  }
+  flow::MagnusSolver solver(Emax2Hno(), ShortFlow(0.5),
+                            flow::GeneratorOptions{});
+  flow::SolverOptions o = ShortFlow(0.5);
+  o.domega = 0.0;
+  EXPECT_THROW(solver.set_solver_options(o), InputError);
+  EXPECT_DOUBLE_EQ(solver.solver_options().domega, 0.1);  // unchanged
+}
+
+TEST(MagnusSolver, NonPositiveDenominatorCutoffThrows) {
+  flow::GeneratorOptions g;
+  g.denominator_cutoff = 0.0;
+  flow::MagnusSolver solver(Emax2Hno(), ShortFlow(0.5), g);
+  EXPECT_THROW(solver.Solve(), InputError);
+}
+
+TEST(MagnusSolver, NanInHamiltonianIsDivergenceNotSmax) {
+  // NaN zero-body energy: caught by the E0 guard before any step.
+  {
+    op::Operator h0 = Emax2Hno();
+    h0.zero_body() = std::numeric_limits<double>::quiet_NaN();
+    flow::MagnusSolver solver(std::move(h0), ShortFlow(2.0),
+                              flow::GeneratorOptions{});
+    const flow::SolveResult r = solver.Solve();
+    EXPECT_EQ(r.reason, flow::StopReason::kDiverged);
+    EXPECT_EQ(r.steps, 0);
+  }
+  // NaN one-body element: eta is NaN, ||eta|| fails every comparison.
+  {
+    op::Operator h0 = Emax2Hno();
+    h0.one_body().set(OrbitIndex{0}, OrbitIndex{0},
+                      std::numeric_limits<double>::quiet_NaN());
+    flow::MagnusSolver solver(std::move(h0), ShortFlow(2.0),
+                              flow::GeneratorOptions{});
+    const flow::SolveResult r = solver.Solve();
+    EXPECT_EQ(r.reason, flow::StopReason::kDiverged);
+    EXPECT_NE(r.reason, flow::StopReason::kSmaxReached);
+    EXPECT_LE(r.steps, 1);
+  }
+}
+
+TEST(MagnusSolver, NonAdaptiveStepIsCappedByDsmax) {
+  // imsrg++ SetDsmax caps the member ds (IMSRGSolver.cc:201-205).
+  flow::SolverOptions o = ShortFlow(0.3);
+  o.magnus_adaptive = false;
+  o.ds_0 = 0.5;
+  o.dsmax = 0.05;
+  flow::MagnusSolver solver(Emax2Hno(), o, flow::GeneratorOptions{});
+  std::vector<flow::FlowStatus> lines;
+  solver.Solve([&](const flow::FlowStatus& st) { lines.push_back(st); });
+  ASSERT_GT(lines.size(), 4u);
+  EXPECT_DOUBLE_EQ(lines[1].ds, 0.05);
+  for (const auto& st : lines) EXPECT_LE(st.ds, 0.05);
+  // ds_0 below dsmax is kept.
+  o.ds_0 = 0.02;
+  flow::MagnusSolver small(Emax2Hno(), o, flow::GeneratorOptions{});
+  std::vector<flow::FlowStatus> small_lines;
+  small.Solve([&](const flow::FlowStatus& st) { small_lines.push_back(st); });
+  EXPECT_DOUBLE_EQ(small_lines[1].ds, 0.02);
+}
+
+TEST(MagnusSolver, StageTwoOptionsReachTheSolver) {
+  // As the driver does for a stiff valence generator (imsrg++.cc:1130-1140):
+  // dsmax 1e-2 for stage 2 only.
+  flow::MagnusSolver solver(Emax2Hno(), ShortFlow(0.3),
+                            flow::GeneratorOptions{});
+  std::vector<flow::FlowStatus> stage1;
+  solver.Solve([&](const flow::FlowStatus& st) { stage1.push_back(st); });
+  double max_ds1 = 0.0;
+  for (const auto& st : stage1) max_ds1 = std::max(max_ds1, st.ds);
+  EXPECT_GT(max_ds1, 1.0e-2);  // without the cap the steps are larger
+  flow::SolverOptions o2 = solver.solver_options();
+  o2.smax = 0.4;
+  o2.ds_0 = 1.0e-4;
+  o2.dsmax = 1.0e-2;
+  solver.set_generator(flow::GeneratorOptions{});
+  solver.set_solver_options(o2);
+  std::vector<flow::FlowStatus> stage2;
+  solver.Solve([&](const flow::FlowStatus& st) { stage2.push_back(st); });
+  ASSERT_GT(stage2.size(), 5u);
+  for (const auto& st : stage2) EXPECT_LE(st.ds, 1.0e-2);
 }
 
 TEST(MagnusSolver, StopsWhenConverged) {
