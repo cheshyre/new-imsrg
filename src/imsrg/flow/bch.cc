@@ -5,6 +5,7 @@
 
 #include <array>
 #include <cmath>
+#include <optional>
 #include <utility>
 
 #include "imsrg/base/log.h"
@@ -12,6 +13,46 @@
 #include "imsrg/operator/norms.h"
 
 namespace imsrg::flow {
+
+namespace {
+
+/// The IMSRG(3f2) correction F(eta, gamma) for one eta (the Omega of a
+/// transform, the Y of a product) and the gammas of a series: eta's
+/// intermediates (`commutator::FactorizedEta`) are computed at the first
+/// evaluation and reused.
+class FactorizedTerm {
+ public:
+  FactorizedTerm(const op::Operator& eta,
+                 const commutator::FactorizedOptions& opts,
+                 commutator::Workspace& ws)
+      : eta_(eta), opts_(opts), ws_(ws) {}
+  FactorizedTerm(const FactorizedTerm&) = delete;
+  FactorizedTerm& operator=(const FactorizedTerm&) = delete;
+  FactorizedTerm(FactorizedTerm&&) = delete;
+  FactorizedTerm& operator=(FactorizedTerm&&) = delete;
+  ~FactorizedTerm() = default;
+
+  /// corr = F(eta, gamma); returns false, leaving corr untouched, if F
+  /// vanishes identically because eta or gamma has no two-body part or no
+  /// topology is selected (so a series of rank-1 operators stays rank 1).
+  bool Evaluate(const op::Operator& gamma, op::Operator& corr) {
+    if (!eta_.two_body().allocated() || !gamma.two_body().allocated())
+      return false;
+    if (!opts_.one_body_intermediates && !opts_.two_body_intermediates)
+      return false;
+    if (!pre_) pre_.emplace(eta_, ws_);
+    commutator::FactorizedDoubleCommutator(*pre_, gamma, corr, opts_, ws_);
+    return true;
+  }
+
+ private:
+  const op::Operator& eta_;
+  const commutator::FactorizedOptions& opts_;
+  commutator::Workspace& ws_;
+  std::optional<commutator::FactorizedEta> pre_;
+};
+
+}  // namespace
 
 op::Operator WithParticleRank(const op::Operator& op,
                               std::int32_t particle_rank) {
@@ -45,15 +86,13 @@ op::Operator BchTransform(const op::Operator& X, const op::Operator& Omega,
   int count = 0;
   int corrections = 0;
   bool converged = false;
+  FactorizedTerm f_omega(Omega, opts.factorized_terms, ws);
   for (int i = 1; i <= opts.max_iterations; ++i) {
     // IMSRG(3f2): nested_i += F(Omega, nested_{i-2}) for i >= 2. `next` holds
     // the (corrected) nested_{i-2}, nested_0 = out at i = 2, until the
     // commutator below overwrites it.
-    const bool factorized = opts.factorized && i >= 2;
-    if (factorized) {
-      commutator::FactorizedDoubleCommutator(Omega, next, corr,
-                                             opts.factorized_terms, ws);
-    }
+    const bool factorized =
+        opts.factorized && i >= 2 && f_omega.Evaluate(next, corr);
     commutator::Commutator(Omega, nested, next, copts, ws);
     std::swap(nested, next);
     if (factorized) {
@@ -109,11 +148,11 @@ op::Operator BchProduct(const op::Operator& X, const op::Operator& Y,
     commutator::Commutator(nested, X, next, copts, ws);
     op::Axpy(1.0 / 12, next, Z);
     if (opts.factorized) {  // imsrg++ BCH.cc:312-319: eta = X, gamma = Y
-      commutator::FactorizedDoubleCommutator(X, Y, corr, opts.factorized_terms,
-                                             ws);
-      op::Axpy(1.0 / 12, corr, Z);
+      FactorizedTerm f_x(X, opts.factorized_terms, ws);
+      if (f_x.Evaluate(Y, corr)) op::Axpy(1.0 / 12, corr, Z);
     }
   }
+  FactorizedTerm f_y(Y, opts.factorized_terms, ws);
   std::size_t k = 1;
   while (nxy > thr) {
     if (k < 2 || k % 2 == 0) op::Axpy(bernoulli[k] / factorial[k], nested, Z);
@@ -122,13 +161,11 @@ op::Operator BchProduct(const op::Operator& X, const op::Operator& Y,
     if (2 * ny * nxy < thr) break;
     // IMSRG(3f2): N_k += F(Y, N_{k-2}) with N_0 = X (imsrg++ BCH.cc:321-359);
     // for k >= 3 `next` holds N_{k-2} until the commutator overwrites it.
-    if (opts.factorized) {
-      commutator::FactorizedDoubleCommutator(Y, k == 2 ? X : next, corr,
-                                             opts.factorized_terms, ws);
-    }
+    const bool factorized =
+        opts.factorized && f_y.Evaluate(k == 2 ? X : next, corr);
     commutator::Commutator(Y, nested, next, copts, ws);
     std::swap(nested, next);
-    if (opts.factorized) op::Axpy(1.0, corr, nested);
+    if (factorized) op::Axpy(1.0, corr, nested);
     nxy = op::Norm(nested);
   }
   return Z;

@@ -103,21 +103,25 @@ TEST(flow_bch_factorized, transform_series_by_hand) {
   const Operator R = RandomOperator(ms, Hermiticity::kAntiHermitian, 42);
   const Operator omega = (0.3 / op::Norm(R)) * R;
   // nested_1 = [O, X], nested_2 = [O, n1] + F(O, X), nested_3 = [O, n2] +
-  // F(O, n1); the series is truncated by max_iterations (no epsilon stop).
+  // F(O, n1), nested_4 = [O, n3] + F(O, n2) (the first F of a corrected
+  // term); the series is truncated by max_iterations (no epsilon stop).
   const Operator n1 = commutator::Commutator(omega, X, copts, ws);
   const Operator n2 = commutator::Commutator(omega, n1, copts, ws) +
                       F(omega, flow::WithParticleRank(X, 2), ws);
   const Operator n3 =
       commutator::Commutator(omega, n2, copts, ws) + F(omega, n1, ws);
+  const Operator n4 =
+      commutator::Commutator(omega, n3, copts, ws) + F(omega, n2, ws);
   BchOptions opts;
   opts.factorized = true;
   opts.transform_threshold = 1.0e-300;
-  for (const int iterations : {2, 3}) {
+  for (const int iterations : {2, 3, 4}) {
     opts.max_iterations = iterations;
     BchReport report;
     const Operator z = flow::BchTransform(X, omega, opts, copts, ws, &report);
     Operator expected = X + n1 + 0.5 * n2;
-    if (iterations == 3) expected = expected + (1.0 / 6) * n3;
+    if (iterations >= 3) expected = expected + (1.0 / 6) * n3;
+    if (iterations >= 4) expected = expected + (1.0 / 24) * n4;
     const double dev = RelativeDeviation(z, expected);
     std::printf("[by-hand] transform, %d terms: %.3e\n", iterations, dev);
     EXPECT_LE(dev, 1.0e-14) << iterations;
@@ -175,9 +179,28 @@ TEST(flow_bch_factorized, all_topologies_off_is_plain) {
       RelativeDeviation(flow::BchTransform(H, omega, off, copts, ws, &report),
                         flow::BchTransform(H, omega, plain, copts, ws)),
       0.0);
-  EXPECT_EQ(report.factorized_corrections, report.nested_commutators - 1);
+  EXPECT_EQ(report.factorized_corrections, 0);  // F vanishes, skipped
   EXPECT_EQ(RelativeDeviation(flow::BchProduct(small, omega, off, copts, ws),
                               flow::BchProduct(small, omega, plain, copts, ws)),
+            0.0);
+}
+
+TEST(flow_bch_factorized, rank_one_operands_skip_the_correction) {
+  // F needs two-body parts; with rank-1 X and Y the corrected series equals
+  // the plain one (and stays rank 1).
+  const auto ms = imsrg::testing::MakeModelSpace(2, "O16");
+  Workspace ws(ms);
+  const CommutatorOptions copts;
+  const Operator A = RandomOperator(ms, Hermiticity::kAntiHermitian, 81, 1);
+  const Operator B = RandomOperator(ms, Hermiticity::kAntiHermitian, 82, 1);
+  const Operator X = (0.1 / op::Norm(A)) * A;
+  const Operator Y = (0.5 / op::Norm(B)) * B;
+  BchOptions plain;
+  BchOptions corrected;
+  corrected.factorized = true;
+  const Operator z = flow::BchProduct(X, Y, corrected, copts, ws);
+  EXPECT_EQ(z.spec().particle_rank, 1);
+  EXPECT_EQ(RelativeDeviation(z, flow::BchProduct(X, Y, plain, copts, ws)),
             0.0);
 }
 
