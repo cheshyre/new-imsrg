@@ -20,6 +20,7 @@
 
 #include <chrono>
 #include <cinttypes>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -32,6 +33,7 @@
 #include "imsrg/base/types.h"
 #include "imsrg/basis/model_space.h"
 #include "imsrg/commutator/commutator.h"
+#include "imsrg/commutator/detail/workspace_impl.h"
 #include "imsrg/commutator/options.h"
 #include "imsrg/commutator/workspace.h"
 #include "imsrg/exec/kokkos_backend.h"
@@ -170,6 +172,44 @@ int main(int argc, char** argv) {
               static_cast<std::int64_t>(X.two_body().matrix().total_size()),
               omp ? omp : "(unset)", IMSRG_BENCH_GIT_HASH);
   std::printf("reps %d\nworkspace construction: %.3f ms\n", reps, ws_ms);
+  {
+    // Scratch footprint relative to one two-body operator (design/benchmarks).
+    const auto& impl = ws.impl();
+    const double op_mb =
+        static_cast<double>(impl.two_body_size) * sizeof(double) / 1.0e6;
+    const double lad_mb =
+        static_cast<double>(impl.ladder.scratch_bytes()) / 1.0e6;
+    const double pan_mb =
+        static_cast<double>(impl.pandya.scratch_bytes()) / 1.0e6;
+    const double sixj_mb =
+        static_cast<double>(impl.sixj.size()) * sizeof(double) / 1.0e6;
+    std::printf(
+        "scratch: two-body operator %.1f MB, ladder %.1f MB (%.2fx), Pandya "
+        "%.1f MB (%.2fx), 6j table %.1f MB\n",
+        op_mb, lad_mb, lad_mb / op_mb, pan_mb, pan_mb / op_mb, sixj_mb);
+    // The same model space in the layout before M12a (gathered operands of
+    // every listed channel, YK for both pair orders, a separate ZB buffer).
+    double old_lad = 0.0;
+    for (const auto* p : {&impl.ladder.pp, &impl.ladder.hh}) {
+      old_lad += static_cast<double>(impl.two_body_size);
+      for (std::size_t ch = 0; ch < p->count_host.size(); ++ch) {
+        const double n = std::sqrt(static_cast<double>(
+            impl.block_offsets_host[ch + 1] - impl.block_offsets_host[ch]));
+        old_lad += 2.0 * n * p->count_host[ch];
+      }
+    }
+    double old_pan = 0.0;
+    for (std::size_t c = 0; c < impl.pandya.ncc_host.size(); ++c) {
+      const double n = impl.pandya.ncc_host[c];
+      old_pan += n * (3.0 * impl.pandya.nk_host[c] + 4.0 * n);
+    }
+    old_lad *= sizeof(double) / 1.0e6;
+    old_pan *= sizeof(double) / 1.0e6;
+    std::printf(
+        "scratch before M12a (same model space): ladder %.1f MB (%.2fx), "
+        "Pandya %.1f MB (%.2fx)\n",
+        old_lad, old_lad / op_mb, old_pan, old_pan / op_mb);
+  }
 
   const Named named[] = {
       {"comm110ss", cm::terms::Comm110ss},

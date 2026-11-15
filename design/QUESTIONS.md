@@ -273,6 +273,9 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
   emax <= 6 (all tests and runs, AGENTS.md rule 3). **Assumed meanwhile:** keep the eager
   allocation; M12 (performance) can share ZB with W, gather in place, and stream channels.
   **Answer (owner, 2026-11-15):** confirmed as assumed (low-impact batch).
+  **Done in M12a (2026-11-16):** ZB folded into W, YK stored for one pair order, closed-shell
+  ladder operands read in place: Workspace scratch at O16 emax 6 from 10.4x to 5.5x a two-body
+  operator (`design/benchmarks/imsrg2-performance.md`).
 * **M6-Q1** (2026-11-12, opslib) - The golden `Rp2.dump` includes the spin-orbit term
   (`RpSpinOrbitCorrection`), contradicting the brief. **Assumed meanwhile:** `rp2` includes it by
   default (matches the golden to 6e-16); `include_spin_orbit = false` excludes it.
@@ -301,6 +304,8 @@ the orchestrator uses `O<n>`. Older entries from the first parallel leads may st
   at emax 4 still solves in < 0.1 s. **Assumed meanwhile:** fine for emax <= 6; M12 adds an
   orbit-index cache and a CG table if profiles show it.
   **Answer (owner, 2026-11-15):** confirmed as assumed (low-impact batch).
+  **Done in M12a (2026-11-16):** dense orbit table and tabulated isospin CGs, bitwise identical
+  (M12-Q1 for the remaining hash lookups).
 * **M8a-Q1** (2026-11-12, M8a config) - `Generator` and `Method` enums (with their canonical TOML
   spellings) live in `driver/config/schema.hpp`, since `flow` does not exist yet. **Assumed
   meanwhile:** M8 makes `flow` reuse them or maps them 1:1 in the driver; the spellings are fixed.

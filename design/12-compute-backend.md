@@ -63,7 +63,7 @@ Details are in `reference/02-commutators.md`.
 |------|----------|
 | comm110, comm111, comm121, comm221-like 1B outputs | Small; flat kernels over orbit pairs with precomputed ket lists. |
 | comm122, comm222_pp_hh (ladders) | Per channel: `Z_ch += X_ch P Y_ch - ...`, where `P` is a diagonal occupation weighting. Use grouped GEMM over channels with occupation-scaled copies. |
-| comm222_ph | Forward Pandya transform as a **precomputed sparse recoupling map** (6j-weighted gather), then grouped GEMM in the ph channels, then inverse Pandya (scatter-add, or gather from the output side to avoid atomics). The map is built once per ModelSpace. |
+| comm222_ph | Forward Pandya transform (6j-weighted gather), then grouped GEMM in the ph channels, then inverse Pandya (gather from the output side, no atomics). **As implemented (M12a):** no stored element-wise recoupling map (for the inverse it would cost several two-body operators of memory); instead the kernels read 6j values from contiguous table rows (`SixJView::row`), resolve the cc kets of orbit pairs from a small per-pair descriptor table (norb^2 entries), fill XK/YK per cc ket with the X and Y transforms fused, store YK for one pair order only (second GEMM after an in-place row-pair flip), combine W in place (no ZB buffer), and run the inverse over pairs of kets with all J at once. |
 
 Implementation phases for every kernel:
 1. Make it correct and simple: a straightforward Kokkos kernel (or host loop) that mirrors the
