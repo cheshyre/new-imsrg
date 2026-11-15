@@ -86,6 +86,11 @@ double MaxRMinusScaledET(const CsrView& rm, const CsrView& em,
   return dev;
 }
 
+// Layout-C counts. The planning pass predicted 3.1-3.5 % more states (5,754
+// at emax 2): it also counted the pair-third states of triples that keep no
+// canonical row in a channel (e.g. a == b == c with j = 1/2, or stretched
+// states with coinciding orbits). Those states vanish under antisymmetrization,
+// so this prototype leaves them out.
 void ExpectCounts(int emax, int e3max, double de3max, std::int64_t sum_n,
                   std::int64_t sum_n2, int max_n) {
   const CanonicalSpace space = MakeSpace(emax, e3max, de3max);
@@ -108,16 +113,16 @@ void ExpectCounts(int emax, int e3max, double de3max, std::int64_t sum_n,
 }
 
 TEST(PairThirdCounts, O16Emax2E3max6) {
-  ExpectCounts(2, 6, kNoCut, 5754, 1135982, 320);
+  ExpectCounts(2, 6, kNoCut, 5574, 1090366, 311);
 }
 TEST(PairThirdCounts, O16Emax3E3max9) {
-  ExpectCounts(3, 9, kNoCut, 37072, 36423808, 1586);
+  ExpectCounts(3, 9, kNoCut, 36564, 35782440, 1574);
 }
 TEST(PairThirdCounts, O16Emax3E3max7) {
-  ExpectCounts(3, 7, kNoCut, 25696, 19272500, 1314);
+  ExpectCounts(3, 7, kNoCut, 25324, 18895336, 1304);
 }
 TEST(PairThirdCounts, O16Emax3E3max9De3max3) {
-  ExpectCounts(3, 9, 3.0, 17096, 8510804, 799);
+  ExpectCounts(3, 9, 3.0, 16840, 8346800, 793);
 }
 
 /// Checks R = E^T and orthogonality for all triples of distinct orbits.
@@ -217,14 +222,25 @@ void CheckCoincident(int emax, int e3max) {
 TEST(PairThirdCoincident, Emax2) { CheckCoincident(2, 6); }
 TEST(PairThirdCoincident, Emax3E3max7) { CheckCoincident(3, 7); }
 
-TEST(PairThirdMaps, EveryRowHasAnREntryAndSizesAreReported) {
+// A canonical row without R entries is a canonical ket that vanishes under
+// antisymmetrization (a null column of the projector Q); imsrg++ keeps some of
+// them (its stretched-state rules remove only part), and its comm223ss gives
+// them 0 up to rounding. They can only occur for triples with b == c.
+TEST(PairThirdMaps, EmptyRRowsOnlyForNullKetsAndSizesAreReported) {
   const CanonicalSpace space = MakeSpace(3, 9, kNoCut);
   const SixJ3Table sixj(3);
   const PairThirdSpace pt(space, sixj);
   const CsrView rm = pt.RMap().host_view();
+  const CanonicalView cv = space.host_view();
+  std::int64_t empty = 0;
   for (std::int64_t r = 0; r < space.NumRows(); ++r) {
-    ASSERT_LT(rm.ptr[r], rm.ptr[r + 1]) << "row " << r;
+    if (rm.ptr[r] < rm.ptr[r + 1]) continue;
+    ++empty;
+    const std::int32_t t = cv.row_triple[r];
+    EXPECT_EQ(cv.tr_b[t], cv.tr_c[t]) << "row " << r;
   }
+  std::cout << "PairThird emax 3 E3max 9: " << empty
+            << " canonical rows without R entries (null kets)" << std::endl;
   EXPECT_GT(pt.EMap().Nonzeros(), 0);
   EXPECT_GT(pt.StateBytes(), 0);
   RecordProperty("nnz_R_emax3_e3max9", std::to_string(pt.RMap().Nonzeros()));

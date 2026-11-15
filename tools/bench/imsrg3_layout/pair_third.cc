@@ -19,6 +19,9 @@ namespace {
 
 constexpr double kDropBelow = 1.0e-13;
 
+/// Index conversion for std containers.
+constexpr std::size_t U(std::int64_t i) { return static_cast<std::size_t>(i); }
+
 /// One pair-third state of a triple (channel-local order = vector order).
 struct State {
   std::int32_t p;
@@ -50,9 +53,9 @@ void AppendTripleStates(std::span<const basis::Orbit> orbits, int a, int b,
     if (seen) continue;
     for (int d = 0; d < 3; ++d) keys[num_keys][d] = key[d];
     ++num_keys;
-    const int jp = orbits[key[0]].j2.twice;
-    const int jq = orbits[key[1]].j2.twice;
-    const int jr = orbits[key[2]].j2.twice;
+    const int jp = orbits[U(key[0])].j2.twice;
+    const int jq = orbits[U(key[1])].j2.twice;
+    const int jr = orbits[U(key[2])].j2.twice;
     for (int jpq = std::abs(jp - jq) / 2; jpq <= (jp + jq) / 2; ++jpq) {
       if (key[0] == key[1] && (jpq & 1) == 1) continue;
       if (!Triangle2(2 * jpq, jr, two_j)) continue;
@@ -141,10 +144,10 @@ PairThirdSpace::PairThirdSpace(const CanonicalSpace& space,
   const auto orbits = space.model_space().basis().orbits();
   num_channels_ = cv.num_channels;
 
-  std::vector<std::int32_t> ch_off(cv.num_channels);
-  std::vector<std::int32_t> ch_num(cv.num_channels);
-  std::vector<std::int32_t> tr_begin(cv.num_triples);
-  std::vector<std::int32_t> tr_end(cv.num_triples);
+  std::vector<std::int32_t> ch_off(U(cv.num_channels));
+  std::vector<std::int32_t> ch_num(U(cv.num_channels));
+  std::vector<std::int32_t> tr_begin(U(cv.num_triples));
+  std::vector<std::int32_t> tr_end(U(cv.num_triples));
   std::vector<std::int32_t> pp;
   std::vector<std::int32_t> pq;
   std::vector<std::int32_t> pr;
@@ -162,20 +165,20 @@ PairThirdSpace::PairThirdSpace(const CanonicalSpace& space,
   for (std::int32_t ch = 0; ch < cv.num_channels; ++ch) {
     const int two_j = cv.ch_two_j[ch];
     const TwoJ tj{two_j};
-    ch_off[ch] = static_cast<std::int32_t>(flat);
+    ch_off[U(ch)] = static_cast<std::int32_t>(flat);
     std::int32_t local = 0;
     for (std::int32_t t = cv.ch_triple_begin[ch]; t < cv.ch_triple_end[ch];
          ++t) {
       const int a = cv.tr_a[t];
       const int b = cv.tr_b[t];
       const int c = cv.tr_c[t];
-      const TwoJ ja = orbits[a].j2;
-      const TwoJ jb = orbits[b].j2;
-      const TwoJ jc = orbits[c].j2;
+      const TwoJ ja = orbits[U(a)].j2;
+      const TwoJ jb = orbits[U(b)].j2;
+      const TwoJ jc = orbits[U(c)].j2;
       states.clear();
       AppendTripleStates(orbits, a, b, c, two_j, &states);
       const std::int32_t base = local;
-      tr_begin[t] = base;
+      tr_begin[U(t)] = base;
       for (const State& s : states) {
         pp.push_back(s.p);
         pq.push_back(s.q);
@@ -183,12 +186,12 @@ PairThirdSpace::PairThirdSpace(const CanonicalSpace& space,
         pj.push_back(s.two_jpq);
       }
       local += static_cast<std::int32_t>(states.size());
-      tr_end[t] = local;
+      tr_end[U(t)] = local;
       const auto find_state = [&](int p, int q, int r, int two_jpq) {
         for (std::size_t k = 0; k < states.size(); ++k) {
           if (states[k].p == p && states[k].q == q && states[k].r == r &&
               states[k].two_jpq == two_jpq) {
-            return static_cast<std::int32_t>(base + k);
+            return base + static_cast<std::int32_t>(k);
           }
         }
         return static_cast<std::int32_t>(-1);
@@ -202,8 +205,8 @@ PairThirdSpace::PairThirdSpace(const CanonicalSpace& space,
           int i2 = 0;
           int i3 = 0;
           Permute(perm, a, b, c, i1, i2, i3);
-          const int jo1 = orbits[i1].j2.twice;
-          const int jo2 = orbits[i2].j2.twice;
+          const int jo1 = orbits[U(i1)].j2.twice;
+          const int jo2 = orbits[U(i2)].j2.twice;
           const int lo = perm == Perm::kABC ? j1 : std::abs(jo1 - jo2) / 2;
           const int hi = perm == Perm::kABC ? j1 : (jo1 + jo2) / 2;
           for (int j1p = lo; j1p <= hi; ++j1p) {
@@ -240,7 +243,7 @@ PairThirdSpace::PairThirdSpace(const CanonicalSpace& space,
         e_ptr.push_back(static_cast<std::int64_t>(e_col.size()));
       }
     }
-    ch_num[ch] = local;
+    ch_num[U(ch)] = local;
     flat += local;
   }
   num_states_ = flat;
@@ -303,7 +306,7 @@ PairThirdView PairThirdSpace::device_view() const noexcept {
 SpaceCounts PairThirdSpace::CountOnly(const CanonicalSpace& space) {
   const CanonicalView cv = space.host_view();
   const auto orbits = space.model_space().basis().orbits();
-  std::vector<std::int64_t> dims(cv.num_channels, 0);
+  std::vector<std::int64_t> dims(U(cv.num_channels), 0);
   std::vector<State> states;
   for (std::int32_t ch = 0; ch < cv.num_channels; ++ch) {
     for (std::int32_t t = cv.ch_triple_begin[ch]; t < cv.ch_triple_end[ch];
@@ -311,7 +314,7 @@ SpaceCounts PairThirdSpace::CountOnly(const CanonicalSpace& space) {
       states.clear();
       AppendTripleStates(orbits, cv.tr_a[t], cv.tr_b[t], cv.tr_c[t],
                          cv.ch_two_j[ch], &states);
-      dims[ch] += static_cast<std::int64_t>(states.size());
+      dims[U(ch)] += static_cast<std::int64_t>(states.size());
     }
   }
   return Summarize(dims, cv.num_triples);
