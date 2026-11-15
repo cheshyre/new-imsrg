@@ -76,3 +76,16 @@ def no2b_file():
     if d is None or not (d / NO2B_NAME).exists():
         pytest.skip("big 3N input file not found (set IMSRG_TEST_DATA_DIR)")
     return d / NO2B_NAME
+
+
+@pytest.fixture(scope="session")
+def he4_emax2(me2j_file):
+    """He4, emax 2, hw 16: the pipeline of the driver by hand (T_rel + V, HF, normal ordering)."""
+    from imsrg import hf, io, operators as ops
+
+    ms = imsrg.ModelSpace(2, "He4", "He4", hw=16.0)
+    h = io.read_me2j(me2j_file, ms, file_e1max=14, file_e2max=28, file_lmax=14)
+    h += ops.t_rel(ms, 4)
+    res = hf.solve(h)
+    hno = res.normal_ordered_hamiltonian(h)
+    return ms, h, res, hno
