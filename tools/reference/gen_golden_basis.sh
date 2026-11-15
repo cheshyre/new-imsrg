@@ -6,7 +6,9 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "${HERE}/../.." && pwd)"
-RH="${1:-${IMSRG_REFERENCE_ROOT:-/Users/cheshyre/Downloads/new-imsrg-reference}/harness-build/refharness}"
+RH="${1:-${IMSRG_REFERENCE_ROOT:-/Users/cheshyre/Downloads/new-imsrg-reference}/harness-build-d35/refharness}"
+# D35: default = the patched harness (harness-build-d35) and its version string (tests/golden/README.md).
+export IMSRG_REFERENCE_SHA_FILE="${IMSRG_REFERENCE_SHA_FILE:-${IMSRG_REFERENCE_ROOT:-/Users/cheshyre/Downloads/new-imsrg-reference}/REFERENCE_SRC_SHA256_D35}"
 OUT="${REPO}/tests/golden/basis"
 mkdir -p "${OUT}"
 

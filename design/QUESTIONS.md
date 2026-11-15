@@ -477,6 +477,9 @@ validation); the round-trip tests use `memory`.
   **Assumed meanwhile:** after merging, run `REFHARNESS=<ref root>/harness-build-d35/refharness
   tools/reference/gen_golden_generated.sh` once per checkout (also done by `regen_golden_d35.sh` into
   `<ref root>/golden-generated-d35`). Alternative: make the script default to the patched harness.
+  **Resolved (2026-11-15, M8 review follow-up):** every `gen_golden_*.sh` now defaults to the patched
+  harness, so `tools/reference/gen_golden_generated.sh` alone regenerates `build/golden-generated` with
+  the right build; each checkout runs it once (`tests/golden/README.md`).
 * **M8-Q22** (2026-11-15, M8 D35 task) - `tools/reference/refharness.cpp` and `gen_golden_flow.sh` were
   edited (a few lines each: `IMSRG_REFERENCE_SHA_FILE`, `IMSRG_GOLDEN_E2E_OUT`, `FLOW_JOBS`); the
   hunter-gatherer task edits the same two files, so the merge may need a manual resolution of
