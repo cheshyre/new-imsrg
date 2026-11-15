@@ -5,7 +5,6 @@ import csv
 import json
 import math
 import threading
-import time
 from pathlib import Path
 
 import pytest
@@ -171,32 +170,33 @@ def test_solver_option_validation(o16):
 
 
 def test_solve_releases_the_gil(o16):
-    # While the solver thread is inside solve(), the main thread counts 1 ms
-    # ticks; it can only run if solve() releases the GIL (otherwise it ticks
-    # about once, after the solve). The bound scales with the measured solve
-    # time (about one tick per ms expected, a quarter required), so a faster
-    # solve no longer fails the test: the earlier fixed bound of 20 ticks
-    # failed once the smax-4 solve took < 20 ms in the serial build (M12-Q3).
-    s = flow.MagnusSolver(o16["H"], solver=flow.SolverOptions(smax=20.0))
+    # The main thread polls how many status callbacks the solver thread has
+    # made. It can see a count strictly between 0 and the final one only if
+    # solve() releases the GIL between steps: the callback is the builtin
+    # list.append, which runs no bytecode, so a GIL-holding solve would never
+    # hand the GIL over between its first and last callback. Unlike counting
+    # 1 ms ticks, this does not depend on the solver speed or on how busy the
+    # machine is; it only needs the main thread to run once during the solve
+    # (smax 40: 88 steps, tens of ms in the serial build; M12-Q3).
+    s = flow.MagnusSolver(o16["H"], solver=flow.SolverOptions(smax=40.0))
+    calls = []
     done = threading.Event()
-    elapsed = [0.0]
 
     def work():
-        t0 = time.perf_counter()
         try:
-            s.solve()
+            s.solve(calls.append)
         finally:
-            elapsed[0] = time.perf_counter() - t0
             done.set()  # never leave the main loop waiting
 
+    seen = set()
     t = threading.Thread(target=work)
-    ticks = 0
     t.start()
     while not done.is_set():
-        ticks += 1
+        seen.add(len(calls))
         done.wait(0.001)
     t.join()
-    assert ticks >= max(5, elapsed[0] * 1000.0 / 4)  # the main thread ran meanwhile
+    assert len(calls) > 2
+    assert any(0 < n < len(calls) for n in seen)  # the main thread ran meanwhile
 
 
 def test_hunter_gatherer_he4_matches_imsrgpp(golden, he4_emax2):

@@ -714,6 +714,14 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   a quarter of the ticks the measured solve time allows (and at least 5); a GIL-holding solve gives
   about one. Same check, independent of the solver speed. (A time-stamp variant was rejected: the
   GIL hand-off at a callback's entry also produces stamps inside the windows.)
+  **Revised (2026-11-16):** tick counting still failed in dev-serial at load ~38 (another lead's
+  slow tests; the main thread woke only every ~14 ms). The test now passes the builtin
+  `list.append` as the status callback and has the main thread poll the number of calls: it must
+  see a count strictly between 0 and the final one. A builtin runs no bytecode, so a GIL-holding
+  solve could not hand the GIL over between its first and last callback (negative control: a
+  GIL-holding C loop calling `list.append` 3e6 times gives no intermediate count; a GIL-releasing
+  loop gives ~47 of 50). The check needs a single main-thread wake-up during the solve (smax 40,
+  88 steps): 25/25 passes at normal load and 25/25 with 40-64 busy processes.
 
 * **M12-Q4** (2026-11-16, M12a ladder-direct) - Direct channels (contiguous listed kets, all weights
   exactly 1.0) skip the gather and the gemm reads X and Y in place with leading dimension N. The
