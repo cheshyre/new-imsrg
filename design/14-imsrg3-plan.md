@@ -117,6 +117,21 @@ layout.
    (`perturbative_triples=true`) on the O16/He4 emax 2/3 tests. The tiled prototype
    (`TriplesTiled`) already agrees with imsrg++ to 3e-15 at O16 emax 3 through
    `refharness comm223 ... epsilon=` and costs 5 % of a full [2,2]→3.
+   **Done (M10 step 2, run 2) for items 0 and 1:** `basis::ThreeBodySpace` (kept canonical space,
+   built by `ModelSpace::WithThreeBody`, cuts in `ThreeBodyCuts`), `angmom::SixJ3Table` and
+   `three_body_recoupling.h` (`SixJTable` now throws on the host and returns NaN on the device for
+   arguments beyond its coverage, e.g. a three-body J), `op::ThreeBody` (packed lower triangle for
+   H/A, dense for N; `ImsrgppNorm`; the OperatorDump 3B section), `op::PairThirdSpace` (R, E),
+   `commutator::Comm223` and `PerturbativeTriplesEnergy` (`commutator/three_body.h`: per-tile
+   gathers, 6j-allowed j blocks, team scratch, packed writes, a general ket-leg gather for
+   non-Hermitian operands), `flow::PerturbativeTriples` and the driver call after stage 1
+   (`results.json` schema 2). Against imsrg-devel: [2,2]→3 element-wise 2.2e-15 of max|Z| (O16
+   emax 2, E3max 3, `tests/golden/imsrg3`), 3B norms <= 1.6e-14 and triples energies <= 1.3e-15
+   relative (emax 2 and 3); IT-8 He4 emax 2 and O16 emax 3: same step counts (192, 154), dE within
+   1e-15 MeV of the reference harness (`harness_triples.json`). The production kernel takes
+   15.2 ms against the prototype K1's 9.0 ms at O16 emax 3 (18 threads; the per-tile gathers,
+   M10-Q41), the triples 0.32 against 0.43 ms; device tables 4.2 MB and 16.6 KB of scratch per
+   team replace the global gather tables (15 GB at emax 12). Open: M10-Q40..Q46.
 2. **IMSRG(3)-N7 terms**: implement the 3B part of the operator (chosen layout), all terms in
    the N7 preset, CommutatorOptions presets, and 3B cuts (E3max, dE3max, OccNat3Cut). Kets that
    fail dE3max or OccNat3Cut are **dropped when the 3B kets are enumerated** (owner, D34, M3-Q9):

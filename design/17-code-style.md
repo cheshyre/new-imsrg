@@ -113,7 +113,8 @@ unindented namespaces and access specifiers (clang-format Google base); project 
    the bitset-like `TermMask`) keep the STL spelling. Static member functions are not accessors,
    except `ThreeBodyChannels::channel_index` and the internal `DeviceBufferAccess::view`, which
    share the names of accessors. `.clang-tidy` holds the allowlist (199 names, collected from the 349 flagged method
-   names during the conversion); a new accessor name is added there.
+   names during the conversion; 224 after the M10 three-body pieces); a new accessor name is added
+   there.
 
 ## 4. Tooling (added by the conversion)
 
