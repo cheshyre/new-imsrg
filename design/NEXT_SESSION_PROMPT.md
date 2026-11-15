@@ -1,41 +1,41 @@
-# Prompt for the next unsupervised implementation session (run 2)
+# Prompt for the next unsupervised implementation session (run 3)
 
-The first unsupervised run (2026-11-11 23:41 → 2026-11-12 ~08:45 JST) merged M0–M9 (M8 in two
-parts, M8a config/CLI and M8 flow/pipeline) and M11 phase 1; see `design/reports/2026-11-12-overnight.md`.
-The owner then answered every open question and settled the next design decisions in two interviews
-(2026-11-13: D25–D29; 2026-11-15: D30–D42, report `design/reports/2026-11-15-owner-interview.md`).
-This prompt starts the second run. (The prompt of the first run is in the git history of this file.)
+The first run (2026-11-11/12) merged M0–M9 and M11 phase 1 (`design/reports/2026-11-12-overnight.md`).
+The second run (2026-11-15/16, `design/reports/2026-11-15-run2.md`) did the Google-style conversion
+(MS), the M8 follow-ups, IMSRG(3f2) (IT-10), the three-body layout decision (D43), production
+three-body storage with `Comm223` and perturbative triples (IT-8), M11 phase 2, and started
+IMSRG(3)-N7 (IT-9) and M12a. The owner interviews of 2026-11-13 (D25–D29), 2026-11-15 (D30–D42) and
+the one after run 2 (D44 and later; `design/reports/<date>-owner-interview.md`, written by that
+session) answered the open questions. This prompt starts the third run. (The prompts of runs 1 and 2
+are in the git history of this file.)
 
 **Owner pre-flight (once, before launching):**
 
-1. **Sync the main checkout** (QUESTIONS O1): the interview sessions advanced `develop` from worktrees
-   again, so the main checkout's files still show 68c8927. Check `git status` there: it should list
-   only staged reversals of the newer commits. With no local edits of your own:
-   `git -C /Users/cheshyre/Downloads/new-imsrg read-tree -m -u 68c8927 develop`
-   (a two-tree fast-forward of index and files that refuses if local edits conflict), or simply
-   `git -C /Users/cheshyre/Downloads/new-imsrg reset --hard` (HEAD is `develop`).
-2. Start the session (Opus) **in the main checkout on `develop`** (D31): merges then happen on
-   `develop` directly. Agent definitions load at startup from `.claude/agents/`.
-3. Settings (D31: no `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`; `"autoCompactWindow": 800000` for the
-   orchestrator). After step 1, in the main checkout: install the proposal as
-   `.claude/settings.local.json` (gitignored), without its `_comment` key, and rename the run-1 copy
-   `.claude/settings.json` (untracked, still setting `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=80`, which would
-   otherwise keep applying because settings files are merged) to `.claude/settings.json.bak`
-   (gitignored by `*.bak`):
-   `python3 -c "import json; d=json.load(open('design/claude-settings.proposed.json')); d.pop('_comment', None); json.dump(d, open('.claude/settings.local.json', 'w'), indent=2)"`
-   and `mv .claude/settings.json .claude/settings.json.bak`. Pick a permission mode that does not
-   stall in the app's permission-mode picker. **Launch right after a reset of your 5-hour usage
-   window** (run 1 stopped 01:30–02:30 and 04:15–07:30).
-4. Optional hard stop against pushing:
+1. **Sync the main checkout** (QUESTIONS O1, O3): runs 1 and 2 and the interviews advanced `develop`
+   from worktrees, so the main checkout's files may still show an old `develop`. Check `git status`
+   there: it should list only staged reversals of the newer commits. With no local edits of your own:
+   `git -C /Users/cheshyre/Downloads/new-imsrg reset --hard` (HEAD is `develop`), or
+   `git -C /Users/cheshyre/Downloads/new-imsrg read-tree -m -u <old develop hash> develop`.
+2. Regenerate the gitignored emax-4 dumps in that checkout: `tools/reference/gen_golden_generated.sh`
+   (patched harness by default; stale dumps make `Emax4TrelAndRp2` fail, M8-Q21).
+3. Start the session (Opus) **in the main checkout on `develop`** (D31); in run 2 the desktop app
+   opened a worktree instead (O3), which works with the staging procedure below but leaves the main
+   checkout stale. Agent definitions load at startup from `.claude/agents/`. Settings are as in run 2
+   (`.claude/settings.local.json` from `design/claude-settings.proposed.json` without `_comment`; no
+   `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`; `"autoCompactWindow": 800000` for the orchestrator). Pick a
+   permission mode that does not stall.
+4. **Launch right after a reset of your 5-hour usage window** (resets at 13:00, 18:00, 23:00, 04:00
+   JST; runs 1 and 2 each hit the limit two times).
+5. Optional: `git config blame.ignoreRevsFile .git-blame-ignore-revs`;
    `git -C /Users/cheshyre/Downloads/new-imsrg remote set-url --push origin DISABLED`.
 
 Then paste everything below the line.
 
 ---
 
-You are the **orchestrator** of the second unsupervised implementation run of the imsrg rewrite
-(~8–12 h, nobody answers questions until morning). Continue from the state left by the first run and
-the owner's interview of 2026-11-15, milestone by milestone, without breaking what works.
+You are the **orchestrator** of the third unsupervised implementation run of the imsrg rewrite
+(~8–12 h, nobody answers questions until morning). Continue from the state left by run 2 and the
+owner's interview after it, milestone by milestone, without breaking what works.
 
 ## The owner's instructions (verbatim, from the planning session)
 
@@ -56,23 +56,25 @@ https://google.github.io/styleguide/cppguide.html Use clang-format to implement 
 formatting things automatically. Use cpp-lint to lint the code as well (but do not blindly follow the
 linter)."
 
-The owner's binding decisions are in `design/00-requirements-and-decisions.md` §2–5 (D1–D42) and in
-the answers in `design/QUESTIONS.md`. The most important ones:
+The owner's binding decisions are in `design/00-requirements-and-decisions.md` §2–5 (D1–D43 and the
+rows of the interview after run 2) and in the answers in `design/QUESTIONS.md`. The most important:
 
-* Hardware targets: NVIDIA GPUs, AMD GPUs, CPU clusters → Kokkos (D2); baseline GCC ≥ 11, CUDA ≥ 12.2,
-  ROCm ≥ 6.2 (D30). GPU work starts only after M12 (D40).
+* Hardware targets: NVIDIA GPUs (H100/H200/GH200, A100), AMD GPUs (MI250X/MI300A), CPU clusters →
+  Kokkos (D2); baseline GCC ≥ 11, CUDA ≥ 12.2, ROCm ≥ 6.2 (D30). GPU work starts only after M12 (D40).
 * Order: core → 3N input + natural orbitals → **IMSRG(3)** (top-priority extension: N7, 3f2,
-  perturbative triples; the 3B layout is chosen by benchmark and the session decides itself, D23).
-  After IMSRG(3): tensor operators first (D39). Atomic systems and RPA/TDA are dropped.
-* **Code style: the Google C++ Style Guide** (D38, `design/17-code-style.md`); the conversion of the
-  existing code is the **first task of this run**, done alone before any other branch starts.
+  perturbative triples; layout A decided, D43). After IMSRG(3): tensor operators first (D39).
+  Atomic systems and RPA/TDA are dropped.
+* **Code style: the Google C++ Style Guide** (D38, `design/17-code-style.md`), converted in run 2.
 * **emax ≤ 6 in all tests and runs; IMSRG(3) only at emax 2 and 3.** Exception: occasional emax-8
   IMSRG(2) performance benchmarks against imsrg++, never in CI (D40).
 * Git is **local only**: feature branches → local `develop`. Never push, no PRs. Never touch `main`.
+* **Golden rule 10:** file searches stay inside the project directories (never `find /`, `find ~`,
+  `mdfind`, `grep -r` outside them): a whole-disk search by a helper made macOS ask the owner for
+  access to other apps' data. **Put this rule into every brief you write.**
 * Homebrew and pip (shared venv) installs are allowed. The old imsrg-devel is built **outside** the
-  repo (already done, see below; a patched second build is a task of this run).
+  repo (pristine and D35-patched builds exist).
 * Old-code bugs that change results: fix them, document them in `design/30-testing-and-validation.md`
-  §6, and validate the fixed path another way.
+  §6, and validate the fixed path another way. No compatibility switches (D35).
 * Tolerances: unit checks ~1e-10 relative; end to end 1e-4 MeV (HF, MBPT, perturbative triples) and
   1e-3 MeV (IMSRG(2)/(3) E0, valence-space elements). Always log the actual deviation (D19, D34).
 * `tools/ci.sh dev-openmp` stays under 5 minutes; longer tests get the `slow` label and run before
@@ -83,198 +85,209 @@ the answers in `design/QUESTIONS.md`. The most important ones:
 ## Where everything is
 
 * Repository: `/Users/cheshyre/Downloads/new-imsrg` (git), integration branch **`develop`**.
-  Preflight: `git branch --show-current` prints `develop`; `git merge-base --is-ancestor
-  feature/design-plan develop` succeeds; `git status --porcelain --untracked-files=no` prints nothing
-  (untracked ignored files such as the settings are fine); then `tools/ci.sh dev-openmp` prints
-  `CI PASS dev-openmp`. If any check fails, write `PREFLIGHT_FAILED.md` at the repo root with the
-  details and stop. If the `imsrg-*` agent types are unavailable, spawn `general-purpose` agents
-  with the matching `model` and paste the body of the corresponding `.claude/agents/*.md` into their
-  prompt.
+  Preflight: `git branch --show-current` prints `develop` (in a worktree: the staging branch is at
+  `develop`'s tip, QUESTIONS O3); `git merge-base --is-ancestor feature/design-plan develop`
+  succeeds; `git status --porcelain --untracked-files=no` prints nothing; `tools/ci.sh dev-openmp`
+  prints `CI PASS dev-openmp`. If any check fails, write `PREFLIGHT_FAILED.md` at the repo root and
+  stop. If the `imsrg-*` agent types are unavailable, spawn `general-purpose` agents with the
+  matching `model` and paste the body of the corresponding `.claude/agents/*.md` into their prompt.
 * Read first: `AGENTS.md`, `CLAUDE.md`, `design/README.md`, `design/STATUS.md` (current state, log
-  of every merge), `design/reports/2026-11-15-owner-interview.md`, `design/00-requirements-and-decisions.md`,
-  `design/40-roadmap.md`, `design/41-agent-workflow.md`. Leads read the other design docs and
-  `design/reference/*.md` as their milestone requires; the orchestrator delegates big reading.
-* Toolchain (installed): Homebrew cmake, ninja, ccache, Open MPI, libomp, clang-format 23.1.5, gsl,
-  boost, openblas; Apple clang 21; Kokkos 5.3.0 per backend in `~/.cache/imsrg-deps` (via
-  `tools/bootstrap_deps.sh`); shared venv `~/.cache/imsrg-deps/venv` (`.venv` symlink per checkout)
-  with cpplint 2.0.2. **clang-tidy is not installed** (`brew install llvm` provides it). A fresh
-  worktree needs only `tools/ci.sh dev-openmp` (~40 s submodule fetch on first use).
-* Reference: source `/Users/cheshyre/Downloads/new-imsrg/imsrg-devel` (read-only); build, harness
-  and old executable in `/Users/cheshyre/Downloads/new-imsrg-reference/` (`build/imsrg++`,
-  `harness-build/refharness`; rebuild with `tools/reference/build_imsrg_devel.sh` if missing).
-  Golden data: `tests/golden/` (README lists every file and command).
+  of every merge), the report of run 2 and the interview report after it,
+  `design/00-requirements-and-decisions.md`, `design/40-roadmap.md`, `design/41-agent-workflow.md`.
+  Leads read the other design docs and `design/reference/*.md` as their milestone requires; the
+  orchestrator delegates big reading.
+* Toolchain (installed): Homebrew cmake, ninja, ccache, Open MPI, libomp, clang-format 23.1.5, LLVM
+  (clang-tidy 23.1.5 at `/opt/homebrew/opt/llvm/bin/clang-tidy`, `tools/lint.sh`), gsl, boost,
+  openblas; Apple clang 21; Kokkos 5.3.0 per backend in `~/.cache/imsrg-deps`; shared venv
+  `~/.cache/imsrg-deps/venv` (`.venv` symlink per checkout) with cpplint 2.0.2. A fresh worktree
+  needs only `tools/ci.sh dev-openmp` (~40 s submodule fetch on first use).
+* Reference: source `/Users/cheshyre/Downloads/new-imsrg/imsrg-devel` (read-only); builds, harnesses
+  and plans in `/Users/cheshyre/Downloads/new-imsrg-reference/`: the **D35-patched** build
+  `build-d35/imsrg++` and `harness-build-d35/refharness` (default of every
+  `tools/reference/gen_golden_*.sh`), the pristine `build/`, `harness-build/`, and `plans/`
+  (implementation plans of run 2). Golden data: `tests/golden/` (README lists every file and command).
+  **After syncing, regenerate `build/golden-generated` with the patched harness** (`tools/reference/
+  gen_golden_generated.sh`) in every checkout and worktree that runs the emax-4 tests.
 * Test inputs (never copy them into the repo), in `/Users/cheshyre/Downloads/new-imsrg/`:
   * `VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz`: `file2e1max=14 file2e2max=28 file2lmax=14 hw=16`
   * `NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin`: `3bme_type=no2b file3e1max=6
-    file3e2max=12 file3e3max=18 hw=16`. It holds **only the cE contact term** and **stays the 3N test
-    input** (D33): E_HF(O16, emax 4) = −313.17 MeV is genuine and the full flow diverges, so IT-4/IT-5
-    compare HF plus the flow stopped at s = 10. A full N2LO file comes later from the owner. O16 at
-    emax 2 is a known, genuine IMSRG(2) instability (IT-8 uses He4 emax 2 and O16 emax 3).
+    file3e2max=12 file3e3max=18 hw=16`. It holds **only the cE contact term** and stays the 3N test
+    input (D33): E_HF(O16, emax 4) = −313.17 MeV is genuine and the full flow diverges, so IT-4/IT-5
+    compare HF plus the flow stopped at s = 10. O16 at emax 2 is a known, genuine IMSRG(2)
+    instability (IT-8 uses He4 emax 2 and O16 emax 3).
 
 ## State at hand-off (details: `design/STATUS.md`)
 
-* **Merged into `develop`:** M0 bootstrap; M1 reference build, refharness, golden data (incl.
-  IT-1..IT-10 goldens); M2 base/exec/comm/linalg/angmom; M3 basis; M4 operator (`imsrg::op`);
-  M5+M6 io/opslib/hf (HF matches imsrg++ to 2e-13, DIIS); M7 IMSRG(2) commutators (all scalar terms,
-  ≤ 1.5e-15 vs goldens, 1.1–1.2× imsrg++ time); M8a config + legacy CLI + `apps/imsrg`; M8 flow
-  (generators, BCH, Magnus with the imsrg++ step rule) + driver pipeline: IT-2, IT-3, IT-4, IT-6,
-  IT-7, IT-12 pass with identical step counts and |ΔE0| ≤ 3e-10 MeV; M9 mbpt; M11 phase 1 Python
-  bindings (Python ≥ 3.12, stable ABI). CI on `develop`: 851 unit, 34 integration, 3 MPI, 23 Python
-  tests; `tools/ci.sh dev-openmp` takes 139 s.
-* **Not started:** MS (style conversion), M10 (IMSRG(3)), M11 phase 2, M12a/M12b, M13, M14 (GPU).
-* **Owner decisions of 2026-11-15** (D30–D42; details in the report): the IMSRG(3f2) definition
-  (D32: hunter-gatherer, `omega_norm_max` 0.1, factorized correction with 1b intermediates on and
-  2b off; the IT-10 goldens must be regenerated); Tcm without the 1e-7 threshold and Rp2 without the
-  spin-orbit term, validated with goldens from a patched imsrg-devel build (D35); general
-  (non-Hermitian) fast-commutator paths and full-precision 1/√2 (D36); `hartree_fock.mixing` default
-  DIIS in TOML, TOML paths relative to the config file, `results.json` `schema_version` (D37);
-  Google style (D38); 3B cuts drop kets at enumeration, N7 production target emax 10–12 (D34);
-  M12 split into single-node performance (M12a) before MPI (M12b) (D40).
+* **Merged into `develop`:** M0–M9; M11 phases 1 and 2 (118 Python tests); MS (Google style);
+  hunter-gatherer Magnus; D35 (Tcm/Rp2/Rso, patched reference); flow-review fixes; D37 config/driver
+  tasks (DIIS default, config-relative paths, `schema_version`, EMP2, NAT basis, IT-5); ODE flow
+  methods (`flow_rk4`, `flow`; IT-14); general (non-Hermitian) fast commutator paths and
+  full-precision 1/√2 (D36); M10 3f2 (IT-10, 1b intermediates); M10 layout benchmark and decision
+  (D43, layout A, packed); M10 production three-body pieces (`ThreeBodySpace`, `SixJ3Table`,
+  `op::ThreeBody`, `PairThirdSpace`, `commutator::Comm223`, `PerturbativeTriplesEnergy`) and the
+  perturbative triples in the driver (IT-8, `results.json` schema 2).
+* **End to end:** `imsrg` reproduces imsrg-devel (D35-patched) for IT-1..IT-8, IT-10, IT-12, IT-14 and
+  the hunter-gatherer cases (identical step and gather counts, |ΔE0| ≤ 3e-10 MeV); numbers in the
+  run-2 report §3. CI on `develop`: (INSERT: final counts and time, from the end of run 2).
+* **IMSRG(3)-N7 (IT-9), `feature/m10-n7`:** (INSERT the N7 result: terms implemented, IT-9 deviations
+  and step counts, what remains, branch and merge state, new M10-Q ids).
+* **M12a single-node performance, `feature/m12a-perf`:** (INSERT the M12a result: what landed, the
+  benchmark table vs imsrg++ at emax 4/6/8, what remains, branch and merge state).
+* **Not started:** M12b (MPI), M13 (Makefile, docs), M14 (GPU), tensor operators (D39), IT-11, 3f2
+  2b intermediates (E-PLANNED, M10-Q20), NAT options (M9-Q3), checkpoint/restart.
+* **Open questions** with assumptions: `design/QUESTIONS.md`, "Added during run 2" and the answers
+  of the interview after run 2 (apply them first: read the interview report and the new D-rows).
 
 ## Plan for this run (in order; at most 3 leads at once)
 
-1. Preflight (above).
-2. **MS — Google style conversion** (one Opus lead with Haiku/Sonnet workers; brief below). It runs
-   **alone**: no other branch starts until it is merged, because it renames every file and most
-   functions. Merge when CI passes and the test results are bitwise identical.
-3. **M8 follow-ups and the interview tasks** (from `develop` after MS; one lead, or two or three
-   Sonnet implementers with an Opus review; `40-roadmap.md` M8 lists them):
-   a. Opus review of the flow numerics (first).
-   b. Hunter-gatherer Magnus (`imsrg.omega.hunter_gatherer`; imsrg++ `IMSRGSolver.cc:85-115`), a
-      prerequisite of 3f2.
-   c. Tcm without threshold, Rp2 without spin-orbit, `Rso` as the separate correction, charge radius
-      adds `Rso` (D35); a **patched imsrg-devel build** (patch file in `tools/reference/`, separate
-      build directory, `30` §3) and the e2e goldens containing T_int or Rp2 regenerated from it, so
-      the ITs keep ~1e-10 MeV and identical step counts. Golden policy D42.
-   d. Config and driver: `hartree_fock.mixing` (`diis` in TOML, linear in legacy); TOML paths relative
-      to the config file and absolute paths in `resolved_config.toml` (adapt `examples/config/` and
-      the TOML/legacy equivalence test); `results.json` `schema_version` with the schema table and a
-      changelog in `16` §2.10; MP2 column and EMP2; NAT basis and IT-5 in the driver; `Denominators`
-      copying H every step; flow-RK4/DP45.
-   e. General (non-Hermitian) paths in the fast IMSRG(2) commutator, tested against `commutator_ref`.
-   f. Full-precision 1/√2 (rename the 13-digit copy `imsrgpp_inv_sqrt2`, tests only).
-4. **M10 IMSRG(3)**, following `design/14-imsrg3-plan.md`, the top priority after step 3, in two
-   tracks:
-   * **3f2 track** (needs hunter-gatherer from 3b; brief below): config keys (D32), refharness flags
-     and the regenerated IT-10 goldens, the factorized double commutator in BCH, IT-10.
-   * **Layout track:** the layout benchmark (brief below) and the decision row in `00`, then the
-     brute-force m-scheme reference, perturbative triples (IT-8), IMSRG(3)-N7 (IT-9). imsrg++'s
-     IMSRG(3) bugs are fixed and validated against brute force (D34).
-5. In parallel with M10 when capacity allows (one lead or one Sonnet implementer each):
-   **M11 phase 2** (the `StaleHostError` state machine of `18` §2.2 first; then bind io, hf, mbpt,
-   commutators, flow, pipeline; users are pipelines and operator algebra, D41) and **M12a**
-   (single-node CPU performance: sparse Pandya maps and Workspace memory (M7-Q4), per-channel norm
-   reductions, `op::No2bThreeBody::get_pn` (M6-Q4); reach imsrg++ parity, then explore; occasional
-   emax-8 benchmarks against imsrg++, never in CI; results in `design/benchmarks/`). M12b, M13 and
-   M14 only if everything above is done.
-6. At the end: the definition of done below.
+1. Preflight (above); apply the interview answers that change code or goldens (small tasks, one
+   Sonnet implementer each, review per D42 where goldens change).
+2. **Finish and merge IMSRG(3)-N7 and IT-9** (brief below). Remaining terms, validation against
+   imsrg-devel where it is right and against the brute-force m-scheme reference where it is buggy
+   (D34), IT-9 at emax 2 (emax 3 under `slow`), `slow` run before the merge. This is the top
+   priority.
+3. **M12a continuation** (brief below): imsrg++ parity, then explore single-node limits; occasional
+   emax-8 benchmarks against imsrg++, never in CI.
+4. **M12b MPI** (brief below), after M12a's data structures settle: D14 phase 1 (IMSRG(2) by channel
+   blocks), phase 2 (3B blocks, Hagen–Nam evaluation, D40), IT-11. Starts when N7 has merged, because
+   phase 2 distributes N7's blocks.
+5. **Tensor operators** (D39: the first extension after IMSRG(3); tensor `OperatorSpec` exists, only
+   `ch_bra ≤ ch_ket` blocks stored, D25): design check against `13`/`15`, tensor commutators for the
+   IMSRG(2) terms, transformation of tensor observables (not number-conserving operators cannot flow
+   today, M8-Q40). Plan in `40-roadmap.md` M15+; write a brief when the time comes and keep it small.
+6. **M13** (Makefile, docs) and M14 (GPU) only if everything above is done; M11 follow-ups (generator
+   callbacks, stop flag, M11-Q13) and the cleanup items of the run-2 report §7 are filler tasks for
+   spare capacity.
+7. At the end: the definition of done below.
 
-## Lessons from the first run (follow them)
+## Lessons from runs 1 and 2 (follow them)
 
 * **The usage budget is the binding constraint**, not wall time. Keep at most 3 leads running and
   delegate to Sonnet/Haiku; well-specified milestones went well with a single Sonnet
-  `imsrg-implementer` (M9, M11 phase 1, the refharness flow subcommand). Leads delegate code and read
-  little themselves. The orchestrator reads only summaries and small files.
-* When agents stop on a usage limit, resume each with `SendMessage` after the reset (their
-  transcripts are kept); do not start new agents for the same work.
-* **Stacked branches via API-ready tags** shortened the critical path: a lead tags `m<k>-api-ready`
-  once its public API is stable and tested, and the next milestone branches from the tag (use a
-  background `until git rev-parse -q --verify refs/tags/<tag>` loop to get notified). The next lead
-  must later merge the predecessor's **final head**, not the tag (M7's comm121ss fix landed after
-  its tag). Tell leads when a predecessor lands in `develop`. (MS is the exception: nothing stacks on
-  it before it is merged.)
-* **Question ids:** leads use `M<k>-Q<n>` (`MS-Q<n>` for the style conversion), the orchestrator
-  `O<n>`, so parallel branches never collide in `QUESTIONS.md`; new questions go under "Added during
-  run 2".
-* **Merging:** in the main checkout, merge on `develop` directly: `git merge --no-ff --no-commit
-  feature/<x>`, add the `STATUS.md` log entry, commit, run `tools/ci.sh dev-openmp`, and revert at
-  once if it fails. If the app forces a worktree after all, use the staging procedure of QUESTIONS
-  O1 and chain the ref update to the CI exit status itself (`tools/ci.sh dev-openmp && git
-  update-ref refs/heads/develop <new> <old>`), never to a grep of its log: run 1 once advanced
-  `develop` after a failed CI that way.
+  `imsrg-implementer`. Leads delegate code and read little themselves. The orchestrator reads only
+  summaries and small files.
+* **Pace with `get_usage`:** check the usage windows (5-hour windows reset at 13:00, 18:00, 23:00,
+  04:00 JST) before starting a big task; a stopped Opus lead that resumes reloads its whole context,
+  so start long leads right after a reset and avoid launching new leads in the last minutes of a
+  window. When agents stop on a limit, resume each with `SendMessage` after the reset (transcripts
+  are kept); do not start new agents for the same work. Run 2 hit the limit at ~16:35 and ~21:15 and
+  used about 12 % of the weekly budget in 9 hours.
+* **Prepare outside the repository during exclusive tasks.** When one task has to run alone
+  (a rename, a regeneration of goldens), do the work that cannot conflict in a scratch tree: reference
+  builds and goldens, refharness flags, read-only Opus reviews, and implementation plans
+  (`new-imsrg-reference/plans/`); commit it afterwards. This shortened the critical path in run 2.
+* **Stacked branches via API-ready tags** shortened run 1's critical path: a lead tags
+  `m<k>-api-ready` once its public API is stable and tested, and the next milestone branches from the
+  tag. The next lead must later merge the predecessor's **final head**, not the tag.
+* **Question ids:** every brief carries the id prefix (`M<k>-Q<n>`, `M12a-Q<n>`, `M12b-Q<n>`, ...) and
+  a **block of numbers** for the lead (e.g. `M10-Q50..Q59`), the orchestrator uses `O<n>`; new
+  questions go under "Added during run 3". Parallel branches then never collide in `QUESTIONS.md`.
+* **Every brief carries the current `develop` hash** (and the hash of its own base branch if
+  stacked), the golden rule 10 text, the emax rule, the usage/deadline wording, and the acceptance
+  command.
+* **Merging:** in the main checkout, `git merge --no-ff --no-commit feature/<x>`, add the `STATUS.md`
+  log entry, commit, run `tools/ci.sh dev-openmp`, and revert at once if it fails. In a worktree
+  (staging procedure of O1/O3) **chain the slow tests and the ref update to the exit codes
+  themselves**: `tools/ci.sh dev-openmp && ctest --preset dev-openmp -L slow && git update-ref
+  refs/heads/develop <new> <old>` for numerics merges (`tools/ci.sh dev-openmp && git update-ref ...`
+  otherwise), never to a grep of the log (run 1 advanced `develop` after a failed CI that way).
+* **Reviews:** one `imsrg-reviewer` (Opus) pass on every numerics or kernel merge (D42). In run 2
+  the Opus reviews found real issues (host-only scratch counts breaking CUDA, scratch accounting,
+  exception safety) and were cheap relative to their value.
+* **Debug crashes under lldb**, not by guessing: a segfault in the Python exit hook (a solver
+  constructor that threw left a dangling registry entry) popped macOS "Python quit unexpectedly"
+  dialogs for the owner. Agents run crashing tests under `lldb -b -o run -o bt` and keep Python
+  development crashes out of the owner's session (run pytest in a subprocess with a timeout).
+* **Reference goldens:** after any change to `tools/reference` or the patch, rebuild
+  `harness-build-d35` from the merged tree and regenerate `build/golden-generated` (patched harness)
+  in every checkout; the unit tests `Emax4TrelAndRp2` etc. fail on stale dumps.
 * **Phrase deadlines unambiguously** ("keep working; your final report is due by 09:30"): one lead
   read "report by 09:00" as "stop now".
 * After an agent's work is merged, stop it (`TaskStop`) if it is still waiting on background work,
   and check the shared venv for editable installs (`~/.cache/imsrg-deps/venv/bin/pip list | grep
   imsrg`); remove them, because they shadow in-tree builds in other worktrees.
-* Tests must not share fixed file names in the system temp directory: ctest runs every test in
-  its own process in parallel (run 1 hit such a race in the io tests). Use per-process names (the
-  pattern in `tests/unit/driver/integration/run_support.hpp`) or, better, a shared helper; the
-  remaining fixed names are listed in the `STATUS.md` log entry of 2026-11-12 08:55.
-* Reading inputs is fast (me2j emax-4 prefix 3.6 ms, whole file 9 s; NO2B 0.05 s at emax 4): no
-  caches are needed.
+* Tests must not share fixed file names in the system temp directory (ctest runs tests in parallel
+  processes): use `tests/support/scratch_dir.h`.
+* Reading inputs is fast (me2j emax-4 prefix 3.6 ms, whole file 9 s): no caches are needed.
 
-## Brief for MS — the Google style conversion (ready to use; adjust the develop hash)
+## Brief for the IMSRG(3)-N7 continuation (ready to use; adjust the hashes and the pending parts)
 
-> You lead **MS — the conversion of the imsrg rewrite to the Google C++ Style Guide** (owner
-> decision D38: "Follow the Google style guide ... Use clang-format ... Use cpp-lint ... but do not
-> blindly follow the linter"). Usage budget is tight: delegate the mechanical steps to Haiku/Sonnet
-> workers and review their diffs; one `imsrg-reviewer` pass at the end. Never block; questions go to
-> `design/QUESTIONS.md` as `MS-Q<n>`. Branch `feature/style-google` from `develop`. Read
-> `AGENTS.md`, `design/17-code-style.md` (all; §5 is your plan, §2 the measured scale, §3 the
-> exceptions, §4 the tool configuration), `10-architecture.md` §1–2 and `20-build-and-tooling.md`
-> §2–4. Tools: clang-format 23.1.5 (installed), cpplint 2.0.2 (`~/.cache/imsrg-deps/venv/bin/cpplint`),
-> clang-tidy (`brew install llvm`; use `compile_commands.json` from the dev-openmp build). Before step
-> 1, record the IT `results.json` numbers and the test counts; after **every** step: build,
-> `tools/ci.sh dev-openmp` PASS, and identical numbers. One commit per step of `17` §5, each with a
-> body explaining the step. Never touch `tools/reference/`, `extern/` or `tests/golden/`. Python names
-> must not change (the bindings name every function explicitly). Exceptions stay: C++ exceptions,
-> `<filesystem>` outside kernels, Kokkos `[=]` device lambdas. Finally update `AGENTS.md` (code
-> conventions), `10` §1, `20` and the status line of `17`. Acceptance: `17` §5. Report ≤ 250 words
-> with before/after counts (cpplint findings, files, renamed names) and every rule you could not apply.
+> You lead **M10 step 3 — IMSRG(3)-N7** on branch `feature/m10-n7` (`develop` = <HASH>; the previous
+> lead's state: (INSERT: the N7 result of run 2: branch head, terms done, tests, open findings)).
+> Question ids `M10-Q<block>`. **Golden rule 10:** searches stay inside the repository, its
+> worktrees, `/Users/cheshyre/Downloads/new-imsrg-reference/`, `~/.cache/imsrg-deps/` and temp
+> directories; never `find /`, `find ~`, `mdfind`. emax ≤ 6 everywhere, IMSRG(3) only at emax 2 and 3.
+> Usage is tight: delegate code to Sonnet workers, one Opus review of the kernels. Final report due
+> by <TIME> (keep working until then). Read `AGENTS.md`, `design/14-imsrg3-plan.md` §1, §4 item 2 and
+> §5, `00` (D12, D34, D36, D43), `12` §3–§5, `reference/02-commutators.md` (the IMSRG(3) terms),
+> `benchmarks/imsrg3-layout.md`, QUESTIONS M10-Q40..Q46, `commutator/three_body.h`, `op::ThreeBody`
+> and `op::PairThirdSpace` headers, imsrg-devel `IMSRG3Commutators.cc`. Goal: all terms of the
+> N7 preset on `op::ThreeBody` (layout A, packed): the remaining three-body commutator terms beyond
+> [2,2]→3 (231/232/331/132-type, [2,3]→3, [3,3]→2, 1B/2B outputs: take the list from `14` §1 and
+> imsrg++'s N7 preset), `CommutatorOptions` presets, Magnus flow with three-body H and Omega (BCH
+> with 3B operands, general operands per D36), the driver and `[imsrg3]` config keys
+> (`method = n7`, E3max/dE3max/OccNat3Cut), `results.json` entries. Validation: term by term against
+> imsrg-devel on random operators at emax 2 (1e-10 relative); where imsrg-devel is buggy (`14` §1)
+> fix the bug and validate against the **brute-force m-scheme reference** (`commutator_ref`
+> three-body, tests only; D34; a bug entry in `30` §6 for each); IT-9 end to end (E0 within 1e-3 MeV,
+> identical step counts where the reference is right; emax 2 in CI, emax 3 under `slow`; golden
+> values in `tests/golden/`: N7 E0 −145.489827 (emax 2), −158.254073 (emax 3), O16, imsrg++ as
+> committed; regenerate through scripts only, D42). Known open items from run 2: `Comm223` kernel calls
+> Kokkos directly (M10-Q44: add `exec::TeamFor`/`TeamReduce` options when the next team kernels
+> arrive), per-tile gather cost (M10-Q41), the early return of imsrg++ comm223ss (M10-Q43, answer in
+> the interview), Omega combination order for split stacks (M10-Q40, answer in the interview).
+> Acceptance: IT-9 within tolerance, every term tested, `tools/ci.sh dev-openmp` PASS and `ctest -L
+> slow` PASS. Report ≤ 250 words (deviations, step counts, timings per term).
 
-## Brief for the M10 layout benchmark (ready to use; adjust the develop hash)
+## Brief for the M12a continuation (ready to use; adjust the hashes and the pending parts)
 
-> You lead **M10 step 1 — the IMSRG(3) three-body storage layout benchmark and the layout
-> decision**. The owner told the session to decide itself and continue (D23). Usage budget is
-> tight: delegate to Sonnet/Haiku workers, one `imsrg-reviewer` pass (opus) at most. Never block;
-> questions go to `design/QUESTIONS.md` as `M10-Q<n>`. Problem sizes: emax 2 and 3 only, but judge
-> memory and scaling against the owner's production target, **IMSRG(3)-N7 at emax 10–12** on several
-> nodes (D34). Kets failing dE3max/OccNat3Cut are dropped at enumeration (D34). IMSRG(3f2) is a
-> separate track, not part of this brief. Branch `feature/m10-layout-benchmark` from `develop` (after
-> MS; the old empty branch of that name can be reset); prototypes in `tools/bench/imsrg3_layout/`
-> (a benchmark target outside `ci.sh`'s unit label); production modules only get small additive
-> accessors (separate commits). Read `AGENTS.md`, `design/STATUS.md`, `design/14-imsrg3-plan.md`
-> (all), `00` (D12 3B norm, D15, D23, D34), `12` §3–§5, `reference/02-commutators.md` §1, §4, §8,
-> `reference/01-core-data-model.md` (3B storage), the `basis` ThreeBodyChannels header.
-> Priorities: (1) the `ThreeBodyLayout` interface and layouts A (canonical a ≤ b ≤ c × Jab),
-> B (orthonormal antisymmetric basis per channel), C (partially antisymmetric |(ab)Jab c⟩), with
-> memory and metadata build time at emax 2/3 and an extrapolation to emax 10–12; (2) the [2,2]→3
-> kernel (`comm223`-type, the hotspot) in each layout, cross-layout agreement to 1e-10 on random 2B
-> inputs, release timings with 18 OpenMP threads; (3) the perturbative-triples energy per layout,
-> then [2,3]→3 and [3,3]→2 if time remains; (4) decide: best speed at acceptable memory, written up in
-> `design/benchmarks/imsrg3-layout.md`, a decision row in `00`, next steps in `14`.
-> Acceptance: report and decision committed; prototypes build; numbers are real measurements;
-> `tools/ci.sh dev-openmp` PASS. Report ≤ 250 words.
+> You lead **M12a — single-node CPU performance** on `feature/m12a-perf` (`develop` = <HASH>; state of
+> the previous lead: (INSERT: the M12a result of run 2: what landed, the benchmark table, what is
+> left)). Question ids `M12a-Q<block>`. **Golden rule 10 applies** (searches only inside the project
+> directories). Delegate to Sonnet workers; one Opus review per kernel merge. Goal (D40): imsrg++
+> parity first, then explore how far one node goes, judged mainly at larger emax. Known follow-ups:
+> sparse Pandya maps and smaller `Workspace` (M7-Q4, the Workspace is ≈ 10× a 2B operator),
+> per-channel norm reductions, `op::No2bThreeBody::get_pn` linear scan and CG recomputation (M6-Q4),
+> the `Denominators` copy of H (F2b), the general commutator paths' cost (M7-Q10: ≈ 2× ladder and 4×
+> ph flops, only when flagged NonHermitian), `Comm223` gathers (M10-Q41/Q42: per-tile transposed 6j
+> slices, a ket cache). Today: the full IMSRG(2) commutator is 1.10–1.20× the imsrg++ time at emax
+> 4/6 (5.7 vs 5.2 ms at emax 4, 1 thread; 80 vs 67 ms at emax 6); (INSERT: updated numbers).
+> Benchmarks: `tools/bench`, `refharness bench-commutator`, results in
+> `design/benchmarks/imsrg2-commutators.md` (emax 4, 6, and **occasional emax-8** runs against
+> imsrg++, never in CI: the one exception to the emax rule, D40). Acceptance: no regression in any
+> golden test (bitwise where the arithmetic is unchanged); benchmark table with before/after and
+> imsrg++; `tools/ci.sh dev-openmp` PASS. Report ≤ 250 words.
 
-## Brief for the M10 3f2 track (ready to use once hunter-gatherer is merged)
+## Brief for M12b — MPI (ready to use once M12a's data structures have settled)
 
-> You lead **M10 track 3f2 — IMSRG(3f2)**, the owner's factorized approximation (D32): plain IMSRG(2)
-> plus hunter-gatherer Magnus, `omega_norm_max` 0.1, and the factorized double-commutator correction
-> in BCH with 1b intermediates on and 2b intermediates off (pyIMSRG: `SetHunterGatherer(True)`,
-> `SetOmegaNormMax(0.1)`, `BCH.SetUseFactorizedCorrection(True)`,
-> `FactorizedDoubleCommutator.SetUse_1b_Intermediates(True)`, `SetUse_2b_Intermediates(False)`).
-> Delegate to Sonnet workers; one Opus review of the kernels. Questions as `M10-Q<n>`. Branch
-> `feature/m10-3f2` from `develop`. Read `14` §1 and §4 item 3, `13` §6–7, `16` §2.8,
-> `reference/02-commutators.md` (factorized terms), imsrg++ `Commutator/FactorizedDoubleCommutator.cc`
-> and `BCH.cc:182-191`, `tools/reference/rh_flow.cpp`. Steps: (1) refharness `flow` flags for
-> hunter-gatherer, `omega_norm_max` and the 1b/2b intermediates; regenerate the IT-10 goldens with
-> the recipe (golden policy D42; old vs new numbers in the commit); (2) `BchOptions::factorized` with
-> both intermediate switches, term tests against imsrg-devel (its `UnitTestFactorized` cases) at
-> 1e-10; (3) config keys `factorized_1b_intermediates`/`factorized_2b_intermediates` and the recipe
-> defaults of `[imsrg3] factorized = true` (resolved config writes them out); (4) IT-10 at emax 2
-> (emax 3 under `slow`). Acceptance: IT-10 E0 within 1e-3 MeV (log the deviation and step counts);
-> `tools/ci.sh dev-openmp` PASS. Report ≤ 250 words.
+> You lead **M12b — MPI distribution** on `feature/m12b-mpi` (`develop` = <HASH>). Question ids
+> `M12b-Q<block>`. **Golden rule 10 applies.** Read `AGENTS.md`, `14-imsrg3-plan.md` §4 item 4, `00`
+> (D14, D34, D40, D43), `12`, `comm` module headers (Communicator, serial stub), the `Workspace`
+> and ownership notes of M7. Phase 1 (D14): 1B/2B operator parts replicated; the expensive IMSRG(2)
+> commutator terms split by channel blocks across ranks through an `OwnershipMap`; results combined
+> with `Allreduce`; builds without MPI keep working (serial stub). Phase 2: 3B blocks distributed by
+> 3B channel (D43 layout A, packed blocks) with an ownership map; **evaluate** (as measurement, with
+> a cost model and a small implementation) the row-wise, cost-balanced block distribution of Hagen
+> and Nam (Prog. Theor. Phys. Suppl. 196, 102 (2012), arXiv:1203.3765) against distribution by whole
+> channels, which is likely unbalanced; record the numbers in `design/benchmarks/` and decide in a
+> `00` row. Targets: NVIDIA H100/H200/GH200, A100; AMD MI250X/MI300A; CPU clusters; N7 at emax 10–12
+> on several nodes (D34), so distribution decisions are judged at those sizes by counting, not by
+> running (emax rule). Tests: `mpirun -n 2/4` unit and integration tests under the `mpi` label;
+> **IT-11**: MPI result identical to the serial result within 1e-12 relative for IMSRG(2) and N7 at
+> emax 2/3 (reduction order may differ at round-off). Single-node speed may fall back to imsrg++
+> level once scaled (D40). Acceptance: IT-11, scaling measurements (ranks 1, 2, 4 on the dev machine),
+> `tools/ci.sh dev-openmp` PASS, the 3 existing MPI tests still PASS. Report ≤ 250 words.
 
 ## Definition of done for the run
 
 At the end of the run (or when the budget runs low; write a draft report early as insurance):
-* all finished work is merged into `develop`, and `tools/ci.sh dev-openmp` passes on `develop`;
+* all finished work is merged into `develop`, and `tools/ci.sh dev-openmp` passes on `develop`
+  (and `ctest -L slow` for numerics merges);
 * unfinished work sits on clearly named branches, with its state described in `STATUS.md`;
 * `design/STATUS.md` has an up-to-date "Current state" and a log entry for every merge;
 * `design/QUESTIONS.md` holds every open question, with your assumptions;
-* a report `design/reports/<date>-run2.md` summarizes milestones completed, test and validation
-  status (with the comparison numbers against imsrg-devel), performance numbers, deviations from
-  the design, open questions, and the recommended next steps;
+* a report `design/reports/<date>-run3.md` in the format of the run-1 and run-2 reports (summary,
+  owner actions, validation table with actual deviations vs imsrg-devel, performance, old-code bugs
+  fixed, deviations from the plan, what is left and recommended next steps);
 * `design/NEXT_SESSION_PROMPT.md` is updated for the run after this one, and the agenda of
   `design/INTERVIEW_PROMPT.md` is refreshed for the owner interview that follows this run (D42).
