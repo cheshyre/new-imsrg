@@ -233,7 +233,7 @@ Group MakeGroup(std::mt19937_64& rng, int count) {
     g.ob.push_back(ob);
   }
   g.C0 = g.C;
-  for (int p = 0; p < count; ++p) {
+  for (std::size_t p = 0; p < g.C.size(); ++p) {
     g.ps.push_back({g.alpha[p], g.A[p].const_view(), g.oa[p],
                     g.B[p].const_view(), g.ob[p], g.beta[p], g.C[p].view()});
   }
