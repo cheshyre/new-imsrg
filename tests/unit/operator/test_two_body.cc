@@ -17,9 +17,10 @@ namespace imsrg::op {
 namespace {
 
 std::shared_ptr<const basis::ModelSpace> Ms2() {
-  static const auto kMs = basis::ModelSpace::FromNames(
-      basis::BasisTruncation{.emax = 2}, 16.0, "O16", "O16");
-  return kMs;
+  static const auto* const kMs =
+      new std::shared_ptr<const basis::ModelSpace>(basis::ModelSpace::FromNames(
+          basis::BasisTruncation{.emax = 2}, 16.0, "O16", "O16"));
+  return *kMs;
 }
 
 /// Orbit |n l 2j tz2> of the shared model space.

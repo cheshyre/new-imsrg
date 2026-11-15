@@ -217,7 +217,7 @@ class Reader {
       TypeError(path, v, "an array of tables");
       return false;
     }
-    static const std::vector<std::string> kKeys = {
+    static const auto* const kKeys = new std::vector<std::string>{
         "name",          "rank",    "dtz",     "parity",
         "particle_rank", "file_2b", "file_3b", "format"};
     std::vector<OperatorFromFile> result;
@@ -257,7 +257,7 @@ class Reader {
         } else {
           issues_.push_back(MakeError("E-KEY-UNKNOWN", ep,
                                       "unknown key '" + key + "' in " + base,
-                                      val.where, DidYouMean(key, kKeys)));
+                                      val.where, DidYouMean(key, *kKeys)));
           r = false;
         }
         ok = ok && r;

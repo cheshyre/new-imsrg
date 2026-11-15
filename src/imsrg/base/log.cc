@@ -60,8 +60,10 @@ void Logger::Write(Level lvl, std::string_view message) {
 }
 
 Logger& DefaultLogger() {
-  static Logger logger(Level::kInfo);
-  return logger;
+  // Leaked on purpose: static objects must be trivially destructible, and
+  // messages may still be logged while other statics are destroyed.
+  static Logger* const kLogger = new Logger(Level::kInfo);
+  return *kLogger;
 }
 
 }  // namespace imsrg::log

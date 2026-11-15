@@ -42,7 +42,7 @@ struct NamedTerm {
 };
 
 const std::vector<NamedTerm>& AllTerms() {
-  static const std::vector<NamedTerm> kT = {
+  static const auto* const kT = new std::vector<NamedTerm>{
       {"comm110ss", commutator::terms::Comm110ss, commutator_ref::Comm110ss},
       {"comm220ss", commutator::terms::Comm220ss, commutator_ref::Comm220ss},
       {"comm111ss", commutator::terms::Comm111ss, commutator_ref::Comm111ss},
@@ -56,7 +56,7 @@ const std::vector<NamedTerm>& AllTerms() {
       {"comm222_pp_hh_221ss", commutator::terms::Comm222PpHh221ss,
        commutator_ref::Comm222PpHh221ss},
   };
-  return kT;
+  return *kT;
 }
 
 // The same operator with particle rank 2 and a zero two-body part (x1 has rank

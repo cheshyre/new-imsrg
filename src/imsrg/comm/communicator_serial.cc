@@ -16,8 +16,9 @@ namespace imsrg::comm {
 struct Communicator::Impl {};
 
 Communicator Communicator::Serial() {
-  static const auto kImpl = std::make_shared<const Impl>();
-  return Communicator(kImpl);
+  static const auto* const kImpl =
+      new std::shared_ptr<const Impl>(std::make_shared<const Impl>());
+  return Communicator(*kImpl);
 }
 
 Communicator Communicator::World() { return Serial(); }

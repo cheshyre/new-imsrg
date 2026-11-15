@@ -109,17 +109,18 @@ std::vector<T> GatherAll(const Communicator::Impl& impl, T x) {
 }  // namespace
 
 Communicator Communicator::Serial() {
-  static const std::shared_ptr<const Impl> kImpl = [] {
+  static const auto* const kImpl = new std::shared_ptr<const Impl>([] {
     auto p = std::make_shared<Impl>();
     p->serial = true;
     return p;
-  }();
-  return Communicator(kImpl);
+  }());
+  return Communicator(*kImpl);
 }
 
 Communicator Communicator::World() {
-  static const std::shared_ptr<const Impl> kImpl = Wrap(MPI_COMM_WORLD, false);
-  return Communicator(kImpl);
+  static const auto* const kImpl =
+      new std::shared_ptr<const Impl>(Wrap(MPI_COMM_WORLD, false));
+  return Communicator(*kImpl);
 }
 
 int Communicator::rank() const noexcept { return impl_->rank; }

@@ -44,11 +44,11 @@ std::string Slurp(const fs::path& p) {
 // Every norms object written by the harness (`norms_json`) has the same five
 // fields in the same order, so a regex over the flat JSON text is enough.
 std::map<std::string, GoldenNorms> ParseNorms(const std::string& text) {
-  static const std::regex kRe(
+  static const auto* const kRe = new std::regex(
       R"re("([A-Za-z0-9_]+)":\s*\{\s*"zero_body":\s*([^,\s]+),\s*"one_body_norm":\s*([^,\s]+),)re"
       R"re(\s*"two_body_norm":\s*([^,\s]+),\s*"three_body_norm":\s*([^,\s]+),\s*"norm":\s*([^,\s}]+))re");
   std::map<std::string, GoldenNorms> out;
-  for (std::sregex_iterator it(text.begin(), text.end(), kRe), end; it != end;
+  for (std::sregex_iterator it(text.begin(), text.end(), *kRe), end; it != end;
        ++it) {
     const auto& m = *it;
     out[m[1].str()] = {std::stod(m[2].str()), std::stod(m[3].str()),

@@ -20,7 +20,7 @@ namespace c = imsrg::constants;
 // Reference name -> our value, for the constants written as a plain numeric
 // literal.
 const std::map<std::string, double>& LiteralTable() {
-  static const std::map<std::string, double> kT = {
+  static const auto* const kT = new std::map<std::string, double>{
       {"HBARC", c::kHbarc},
       {"M_PROTON", c::kMProton},
       {"M_NEUTRON", c::kMNeutron},
@@ -43,7 +43,7 @@ const std::map<std::string, double>& LiteralTable() {
       {"PI", c::kPi},
       {"SQRTPI", c::kSqrtPi},
   };
-  return kT;
+  return *kT;
 }
 
 TEST(Constants, EqualReferenceLiterals) {

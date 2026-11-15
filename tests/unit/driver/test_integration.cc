@@ -69,8 +69,8 @@ const RunResult* SharedIt2Run() {
     const auto dir = FreshDir("it2_toml");
     driver::ConfigSources src;
     src.config_text = TomlText(dir, "O16", "[operators]\nlist = [\"Rp2\"]\n");
-    static RunResult result = Execute(src, dir);
-    return &result;
+    static const RunResult* const kResult = new RunResult(Execute(src, dir));
+    return kResult;
   }();
   return cached;
 }

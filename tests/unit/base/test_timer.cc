@@ -14,8 +14,8 @@ namespace imsrg {
 namespace {
 
 std::vector<std::string>& Events() {
-  static std::vector<std::string> e;
-  return e;
+  static auto* const kEvents = new std::vector<std::string>();
+  return *kEvents;
 }
 void PushHook(const char* name) {
   Events().push_back(std::string("push:") + name);

@@ -110,8 +110,8 @@ std::string IssuesText(const ConfigIssues& issues) {
 }
 
 const std::vector<Example>& Examples() {
-  static const std::vector<Example> kEx = ExtractExamples();
-  return kEx;
+  static const auto* const kEx = new std::vector<Example>(ExtractExamples());
+  return *kEx;
 }
 
 /// Loads `sources` and requires success without warnings.

@@ -59,8 +59,8 @@ struct SchemaLists {
 };
 
 const SchemaLists& Lists() {
-  static const SchemaLists kInstance;
-  return kInstance;
+  static const auto* const kInstance = new SchemaLists();
+  return *kInstance;
 }
 
 }  // namespace

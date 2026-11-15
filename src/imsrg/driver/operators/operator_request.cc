@@ -250,15 +250,15 @@ void AddNotSupportedRows(std::vector<OperatorCatalogEntry>& v) {
 }
 
 const std::vector<OperatorCatalogEntry>& CatalogRows() {
-  static const std::vector<OperatorCatalogEntry> kRows = [] {
+  static const auto* const kRows = new std::vector<OperatorCatalogEntry>([] {
     std::vector<OperatorCatalogEntry> v;
     v.reserve(160);
     AddP1Rows(v);
     AddPlannedRows(v);
     AddNotSupportedRows(v);
     return v;
-  }();
-  return kRows;
+  }());
+  return *kRows;
 }
 
 // -----------------------------------------------------------------------------
