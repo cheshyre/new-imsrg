@@ -1,9 +1,9 @@
 {
   "job": "IT-5",
-  "reference_version": "imsrg-devel src-sha256:ddcbf1aff166414e746113d5f3de2ddc1e72783fb7c201829cd58e317717f40f",
-  "command": "/Users/cheshyre/Downloads/new-imsrg-reference/build/imsrg++ 2bme=/Users/cheshyre/Downloads/new-imsrg/VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz file2e1max=14 file2e2max=28 file2lmax=14 hw=16 emax=4 reference=O16 valence_space=O16 basis=NAT method=magnus 3bme=/Users/cheshyre/Downloads/new-imsrg/NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin 3bme_type=no2b file3e1max=6 file3e2max=12 file3e3max=18 flowfile=/Users/cheshyre/Downloads/new-imsrg-reference/runs/e2e/IT-5/flow.dat intfile=/Users/cheshyre/Downloads/new-imsrg-reference/runs/e2e/IT-5/int",
+  "reference_version": "imsrg-devel src-sha256:ddcbf1aff166414e746113d5f3de2ddc1e72783fb7c201829cd58e317717f40f+d35-patch:cb9d11ba30f579d4",
+  "command": "/Users/cheshyre/Downloads/new-imsrg-reference/build-d35/imsrg++ 2bme=/Users/cheshyre/Downloads/new-imsrg/VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz file2e1max=14 file2e2max=28 file2lmax=14 hw=16 emax=4 reference=O16 valence_space=O16 basis=NAT method=magnus 3bme=/Users/cheshyre/Downloads/new-imsrg/NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin 3bme_type=no2b file3e1max=6 file3e2max=12 file3e3max=18 flowfile=/Users/cheshyre/Downloads/new-imsrg-reference/runs-d35/e2e/IT-5/flow.dat intfile=/Users/cheshyre/Downloads/new-imsrg-reference/runs-d35/e2e/IT-5/int",
   "omp_threads": 8,
-  "wall_time_s": 5.693,
+  "wall_time_s": 5.602,
   "exit_code": 0,
   "timed_out": false,
   "completed": true,
@@ -23,8 +23,8 @@
     "file3e1max": "6",
     "file3e2max": "12",
     "file3e3max": "18",
-    "flowfile": "/Users/cheshyre/Downloads/new-imsrg-reference/runs/e2e/IT-5/flow.dat",
-    "intfile": "/Users/cheshyre/Downloads/new-imsrg-reference/runs/e2e/IT-5/int"
+    "flowfile": "/Users/cheshyre/Downloads/new-imsrg-reference/runs-d35/e2e/IT-5/flow.dat",
+    "intfile": "/Users/cheshyre/Downloads/new-imsrg-reference/runs-d35/e2e/IT-5/int"
   },
   "hf": {
     "e1hf": 469.8128554,
@@ -435,8 +435,8 @@
     "last": {
       "istep": 437,
       "s": 38.85789,
-      "E0": -1045345935.9201839,
-      "norm_H": 3421508938.529967,
+      "E0": -1045345935.9201727,
+      "norm_H": 3421508938.529929,
       "estim_err": 0.0,
       "norm_Omega1": 6.68e-06,
       "norm_Omega2": 0.299999813,
@@ -445,15 +445,15 @@
       "norm_Eta2": 6.249623103,
       "norm_Eta3": 0.0,
       "Ncomm": 2920,
-      "E_MP2": -1330269933.0465717
+      "E_MP2": -1330269933.0465577
     },
-    "last_raw": "437 38.85789 -1045345935.920183897 3421508938.529966831 0.000000000 0.000006680 0.299999813 0.000000000 0.000133535 6.249623103 0.000000000 2920 -1330269933.046571732",
+    "last_raw": "437 38.85789 -1045345935.920172691 3421508938.529929161 0.000000000 0.000006680 0.299999813 0.000000000 0.000133535 6.249623103 0.000000000 2920 -1330269933.046557665",
     "final_s": 38.85789,
-    "final_E0": -1045345935.9201839,
-    "final_E0_str": "-1045345935.920183897",
+    "final_E0": -1045345935.9201727,
+    "final_E0_str": "-1045345935.920172691",
     "final_norm_Eta1": 0.000133535,
     "final_norm_Eta2": 6.249623103,
-    "final_E_MP2": -1330269933.0465717
+    "final_E_MP2": -1330269933.0465577
   },
   "stdout_warning_lines": [],
   "stderr_lines": []
