@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Slow: consumes the whole emax-14 file (168066656 values) and checks the format's value count.
 #include <filesystem>
 #include <iostream>

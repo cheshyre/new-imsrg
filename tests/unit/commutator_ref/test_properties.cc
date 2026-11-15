@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Algebraic property tests of the reference commutator on random operators (design/30 section 2):
 // antisymmetry, linearity, element-wise hermiticity, the Jacobi identity for one-body operators
 // and consistency for non-Hermitian operands.

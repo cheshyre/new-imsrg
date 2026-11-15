@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Ladder (pp/hh) terms: comm222_pp_hhss, comm221ss and their fusion (design/12 section 4.1).
 // Kernel TU (see simple_terms.cc). Both terms are built from the same per-channel intermediates
 //   Mpp = X P_pp Y - Y P_pp X,   Mhh = X P_hh Y - Y P_hh X

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Writers of valence-space interaction files: KSHELL/tokyo (.snt) and NuShellX (.int, .sp).
 #ifndef IMSRG_IO_VALENCE_WRITERS_H_
 #define IMSRG_IO_VALENCE_WRITERS_H_

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Tests of the Talmi-Moshinsky bracket and Talmi coefficient/integral against exact values,
 // imsrg++ samples, orthogonality and Talmi sum rules.
 #include "imsrg/angmom/moshinsky.h"

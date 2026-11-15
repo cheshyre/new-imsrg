@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 #include "imsrg/operator/operator_dump.h"
 
 #include <algorithm>

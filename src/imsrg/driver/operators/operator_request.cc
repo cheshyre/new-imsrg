@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Operator catalog and the table-driven operator-name grammar (design/16 section 4).
 #include "imsrg/driver/operators/operator_request.h"
 

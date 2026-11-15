@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // The simple terms (110, 220, 111, 121, 122) of the fast commutator: golden acceptance,
 // term-by-term comparison with commutator_ref on random operators, and the NonHermitian guard.
 #include <cstdio>

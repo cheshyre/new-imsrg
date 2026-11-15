@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 /// @file
 /// Semantics of the serial communicator (valid in builds with and without MPI).
 

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Golden acceptance of the reference commutator terms against imsrg-devel dumps (design/30
 // section 2): relative_deviation <= 1e-10 for every term and pair.
 #include <algorithm>

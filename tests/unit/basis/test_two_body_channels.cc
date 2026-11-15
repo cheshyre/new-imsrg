@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Unit tests of TwoBodyChannels and TwoBodyKetSubsets (design/reference/01 sections 2.1-2.4).
 // Hardcoded values come from tests/golden/basis/{emax2_He4,emax2_sd-shell,emax4_O16}.txt.
 #include <cstdlib>

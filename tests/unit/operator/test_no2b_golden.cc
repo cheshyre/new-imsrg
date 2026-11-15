@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Normal ordering of the NO2B three-nucleon force against imsrg-devel (V3_NO2B.dump) with the
 // real 3N input file. Skips itself if the file (outside the repository) is absent.
 #include <algorithm>

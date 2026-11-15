@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Round-trip tests of the resolved-config writer (design/16 sections 1.3, 6.3): for every
 // loadable config cfg1, load_config(to_toml(cfg1)) succeeds, equals cfg1, and writes the same text.
 #include <cmath>

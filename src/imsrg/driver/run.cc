@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // The pipeline of the `imsrg` driver (design/13 section 9, design/16 section 6.1, imsrg++.cc):
 // stage 1 (pipeline/hamiltonian.cc) -> IMSRG flow (1 or 2 Magnus stages) -> re-normal ordering
 // for ensemble references -> transformed operators -> outputs (results.json, flow CSV, .snt).

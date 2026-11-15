@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Reader for the NO2B (normal-ordered two-body approximation) three-nucleon matrix-element files.
 #ifndef IMSRG_IO_NO2B_H_
 #define IMSRG_IO_NO2B_H_

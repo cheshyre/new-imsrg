@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Tests of transform_basis and with_model_space: golden HF-basis data from imsrg-devel,
 // identity, unitarity, round trip and error paths.
 #include <cmath>

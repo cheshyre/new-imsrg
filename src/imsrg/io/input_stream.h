@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Buffered text input over zlib (plain or gzip, detected by content) and a small gzip writer.
 #ifndef IMSRG_IO_INPUT_STREAM_H_
 #define IMSRG_IO_INPUT_STREAM_H_

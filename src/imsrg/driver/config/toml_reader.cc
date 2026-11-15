@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // TOML -> raw tree (design/16 sections 2 and 6.1). The only file that includes toml++.
 #include "imsrg/driver/config/toml_reader.h"
 

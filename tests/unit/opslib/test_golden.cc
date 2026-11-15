@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // T_rel and R_p^2 against the harness dumps (imsrg++ output) at emax 2 and emax 4.
 #include <filesystem>
 #include <iostream>

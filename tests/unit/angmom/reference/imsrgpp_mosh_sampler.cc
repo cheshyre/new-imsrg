@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Prints imsrg++ AngMom::Moshinsky and AngMom::TalmiB values for the angmom tests of the rewrite;
 // its output is tests/unit/angmom/data/moshinsky_imsrgpp_samples.txt. NOT part of the build: it
 // links against the imsrg-devel reference library (M1 build, outside the repo):

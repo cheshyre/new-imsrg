@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // End-to-end integration tests of the `imsrg` driver pipeline (task P3 of M8): IT-2, IT-3, IT-4,
 // IT-6, IT-7 and IT-12, compared against the imsrg++ goldens under tests/golden/e2e.
 //

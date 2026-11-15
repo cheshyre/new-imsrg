@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // The Magnus IMSRG solver (design/13 section 7, imsrg++ IMSRGSolver.cc:20-122 and 280-366).
 #include "imsrg/flow/magnus.h"
 

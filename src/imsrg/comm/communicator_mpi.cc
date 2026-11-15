@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Communicator backed by MPI. The serial communicator (Communicator::serial()) makes no MPI calls.
 #include <algorithm>
 #include <cstring>

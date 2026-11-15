@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Tests of the validation table (design/16 section 6.1) through `resolve` and `validate`.
 #include <cstdint>
 #include <filesystem>

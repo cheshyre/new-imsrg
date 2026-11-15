@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Tests of the NO2B three-nucleon input container `No2bThreeBody` (layout of imsrg++
 // ThreeBodyStorage_no2b<float>): orbits, channel/state counts against a brute-force enumeration,
 // set/get round trips with ordering phases, float storage, and the pn recoupling.

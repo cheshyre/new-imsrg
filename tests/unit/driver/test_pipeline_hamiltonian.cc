@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Acceptance tests of pipeline stage 1 (prepare_hamiltonian / prepare_operator): O16 and Ne20
 // (sd-shell) at emax 4 against the HF and golden values. Skipped without the input files.
 #include <chrono>

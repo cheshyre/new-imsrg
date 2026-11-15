@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // DeviceTables: device accessor results (evaluated in kernels) against the host classes.
 #include <cstdint>
 #include <string>

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 /// @file
 /// Multi-rank tests of imsrg::comm. CTest runs this under mpiexec with 2 and 4 ranks; every rank
 /// runs the tests, only rank 0 prints, and the exit code is the maximum over ranks.

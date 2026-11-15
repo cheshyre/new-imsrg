@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // The harmonic-oscillator single-particle basis and its truncations.
 #include <algorithm>
 #include <cmath>

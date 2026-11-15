@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Wigner symbols and Clebsch-Gordan coefficients against exact sympy values (design/30 section 2).
 //
 // The reference file is generated at build time by reference/gen_wigner_reference.py (emax 8);

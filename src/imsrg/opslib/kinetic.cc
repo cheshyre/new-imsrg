@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 #include "imsrg/opslib/kinetic.h"
 
 #include "imsrg/opslib/detail/pair_engine.h"

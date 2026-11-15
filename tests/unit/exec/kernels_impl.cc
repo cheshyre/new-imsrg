@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Kernels written against the exec facade. Free functions only (design/12 section 5).
 #include "kernels_impl.h"
 

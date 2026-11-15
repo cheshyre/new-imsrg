@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // App-level tests of the `imsrg` executable (design/16 section 6.3 item 10): spawn it in a fresh
 // temporary directory and check stdout, stderr, files and exit codes.
 #include <atomic>

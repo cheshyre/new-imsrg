@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Hartree-Fock with the NO2B three-body interaction at emax 2, O16 (needs the NO2B file).
 #include <chrono>
 

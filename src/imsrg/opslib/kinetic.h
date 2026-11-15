@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 #ifndef IMSRG_OPSLIB_KINETIC_H_
 #define IMSRG_OPSLIB_KINETIC_H_
 /// @file

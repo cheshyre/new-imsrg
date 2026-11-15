@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Unit tests of ParticleHoleChannels (design/reference/01 sections 2.2-2.3). The expected
 // structure is rebuilt by brute force from the orbits; the golden comparison lives in
 // test_golden_basis.cc.

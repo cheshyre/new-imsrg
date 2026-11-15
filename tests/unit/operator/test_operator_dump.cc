@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Tests of the OperatorDump v1 reader and writer: round trips and one test per reader error.
 #include <cstddef>
 #include <filesystem>

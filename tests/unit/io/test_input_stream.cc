@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // TextInput / GzipWriter: plain and gzip tokens, header skip, malformed tokens, float parsing.
 #include <bit>
 #include <cstdint>

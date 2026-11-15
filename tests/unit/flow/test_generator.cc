@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // IMSRG generators (M8 task T1): golden eta(H) of the emax-2 O16 harness, block structure and
 // values of every generator kind on a random Hamiltonian, the denominator floor (design/00 D21),
 // the denominator tables and the reuse of the generator operator.

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Tests of Operator: construction, sizing, hermiticity propagation, same_model_space, copies.
 #include <memory>
 #include <utility>

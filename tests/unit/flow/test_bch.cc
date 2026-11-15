@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // BCH transform and product (M8 task T2): exactness on one-body operators against dense matrix
 // exponentials, invertibility, the BCH product against expm(X) expm(Y), the thresholds and
 // hermiticity.

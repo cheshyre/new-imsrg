@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Wall-clock timings of the two-body constructions at emax 6 (printed, not asserted).
 #include <chrono>
 #include <iostream>

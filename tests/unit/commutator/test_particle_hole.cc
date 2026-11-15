@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // The particle-hole (Pandya) term comm222_phss of the fast commutator: golden acceptance,
 // comparison with commutator_ref on random operators, a timing print and the NonHermitian guard.
 #include <chrono>

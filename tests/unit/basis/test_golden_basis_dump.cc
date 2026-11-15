@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Self-consistency of the golden basis files (imsrg-basis-dump v1) through the strict parser, and
 // agreement of the harmonic-oscillator orbit list with them.
 #include <algorithm>

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 #ifndef TESTS_UNIT_BASIS_GOLDEN_BASIS_DUMP_H_
 #define TESTS_UNIT_BASIS_GOLDEN_BASIS_DUMP_H_
 /// @file

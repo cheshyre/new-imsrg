@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Norms of every golden OperatorDump against the imsrg-devel norms recorded next to it
 // (design/30 section 2: norms on fixed inputs agree to 1e-10 relative; the actual deviations are
 // printed). The dumps are read with our reader, so this also checks that reading loses nothing.

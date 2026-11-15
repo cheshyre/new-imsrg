@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 #ifndef IMSRG_FLOW_BCH_H_
 #define IMSRG_FLOW_BCH_H_
 /// @file

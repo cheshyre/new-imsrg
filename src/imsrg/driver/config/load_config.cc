@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Config loading entry point: sources -> raw tree -> resolved, validated RunConfig.
 #include "imsrg/driver/config/load_config.h"
 

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Tests of random_operator: determinism, symmetries, selection rules, scales and the
 // generator's fixed output.
 #include <algorithm>

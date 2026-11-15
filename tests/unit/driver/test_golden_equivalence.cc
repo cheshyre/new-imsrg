@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Golden equivalence of the design/16 section 2.11 examples: TOML vs legacy command line
 // (design/16 section 6.3). The four TOML blocks and the four "Equivalent legacy command" lines
 // are extracted from the design document itself; examples/config holds verbatim copies.

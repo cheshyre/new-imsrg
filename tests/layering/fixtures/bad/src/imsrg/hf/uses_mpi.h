@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 #ifndef TESTS_LAYERING_FIXTURES_BAD_SRC_IMSRG_HF_USES_MPI_H_
 #define TESTS_LAYERING_FIXTURES_BAD_SRC_IMSRG_HF_USES_MPI_H_
 

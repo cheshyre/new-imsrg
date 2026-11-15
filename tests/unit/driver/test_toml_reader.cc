@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Tests of the TOML reader and of --set (design/16-config-and-cli.md sections 2.11, 2.12, 6.1).
 #include <cstdint>
 #include <filesystem>

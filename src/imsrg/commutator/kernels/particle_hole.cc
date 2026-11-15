@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Particle-hole (Pandya) term comm222_phss (design/12 section 4.2; imsrg++ `comm222_phss`,
 // reference/02 P-12). Kernel TU: includes the Kokkos vocabulary.
 //

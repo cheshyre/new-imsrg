@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 /// @file
 /// Bindings of the operator module: OperatorSpec, Operator (numpy views, arithmetic, norms),
 /// normal ordering, random operators, OperatorDump I/O (design/18 sections 3 and 4).

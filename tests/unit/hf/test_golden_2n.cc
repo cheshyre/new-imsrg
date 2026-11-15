@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Hartree-Fock (linear mixing, 2N only) against the imsrg++ harness output at emax 2, O16.
 #include <chrono>
 

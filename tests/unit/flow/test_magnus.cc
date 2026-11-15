@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Magnus solver (M8 task T3): a short single-reference flow of the emax-2 O16 HF Hamiltonian
 // against the imsrg++ flow file (tests/golden/e2e/IT-8/emax2, same Hamiltonian as
 // tests/golden/hf/emax2_O16_2N/HNO.dump), the Omega-stack replay, stage switching and the stop

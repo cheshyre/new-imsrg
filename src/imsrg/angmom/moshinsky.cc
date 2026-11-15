@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Moshinsky brackets and Talmi coefficients: a port of imsrg++ `AngMom::Moshinsky`
 // (AngMom.cc:163-241), `AngMom::TalmiB` (AngMom.cc:246-261) and `imsrg_util::TalmiI`.
 // The Buck et al. sums suffer heavy cancellation, so `moshinsky` is evaluated entirely in

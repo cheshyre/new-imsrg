@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Record-by-record comparison of the basis bookkeeping (orbits, reference, partition, two-body
 // channels, ket subsets, cross-coupled channels and three-body channels) with every
 // imsrg-basis-dump v1 golden file. Only the header records of each file are used to build our

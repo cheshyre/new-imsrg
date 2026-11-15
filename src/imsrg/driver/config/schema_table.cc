@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // The key and table lists derived from visit_schema (the single schema table).
 
 #include <algorithm>

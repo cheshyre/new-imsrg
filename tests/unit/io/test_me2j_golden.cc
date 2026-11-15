@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // The real emax-14 interaction read into the golden model spaces, compared with the harness dumps.
 #include <filesystem>
 #include <iostream>

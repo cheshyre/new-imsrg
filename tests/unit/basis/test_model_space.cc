@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Tests of the ModelSpace bundle: the imsrg++-driver construction path against every golden file,
 // sharing of the occupation-independent parts, the reference-changing derivations, and errors.
 #include <memory>

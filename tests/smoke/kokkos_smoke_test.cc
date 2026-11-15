@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 /// @file
 /// Smoke test of the Kokkos installation the build uses (tools/bootstrap_deps.sh or the in-tree
 /// extern/kokkos fallback): the default execution space is the backend selected by

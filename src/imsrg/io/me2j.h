@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Reader for the Darmstadt (me2j) two-body matrix element format.
 #ifndef IMSRG_IO_ME2J_H_
 #define IMSRG_IO_ME2J_H_

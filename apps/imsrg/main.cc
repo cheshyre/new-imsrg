@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // The `imsrg` executable: CLI11 command line -> imsrg::driver (design/16 section 2.12).
 // Exit codes: 0 ok, 1 runtime failure, 2 configuration error, 3 input file error.
 #include <exception>

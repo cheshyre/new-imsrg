@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // commutator_spec, Z reuse, the term-mask dispatch of commutator(), and the full IMSRG(2)
 // commutator against the imsrg-devel golden data and commutator_ref.
 #include <algorithm>

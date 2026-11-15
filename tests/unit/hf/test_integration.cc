@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // End-to-end Hartree-Fock inputs: the Hamiltonian is assembled from the real input files
 // (me2j + NO2B + relative kinetic energy) instead of a dump, as in integration tests IT-1/IT-4.
 #include <chrono>

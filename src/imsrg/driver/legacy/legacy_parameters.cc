@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Legacy imsrg++ `key=value` command line -> raw tree in new-schema paths (design/16 section 3).
 #include "imsrg/driver/legacy/legacy_parameters.h"
 

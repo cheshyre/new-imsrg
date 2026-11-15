@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 /// @file
 /// Bindings of the driver config (design/18 section 6): `RunConfig` as an opaque resolved value
 /// with `to_toml()` / `to_dict()`, and `load_config()`.

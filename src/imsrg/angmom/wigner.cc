@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Wigner 3j/6j/9j symbols and Clebsch-Gordan coefficients (see wigner.h).
 //
 // All internal arithmetic is on doubled integers; every factorial argument below is an exact

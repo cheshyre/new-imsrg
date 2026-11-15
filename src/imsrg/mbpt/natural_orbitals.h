@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 #ifndef IMSRG_MBPT_NATURAL_ORBITALS_H_
 #define IMSRG_MBPT_NATURAL_ORBITALS_H_
 /// @file

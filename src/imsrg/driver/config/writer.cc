@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // RunConfig -> TOML (resolved_config.toml, design/16 sections 1.3, 1.7 and 6.1).
 #include "imsrg/driver/config/writer.h"
 

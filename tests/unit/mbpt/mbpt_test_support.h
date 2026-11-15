@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 #ifndef TESTS_UNIT_MBPT_MBPT_TEST_SUPPORT_H_
 #define TESTS_UNIT_MBPT_MBPT_TEST_SUPPORT_H_
 /// Test-side assembly of the NAT-basis Hamiltonian. mbpt does not depend on hf, so the test

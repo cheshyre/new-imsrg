@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Tests of normal ordering and its inverse: imsrg-devel goldens and algebraic properties.
 #include <algorithm>
 #include <cmath>

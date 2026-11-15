@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Flat kernels on operator-part buffers (declared in imsrg/operator/detail/part_kernels.h).
 #include "imsrg/operator/detail/part_kernels.h"
 

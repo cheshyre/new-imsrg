@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 #ifndef TESTS_UNIT_COMMUTATOR_COMMUTATOR_TEST_CASES_H_
 #define TESTS_UNIT_COMMUTATOR_COMMUTATOR_TEST_CASES_H_
 

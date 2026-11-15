@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Resolution of a raw tree into a RunConfig: typed reading through the schema visitor, defaults,
 // derived values (design/16 sections 1 and 6.1), then validation (validate.cc).
 #include "imsrg/driver/config/resolve.h"

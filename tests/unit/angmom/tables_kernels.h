@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 #ifndef TESTS_UNIT_ANGMOM_TABLES_KERNELS_H_
 #define TESTS_UNIT_ANGMOM_TABLES_KERNELS_H_
 // Test-local kernel entry points (Kokkos-free interface); the kernels are in tables_kernels.cc.

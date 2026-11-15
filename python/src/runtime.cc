@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 /// @file
 /// imsrg.Runtime: process singleton for Kokkos (and optionally MPI), design/18 section 4.3.
 

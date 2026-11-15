@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // The pp/hh ladder terms (comm222_pp_hhss, comm221ss and their fusion comm222_pp_hh_221ss) of the
 // fast commutator: golden acceptance, comparison with commutator_ref on random operators, fused
 // versus separate evaluation, an emax-4 timing report and the NonHermitian guard.

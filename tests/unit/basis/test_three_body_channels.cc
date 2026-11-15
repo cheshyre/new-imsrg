@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Unit tests of ThreeBodyChannels (design/reference/01 section 3). Kets are rebuilt by brute
 // force; the golden comparison lives in test_golden_basis.cc.
 #include <cmath>

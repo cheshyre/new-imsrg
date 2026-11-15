@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Reference implementations of the scalar IMSRG(2) commutator terms (see commutator_ref.h).
 //
 // Everything is written as the plain loops of imsrg++ `ReferenceImplementations/

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // commutator_bench -- IMSRG(2) commutator micro-benchmark (design/30 section 5).
 //
 //   commutator_bench --emax N --reps R [--reference O16] [--seed S]

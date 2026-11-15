@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // The one-, two-body-reduced and mixed IMSRG(2) terms: comm110ss, comm220ss, comm111ss, comm121ss,
 // comm122ss (design/12 section 4.1). Kernel TU: the only place of this module (with ladder.cc and
 // particle_hole.cc) that includes the Kokkos vocabulary.

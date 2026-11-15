@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 #include "imsrg/comm/environment.h"
 
 #include "imsrg/base/error.h"

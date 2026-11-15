@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Valence-space interaction writers (tokyo .snt, NuShellX .int and .sp); a port of imsrg++
 // ReadWrite::WriteTokyo, WriteNuShellX_intfile and WriteNuShellX_sps with the same thresholds,
 // ordering and number formats, including the stream-state quirks of the original.

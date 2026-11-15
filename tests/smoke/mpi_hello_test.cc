@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 /// @file
 /// Smoke test of the MPI toolchain. CTest runs it as `mpiexec -n N smoke_mpi_hello
 /// --expected-ranks=N`; it checks the size of MPI_COMM_WORLD, the rank range, and an allreduce.

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Orbit quantum numbers, the imsrg++ hash and the label format.
 #include <string>
 #include <vector>

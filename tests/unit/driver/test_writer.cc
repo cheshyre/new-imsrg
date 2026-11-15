@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Tests of the resolved-config writer (design/16 sections 1.3, 1.7, 6.1).
 #include <atomic>
 #include <filesystem>

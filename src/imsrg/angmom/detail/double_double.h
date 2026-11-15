@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Private, host-only double-double (dd) arithmetic: a value is the unevaluated sum hi + lo with
 // |lo| <= ulp(hi)/2, giving about 106 bits (~32 decimal digits). Built from the classic exact
 // error-free transformations (Knuth two_sum, fma-based two_prod). Requires strict IEEE

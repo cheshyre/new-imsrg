@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // IT-1 (EMP2, emax 4, 2N) and IT-5 (NAT-basis E_HF, emax 4, 2N + NO2B 3N) from the real inputs.
 #include "mbpt_test_support.h"
 

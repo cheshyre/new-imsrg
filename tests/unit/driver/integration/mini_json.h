@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 #ifndef TESTS_UNIT_DRIVER_INTEGRATION_MINI_JSON_H_
 #define TESTS_UNIT_DRIVER_INTEGRATION_MINI_JSON_H_
 /// @file

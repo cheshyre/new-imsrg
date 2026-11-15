@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Normal-ordered Hamiltonian in the HF basis and basis transformation against imsrg++ goldens.
 #include <chrono>
 

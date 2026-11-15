@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Kernels evaluating the device accessors of DeviceTables. Free functions only (design/12 s5);
 // lambdas capture the (trivially copyable) views and raw output pointers by value.
 #include "device_tables_kernels.h"

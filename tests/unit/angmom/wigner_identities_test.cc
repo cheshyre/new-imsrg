@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Exhaustive internal identities of the Wigner symbols over the emax-8 ranges (design/30 section
 // 2): orthogonality relations, symmetries, special values, invalid arguments, 9j reductions.
 // Independent of any external reference data.

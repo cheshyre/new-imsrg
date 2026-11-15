@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // Input validation and consistency checks of the fast commutator and commutator_ref: rank-1
 // operands versus the same operators promoted to rank 2, Z hermiticity and aliasing checks, the
 // non-fused dispatcher branches, and the scratch footprint of a Workspace.

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 // The real NO2B 3N file read into the golden model spaces, normal-ordered and compared with the
 // harness dumps; and a check against an independent transcription of imsrg++ ReadFile.
 #include <algorithm>

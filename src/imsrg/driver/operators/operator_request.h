@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
 #ifndef IMSRG_DRIVER_OPERATORS_OPERATOR_REQUEST_H_
 #define IMSRG_DRIVER_OPERATORS_OPERATOR_REQUEST_H_
 /// @file
