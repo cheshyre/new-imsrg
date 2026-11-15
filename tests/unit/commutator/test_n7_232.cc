@@ -30,6 +30,7 @@
 #include "imsrg/operator/norms.h"
 #include "imsrg/operator/operator.h"
 #include "imsrg/operator/operator_spec.h"
+#include "imsrg/operator/random_operator.h"
 #include "tests/support/commutator_test_support.h"
 #include "tests/support/three_body_test_support.h"
 #include "tests/unit/commutator/n7_test_support.h"
@@ -148,6 +149,38 @@ TEST(N7Comm232, MatchesBruteForceWithCuts) {
                 ref, cuts.e3max, cuts.de3max, kept,
                 RelativeDeviation(fast, bf));
   }
+}
+
+// An operand without a three-body part (particle rank 2) contributes only
+// through its two-body part: [X2, Y3] alone, [X3, Y2] alone, nothing for two
+// rank-2 operands.
+TEST(N7Comm232, MissingThreeBodyParts) {
+  const auto ms3 =
+      testing::MakeThreeBodySpace(1, "C12", basis::ThreeBodyCuts{});
+  const ThreeBodyContext ctx(ms3);
+  const op::Operator x3 =
+      testing::RandomThreeBodyOperator(ctx, Hermiticity::kAntiHermitian, 41);
+  const op::Operator y3 =
+      testing::RandomThreeBodyOperator(ctx, Hermiticity::kHermitian, 42);
+  op::RandomOperatorOptions opt;
+  opt.seed = 43;
+  const op::Operator x2 = op::RandomOperator(
+      ms3, op::OperatorSpec::Scalar(2, Hermiticity::kNonHermitian), opt);
+  opt.seed = 44;
+  const op::Operator y2 = op::RandomOperator(
+      ms3, op::OperatorSpec::Scalar(2, Hermiticity::kHermitian), opt);
+  for (const auto& [x, y] :
+       {std::pair<const op::Operator*, const op::Operator*>{&x2, &y3},
+        std::pair<const op::Operator*, const op::Operator*>{&x3, &y2}}) {
+    const op::Operator bf = BruteForceN7Term(Term::kComm232ss, *x, *y, ms3);
+    const op::Operator fast = EvaluateN7Term(Term::kComm232ss, *x, *y, ctx);
+    const op::Operator slow = EvaluateReference(*x, *y, ctx);
+    EXPECT_GT(op::TwoBodyNorm(bf), 1.0);
+    EXPECT_LE(RelativeDeviation(fast, bf), kTol);
+    EXPECT_LE(RelativeDeviation(slow, bf), kTol);
+  }
+  const op::Operator none = EvaluateN7Term(Term::kComm232ss, x2, y2, ctx);
+  EXPECT_EQ(op::TwoBodyNorm(none), 0.0);
 }
 
 // Element-wise against the imsrg++ dumps (E3max 3) and the two-body norms of

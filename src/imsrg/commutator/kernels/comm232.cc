@@ -121,6 +121,7 @@ struct J3Range {
   int lo = 0;
   int hi = -1;
 };
+static_assert(std::is_trivially_copyable_v<J3Range>);
 
 IMSRG_INLINE_FUNCTION J3Range RangeOfJ3(int two_jp, int jq, int two_J,
                                         int jc) noexcept {
