@@ -27,6 +27,32 @@ void Scale(double a, exec::DeviceBuffer<double>& x) {
       IMSRG_LAMBDA(const exec::Index i) { xv(i) *= a; });
 }
 
+void Abs(exec::DeviceBuffer<double>& x) {
+  auto xv = exec::View(x);
+  exec::ParallelFor(
+      "op::abs", static_cast<exec::Index>(x.size()),
+      IMSRG_LAMBDA(const exec::Index i) {
+        xv(i) = xv(i) < 0.0 ? -xv(i) : xv(i);
+      });
+}
+
+void Divide(exec::DeviceBuffer<double>& x,
+            const exec::DeviceBuffer<double>& y) {
+  IMSRG_CHECK(x.size() == y.size(), "divide: buffer sizes differ");
+  auto xv = exec::View(x);
+  const auto yv = exec::View(y);
+  exec::ParallelFor(
+      "op::divide", static_cast<exec::Index>(x.size()),
+      IMSRG_LAMBDA(const exec::Index i) { xv(i) /= yv(i); });
+}
+
+void AddScalar(double c, exec::DeviceBuffer<double>& x) {
+  auto xv = exec::View(x);
+  exec::ParallelFor(
+      "op::add_scalar", static_cast<exec::Index>(x.size()),
+      IMSRG_LAMBDA(const exec::Index i) { xv(i) += c; });
+}
+
 double SumOfSquares(const exec::DeviceBuffer<double>& x, std::int64_t offset,
                     std::int64_t count) {
   IMSRG_CHECK(offset >= 0 && count >= 0 &&

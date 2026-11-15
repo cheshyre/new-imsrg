@@ -81,7 +81,7 @@ class OneBody {
   /// The underlying buffer, read-only.
   const exec::DeviceBuffer<double>& buffer() const noexcept { return data_; }
   /// Copies the device data to the host mirror (see the memory model).
-  void SyncToHost() { data_.SyncToHost(); }
+  void SyncToHost() const { data_.SyncToHost(); }
   /// Copies the host mirror to the device data (see the memory model).
   void SyncToDevice() { data_.SyncToDevice(); }
 

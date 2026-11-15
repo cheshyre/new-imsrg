@@ -120,7 +120,7 @@ class DeviceBuffer {
 
   /// Copies device data to the host mirror (creating it if needed); fences. A
   /// fence only when the mirror aliases the device data.
-  void SyncToHost();
+  void SyncToHost() const;  // const: refreshes a cache only
   /// Copies the host mirror to the device data (no-op apart from a fence when
   /// aliasing).
   void SyncToDevice();

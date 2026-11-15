@@ -102,7 +102,7 @@ class Operator {
   /// Sets all parts to zero (imsrg++ `Erase`).
   void set_zero();
   /// Syncs the device data of all parts to their host mirrors (see `OneBody`).
-  void SyncToHost();
+  void SyncToHost() const;  // const: refreshes the host mirror cache only
   /// Syncs the host mirrors of all parts to the device data (see `OneBody`).
   void SyncToDevice();
 

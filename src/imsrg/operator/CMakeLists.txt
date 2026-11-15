@@ -11,6 +11,7 @@ imsrg_add_module(NAME operator
     operator.cc
     compare.cc
     arithmetic.cc
+    elementwise.cc
     norms.cc
     operator_dump.cc
     normal_ordering.cc

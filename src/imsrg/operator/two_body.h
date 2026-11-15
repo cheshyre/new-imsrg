@@ -135,7 +135,7 @@ class TwoBody {
     return matrix_;
   }
   /// Copies the device data to the host mirror (see the memory model).
-  void SyncToHost() { matrix_.buffer().SyncToHost(); }
+  void SyncToHost() const { matrix_.buffer().SyncToHost(); }
   /// Copies the host mirror to the device data (see the memory model).
   void SyncToDevice() { matrix_.buffer().SyncToDevice(); }
 

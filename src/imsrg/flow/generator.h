@@ -126,8 +126,8 @@ class Denominators {
  public:
   /// Precomputes the tables from H (scalar, particle_rank >= 2) and the
   /// occupations of H's model space. Host computation, O(norb^2 * J range).
-  /// Reads H's device data (const-correct copies), so it is valid right after
-  /// library calls.
+  /// Syncs H's host mirror (no copy of H), so it is valid right after library
+  /// calls.
   Denominators(const op::Operator& H, const GeneratorOptions& opts);
 
   Denominators(const Denominators&) = default;
