@@ -31,15 +31,24 @@ consequence.
   items (up to 4 questions per call). Use plain conversation for open topics.
 * Go from high to low impact. Be brief: one or two sentences of context per question. Do not
   re-ask anything already answered in `QUESTIONS.md`.
+* Phrase every question so that a one-word answer is unambiguous: a yes/no proposal, or numbered
+  options. If an answer is ambiguous anyway (a plain "Yes" to an either/or question, as happened
+  with Q5), ask back before recording it.
 * If the owner wants to defer an item, record "deferred" with the reason and keep the assumption.
-* Edit documentation only, never code. Work on a branch `feature/owner-answers-<date>` cut from
-  `develop`; at the end, `tools/ci.sh dev-openmp` must pass, then merge into `develop` with
-  `--no-ff`. Git stays local: never push.
+* Edit documentation only. Exception: if the owner explicitly asks for a small code change during
+  the interview, make it on its own `feature/` branch with tests and merge it only after
+  `tools/ci.sh dev-openmp` passes; larger work goes into the next-session plan instead.
+* Work on a branch `feature/owner-answers-<date>` cut from `develop`; at the end,
+  `tools/ci.sh dev-openmp` must pass, then merge into `develop` with `--no-ff`. If the session runs
+  in an app worktree while `develop` is checked out in the main checkout, follow QUESTIONS O1:
+  merge on your worktree branch, then `tools/ci.sh dev-openmp && git update-ref refs/heads/develop
+  <new> <old>` (never chain the update to a grep of the CI log). Git stays local: never push.
 
 ## Agenda, part 1: open questions (ids from `design/QUESTIONS.md`)
 
 Already answered by the owner on 2026-11-13 (do not re-ask): Q6, Q11, Q12, Q13, Q14, Q15, Q16,
-Q17 (decisions D26–D29); Q5 needs only the confirmation listed under B.
+Q17 (decisions D26–D29; D29's Python 3.12 / stable-ABI change is already applied); Q5 needs only
+the confirmation listed under B. The next free decision number is D30.
 
 **A. Owner facts and actions (ask first)**
 * **O1**: was the main checkout synced? Should future unsupervised runs start in the main checkout
