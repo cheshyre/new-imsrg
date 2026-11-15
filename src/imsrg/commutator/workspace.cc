@@ -44,10 +44,6 @@ Workspace::Impl::Impl(const std::shared_ptr<const basis::ModelSpace>& ms)
   ob_owner.CopyFromHost(owner);
 
   // One-body intermediates of the factorized double commutator (zeroed).
-  factorized.chi1 =
-      exec::DeviceBuffer<double>(norb * norb, "commutator::factorized_chi1");
-  factorized.chia =
-      exec::DeviceBuffer<double>(norb * norb, "commutator::factorized_chia");
   factorized.chi2 =
       exec::DeviceBuffer<double>(norb * norb, "commutator::factorized_chi2");
   factorized.chib =

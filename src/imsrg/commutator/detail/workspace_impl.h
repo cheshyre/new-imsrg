@@ -28,13 +28,12 @@ namespace imsrg::commutator {
 
 namespace detail {
 
-/// One-body intermediates of the factorized double commutator (factorized.h):
+/// The gamma-dependent one-body intermediates of the factorized double
+/// commutator (factorized.h; the eta-only ones live in `FactorizedEta`):
 /// dense column-major num_orbits x num_orbits device matrices. Only the
 /// entries (d, e) of equal (l, 2j, 2tz) are written (each call overwrites all
 /// of them); the others stay zero.
 struct FactorizedScratch {
-  exec::DeviceBuffer<double> chi1;  ///< chi1 = A_pp + A_hh (from eta P eta).
-  exec::DeviceBuffer<double> chia;  ///< chia (from eta P eta).
   exec::DeviceBuffer<double> chi2;  ///< chi2 = B_pp + B_hh (from gamma P eta).
   exec::DeviceBuffer<double> chib;  ///< chib (from gamma P eta).
 };

@@ -43,7 +43,8 @@ struct LadderProjector {
   exec::DeviceBuffer<double> xg;  ///< Gathered X operands, all channels.
   exec::DeviceBuffer<double> yg;  ///< Gathered Y operands, all channels.
   exec::DeviceBuffer<double>
-      product;  ///< Mpp or Mhh, laid out like a two-body operator.
+      product;  ///< W = X P Y (`LadderProducts`), antisymmetrized in place
+                ///< to Mpp or Mhh by the ladder terms; two-body layout.
 };
 
 /// Device-resident data of the ladder terms.

@@ -154,6 +154,26 @@ TEST(commutator_factorized, options_and_trivial_inputs) {
   EXPECT_EQ(op::Norm(Z), 0.0);
 }
 
+TEST(commutator_factorized, precomputed_eta_is_bit_identical) {
+  const auto ms = imsrg::testing::FractionalModelSpace(2, "O16");
+  Workspace ws(ms);
+  const Operator eta = RandomOperator(ms, Hermiticity::kAntiHermitian, 71);
+  const commutator::FactorizedEta pre(eta, ws);
+  EXPECT_EQ(&pre.eta(), &eta);
+  // Several gammas with one set of eta intermediates (the BCH use), with a
+  // plain call for another eta in between (the workspace scratch is reused).
+  const Operator other = RandomOperator(ms, Hermiticity::kAntiHermitian, 72);
+  for (const Hermiticity hg :
+       {Hermiticity::kHermitian, Hermiticity::kAntiHermitian}) {
+    const Operator gamma = RandomOperator(ms, hg, 73);
+    const Operator plain = Fast(eta, gamma, ws);
+    (void)Fast(other, gamma, ws);
+    Operator Z;
+    FactorizedDoubleCommutator(pre, gamma, Z, FactorizedOptions{}, ws);
+    EXPECT_EQ(RelativeDeviation(Z, plain), 0.0);
+  }
+}
+
 TEST(commutator_factorized, rejected_inputs) {
   const auto ms = imsrg::testing::MakeModelSpace(1, "He4");
   Workspace ws(ms);
@@ -177,8 +197,8 @@ TEST(commutator_factorized, rejected_inputs) {
       InvariantError);
 }
 
-TEST(commutator_factorized, timing_emax4) {
-  const auto ms = imsrg::testing::MakeModelSpace(4, "O16");
+TEST(commutator_factorized, timing_emax3) {
+  const auto ms = imsrg::testing::MakeModelSpace(3, "O16");
   Workspace ws(ms);
   const Operator A = RandomOperator(ms, Hermiticity::kAntiHermitian, 1);
   const Operator H = RandomOperator(ms, Hermiticity::kHermitian, 2);
@@ -194,7 +214,7 @@ TEST(commutator_factorized, timing_emax4) {
   const double tf = std::chrono::duration<double, std::milli>(t1 - t0).count();
   const double tc = std::chrono::duration<double, std::milli>(t2 - t1).count();
   std::printf(
-      "[timing] emax 4 O16: factorized %.1f ms, IMSRG(2) commutator %.1f ms "
+      "[timing] emax 3 O16: factorized %.1f ms, IMSRG(2) commutator %.1f ms "
       "(ratio %.2f)\n",
       tf, tc, tf / tc);
 }

@@ -37,9 +37,11 @@
 ///                                               [232: Ia, Ib, IVa, IVb]
 /// which is imsrg++'s expression (the GEMM form reorders its orbit sums; the
 /// skip thresholds of imsrg++ on occupation products, below 1e-6, are not
-/// applied).
+/// applied, design/30 section 6). Like imsrg++, no three-body truncation
+/// (E3max, dE3max) is applied to the implied [eta, gamma]_3b.
 
 #include "imsrg/commutator/workspace.h"
+#include "imsrg/exec/device_buffer.h"
 #include "imsrg/operator/operator.h"
 
 namespace imsrg::commutator {
@@ -57,14 +59,50 @@ struct FactorizedOptions {
   bool two_body_intermediates = false;
 };
 
+/// The eta-only intermediates chi1 and chia (from W_x = eta P_x eta) of the
+/// factorized double commutator, for evaluating F(eta, gamma) with one eta
+/// and several gamma: the BCH series needs F(Omega, nested_{i-2}) for every
+/// nested term with the same Omega, and these intermediates are half of the
+/// GEMM work of each F. An explicit value, not a cache inside the Workspace
+/// (design/00 D10). Keeps a pointer to eta, which must outlive the object
+/// unchanged. Movable, not copyable.
+class FactorizedEta {
+ public:
+  /// Checks eta as `FactorizedDoubleCommutator` does and computes chi1 and
+  /// chia with `ws` (both zero if eta has no two-body part). Complexity: one
+  /// ladder-product pair and a comm221ss-like contraction.
+  /// @throws InvariantError if eta is not on the workspace's model space,
+  ///         NotImplementedError for an eta `FactorizedDoubleCommutator`
+  ///         rejects.
+  FactorizedEta(const op::Operator& eta, Workspace& ws);
+  ~FactorizedEta() = default;
+  FactorizedEta(FactorizedEta&&) noexcept = default;
+  FactorizedEta& operator=(FactorizedEta&&) noexcept = default;
+  FactorizedEta(const FactorizedEta&) = delete;
+  FactorizedEta& operator=(const FactorizedEta&) = delete;
+
+  /// The operator the intermediates belong to.
+  const op::Operator& eta() const noexcept { return *eta_; }
+  /// chi1 = A_pp + A_hh: dense column-major num_orbits x num_orbits device
+  /// matrix (only entries of equal (l, 2j, 2tz) are non-zero).
+  const exec::DeviceBuffer<double>& chi1() const noexcept { return chi1_; }
+  /// chia, same layout.
+  const exec::DeviceBuffer<double>& chia() const noexcept { return chia_; }
+
+ private:
+  const op::Operator* eta_;
+  exec::DeviceBuffer<double> chi1_;
+  exec::DeviceBuffer<double> chia_;
+};
+
 /// Z = the factorized double commutator F(eta, gamma) restricted to the
 /// topologies selected by `opts` (see the file comment for the expression).
 /// Z is overwritten like the output of `Commutator`: reset to zero if it
 /// already is a scalar rank-2 operator with gamma's hermiticity on the
-/// workspace's model space, otherwise replaced by a new one. Z has no zero-body
-/// part (it stays 0). Z = 0 if no topology is selected or if eta or gamma has
-/// no two-body part (every topology needs eta_2 and gamma_2; one-body parts do
-/// not enter).
+/// workspace's model space, otherwise replaced by a new one, so Z always has
+/// particle_rank 2 and gamma's hermiticity; its zero-body part stays 0. Z = 0
+/// if no topology is selected or if eta or gamma has no two-body part (every
+/// topology needs eta_2 and gamma_2; one-body parts do not enter).
 /// Preconditions (InvariantError): eta and gamma on the workspace's model
 /// space; Z is neither of them.
 /// @throws NotImplementedError if eta or gamma is not scalar, number conserving
@@ -73,9 +111,16 @@ struct FactorizedOptions {
 ///         `opts.two_body_intermediates` is set.
 /// Complexity: two ladder-product pairs (four grouped GEMMs of sum over
 /// channels N^2 (|Kpp| + |Khh|) flops), a comm221ss-like contraction per
-/// intermediate, a comm121ss-like one-body pass and a comm122ss-like two-body
-/// pass; about a third of an IMSRG(2) commutator.
+/// pair, a comm121ss-like one-body pass and a comm122ss-like two-body pass;
+/// measured at about half of an IMSRG(2) commutator (O16 emax 4).
 void FactorizedDoubleCommutator(const op::Operator& eta,
+                                const op::Operator& gamma, op::Operator& Z,
+                                const FactorizedOptions& opts, Workspace& ws);
+
+/// The same with eta's intermediates precomputed (`eta.eta()` is eta): saves
+/// one ladder-product pair and one contraction per call. Same results to the
+/// last bit, same preconditions and exceptions (Z must not alias `eta.eta()`).
+void FactorizedDoubleCommutator(const FactorizedEta& eta,
                                 const op::Operator& gamma, op::Operator& Z,
                                 const FactorizedOptions& opts, Workspace& ws);
 

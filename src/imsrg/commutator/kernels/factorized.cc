@@ -4,8 +4,9 @@
 // The factorized double commutator of IMSRG(3f2) with one-body intermediates
 // (factorized.h; imsrg++ FactorizedDoubleCommutator.cc, comm223_231_chi1b at
 // 133-436 and comm223_232_chi1b at 1090-1394). Kernel TU. Steps:
-//   1. W_x = eta P_x eta (detail::LadderProducts), contracted into chi1, chia;
-//   2. V_x = gamma P_x eta, contracted into chi2, chib;
+//   1. W_x = eta P_x eta (detail::LadderProducts), contracted into chi1, chia
+//      (`FactorizedEta`, reusable for several gamma);
+//   2. V_x = gamma P_x eta, contracted into chi2, chib (workspace scratch);
 //   3. Z1, one thread per one-body channel entry (the comm121ss shape);
 //   4. Z2, one thread per upper-triangle element (the comm122ss shape, over
 //      the lifted one-body lists of the workspace).
@@ -22,6 +23,7 @@
 
 #include "imsrg/commutator/factorized.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <type_traits>
@@ -46,6 +48,12 @@ using linalg::MatrixView;
 /// View of a dense num_orbits x num_orbits scratch matrix.
 MatrixView<double> SquareView(exec::DeviceBuffer<double>& buf, int norb) {
   return MatrixView<double>{buf.device_data(), norb, norb, norb};
+}
+
+/// Read-only view of a dense num_orbits x num_orbits matrix.
+MatrixView<const double> ConstSquareView(const exec::DeviceBuffer<double>& buf,
+                                         int norb) {
+  return MatrixView<const double>{buf.device_data(), norb, norb, norb};
 }
 
 /// POD bundle of the contraction kernel.
@@ -140,12 +148,13 @@ static_assert(std::is_trivially_copyable_v<OneBodyOutArgs>);
 /// chic_de eta~^J_epdq), chic_de = chib_de + s chib_ed (231: I, IIIa, IIIb).
 /// One thread per one-body channel entry (p, q); O(E norb c Jr). Fenced.
 void AddOneBody(const op::Operator& eta, const op::Operator& gamma,
-                op::Operator& Z, double s, Workspace::Impl& impl) {
+                MatrixView<const double> chia, op::Operator& Z, double s,
+                Workspace::Impl& impl) {
   const int norb = impl.tables.orbits().num_orbits;
   OneBodyOutArgs a;
   a.eta = impl.two_body_view(eta);
   a.gamma = impl.two_body_view(gamma);
-  a.chia = SquareView(impl.factorized.chia, norb);
+  a.chia = chia;
   a.chib = SquareView(impl.factorized.chib, norb);
   a.j2 = impl.tables.orbits().j2;
   a.owner = impl.ob_owner.device_data();
@@ -215,14 +224,15 @@ static_assert(std::is_trivially_copyable_v<TwoBodyOutArgs>);
 /// transposed (exact for the round-off asymmetry of chi1); Z(c, r) = h_Z
 /// Z(r, c). O(sum over channels of N^2 x orbits per one-body channel). Fenced.
 void AddTwoBody(const op::Operator& eta, const op::Operator& gamma,
-                op::Operator& Z, double hz, double s, Workspace::Impl& impl) {
+                MatrixView<const double> chi1, op::Operator& Z, double hz,
+                double s, Workspace::Impl& impl) {
   const int norb = impl.tables.orbits().num_orbits;
   const TwoBodyView ev = impl.two_body_view(eta);
   TwoBodyOutArgs a;
   a.eta = ev.data;
   a.gamma = impl.two_body_view(gamma).data;
   a.z2 = Z.two_body().matrix().buffer().device_data();
-  a.chi1 = SquareView(impl.factorized.chi1, norb);
+  a.chi1 = chi1;
   a.chi2 = SquareView(impl.factorized.chi2, norb);
   a.block_offset = impl.block_offsets.device_data();
   a.num_kets = ev.tb.channel_num_kets;
@@ -284,23 +294,26 @@ void CheckOperand(const op::Operator& o, const char* name) {
         " must be scalar, number conserving and of particle rank <= 2");
 }
 
-}  // namespace
-
-void FactorizedDoubleCommutator(const op::Operator& eta,
-                                const op::Operator& gamma, op::Operator& Z,
-                                const FactorizedOptions& opts, Workspace& ws) {
+/// The checks of eta (see factorized.h).
+void CheckEta(const op::Operator& eta, const Workspace& ws) {
   IMSRG_CHECK(ws.Compatible(eta),
               "factorized: eta is not on the workspace's model space");
-  IMSRG_CHECK(ws.Compatible(gamma),
-              "factorized: gamma is not on the workspace's model space");
-  IMSRG_CHECK(&Z != &eta && &Z != &gamma,
-              "factorized: Z must not alias eta or gamma");
   CheckOperand(eta, "eta");
-  CheckOperand(gamma, "gamma");
   if (eta.hermiticity() != Hermiticity::kAntiHermitian)
     throw NotImplementedError(
         "factorized double commutator: eta must be anti-Hermitian (imsrg++ "
         "assumes it)");
+}
+
+/// The checks of gamma, Z and the options (see factorized.h).
+void CheckGamma(const op::Operator& eta, const op::Operator& gamma,
+                const op::Operator& Z, const FactorizedOptions& opts,
+                const Workspace& ws) {
+  IMSRG_CHECK(ws.Compatible(gamma),
+              "factorized: gamma is not on the workspace's model space");
+  IMSRG_CHECK(&Z != &eta && &Z != &gamma,
+              "factorized: Z must not alias eta or gamma");
+  CheckOperand(gamma, "gamma");
   if (gamma.hermiticity() == Hermiticity::kNonHermitian)
     throw NotImplementedError(
         "factorized double commutator: NonHermitian gamma is not supported");
@@ -308,7 +321,11 @@ void FactorizedDoubleCommutator(const op::Operator& eta,
     throw NotImplementedError(
         "factorized double commutator: two-body intermediates are not "
         "implemented (the IMSRG(3f2) recipe, D32, switches them off)");
+}
 
+/// Resets Z to a zero scalar rank-2 operator with gamma's hermiticity, reusing
+/// its storage when the spec already matches.
+void ResetZ(const op::Operator& gamma, op::Operator& Z, const Workspace& ws) {
   const op::OperatorSpec spec =
       op::OperatorSpec::Scalar(2, gamma.hermiticity());
   if (!Z.empty() && Z.spec() == spec && ws.Compatible(Z)) {
@@ -316,8 +333,42 @@ void FactorizedDoubleCommutator(const op::Operator& eta,
   } else {
     Z = op::Operator(ws.model_space_ptr(), spec);
   }
-  if (!opts.one_body_intermediates) return;
-  if (!eta.two_body().allocated() || !gamma.two_body().allocated()) return;
+}
+
+/// True if F vanishes identically: no topology selected, or eta or gamma
+/// without a two-body part.
+bool Vanishes(const op::Operator& eta, const op::Operator& gamma,
+              const FactorizedOptions& opts) {
+  return !opts.one_body_intermediates || !eta.two_body().allocated() ||
+         !gamma.two_body().allocated();
+}
+
+}  // namespace
+
+FactorizedEta::FactorizedEta(const op::Operator& eta, Workspace& ws)
+    : eta_(&eta) {
+  CheckEta(eta, ws);
+  auto& impl = ws.impl();
+  const int norb = impl.tables.orbits().num_orbits;
+  const auto n =
+      static_cast<std::size_t>(norb) * static_cast<std::size_t>(norb);
+  chi1_ = exec::DeviceBuffer<double>(n, "commutator::factorized_chi1");
+  chia_ = exec::DeviceBuffer<double>(n, "commutator::factorized_chia");
+  if (!eta.two_body().allocated()) return;
+  detail::LadderProducts(eta, eta, impl);  // W_x = eta P_x eta
+  ContractChi(eta, true, impl, SquareView(chi1_, norb),
+              SquareView(chia_, norb));
+}
+
+void FactorizedDoubleCommutator(const FactorizedEta& pre,
+                                const op::Operator& gamma, op::Operator& Z,
+                                const FactorizedOptions& opts, Workspace& ws) {
+  const op::Operator& eta = pre.eta();
+  IMSRG_CHECK(ws.Compatible(eta),
+              "factorized: eta is not on the workspace's model space");
+  CheckGamma(eta, gamma, Z, opts, ws);
+  ResetZ(gamma, Z, ws);
+  if (Vanishes(eta, gamma, opts)) return;
 
   auto& impl = ws.impl();
   const int norb = impl.tables.orbits().num_orbits;
@@ -325,14 +376,24 @@ void FactorizedDoubleCommutator(const op::Operator& eta,
       static_cast<double>(op::HermiticitySign(gamma.hermiticity()));
   const double s =
       static_cast<double>(op::HermiticitySign(eta.hermiticity())) * hz;
-  detail::LadderProducts(eta, eta, impl);
-  ContractChi(eta, true, impl, SquareView(impl.factorized.chi1, norb),
-              SquareView(impl.factorized.chia, norb));
-  detail::LadderProducts(gamma, eta, impl);
+  detail::LadderProducts(gamma, eta, impl);  // V_x = gamma P_x eta
   ContractChi(eta, false, impl, SquareView(impl.factorized.chi2, norb),
               SquareView(impl.factorized.chib, norb));
-  AddOneBody(eta, gamma, Z, s, impl);
-  AddTwoBody(eta, gamma, Z, hz, s, impl);
+  AddOneBody(eta, gamma, ConstSquareView(pre.chia(), norb), Z, s, impl);
+  AddTwoBody(eta, gamma, ConstSquareView(pre.chi1(), norb), Z, hz, s, impl);
+}
+
+void FactorizedDoubleCommutator(const op::Operator& eta,
+                                const op::Operator& gamma, op::Operator& Z,
+                                const FactorizedOptions& opts, Workspace& ws) {
+  CheckEta(eta, ws);
+  CheckGamma(eta, gamma, Z, opts, ws);
+  if (Vanishes(eta, gamma, opts)) {
+    ResetZ(gamma, Z, ws);
+    return;
+  }
+  const FactorizedEta pre(eta, ws);
+  FactorizedDoubleCommutator(pre, gamma, Z, opts, ws);
 }
 
 }  // namespace imsrg::commutator
