@@ -257,6 +257,36 @@ std::vector<Row> Rows() {
        "imsrg3.variant",
        "not active",
        true},
+      {"V56_1b_intermediates_without_factorized",
+       {{"imsrg3.factorized_1b_intermediates", B(false)}},
+       "V-56",
+       "imsrg3.factorized_1b_intermediates",
+       "imsrg3.factorized is false",
+       true},
+      {"V56_2b_intermediates_without_factorized",
+       {{"imsrg3.factorized_2b_intermediates", B(true)}},
+       "V-56",
+       "imsrg3.factorized_2b_intermediates",
+       "imsrg3.factorized is false",
+       true},
+      {"V57_factorized_with_in_flow",
+       {{"imsrg3.factorized", B(true)}, {"imsrg3.in_flow", B(true)}},
+       "V-57",
+       "imsrg3.in_flow",
+       "double count",
+       true},
+      {"V57_factorized_with_at_end",
+       {{"imsrg3.factorized", B(true)}, {"imsrg3.at_end", B(true)}},
+       "V-57",
+       "imsrg3.at_end",
+       "double count",
+       true},
+      {"V57_factorized_with_other_method",
+       {{"imsrg3.factorized", B(true)}, {"imsrg.method", S("flow_euler")}},
+       "V-57",
+       "imsrg3.factorized",
+       "requires imsrg.method",
+       false},
       {"V52_at_end_without_3n",
        {{"imsrg3.at_end", B(true)}},
        "V-52",
@@ -329,6 +359,21 @@ TEST(Validate, table_of_rules) {
       EXPECT_EQ(i->severity, Severity::kError);
     }
   }
+}
+
+TEST(Validate, factorized_recipe_keys_do_not_trip_v50_or_v56) {
+  const auto r = Resolve(With(Minimal(), {{"imsrg3.factorized", B(true)}}),
+                         ResolveOptions{false, false});
+  EXPECT_EQ(FindIssue(r.issues, "V-50"), nullptr);
+  EXPECT_EQ(FindIssue(r.issues, "V-56"), nullptr);
+  EXPECT_EQ(FindIssue(r.issues, "V-57"), nullptr);
+  EXPECT_FALSE(HasErrors(r.issues));
+  // Explicit sub-switches with factorized are accepted.
+  const auto r2 =
+      Resolve(With(Minimal(), {{"imsrg3.factorized", B(true)},
+                               {"imsrg3.factorized_1b_intermediates", B(false)}}),
+              ResolveOptions{false, false});
+  EXPECT_FALSE(HasErrors(r2.issues));
 }
 
 TEST(Validate, legacy_downgrades_selected_rules_to_warnings) {

@@ -147,7 +147,8 @@ to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9.
   it acts at the BCH level (it reuses the nested commutator from two steps back, `BCH.cc:182-191`)
   and is switched on with `BchOptions::factorized` (`[imsrg3] factorized = true`). The owner's
   3f2 recipe (D32): hunter-gatherer Magnus, `omega_norm_max` 0.1, 1b intermediates on, 2b
-  intermediates off; `factorized = true` sets these as defaults (`16` §2.8).
+  intermediates off; `factorized = true` sets these as defaults (`16` §2.8). Implemented in M10 3f2
+  (kernels, `BchOptions`, config keys V-56/V-57, driver wiring, IT-10).
 * **As implemented (M7, tag `m7-api-ready`):** headers `imsrg/commutator/{options,workspace,
   commutator}.h`. `Commutator(X, Y, Z, opts, ws)` overwrites Z (reusing its storage when the
   spec matches) and an allocating overload returns Z; `terms::Comm*ss` add one term each;

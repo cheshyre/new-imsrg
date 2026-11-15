@@ -222,6 +222,30 @@ TEST(Writer, OutputReadsBackWithoutIssuesAndContainsEveryKey) {
   EXPECT_GT(checked, 30u);
 }
 
+TEST(Writer, FactorizedRecipeValuesRoundTrip) {
+  RunConfig cfg = SampleConfig();
+  cfg.reference.nucleus = "O16";
+  cfg.imsrg3.factorized = true;
+  cfg.imsrg3.factorized_1b_intermediates = false;
+  cfg.imsrg3.factorized_2b_intermediates = true;
+  cfg.imsrg.omega.hunter_gatherer = true;
+  cfg.imsrg.step.omega_norm_max = 0.1;
+  const std::string text = ToToml(cfg, false);
+  EXPECT_TRUE(HasLine(text, "factorized = true"));
+  EXPECT_TRUE(HasLine(text, "factorized_1b_intermediates = false"));
+  EXPECT_TRUE(HasLine(text, "factorized_2b_intermediates = true"));
+  EXPECT_TRUE(HasLine(text, "hunter_gatherer = true"));
+  EXPECT_TRUE(HasLine(text, "omega_norm_max = 0.10000000000000001"));
+  RawTree tree;
+  EXPECT_TRUE(ReadTomlString(text, "rt", tree).empty());
+  for (const char* k :
+       {"imsrg3.factorized", "imsrg3.factorized_1b_intermediates",
+        "imsrg3.factorized_2b_intermediates", "imsrg.omega.hunter_gatherer",
+        "imsrg.step.omega_norm_max"}) {
+    EXPECT_TRUE(tree.contains(k)) << k;
+  }
+}
+
 TEST(Writer, WriteResolvedConfigCreatesDirectories) {
   static std::atomic<int> counter{0};
   const std::filesystem::path root =

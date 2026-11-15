@@ -470,6 +470,32 @@ void Checker::Imsrg3Rules() {
     if (i3.threebody_threshold != def.threebody_threshold)
       bad("threebody_threshold");
   }
+  if (!i3.factorized) {
+    // V-56: the 3f2 sub-switches only mean something with `factorized`.
+    if (i3.factorized_1b_intermediates != def.factorized_1b_intermediates ||
+        i3.factorized_2b_intermediates != def.factorized_2b_intermediates) {
+      Strict("V-56",
+             i3.factorized_1b_intermediates != def.factorized_1b_intermediates
+                 ? "imsrg3.factorized_1b_intermediates"
+                 : "imsrg3.factorized_2b_intermediates",
+             "imsrg3.factorized_1b_intermediates / "
+             "imsrg3.factorized_2b_intermediates are set but "
+             "imsrg3.factorized is false");
+    }
+  } else {
+    // V-57: 3f2 replaces the explicit 3-body terms and lives in the Magnus
+    // BCH transform.
+    if (i3.active()) {
+      Strict("V-57", i3.in_flow ? "imsrg3.in_flow" : "imsrg3.at_end",
+             "imsrg3.factorized cannot be combined with imsrg3.in_flow or "
+             "imsrg3.at_end (the factorized correction would double count "
+             "the explicit 3-body terms)");
+    }
+    if (cfg_.imsrg.method != Method::kMagnus) {
+      Strict("V-57", "imsrg3.factorized",
+             "imsrg3.factorized requires imsrg.method = \"magnus\"");
+    }
+  }
   if (i3.at_end) {
     if (cfg_.imsrg.method != Method::kMagnus) {
       Strict("V-52", "imsrg3.at_end",
