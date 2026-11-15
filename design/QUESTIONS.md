@@ -584,4 +584,6 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   next team kernels ([2,3]->3, [3,3]->2) arrive.
 * **M10-Q34** (2026-11-15, M10 T5) - Additive API beyond the brief: `ThreeBodyContext::
   ScratchBytesPerTeam()` (reported by the benchmark) and `impl()` (the internal tables, a
-  `detail::` type for tests and the benchmark). **Assumed meanwhile:** kept; both removable.
+  `detail::` type for tests and the benchmark). **Assumed meanwhile:** kept; both removable. The
+  context also holds `op::PairThirdSpace`'s E map (1.1 MB of its 4.2 MB at O16 emax 3 E3max 9),
+  which these kernels never read; PairThirdSpace has no option to skip it.

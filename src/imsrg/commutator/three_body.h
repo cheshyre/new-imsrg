@@ -82,7 +82,8 @@ class ThreeBodyContext {
 
   /// Bytes of the device tables owned by the context (basis tables, 6j table,
   /// pair-third states with R and E, canonical-space tables, orbit groups,
-  /// work orders), for reports. 0 for a moved-from context.
+  /// leg gather tables, work orders), for reports. 0 for a moved-from
+  /// context.
   std::int64_t TableBytes() const noexcept;
 
   /// Bytes of team scratch one team of the tile kernels requests (sized from
@@ -141,8 +142,8 @@ op::ThreeBody Comm223(const op::Operator& X, const op::Operator& Y,
 /// reduction: the last digits depend on the thread count.
 /// @throws InputError if `epsilon.size()` is not the number of orbits, and as
 ///         `Comm223` for X, Y and the context.
-/// Complexity: as `Comm223` restricted to the hhh-ppp-type tiles (about 5 %
-/// of the full term for a closed-shell reference).
+/// Complexity: as `Comm223` restricted to the hhh-ppp-type tiles (2 % of the
+/// time of the full term for O16 at emax 3).
 double PerturbativeTriplesEnergy(const op::Operator& X, const op::Operator& Y,
                                  std::span<const double> epsilon,
                                  const ThreeBodyContext& ctx);
