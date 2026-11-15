@@ -23,6 +23,8 @@
 #include "imsrg/base/log.h"
 #include "imsrg/basis/orbit.h"
 #include "imsrg/driver/config/writer.h"
+#include "imsrg/driver/operators/operator_request.h"
+#include "imsrg/driver/pipeline/charge_radius.h"
 #include "imsrg/driver/pipeline/hamiltonian.h"
 #include "imsrg/flow/magnus.h"
 #include "imsrg/flow/ode.h"
@@ -306,6 +308,46 @@ struct OperatorRecord {
   std::string file;
 };
 
+/// The charge radius of the output stage (D35): the zero-body parts of Rp2 and
+/// Rso before the flow (HF) and after it, and the Rch2 built from them.
+struct ChargeRadiusRecord {
+  double rso_reference = 0.0;
+  double rso_imsrg = 0.0;
+  double rch2_reference = 0.0;
+  double rch2_imsrg = 0.0;
+};
+
+/// Positions of Rp2 and Rso in the operator list the flow evolves.
+struct ChargeRadiusSlots {
+  std::size_t rp2 = 0;
+  std::size_t rso = 0;
+};
+
+/// The charge radius is produced whenever the plain `Rp2` is requested (D35).
+/// Finds Rp2 and Rso in `requests` and appends an Rso request if there is
+/// none. Returns nullopt (and leaves `requests` alone) without a requested Rp2
+/// or without protons.
+std::optional<ChargeRadiusSlots> PlanChargeRadius(
+    const RunConfig& config, std::vector<OperatorRequest>& requests) {
+  std::optional<std::size_t> rp2;
+  std::optional<std::size_t> rso;
+  for (std::size_t i = 0; i < requests.size(); ++i) {
+    if (requests[i].kind == OperatorKind::kRp2 && !rp2) rp2 = i;
+    if (requests[i].kind == OperatorKind::kRso && !rso) rso = i;
+  }
+  if (!rp2) return std::nullopt;
+  if (!rso) {
+    auto parsed =
+        ParseOperatorSpec("Rso", ModelSpaceInfo{.emax = config.basis.emax});
+    if (!parsed.has_value() || parsed.value().size() != 1) {
+      throw InvariantError("the catalog operator Rso does not parse");
+    }
+    requests.push_back(parsed.value().front());
+    rso = requests.size() - 1;
+  }
+  return ChargeRadiusSlots{*rp2, *rso};
+}
+
 /// Occupations of the core (1 for core orbits, 0 otherwise).
 std::vector<double> CoreOccupations(const basis::ModelSpace& ms) {
   std::vector<double> occ(static_cast<std::size_t>(ms.num_orbits()), 0.0);
@@ -372,14 +414,15 @@ void WriteValenceFile(const fs::path& path, op::Operator O, const RunConfig& c,
 
 /// Version of the `results.json` layout (design/16 section 2.10: the schema
 /// table and its changelog). Bump it with every change of the written keys.
-constexpr int kResultsSchemaVersion = 2;
+constexpr int kResultsSchemaVersion = 3;
 
 void WriteResults(const fs::path& path, const pipeline::PreparedHamiltonian& ph,
                   const std::vector<StageRecord>& stages, double e0,
                   std::size_t num_omegas, int num_gathers,
                   const std::vector<OperatorRecord>& ops,
                   const std::string& valence_file,
-                  const std::optional<TriplesRecord>& triples = {}) {
+                  const std::optional<TriplesRecord>& triples = {},
+                  const std::optional<ChargeRadiusRecord>& radius = {}) {
   std::ofstream out(path);
   if (!out) throw InputError("cannot write '" + path.string() + "'");
   out << "{\n  \"schema_version\": " << kResultsSchemaVersion
@@ -419,7 +462,21 @@ void WriteResults(const fs::path& path, const pipeline::PreparedHamiltonian& ph,
         << ", \"imsrg\": " << Fmt17(ops[i].imsrg)
         << ", \"file\": " << JsonString(ops[i].file) << "}";
   }
-  out << "},\n  \"valence_interaction\": "
+  out << "}";
+  if (radius) {
+    const auto rch = [](double rch2) {
+      const std::optional<double> r = pipeline::ChargeRadius(rch2);
+      return r ? Fmt17(*r) : std::string("null");
+    };
+    out << ",\n  \"charge_radius\": {\"rso\": {\"reference\": "
+        << Fmt17(radius->rso_reference)
+        << ", \"imsrg\": " << Fmt17(radius->rso_imsrg)
+        << "}, \"rch2\": {\"reference\": " << Fmt17(radius->rch2_reference)
+        << ", \"imsrg\": " << Fmt17(radius->rch2_imsrg)
+        << "}, \"rch\": {\"reference\": " << rch(radius->rch2_reference)
+        << ", \"imsrg\": " << rch(radius->rch2_imsrg) << "}}";
+  }
+  out << ",\n  \"valence_interaction\": "
       << (valence_file.empty() ? std::string("null") : JsonString(valence_file))
       << "\n}\n";
 }
@@ -458,10 +515,17 @@ void Run(const RunConfig& config) {
   // The ODE methods evolve the requested operators alongside H, so these are
   // built first (imsrg++.cc:1074); Magnus replays its Omega stack afterwards.
   const bool magnus = config.imsrg.method == Method::kMagnus;
+  // The charge radius (D35) needs Rso next to Rp2: an Rso that was not
+  // requested is evaluated internally as one more operator after the requested
+  // ones (flowing alongside H for the ODE methods); it gets no file and no
+  // `operators` entry.
+  std::vector<OperatorRequest> requests = config.operators.list;
+  const std::optional<ChargeRadiusSlots> radius_slots =
+      PlanChargeRadius(config, requests);
   std::vector<op::Operator> prepared;
   std::vector<OperatorRecord> ops;
   if (!magnus) {
-    for (const OperatorRequest& req : config.operators.list) {
+    for (const OperatorRequest& req : requests) {
       prepared.push_back(pipeline::PrepareOperator(req, ph, config));
       OperatorRecord rec;
       rec.name = req.canonical_name;
@@ -520,6 +584,13 @@ void Run(const RunConfig& config) {
     // Derived from the solver's options so that the domega bump persists.
     flow::SolverOptions so2 = solver.solver_options();
     so2.smax = (magnus ? 2.0 : 1.0) * step.smax;
+    if (config.imsrg.method == Method::kFlow) {
+      // The flow parameter continues across the stages (M8-Q40), but imsrg++'s
+      // adaptive method restarts at s = 0 and so integrates [0, smax] again
+      // even when stage 1 ran to smax. The flow equation is autonomous, so
+      // the equivalent range here is [s_1, s_1 + smax] (M8-Q50).
+      so2.smax = stages.back().result.s + step.smax;
+    }
     SmallStepsForStiffGenerators(val_gen, so2);
     log::Info("Setting generator to {}", ToString(val_gen));
     solver.set_generator(MakeGeneratorOptions(config, val_gen, ms));
@@ -561,8 +632,8 @@ void Run(const RunConfig& config) {
 
   // ---- Operators: HF-basis, normal-ordered operators transformed with the
   // Omega stack.
-  for (std::size_t i = 0; i < config.operators.list.size(); ++i) {
-    const OperatorRequest& req = config.operators.list[i];
+  for (std::size_t i = 0; i < requests.size(); ++i) {
+    const OperatorRequest& req = requests[i];
     op::Operator hf;
     if (magnus) {
       hf = pipeline::PrepareOperator(req, ph, config);
@@ -577,13 +648,32 @@ void Run(const RunConfig& config) {
     if (renormal) O = RenormalOrderToCore(O);
     rec.imsrg = O.zero_body();
     log::Info("{}   IMSRG: {:.8f}", rec.name, rec.imsrg);
+    if (i >= config.operators.list.size()) continue;  // internal Rso
     rec.file = (dir / (stem + "_" + rec.name + ".snt")).string();
     WriteValenceFile(rec.file, O, config, ph,
                      io::ValenceWriteMode::kIsospinAveragedOperator);
   }
+  std::optional<ChargeRadiusRecord> radius;
+  if (radius_slots) {
+    const OperatorRecord& rp2 = ops.at(radius_slots->rp2);
+    const OperatorRecord& rso = ops.at(radius_slots->rso);
+    ChargeRadiusRecord rr;
+    rr.rso_reference = rso.reference;
+    rr.rso_imsrg = rso.imsrg;
+    rr.rch2_reference = pipeline::ChargeRadiusSquared(
+        rp2.reference, rso.reference, ph.mass_number, ph.proton_number);
+    rr.rch2_imsrg = pipeline::ChargeRadiusSquared(
+        rp2.imsrg, rso.imsrg, ph.mass_number, ph.proton_number);
+    log::Info(
+        "Charge radius^2 (Rp2 + Rso/Z + nucleon terms): HF {:.6f} fm^2, "
+        "IMSRG {:.6f} fm^2",
+        rr.rch2_reference, rr.rch2_imsrg);
+    radius = rr;
+  }
+  ops.resize(config.operators.list.size());  // drop the internal Rso
 
   WriteResults(dir / "results.json", ph, stages, e0, solver.num_omegas(),
-               solver.num_gathers(), ops, valence_file, triples);
+               solver.num_gathers(), ops, valence_file, triples, radius);
   if (diverged) {
     throw NumericalError(
         "the IMSRG flow diverged (see the flow log); results.json was written");

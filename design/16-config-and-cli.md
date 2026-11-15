@@ -216,7 +216,7 @@ first column of this table and compares it with the keys of a real run, so the t
 
 | key | type | present | meaning |
 |---|---|---|---|
-| `schema_version` | int | always | layout version of this table (currently 2). |
+| `schema_version` | int | always | layout version of this table (currently 3). |
 | `e_reference` | number | always | reference energy: E_HF in the basis of the flow (HF or NAT basis) or the zero-body part of the normal-ordered Hamiltonian (oscillator basis); Lawson constant not included. |
 | `e_mp2` | number | always | MBPT(2) correlation energy of the normal-ordered Hamiltonian that enters the flow (HF or NAT basis; imsrg++ `EMP2`), MeV. Equals the `E_MP2` of flow-file step 0. *(added in run 2)* |
 | `hf` | object | `basis.kind = "hf"` | the Hartree-Fock solution. |
@@ -247,6 +247,16 @@ first column of this table and compares it with the keys of a real run, so the t
 | `operators.<name>.reference` | number | per operator | zero-body part before the flow (HF basis, normal ordered). |
 | `operators.<name>.imsrg` | number | per operator | zero-body part after the flow. |
 | `operators.<name>.file` | string | per operator | path of the written operator file. |
+| `charge_radius` | object | `Rp2` is among `operators.list` | the charge radius of the output stage *(added in version 3, D35)*: `Rch2 = Rp2 + Rso/Z + r_p^2 + (N/Z) r_n^2 + Darwin-Foldy` with `r_p^2 = 0.707`, `r_n^2 = -0.1161`, Darwin-Foldy `0.033172` fm^2 (`PhysicalConstants.hh`), `N = A - Z` of the Rp2 operator; evaluated for the plain `Rp2` (not `Rp2Z`/`Rp2AZ`). `Rso` is evaluated internally if it was not requested (it then has no `operators` entry or file). |
+| `charge_radius.rso` | object | with `charge_radius` | zero-body part of the spin-orbit correction `Rso`, fm^2. |
+| `charge_radius.rso.reference` | number | with `charge_radius` | before the flow (HF basis). |
+| `charge_radius.rso.imsrg` | number | with `charge_radius` | after the flow. |
+| `charge_radius.rch2` | object | with `charge_radius` | mean square charge radius, fm^2. |
+| `charge_radius.rch2.reference` | number | with `charge_radius` | from the HF values of Rp2 and Rso. |
+| `charge_radius.rch2.imsrg` | number | with `charge_radius` | from the values after the flow. |
+| `charge_radius.rch` | object | with `charge_radius` | charge radius `sqrt(Rch2)`, fm. |
+| `charge_radius.rch.reference` | number or null | with `charge_radius` | HF value; `null` if `Rch2` is negative or not finite. |
+| `charge_radius.rch.imsrg` | number or null | with `charge_radius` | value after the flow; `null` as above. |
 | `valence_interaction` | string or null | always | path of the valence-space interaction file, `null` without a valence space. |
 
 The flow file (`output.flow_file`, CSV with a header line) has one row per solver step, `istep = 0`
@@ -256,6 +266,9 @@ norm_eta_2b, norm_eta, norm_omega_1b, norm_omega_2b, norm_omega, num_omegas, E_M
 file (`E(MP2)` column); it costs one MP2 evaluation per step.
 
 Changelog (newest first):
+
+* **3** (run 2, M8, 2026-11-15): added `charge_radius` (`rso`, `rch2`, `rch`, each with `reference` and
+  `imsrg`), written when `Rp2` is a requested operator. No other key changed.
 
 * **2** (run 2, M10, 2026-11-15): added `imsrg.perturbative_triples` (`de`, `e0_plus_de`), written only
   when `imsrg.perturbative_triples = true`. No other key changed.

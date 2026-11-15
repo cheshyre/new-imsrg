@@ -270,6 +270,22 @@ and never includes the spin-orbit correction, which stays available as the separ
 (`RpSpinOrbitCorrection`, catalog name `Rso`; a charge radius adds `Rso/Z` explicitly). No imsrg++ compatibility switch: the goldens come from a patched
 imsrg-devel build (`30` §3).
 
+**Charge radius (D35, run 2; `driver/pipeline/charge_radius.h`).** The operator contract: `Rp2` is the
+intrinsic point-proton radius squared WITHOUT the spin-orbit term, `Rso` the spin-orbit correction (so
+imsrg++'s old `Rp2` equals our `Rp2 + Rso/Z` to 3.5e-17). The driver's output stage builds the charge
+radius whenever the plain `Rp2` is requested (not `Rp2Z`/`Rp2AZ`; operators of other families are
+untouched): `Rch2 = Rp2 + Rso/Z + r_p^2 + (N/Z) r_n^2 + Darwin-Foldy` (fm^2) with `N = A - Z` of the
+Rp2 operator and `r_p^2 = 0.707`, `r_n^2 = -0.1161`, Darwin-Foldy = 0.033172 (`imsrg::constants`, from
+`PhysicalConstants.hh`; the imsrg++ lines are `imsrg++.cc:845` and `:1367`). `Rch = sqrt(Rch2)` (`null` in
+`results.json` if negative; imsrg++'s `|Rp2| < 1e-6 -> 0` guard of the HF printout is not copied).
+`Rso` is evaluated internally if it was not requested: for Magnus it is one more operator replayed with the
+Omega stack, for the ODE methods one more operator flowing alongside H; it gets no `operators` entry and no
+file. Both the HF (`reference`) and the final (`imsrg`) values are written, `results.json` key
+`charge_radius` (`16` §2.10). Validated against the pristine imsrg++ (its `Rp2` still held the spin-orbit
+term), `flow_RK4`/`flow` runs, which are the only methods for which it prints a charge radius: HF radius to
+2e-9 fm, IMSRG radius to the 6 printed decimals (He4 emax 2 and O16 emax 3; tests in `driver_flow_methods`
+and `driver_charge_radius`).
+
 ## 9. driver
 
 The pipeline replicates `imsrg++.cc` (see `reference/03` §1):
