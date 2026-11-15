@@ -5,6 +5,7 @@ import csv
 import json
 import math
 import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -170,16 +171,30 @@ def test_solver_option_validation(o16):
 
 
 def test_solve_releases_the_gil(o16):
-    s = flow.MagnusSolver(o16["H"], solver=flow.SolverOptions(smax=4.0))
+    # While the solver thread is inside solve(), the main thread counts 1 ms
+    # ticks; it can only run if solve() releases the GIL (otherwise it ticks
+    # about once, after the solve). The bound scales with the measured solve
+    # time (about one tick per ms expected, a quarter required), so a faster
+    # solve no longer fails the test: the earlier fixed bound of 20 ticks
+    # failed once the smax-4 solve took < 20 ms in the serial build (M12-Q3).
+    s = flow.MagnusSolver(o16["H"], solver=flow.SolverOptions(smax=20.0))
     done = threading.Event()
-    t = threading.Thread(target=lambda: (s.solve(), done.set()))
+    elapsed = [0.0]
+
+    def work():
+        t0 = time.perf_counter()
+        s.solve()
+        elapsed[0] = time.perf_counter() - t0
+        done.set()
+
+    t = threading.Thread(target=work)
     ticks = 0
     t.start()
     while not done.is_set():
         ticks += 1
         done.wait(0.001)
     t.join()
-    assert ticks > 20  # the main thread ran while the solver worked
+    assert ticks >= max(5, elapsed[0] * 1000.0 / 4)  # the main thread ran meanwhile
 
 
 def test_hunter_gatherer_he4_matches_imsrgpp(golden, he4_emax2):

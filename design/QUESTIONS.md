@@ -667,3 +667,7 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   the test is wall-time fragile and gets worse as the commutator gets faster. **Assumed:** not
   loosened here; the test needs a longer solve (e.g. larger smax or a bigger fixture) or a
   deterministic hook (event set inside a callback) instead of counting ticks.
+  **Resolved by the M12a lead:** the test now solves to smax 20 (35 ms serial) and requires at least
+  a quarter of the ticks the measured solve time allows (and at least 5); a GIL-holding solve gives
+  about one. Same check, independent of the solver speed. (A time-stamp variant was rejected: the
+  GIL hand-off at a callback's entry also produces stamps inside the windows.)
