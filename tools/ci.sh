@@ -3,8 +3,8 @@
 #
 # Runs, timing each step: submodules (init if missing) -> configure (preset, -DIMSRG_WERROR=ON)
 # -> build -> unit tests -> integration tests (only if the input data exist) -> MPI tests (only
-# if MPI is enabled) -> layering check -> clang-format (our sources only). Tests labeled `slow`
-# never run here. The last line is exactly `CI PASS <preset>` or `CI FAIL <preset>: <step>`, and
+# if MPI is enabled) -> layering check -> clang-format and cpplint (our sources only). Tests
+# labeled `slow` never run here. The last line is exactly `CI PASS <preset>` or `CI FAIL <preset>: <step>`, and
 # the exit status is nonzero on failure. Works from any worktree: it checks the checkout that
 # contains this script. Needs no network once the submodules are checked out. The layering and
 # format checks see tracked files and new files not yet added (never gitignored ones).
@@ -156,19 +156,50 @@ step_layering() {
     "$python" tools/check_layering.py --repo-root "$repo_root" --self-test
 }
 
+# Our C++ sources: tracked files plus new files not yet added (never ignored ones) that still
+# exist, under src apps tests python tools/bench (never extern/, tools/reference/, tests/golden/).
+cxx_sources() {
+  local f
+  git ls-files --cached --others --exclude-standard -- src apps tests python tools/bench \
+    | grep -E '\.(c|cc|cpp|cxx|cu|h|hh|hpp|hxx|inl|ipp|tpp)$' | grep -v '^tests/golden/' \
+    | sort -u | while IFS= read -r f; do if [ -f "$f" ]; then echo "$f"; fi; done
+}
+
 step_format() {
   if ! command -v clang-format >/dev/null 2>&1; then
     echo "clang-format not found (brew install clang-format)"; return 1
   fi
   echo "$(clang-format --version)"
-  # Tracked files plus new files not yet added (but never ignored ones), that still exist.
-  local files f
-  files=$(git ls-files --cached --others --exclude-standard -- src apps tests python tools/bench \
-    | grep -E '\.(c|cc|cpp|cxx|cu|h|hh|hpp|hxx|inl|ipp|tpp)$' | grep -v '^tests/golden/' \
-    | sort -u | while IFS= read -r f; do if [ -f "$f" ]; then echo "$f"; fi; done)
+  local files
+  files=$(cxx_sources)
   if [ -z "$files" ]; then echo "no C++ sources"; return 0; fi
   echo "checking $(echo "$files" | wc -l | tr -d ' ') files"
   echo "$files" | tr '\n' '\0' | xargs -0 clang-format --dry-run --Werror
+}
+
+# cpplint with the repository's CPPLINT.cfg (design/17 section 4). Advisory until the
+# Google-style conversion has fixed the findings (design/17 section 5, step 8): it reports them
+# but does not fail.
+step_cpplint() {
+  local cpplint=$IMSRG_VENV/bin/cpplint files out n
+  if [ ! -x "$cpplint" ]; then
+    cpplint=$(command -v cpplint) || {
+      echo "cpplint not found (pip install -r tools/requirements-dev.txt)"; return 1; }
+  fi
+  echo "$("$cpplint" --version | head -n 2 | tail -n 1)"
+  files=$(cxx_sources | grep -E '\.(h|cc)$')
+  if [ -z "$files" ]; then echo "no .h/.cc sources"; return 0; fi
+  echo "checking $(echo "$files" | wc -l | tr -d ' ') files"
+  out=$(echo "$files" | tr '\n' '\0' | xargs -0 "$cpplint" --quiet 2>&1)
+  n=$(echo "$out" | grep -c -E '\[[a-z_+0-9/]+\] \[[0-9]\]$')
+  if [ "$n" -gt 0 ]; then
+    echo "$out" | grep -E '\[[a-z_+0-9/]+\] \[[0-9]\]$' \
+      | sed -E 's/.*\[([a-z_+0-9/]+)\] \[[0-9]\]$/\1/' | sort | uniq -c | sort -rn
+    echo "cpplint: $n findings (advisory)"
+  else
+    echo "cpplint: no findings"
+  fi
+  return 0
 }
 
 run_step submodules step_submodules
@@ -205,4 +236,5 @@ esac
 
 run_step layering step_layering
 run_step clang-format step_format
+run_step cpplint step_cpplint
 finish PASS
