@@ -115,7 +115,7 @@ std::string FormatValue(const KeyInfo& key, const T& value) {
     return FormatDouble(value);
   } else if constexpr (std::is_same_v<T, std::string>) {
     return Quote(value);
-  } else if constexpr (ConfigEnum<T>) {
+  } else if constexpr (detail::ConfigEnum<T>) {
     return Quote(ToString(value));
   } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
     if (key.string_or_array && value.size() == 1) return Quote(value.front());

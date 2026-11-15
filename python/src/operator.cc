@@ -25,6 +25,8 @@
 #include "python/src/bindings.h"
 
 namespace imsrg::py {
+
+namespace nb = nanobind;
 namespace {
 
 /// Wraps a column-major host matrix as a zero-copy numpy view kept alive by

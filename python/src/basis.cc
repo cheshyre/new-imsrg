@@ -18,6 +18,8 @@
 #include "python/src/bindings.h"
 
 namespace imsrg::py {
+
+namespace nb = nanobind;
 namespace {
 
 /// A two-body channel (J, parity, Tz) with its index in the model space.

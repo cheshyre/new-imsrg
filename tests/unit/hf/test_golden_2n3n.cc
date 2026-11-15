@@ -9,6 +9,8 @@
 #include "tests/unit/hf/hf_test_support.h"
 
 namespace imsrg::hftest {
+
+namespace fs = std::filesystem;
 namespace {
 
 TEST(HfGolden2N3N, Emax2O16Linear) {

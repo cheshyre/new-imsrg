@@ -15,6 +15,8 @@
 #include "tests/unit/hf/hf_test_support.h"
 
 namespace imsrg::hftest {
+
+namespace fs = std::filesystem;
 namespace {
 
 double SecondsSince(std::chrono::steady_clock::time_point t0) {

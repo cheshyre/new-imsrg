@@ -613,7 +613,7 @@ class Translator {
     return std::nullopt;
   }
 
-  /// Map a spelling through `table`; the canonical spellings are accepted too.
+  /// Maps a spelling through `table`; the canonical spellings are accepted too.
   /// Unknown -> V-01.
   std::optional<std::string> MapEnum(const Entry& e, std::string_view path,
                                      std::span<const Spelling> table) {

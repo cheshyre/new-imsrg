@@ -11,6 +11,8 @@
 #include "tests/unit/hf/hf_test_support.h"
 
 namespace imsrg::hftest {
+
+namespace fs = std::filesystem;
 namespace {
 
 /// Compares `hno` with the dump `file`, prints the deviations and returns the

@@ -17,7 +17,8 @@
 namespace imsrg::driver {
 namespace {
 
-template <ConfigEnum E>
+template <class E>
+  requires detail::ConfigEnum<E>
 void ExpectEnumRoundTrip() {
   std::set<std::string_view> seen;
   for (const auto& entry : EnumTraits<E>::entries) {

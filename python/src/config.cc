@@ -22,6 +22,8 @@
 
 namespace imsrg::py {
 
+namespace nb = nanobind;
+
 namespace {
 
 using driver::RunConfig;

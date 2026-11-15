@@ -28,8 +28,6 @@
 
 namespace imsrg::it {
 
-namespace fs = std::filesystem;
-
 /// A flow CSV: column names and numeric rows (one per step, istep 0 of every
 /// stage included).
 struct FlowTable {
@@ -50,7 +48,7 @@ struct FlowTable {
 
 /// Reads a comma separated flow file with a header line. @throws
 /// std::runtime_error if missing.
-inline FlowTable ReadFlow(const fs::path& path) {
+inline FlowTable ReadFlow(const std::filesystem::path& path) {
   std::ifstream in(path);
   if (!in) throw std::runtime_error("cannot open flow file " + path.string());
   FlowTable t;
@@ -74,7 +72,7 @@ inline FlowTable ReadFlow(const fs::path& path) {
 }
 
 /// Reads a whole text file. @throws std::runtime_error if missing.
-inline std::string Slurp(const fs::path& path) {
+inline std::string Slurp(const std::filesystem::path& path) {
   std::ifstream in(path);
   if (!in) throw std::runtime_error("cannot open " + path.string());
   std::ostringstream os;
@@ -84,26 +82,27 @@ inline std::string Slurp(const fs::path& path) {
 
 /// A fresh, empty directory `<tmp>/imsrg_it_<tag>_<pid-independent counter>`;
 /// any earlier directory of the same name is removed first.
-inline fs::path FreshDir(const std::string& tag) {
+inline std::filesystem::path FreshDir(const std::string& tag) {
   // CTest runs every test case in its own process, in parallel, and the
   // IT-2/IT-6/IT-12 cases each repeat the shared run: the process id keeps
   // their output directories apart.
-  const fs::path d = fs::temp_directory_path() /
-                     ("imsrg_it_" + tag + "_" + std::to_string(::getpid()));
+  const std::filesystem::path d =
+      std::filesystem::temp_directory_path() /
+      ("imsrg_it_" + tag + "_" + std::to_string(::getpid()));
   std::error_code ec;
-  fs::remove_all(d, ec);
-  fs::create_directories(d);
+  std::filesystem::remove_all(d, ec);
+  std::filesystem::create_directories(d);
   return d;
 }
 
 /// Absolute path of an input file below `IMSRG_TEST_DATA_DIR`.
-inline fs::path DataFile(const std::string& name) {
-  return fs::path(IMSRG_TEST_DATA_DIR) / name;
+inline std::filesystem::path DataFile(const std::string& name) {
+  return std::filesystem::path(IMSRG_TEST_DATA_DIR) / name;
 }
 
 /// Absolute path of a golden file below `IMSRG_GOLDEN_DIR/e2e`.
-inline fs::path GoldenFile(const std::string& rel) {
-  return fs::path(IMSRG_GOLDEN_DIR) / "e2e" / rel;
+inline std::filesystem::path GoldenFile(const std::string& rel) {
+  return std::filesystem::path(IMSRG_GOLDEN_DIR) / "e2e" / rel;
 }
 
 /// The 2N interaction file used by every integration test.
@@ -118,7 +117,7 @@ inline const char* ThreeBodyName() {
 /// Everything a finished run left behind.
 struct RunResult {
   driver::RunConfig config;
-  fs::path directory;
+  std::filesystem::path directory;
   Json results;          ///< parsed `results.json`
   FlowTable flow;        ///< parsed flow CSV (empty if the run wrote none)
   bool planned = false;  ///< `Run()` is not implemented yet (E-PLANNED)
@@ -130,7 +129,7 @@ struct RunResult {
 /// throwing. Other failures throw `std::runtime_error` carrying every config
 /// issue or the run's message.
 inline RunResult Execute(const driver::ConfigSources& sources,
-                         const fs::path& directory) {
+                         const std::filesystem::path& directory) {
   RunResult r;
   r.directory = directory;
   auto loaded = driver::LoadConfig(sources);
@@ -151,10 +150,11 @@ inline RunResult Execute(const driver::ConfigSources& sources,
     throw;
   }
   r.results = ParseJson(Slurp(directory / "results.json"));
-  const fs::path flow_path = r.config.output.flow_file.empty()
-                                 ? directory / (r.config.output.stem + ".flow")
-                                 : fs::path(r.config.output.flow_file);
-  if (fs::exists(flow_path)) r.flow = ReadFlow(flow_path);
+  const std::filesystem::path flow_path =
+      r.config.output.flow_file.empty()
+          ? directory / (r.config.output.stem + ".flow")
+          : std::filesystem::path(r.config.output.flow_file);
+  if (std::filesystem::exists(flow_path)) r.flow = ReadFlow(flow_path);
   return r;
 }
 
@@ -162,7 +162,8 @@ inline RunResult Execute(const driver::ConfigSources& sources,
 /// into `dir`. `extra` is appended verbatim (further tables such as `[valence]`
 /// or `[operators]`); keys of tables already open at the end must not be
 /// repeated there.
-inline std::string TomlText(const fs::path& dir, const std::string& nucleus,
+inline std::string TomlText(const std::filesystem::path& dir,
+                            const std::string& nucleus,
                             const std::string& extra, bool three_body = false,
                             const std::string& smax = "") {
   std::ostringstream t;

@@ -17,6 +17,8 @@
 #include "python/src/bindings.h"
 
 namespace imsrg::py {
+
+namespace nb = nanobind;
 namespace {
 
 // Process singleton (design/18 section 4.3). Heap-allocated and never deleted:

@@ -141,7 +141,7 @@ class Reader {
         return true;
       }
       return false;
-    } else if constexpr (ConfigEnum<F>) {
+    } else if constexpr (detail::ConfigEnum<F>) {
       const auto* s = v.get_if<std::string>();
       if (s == nullptr) {
         TypeError(path, v, "a string");

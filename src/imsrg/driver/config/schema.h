@@ -117,15 +117,21 @@ struct EnumEntry {
 template <class E>
 struct EnumTraits;
 
-/// An enum with `EnumTraits`.
+namespace detail {
+
+/// An enum with `EnumTraits`. Internal: concepts stay out of the public API
+/// (Google style); the functions below state it as a requires-clause.
 template <class E>
 concept ConfigEnum = std::is_enum_v<E> && requires {
   EnumTraits<E>::type_name;
   EnumTraits<E>::entries;
 };
 
+}  // namespace detail
+
 /// Canonical spelling of `value` ("" if it is not an enumerator).
-template <ConfigEnum E>
+template <class E>
+  requires detail::ConfigEnum<E>
 constexpr std::string_view ToString(E value) noexcept {
   for (const auto& entry : EnumTraits<E>::entries) {
     if (entry.value == value) return entry.name;
@@ -134,7 +140,8 @@ constexpr std::string_view ToString(E value) noexcept {
 }
 
 /// The enumerator spelled exactly `name`, or nullopt.
-template <ConfigEnum E>
+template <class E>
+  requires detail::ConfigEnum<E>
 constexpr std::optional<E> EnumFromString(std::string_view name) noexcept {
   for (const auto& entry : EnumTraits<E>::entries) {
     if (entry.name == name) return entry.value;
@@ -143,7 +150,8 @@ constexpr std::optional<E> EnumFromString(std::string_view name) noexcept {
 }
 
 /// Phase of `value`.
-template <ConfigEnum E>
+template <class E>
+  requires detail::ConfigEnum<E>
 constexpr Phase EnumPhase(E value) noexcept {
   for (const auto& entry : EnumTraits<E>::entries) {
     if (entry.value == value) return entry.phase;
@@ -153,7 +161,8 @@ constexpr Phase EnumPhase(E value) noexcept {
 
 /// All canonical spellings of `E`, in declaration order (did-you-mean
 /// candidates, docs).
-template <ConfigEnum E>
+template <class E>
+  requires detail::ConfigEnum<E>
 std::vector<std::string_view> EnumNames() {
   std::vector<std::string_view> names;
   for (const auto& entry : EnumTraits<E>::entries) names.push_back(entry.name);

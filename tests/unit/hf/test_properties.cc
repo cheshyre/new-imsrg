@@ -10,6 +10,8 @@
 #include "tests/unit/hf/hf_test_support.h"
 
 namespace imsrg::hftest {
+
+namespace fs = std::filesystem;
 namespace {
 
 struct State {

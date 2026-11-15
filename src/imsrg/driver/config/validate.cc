@@ -119,7 +119,7 @@ class PlannedEnumVisitor {
 
   template <class F>
   void Field(const KeyInfo& key, F& f) {
-    if constexpr (ConfigEnum<F>) {
+    if constexpr (detail::ConfigEnum<F>) {
       if (EnumPhase(f) == Phase::kPlanned) {
         c_.AddError("E-PLANNED", std::string(key.path),
                     "'" + std::string(ToString(f)) +

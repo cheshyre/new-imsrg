@@ -17,8 +17,6 @@
 
 namespace imsrg::py {
 
-namespace nb = nanobind;
-
 /// Python-side ModelSpace: a handle to the immutable C++ model space (value
 /// semantics, shared).
 struct PyModelSpace {
@@ -55,13 +53,13 @@ struct PyOperator : op::Operator {
 void EnsureRuntime();
 
 /// Binds imsrg.Runtime and the atexit hook.
-void BindRuntime(nb::module_& m);
+void BindRuntime(nanobind::module_& m);
 /// Binds Orbit, Channel, ModelSpace.
-void BindBasis(nb::module_& m);
+void BindBasis(nanobind::module_& m);
 /// Binds Operator, OperatorSpec, enums, dump I/O, norms, random operators.
-void BindOperator(nb::module_& m);
+void BindOperator(nanobind::module_& m);
 /// Binds RunConfig and load_config.
-void BindConfig(nb::module_& m);
+void BindConfig(nanobind::module_& m);
 
 }  // namespace imsrg::py
 

@@ -29,8 +29,6 @@
 
 namespace imsrg::hftest {
 
-namespace fs = std::filesystem;
-
 /// A JSON value reduced to what the golden files contain: numbers, arrays,
 /// objects.
 struct Json {
@@ -122,7 +120,7 @@ class JsonParser {
   std::size_t p_ = 0;
 };
 
-inline Json ReadJson(const fs::path& path) {
+inline Json ReadJson(const std::filesystem::path& path) {
   std::ifstream in(path);
   if (!in) throw std::runtime_error("cannot open " + path.string());
   std::stringstream ss;
@@ -138,7 +136,7 @@ struct Golden {
   std::vector<std::vector<double>> C;  // rows: C[ho][hf]
 };
 
-inline Golden LoadGolden(const fs::path& path) {
+inline Golden LoadGolden(const std::filesystem::path& path) {
   const Json j = ReadJson(path);
   Golden g;
   g.e_hf = j.at("EHF").number;
@@ -194,23 +192,23 @@ inline void CompareToGolden(const hf::HFResult& r, const Golden& g,
 }
 
 /// Hamiltonian from `dir/H.dump`.
-inline op::Operator LoadHamiltonian(const fs::path& dir) {
-  const fs::path dump = dir / "H.dump";
+inline op::Operator LoadHamiltonian(const std::filesystem::path& dir) {
+  const std::filesystem::path dump = dir / "H.dump";
   const auto ms = op::ModelSpaceForDump(op::ReadOperatorDumpHeader(dump));
   return op::ReadOperatorDump(dump, ms);
 }
 
 /// The NO2B file of the 2N+3N cases (outside the repo); empty path if absent.
-inline fs::path No2bFile() {
-  const fs::path p =
-      fs::path(IMSRG_TEST_DATA_DIR) /
+inline std::filesystem::path No2bFile() {
+  const std::filesystem::path p =
+      std::filesystem::path(IMSRG_TEST_DATA_DIR) /
       "NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin";
-  return fs::exists(p) ? p : fs::path{};
+  return std::filesystem::exists(p) ? p : std::filesystem::path{};
 }
 
 /// Reads the NO2B file (stored with truncation {6,12,18,6}) into a container
 /// with `trunc`.
-inline op::No2bThreeBody LoadV3(const fs::path& file,
+inline op::No2bThreeBody LoadV3(const std::filesystem::path& file,
                                 const op::No2bTruncation& trunc) {
   op::No2bThreeBody v3(trunc);
   io::ReadNo2b(file, {.file = {6, 12, 18, 6}}, v3);

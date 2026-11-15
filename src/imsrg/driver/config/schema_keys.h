@@ -12,7 +12,7 @@
 /// design/16 section 2 and of `resolved_config.toml`),
 ///   * `visitor.Field(const KeyInfo&, Field&)` for every leaf key, where
 ///     `Field` is the field's type (`bool`, `int`, `double`, `std::string`,
-///     `std::optional<int|double|std::string>`, a `ConfigEnum`,
+///     `std::optional<int|double|std::string>`, a `detail::ConfigEnum`,
 ///     `std::vector<std::string>`, `std::vector<OperatorRequest>` or
 ///     `std::vector<OperatorFromFile>`), const-qualified when `config` is
 ///     const;

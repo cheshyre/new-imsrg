@@ -9,6 +9,8 @@
 #include "tests/unit/hf/hf_test_support.h"
 
 namespace imsrg::hftest {
+
+namespace fs = std::filesystem;
 namespace {
 
 void Check(const fs::path& ham_dir, const fs::path& hfjson,
