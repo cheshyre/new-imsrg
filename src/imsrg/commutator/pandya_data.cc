@@ -145,4 +145,45 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
   return d;
 }
 
+void EnsureGeneralScratch(PandyaData& pd) {
+  PandyaGeneralData& g = pd.general;
+  if (g.allocated()) return;
+  const auto ncc = static_cast<std::size_t>(pd.num_cc);
+  g.g_off_host.assign(ncc + 1, 0);
+  g.gz_off_host.assign(ncc + 1, 0);
+  for (std::size_t c = 0; c < ncc; ++c) {
+    const std::int64_t n = pd.ncc_host[c];
+    const std::int64_t nk = pd.nk_host[c];
+    g.g_off_host[c + 1] = g.g_off_host[c] + 4 * n * nk;
+    g.gz_off_host[c + 1] = g.gz_off_host[c] + 4 * n * n;
+  }
+  g.g_off = Upload(g.g_off_host, "pandya_general::g_off");
+  g.gz_off = Upload(g.gz_off_host, "pandya_general::gz_off");
+  g.a = exec::DeviceBuffer<double>(
+      static_cast<std::size_t>(g.g_off_host.back()), "pandya_general::A");
+  g.b = exec::DeviceBuffer<double>(
+      static_cast<std::size_t>(g.g_off_host.back()), "pandya_general::B");
+  g.z = exec::DeviceBuffer<double>(
+      static_cast<std::size_t>(g.gz_off_host.back()), "pandya_general::Z");
+  g.gemms.clear();
+  for (std::size_t c = 0; c < ncc; ++c) {
+    const std::int64_t n = pd.ncc_host[c];
+    const std::int64_t nk = pd.nk_host[c];
+    // nk == 0 blocks are skipped: their Z stays zero (never written).
+    if (n == 0 || nk == 0) continue;
+    linalg::GemmProblem p;
+    p.alpha = 1.0;
+    p.A = linalg::MatrixView<const double>{g.a.device_data() + g.g_off_host[c],
+                                           2 * n, 2 * nk, 2 * n};
+    p.opA = linalg::Op::kNoTrans;
+    p.B = linalg::MatrixView<const double>{g.b.device_data() + g.g_off_host[c],
+                                           2 * nk, 2 * n, 2 * nk};
+    p.opB = linalg::Op::kNoTrans;
+    p.beta = 0.0;
+    p.C = linalg::MatrixView<double>{g.z.device_data() + g.gz_off_host[c],
+                                     2 * n, 2 * n, 2 * n};
+    g.gemms.push_back(p);
+  }
+}
+
 }  // namespace imsrg::commutator::detail

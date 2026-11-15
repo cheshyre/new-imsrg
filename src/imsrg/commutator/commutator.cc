@@ -23,18 +23,20 @@ void CheckTermInputs(const op::Operator& X, const op::Operator& Y,
   IMSRG_CHECK(ws.Compatible(Z),
               "commutator: Z is not on the workspace's model space");
   IMSRG_CHECK(&Z != &X && &Z != &Y, "commutator: Z must not alias X or Y");
-  if (X.hermiticity() == Hermiticity::kNonHermitian ||
-      Y.hermiticity() == Hermiticity::kNonHermitian)
-    throw NotImplementedError(
-        "commutator: NonHermitian X or Y is not supported");
   IMSRG_CHECK(
       Z.hermiticity() == CommutatorSpec(X.spec(), Y.spec()).hermiticity,
       "commutator: Z's hermiticity must be that of [X, Y] (Hermitian if X and "
-      "Y differ in "
-      "hermiticity, anti-Hermitian otherwise)");
+      "Y differ in hermiticity, anti-Hermitian if they agree, general if "
+      "either is general)");
+}
+
+bool IsGeneral(const op::Operator& X, const op::Operator& Y) {
+  return X.hermiticity() == Hermiticity::kNonHermitian ||
+         Y.hermiticity() == Hermiticity::kNonHermitian;
 }
 
 int CommutatorHermiticitySign(const op::Operator& X, const op::Operator& Y) {
+  IMSRG_ASSERT(!IsGeneral(X, Y));
   return -op::HermiticitySign(X.hermiticity()) *
          op::HermiticitySign(Y.hermiticity());
 }
@@ -72,10 +74,6 @@ void Commutator(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   IMSRG_CHECK(ws.Compatible(Y),
               "commutator: Y is not on the workspace's model space");
   IMSRG_CHECK(&Z != &X && &Z != &Y, "commutator: Z must not alias X or Y");
-  if (X.hermiticity() == Hermiticity::kNonHermitian ||
-      Y.hermiticity() == Hermiticity::kNonHermitian)
-    throw NotImplementedError(
-        "commutator: NonHermitian X or Y is not supported");
 
   const op::OperatorSpec spec = CommutatorSpec(X.spec(), Y.spec());
   if (!Z.empty() && Z.spec() == spec && ws.Compatible(Z)) {

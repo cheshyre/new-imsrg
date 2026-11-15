@@ -3,7 +3,7 @@
 
 // The simple terms (110, 220, 111, 121, 122) of the fast commutator: golden
 // acceptance, term-by-term comparison with commutator_ref on random operators,
-// and the NonHermitian guard.
+// (the general paths are tested in test_general.cc).
 #include <cstdio>
 #include <filesystem>
 #include <string>
@@ -88,18 +88,6 @@ TEST(commutator_simple_terms, fast_vs_reference) {
         EXPECT_LE(dev, kTol) << sc.label << " " << hp.label << " " << t.name;
       }
     }
-  }
-}
-
-TEST(commutator_simple_terms, nonhermitian_input_throws) {
-  const auto ms = imsrg::testing::MakeModelSpace(1, "He4");
-  Workspace ws(ms);
-  const Operator X = RandomOperator(ms, Hermiticity::kNonHermitian, 3);
-  const Operator Y = RandomOperator(ms, Hermiticity::kHermitian, 4);
-  Operator Z(ms, op::OperatorSpec::Scalar(2, Hermiticity::kAntiHermitian));
-  for (const auto& t : kTerms) {
-    EXPECT_THROW(t.fast(X, Y, Z, ws), NotImplementedError) << t.name;
-    EXPECT_THROW(t.fast(Y, X, Z, ws), NotImplementedError) << t.name;
   }
 }
 

@@ -11,6 +11,8 @@
 //   2. one grouped gemm W = Xg Yg per channel and projector,
 //   3. the in-place antisymmetrization M = W + h_Z W^T, valid because X^T = h_X
 //      X, Y^T = h_Y Y give Y P X = h_X h_Y (X P Y)^T and h_Z = -h_X h_Y.
+// For general X or Y (no such symmetry) step 2 also computes W' = Y P X
+// (`detail::LadderProductsGeneral`) and step 3 is M = W - W'.
 
 #include <algorithm>
 #include <cstdint>
@@ -108,8 +110,13 @@ static_assert(std::is_trivially_copyable_v<SymArgs>);
 
 namespace detail {
 
-void LadderProducts(const op::Operator& X, const op::Operator& Y,
-                    Workspace::Impl& impl) {
+namespace {
+
+/// W = A P B per channel and projector into `p->*out` (`product` or
+/// `product_yx`) for the gathered A, B. See `LadderProducts`.
+void ProductsInto(const op::Operator& X, const op::Operator& Y,
+                  Workspace::Impl& impl,
+                  exec::DeviceBuffer<double> LadderProjector::* out) {
   auto& lad = impl.ladder;
   const TwoBodyView xv = impl.two_body_view(X);
   const TwoBodyView yv = impl.two_body_view(Y);
@@ -123,7 +130,7 @@ void LadderProducts(const op::Operator& X, const op::Operator& Y,
   lad.problems.clear();
   const int nch = xv.tb.num_channels;
   for (LadderProjector* p : {&lad.pp, &lad.hh}) {
-    double* prod = p->product.device_data();
+    double* prod = (p->*out).device_data();
     const double* xg = p->xg.device_data();
     const double* yg = p->yg.device_data();
     for (int ch = 0; ch < nch; ++ch) {
@@ -155,6 +162,36 @@ void LadderProducts(const op::Operator& X, const op::Operator& Y,
   linalg::GroupedGemm(lad.problems);
 }
 
+}  // namespace
+
+void LadderProducts(const op::Operator& X, const op::Operator& Y,
+                    Workspace::Impl& impl) {
+  ProductsInto(X, Y, impl, &LadderProjector::product);
+}
+
+void LadderProductsGeneral(const op::Operator& X, const op::Operator& Y,
+                           Workspace::Impl& impl) {
+  auto& lad = impl.ladder;
+  for (LadderProjector* p : {&lad.pp, &lad.hh}) {
+    if (p->product_yx.size() != p->product.size())
+      p->product_yx =
+          exec::DeviceBuffer<double>(p->product.size(), "ladder_product_yx");
+  }
+  ProductsInto(X, Y, impl, &LadderProjector::product);     // X P Y
+  ProductsInto(Y, X, impl, &LadderProjector::product_yx);  // Y P X
+  // Blocks without listed kets are skipped by both products: they stay zero,
+  // and 0 - 0 = 0.
+  for (LadderProjector* p : {&lad.pp, &lad.hh}) {
+    double* w = p->product.device_data();
+    const double* wyx = p->product_yx.device_data();
+    exec::ParallelFor(
+        "commutator::ladder_general_difference",
+        static_cast<exec::Index>(impl.two_body_size),
+        IMSRG_LAMBDA(const exec::Index e) { w[e] -= wyx[e]; });
+  }
+  exec::Fence("commutator::ladder_general_difference");
+}
+
 }  // namespace detail
 
 namespace terms {
@@ -162,11 +199,17 @@ namespace terms {
 namespace {
 
 /// Computes Mpp and Mhh for X and Y into `impl.ladder.{pp,hh}.product`. X and Y
-/// must have an allocated two-body part; `h_z` is the hermiticity sign of the
-/// commutator. Leaves the device idle (fenced). Complexity: two grouped gemms
-/// of sum_c N_c^2 (|Kp| + |Kh|) flops.
-void ComputeIntermediates(const op::Operator& X, const op::Operator& Y, int h_z,
+/// must have an allocated two-body part. (Anti-)Hermitian X, Y: one product and
+/// the antisymmetrization M = W + hZ W^T; general X or Y: both products
+/// (`detail::LadderProductsGeneral`). Leaves the device idle (fenced).
+/// Complexity: two grouped gemms of sum_c N_c^2 (|Kp| + |Kh|) flops.
+void ComputeIntermediates(const op::Operator& X, const op::Operator& Y,
                           Workspace::Impl& impl) {
+  if (detail::IsGeneral(X, Y)) {
+    detail::LadderProductsGeneral(X, Y, impl);
+    return;
+  }
+  const int h_z = detail::CommutatorHermiticitySign(X, Y);
   detail::LadderProducts(X, Y, impl);  // W = X P Y for P = P_pp, P_hh
 
   auto& lad = impl.ladder;
@@ -279,12 +322,6 @@ bool HasTwoBody(const op::Operator& X, const op::Operator& Y) {
   return X.two_body().allocated() && Y.two_body().allocated();
 }
 
-/// hZ = -hX hY from X and Y (Z's flag is validated against it by
-/// `CheckTermInputs`).
-int ZSign(const op::Operator& X, const op::Operator& Y) {
-  return detail::CommutatorHermiticitySign(X, Y);
-}
-
 }  // namespace
 
 void Comm222PpHhss(const op::Operator& X, const op::Operator& Y,
@@ -292,7 +329,7 @@ void Comm222PpHhss(const op::Operator& X, const op::Operator& Y,
   detail::CheckTermInputs(X, Y, Z, ws);
   if (!HasTwoBody(X, Y) || !Z.two_body().allocated()) return;
   auto& impl = ws.impl();
-  ComputeIntermediates(X, Y, ZSign(X, Y), impl);
+  ComputeIntermediates(X, Y, impl);
   AddLadderTwoBody(Z, impl);
 }
 
@@ -301,7 +338,7 @@ void Comm221ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   detail::CheckTermInputs(X, Y, Z, ws);
   if (!HasTwoBody(X, Y)) return;
   auto& impl = ws.impl();
-  ComputeIntermediates(X, Y, ZSign(X, Y), impl);
+  ComputeIntermediates(X, Y, impl);
   Add221(Z, impl, X);
 }
 
@@ -310,7 +347,7 @@ void Comm222PpHh221ss(const op::Operator& X, const op::Operator& Y,
   detail::CheckTermInputs(X, Y, Z, ws);
   if (!HasTwoBody(X, Y)) return;
   auto& impl = ws.impl();
-  ComputeIntermediates(X, Y, ZSign(X, Y), impl);
+  ComputeIntermediates(X, Y, impl);
   if (Z.two_body().allocated()) AddLadderTwoBody(Z, impl);
   Add221(Z, impl, X);
 }

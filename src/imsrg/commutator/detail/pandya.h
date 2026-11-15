@@ -69,6 +69,27 @@ struct PandyaView {
 };
 static_assert(std::is_trivially_copyable_v<PandyaView>);
 
+/// Scratch of the general (non-Hermitian) particle-hole path, allocated on the
+/// first general call by `EnsureGeneralScratch` (see there for the layout).
+struct PandyaGeneralData {
+  std::vector<std::int64_t>
+      g_off_host;  ///< Offsets (num_cc + 1) of the A and B blocks.
+  std::vector<std::int64_t>
+      gz_off_host;  ///< Offsets (num_cc + 1) of the Z blocks.
+  exec::DeviceBuffer<std::int64_t> g_off, gz_off;  ///< Device copies.
+  exec::DeviceBuffer<double> a, b, z;              ///< A, B and Z = A B.
+  std::vector<linalg::GemmProblem> gemms;  ///< One GEMM per channel with
+                                           ///< Ncc > 0 and |K| > 0.
+
+  /// True once `EnsureGeneralScratch` has run. O(1).
+  bool allocated() const noexcept { return !gz_off_host.empty(); }
+
+  /// Size of A, B and Z in bytes (0 before the first general call). O(1).
+  std::size_t scratch_bytes() const noexcept {
+    return (a.size() + b.size() + z.size()) * sizeof(double);
+  }
+};
+
 /// Device-resident data and scratch of the particle-hole term. Movable, not
 /// copyable (the prebuilt GEMM list and the cached view hold pointers into the
 /// scratch buffers, which survive moves because the buffers are heap
@@ -107,6 +128,8 @@ struct PandyaData {
   /// scratch).
   std::vector<linalg::GemmProblem> gemms;
 
+  PandyaGeneralData general;  ///< Scratch of the general path (lazy).
+
   /// Trivially copyable view for kernels, cached at build time; valid while
   /// this object lives.
   PandyaView kernel_view;
@@ -128,6 +151,21 @@ struct PandyaData {
 /// and ZB (2 Ncc^2 each), i.e. Ncc (3 nk + 4 Ncc); `scratch_bytes()` reports
 /// it.
 PandyaData BuildPandyaData(const basis::ModelSpace& ms);
+
+/// Allocates (once) the scratch of the general particle-hole path for the
+/// channels of `pd`. General X or Y have no (anti-)Hermiticity to halve the
+/// work, so the path computes the Pandya-transformed result for all ordered
+/// pairs on both sides: Zbar(alpha, beta) = sum_kappa D_kappa (Xbar(alpha,
+/// kappa) Ybar(kappa, beta) - Ybar(alpha, kappa) Xbar(kappa, beta)) for alpha,
+/// beta in the 2 Ncc ordered pairs of the channel, as ONE GEMM per channel
+///   Z (2Ncc x 2Ncc) = A (2Ncc x 2nk) B (2nk x 2Ncc),
+///   A = [ D Xbar(alpha, kappa) | -D Ybar(alpha, kappa) ],
+///   B = [ Ybar(kappa, beta) ; Xbar(kappa, beta) ]   (stacked rows),
+/// all column-major (A, B at the same offset `g_off`, each 4 Ncc nk doubles; Z
+/// at `gz_off`, 4 Ncc^2). Memory O(sum over cc channels of Ncc (8 nk + 4
+/// Ncc)) doubles, about 4x the Hermitian scratch, paid only by programs that
+/// use general operators. Idempotent. Needs an initialized `exec::Runtime`.
+void EnsureGeneralScratch(PandyaData& pd);
 
 }  // namespace imsrg::commutator::detail
 

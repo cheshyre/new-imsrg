@@ -41,7 +41,9 @@ void Comm110ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                Workspace& ws) {
   detail::CheckTermInputs(X, Y, Z, ws);
   // [X,Y] is anti-Hermitian (hZ = -hX hY = -1) -> the scalar part vanishes.
-  if (detail::CommutatorHermiticitySign(X, Y) < 0) return;
+  // (A general Z may have a scalar part; the sums below need no symmetry.)
+  if (!detail::IsGeneral(X, Y) && detail::CommutatorHermiticitySign(X, Y) < 0)
+    return;
   const auto& impl = ws.impl();
   OneBodyArgs a;
   a.x = std::as_const(X).one_body().device_view();
@@ -73,7 +75,9 @@ void Comm220ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                Workspace& ws) {
   detail::CheckTermInputs(X, Y, Z, ws);
   // [X,Y] is anti-Hermitian (hZ = -hX hY = -1) -> the scalar part vanishes.
-  if (detail::CommutatorHermiticitySign(X, Y) < 0) return;
+  // (A general Z may have a scalar part; the sums below need no symmetry.)
+  if (!detail::IsGeneral(X, Y) && detail::CommutatorHermiticitySign(X, Y) < 0)
+    return;
   if (!X.two_body().allocated() || !Y.two_body().allocated()) return;
   const auto& impl = ws.impl();
   const TwoBodyView xv = impl.two_body_view(X);
@@ -213,14 +217,56 @@ void Comm122ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   const std::int32_t* lfrom = impl.lifted.from.device_data();
   const std::int32_t* lto = impl.lifted.to.device_data();
   const double* lcoef = impl.lifted.coef.device_data();
-  const double hz =
-      static_cast<double>(detail::CommutatorHermiticitySign(X, Y));
   const int nch = xv.tb.num_channels;
   const exec::Index total = static_cast<exec::Index>(impl.two_body_size);
+  if (detail::IsGeneral(X, Y)) {
+    // General X or Y: no symmetry is used. One thread per element (r, c) of
+    // every block: the bra part B(r, c) is the lifted one-body list of row r
+    // acting on column c of X, Y; the ket part K(r, c) = sum_a (Y_ij,al X_ak +
+    // Y_ij,ka X_al) - (X <-> Y) is the list of row c acting on row r of X, Y
+    // with the one-body matrix transposed (coef is shared: it depends only on
+    // the lifted ket and on the normalization of the row or column).
+    exec::ParallelFor(
+        "commutator::comm122ss_general", total,
+        IMSRG_LAMBDA(const exec::Index e) {
+          const int ch = detail::FindBlock(block_offset, nch, e);
+          const std::int64_t off = block_offset[ch];
+          const std::int64_t local = e - off;
+          const int n = num_kets[ch];
+          const int r = static_cast<int>(local % n);
+          const int c = static_cast<int>(local / n);
+          const int rb = row_base[ch];
+          double bra = 0.0;
+          for (int t = entry_offset[rb + r]; t < entry_offset[rb + r + 1];
+               ++t) {
+            const std::int64_t idx =
+                off + lm[t] + static_cast<std::int64_t>(c) * n;
+            double v = 0.0;
+            if (yd != nullptr) v += x1(lfrom[t], lto[t]) * yd[idx];
+            if (xd != nullptr) v -= y1(lfrom[t], lto[t]) * xd[idx];
+            bra += lcoef[t] * v;
+          }
+          double ket = 0.0;
+          for (int t = entry_offset[rb + c]; t < entry_offset[rb + c + 1];
+               ++t) {
+            const std::int64_t idx =
+                off + r + static_cast<std::int64_t>(lm[t]) * n;
+            double v = 0.0;
+            if (yd != nullptr) v += x1(lto[t], lfrom[t]) * yd[idx];
+            if (xd != nullptr) v -= y1(lto[t], lfrom[t]) * xd[idx];
+            ket += lcoef[t] * v;
+          }
+          z2[e] += bra - ket;
+        });
+    exec::Fence("commutator::comm122ss");
+    return;
+  }
+  const double hz =
+      static_cast<double>(detail::CommutatorHermiticitySign(X, Y));
   // One thread per element (r, c) with r <= c. B(r, c) is the bra part (lifted
   // one-body list of row r acting on column c of X, Y); the ket part of Z(r, c)
-  // is hZ B(c, r) by hermiticity of X, Y (checked by check_term_inputs), and
-  // Z(c, r) = hZ Z(r, c). No division or sqrt.
+  // is hZ B(c, r) by hermiticity of X, Y, and Z(c, r) = hZ Z(r, c). No
+  // division or sqrt.
   exec::ParallelFor(
       "commutator::comm122ss", total, IMSRG_LAMBDA(const exec::Index e) {
         const int ch = detail::FindBlock(block_offset, nch, e);

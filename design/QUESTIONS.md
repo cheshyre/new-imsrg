@@ -542,3 +542,15 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   and the hunter-gatherer `H_saved` rebuild; `BchOptions::factorized` does the same (the solver passes
   one `BchOptions` to all its BCH calls). **Assumed meanwhile:** intended (it is what the IT-10
   goldens contain for H); say if operators should be transformed without the correction.
+* **M7-Q10** (2026-11-15, M7 general paths) - The general (NonHermitian) paths are chosen by the
+  hermiticity FLAG of X or Y, not by inspecting the data: an operator flagged NonHermitian but
+  holding Hermitian data gives the same numbers as the symmetric paths (tested, 4e-16) at higher
+  cost (about 2x ladder flops, 4x particle-hole flops, scratch 4x the Pandya scratch, allocated on
+  first use). **Assumed meanwhile:** callers who know the symmetry set the flag (the flow does).
+* **M7-Q11** (2026-11-15, M7 general paths) - The brief asked to test `commutator_ref` for general
+  operators against a dense (m-scheme) brute force if the reference did not support them. It does:
+  every term is bilinear, the reference matches imsrg++ goldens and the symmetry-based fast kernels
+  for all (anti-)Hermitian pairs, which span every operator, and
+  `commutator_ref_properties.general_by_general_bilinearity` shows the reference respects the
+  bilinear decomposition for general X and Y. **Assumed meanwhile:** that is sufficient; a true
+  m-scheme brute force stays on the M10 list (needed there for 3B anyway, design/30 section 1).

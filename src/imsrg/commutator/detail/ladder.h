@@ -45,6 +45,10 @@ struct LadderProjector {
   exec::DeviceBuffer<double>
       product;  ///< W = X P Y (`LadderProducts`), antisymmetrized in place
                 ///< to Mpp or Mhh by the ladder terms; two-body layout.
+  exec::DeviceBuffer<double>
+      product_yx;  ///< W' = Y P X, general operators only: empty until the
+                   ///< first `LadderProductsGeneral` call (lazy allocation, so
+                   ///< (anti-)Hermitian flows never pay for it).
 };
 
 /// Device-resident data of the ladder terms.
@@ -81,6 +85,15 @@ LadderData BuildLadderData(const basis::ModelSpace& ms);
 /// (host BLAS). Complexity: grouped gemms of sum_c N_c^2 (|Kp| + |Kh|) flops.
 void LadderProducts(const op::Operator& X, const op::Operator& Y,
                     Workspace::Impl& impl);
+
+/// General (non-Hermitian) form of the ladder intermediates: afterwards
+/// `impl.ladder.{pp,hh}.product` hold Mpp = X P_pp Y - Y P_pp X and Mhh = X
+/// P_hh Y - Y P_hh X directly (no use of X^T = hX X). Preconditions as for
+/// `LadderProducts`. Allocates the `product_yx` scratch on first use. The
+/// results are complete when it returns. Complexity: twice that of
+/// `LadderProducts` plus one elementwise pass.
+void LadderProductsGeneral(const op::Operator& X, const op::Operator& Y,
+                           Workspace::Impl& impl);
 
 }  // namespace imsrg::commutator::detail
 

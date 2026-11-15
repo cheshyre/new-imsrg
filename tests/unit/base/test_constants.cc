@@ -2,6 +2,7 @@
 // Copyright 2026 The imsrg authors
 
 #include <bit>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
@@ -38,7 +39,7 @@ const std::map<std::string, double>& LiteralTable() {
       {"NEUTRON_RCH2", c::kNeutronRch2},
       {"DARWIN_FOLDY", c::kDarwinFoldy},
       {"SQRT2", c::kSqrt2},
-      {"INVSQRT2", c::kInvSqrt2},
+      {"INVSQRT2", c::kImsrgppInvSqrt2},
       {"LOG2", c::kLn2},
       {"PI", c::kPi},
       {"SQRTPI", c::kSqrtPi},
@@ -66,15 +67,26 @@ TEST(Constants, EqualReferenceLiterals) {
   EXPECT_EQ(c::kNeutronRch2, -0.1161);
   EXPECT_EQ(c::kDarwinFoldy, 0.033172);
   EXPECT_EQ(c::kSqrt2, 1.41421356237309505);
-  EXPECT_EQ(c::kInvSqrt2, 0.7071067811865);
+  EXPECT_EQ(c::kImsrgppInvSqrt2, 0.7071067811865);
   EXPECT_EQ(c::kLn2, 0.69314718055994530942);
   EXPECT_EQ(c::kPi, 3.14159265358979324);
   EXPECT_EQ(c::kSqrtPi, 1.7724538509055160);
 }
 
-TEST(Constants, InvSqrt2IsTruncatedReferenceValue) {
-  EXPECT_NE(c::kInvSqrt2, 1.0 / c::kSqrt2);
-  EXPECT_NEAR(c::kInvSqrt2, 1.0 / c::kSqrt2, 1.0e-12);
+TEST(Constants, ImsrgppInvSqrt2IsTruncatedReferenceValue) {
+  EXPECT_NE(c::kImsrgppInvSqrt2, 1.0 / c::kSqrt2);
+  EXPECT_NEAR(c::kImsrgppInvSqrt2, 1.0 / c::kSqrt2, 1.0e-12);
+}
+
+// D36: the production 1/sqrt(2) is the correctly rounded double (within one ulp
+// of the exact value 0.70710678118654752440084436210485), and consistent with
+// kSqrt2.
+TEST(Constants, InvSqrt2IsFullPrecision) {
+  EXPECT_EQ(c::kInvSqrt2, 0.70710678118654752440084436210485);
+  EXPECT_NEAR(c::kInvSqrt2, 1.0 / c::kSqrt2, 1.0e-15);
+  EXPECT_EQ(c::kInvSqrt2 * 2.0, c::kSqrt2);
+  EXPECT_NEAR(c::kInvSqrt2 * c::kSqrt2, 1.0, 5.0e-16);
+  EXPECT_GT(std::abs(c::kInvSqrt2 - c::kImsrgppInvSqrt2), 1.0e-14);
 }
 
 TEST(Constants, MatchReferenceFile) {

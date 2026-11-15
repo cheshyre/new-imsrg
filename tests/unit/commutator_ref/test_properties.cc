@@ -247,4 +247,41 @@ TEST(commutator_ref_properties, non_hermitian_consistency) {
   }
 }
 
+// Validity of the reference for GENERAL X and Y (M7-Q2). Every term is
+// bilinear in (X, Y), and the reference agrees with imsrg++'s goldens and with
+// the symmetry-based fast kernels for every (anti-)Hermitian pair (the HH, HA,
+// AH, AA pairs of the term tests), which span all operators (X = (X + X^+)/2 +
+// (X - X^+)/2). So a general X and a general Y must give the sum of the four
+// part commutators; this also covers general-by-general, which
+// non_hermitian_consistency does not.
+TEST(commutator_ref_properties, general_by_general_bilinearity) {
+  for (const auto& c : Cases()) {
+    const auto seed = c.seeds.front();
+    const Operator XH = RandomOperator(c.ms, Hermiticity::kHermitian, seed + 1);
+    const Operator XA =
+        RandomOperator(c.ms, Hermiticity::kAntiHermitian, seed + 2);
+    const Operator YH = RandomOperator(c.ms, Hermiticity::kHermitian, seed + 3);
+    const Operator YA =
+        RandomOperator(c.ms, Hermiticity::kAntiHermitian, seed + 4);
+    Operator X = XH + XA;
+    Operator Y = YH + YA;
+    X.set_hermiticity(Hermiticity::kNonHermitian);
+    Y.set_hermiticity(Hermiticity::kNonHermitian);
+    for (const auto& t : kTerms) {
+      Operator sum(c.ms, cr::CommutatorSpec(X.spec(), Y.spec()));
+      for (const Operator* px : {&XH, &XA}) {
+        for (const Operator* py : {&YH, &YA}) {
+          Operator part = Apply(t, *px, *py);
+          part.set_hermiticity(Hermiticity::kNonHermitian);
+          sum += part;
+        }
+      }
+      const double dev = RelativeDeviation(Apply(t, X, Y), sum);
+      std::printf("[prop] general-by-general %s %s: %.3e\n", c.name.c_str(),
+                  t.name, dev);
+      EXPECT_LE(dev, kTol) << c.name << " " << t.name;
+    }
+  }
+}
+
 }  // namespace
