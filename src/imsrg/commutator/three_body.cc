@@ -210,6 +210,7 @@ ThreeBodyContext::Impl::Impl(
     }
     ob_offsets = Upload(offs, "commutator::n7_ob_offsets");
     ob_orbits = Upload(orbs, "commutator::n7_ob_orbits");
+    comm232 = detail::BuildComm232Tables(pair_third, *ms3);
   }
 
   // Orbit groups by (parity, 2tz), sorted by (2j, index), with the j blocks.
@@ -386,7 +387,7 @@ ThreeBodyContext::Impl::Impl(
                 BufferBytes(order_full) + BufferBytes(order_triples) +
                 BufferBytes(row_two_jab) + BufferBytes(row_triple) +
                 BufferBytes(two_body_offset) + BufferBytes(ob_offsets) +
-                BufferBytes(ob_orbits);
+                BufferBytes(ob_orbits) + comm232.Bytes();
 }
 
 detail::TileViews ThreeBodyContext::Impl::Views() const {

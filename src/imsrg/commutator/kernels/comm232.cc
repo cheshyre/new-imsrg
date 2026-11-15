@@ -67,6 +67,7 @@
 
 #include "imsrg/base/assert.h"
 #include "imsrg/base/constants.h"
+#include "imsrg/basis/three_body_space.h"
 #include "imsrg/basis/two_body_channels.h"
 #include "imsrg/commutator/detail/device_views.h"
 #include "imsrg/commutator/detail/n7_common.h"
@@ -83,9 +84,6 @@ namespace {
 /// The overall sign s of the m-scheme expression (file comment), fixed by
 /// the m-scheme brute force (commutator_ref::mscheme).
 constexpr double kSign = -1.0;
-
-/// Number of occupation classes of a pair (`PairClass`).
-constexpr int kNumClasses = 4;
 
 /// Range policy with a dynamic schedule: the cost of a work item varies by
 /// an order of magnitude (channel sizes, orbit j), and the cores of the dev
@@ -204,42 +202,12 @@ IMSRG_INLINE_FUNCTION double BracketReference(
          p_kl * HalfSumReference(v, a2, b3, 1, l, k, i, j, J);
 }
 
-/// The pair-third states of the context's kept space in the order of the
-/// pair-third path (file comment): per channel, sorted by (third r, Jpq,
-/// class, p, q). "Sorted index" t: the position in that order, flat over the
-/// channels (channel ch owns [ch_begin[ch], ch_begin[ch + 1]), the flat
-/// range of its states in `op::PairThirdSpace`). Block b = (ch norb + r) nj
-/// + Jpq holds the states of channel ch with third r and pair J Jpq; its
-/// class k starts at blk[kNumClasses b + k] and the block ends at
-/// blk[kNumClasses (b + 1)]. The active rows (classes 0..2) of a channel
-/// have compact indices 0..A_ch - 1 in sorted order; those of block b start
-/// at arow0[b]. Device pointers; captured by value.
-struct PairBlocksView {
-  const std::int32_t* blk = nullptr;        ///< kNumClasses nblocks + 1.
-  const std::int32_t* arow0 = nullptr;      ///< Per block.
-  const std::int32_t* ch_begin = nullptr;   ///< num_channels + 1 entries.
-  const std::int32_t* ch_active = nullptr;  ///< A_ch per channel.
-  /// Active rows of all channels in compact order (channel ch from
-  /// act_begin[ch]): the sorted index of each.
-  const std::int32_t* act_row = nullptr;
-  const std::int32_t* act_begin = nullptr;  ///< num_channels entries.
-  const std::int32_t* orig = nullptr;       ///< Sorted -> PairThirdSpace flat.
-  const std::int32_t* key = nullptr;    ///< p norb + q of the pair (p <= q).
-  const std::int32_t* local = nullptr;  ///< Local index of (p, q) at Jpq.
-  const double* occ_hh = nullptr;       ///< w n_p n_q, w = 1/sqrt 2 for p == q.
-  const double* occ_pp = nullptr;       ///< w nbar_p nbar_q.
-  /// Offset of channel ch's dense column-major A_ch x S_ch block of active
-  /// rows in a buffer holding all channels (num_channels + 1 entries); a
-  /// batch buffer starting at channel ch_lo is offset by w_off[ch_lo].
-  const std::int64_t* w_off = nullptr;
-  std::int32_t norb = 0;          ///< Orbits of the basis.
-  std::int32_t nj = 0;            ///< Two-body J values (max J + 1).
-  std::int32_t num_channels = 0;  ///< Three-body channels.
-};
-static_assert(std::is_trivially_copyable_v<PairBlocksView>);
+using PairBlocksView = detail::Comm232TablesView;
 
-/// The blocks of one batch of channels [ch_lo, ch_hi) for the element kernel
-/// (null pointers: that operand does not contribute).
+/// The blocks of one batch for the element pass: the W columns (sorted
+/// indices) [t0, t1), i.e. the block elements [w_base, w_base + size) of the
+/// full layout, of the channels [ch_lo, ch_hi) with 2 J3 in [two_j3_lo,
+/// two_j3_hi] (null pointers: that operand does not contribute).
 struct BatchBlocks {
   const double* wx = nullptr;   ///< Active rows of W(X3).
   const double* wxt = nullptr;  ///< Active rows of W(X3^T) (V or W).
@@ -247,9 +215,13 @@ struct BatchBlocks {
   const double* wyt = nullptr;  ///< Active rows of W(Y3^T).
   double sxt = 1.0;             ///< Sign of wxt (h_X3 when it is W(X3)).
   double syt = 1.0;             ///< Sign of wyt.
-  std::int64_t w_base = 0;      ///< w_off[ch_lo].
-  std::int32_t ch_lo = 0;       ///< First channel of the batch.
-  std::int32_t ch_hi = 0;       ///< One past the last.
+  std::int64_t w_base = 0;      ///< Full-layout offset of column t0.
+  std::int32_t t0 = 0;          ///< First column (sorted index).
+  std::int32_t t1 = 0;          ///< One past the last column.
+  std::int32_t ch_lo = 0;       ///< Channel of column t0.
+  std::int32_t ch_hi = 0;       ///< One past the channel of column t1 - 1.
+  std::int32_t two_j3_lo = 0;   ///< 2 J3 of channel ch_lo.
+  std::int32_t two_j3_hi = 0;   ///< 2 J3 of channel ch_hi - 1.
 };
 static_assert(std::is_trivially_copyable_v<BatchBlocks>);
 
@@ -272,12 +244,18 @@ IMSRG_INLINE_FUNCTION int FindKey(const std::int32_t* keys, int lo, int hi,
   return -1;
 }
 
+/// Larger of two ints.
+IMSRG_INLINE_FUNCTION int Max(int a, int b) noexcept { return a > b ? a : b; }
+/// Smaller of two ints.
+IMSRG_INLINE_FUNCTION int Min(int a, int b) noexcept { return a < b ? a : b; }
+
 /// The creator-side half sum F[A, B](p, q; r s) at pair J through the
-/// active-row blocks `w` of B (file comment) for the three-body channels of
+/// active-row blocks `w` of B (file comment), restricted to the columns of
 /// the batch `bb`; `trans` != 0 evaluates F[A^T, B^T] with `w` the blocks of
 /// B^T. `w_sign` multiplies the result (h_B when B^T is read from the blocks
-/// of B). Zero if A or `w` is missing. Cost O(norb * J'-range * J3-range *
-/// (visited rows of the block (q, J') + log S)).
+/// of B). The c, J' and J3 loops are clamped to the batch's 2 J3 range.
+/// Zero if A or `w` is missing. Cost O(norb + (c, J', J3 in range) * (visited
+/// rows of the block (q, J') + log S)).
 IMSRG_INLINE_FUNCTION double HalfSumPairThird(
     const detail::N7Views& v, const PairBlocksView& pb, const BatchBlocks& bb,
     const detail::TwoBodyView& a2, const double* w, double w_sign, int trans,
@@ -292,6 +270,10 @@ IMSRG_INLINE_FUNCTION double HalfSumPairThird(
   double total = 0.0;
   for (int c = 0; c < v.norb; ++c) {
     const int jc = v.ob.j2[c];
+    // 2 J3 of the column (r s) J c within the batch.
+    const int c_lo = Max(AbsDiff(two_J, jc), bb.two_j3_lo);
+    const int c_hi = Min(two_J + jc, bb.two_j3_hi);
+    if (c_lo > c_hi) continue;
     const double nc = v.ob.occupation[c];
     const double nbar_c = 1.0 - nc;
     // Visited classes: n_c == 0 needs n_a n_b != 0 (classes 0, 1), n_c == 1
@@ -300,11 +282,17 @@ IMSRG_INLINE_FUNCTION double HalfSumPairThird(
     const int k_hi = nc == 0.0 ? 2 : 3;
     const KetIndex pc =
         tb.ket_index(OrbitIndex{p < c ? p : c}, OrbitIndex{p < c ? c : p});
-    for (int Jp = AbsDiff(jp, jc) / 2; Jp <= (jp + jc) / 2; ++Jp) {
+    // J' couples p and c, and (J', j_q) must reach a 2 J3 in [c_lo, c_hi].
+    // (2 J3 and 2 j_q are odd, so the differences are even.)
+    const int jp_lo = Max(AbsDiff(jp, jc) / 2, Max(c_lo - jq, jq - c_hi) / 2);
+    const int jp_hi = Min((jp + jc) / 2, (c_hi + jq) / 2);
+    for (int Jp = jp_lo; Jp <= jp_hi; ++Jp) {
       const std::int32_t xloc = tb.local_index(pc, TwoJ{2 * Jp});
       if (xloc < 0) continue;
       const J3Range j3 = RangeOfJ3(2 * Jp, jq, two_J, jc);
-      if (j3.lo > j3.hi) continue;
+      const int lo3 = Max(j3.lo, c_lo);
+      const int hi3 = Min(j3.hi, c_hi);
+      if (lo3 > hi3) continue;
       const int ch2 =
           tb.channel_of(OrbitIndex{p}, OrbitIndex{c}, TwoJ{2 * Jp}).value();
       const std::int64_t n2 = tb.channel_num_kets[ch2];
@@ -321,17 +309,18 @@ IMSRG_INLINE_FUNCTION double HalfSumPairThird(
       const std::int64_t xs = trans != 0 ? 1 : n2;
       const double pref =
           Phase((jq + jc) / 2 + J + Jp) * xf * v.sj.Hat(Jp) / v.sj.Hat(J);
-      for (int two_j3 = j3.lo; two_j3 <= j3.hi; two_j3 += 2) {
+      for (int two_j3 = lo3; two_j3 <= hi3; two_j3 += 2) {
         const int ch3 = detail::Channel3Of(v, two_j3, r, s, c);
         if (ch3 < bb.ch_lo || ch3 >= bb.ch_hi) continue;
         const int rb = (ch3 * pb.norb + q) * pb.nj + Jp;
-        const int r0 = pb.blk[kNumClasses * rb + k_lo];
-        const int r1 = pb.blk[kNumClasses * rb + k_hi];
+        const int r0 = pb.blk[detail::kComm232Classes * rb + k_lo];
+        const int r1 = pb.blk[detail::kComm232Classes * rb + k_hi];
         if (r0 >= r1) continue;
-        const int cb = kNumClasses * ((ch3 * pb.norb + c) * pb.nj + J);
+        const int cb =
+            detail::kComm232Classes * ((ch3 * pb.norb + c) * pb.nj + J);
         const int col = FindKey(pb.key, pb.blk[cb + rs_class],
                                 pb.blk[cb + rs_class + 1], rs_key);
-        if (col < 0) continue;
+        if (col < bb.t0 || col >= bb.t1) continue;  // also col == -1
         const double six = v.sj(TwoJ{jq}, TwoJ{jp}, TwoJ{two_J}, TwoJ{jc},
                                 TwoJ{two_j3}, TwoJ{2 * Jp});
         if (six == 0.0) continue;
@@ -339,7 +328,7 @@ IMSRG_INLINE_FUNCTION double HalfSumPairThird(
         // W[t, col] at w[wc + t] for the active rows t of block rb.
         const std::int64_t wc = pb.w_off[ch3] - bb.w_base +
                                 (col - pb.ch_begin[ch3]) * na + pb.arow0[rb] -
-                                pb.blk[kNumClasses * rb];
+                                pb.blk[detail::kComm232Classes * rb];
         double acc_hh = 0.0;
         double acc_pp = 0.0;
         for (int t = r0; t < r1; ++t) {
@@ -356,7 +345,7 @@ IMSRG_INLINE_FUNCTION double HalfSumPairThird(
 
 /// The four bracket terms of [A2, B3]^J_{ijkl} without the sign s through
 /// the active-row blocks `w` of B3 and `wt` (sign `wt_sign`) of its
-/// transpose, for the channels of the batch. O(4 HalfSumPairThird).
+/// transpose, for the columns of the batch. O(4 HalfSumPairThird).
 IMSRG_INLINE_FUNCTION double BracketPairThird(
     const detail::N7Views& v, const PairBlocksView& pb, const BatchBlocks& bb,
     const detail::TwoBodyView& a2, const double* w, const double* wt,
@@ -369,26 +358,6 @@ IMSRG_INLINE_FUNCTION double BracketPairThird(
          p_kl * HalfSumPairThird(v, pb, bb, a2, wt, wt_sign, 1, l, k, i, j, J);
 }
 
-/// Owner of the device tables behind a `PairBlocksView` (built per call on
-/// the host from the context's `op::PairThirdSpace` and model space), with
-/// the host copies the batching needs.
-struct PairBlocks {
-  exec::DeviceBuffer<std::int32_t> blk;
-  exec::DeviceBuffer<std::int32_t> arow0;
-  exec::DeviceBuffer<std::int32_t> ch_begin;
-  exec::DeviceBuffer<std::int32_t> ch_active;
-  exec::DeviceBuffer<std::int32_t> act_row;
-  exec::DeviceBuffer<std::int32_t> act_begin;
-  exec::DeviceBuffer<std::int32_t> orig;
-  exec::DeviceBuffer<std::int32_t> key;
-  exec::DeviceBuffer<std::int32_t> local;
-  exec::DeviceBuffer<double> occ_hh;
-  exec::DeviceBuffer<double> occ_pp;
-  exec::DeviceBuffer<std::int64_t> w_off;
-  std::vector<std::int64_t> w_off_host;  ///< Host copy of w_off.
-  PairBlocksView view;  ///< Device view (valid while *this lives).
-};
-
 /// Copies a host vector into a new device buffer.
 template <class T>
 exec::DeviceBuffer<T> ToDevice(const std::vector<T>& h, const char* label) {
@@ -397,139 +366,14 @@ exec::DeviceBuffer<T> ToDevice(const std::vector<T>& h, const char* label) {
   return d;
 }
 
-/// Builds the sorted pair-third tables of the context (PairBlocksView).
-/// Cost O(states log states) on the host plus the copies.
-PairBlocks BuildPairBlocks(const ThreeBodyContext& ctx) {
-  const op::PairThirdView pt = ctx.impl().pair_third.host_view();
-  const basis::ModelSpace& ms = *ctx.model_space_ptr();
-  const basis::TwoBodyChannels& two = ms.two_body();
-  const std::span<const double> occ = ms.reference().occupations();
-  const int norb = ms.num_orbits();
-  const int nj = two.max_J() + 1;
-  const int nch = pt.num_channels;
-  const auto ns = static_cast<std::size_t>(pt.num_states);
-  const auto at = [](auto i) { return static_cast<std::size_t>(i); };
-  // Block index of (ch, r, Jpq).
-  const auto block_of = [norb, nj](int ch, int r, int jpq) {
-    return static_cast<std::size_t>(
-        (static_cast<std::int64_t>(ch) * norb + r) * nj + jpq);
-  };
-  const std::size_t nblocks = block_of(nch, 0, 0);
-  const auto class_of = [&](std::int32_t f) {
-    return PairClass(occ[at(pt.st_p[f])], occ[at(pt.st_q[f])]);
-  };
-  std::vector<std::int32_t> count(kNumClasses * nblocks + 1, 0);
-  std::vector<std::int32_t> ch_begin(at(nch) + 1, 0);
-  std::vector<std::int32_t> orig(ns), key(ns), local(ns);
-  std::vector<double> occ_hh(ns), occ_pp(ns);
-  std::vector<std::int32_t> perm;
-  std::int32_t next = 0;
-  for (int ch = 0; ch < nch; ++ch) {
-    const std::int32_t off = pt.ch_state_offset[ch];
-    const std::int32_t S = pt.ch_num_states[ch];
-    IMSRG_CHECK(S == 0 || off == next,
-                "comm232ss: pair-third channels are not contiguous");
-    ch_begin[at(ch)] = next;
-    perm.resize(at(S));
-    std::iota(perm.begin(), perm.end(), off);
-    std::sort(perm.begin(), perm.end(), [&](std::int32_t x, std::int32_t y) {
-      if (pt.st_r[x] != pt.st_r[y]) return pt.st_r[x] < pt.st_r[y];
-      if (pt.st_two_jpq[x] != pt.st_two_jpq[y]) {
-        return pt.st_two_jpq[x] < pt.st_two_jpq[y];
-      }
-      const int cx = class_of(x);
-      const int cy = class_of(y);
-      if (cx != cy) return cx < cy;
-      if (pt.st_p[x] != pt.st_p[y]) return pt.st_p[x] < pt.st_p[y];
-      return pt.st_q[x] < pt.st_q[y];
-    });
-    for (std::int32_t pos = 0; pos < S; ++pos) {
-      const std::int32_t f = perm[at(pos)];
-      const std::size_t t = at(next + pos);
-      const int p = pt.st_p[f];
-      const int q = pt.st_q[f];
-      const int two_jpq = pt.st_two_jpq[f];
-      orig[t] = f;
-      key[t] = p * norb + q;
-      const std::optional<LocalKetIndex> li = two.local_index(
-          two.ket_index(OrbitIndex{p}, OrbitIndex{q}), TwoJ{two_jpq});
-      IMSRG_CHECK(li.has_value(),
-                  "comm232ss: a pair-third state has no two-body ket");
-      local[t] = li->value();
-      const double w = p == q ? 1.0 / constants::kSqrt2 : 1.0;
-      const double np = occ[at(p)];
-      const double nq = occ[at(q)];
-      occ_hh[t] = w * np * nq;
-      occ_pp[t] = w * (1.0 - np) * (1.0 - nq);
-      ++count[kNumClasses * block_of(ch, pt.st_r[f], two_jpq / 2) +
-              at(class_of(f))];
-    }
-    next += S;
-  }
-  ch_begin[at(nch)] = next;
-  // blk[k b + c] = first sorted index of class c in block b (exclusive scan;
-  // blocks, and classes within a block, follow the sorted order).
-  std::vector<std::int32_t> blk(count.size(), 0);
-  std::exclusive_scan(count.begin(), count.end(), blk.begin(), 0);
-  // Compact active rows per channel.
-  std::vector<std::int32_t> arow0(nblocks, 0);
-  std::vector<std::int32_t> ch_active(at(nch), 0);
-  std::vector<std::int32_t> act_begin(at(nch), 0);
-  std::vector<std::int32_t> act_row;
-  act_row.reserve(ns);
-  std::vector<std::int64_t> w_off(at(nch) + 1, 0);
-  const std::size_t blocks_per_channel = block_of(1, 0, 0);
-  for (int ch = 0; ch < nch; ++ch) {
-    act_begin[at(ch)] = static_cast<std::int32_t>(act_row.size());
-    std::int32_t active = 0;
-    for (std::size_t b = at(ch) * blocks_per_channel;
-         b < at(ch + 1) * blocks_per_channel; ++b) {
-      arow0[b] = active;
-      for (std::int32_t t = blk[kNumClasses * b]; t < blk[kNumClasses * b + 3];
-           ++t) {
-        act_row.push_back(t);
-        ++active;
-      }
-    }
-    ch_active[at(ch)] = active;
-    w_off[at(ch) + 1] =
-        w_off[at(ch)] + static_cast<std::int64_t>(active) *
-                            (ch_begin[at(ch) + 1] - ch_begin[at(ch)]);
-  }
-  PairBlocks t;
-  t.blk = ToDevice(blk, "commutator::comm232_blk");
-  t.arow0 = ToDevice(arow0, "commutator::comm232_arow0");
-  t.ch_begin = ToDevice(ch_begin, "commutator::comm232_ch_begin");
-  t.ch_active = ToDevice(ch_active, "commutator::comm232_ch_active");
-  t.act_row = ToDevice(act_row, "commutator::comm232_act_row");
-  t.act_begin = ToDevice(act_begin, "commutator::comm232_act_begin");
-  t.orig = ToDevice(orig, "commutator::comm232_orig");
-  t.key = ToDevice(key, "commutator::comm232_key");
-  t.local = ToDevice(local, "commutator::comm232_local");
-  t.occ_hh = ToDevice(occ_hh, "commutator::comm232_occ_hh");
-  t.occ_pp = ToDevice(occ_pp, "commutator::comm232_occ_pp");
-  t.w_off = ToDevice(w_off, "commutator::comm232_w_off");
-  t.w_off_host = std::move(w_off);
-  t.view.blk = t.blk.device_data();
-  t.view.arow0 = t.arow0.device_data();
-  t.view.ch_begin = t.ch_begin.device_data();
-  t.view.ch_active = t.ch_active.device_data();
-  t.view.act_row = t.act_row.device_data();
-  t.view.act_begin = t.act_begin.device_data();
-  t.view.orig = t.orig.device_data();
-  t.view.key = t.key.device_data();
-  t.view.local = t.local.device_data();
-  t.view.occ_hh = t.occ_hh.device_data();
-  t.view.occ_pp = t.occ_pp.device_data();
-  t.view.w_off = t.w_off.device_data();
-  t.view.norb = norb;
-  t.view.nj = nj;
-  t.view.num_channels = nch;
-  return t;
+/// Bytes of a device buffer.
+template <class T>
+std::int64_t BufferBytes(const exec::DeviceBuffer<T>& b) {
+  return static_cast<std::int64_t>(b.size() * sizeof(T));
 }
 
 /// The output pointers of the pair-third build of one batch (null: not
-/// needed); each indexed like the batch buffer (w_off[ch] - w_base).
+/// needed); each indexed like the batch buffer (full offset - w_base).
 struct PairThirdOut {
   double* wx = nullptr;  ///< Active rows of W(X3).
   double* vx = nullptr;  ///< Active rows of W(X3^T) (non-Hermitian X3).
@@ -540,7 +384,7 @@ static_assert(std::is_trivially_copyable_v<PairThirdOut>);
 
 /// Kernel of the pair-third build: the active rows of W = E B3 E^T (and of
 /// V = E B3^T E^T where requested) of X3 and Y3 for the block elements
-/// [w_base, w_base + size) of the layout `pb.w_off` (the channels of one
+/// [w_base, w_base + size) of the full layout `pb.w_off` (the columns of one
 /// batch), written to `o` at index (element - w_base). Element (t, u):
 /// W[t, u] = sum_{I in E_t, K in E_u} E_tI E_uK B3[I, K] with E the map `e`
 /// (rows: PairThirdSpace flat states, columns: channel-local kept rows).
@@ -608,16 +452,18 @@ void BuildPairThirdBlocks(const detail::N7Views& v, const PairBlocksView& pb,
                        DynamicPolicy(0, size), f);
 }
 
-/// Kernel of the element pass: adds the contribution of the channels of the
-/// batch `bb` to the stored Z2 element `e` (functor for the reason given at
-/// `BuildBlocksFunctor`). Cost per element O(8 HalfSumPairThird).
+/// Kernel of the element pass: adds the contribution of the columns of the
+/// batch `bb` to the stored Z2 element e0 + e (functor for the reason given
+/// at `BuildBlocksFunctor`). Cost per element O(8 HalfSumPairThird).
 struct AddBatchFunctor {
   detail::N7Views v;
   PairBlocksView pb;
   BatchBlocks bb;
   detail::TwoBodyOutView out;
+  std::int64_t e0 = 0;  ///< First Z2 element of the launch.
 
-  IMSRG_FUNCTION void operator()(const exec::Index e) const {
+  IMSRG_FUNCTION void operator()(const exec::Index ie) const {
+    const std::int64_t e = e0 + ie;
     const basis::TwoBodyTableView& tb = v.x2.tb;
     const int ch = detail::FindBlock(out.block_offset, tb.num_channels, e);
     const std::int64_t n = tb.channel_num_kets[ch];
@@ -649,42 +495,80 @@ struct AddBatchFunctor {
 };
 static_assert(std::is_trivially_copyable_v<AddBatchFunctor>);
 
-/// Adds the contribution of the channels of batch `bb` to every stored Z2
-/// element (`AddBatchFunctor`, one work item per element; `total` elements).
+/// Adds the contribution of the columns of batch `bb` to the stored Z2
+/// elements [e_begin, e_end) (`AddBatchFunctor`, one work item per element).
 void AddBatch(const detail::N7Views& v, const PairBlocksView& pb,
               const BatchBlocks& bb, const detail::TwoBodyOutView& out,
-              std::int64_t total) {
+              std::int64_t e_begin, std::int64_t e_end) {
+  if (e_end <= e_begin) return;
   AddBatchFunctor f;
   f.v = v;
   f.pb = pb;
   f.bb = bb;
   f.out = out;
-  Kokkos::parallel_for("commutator::comm232ss", DynamicPolicy(0, total), f);
+  f.e0 = e_begin;
+  Kokkos::parallel_for("commutator::comm232ss",
+                       DynamicPolicy(0, e_end - e_begin), f);
 }
 
-/// A batch of consecutive three-body channels [lo, hi) and the doubles of
-/// one set of its blocks.
-struct ChannelBatch {
-  int lo = 0;
-  int hi = 0;
-  std::int64_t size = 0;
+/// A batch of consecutive W columns (sorted indices) [t0, t1) of the
+/// channels [ch_lo, ch_hi), and the doubles of one set of its blocks.
+struct ColumnBatch {
+  std::int32_t t0 = 0;
+  std::int32_t t1 = 0;
+  std::int32_t ch_lo = 0;
+  std::int32_t ch_hi = 0;
+  std::int64_t w_base = 0;  ///< Full-layout offset of column t0.
+  std::int64_t size = 0;    ///< Doubles of one block set.
 };
 
-/// Splits the channels into batches of consecutive channels whose blocks
-/// (offsets `w_off`, num_channels + 1 entries) hold at most `budget` doubles,
-/// each batch at least one channel; batches without blocks are dropped.
-/// O(num_channels).
-std::vector<ChannelBatch> MakeBatches(const std::vector<std::int64_t>& w_off,
-                                      std::int64_t budget) {
-  std::vector<ChannelBatch> out;
-  const int nch = static_cast<int>(w_off.size()) - 1;
-  const auto at = [](int i) { return static_cast<std::size_t>(i); };
-  for (int lo = 0, hi = 0; lo < nch; lo = hi) {
-    hi = lo + 1;
-    while (hi < nch && w_off[at(hi + 1)] - w_off[at(lo)] <= budget) ++hi;
-    const std::int64_t size = w_off[at(hi)] - w_off[at(lo)];
-    if (size > 0) out.push_back(ChannelBatch{lo, hi, size});
+/// Splits the columns of the channels with active rows into batches of
+/// consecutive columns holding at most `budget` doubles per block set (at
+/// least one column each; a channel larger than the budget is split, a
+/// column of A_ch > budget doubles is a batch of its own). Columns of
+/// channels without active rows carry no data and belong to no batch.
+/// O(num_channels + batches).
+std::vector<ColumnBatch> MakeBatches(const detail::Comm232Tables& tables,
+                                     std::int64_t budget) {
+  std::vector<ColumnBatch> out;
+  const auto at = [](std::int32_t i) { return static_cast<std::size_t>(i); };
+  const auto nch = static_cast<std::int32_t>(tables.ch_active_host.size());
+  ColumnBatch cur;
+  bool open = false;
+  std::int32_t last_t = 0;   // one past the last column taken
+  std::int32_t last_ch = 0;  // channel of the last column taken
+  const auto close = [&]() {
+    cur.t1 = last_t;
+    cur.ch_hi = last_ch + 1;
+    out.push_back(cur);
+    open = false;
+  };
+  for (std::int32_t ch = 0; ch < nch; ++ch) {
+    const std::int64_t na = tables.ch_active_host[at(ch)];
+    const std::int32_t base = tables.ch_begin_host[at(ch)];
+    const std::int32_t S = tables.ch_begin_host[at(ch) + 1] - base;
+    if (na == 0 || S == 0) continue;
+    const std::int64_t w0 = tables.w_off_host[at(ch)];
+    std::int32_t u = 0;
+    while (u < S) {
+      if (open && cur.size + na > budget) close();
+      if (!open) {
+        cur = ColumnBatch{};
+        cur.t0 = base + u;
+        cur.ch_lo = ch;
+        cur.w_base = w0 + u * na;
+        open = true;
+      }
+      // At least one column per batch, then as many as fit.
+      const std::int64_t take = std::min<std::int64_t>(
+          std::max<std::int64_t>(1, (budget - cur.size) / na), S - u);
+      cur.size += take * na;
+      u += static_cast<std::int32_t>(take);
+      last_t = base + u;
+      last_ch = ch;
+    }
   }
+  if (open) close();
   return out;
 }
 
@@ -703,6 +587,159 @@ double* DataOrNull(exec::DeviceBuffer<double>& b) {
 }  // namespace
 
 namespace detail {
+
+Comm232TablesView Comm232Tables::View() const noexcept {
+  Comm232TablesView t;
+  t.blk = blk.device_data();
+  t.arow0 = arow0.device_data();
+  t.ch_begin = ch_begin.device_data();
+  t.ch_active = ch_active.device_data();
+  t.act_row = act_row.device_data();
+  t.act_begin = act_begin.device_data();
+  t.orig = orig.device_data();
+  t.key = key.device_data();
+  t.local = local.device_data();
+  t.occ_hh = occ_hh.device_data();
+  t.occ_pp = occ_pp.device_data();
+  t.w_off = w_off.device_data();
+  t.norb = norb;
+  t.nj = nj;
+  t.num_channels = static_cast<std::int32_t>(ch_active_host.size());
+  return t;
+}
+
+std::int64_t Comm232Tables::Bytes() const noexcept {
+  return BufferBytes(blk) + BufferBytes(arow0) + BufferBytes(ch_begin) +
+         BufferBytes(ch_active) + BufferBytes(act_row) +
+         BufferBytes(act_begin) + BufferBytes(orig) + BufferBytes(key) +
+         BufferBytes(local) + BufferBytes(occ_hh) + BufferBytes(occ_pp) +
+         BufferBytes(w_off);
+}
+
+Comm232Tables BuildComm232Tables(const op::PairThirdSpace& pair_third,
+                                 const basis::ModelSpace& ms3) {
+  const op::PairThirdView pt = pair_third.host_view();
+  const basis::TwoBodyChannels& two = ms3.two_body();
+  const std::span<const double> occ = ms3.reference().occupations();
+  const int norb = ms3.num_orbits();
+  const int nj = two.max_J() + 1;
+  const int nch = pt.num_channels;
+  const auto ns = static_cast<std::size_t>(pt.num_states);
+  const auto at = [](auto i) { return static_cast<std::size_t>(i); };
+  // Block index of (ch, r, Jpq).
+  const auto block_of = [norb, nj](int ch, int r, int jpq) {
+    return static_cast<std::size_t>(
+        (static_cast<std::int64_t>(ch) * norb + r) * nj + jpq);
+  };
+  const std::size_t nblocks = block_of(nch, 0, 0);
+  const auto class_of = [&](std::int32_t f) {
+    return PairClass(occ[at(pt.st_p[f])], occ[at(pt.st_q[f])]);
+  };
+  std::vector<std::int32_t> count(kComm232Classes * nblocks + 1, 0);
+  std::vector<std::int32_t> ch_begin(at(nch) + 1, 0);
+  std::vector<std::int32_t> orig(ns), key(ns), local(ns);
+  std::vector<double> occ_hh(ns), occ_pp(ns);
+  std::vector<std::int32_t> perm;
+  std::int32_t next = 0;
+  for (int ch = 0; ch < nch; ++ch) {
+    const std::int32_t off = pt.ch_state_offset[ch];
+    const std::int32_t S = pt.ch_num_states[ch];
+    IMSRG_CHECK(S == 0 || off == next,
+                "comm232ss: pair-third channels are not contiguous");
+    ch_begin[at(ch)] = next;
+    perm.resize(at(S));
+    std::iota(perm.begin(), perm.end(), off);
+    std::sort(perm.begin(), perm.end(), [&](std::int32_t x, std::int32_t y) {
+      if (pt.st_r[x] != pt.st_r[y]) return pt.st_r[x] < pt.st_r[y];
+      if (pt.st_two_jpq[x] != pt.st_two_jpq[y]) {
+        return pt.st_two_jpq[x] < pt.st_two_jpq[y];
+      }
+      const int cx = class_of(x);
+      const int cy = class_of(y);
+      if (cx != cy) return cx < cy;
+      if (pt.st_p[x] != pt.st_p[y]) return pt.st_p[x] < pt.st_p[y];
+      return pt.st_q[x] < pt.st_q[y];
+    });
+    for (std::int32_t pos = 0; pos < S; ++pos) {
+      const std::int32_t f = perm[at(pos)];
+      const std::size_t t = at(next + pos);
+      const int p = pt.st_p[f];
+      const int q = pt.st_q[f];
+      const int two_jpq = pt.st_two_jpq[f];
+      orig[t] = f;
+      key[t] = p * norb + q;
+      const std::optional<LocalKetIndex> li = two.local_index(
+          two.ket_index(OrbitIndex{p}, OrbitIndex{q}), TwoJ{two_jpq});
+      IMSRG_CHECK(li.has_value(),
+                  "comm232ss: a pair-third state has no two-body ket");
+      local[t] = li->value();
+      const double w = p == q ? 1.0 / constants::kSqrt2 : 1.0;
+      const double np = occ[at(p)];
+      const double nq = occ[at(q)];
+      occ_hh[t] = w * np * nq;
+      occ_pp[t] = w * (1.0 - np) * (1.0 - nq);
+      ++count[kComm232Classes * block_of(ch, pt.st_r[f], two_jpq / 2) +
+              at(class_of(f))];
+    }
+    next += S;
+  }
+  ch_begin[at(nch)] = next;
+  // blk[k b + c] = first sorted index of class c in block b (exclusive scan;
+  // blocks, and classes within a block, follow the sorted order).
+  std::vector<std::int32_t> blk(count.size(), 0);
+  std::exclusive_scan(count.begin(), count.end(), blk.begin(), 0);
+  // Compact active rows per channel.
+  std::vector<std::int32_t> arow0(nblocks, 0);
+  std::vector<std::int32_t> ch_active(at(nch), 0);
+  std::vector<std::int32_t> act_begin(at(nch), 0);
+  std::vector<std::int32_t> act_row;
+  act_row.reserve(ns);
+  std::vector<std::int64_t> w_off(at(nch) + 1, 0);
+  const std::size_t blocks_per_channel = block_of(1, 0, 0);
+  for (int ch = 0; ch < nch; ++ch) {
+    act_begin[at(ch)] = static_cast<std::int32_t>(act_row.size());
+    std::int32_t active = 0;
+    for (std::size_t b = at(ch) * blocks_per_channel;
+         b < at(ch + 1) * blocks_per_channel; ++b) {
+      arow0[b] = active;
+      for (std::int32_t t = blk[kComm232Classes * b];
+           t < blk[kComm232Classes * b + 3]; ++t) {
+        act_row.push_back(t);
+        ++active;
+      }
+    }
+    ch_active[at(ch)] = active;
+    w_off[at(ch) + 1] =
+        w_off[at(ch)] + static_cast<std::int64_t>(active) *
+                            (ch_begin[at(ch) + 1] - ch_begin[at(ch)]);
+  }
+  std::vector<std::int32_t> ch_two_j(at(nch), 0);
+  const basis::ThreeBodySpace& space = *ms3.three_body_space();
+  for (int ch = 0; ch < nch; ++ch) {
+    ch_two_j[at(ch)] = space.channel(Channel3Index{ch}).two_j.twice;
+  }
+  Comm232Tables t;
+  t.blk = ToDevice(blk, "commutator::comm232_blk");
+  t.arow0 = ToDevice(arow0, "commutator::comm232_arow0");
+  t.ch_begin = ToDevice(ch_begin, "commutator::comm232_ch_begin");
+  t.ch_active = ToDevice(ch_active, "commutator::comm232_ch_active");
+  t.act_row = ToDevice(act_row, "commutator::comm232_act_row");
+  t.act_begin = ToDevice(act_begin, "commutator::comm232_act_begin");
+  t.orig = ToDevice(orig, "commutator::comm232_orig");
+  t.key = ToDevice(key, "commutator::comm232_key");
+  t.local = ToDevice(local, "commutator::comm232_local");
+  t.occ_hh = ToDevice(occ_hh, "commutator::comm232_occ_hh");
+  t.occ_pp = ToDevice(occ_pp, "commutator::comm232_occ_pp");
+  t.w_off = ToDevice(w_off, "commutator::comm232_w_off");
+  t.w_off_host = std::move(w_off);
+  t.ch_begin_host = std::move(ch_begin);
+  t.ch_active_host = std::move(ch_active);
+  t.ch_two_j_host = std::move(ch_two_j);
+  t.norb = norb;
+  t.nj = nj;
+  t.max_two_jc = ms3.basis().max_j2().twice;
+  return t;
+}
 
 void Comm232ssReference(const op::Operator& X, const op::Operator& Y,
                         op::Operator& Z, const ThreeBodyContext& ctx) {
@@ -746,19 +783,17 @@ void Comm232ssPairThird(const op::Operator& X, const op::Operator& Y,
   const bool xy = v.x2.data != nullptr && v.y3.data != nullptr;
   const bool yx = v.y2.data != nullptr && v.x3.data != nullptr;
   if (!xy && !yx) return;
-  const PairBlocks blocks = BuildPairBlocks(ctx);
-  const PairBlocksView pb = blocks.view;
-  const std::vector<std::int64_t>& w_off = blocks.w_off_host;
-  // Block sets per channel element: W(X3), W(X3^T), W(Y3), W(Y3^T).
+  const ThreeBodyContext::Impl& impl = ctx.impl();
+  const Comm232Tables& tables = impl.comm232;
+  const PairBlocksView pb = tables.View();
+  // Block sets per column element: W(X3), W(X3^T), W(Y3), W(Y3^T).
   const int sets = (yx ? 1 : 0) + (yx && v.x3.packed == 0 ? 1 : 0) +
                    (xy ? 1 : 0) + (xy && v.y3.packed == 0 ? 1 : 0);
   const std::int64_t budget = std::max<std::int64_t>(
       1, max_block_bytes / (sets * static_cast<std::int64_t>(sizeof(double))));
-  const op::CsrView e = ctx.impl().pair_third.e_map().device_view();
-  const std::int64_t total = Z.two_body().matrix().total_size();
-  const std::vector<ChannelBatch> batches = MakeBatches(w_off, budget);
+  const std::vector<ColumnBatch> batches = MakeBatches(tables, budget);
   std::int64_t batch_max = 0;
-  for (const ChannelBatch& b : batches) batch_max = std::max(batch_max, b.size);
+  for (const ColumnBatch& b : batches) batch_max = std::max(batch_max, b.size);
   exec::DeviceBuffer<double> wx =
       MaybeBuffer(yx, batch_max, "commutator::comm232_wx");
   exec::DeviceBuffer<double> vx =
@@ -780,14 +815,30 @@ void Comm232ssPairThird(const op::Operator& X, const op::Operator& Y,
   bb.wyt = o.vy != nullptr ? o.vy : o.wy;
   bb.sxt = o.vx != nullptr ? 1.0 : v.x3.sign;
   bb.syt = o.vy != nullptr ? 1.0 : v.y3.sign;
+  const op::CsrView e = impl.pair_third.e_map().device_view();
+  const std::vector<std::int64_t>& z_off = impl.two_body_offset_host;
+  const auto nch2 = static_cast<std::int32_t>(z_off.size()) - 1;
+  const std::int32_t max_jc = tables.max_two_jc;  // largest 2 j of an orbit
+  const auto at = [](std::int32_t i) { return static_cast<std::size_t>(i); };
   // Batches run in order on the execution space, so one set of buffers
   // serves them all.
-  for (const ChannelBatch& b : batches) {
-    bb.w_base = w_off[static_cast<std::size_t>(b.lo)];
-    bb.ch_lo = b.lo;
-    bb.ch_hi = b.hi;
+  for (const ColumnBatch& b : batches) {
+    bb.w_base = b.w_base;
+    bb.t0 = b.t0;
+    bb.t1 = b.t1;
+    bb.ch_lo = b.ch_lo;
+    bb.ch_hi = b.ch_hi;
+    bb.two_j3_lo = tables.ch_two_j_host[at(b.ch_lo)];
+    bb.two_j3_hi = tables.ch_two_j_host[at(b.ch_hi - 1)];
     BuildPairThirdBlocks(v, pb, e, bb.w_base, b.size, o);
-    AddBatch(v, pb, bb, out, total);
+    // Z2 blocks whose pair J reaches the batch: |2J - j_c| <= 2 J3 <= 2J +
+    // j_c for some 2 J3 of the batch and j_c <= 2 emax + 1. Two-body
+    // channels are ordered by J (6 per J).
+    const std::int32_t j_lo = std::max(0, (bb.two_j3_lo - max_jc + 1) / 2);
+    const std::int32_t j_hi = (bb.two_j3_hi + max_jc) / 2;
+    const std::int32_t c_lo = std::min(nch2, 6 * j_lo);
+    const std::int32_t c_hi = std::min(nch2, 6 * (j_hi + 1));
+    AddBatch(v, pb, bb, out, z_off[at(c_lo)], z_off[at(c_hi)]);
   }
   exec::Fence("commutator::comm232ss");
 }
