@@ -151,6 +151,8 @@ int cmd_norms(const Args& a);
 int cmd_commutator(const Args& a);
 int cmd_bench_commutator(const Args& a);
 int cmd_comm223(const Args& a);
+int cmd_comm3(const Args& a);
+int cmd_generator3(const Args& a);
 int cmd_generator(const Args& a);
 int cmd_flow(const Args& a);
 int cmd_factorized(const Args& a);
