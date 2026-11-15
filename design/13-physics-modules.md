@@ -113,6 +113,9 @@ sd shell): every number identical to imsrg++, comment lines identical except the
   weighted by 2j+1, `diis_start` = 2, subspace 8, history reset when occupations change). The
   NO2B monopole uses `No2bThreeBody::get_pn` with the `e3max` cut (imsrg++ `ModelSpace` E3max,
   default 12). Deviations M6-1/M6-2 in `30` §6 (rescue path beyond iteration 100 only).
+  **Owner, 2026-11-15 (D36, D37):** the DIIS design is confirmed; the driver gets a
+  `hartree_fock.mixing` key in run 2, defaulting to DIIS in TOML configs and to linear mixing in
+  the legacy layer.
 
 ## 5. mbpt (reference: `reference/04` §2)
 
@@ -130,7 +133,7 @@ sd shell): every number identical to imsrg++, comment lines identical except the
 trace check against A), `reference_density_ho`, `matmul`, `to_nat_basis`. mbpt does not depend on
 hf: the NAT-basis Hamiltonian is assembled by the caller from a modified `HFResult` (see
 M9-Q1 and `tests/unit/mbpt/mbpt_test_support.hpp`). Not implemented: `use_NAT_occupations`,
-`NAT_order` energy/mp2 (M9-Q3). Verified: MP2/MP3 at emax 2 (2N and 2N+3N) to 1e-15; IT-1 EMP2
+`NAT_order` energy/mp2 (M9-Q3; owner: not now, added when a job needs them, D36). Verified: MP2/MP3 at emax 2 (2N and 2N+3N) to 1e-15; IT-1 EMP2
 to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9.
 
 ## 6. commutator (reference: `reference/02`)
@@ -142,7 +145,9 @@ to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9.
 * Term selection uses an enum bitset `TermMask` in `CommutatorOptions` (no string keys) and
   named presets: `imsrg2`, `imsrg3_n7`, `imsrg3_full`. IMSRG(3f2) is **not** a TermMask preset:
   it acts at the BCH level (it reuses the nested commutator from two steps back, `BCH.cc:182-191`)
-  and is switched on with `BchOptions::factorized` (`[imsrg3] factorized = true`).
+  and is switched on with `BchOptions::factorized` (`[imsrg3] factorized = true`). The owner's
+  3f2 recipe (D32): hunter-gatherer Magnus, `omega_norm_max` 0.1, 1b intermediates on, 2b
+  intermediates off; `factorized = true` sets these as defaults (`16` §2.8).
 * **As implemented (M7, tag `m7-api-ready`):** headers `imsrg/commutator/{options,workspace,
   commutator}.hpp`. `commutator(X, Y, Z, opts, ws)` overwrites Z (reusing its storage when the
   spec matches) and an allocating overload returns Z; `terms::comm*ss` add one term each;
@@ -150,7 +155,8 @@ to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9.
   `Workspace` (one per model space, eagerly built, one call at a time) holds the device tables,
   the dense 6j table, the ladder ket lists and the Pandya data, and all scratch. Every fast term
   writes every element of its output part (no final symmetrization); X and Y must each be
-  Hermitian or anti-Hermitian (NotImplementedError otherwise, QUESTIONS M7-Q2), and Z must
+  Hermitian or anti-Hermitian (NotImplementedError otherwise, QUESTIONS M7-Q2; **owner,
+  2026-11-15, D36: run 2 adds general, non-Hermitian paths**, tested against `commutator_ref`), and Z must
   carry the hermiticity `commutator_spec` gives. Ladders: per channel gathered GEMMs
   `X P Y` with P = diag(nbar nbar) and diag(n n), symmetrized with `Y P X = hX hY (X P Y)^T`,
   shared with the 221 term. Particle-hole: Pandya transform of X and Y into the cross-coupled
@@ -171,7 +177,12 @@ to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9.
   recomputed every step, then capped with `ds = min(ds, smax - s)`; replicate the `domega` bump
   too (`IMSRGSolver.cc:290`, `:335`). `ds_0` is effectively unused in magnus; keep it for flow methods.
 * Omega stack: when `‖Ω‖ > omega_norm_max`, push Ω and restart from the transformed H.
-  Operators are transformed afterwards by replaying the stack. Optional scratch-to-disk.
+  Operators are transformed afterwards by replaying the stack. Optional scratch-to-disk (deferred
+  with checkpoint/restart until after M13, D39).
+* **Hunter-gatherer** (`imsrg.omega.hunter_gatherer`, imsrg++ `IMSRGSolver.cc:85-115`): only two
+  Omegas are kept; the hunter accumulates η ds by BCH products and, when its norm exceeds
+  `omega_norm_max`, is gathered into the gatherer (`gatherer = BCH_Product(hunter, gatherer)`) and
+  reset. Not implemented yet; a **prerequisite of IMSRG(3f2)** (D32), so it is an M8 follow-up in run 2.
 * BCH transform: nested commutators with 1/i!, terminating on a threshold epsilon, at most 40
   terms. BCH product: implement exactly the terms imsrg++ includes; its comment lists a
   −1/24 [Y,[X,[X,Y]]] term that the code does **not** implement. That is a truncation choice,
@@ -192,8 +203,8 @@ to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9.
 
 Phase 1 (scalar): kinetic energy T (with A-dependence, `A` parameter), intrinsic kinetic energy
 `Trel`, `Tcm`, `HCM` (Lawson term `BetaCM`, `hwBetaCM`), `Rp2`, `Rn2`, `Rm2`, `Rso`/Darwin-Foldy
-pieces as in imsrg++, `OBD`/`TBD` (later). Later: tensor (E2, M1, GT, Fermi), dagger, M0nu,
-DM NREFT. The name grammar and legacy names are in `16-config-and-cli.md`.
+pieces as in imsrg++, `OBD`/`TBD` (later). Later: tensor (E2, M1, GT, Fermi; the first extension
+after IMSRG(3), D39), dagger, M0nu, DM NREFT. The name grammar and legacy names are in `16-config-and-cli.md`.
 
 **As implemented (M6).** Namespace `imsrg::opslib`, every physics parameter explicit (no hidden
 model-space state): `kinetic_energy(ms)` (Tlab), `t_cm(ms, A)`, `t_rel(ms, A)` (T_int used in
@@ -201,6 +212,12 @@ H), `r2_cm(ms, A)`, `h_cm(ms, A, hw_trap)`, `r2_one_body/r2_two_body(ms, Species
 `rp2(ms, A, Z, include_spin_orbit = true)` (imsrg++ "Rp2" includes `RpSpinOrbitCorrection`,
 M6-Q1), `rn2(ms, A, Z)`, `rm2(ms, A)`. Equal to the imsrg-devel dumps within 1.1e-14 (emax 2
 and 4); emax 6 builds take 0.4 s (t_rel) and 0.7 s (rp2).
+
+**Owner decisions 2026-11-15 (D35), implemented in run 2:** `t_cm` keeps all two-body entries
+(imsrg++ drops |v| ≤ 1e-7, which also enters T_int and thus H); `rp2` loses `include_spin_orbit`
+and never includes the spin-orbit correction, which stays available as the separate `Rso` operator
+(`rp_spin_orbit_correction`). No imsrg++ compatibility switch: the goldens come from a patched
+imsrg-devel build (`30` §3).
 
 ## 9. driver
 

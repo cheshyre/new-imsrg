@@ -3,12 +3,14 @@
 ## Current state (keep this section up to date)
 
 * **Phase:** run 1 of the unsupervised implementation ended 2026-11-12 ~08:45 JST at the owner's
-  request (started 2026-11-11 23:41). Report: `design/reports/2026-11-12-overnight.md`. Next:
-  the owner interview (`design/INTERVIEW_PROMPT.md`), then run 2 (`design/NEXT_SESSION_PROMPT.md`).
-* **Integration branch:** `develop` (local). In run 1 it was advanced from the orchestrator's
-  worktree branch `claude/imsrg-refactor-overnight-800606` with `git update-ref` after
-  `tools/ci.sh dev-openmp` passed on each merge (QUESTIONS O1). **The main checkout's index still
-  shows 331b2d4 and needs a sync** (see O1).
+  request (started 2026-11-11 23:41). Report: `design/reports/2026-11-12-overnight.md`. The owner
+  interviews of 2026-11-13 (D25–D29) and 2026-11-15 (D30–D42, report
+  `design/reports/2026-11-15-owner-interview.md`) answered every open question. Next: run 2
+  (`design/NEXT_SESSION_PROMPT.md`), which starts with the Google-style conversion (MS, D38).
+* **Integration branch:** `develop` (local). Run 1 and the interview sessions advanced it from
+  worktree branches with `git update-ref` after `tools/ci.sh dev-openmp` passed (QUESTIONS O1).
+  **The main checkout's files match 68c8927 (synced 2026-11-12) and need another sync before run 2**
+  (command in the 2026-11-15 report); from run 2 on, runs start in the main checkout (D31).
 * **Merged:** M0 bootstrap; M1 reference build, refharness, golden data (IT-1..IT-10); M2
   base/exec/comm/linalg/angmom; M3 basis; M4 operator (`imsrg::op`); M5+M6 io/opslib/hf (mixing +
   DIIS); M7 IMSRG(2) commutators (Kokkos kernels + `commutator_ref`); M8a config/legacy CLI/`apps/imsrg`;
@@ -16,20 +18,26 @@
 * **End to end:** `imsrg` reproduces imsrg-devel for IT-2, IT-3, IT-4, IT-6, IT-7, IT-12 (same step
   counts, |ΔE0| ≤ 3e-10 MeV, `.snt` ≤ 1.2e-14). CI on `develop`: 851 unit, 34 integration, 3 MPI,
   23 Python tests, dev-openmp PASS (dev-serial passed in every lead's final run).
-* **Not started:** M10 IMSRG(3) (layout-benchmark brief ready in `NEXT_SESSION_PROMPT.md`;
-  `feature/m10-layout-benchmark` exists but has no commits), M11 phase 2, M12, M13. Open M8
-  follow-ups: Opus review of the flow numerics, flow-RK4/DP45, hunter-gatherer, `hartree_fock.mixing`
-  key, MP2 column, NAT basis/IT-5 in the driver, `Denominators` copies H every step.
+* **Not started:** MS (Google-style conversion, D38; brief in `NEXT_SESSION_PROMPT.md`), M10
+  IMSRG(3) (two tracks, 3f2 and layout, D39; briefs ready; `feature/m10-layout-benchmark` exists but
+  has no commits), M11 phase 2, M12a/M12b (D40), M13, M14 (GPU, after M12). Open M8 follow-ups and
+  the tasks of the 2026-11-15 interview are listed under M8 in `40-roadmap.md` (hunter-gatherer,
+  Tcm/Rp2 fixes with a patched reference build, `hartree_fock.mixing`, config-relative paths,
+  `results.json` schema version, MP2 column, NAT/IT-5, non-Hermitian commutator paths, 1/√2, ...).
+  The IT-10 goldens must be regenerated with the owner's 3f2 recipe before use (D32).
 * **Interruptions:** all agents stopped on the 5-hour usage limit 01:30–02:30 and 04:15–07:30 JST.
   Usage budget, not wall time, was the binding constraint.
 * **Toolchain:** Homebrew cmake 4.4.5, ninja 1.13.2, ccache 4.14.3, Open MPI 5.0.11, libomp 23.1.5,
   clang-format 23.1.5, gsl, boost, openblas; Apple clang 21; Python 3.15.2; Kokkos 5.3.0 per backend
   in `~/.cache/imsrg-deps` (`tools/bootstrap_deps.sh`); shared venv `~/.cache/imsrg-deps/venv`. The
   default MacOSX27.0.sdk does not link; `cmake/ImsrgAppleSdk.cmake` picks a working SDK (Q24).
+  cpplint 2.0.2 is in the shared venv (2026-11-15); clang-tidy is not installed yet.
   Reference build and harness: `/Users/cheshyre/Downloads/new-imsrg-reference/`.
 * **Inputs:** me2j test file = 168,066,656 values (e1max 14, e2max 28, lmax 14); NO2B test file =
-  32,685,840 floats (6, 12, 18; single precision) holding only the cE contact term (M1-Q1).
-* **Blocking questions:** none. Open: ~50 entries with "Assumed meanwhile" in `QUESTIONS.md`.
+  32,685,840 floats (6, 12, 18; single precision) holding only the cE contact term (M1-Q1); it stays
+  the 3N test input until the owner provides a full N2LO file (D33).
+* **Blocking questions:** none. Open: none; all 73 entries in `QUESTIONS.md` were answered on
+  2026-11-15 (run 2 appends new ones under "Added during run 2").
 
 ## Log (append one entry per merged branch)
 
@@ -54,3 +62,4 @@
 | 2026-11-12 08:55 | feature/fix-io-test-temp-race → develop | io test helpers (me2j, input stream, NO2B) use per-process temp names: ctest runs each test in its own process in parallel, so fixed names raced | ci.sh dev-openmp PASS on the merge, run twice | Other tests with fixed temp names (basis golden dump, toml reader, writer, operator dump) look single-use but should move to a shared unique-temp-path helper |
 | 2026-11-13 | feature/owner-answers-2026-11-13 → develop | Owner answers Q5, Q6, Q11–Q17 recorded in QUESTIONS.md; decisions D25–D29; config/Python/build/architecture docs, next-session plan and interview agenda updated | ci.sh dev-openmp PASS on the merge (docs only) | Confirm the reading of Q5 ("Yes" = only `ch_bra ≤ ch_ket` blocks) |
 | 2026-11-13 | feature/python-312-stable-abi → develop | D29 applied: Python ≥ 3.12 (`requires-python`, both CMake lookups), `_core` built with nanobind `STABLE_ABI` (`_core.abi3.so`; `Development.SABIModule` on CMake ≥ 3.26), `wheel.py-api = "cp312"`; configure removes stale `_core.*` files with another suffix | ci.sh dev-openmp PASS (23 Python tests on the abi3 module); `pip wheel` → `imsrg-0.1.0-cp312-abi3-macosx_26_0_arm64.whl` (not installed) | `StaleHostError` for device-resident data remains for M11 phase 2 |
+| 2026-11-15 | feature/owner-answers-2026-11-15 → develop | Owner interview: all 73 `QUESTIONS.md` entries answered; decisions D30–D42; new `design/17-code-style.md` (Google style: measured change list, exceptions, tool configuration, conversion plan); updates to `00`, `10`, `13`, `14`, `16`, `18`, `20`, `30`, `40`, `41`, `AGENTS.md`, the proposed settings and `NEXT_SESSION_PROMPT.md` (run-2 plan, briefs for MS and both M10 tracks); report `design/reports/2026-11-15-owner-interview.md`; cpplint 2.0.2 added to the shared venv | ci.sh dev-openmp PASS on the merge (documentation only; 851 unit, 34 integration, 3 MPI, 23 Python tests) | Owner: sync the main checkout (68c8927 → develop) and launch run 2 in it; run 2 starts with MS |

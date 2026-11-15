@@ -27,7 +27,15 @@ orchestrator → lead → worker structure works as described.
   has merged, the current `develop`; then `git merge --no-ff`. If a merge breaks `develop`,
   revert the merge commit immediately and fix it on the branch.
 * Never `git push`. Never use bare `git stash`: the stash is shared across worktrees. Use WIP
-  commits instead.
+  commits instead. Git stays local, without pushes or PRs, until the owner decides otherwise
+  (2026-11-15, D42).
+* **Where runs start (owner, 2026-11-15, D31):** unsupervised runs start in the main checkout on
+  `develop` and merge there directly. The staging procedure of QUESTIONS O1 (merge on the worktree
+  branch, CI, then `tools/ci.sh dev-openmp && git update-ref refs/heads/develop <new> <old>`) is
+  only the fallback when the app forces a worktree.
+* **Pacing (D31):** at most 3 leads, Sonnet-heavy delegation; when the 5-hour usage limit stops
+  agents, resume each with `SendMessage` after the reset; the owner launches runs right after a
+  usage reset. An owner interview follows every run (D42).
 
 ## 3. Parallel work
 
@@ -66,7 +74,13 @@ Every task brief contains:
   value 150000 meant ~15 %, not 60 %. The agent files now use `autoCompactWindow: 600000` for the
   Sonnet/Haiku agents (implementer, mechanic, reviewer) and `800000` for `imsrg-lead` (Opus). How
   `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` combines with `autoCompactWindow` is not documented; do not
-  set both (see Q19). Agent definitions load at session start, so the new values apply from the
+  set both (see Q19). **Decided (owner, 2026-11-15, D31):** per-agent windows only. The docs say
+  the percentage override also applies to subagents, on top of their `autoCompactWindow` (80 would
+  compact Sonnet/Haiku agents at ~480k tokens), so it is not set; the orchestrator gets
+  `"autoCompactWindow": 800000` from the session settings, which agents with their own frontmatter
+  value do not inherit (`design/claude-settings.proposed.json`). The frontmatter field needs Claude
+  Code ≥ v2.1.296 and a plain integer; `CLAUDE_CODE_AUTO_COMPACT_WINDOW` would override everything
+  and must not be set. Agent definitions load at session start, so the new values apply from the
   next session on.
 * More important than compaction: **keep tasks small** so workers finish well before they need
   it, and **keep the orchestrator lean**. Leads report summaries, not diffs. Detailed results

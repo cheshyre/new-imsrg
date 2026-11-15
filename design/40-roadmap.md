@@ -23,11 +23,25 @@ to one `imsrg-implementer`/`imsrg-mechanic`, without a lead agent.
 | M9 | `mbpt`: MP2/MP3, natural orbitals | M6 | M10 | sonnet / sonnet |
 | M10 | IMSRG(3): layout benchmark → perturbative triples → N7 → 3f2 | M8 | M9 | opus / opus+sonnet |
 | M11 | Python bindings (nanobind) | M4 (grows with M5–M8) | M8–M10 | sonnet / haiku |
-| M12 | MPI work distribution + performance pass | M8 | — | opus / sonnet |
+| MS | Google C++ style conversion (D38, `17-code-style.md` §5) | M8 | none (first in run 2, alone) | opus / sonnet, haiku |
+| M12a | Single-node CPU performance: imsrg++ parity, then explore single-node limits (D40) | M8 | M10, M11 | opus / sonnet |
+| M12b | MPI distribution (D14 phase 1; phase 2 for 3B blocks, evaluating the Hagen–Nam scheme, D40) | M12a | M10 | opus / sonnet |
 | M13 | Plain Makefile, docs site, polishing | M8 | any | haiku / haiku |
+| M14 | GPU builds and tuning (CUDA/HIP; after M12, D40) | M12b | — | opus / sonnet |
+| M15+ | Extensions: tensor operators first, then me3j, Navratil/Miyagi files, dagger, 0νββ, DM (order open); checkpoint/restart and Omega scratch storage; me2jp/me3jp output formats (D39) | M10 | — | opus / sonnet |
 
-Realistic overnight target: **M0–M8 done**, M9 and M11 started, the M10 layout benchmark
-started if time allows. Keep going down the list for as long as the session runs.
+Run 1 (2026-11-11/12) finished M0–M9 and M11 phase 1. **Run-2 order (owner, 2026-11-15, D38/D39):**
+(1) MS, alone, before any other branch; (2) the M8 follow-ups and the tasks of the 2026-11-15
+interview (below); (3) M10, with the IMSRG(3f2) track in parallel with the layout benchmark, then
+perturbative triples → N7; (4) M11 phase 2 and M12a alongside when capacity allows. M12b follows
+M12a; GPU work (M14) starts only after M12. Keep going down the list for as long as the session runs.
+
+## MS — Google C++ style conversion (first task of run 2)
+* Follow `17-code-style.md` §5: tooling, `.h`/`.cc` renames, `#define` guards, license boilerplate,
+  clang-format at 80 columns, Google naming with clang-tidy, floating-point literals, cpplint fixes,
+  structural items as far as time allows.
+* **Accept**: `ci.sh` passes with the blocking cpplint step; clang-format and clang-tidy naming
+  clean; Python names unchanged; test results bitwise identical to before the conversion.
 
 ---
 
@@ -101,6 +115,13 @@ started if time allows. Keep going down the list for as long as the session runs
   and Omega stack, flow-RK4/DP45, operator transformation; driver pipeline; TOML config and
   legacy `key=value` translation (`16-config-and-cli.md`); results JSON + flow CSV; tokyo output.
 * **Accept**: IT-2, IT-3, IT-4, IT-6, IT-7, IT-12 pass.
+* **Follow-ups for run 2 (owner, 2026-11-15):** Opus review of the flow numerics; hunter-gatherer
+  (prerequisite of 3f2, D32); flow-RK4/DP45; `hartree_fock.mixing` (DIIS default in TOML, D37);
+  MP2 column and EMP2; NAT basis and IT-5 in the driver; `Denominators` copying H; config-relative
+  TOML paths and absolute paths in `resolved_config.toml` (D37); `results.json` `schema_version`
+  (D37); Tcm without threshold and Rp2 without spin-orbit plus `Rso` (D35) with the patched
+  reference build and regenerated e2e goldens; general (non-Hermitian) fast-commutator paths
+  (D36); full-precision 1/√2 (D36); 3f2 config keys and refharness flags, IT-10 regeneration (D32).
 
 ## M9 — mbpt
 * MP2/MP3 energies, MBPT(2) density matrix, natural orbitals.
@@ -108,17 +129,28 @@ started if time allows. Keep going down the list for as long as the session runs
 
 ## M10 — IMSRG(3)
 * Follow `14-imsrg3-plan.md`: layout benchmark and decision → brute-force m-scheme reference →
-  perturbative triples → N7 → 3f2.
+  perturbative triples → N7, with **3f2 as a parallel track** (no 3B storage; needs hunter-gatherer
+  and the regenerated IT-10 goldens; owner, 2026-11-15, D39). 3B cuts drop kets at enumeration
+  (D34). Production target: N7 at emax 10–12 (D34).
 * **Accept**: IT-8, IT-9, IT-10 pass (emax 2; emax 3 under `slow`); benchmark report written.
 
 ## M11 — Python bindings
 * Per `18-python-api.md`; grows with each module.
 * **Accept**: pytest suite for bindings passes; the example pipeline script runs.
 
-## M12 — MPI and performance
-* OwnershipMap-based distribution of the expensive IMSRG(2) terms (D14 phase 1); profiling
-  pass; batched GEMM tuning.
-* **Accept**: IT-11 passes; benchmark comparison vs imsrg-devel recorded.
+## M12 — performance (M12a) and MPI (M12b)
+*Split by the owner, 2026-11-15 (D40).*
+* **M12a, single node first:** reach imsrg++ parity (sparse Pandya maps, smaller Workspace,
+  per-channel norm reductions, `No2bThreeBody::get_pn`, `Denominators`), then explore how far
+  single-node CPU performance goes; judge mainly at larger emax, with occasional emax-8 IMSRG(2)
+  benchmarks against imsrg++ (never in CI). **Accept**: benchmark report in `design/benchmarks/`
+  (emax 4, 6, 8) vs imsrg-devel.
+* **M12b, then scaling:** OwnershipMap-based distribution of the expensive IMSRG(2) terms (D14
+  phase 1), then the 3B-block distribution for IMSRG(3) (phase 2), evaluating the row-wise,
+  cost-balanced block distribution of Hagen and Nam (Prog. Theor. Phys. Suppl. 196, 102 (2012),
+  arXiv:1203.3765) against distribution by channel. Single-node speed may fall back to imsrg++ level
+  once scaled. **Accept**: IT-11 passes; scaling measurements recorded.
+* GPU work (M14) starts after M12.
 
 ## M13 — Makefile and docs
 * `Makefile` per `20` §6; Doxygen config; `docs/` user guide (install, run, config reference).

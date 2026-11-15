@@ -19,8 +19,8 @@
 **Pinned in M0 (2026-11-11, details in `extern/README.md`):** kokkos 5.3.0 (tagged 2026-11-10,
 newer than Homebrew's 5.2.2), googletest v1.18.0, fmt 12.2.1, CLI11 v2.7.2, toml++ v3.4.0,
 nanobind v3.1.0 (robin_map v1.4.0). Kokkos 5.3.0 requires GCC ≥ 10.4, Clang ≥ 14, NVCC ≥ 12.2,
-HIPCC ≥ 6.2 and CMake ≥ 3.22: the GCC baseline (D20) is met, but CUDA and ROCm need the 12.2 and
-6.2 minor releases (QUESTIONS Q20). Do not use Homebrew's kokkos package for development builds
+HIPCC ≥ 6.2 and CMake ≥ 3.22: the GCC baseline (D20) is met, and the owner raised the CUDA and
+ROCm baseline to 12.2 and 6.2 (QUESTIONS Q20, D30). Do not use Homebrew's kokkos package for development builds
 (its backend configuration is not under our control); `tools/bootstrap_deps.sh` builds the
 submodule.
 
@@ -172,7 +172,11 @@ As implemented in M0:
 * `tools/reference/build_imsrg_devel.sh`: builds the old code outside the repo (§5).
 * `tools/reference/gen_golden_*.py|.cpp`: produces golden data (see `30-testing-and-validation.md`).
 * `.clang-format` (based on Google style, 100 columns) and `.clang-tidy` (bugprone, performance,
-  modernize subsets; not enforced at first).
+  modernize subsets; not enforced at first). **Owner, 2026-11-15 (D38):** the code follows the Google
+  C++ Style Guide; the run-2 conversion moves `.clang-format` to 80 columns and the guide's include
+  order, adds `CPPLINT.cfg` and a cpplint step to `ci.sh`, and adds clang-tidy
+  `readability-identifier-naming` (details and the measured scale in `17-code-style.md`). `ci.sh`
+  stays under 5 minutes (D42).
 
 ## 5. Building the reference imsrg-devel (outside the repo)
 
@@ -237,7 +241,9 @@ pointing at the Kokkos deps prefix and `OpenMP_ROOT=$(brew --prefix libomp)`) bu
 `IMSRG_BUILD_TESTS=OFF`). For development, the in-tree build's `python/` directory can be put
 on `PYTHONPATH` directly. Python ≥ 3.12 (D29); the extension is a stable-ABI module
 (`_core.abi3.so`, CMake ≥ 3.26) and `wheel.py-api = "cp312"` makes `pip wheel` produce one
-`cp312-abi3` wheel per platform. Details: `18-python-api.md` §8.
+`cp312-abi3` wheel per platform. Details: `18-python-api.md` §8. Distribution target (owner,
+2026-11-15, D41): pip wheels built with cibuildwheel (Linux x86_64/aarch64, macOS arm64), Kokkos
+OpenMP inside; GPU/MPI builds from source.
 
 ## 8. Toolchain notes and workarounds (macOS arm64, found in M0, 2026-11-12)
 
@@ -251,7 +257,10 @@ on `PYTHONPATH` directly. Python ≥ 3.12 (D29); the extension is a stable-ABI m
   (`tools/bootstrap_deps.sh` does this for Kokkos; the imsrg-devel reference build can do the same,
   or pass `-DCMAKE_OSX_SYSROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk`, or export
   `SDKROOT` to that path, which also fixes plain `clang++`/`mpicxx` calls). Owner action, optional:
-  update or reinstall the Command Line Tools so `ld` and the default SDK match.
+  update or reinstall the Command Line Tools so `ld` and the default SDK match. *Cause (checked
+  2026-11-15):* every installed CLT package is 26.6, and CLT 26.6 itself ships the pre-release
+  `MacOSX27.0.sdk`, so reinstalling 26.6 does not help; no license agreement is involved. The owner
+  keeps the workaround and installs the next CLT update when Software Update offers it (Q24).
 * **OpenMP with Apple clang** works directly with Homebrew libomp: Kokkos' CMake finds it as
   `-Xclang -fopenmp` when `OpenMP_ROOT=/opt/homebrew/opt/libomp`; brew `llvm` or `gcc` were not
   needed. Consumers of the installed Kokkos need the same `OpenMP_ROOT` (Kokkos re-runs

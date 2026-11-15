@@ -99,6 +99,7 @@ For single-reference runs set only `reference.nucleus`.
 
 | key | type | default | meaning |
 |---|---|---|---|
+| `hartree_fock.mixing` | enum `diis`, `linear` | `diis` (TOML); the legacy layer sets `linear` | HF update: Pulay DIIS on the Fock matrix (M6-Q3) or imsrg++'s linear density mixing (for reproducing imsrg++ iteration counts). Both reach the same solution. *(owner, 2026-11-15, D37; to be implemented in run 2, the driver uses linear today)* |
 | `hartree_fock.freeze_occupations` | bool | `false` | keep reference occupations fixed (default: fractional/ensemble occupations may follow HF energies). Ignored for `basis.kind="oscillator"`. |
 | `natural_orbitals.use_occupations` | bool | `false` | use NAT occupations for the reference. |
 | `natural_orbitals.order` | enum `occupation`, `energy` | `occupation` | orbit labelling order. Only valid with `basis.kind="nat"`. |
@@ -168,14 +169,16 @@ Whole table absent or all-default = IMSRG(2). Non-default keys without `in_flow`
 | `in_flow` | bool | `false` | include 3-body terms in commutators during the flow (old `IMSRG3`). |
 | `at_end` | bool | `false` | after the IMSRG(2) flow, replay Omega at IMSRG(3) level (old `imsrg3_at_end`); requires `method="magnus"`. |
 | `variant` | enum `full`, `n7`, `mp4` | `full` | which 3-body commutator terms (old `imsrg3_n7`, `imsrg3_mp4`; both set = error). |
-| `factorized` | bool | `false` | IMSRG(3f2): factorized double-commutator correction inside the BCH transform. imsrg++ exposes it only as `BCH::SetUseFactorizedCorrection` (pyIMSRG), with no executable parameter; here it maps to `BchOptions::factorized`, not to the commutator TermMask. |
+| `factorized` | bool | `false` | IMSRG(3f2): factorized double-commutator correction inside the BCH transform. imsrg++ exposes it only as `BCH::SetUseFactorizedCorrection` (pyIMSRG), with no executable parameter; here it maps to `BchOptions::factorized`, not to the commutator TermMask. **`true` sets the owner's 3f2 recipe as defaults (D32):** `imsrg.omega.hunter_gatherer = true`, `imsrg.step.omega_norm_max = 0.1`, `factorized_1b_intermediates = true`, `factorized_2b_intermediates = false`; explicitly given keys win, and `resolved_config.toml` writes all four out. |
+| `factorized_1b_intermediates` | bool | `true` | 3f2: use the one-body intermediates of the factorized double commutator (pyIMSRG `FactorizedDoubleCommutator::SetUse_1b_Intermediates`). *(D32, run 2)* |
+| `factorized_2b_intermediates` | bool | `false` with `factorized` (imsrg++ default `true`) | 3f2: use the two-body intermediates (`SetUse_2b_Intermediates`). *(D32, run 2)* |
 | `no_qqq` | bool | `false` | drop `qqq` terms (old `imsrg3_no_qqq`). |
 | `only_2b_eta` | bool | `false` | generator stays 2-body. |
 | `only_2b_omega` | bool | `false` | Omega stays 2-body. |
 | `discard_residual_input_3n` | bool | `false` | drop input 3N after normal ordering (keep induced only). |
 | `threebody_threshold` | double >= 0 | `0.0` | skip 3-body terms when `\|\|A\|\|` or `\|\|B\|\|` is below. |
-| `de3max` | opt double | none (old `99`) | energy cut on 3-body states in generator/commutators. |
-| `occ_nat3_cut` | opt double > 0 | none (old `-1`) | natural-orbital occupation cut `n(1-n)` on 3-body states; also triggers the NAT-occupation calculation (Q13). |
+| `de3max` | opt double | none (old `99`) | energy cut on 3-body states; kets above the cut are not enumerated, so the cut acts identically in every term (D34). |
+| `occ_nat3_cut` | opt double > 0 | none (old `-1`) | natural-orbital occupation cut `n(1-n)` on 3-body states (kets failing it are not enumerated, D34); also triggers the NAT-occupation calculation (Q13). |
 
 ### 2.9 `[operators]`
 
@@ -198,6 +201,12 @@ Old `OperatorsRPA`/`OperatorsTDA`: not supported (no schema key).
 | `write_omega` | bool | `false` | write Omega operators (and occupations, coefficient matrix) next to the interaction. |
 | `write_ho_ops`, `write_hf_ops` | bool | `false` | write operators before the HF transformation / before the IMSRG flow (PL). |
 | `spwf` | array of strings | `[]` | orbits whose HF/NAT single-particle wave functions are written; `"valence"` = all valence orbits. |
+
+`results.json` (written to `directory`) carries an integer `schema_version` (starting at 1); its
+schema is documented in a table in this section and every change is listed in a changelog next to it
+*(owner, 2026-11-15, D37; to be added in run 2)*. Only the tokyo and NuShellX valence-space files must
+stay file-compatible with imsrg++ (D39); the other outputs use our formats. Two new output formats,
+`me2jp` and `me3jp`, come later (specification from the owner, D39).
 
 ### 2.11 Example configs
 
@@ -336,7 +345,9 @@ Equivalent legacy command for (c): `imsrg 2bme=VNN_N3LO_EM500_lambda_1.80_hw16.0
 
 Equivalent legacy command for (d): `imsrg 2bme=VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz file2e1max=14 file2e2max=28 file2lmax=14 emax=2 e3max=6 hw=16 reference=O16 valence_space=O16 3bme=NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin 3bme_type=no2b file3e1max=6 file3e2max=12 file3e3max=18 IMSRG3=true imsrg3_n7=true`
 
-(Clarification, M8a: (b) and (d) list no operators, so their legacy commands have no `Operators=`. The test of section 6.3 item 6 extracts the four TOML blocks and these four command lines from this file; `examples/config/{a,b,c,d}_*.toml` hold the same four TOML files and are checked against the blocks. Relative input paths are relative to the working directory, as in imsrg++.)
+(Clarification, M8a: (b) and (d) list no operators, so their legacy commands have no `Operators=`. The test of section 6.3 item 6 extracts the four TOML blocks and these four command lines from this file; `examples/config/{a,b,c,d}_*.toml` hold the same four TOML files and are checked against the blocks. Relative input paths in these TOML files resolve against the config file's directory (D37, below), so the examples need paths that are valid from `examples/config/` (or a `--set` override) once run 2 implements the rule.)
+
+**Relative paths (owner, 2026-11-15, D37):** relative paths in a TOML config resolve against the directory of that config file; legacy `key=value` values and command-line `--set` values resolve against the working directory, as in imsrg++. `resolved_config.toml` records absolute paths, so it reruns from anywhere. (Run 1 implemented the working-directory rule for TOML too; run 2 changes it.)
 
 ### 2.12 CLI
 
@@ -481,7 +492,7 @@ Columns: old key (type) | new key | type / enum | old default | status | notes. 
 | `2bme=none` | no 2N input; only valid for `schematic`/atomic in old code | C (error otherwise) |
 | `fmt2=oakridge[bin]` with `2bme=sp.dat,vnn.dat` | `format`, 2-element `file` | PL |
 | `core_generator` containing `imaginary` or `wegner` | solver rule, not a config rewrite: before stage 1 and before stage 2, if the active generator is `imaginary_time`/`wegner` and `ds_0 > 1e-2`, set `ds_0=1e-4, dsmax=1e-2` (persists once triggered). Kept (Q2) | S (PL generators) |
-| `Operators=Rp2` | additionally prints point-proton and charge radius with `PROTON_RCH2`, `NEUTRON_RCH2`, `DARWIN_FOLDY` constants | S (post-processing owned by the output stage) |
+| `Operators=Rp2` | additionally prints point-proton and charge radius with `PROTON_RCH2`, `NEUTRON_RCH2`, `DARWIN_FOLDY` constants; since D35, `Rp2` excludes the spin-orbit correction, so the charge radius adds the `Rso` expectation value explicitly | S (post-processing owned by the output stage) |
 | `HCM_<hw>` built internally for `BetaCM` | done by the Hamiltonian-assembly stage from `hamiltonian.beta_cm*`, not via the operator list | S |
 | `help`, `-help`, `--help` | CLI11 help | S |
 
@@ -561,6 +572,11 @@ Catalog entry (static table, one row per operator family): `{ name, n_params, pa
 * Name from a removed feature (`OperatorsRPA`/`OperatorsTDA` keys) is rejected at the key level (section 3.4).
 
 ### 4.5 Catalog phasing (names from R05 1.2)
+
+**Rp2 and Rso (owner, 2026-11-15, D35):** `Rp2` is the point-proton mean-square radius **without**
+the spin-orbit correction (imsrg++'s `Rp2_corrected_Op` includes it); the correction is the separate
+operator `Rso` (imsrg++ `RpSpinOrbitCorrection`), added explicitly for charge radii. `opslib::rp2`
+loses its `include_spin_orbit` parameter (run 2).
 
 | phase | operators |
 |---|---|
@@ -677,5 +693,6 @@ Errors are collected; each rule has an id used in tests. TOML = strict; "legacy:
 * Q1: `steps=1` with a valence space. **Decided (owner, 2026-11-13; QUESTIONS Q11, D27):** keep "uses `generator.core`" with the `W-NSTEPS1` warning; legacy parameters will be re-evaluated later.
 * Q11: `imsrg3_at_end` without `IMSRG3` drops the input 3N. **Decided (owner, 2026-11-13; QUESTIONS Q12, D27):** keep it, with the `W-Q11` warning.
 * TOML requiredness of `basis.emax`, `basis.hw`, `file e1max`. **Decided (owner, 2026-11-13; QUESTIONS Q13, D28):** required in TOML; the legacy layer keeps the old defaults (6, 20.0, 12) and warns. (Q3, `denominator_delta` without an orbit: kept with the `W-Q3` warning, QUESTIONS Q14, D27.)
+* HF mixing default, relative paths, the 3f2 recipe defaults and legacy `valence_space=<A>` with a different `reference=<B>`. **Decided (owner, 2026-11-15; D32, D37):** `hartree_fock.mixing` = `diis` in TOML, `linear` in the legacy layer; TOML paths relative to the config file, legacy/`--set` paths relative to the working directory; `factorized = true` implies the recipe defaults; the legacy combination stays `E-LEGACY-NS` (M8a-Q4).
 * Strictness split (TOML strict, legacy lenient with warnings) versus uniform strictness.
 * Whether `ds_0` should be rejected under `method=magnus` once imaginary-time/Wegner generators are implemented (currently it gates the step-limit override).

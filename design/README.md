@@ -6,22 +6,23 @@ Reading order for a new agent or developer:
 |------|---------|
 | `../AGENTS.md` | Golden rules, build commands, conventions (read first) |
 | `STATUS.md` | Current state and progress log |
-| `00-requirements-and-decisions.md` | Requirements, scope and priorities, decision log (D1–D18) |
+| `00-requirements-and-decisions.md` | Requirements, scope and priorities, decision log (D1–D42) |
 | `10-architecture.md` | Repository layout, module DAG, core types, runtime, header policy |
 | `12-compute-backend.md` | Kokkos facade, linalg, kernel strategy, device-code rules, MPI plan |
 | `13-physics-modules.md` | Per-module specification and what must match imsrg++ |
 | `14-imsrg3-plan.md` | IMSRG(3): layout benchmark, brute-force validation, N7 / 3f2 / triples |
 | `15-operator-dump-format.md` | Text format for exchanging operators with imsrg-devel (golden data) |
 | `16-config-and-cli.md` | TOML schema, legacy `key=value` mapping of every old parameter, operator-name grammar |
+| `17-code-style.md` | Google C++ Style Guide adoption (D38): measured changes, exceptions, clang-format/cpplint/clang-tidy setup, run-2 conversion plan |
 | `18-python-api.md` | nanobind Python API plan and the mapping from the old pyIMSRG |
 | `20-build-and-tooling.md` | Dependencies, CMake structure, presets, scripts, reference build, Makefile |
 | `30-testing-and-validation.md` | Test layers, tolerances, golden data, integration test matrix, deviation log |
-| `40-roadmap.md` | Milestones M0–M13 with acceptance criteria and agent roles |
+| `40-roadmap.md` | Milestones M0–M15 (incl. MS style conversion, M12a/M12b) with acceptance criteria and agent roles |
 | `41-agent-workflow.md` | How the multi-agent session works: roles, git, parallelism, briefs, context |
 | `QUESTIONS.md` | Open questions for the project owner (append, never block) |
 | `NEXT_SESSION_PROMPT.md` | The prompt that starts the next unsupervised implementation run |
 | `INTERVIEW_PROMPT.md` | The prompt for an interactive session that answers the open questions and interviews the owner |
-| `reports/` | Reports of the unsupervised runs (e.g. `2026-11-12-overnight.md`) |
+| `reports/` | Reports of the unsupervised runs (e.g. `2026-11-12-overnight.md`) and owner interviews (`2026-11-15-owner-interview.md`) |
 | `benchmarks/` | Benchmark results (e.g. `imsrg2-commutators.md`) |
 | `claude-settings.proposed.json` | Proposed Claude Code settings for the unattended run (owner installs) |
 | `reference/01..05-*.md` | Detailed analyses of imsrg-devel with file:line citations (feature checklists) |
@@ -31,7 +32,8 @@ rest. The `reference/` files describe the **old** code; their "suggestions for t
 the layering proposal in `reference/01`) do not bind us. Question numbers inside
 `16-config-and-cli.md` and `18-python-api.md` are local to those files; the canonical list is
 `QUESTIONS.md`. Use the file conventions of `10-architecture.md` (`.hpp`/`.cpp`) even where a doc
-writes `.hh`.
+writes `.hh`, until the run-2 Google-style conversion switches the code to `.h`/`.cc` (D38,
+`17-code-style.md`).
 
 Reference analyses:
 * `reference/01-core-data-model.md`: ModelSpace, channels, Operator, TwoBodyME, 3B storage, AngMom, bugs

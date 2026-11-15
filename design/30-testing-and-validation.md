@@ -42,8 +42,12 @@ and note it in STATUS.md, but do not block on it.
 | IMSRG(2) ground-state energy (end to end) | 1e-3 MeV (log the deviation and the step counts of both codes) |
 | Valence-space 0B/1B/2B elements | 1e-3 MeV |
 | Transformed scalar operators (e.g. Rp2) | 1e-4 fm² |
-| IMSRG(3) variants at emax 2/3 (E0, triples energy) | 1e-3 MeV |
+| IMSRG(3) variants at emax 2/3: N7 and 3f2 E0 | 1e-3 MeV |
+| Perturbative triples energy (end to end) | 1e-4 MeV (like MBPT; owner, 2026-11-15, D34) |
 | MPI rank-count invariance | 1e-10 relative |
+
+IMSRG(3) single terms follow the same 1e-10 rule, against imsrg-devel where it is correct and
+against the brute-force m-scheme reference where it is not (owner, 2026-11-15, D34).
 
 ## 3. Golden data from imsrg-devel
 
@@ -74,6 +78,26 @@ elements vanish), which makes the full IT-4/IT-5 Magnus flows diverge; IT-4/IT-5
 the HF numbers and the flow stopped at s = 10 (`tests/golden/e2e/IT-4/smax10`, `IT-5/smax10`).
 O16 at emax 2 is unstable in IMSRG(2) with this 2N interaction (any generator tried), so the
 emax-2 part of IT-8 uses He4 (`e2e/IT-8/He4_emax2`); O16 is covered at emax 3. See M1-Q1.
+**Owner, 2026-11-15 (D33):** the cE-only file stays the 3N test input (a full N2LO file comes later
+and will get full-flow goldens; the cE tests stay as code-path tests), and the O16 emax-2
+instability is recorded as known physics (IT-8 unchanged).
+
+**Golden-data policy (owner, 2026-11-15, D42).** Goldens are regenerated only through the scripted
+`tools/reference` commands; the commit message gives the reason and the old vs new numbers, and a
+reviewer checks the change. Golden numbers are never edited by hand.
+
+**Patched reference build (owner, 2026-11-15, D35).** Our Tcm keeps all two-body entries and our Rp2
+excludes the spin-orbit term, where imsrg++ drops |v| ≤ 1e-7 in `TCM_Op` and adds
+`RpSpinOrbitCorrection` to Rp2. Instead of a compatibility switch in our code, run 2 builds a second
+imsrg-devel copy with a small patch for these two points (patch file in `tools/reference/`, applied by
+`build_imsrg_devel.sh` into a separate build directory) and regenerates the e2e goldens that contain
+T_int or Rp2 from it, so the ITs keep ~1e-10 MeV agreement and identical step counts. The unpatched
+goldens stay where neither operator enters (V2, commutator terms, generators).
+
+**IT-10 (owner, 2026-11-15, D32).** IMSRG(3f2) means hunter-gatherer Magnus with `omega_norm_max`
+0.1 and the factorized correction with 1b intermediates on and 2b intermediates off. The current
+IT-10 goldens (hunter-gatherer off, 0.25, 2b on) are regenerated with these settings (new
+`refharness flow` flags) before IT-10 is used.
 
 ## 4. Integration test matrix
 
@@ -93,7 +117,7 @@ file3e1max=6 file3e2max=12 file3e3max=18`. **Never emax > 6. IMSRG(3) only at em
 | IT-7 | Valence space with an open-shell reference: `reference=Ne20`, sd-shell, emax 4 (fractional occupations in normal ordering) | `.snt` elements |
 | IT-8 | Perturbative triples, O16, emax 2 and 3, 2N | E0, triples energy |
 | IT-9 | IMSRG(3)-N7 Magnus, He4 and O16, emax 2 (3 under `slow`) | E0 |
-| IT-10 | IMSRG(3f2) Magnus, O16, emax 2 and 3 (golden data from `refharness flow --factorized`; imsrg++ has no executable switch) | E0 |
+| IT-10 | IMSRG(3f2) Magnus (owner's recipe, D32: hunter-gatherer, `omega_norm_max` 0.1, 1b intermediates on, 2b off), O16, emax 2 and 3 (golden data from `refharness flow --factorized`, regenerated with the recipe; imsrg++ has no executable switch) | E0 |
 | IT-11 | IT-2 with `mpirun -n 2` and `-n 4` | identical to IT-2 within 1e-10 relative |
 | IT-12 | IT-2 driven through legacy `key=value` arguments vs TOML config | identical results |
 | IT-13 | emax 6 O16 IMSRG(2), release build (label `slow`, `perf`) | E0 vs golden, wall time vs imsrg-devel (recorded, not asserted) |
@@ -104,6 +128,16 @@ file3e1max=6 file3e2max=12 file3e3max=18`. **Never emax > 6. IMSRG(3) only at em
 transform) at emax 4 and 6, and for the IMSRG(3) kernels at **emax 2 and 3 only**. Results (with commit hash, preset,
 thread count) are appended to `design/benchmarks/*.md`. Compare against imsrg-devel timings
 from the same machine. The goal is to be at least as fast on CPU before any GPU work.
+
+**Owner, 2026-11-15 (D40, D42).** M12a first reaches imsrg++ parity on one node and then explores
+how far single-node CPU performance goes; performance matters most in large model spaces, so the
+comparison also runs **occasionally at emax 8** (IMSRG(2) only, never in CI, results in
+`design/benchmarks/`). Once M12b scales across nodes, single-node speed may fall back to imsrg++
+level. GPU work starts after M12.
+
+**CI budget (D42).** `tools/ci.sh dev-openmp` stays under 5 minutes (139 s on 2026-11-15: unit
+34 s, integration 24 s). Longer tests carry the `slow` label and run before merges that touch
+numerics.
 
 ## 6. Deviation log (old-code bugs we fixed)
 
@@ -122,6 +156,10 @@ covers the fixed behaviour.
 | M4-1 | `TwoBodyME.cc:234-260` (`AddToTBME`) | The partner element of an anti-Hermitian operator receives +v instead of -v | `TwoBody::add_normalized` writes h·v (h = -1 anti-Hermitian, no partner for non-Hermitian) | `operator_core` (`test_two_body.cpp`, anti-Hermitian add) |
 | M6-1 | `HartreeFock.cc:105-120` (`Solve`, DIIS branch) and `623-678` (`UpdateDensityMatrix_DIIS`) | The DIIS rescue after iteration 100 has dead code (the `iterations==100` reset can never run), keeps 6 instead of 5 matrices, skips the newest density (off-by-one) and takes `abs()` of the Pulay coefficients | `hf::solve` in `Mixing::Linear` (the imsrg++ path) switches to our standard Pulay DIIS on the Fock matrix (history reset) if not converged after 100 iterations; `Mixing::Diis` uses it from iteration `diis_start` | `hf_diis`: Linear and Diis reach the same E_HF (within 2e-13 MeV) on the four golden cases; every golden converges in Linear mode before iteration 100, so the goldens are unaffected |
 | M6-2 | `HartreeFock.cc:86-103` (`Solve`, rescue schedule) | Mixing factors set from `std::rand()` after iteration 600 (non-deterministic across platforms) | Dropped (the DIIS of M6-1 takes over after iteration 100); freezing the occupations at iteration 800 is kept | Same as M6-1 (no golden reaches iteration 100) |
-| M8-1 | `Generator.cc:155-157` (`Get1bDenominator`), `:222-224` (`Get2bDenominator`) | The denominator floor sets |Delta| < cutoff to +cutoff, losing the sign of small negative denominators (owner decision D21) | `flow::floor_denominator` returns sign(Delta) * cutoff (sign(0) = +) | `flow_generator` (floor and a generator element with a tiny negative denominator); the IT goldens have no denominator below 1e-6, so they are unaffected |
+| M8-1 | `Generator.cc:155-157` (`Get1bDenominator`), `:222-224` (`Get2bDenominator`) | The denominator floor sets \|Delta\| < cutoff to +cutoff, losing the sign of small negative denominators (owner decision D21) | `flow::floor_denominator` returns sign(Delta) * cutoff (sign(0) = +) | `flow_generator` (floor and a generator element with a tiny negative denominator); the IT goldens have no denominator below 1e-6, so they are unaffected |
 | M8-2 | `Generator.cc:662-680` (`ConstructGenerator_HartreeFock`) | The loop includes j == i and writes eta(i,i) = -H(i,i)/cutoff (Delta(i,i) = 0 floored), a huge diagonal in an anti-Hermitian operator | Only j < i; the diagonal of eta stays zero | `flow_generator` (hartree-fock block structure and anti-Hermiticity) |
 | M8-3 | `IMSRGSolver.cc:300-306` (`Solve_magnus_euler`, divergence guard) | A diverged flow multiplies H by 1/0 (inf everywhere) and the driver writes inf output files | `MagnusSolver::solve` stops with `StopReason::Diverged` and keeps the last finite H; `driver::run` writes results.json and throws NumericalError | Behavioural only (no golden depends on it) |
+| D35-1 | `imsrg_util.cc` (`TCM_Op`, two-body part) | Two-body entries with \|p1·p2/A\| ≤ 1e-7 are dropped; the threshold enters T_int = T − Tcm and thus H (owner: a quirk to fix, M6-Q2) | **Planned, run 2 (D35):** `opslib::t_cm` keeps all entries; no compatibility switch | e2e goldens regenerated from the patched imsrg-devel build (§3); a unit test compares Tcm with the patched reference |
+| D35-2 | `imsrg_util.cc:66` ("Rp2" → `Rp2_corrected_Op`, which adds `RpSpinOrbitCorrection`) | The point-proton radius operator includes the spin-orbit correction (owner: belongs to the charge radius, M6-Q1) | **Planned, run 2 (D35):** `rp2` excludes it; the correction is the separate `Rso` operator; the charge-radius output adds it explicitly | IT-6 goldens from the patched build; `Rp2 + Rso` equals imsrg++'s Rp2 (unit test) |
+
+The owner confirmed the fixes M8-1..M8-3 and deviation #1 (double-double Moshinsky) on 2026-11-15 (D36).

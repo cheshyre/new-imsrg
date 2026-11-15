@@ -452,6 +452,13 @@ The old code stays buildable (read-only tree) and is the oracle for the first mi
 - **Optional extras** (`pyproject` extras): `imsrg[config]` (`tomli` for Python < 3.11), `imsrg[mpi]` (mpi4py), `imsrg[test]` (pytest, numpy, hypothesis for index-type property tests), `imsrg[dev]` (mypy, ruff).
 - **CI/packaging risks recorded**: (a) wheels with CUDA/HIP are not published to PyPI (site-specific `pip install .` from source is the supported route); CPU OpenMP manylinux/macOS wheels are possible later; (b) nanobind requires C++17 and our C++20 core compiles in separate translation units from the bindings, so no C++20-only constructs may appear in public headers that `python/src` includes unless the bindings TU also builds as C++20 (we set `CXX_STANDARD 20` on `_core` too; this is the plan, MSVC not supported); (c) `nb::ndarray` zero-copy of Kokkos host mirrors requires `Kokkos::LayoutLeft` host views (F-order, matches Armadillo/old layout), asserted at compile time in `ndarray_util.hh`.
 
+**Owner, 2026-11-15 (D41).** The main users are the owner's group, for pipelines (scripted runs,
+parameter scans, post-processing) and operator algebra (building operators, trying new terms);
+notebooks and external users are secondary. Packaging target: **pip wheels**, `cp312-abi3`, built
+with cibuildwheel for Linux x86_64/aarch64 and macOS arm64, with Kokkos (OpenMP) inside; GPU and MPI
+builds stay source builds on the clusters. Finalization at interpreter exit (M11-Q1) stays as
+implemented and is revisited for GPU builds, together with `StaleHostError`.
+
 ## 7. Open questions for a human decision
 1. `import imsrg` is passive and Kokkos initializes lazily (2.0, 4.3). **Decided (owner, 2026-11-13; QUESTIONS Q15, D29):** explicit `Runtime()` context manager plus the lazy default.
 2. `StaleHostError` (raise) vs implicit sync for host views (2.2). **Decided (owner, 2026-11-13; QUESTIONS Q16, D29):** raise.
