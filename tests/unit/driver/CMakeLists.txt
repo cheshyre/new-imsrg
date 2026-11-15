@@ -39,6 +39,9 @@ if(TARGET imsrg)
   add_dependencies(driver_cli imsrg)
 endif()
 
+# The point-proton -> charge-radius conversion of the output stage (D35).
+imsrg_add_test(NAME driver_charge_radius SOURCES test_charge_radius.cc DEPS driver LABELS unit)
+
 # Pipeline stage 1 (model space, interaction, HF, normal ordering) against the HF goldens; needs
 # the input files in IMSRG_TEST_DATA_DIR and skips without them.
 imsrg_add_test(NAME driver_pipeline_hamiltonian

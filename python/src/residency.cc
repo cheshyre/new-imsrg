@@ -72,9 +72,70 @@ int LiveObjects() noexcept {
                     [](const Releasable* o) { return !o->released; }));
 }
 
+namespace {
+
+std::atomic<int> g_in_flight{0};
+std::atomic<bool> g_releasing{false};
+
+}  // namespace
+
+int CallsInFlight() noexcept { return g_in_flight.load(); }
+
+InFlight::InFlight() {
+  // Dekker-style handshake with ReleaseAllLive (sequentially consistent).
+  ++g_in_flight;
+  if (g_releasing.load()) {
+    --g_in_flight;
+    throw StaleHostError(
+        "the imsrg runtime is being finalized; the call was not started");
+  }
+}
+
+InFlight::~InFlight() { --g_in_flight; }
+
+void BusyFlag::Enter() {
+  std::lock_guard lock(mutex_);
+  const auto me = std::this_thread::get_id();
+  if (depth_ > 0 && owner_ != me)
+    throw imsrg::RuntimeError("object in use by another thread");
+  owner_ = me;
+  ++depth_;
+}
+
+void BusyFlag::Leave() noexcept {
+  std::lock_guard lock(mutex_);
+  if (--depth_ == 0) owner_ = std::thread::id();
+}
+
+void ThrowIfSignalPending() {
+  if (PyErr_CheckSignals() != 0) throw nb::python_error();
+}
+
+PyModelSpace::~PyModelSpace() {
+  const bool shared = ms && ms.use_count() > 1;
+  ms.reset();
+  if (shared) PurgeWorkspaceCache();
+}
+
+void RequireSameModelSpace(const op::Operator& a, const op::Operator& b) {
+  if (!op::SameModelSpace(a, b))
+    throw ModelSpaceError("the operands live on different model spaces");
+}
+
+void RequireFile(const std::filesystem::path& path) {
+  std::error_code ec;
+  if (!std::filesystem::exists(path, ec))
+    throw MissingFileError("file not found: '" + path.string() + "'");
+}
+
 int ReleaseAllLive() noexcept {
   auto& r = GetRegistry();
   std::lock_guard lock(r.mutex);
+  g_releasing.store(true);
+  struct Reset {
+    ~Reset() { g_releasing.store(false); }
+  } reset;
+  if (g_in_flight.load() > 0) return -1;
   int blocked = 0;
   for (const Releasable* o : r.live)
     if (!o->released && !o->CanRelease()) ++blocked;
@@ -122,7 +183,9 @@ const op::Operator& Input(const PyOperator& o) {
     // live, not their value (design/18 section 2.2).
     auto& m = const_cast<PyOperator&>(o);
     m.SyncToDevice();
-    m.residency = Residency::kBoth;
+    // A live writable view keeps the host side authoritative: its later
+    // edits must be pushed before the next call as well.
+    if (m.writable_views->load() == 0) m.residency = Residency::kBoth;
   }
   return o;
 }
@@ -146,19 +209,32 @@ namespace {
 struct ViewGuard {
   nb::object owner;
   std::shared_ptr<std::atomic<int>> count;
+  std::shared_ptr<std::atomic<int>> writable;
 };
 
 }  // namespace
 
-nb::object MakeViewGuard(nb::handle self) {
+nb::object MakeViewGuard(nb::handle self, bool writable) {
   auto& o = nb::cast<PyOperator&>(self);
-  auto* g = new ViewGuard{nb::borrow(self), o.views};
+  auto* g = new ViewGuard{nb::borrow(self), o.views,
+                          writable ? o.writable_views : nullptr};
   ++*g->count;
+  if (g->writable) ++*g->writable;
   return nb::capsule(g, [](void* p) noexcept {
     auto* guard = static_cast<ViewGuard*>(p);
     --*guard->count;
+    if (guard->writable) --*guard->writable;
     delete guard;
   });
+}
+
+void MarkModifiedInPlace(PyOperator& o) {
+  if (o.writable_views->load() > 0) {
+    o.SyncToHost();
+    o.residency = Residency::kHostCurrent;
+  } else {
+    o.residency = Residency::kDeviceCurrent;
+  }
 }
 
 }  // namespace imsrg::py

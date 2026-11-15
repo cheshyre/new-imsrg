@@ -29,7 +29,7 @@ def _options(options, kwargs):
     return HFOptions(**kwargs)
 
 
-def solve(hamiltonian, v3=None, *, options=None, **kwargs):
+def solve(hamiltonian, v3=None, *, options=None, raise_on_failure=False, **kwargs):
     """Solve spherical Hartree-Fock for `hamiltonian`.
 
     Parameters
@@ -43,6 +43,14 @@ def solve(hamiltonian, v3=None, *, options=None, **kwargs):
         Or keyword arguments of ``HFOptions``: ``mixing`` ("linear", "diis" or
         ``Mixing``), ``density_mixing`` (weight of the old density, 0.2),
         ``tolerance``, ``max_iterations``, ``freeze_occupations``, ``e3max``.
+        Note: the default ``mixing`` here is "linear" (the C++ ``HFOptions``
+        default and imsrg++'s scheme, which the goldens use), whereas TOML
+        pipelines (``load_config`` / ``pipeline.run``) default to
+        ``hartree_fock.mixing = "diis"`` (D37). Pass ``mixing="diis"`` to match
+        a default config.
+    raise_on_failure : bool
+        Raise ``ConvergenceError`` (with the result as ``exc.result``) if HF
+        did not converge, instead of returning ``converged=False``.
 
     Returns
     -------
@@ -51,7 +59,14 @@ def solve(hamiltonian, v3=None, *, options=None, **kwargs):
         ``iterations``, ``converged``, and the methods ``transform(op)`` and
         ``normal_ordered_hamiltonian(h, v3)``.
     """
-    return _core.hf_solve(hamiltonian, v3, _options(options, kwargs))
+    result = _core.hf_solve(hamiltonian, v3, _options(options, kwargs))
+    if raise_on_failure and not result.converged:
+        exc = _core.ConvergenceError(
+            f"Hartree-Fock did not converge in {result.iterations} iterations"
+        )
+        exc.result = result
+        raise exc
+    return result
 
 
 def solution_in_basis(hamiltonian, v3, c_ho2basis, occupations, *, options=None, **kwargs):

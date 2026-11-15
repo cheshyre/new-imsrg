@@ -34,6 +34,10 @@ except ImportError:
 try:
     import imsrg
 except ImportError as exc:  # pragma: no cover
+    if os.environ.get("IMSRG_REQUIRE_PYTHON_EXT") == "1":
+        # tools/ci.sh sets this when it built the extension: a missing or broken
+        # _core is a failure, not a skip.
+        raise
     pytest.skip(f"imsrg extension not built: {exc}", allow_module_level=True)
 
 
@@ -47,26 +51,24 @@ def o16_emax2():
     return imsrg.ModelSpace(2, "O16", "O16", hw=16.0)
 
 
-def _data_dir():
-    cands = []
-    if os.environ.get("IMSRG_TEST_DATA_DIR"):
-        cands.append(Path(os.environ["IMSRG_TEST_DATA_DIR"]))
-    cands += [ROOT.parents[2], Path("/Users/cheshyre/Downloads/new-imsrg")]
-    for c in cands:
-        if (c / "VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz").exists():
-            return c
-    return None
-
-
 ME2J_NAME = "VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz"
 NO2B_NAME = "NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin"
+
+
+def _data_dir():
+    """The directory of the big input files: IMSRG_TEST_DATA_DIR (tools/ci.sh sets it from
+    the CMake cache); None (the data tests skip) when unset or the files are missing."""
+    d = os.environ.get("IMSRG_TEST_DATA_DIR")
+    if d and (Path(d) / ME2J_NAME).exists():
+        return Path(d)
+    return None
 
 
 @pytest.fixture(scope="session")
 def me2j_file():
     d = _data_dir()
     if d is None:
-        pytest.skip("big 2N input file not found (set IMSRG_TEST_DATA_DIR)")
+        pytest.skip("big 2N input file not found (set IMSRG_TEST_DATA_DIR to the directory holding it)")
     return d / ME2J_NAME
 
 
