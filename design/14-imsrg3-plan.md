@@ -223,7 +223,10 @@ layout.
    element by element at E3max 3 <= 6.1e-16 and the E3max-6 norms <= 1e-10; the full N7
    commutator against imsrg++'s 5.7e-16; the generator's three-body part exactly. IT-9: He4 and
    O16 emax 2 reproduce the D35-build goldens with identical step counts (250, 147) and dE0 =
-   -3e-11 / -3e-10 MeV. Time per term, O16 emax 2, E3max 6 (dev build, 8 threads): 133 7 ms,
+   -3e-11 / -3e-10 MeV; emax 3 (label `slow`, pristine-build goldens): He4 248 steps (248), dE0
+   -3.8e-10 MeV in 720 s, O16 173 steps (173), dE0 -3.0e-10 MeV in 644 s (dev build; imsrg++
+   30 and 21 min with 8 threads), final Omega norms equal to all 9 printed digits. Time per
+   term, O16 emax 2, E3max 6 (dev build, 8 threads): 133 7 ms,
    132 1 ms, 231 0.9 ms, 331 1.6 ms, 232 2.6 ms (release, 18 threads: 1.7 ms); IT-9 He4 emax 2
    takes 28-45 s against imsrg++'s 46 s (8 threads), O16 12.5 s against 24 s. Open: M10-Q60..Q66.
    The kernels other than 223 and 232 read recoupled elements one by one (binary searches in the
