@@ -660,3 +660,10 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   reduction is about as fast as 84 small ones (0.73 vs 0.68 ms at emax 6), the gain is at > 1
   thread (1.73 -> 0.17 ms at 6 threads). Caching the buffers on the operator would remove the
   allocation if it matters.
+
+* **M12-Q3** (2026-11-15, M12a ladder) - `tests/python/test_flow.py::test_solve_releases_the_gil`
+  fails in dev-serial already at 7f92c7e (before the ladder change; repeatably, 5-6 ticks vs the
+  required 20): the O16 solve finishes in about 5 ms, shorter than the test's 20 ms tick window, so
+  the test is wall-time fragile and gets worse as the commutator gets faster. **Assumed:** not
+  loosened here; the test needs a longer solve (e.g. larger smax or a bigger fixture) or a
+  deterministic hook (event set inside a callback) instead of counting ticks.

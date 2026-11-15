@@ -31,7 +31,6 @@ namespace imsrg::commutator {
 
 namespace {
 
-using detail::FindBlock;
 using detail::LadderProjector;
 using detail::TwoBodyView;
 using linalg::MatrixView;
@@ -43,17 +42,24 @@ struct GatherArgs {
   const std::int32_t* list = nullptr;
   const double* weight = nullptr;
   const std::int64_t* block_offset = nullptr;
+  const std::int32_t* ket_offset = nullptr;
+  const std::int32_t* entry_channel = nullptr;
   const std::int32_t* num_kets = nullptr;
   const double* x = nullptr;
   const double* y = nullptr;
   double* xg = nullptr;
   double* yg = nullptr;
-  int num_channels = 0;
 };
 static_assert(std::is_trivially_copyable_v<GatherArgs>);
 
 /// Gathers the operands of `p` (Xg(i, m) = w_m X(i, K_m), Yg(m, j) = Y(K_m, j))
-/// on the device.
+/// on the device. One work item per two-body column j of every channel (the
+/// flat channel-ket table, so no per-element block search or division): it
+/// writes column j of Yg (k rows, a gather from the contiguous column j of Y)
+/// and, if j < k, column j of Xg (N rows, a weighted copy of the contiguous
+/// column K_j of X). Every element of Xg and Yg is written by exactly one item;
+/// the gather layouts (`gather_offset`) are unchanged. Dynamic scheduling: the
+/// column costs differ by channel. Complexity O(sum_c N_c (N_c + k_c)).
 void Gather(const char* name, LadderProjector& p, const Workspace::Impl& impl,
             const TwoBodyView& xv, const TwoBodyView& yv) {
   const std::int64_t total = p.gather_offset_host.back();
@@ -64,33 +70,36 @@ void Gather(const char* name, LadderProjector& p, const Workspace::Impl& impl,
   a.list = p.list.device_data();
   a.weight = p.weight.device_data();
   a.block_offset = impl.block_offsets.device_data();
+  a.ket_offset = xv.tb.channel_ket_offset;
+  a.entry_channel = impl.entry_channel.device_data();
   a.num_kets = xv.tb.channel_num_kets;
   a.x = xv.data;
   a.y = yv.data;
   a.xg = p.xg.device_data();
   a.yg = p.yg.device_data();
-  a.num_channels = xv.tb.num_channels;
-  exec::ParallelFor(
-      name, static_cast<exec::Index>(total), IMSRG_LAMBDA(const exec::Index e) {
-        const int ch = FindBlock(a.gather_offset, a.num_channels, e);
-        const std::int64_t local = e - a.gather_offset[ch];
+  exec::ParallelForDynamic(
+      name, static_cast<exec::Index>(impl.entry_channel.size()),
+      IMSRG_LAMBDA(const exec::Index e) {
+        const int ch = a.entry_channel[e];
+        const std::int64_t k = a.list_offset[ch + 1] - a.list_offset[ch];
+        if (k == 0) return;
+        const std::int64_t j = e - a.ket_offset[ch];
         const std::int64_t n = a.num_kets[ch];
-        const std::int64_t k = (a.list_offset[ch + 1] - a.list_offset[ch]);
         const std::int32_t* kets = a.list + a.list_offset[ch];
-        const double* w = a.weight + a.list_offset[ch];
         const double* xb = a.x + a.block_offset[ch];
         const double* yb = a.y + a.block_offset[ch];
-        // Xg is n x k: element (i, m).
-        {
-          const std::int64_t i = local % n;
-          const std::int64_t m = local / n;
-          a.xg[e] = w[m] * xb[i + static_cast<std::int64_t>(kets[m]) * n];
-        }
-        // Yg is k x n: element (m, j).
-        {
-          const std::int64_t m = local % k;
-          const std::int64_t j = local / k;
-          a.yg[e] = yb[static_cast<std::int64_t>(kets[m]) + j * n];
+        const std::int64_t goff = a.gather_offset[ch];
+        // Yg is k x n: column j.
+        const double* ycol = yb + j * n;
+        double* yg = a.yg + goff + j * k;
+        for (std::int64_t m = 0; m < k; ++m)
+          yg[m] = ycol[static_cast<std::int64_t>(kets[m])];
+        // Xg is n x k: column j (only the first k columns exist).
+        if (j < k) {
+          const double w = a.weight[a.list_offset[ch] + j];
+          const double* xcol = xb + static_cast<std::int64_t>(kets[j]) * n;
+          double* xg = a.xg + goff + j * n;
+          for (std::int64_t i = 0; i < n; ++i) xg[i] = w * xcol[i];
         }
       });
 }
@@ -98,11 +107,13 @@ void Gather(const char* name, LadderProjector& p, const Workspace::Impl& impl,
 /// POD bundle of the antisymmetrization kernel.
 struct SymArgs {
   const std::int64_t* block_offset = nullptr;
+  const std::int32_t* ket_offset = nullptr;
+  const std::int32_t* entry_channel = nullptr;
   const std::int32_t* num_kets = nullptr;
   double* mpp = nullptr;
   double* mhh = nullptr;
+  double* z2 = nullptr;  ///< Optional: Z2 += Mpp - Mhh (nullptr: skip).
   double h_z = 1.0;
-  int num_channels = 0;
 };
 static_assert(std::is_trivially_copyable_v<SymArgs>);
 
@@ -183,60 +194,8 @@ namespace terms {
 
 namespace {
 
-/// Computes Mpp and Mhh for X and Y into `impl.ladder.{pp,hh}.product`. X and Y
-/// must have an allocated two-body part. (Anti-)Hermitian X, Y: one product and
-/// the antisymmetrization M = W + hZ W^T; general X or Y: both products
-/// (`detail::LadderProductsGeneral`). Leaves the device idle (fenced).
-/// Complexity: two grouped gemms of sum_c N_c^2 (|Kp| + |Kh|) flops.
-void ComputeIntermediates(const op::Operator& X, const op::Operator& Y,
-                          Workspace::Impl& impl) {
-  if (detail::IsGeneral(X, Y)) {
-    detail::LadderProductsGeneral(X, Y, impl);
-    return;
-  }
-  const int h_z = detail::CommutatorHermiticitySign(X, Y);
-  detail::LadderProducts(X, Y, impl);  // W = X P Y for P = P_pp, P_hh
-
-  auto& lad = impl.ladder;
-  const TwoBodyView xv = impl.two_body_view(X);
-  const int nch = xv.tb.num_channels;
-  SymArgs s;
-  s.block_offset = impl.block_offsets.device_data();
-  s.num_kets = xv.tb.channel_num_kets;
-  s.mpp = lad.pp.product.device_data();
-  s.mhh = lad.hh.product.device_data();
-  s.h_z = static_cast<double>(h_z);
-  s.num_channels = nch;
-  exec::ParallelFor(
-      "commutator::ladder_antisymmetrize",
-      static_cast<exec::Index>(impl.two_body_size),
-      IMSRG_LAMBDA(const exec::Index e) {
-        const int ch = FindBlock(s.block_offset, s.num_channels, e);
-        const std::int64_t local = e - s.block_offset[ch];
-        const std::int64_t n = s.num_kets[ch];
-        const std::int64_t i = local % n;
-        const std::int64_t j = local / n;
-        if (i > j) return;  // handled together with (j, i)
-        const std::int64_t base = s.block_offset[ch];
-        const std::int64_t ij = base + i + j * n;
-        const std::int64_t ji = base + j + i * n;
-        const double a_pp = s.mpp[ij];
-        const double b_pp = s.mpp[ji];
-        const double a_hh = s.mhh[ij];
-        const double b_hh = s.mhh[ji];
-        s.mpp[ij] = a_pp + s.h_z * b_pp;
-        s.mhh[ij] = a_hh + s.h_z * b_hh;
-        if (i != j) {
-          s.mpp[ji] = b_pp + s.h_z * a_pp;
-          s.mhh[ji] = b_hh + s.h_z * a_hh;
-        }
-      });
-  exec::Fence("commutator::ladder_antisymmetrize");
-}
-
 /// Z2 += Mpp - Mhh.
-void AddLadderTwoBody(op::Operator& Z, Workspace::Impl& impl) {
-  double* z2 = Z.two_body().matrix().buffer().device_data();
+void AddLadderTwoBody(double* z2, Workspace::Impl& impl) {
   const double* mpp = impl.ladder.pp.product.device_data();
   const double* mhh = impl.ladder.hh.product.device_data();
   exec::ParallelFor(
@@ -244,6 +203,69 @@ void AddLadderTwoBody(op::Operator& Z, Workspace::Impl& impl) {
       static_cast<exec::Index>(impl.two_body_size),
       IMSRG_LAMBDA(const exec::Index e) { z2[e] += mpp[e] - mhh[e]; });
   exec::Fence("commutator::comm222_pp_hhss");
+}
+
+/// Computes Mpp and Mhh for X and Y into `impl.ladder.{pp,hh}.product`. X and Y
+/// must have an allocated two-body part. If `z2` is not null, also adds
+/// Z2 += Mpp - Mhh there (fused into the antisymmetrization on the Hermitian
+/// path). (Anti-)Hermitian X, Y: one product and
+/// the antisymmetrization M = W + hZ W^T; general X or Y: both products
+/// (`detail::LadderProductsGeneral`). Leaves the device idle (fenced).
+/// Complexity: two grouped gemms of sum_c N_c^2 (|Kp| + |Kh|) flops.
+void ComputeIntermediates(const op::Operator& X, const op::Operator& Y,
+                          Workspace::Impl& impl, double* z2) {
+  if (detail::IsGeneral(X, Y)) {
+    detail::LadderProductsGeneral(X, Y, impl);
+    if (z2 != nullptr) AddLadderTwoBody(z2, impl);
+    return;
+  }
+  const int h_z = detail::CommutatorHermiticitySign(X, Y);
+  detail::LadderProducts(X, Y, impl);  // W = X P Y for P = P_pp, P_hh
+
+  auto& lad = impl.ladder;
+  const TwoBodyView xv = impl.two_body_view(X);
+  SymArgs s;
+  s.block_offset = impl.block_offsets.device_data();
+  s.ket_offset = xv.tb.channel_ket_offset;
+  s.entry_channel = impl.entry_channel.device_data();
+  s.num_kets = xv.tb.channel_num_kets;
+  s.mpp = lad.pp.product.device_data();
+  s.mhh = lad.hh.product.device_data();
+  s.z2 = z2;
+  s.h_z = static_cast<double>(h_z);
+  // One item per column j of every block; it owns the pairs (i, j) and (j, i)
+  // for i <= j, so every element is read and written by exactly one item. The
+  // optional Z2 update uses the final values of both elements.
+  exec::ParallelForDynamic(
+      "commutator::ladder_antisymmetrize",
+      static_cast<exec::Index>(impl.entry_channel.size()),
+      IMSRG_LAMBDA(const exec::Index e) {
+        const int ch = s.entry_channel[e];
+        const std::int64_t n = s.num_kets[ch];
+        const std::int64_t j = e - s.ket_offset[ch];
+        const std::int64_t base = s.block_offset[ch];
+        for (std::int64_t i = 0; i <= j; ++i) {
+          const std::int64_t ij = base + i + j * n;
+          const std::int64_t ji = base + j + i * n;
+          const double a_pp = s.mpp[ij];
+          const double b_pp = s.mpp[ji];
+          const double a_hh = s.mhh[ij];
+          const double b_hh = s.mhh[ji];
+          const double c_pp = a_pp + s.h_z * b_pp;
+          const double c_hh = a_hh + s.h_z * b_hh;
+          s.mpp[ij] = c_pp;
+          s.mhh[ij] = c_hh;
+          if (s.z2 != nullptr) s.z2[ij] += c_pp - c_hh;
+          if (i != j) {
+            const double d_pp = b_pp + s.h_z * a_pp;
+            const double d_hh = b_hh + s.h_z * a_hh;
+            s.mpp[ji] = d_pp;
+            s.mhh[ji] = d_hh;
+            if (s.z2 != nullptr) s.z2[ji] += d_pp - d_hh;
+          }
+        }
+      });
+  exec::Fence("commutator::ladder_antisymmetrize");
 }
 
 /// POD bundle of the 221 kernel.
@@ -314,8 +336,8 @@ void Comm222PpHhss(const op::Operator& X, const op::Operator& Y,
   detail::CheckTermInputs(X, Y, Z, ws);
   if (!HasTwoBody(X, Y) || !Z.two_body().allocated()) return;
   auto& impl = ws.impl();
-  ComputeIntermediates(X, Y, impl);
-  AddLadderTwoBody(Z, impl);
+  ComputeIntermediates(X, Y, impl,
+                       Z.two_body().matrix().buffer().device_data());
 }
 
 void Comm221ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
@@ -323,7 +345,7 @@ void Comm221ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   detail::CheckTermInputs(X, Y, Z, ws);
   if (!HasTwoBody(X, Y)) return;
   auto& impl = ws.impl();
-  ComputeIntermediates(X, Y, impl);
+  ComputeIntermediates(X, Y, impl, nullptr);
   Add221(Z, impl, X);
 }
 
@@ -332,8 +354,10 @@ void Comm222PpHh221ss(const op::Operator& X, const op::Operator& Y,
   detail::CheckTermInputs(X, Y, Z, ws);
   if (!HasTwoBody(X, Y)) return;
   auto& impl = ws.impl();
-  ComputeIntermediates(X, Y, impl);
-  if (Z.two_body().allocated()) AddLadderTwoBody(Z, impl);
+  ComputeIntermediates(X, Y, impl,
+                       Z.two_body().allocated()
+                           ? Z.two_body().matrix().buffer().device_data()
+                           : nullptr);
   Add221(Z, impl, X);
 }
 
