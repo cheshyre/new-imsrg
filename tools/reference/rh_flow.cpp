@@ -2,6 +2,8 @@
 //
 //   refharness flow emax=4 reference=O16 [generator=atan] [smax=200] [ds_0=0.5] [dsmax=0.5]
 //       [domega=0.1] [omega_norm_max=0.25] [eta_criterion=1e-6] [--imsrg3 [--n7]] [--factorized]
+//       [--hunter-gatherer] [--omega-norm-max X] [--factorized-1b-intermediates 0|1]
+//       [--factorized-2b-intermediates 0|1]
 //       [2bme=... file2e1max=... hw=16] out=DIR
 //
 // Pipeline = imsrg++.cc (method=magnus, valence_space == reference, basis=HF, 2N only):
@@ -13,10 +15,21 @@
 //   --n7            with --imsrg3: Commutator::SetUseIMSRG3N7(true)
 //   --factorized    BCH::SetUseFactorizedCorrection(true): IMSRG(2) + factorized
 //                   [Eta,[Eta,Gamma]_3b] correction = "IMSRG(3f2)". imsrg++ has no switch for this.
+//   --hunter-gatherer  IMSRGSolver::SetHunterGatherer(true): when |Omega| > omega_norm_max the hunter
+//                   is gathered (GatherOmega) instead of pushing a new Omega (NewOmega), and the
+//                   solve ends with one more gather (IMSRGSolver::Solve, IMSRGSolver.cc:236-239).
+//                   Default off (imsrg++ default hunter_gatherer=false).
+//   --omega-norm-max X  same as omega_norm_max=X (the dashed form wins if both are given).
+//   --factorized-1b-intermediates B / --factorized-2b-intermediates B  (B = 0 or 1)
+//                   Commutator::FactorizedDoubleCommutator::SetUse_1b_Intermediates / _2b_ (only
+//                   used with --factorized). Not given = imsrg++ defaults (both on).
+//                   The owner's IMSRG(3f2) recipe (D32): --factorized --hunter-gatherer
+//                   --omega-norm-max 0.1 --factorized-1b-intermediates 1 --factorized-2b-intermediates 0.
 //
 // Output: DIR/trajectory.csv  (header `step,s,E0,norm_eta,norm_omega`, %.17g, step 0 = initial H;
 //         norm_eta is |Eta| after the generator update of that step, norm_omega = |Omega.back()|),
-//         DIR/result.json (E_HF, E0, steps, final s, final norms, wall time, parameters).
+//         DIR/result.json (E_HF, E0, steps, final s, final norms, wall time, parameters; with
+//         --hunter-gatherer also n_gathers and norm_omega_gathered).
 #include <omp.h>
 
 #include <algorithm>
@@ -35,9 +48,11 @@ int cmd_flow(const Args& a) {
   InteractionParams ip = interaction_params(a);
   const std::string out = a.str("out", ".");
   const bool imsrg3 = a.flag("imsrg3"), n7 = a.flag("n7"), fact = a.flag("factorized");
+  const bool hunter = a.flag("hunter-gatherer");
   const std::string gen = a.str("generator", "atan");
   const double smax = a.real("smax", 200.0), ds0 = a.real("ds_0", 0.5), dsmax = a.real("dsmax", 0.5),
-               domega = a.real("domega", 0.1), omax = a.real("omega_norm_max", 0.25),
+               domega = a.real("domega", 0.1),
+               omax = a.has("omega-norm-max") ? a.real("omega-norm-max", 0.25) : a.real("omega_norm_max", 0.25),
                eta_crit = a.real("eta_criterion", 1e-6);
   const std::string denom = a.str("denominator_partitioning", "Epstein_Nesbet");
 
@@ -61,7 +76,7 @@ int cmd_flow(const Args& a) {
   solver.SetDenominatorPartitioning(denom);
   solver.SetEtaCriterion(eta_crit);
   solver.max_omega_written = 500;
-  solver.SetHunterGatherer(false);
+  solver.SetHunterGatherer(hunter);
   solver.SetSmax(smax);
   solver.SetFlowFile("");
   solver.SetDs(ds0);
@@ -72,6 +87,11 @@ int cmd_flow(const Args& a) {
   Commutator::SetUseIMSRG3(imsrg3);
   Commutator::SetUseIMSRG3N7(imsrg3 && n7);
   if (fact) BCH::SetUseFactorizedCorrection(true);
+  // Process-wide switches in imsrg++ (both default true); touched only when given.
+  if (a.has("factorized-1b-intermediates"))
+    Commutator::FactorizedDoubleCommutator::SetUse_1b_Intermediates(a.flag("factorized-1b-intermediates"));
+  if (a.has("factorized-2b-intermediates"))
+    Commutator::FactorizedDoubleCommutator::SetUse_2b_Intermediates(a.flag("factorized-2b-intermediates"));
   solver.SetGenerator(gen);
 
   std::ofstream csv(out + "/trajectory.csv");
@@ -92,6 +112,7 @@ int cmd_flow(const Args& a) {
   solver.cumulative_error = 0;
   row(0);
   int last_step = 0;
+  int n_gathers = 0;
   bool diverged = false;
   for (solver.istep = 1; solver.s < solver.smax; ++solver.istep) {
     double norm_eta = solver.Eta.Norm();
@@ -102,7 +123,12 @@ int cmd_flow(const Args& a) {
     }
     double norm_omega = solver.Omega.back().Norm();
     if (norm_omega > solver.omega_norm_max) {
-      solver.NewOmega();
+      if (hunter) {
+        solver.GatherOmega();
+        ++n_gathers;
+      } else {
+        solver.NewOmega();
+      }
       norm_omega = 0;
     }
     if (solver.magnus_adaptive)
@@ -125,6 +151,14 @@ int cmd_flow(const Args& a) {
     solver.Elast = solver.FlowingOps[0].ZeroBody;
   }
   // ---- end of copy ----
+  // Values of the last step, before the final gather erases the hunter.
+  const double norm_omega_final = solver.Omega.back().Norm();
+  double norm_omega_gathered = 0;
+  if (hunter) {  // IMSRGSolver::Solve (IMSRGSolver.cc:236-239): one more gather after the method.
+    solver.GatherOmega();
+    ++n_gathers;
+    norm_omega_gathered = solver.Omega[solver.Omega.size() - 2].Norm();
+  }
 
   Json j;
   j.str("source", reference_version() + " refharness flow");
@@ -138,8 +172,17 @@ int cmd_flow(const Args& a) {
   j.integer("steps", last_step);
   j.num("s_final", solver.s);
   j.num("norm_eta_final", solver.Eta.Norm());
-  j.num("norm_omega_final", solver.Omega.back().Norm());
+  j.num("norm_omega_final", norm_omega_final);
   j.boolean("diverged", diverged);
+  if (hunter || a.has("omega-norm-max") || a.has("factorized-1b-intermediates") ||
+      a.has("factorized-2b-intermediates")) {  // only new-style runs, so default result.json is unchanged
+    j.boolean("hunter_gatherer", hunter);
+    j.num("omega_norm_max", omax);
+    j.integer("n_gathers", n_gathers);  // includes the final gather of Solve()
+    j.num("norm_omega_gathered", norm_omega_gathered);
+    j.boolean("factorized_1b_intermediates", Commutator::FactorizedDoubleCommutator::use_1b_intermediates);
+    j.boolean("factorized_2b_intermediates", Commutator::FactorizedDoubleCommutator::use_2b_intermediates);
+  }
   j.integer("omp_threads", omp_get_max_threads());
   j.num("wall_time_s", omp_get_wtime() - t0);
   j.write(out + "/result.json");

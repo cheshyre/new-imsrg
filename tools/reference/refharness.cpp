@@ -71,13 +71,23 @@ Args parse_args(int argc, char** argv) {
   Args a;
   if (argc < 2) throw std::runtime_error("missing subcommand (see the header of refharness.cpp)");
   a.subcommand = argv[1];
+  // Long options that take their value as the NEXT argument (`--omega-norm-max 0.1`); every
+  // other `--name` is a bare flag, and `--name=value` always works.
+  static const char* const kValueOptions[] = {"omega-norm-max", "factorized-1b-intermediates",
+                                              "factorized-2b-intermediates"};
   for (int i = 2; i < argc; ++i) {
     std::string s = argv[i];
     if (s.rfind("--", 0) == 0) {  // --flag or --key=value
       s = s.substr(2);
       auto eq = s.find('=');
-      if (eq == std::string::npos) a.kv[s] = "";
-      else a.kv[s.substr(0, eq)] = s.substr(eq + 1);
+      if (eq == std::string::npos) {
+        bool takes_value = false;
+        for (const char* o : kValueOptions) takes_value = takes_value || (s == o);
+        if (takes_value && i + 1 < argc) a.kv[s] = argv[++i];
+        else a.kv[s] = "";
+        continue;
+      }
+      a.kv[s.substr(0, eq)] = s.substr(eq + 1);
       continue;
     }
     auto eq = s.find('=');
@@ -95,8 +105,12 @@ std::string fmt17(double x) {
 
 std::string reference_version() {
   const char* root = std::getenv("IMSRG_REFERENCE_ROOT");
-  std::string path = std::string(root ? root : "/Users/cheshyre/Downloads/new-imsrg-reference") +
-                     "/REFERENCE_SRC_SHA256";
+  // IMSRG_REFERENCE_SHA_FILE: version file of another build (the D35 patched build writes
+  // REFERENCE_SRC_SHA256_D35); the default is the pristine build's file.
+  const char* sha_file = std::getenv("IMSRG_REFERENCE_SHA_FILE");
+  std::string path = sha_file ? std::string(sha_file)
+                              : std::string(root ? root : "/Users/cheshyre/Downloads/new-imsrg-reference") +
+                                    "/REFERENCE_SRC_SHA256";
   std::ifstream f(path);
   std::string h;
   if (f >> h) return "imsrg-devel src-sha256:" + h;
