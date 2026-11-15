@@ -117,9 +117,10 @@ IMSRG_INLINE_FUNCTION int CcChannel(const PhArgs& a, int p, int q,
 /// phase remain per J''. The operations on each value are those of
 /// `PandyaBar` and `TwoBodyView::get_unnormalized` in the same order, so the
 /// results are bitwise identical. O(J'' range).
-IMSRG_INLINE_FUNCTION void PandyaBarXY(const PhArgs& a, int p, int q, int r,
-                                       int s, int two_Jp, double& xbar,
-                                       double& ybar) noexcept {
+IMSRG_FORCEINLINE_FUNCTION void PandyaBarXY(const PhArgs& a, int p, int q,
+                                            int r, int s, int two_Jp,
+                                            double& xbar,
+                                            double& ybar) noexcept {
   const auto& tb = a.xv.tb;
   const int* j2 = tb.orbit_j2;
   const int jp = j2[p], jq = j2[q], jr = j2[r], js = j2[s];
@@ -217,8 +218,8 @@ static_assert(std::is_trivially_copyable_v<CcTerm>);
 /// -hX hY phi times the element of row local(q, p), column local(min, max) (+
 /// Ncc if s > r), phi = (-1)^((jp + jq)/2 + (jr + js)/2). Pairs of different
 /// cc channel classes give an empty J' range. O(1).
-IMSRG_INLINE_FUNCTION CcTerm MakeCcTerm(const PhArgs& a, int p, int q, int r,
-                                        int s) noexcept {
+IMSRG_FORCEINLINE_FUNCTION CcTerm MakeCcTerm(const PhArgs& a, int p, int q,
+                                             int r, int s) noexcept {
   const auto& tb = a.zv.tb;
   const int* j2 = tb.orbit_j2;
   CcTerm t;
@@ -256,8 +257,8 @@ IMSRG_INLINE_FUNCTION CcTerm MakeCcTerm(const PhArgs& a, int p, int q, int r,
 
 /// zbar(p, q, r, s; J') for the term `t` made by `MakeCcTerm`, read from the
 /// combined W (0 if a cc ket does not exist at J'). O(1).
-IMSRG_INLINE_FUNCTION double CcValue(const PhArgs& a, const CcTerm& t,
-                                     int Jp) noexcept {
+IMSRG_FORCEINLINE_FUNCTION double CcValue(const PhArgs& a, const CcTerm& t,
+                                          int Jp) noexcept {
   if (Jp < t.lo || Jp > t.hi) return 0.0;
   const int c = 6 * Jp + t.cls;
   if (c >= a.pv.num_cc) return 0.0;
@@ -276,8 +277,9 @@ IMSRG_INLINE_FUNCTION double CcValue(const PhArgs& a, const CcTerm& t,
 /// jl J'} zbar(i, l, k, j; J') - (-1)^((ji + jj)/2 - J) {jj ji J; jk jl J'}
 /// zbar(j, l, k, i; J')], with the operation order of the per-element kernel
 /// it replaced (bitwise identical). O(J' range).
-IMSRG_INLINE_FUNCTION double InverseElement(const PhArgs& a, int i, int j,
-                                            int k, int l, int two_J) noexcept {
+IMSRG_FORCEINLINE_FUNCTION double InverseElement(const PhArgs& a, int i, int j,
+                                                 int k, int l,
+                                                 int two_J) noexcept {
   const int* j2 = a.zv.tb.orbit_j2;
   const int ji = j2[i], jj = j2[j], jk = j2[k], jl = j2[l];
   const auto iabs = [](int v) { return v < 0 ? -v : v; };
