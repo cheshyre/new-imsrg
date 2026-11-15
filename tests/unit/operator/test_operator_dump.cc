@@ -352,9 +352,12 @@ TEST_F(DumpErrors, HermiticityViolation) {
   ExpectErrorAt(JoinLines(lines_), lines_.size(), ms_);
 }
 
-TEST_F(DumpErrors, ThreeBodyNotImplemented) {
-  lines_[FindLine(lines_, "three_body")] = "three_body 5";
-  EXPECT_THROW((void)ReadText(JoinLines(lines_), ms_), NotImplementedError);
+TEST_F(DumpErrors, ThreeBodyEntriesForLowRankAreRejected) {
+  const auto k = FindLine(lines_, "three_body");
+  lines_[k] = "three_body 1";
+  lines_.insert(lines_.begin() + static_cast<std::ptrdiff_t>(k) + 1,
+                "0 0 0 1 0 0 0 1 3 1.0");
+  ExpectErrorAt(JoinLines(lines_), k + 1, ms_);
 }
 
 TEST_F(DumpErrors, MissingEnd) {

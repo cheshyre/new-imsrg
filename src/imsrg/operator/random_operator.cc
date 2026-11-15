@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <utility>
 
+#include "imsrg/base/error.h"
 #include "imsrg/base/types.h"
 
 namespace imsrg::op {
@@ -58,6 +59,12 @@ Operator RandomOperator(std::shared_ptr<const basis::ModelSpace> ms,
                         const OperatorSpec& spec,
                         const RandomOperatorOptions& options) {
   Operator op(std::move(ms), spec);
+  if (op.three_body()) {
+    throw NotImplementedError(
+        "random_operator: operators with a three-body part (particle_rank 3) "
+        "are not "
+        "supported");
+  }
   SplitMix64 rng(options.seed);
   const Hermiticity h = spec.hermiticity;
   if (h == Hermiticity::kHermitian && options.zero_body_scale != 0.0) {

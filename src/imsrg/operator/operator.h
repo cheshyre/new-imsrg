@@ -20,9 +20,10 @@
 namespace imsrg::op {
 
 /// A many-body operator O = O0 + sum O_ab {a+ b} + (1/4) sum V_abcd {a+ b+ d c}
-/// (+ 3B later) on a model space: a zero-body constant, a `OneBody`, a
-/// `TwoBody` (allocated iff particle_rank >= 2) and an optional `ThreeBody`
-/// (M10), described by an `OperatorSpec`.
+/// (+ 3B for particle_rank 3) on a model space: a zero-body constant, a
+/// `OneBody`, a `TwoBody` (allocated iff particle_rank >= 2) and an optional
+/// `ThreeBody` (iff particle_rank 3; needs a model space with a three-body
+/// space), described by an `OperatorSpec`.
 ///
 /// The operator does not record with respect to which reference it is normal
 /// ordered: the normal-ordering functions say it in their names, and the model
@@ -69,9 +70,12 @@ class Operator {
   const OperatorSpec& spec() const noexcept { return spec_; }
   /// Shorthand for spec().hermiticity.
   Hermiticity hermiticity() const noexcept { return spec_.hermiticity; }
-  /// Changes the hermiticity in the spec and in the parts; the data are not
-  /// touched (imsrg++ `SetHermitian` / `SetAntiHermitian` / `SetNonHermitian`).
-  void set_hermiticity(Hermiticity h) noexcept;
+  /// Changes the hermiticity in the spec and in the parts; the data of the
+  /// zero-, one- and two-body parts are not touched (imsrg++ `SetHermitian` /
+  /// `SetAntiHermitian` / `SetNonHermitian`). The packed three-body part
+  /// converts its storage when `h` or the old hermiticity is non-Hermitian
+  /// (`ThreeBody::set_hermiticity`), which may allocate.
+  void set_hermiticity(Hermiticity h);
   /// The model space. Precondition: !empty() (IMSRG_CHECK).
   const basis::ModelSpace& model_space() const;
   /// The shared model space (null for an empty operator).
@@ -92,7 +96,7 @@ class Operator {
   TwoBody& two_body() noexcept { return two_body_; }
   /// Two-body part, read-only.
   const TwoBody& two_body() const noexcept { return two_body_; }
-  /// Three-body part: always empty until M10.
+  /// Three-body part: allocated iff particle_rank == 3.
   std::optional<ThreeBody>& three_body() noexcept { return three_body_; }
   /// Three-body part, read-only.
   const std::optional<ThreeBody>& three_body() const noexcept {
