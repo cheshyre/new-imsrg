@@ -161,13 +161,16 @@ inline RunResult Execute(const driver::ConfigSources& sources,
 /// TOML text for an O16/Ne20 run at hw = 16, emax = 4 with the 2N file, writing
 /// into `dir`. `extra` is appended verbatim (further tables such as `[valence]`
 /// or `[operators]`); keys of tables already open at the end must not be
-/// repeated there.
+/// repeated there. `basis_kind` ("hf", "nat", ...) sets `basis.kind` when not
+/// empty.
 inline std::string TomlText(const std::filesystem::path& dir,
                             const std::string& nucleus,
                             const std::string& extra, bool three_body = false,
-                            const std::string& smax = "") {
+                            const std::string& smax = "",
+                            const std::string& basis_kind = "") {
   std::ostringstream t;
-  t << "[basis]\nemax = 4\nhw = 16.0\n\n"
+  t << "[basis]\nemax = 4\nhw = 16.0\n"
+    << (basis_kind.empty() ? "" : "kind = \"" + basis_kind + "\"\n") << "\n"
     << "[reference]\nnucleus = \"" << nucleus << "\"\n\n"
     << "[interaction.two_body]\nfile = \"" << DataFile(TwoBodyName()).string()
     << "\"\n"

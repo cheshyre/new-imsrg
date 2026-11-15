@@ -286,6 +286,54 @@ TEST(DriverIntegration, IT4_ThreeBody_NO2B_Smax10) {
 }
 
 // -----------------------------------------------------------------------------
+// IT-5: IT-4 in the natural-orbital basis (basis.kind = "nat"), smax = 10.
+// -----------------------------------------------------------------------------
+
+TEST(DriverIntegration, IT5_NatBasis_ThreeBody_NO2B_Smax10) {
+  IMSRG_IT_REQUIRE_FILE(DataFile(TwoBodyName()));
+  IMSRG_IT_REQUIRE_FILE(DataFile(ThreeBodyName()));
+  const auto golden_path = GoldenFile("IT-5/smax10/result.json");
+  IMSRG_IT_REQUIRE_FILE(golden_path);
+  const Json golden = ParseJson(Slurp(golden_path));
+  const double g_e0 = golden["flow"]["last"]["E0"].number;  // E0(s = 10)
+  const double g_nat_e_hf = golden["Hbare_0b"].number;
+  const double g_emp2 = golden["flow"]["first"]["E_MP2"].number;
+  const std::int64_t g_steps =
+      static_cast<std::int64_t>(golden["flow"]["n_steps"].number);
+
+  const auto dir = FreshDir("it5");
+  driver::ConfigSources src;
+  src.config_text =
+      TomlText(dir, "O16", "", /*three_body=*/true, "10.0", "nat");
+  const RunResult r = Execute(src, dir);
+  IMSRG_IT_REQUIRE_RUN(r);
+  EXPECT_EQ(r.config.basis.kind, driver::BasisKind::kNat);
+
+  const double e_hf_hf = r.results["hf"]["e_hf"].number;
+  const double e_nat = r.results["e_reference"].number;
+  const double emp2 = r.results["e_mp2"].number;
+  const double e0 = r.results["imsrg"]["e0"].number;
+  const std::int64_t steps = TotalSteps(r.results);
+  std::printf("[IT-5] E_HF(HF basis) = %.7f  golden -313.1684814  dev %.3e\n",
+              e_hf_hf, e_hf_hf + 313.1684814);
+  std::printf("[IT-5] E_HF(NAT basis) = %.8f  golden %.8f  dev %.3e\n", e_nat,
+              g_nat_e_hf, e_nat - g_nat_e_hf);
+  std::printf("[IT-5] EMP2(NAT basis) = %.9f  golden %.9f  dev %.3e\n", emp2,
+              g_emp2, emp2 - g_emp2);
+  std::printf("[IT-5] E0(s=10) = %.9f  golden %.9f  dev %.3e\n", e0, g_e0,
+              e0 - g_e0);
+  std::printf("[IT-5] steps = %" PRId64 "  golden %" PRId64 "\n", steps,
+              g_steps);
+  EXPECT_EQ(steps, g_steps);
+  EXPECT_NEAR(e_hf_hf, -313.1684814, 1.0e-4);
+  EXPECT_NEAR(e_nat, g_nat_e_hf, 1.0e-4);
+  EXPECT_NEAR(emp2, g_emp2, 1.0e-4);
+  EXPECT_NEAR(e0, g_e0, 1.0e-3);  // D19
+  // The NAT basis is not the HF basis: the reference energy rose by ~0.16 MeV.
+  EXPECT_GT(e_nat, e_hf_hf + 0.1);
+}
+
+// -----------------------------------------------------------------------------
 // IT-3 / IT-7: valence-space decoupling, sd-shell, compared with imsrg++
 // int.snt.
 // -----------------------------------------------------------------------------

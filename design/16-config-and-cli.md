@@ -44,7 +44,7 @@ Conventions: keys are `snake_case`; enum values are lower `snake_case` strings (
 | `lmax3` | opt int >= 1 | none | l cut for the three-body interaction. |
 | `emax_unocc` | opt int >= 1 | none | separate emax for (l,j) orbits that are unoccupied in the reference. |
 | `mass_number` | opt int >= 1 | A of the reference nucleus (or core, see 5.4) | `A` used in the intrinsic kinetic energy and radius operators. |
-| `kind` | enum `hf`, `oscillator`, `nat` | `hf` | basis the Hamiltonian is normal ordered in. `nat` = natural orbitals from MBPT(2) density. |
+| `kind` | enum `hf`, `oscillator`, `nat` | `hf` | basis the Hamiltonian is normal ordered in. `nat` = natural orbitals of the MBPT(2) density matrix of the HF-basis Hamiltonian (P1; `results.json` `e_reference` and `e_mp2` then refer to the NAT basis, `hf` to the HF solution; operators are transformed with C_ho2nat). |
 
 ### 2.3 `[reference]` and `[valence]`
 
@@ -102,8 +102,8 @@ For single-reference runs set only `reference.nucleus`.
 |---|---|---|---|
 | `hartree_fock.mixing` | enum `diis`, `linear` | `diis` (TOML); an absent key resolves to `linear` for a legacy command line | HF update: Pulay DIIS on the Fock matrix (M6-Q3) or imsrg++'s linear density mixing (weight 0.2 of the old density; reproduces imsrg++ iteration counts). Both reach the same solution to the HF tolerance (1e-8 on the single-particle energies), so energies differ at the 1e-9 MeV level and flow step counts may differ from imsrg++ with `diis`. An explicit key (also `--set`) wins in both modes; `resolved_config.toml` always records the resolved value. *(owner, 2026-11-15, D37; implemented in run 2)* |
 | `hartree_fock.freeze_occupations` | bool | `false` | keep reference occupations fixed (default: fractional/ensemble occupations may follow HF energies). Ignored for `basis.kind="oscillator"`. |
-| `natural_orbitals.use_occupations` | bool | `false` | use NAT occupations for the reference. |
-| `natural_orbitals.order` | enum `occupation`, `energy` | `occupation` | orbit labelling order. Only valid with `basis.kind="nat"`. |
+| `natural_orbitals.use_occupations` | bool | `false` | use NAT occupations for the reference (PL: `E-PLANNED`, M9-Q3). |
+| `natural_orbitals.order` | enum `occupation`, `energy` | `occupation` | orbit labelling order. Only valid with `basis.kind="nat"`; `energy` is PL (`E-PLANNED`, M9-Q3). |
 
 ### 2.7 `[imsrg]`
 
@@ -217,7 +217,7 @@ first column of this table and compares it with the keys of a real run, so the t
 | key | type | present | meaning |
 |---|---|---|---|
 | `schema_version` | int | always | layout version of this table (currently 1). |
-| `e_reference` | number | always | reference energy: E_HF (HF basis) or the zero-body part of the normal-ordered Hamiltonian (oscillator basis); Lawson constant not included. |
+| `e_reference` | number | always | reference energy: E_HF in the basis of the flow (HF or NAT basis) or the zero-body part of the normal-ordered Hamiltonian (oscillator basis); Lawson constant not included. |
 | `e_mp2` | number | always | MBPT(2) correlation energy of the normal-ordered Hamiltonian that enters the flow (HF or NAT basis; imsrg++ `EMP2`), MeV. Equals the `E_MP2` of flow-file step 0. *(added in run 2)* |
 | `hf` | object | `basis.kind = "hf"` | the Hartree-Fock solution. |
 | `hf.e_hf` | number | with `hf` | E_HF. |

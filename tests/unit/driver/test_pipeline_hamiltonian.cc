@@ -164,7 +164,8 @@ TEST(PipelineHamiltonian, RsoIsAnOperatorAndVanishesForClosedShells) {
 
 TEST(PipelineHamiltonian, PlannedOptionsThrow) {
   const std::string base = Toml(kO16, false);
-  const RunConfig nat = Load(Toml(kO16, false, "kind = \"nat\""));
+  const RunConfig nat = Load(Toml(kO16, false, "kind = \"nat\"") +
+                             "[natural_orbitals]\nuse_occupations = true\n");
   EXPECT_THROW(PrepareHamiltonian(nat), ConfigError);
   try {
     PrepareHamiltonian(nat);

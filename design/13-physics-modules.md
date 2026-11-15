@@ -131,10 +131,9 @@ sd shell): every number identical to imsrg++, comment lines identical except the
 `mbpt2_density_matrix` (HFMBPT.cc:421-777 with the regulated denominators),
 `natural_orbitals` (per-channel `eigh`, descending occupation, columns signed so C(i,i) >= 0,
 trace check against A), `reference_density_ho`, `matmul`, `to_nat_basis`. mbpt does not depend on
-hf: the NAT-basis Hamiltonian is assembled by the caller from a modified `HFResult` (see
-M9-Q1 and `tests/unit/mbpt/mbpt_test_support.h`). Not implemented: `use_NAT_occupations`,
+hf: the NAT-basis mean-field state comes from `hf::SolutionInBasis(H, v3, C_ho2nat, occupations)` (C = C_ho2hf C_hf2nat, rho = reference density in the NAT basis, F[rho], E_HF), and `hf::NormalOrderedHamiltonian` then gives the NAT-basis Hamiltonian; the driver (`pipeline::PrepareHamiltonian`, `basis.kind = "nat"`) and `tests/unit/mbpt/mbpt_test_support.h` both use this public API (run 2; before, the test drove `hf::detail`). Not implemented: `use_NAT_occupations`,
 `NAT_order` energy/mp2 (M9-Q3; owner: not now, added when a job needs them, D36). Verified: MP2/MP3 at emax 2 (2N and 2N+3N) to 1e-15; IT-1 EMP2
-to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9.
+to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9. In the driver (run 2): IT-5/smax10 (IT-4 + `basis=NAT`) reproduces the same step count (28), E0(s=10) to 4e-10 MeV, NAT E_HF to 2e-10 MeV and NAT EMP2 to 4e-10 MeV.
 
 ## 6. commutator (reference: `reference/02`)
 
