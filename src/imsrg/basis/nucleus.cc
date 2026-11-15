@@ -18,20 +18,24 @@ namespace imsrg::basis {
 
 namespace {
 
-// The periodic table of imsrg++ (ModelSpace.cc:570-576), index = Z; "n" is the neutron.
+// The periodic table of imsrg++ (ModelSpace.cc:570-576), index = Z; "n" is the
+// neutron.
 constexpr std::array<std::string_view, 119> kElements = {
-    "n",  "H",  "He", "Li", "Be", "B",  "C",  "N",  "O",  "F",  "Ne", "Na", "Mg", "Al", "Si",
-    "P",  "S",  "Cl", "Ar", "K",  "Ca", "Sc", "Ti", "V",  "Cr", "Mn", "Fe", "Co", "Ni", "Cu",
-    "Zn", "Ga", "Ge", "As", "Se", "Br", "Kr", "Rb", "Sr", "Y",  "Zr", "Nb", "Mo", "Tc", "Ru",
-    "Rh", "Pd", "Ag", "Cd", "In", "Sn", "Sb", "Te", "I",  "Xe", "Cs", "Ba", "La", "Ce", "Pr",
-    "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu", "Hf", "Ta", "W",
-    "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl", "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac",
-    "Th", "Pa", "U",  "Np", "Pu", "Am", "Cm", "Bk", "Cf", "Es", "Fm", "Md", "No", "Lr", "Rf",
-    "Db", "Sg", "Bh", "Hs", "Mt", "Ds", "Rg", "Cn", "Nh", "Fl", "Mc", "Lv", "Ts", "Og"};
+    "n",  "H",  "He", "Li", "Be", "B",  "C",  "N",  "O",  "F",  "Ne", "Na",
+    "Mg", "Al", "Si", "P",  "S",  "Cl", "Ar", "K",  "Ca", "Sc", "Ti", "V",
+    "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Ga", "Ge", "As", "Se", "Br",
+    "Kr", "Rb", "Sr", "Y",  "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag",
+    "Cd", "In", "Sn", "Sb", "Te", "I",  "Xe", "Cs", "Ba", "La", "Ce", "Pr",
+    "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu",
+    "Hf", "Ta", "W",  "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl", "Pb", "Bi",
+    "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th", "Pa", "U",  "Np", "Pu", "Am",
+    "Cm", "Bk", "Cf", "Es", "Fm", "Md", "No", "Lr", "Rf", "Db", "Sg", "Bh",
+    "Hs", "Mt", "Ds", "Rg", "Cn", "Nh", "Fl", "Mc", "Lv", "Ts", "Og"};
 
 bool is_digit(char c) { return c >= '0' && c <= '9'; }
 
-// Parses a complete decimal number (strtod syntax, no leading or trailing junk).
+// Parses a complete decimal number (strtod syntax, no leading or trailing
+// junk).
 bool parse_decimal(std::string_view s, double& value) {
   if (s.empty() || !(is_digit(s.front()) || s.front() == '.')) return false;
   const std::string copy(s);
@@ -42,7 +46,8 @@ bool parse_decimal(std::string_view s, double& value) {
 
 Nucleus checked(Nucleus nuc, std::string_view input) {
   if (!(nuc.Z >= 0.0) || !(nuc.A >= nuc.Z) || !std::isfinite(nuc.A)) {
-    throw InputError("invalid nucleus '" + std::string(input) + "': need A >= Z >= 0");
+    throw InputError("invalid nucleus '" + std::string(input) +
+                     "': need A >= Z >= 0");
   }
   return nuc;
 }
@@ -51,7 +56,8 @@ Nucleus checked(Nucleus nuc, std::string_view input) {
 
 std::string_view element_symbol(std::int32_t Z) {
   if (Z < 0 || Z >= static_cast<std::int32_t>(kElements.size())) {
-    throw InputError("element_symbol: no element with Z = " + std::to_string(Z));
+    throw InputError("element_symbol: no element with Z = " +
+                     std::to_string(Z));
   }
   return kElements[static_cast<std::size_t>(Z)];
 }
@@ -84,18 +90,21 @@ Nucleus Nucleus::parse(std::string_view name) {
   const std::string_view symbol = name.substr(0, i);
   const std::string_view digits = name.substr(i);
   if (symbol.empty() || digits.empty() ||
-      !std::all_of(digits.begin(), digits.end(), [](char c) { return is_digit(c); })) {
-    throw InputError("invalid nucleus name '" + std::string(name) +
-                     "': expected an element symbol and a mass number, e.g. O16");
+      !std::all_of(digits.begin(), digits.end(),
+                   [](char c) { return is_digit(c); })) {
+    throw InputError(
+        "invalid nucleus name '" + std::string(name) +
+        "': expected an element symbol and a mass number, e.g. O16");
   }
   const auto it = std::find(kElements.begin(), kElements.end(), symbol);
   if (it == kElements.end()) {
-    throw InputError("invalid nucleus name '" + std::string(name) + "': unknown element '" +
-                     std::string(symbol) + "'");
+    throw InputError("invalid nucleus name '" + std::string(name) +
+                     "': unknown element '" + std::string(symbol) + "'");
   }
   double A = 0.0;
   if (!parse_decimal(digits, A)) {
-    throw InputError("invalid nucleus name '" + std::string(name) + "': bad mass number");
+    throw InputError("invalid nucleus name '" + std::string(name) +
+                     "': bad mass number");
   }
   return checked(Nucleus{A, static_cast<double>(it - kElements.begin())}, name);
 }
@@ -105,12 +114,14 @@ std::string Nucleus::name() const {
   const bool integral = std::floor(A) == A && std::floor(Z) == Z && Z >= 0.0 &&
                         Z < static_cast<double>(kElements.size()) && A >= Z;
   if (integral) {
-    return std::string(kElements[static_cast<std::size_t>(Z)]) + fmt::format("{}", A);
+    return std::string(kElements[static_cast<std::size_t>(Z)]) +
+           fmt::format("{}", A);
   }
   return fmt::format("mix_A{}_Z{}", A, Z);
 }
 
-std::vector<OrbitOccupation> naive_filling(const Nucleus& nucleus, std::int32_t emax,
+std::vector<OrbitOccupation> naive_filling(const Nucleus& nucleus,
+                                           std::int32_t emax,
                                            std::span<const Orbit> skip) {
   if (emax < 0) throw InputError("naive_filling: emax must be >= 0");
   const double A = nucleus.A;
@@ -121,7 +132,8 @@ std::vector<OrbitOccupation> naive_filling(const Nucleus& nucleus, std::int32_t 
   const auto skipped = [&](const Orbit& o) {
     return std::find(skip.begin(), skip.end(), o) != skip.end();
   };
-  // ModelSpace::GetOrbitsAZ, ModelSpace.cc:617-650; same operations, same order.
+  // ModelSpace::GetOrbitsAZ, ModelSpace.cc:617-650; same operations, same
+  // order.
   double zz = 0;
   double nn = 0;
   std::vector<OrbitOccupation> filled;
@@ -145,9 +157,10 @@ std::vector<OrbitOccupation> naive_filling(const Nucleus& nucleus, std::int32_t 
       if (zz == Z && nn == A - Z) return filled;
     }
   }
-  throw InputError("naive_filling: " + nucleus.name() + " (A=" + fmt::format("{}", A) +
-                   ", Z=" + fmt::format("{}", Z) +
-                   ") does not fit into the shells e <= " + std::to_string(emax));
+  throw InputError(
+      "naive_filling: " + nucleus.name() + " (A=" + fmt::format("{}", A) +
+      ", Z=" + fmt::format("{}", Z) +
+      ") does not fit into the shells e <= " + std::to_string(emax));
 }
 
 }  // namespace imsrg::basis

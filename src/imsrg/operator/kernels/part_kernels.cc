@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Flat kernels on operator-part buffers (declared in imsrg/operator/detail/part_kernels.h).
+// Flat kernels on operator-part buffers (declared in
+// imsrg/operator/detail/part_kernels.h).
 #include "imsrg/operator/detail/part_kernels.h"
 
 #include "imsrg/base/assert.h"
@@ -9,7 +10,8 @@
 
 namespace imsrg::op::detail {
 
-void axpy(double a, const exec::DeviceBuffer<double>& x, exec::DeviceBuffer<double>& y) {
+void axpy(double a, const exec::DeviceBuffer<double>& x,
+          exec::DeviceBuffer<double>& y) {
   IMSRG_CHECK(x.size() == y.size(), "axpy: buffer sizes differ");
   const auto xv = exec::view(x);
   auto yv = exec::view(y);
@@ -27,7 +29,8 @@ void scale(double a, exec::DeviceBuffer<double>& x) {
 
 double sum_of_squares(const exec::DeviceBuffer<double>& x, std::int64_t offset,
                       std::int64_t count) {
-  IMSRG_CHECK(offset >= 0 && count >= 0 && offset + count <= static_cast<std::int64_t>(x.size()),
+  IMSRG_CHECK(offset >= 0 && count >= 0 &&
+                  offset + count <= static_cast<std::int64_t>(x.size()),
               "sum_of_squares: range outside the buffer");
   const auto xv = exec::view(x);
   double result = 0.0;

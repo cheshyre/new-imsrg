@@ -48,7 +48,8 @@ TEST(Writer, FirstLineIsHeaderComment) {
   const std::string text = to_toml(sample_config(), false);
   const std::string first = text.substr(0, text.find('\n'));
   EXPECT_EQ(first,
-            "# imsrg resolved configuration (design/16-config-and-cli.md); reproduce with: imsrg "
+            "# imsrg resolved configuration (design/16-config-and-cli.md); "
+            "reproduce with: imsrg "
             "--config <this file>");
 }
 
@@ -71,7 +72,8 @@ TEST(Writer, SingleFileIsPlainStringTwoFilesAreArray) {
   RunConfig cfg = sample_config();
   EXPECT_TRUE(has_line(to_toml(cfg, false), "file = \"x.me2j\""));
   cfg.interaction.two_body.file = {"sp.dat", "vnn.dat"};
-  EXPECT_TRUE(has_line(to_toml(cfg, false), "file = [\"sp.dat\", \"vnn.dat\"]"));
+  EXPECT_TRUE(
+      has_line(to_toml(cfg, false), "file = [\"sp.dat\", \"vnn.dat\"]"));
 }
 
 TEST(Writer, EmptyStringArrayIsBrackets) {
@@ -138,13 +140,19 @@ TEST(Writer, FromFileInlineTable) {
   const std::string text = to_toml(cfg, false);
   const std::size_t line_start = text.find("from_file = ");
   ASSERT_NE(line_start, std::string::npos);
-  const std::string line = text.substr(line_start, text.find('\n', line_start) - line_start);
-  EXPECT_NE(line.find("{ name = \"A\", rank = 0, dtz = 0, parity = 0, particle_rank = 2, "
-                      "file_2b = \"a.dat\", format = "),
+  const std::string line =
+      text.substr(line_start, text.find('\n', line_start) - line_start);
+  EXPECT_NE(
+      line.find(
+          "{ name = \"A\", rank = 0, dtz = 0, parity = 0, particle_rank = 2, "
+          "file_2b = \"a.dat\", format = "),
+      std::string::npos)
+      << line;
+  EXPECT_NE(line.find("file_2b = \"b2.dat\", file_3b = \"b3.dat\""),
             std::string::npos)
       << line;
-  EXPECT_NE(line.find("file_2b = \"b2.dat\", file_3b = \"b3.dat\""), std::string::npos) << line;
-  EXPECT_EQ(line.find("file_3b"), line.rfind("file_3b"));  // only entry B has one
+  EXPECT_EQ(line.find("file_3b"),
+            line.rfind("file_3b"));  // only entry B has one
 }
 
 TEST(Writer, ProvenanceTable) {
@@ -155,8 +163,9 @@ TEST(Writer, ProvenanceTable) {
   cfg.provenance.command_line = "imsrg --config \"a b\".toml";
   cfg.provenance.legacy_args = {"emax=4", "hw=16"};
   cfg.provenance.applied_rules = {"rule one"};
-  cfg.provenance.warnings.push_back(make_warning("W-TEST", "basis.emax", "a warning",
-                                                 SourceRef{SourceRef::Kind::None, "", 0, 0}));
+  cfg.provenance.warnings.push_back(
+      make_warning("W-TEST", "basis.emax", "a warning",
+                   SourceRef{SourceRef::Kind::None, "", 0, 0}));
   const std::string with = to_toml(cfg, true);
   const std::string without = to_toml(cfg, false);
   const std::size_t pos = with.rfind("\n[provenance]\n");
@@ -166,7 +175,8 @@ TEST(Writer, ProvenanceTable) {
   EXPECT_TRUE(has_line(tail, "version = \"0.1\""));
   EXPECT_TRUE(has_line(tail, "git_hash = \"abc123\""));
   EXPECT_TRUE(has_line(tail, "date = \"2026-01-01T00:00:00Z\""));
-  EXPECT_TRUE(has_line(tail, "command_line = \"imsrg --config \\\"a b\\\".toml\""));
+  EXPECT_TRUE(
+      has_line(tail, "command_line = \"imsrg --config \\\"a b\\\".toml\""));
   EXPECT_TRUE(has_line(tail, "legacy_args = [\"emax=4\", \"hw=16\"]"));
   EXPECT_TRUE(has_line(tail, "applied_rules = [\"rule one\"]"));
   EXPECT_NE(tail.find("warnings = [\""), std::string::npos);
@@ -192,7 +202,8 @@ TEST(Writer, OutputReadsBackWithoutIssuesAndContainsEveryKey) {
   const ConfigIssues issues = read_toml_string(text, "roundtrip", tree);
   EXPECT_TRUE(issues.empty()) << (issues.empty() ? "" : issues[0].to_string());
 
-  // Every written `key = ` line (outside [provenance]) is in the tree under its table.
+  // Every written `key = ` line (outside [provenance]) is in the tree under its
+  // table.
   std::istringstream in(text);
   std::string line;
   std::string table;
@@ -215,15 +226,17 @@ TEST(Writer, WriteResolvedConfigCreatesDirectories) {
   static std::atomic<int> counter{0};
   const std::filesystem::path root =
       std::filesystem::temp_directory_path() /
-      ("imsrg_test_writer_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()) +
-       "_" + std::to_string(counter++));
+      ("imsrg_test_writer_" +
+       std::to_string(::testing::UnitTest::GetInstance()->random_seed()) + "_" +
+       std::to_string(counter++));
   std::filesystem::remove_all(root);
   const std::filesystem::path file = root / "a" / "b" / "resolved_config.toml";
   const RunConfig cfg = sample_config();
   write_resolved_config(cfg, file);
   ASSERT_TRUE(std::filesystem::exists(file));
   std::ifstream in(file, std::ios::binary);
-  const std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+  const std::string content((std::istreambuf_iterator<char>(in)),
+                            std::istreambuf_iterator<char>());
   EXPECT_EQ(content, to_toml(cfg));
   std::filesystem::remove_all(root);
 }

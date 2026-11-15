@@ -1,15 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Prints imsrg++ AngMom::Moshinsky and AngMom::TalmiB values for the angmom tests of the rewrite;
-// its output is tests/unit/angmom/data/moshinsky_imsrgpp_samples.txt. NOT part of the build: it
-// links against the imsrg-devel reference library (M1 build, outside the repo):
-//   SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk clang++ -std=c++17 -O1
+// Prints imsrg++ AngMom::Moshinsky and AngMom::TalmiB values for the angmom
+// tests of the rewrite; its output is
+// tests/unit/angmom/data/moshinsky_imsrgpp_samples.txt. NOT part of the build:
+// it links against the imsrg-devel reference library (M1 build, outside the
+// repo):
+//   SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk \
+//     clang++ -std=c++17 -O1
 //     -I<new-imsrg-reference>/imsrg-devel-src/src imsrgpp_mosh_sampler.cc
-//     -L<new-imsrg-reference>/build -lIMSRG -Wl,-rpath,<new-imsrg-reference>/build -o sampler
+//     -L<new-imsrg-reference>/build -lIMSRG
+//     -Wl,-rpath,<new-imsrg-reference>/build -o sampler
 //   ./sampler > moshinsky_imsrgpp_samples.txt
-// Deterministic: all brackets with E <= 4, then an LCG sample of allowed brackets with E <= 16;
-// all Talmi B with n <= 3, l <= 6, then an LCG sample with n <= 6, l <= 12.
+// Deterministic: all brackets with E <= 4, then an LCG sample of allowed
+// brackets with E <= 16; all Talmi B with n <= 3, l <= 6, then an LCG sample
+// with n <= 6, l <= 12.
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -23,18 +28,21 @@ int next_int(int n) {  // uniform-ish in [0, n)
   return static_cast<int>((state >> 33) % static_cast<std::uint64_t>(n));
 }
 bool tri(int a, int b, int c) { return std::abs(a - b) <= c && c <= a + b; }
-void print_mosh(int N, int L, int n, int l, int n1, int l1, int n2, int l2, int lam) {
-  std::printf("mosh %d %d %d %d %d %d %d %d %d %.17g\n", N, L, n, l, n1, l1, n2, l2, lam,
-              AngMom::Moshinsky(N, L, n, l, n1, l1, n2, l2, lam));
+void print_mosh(int N, int L, int n, int l, int n1, int l1, int n2, int l2,
+                int lam) {
+  std::printf("mosh %d %d %d %d %d %d %d %d %d %.17g\n", N, L, n, l, n1, l1, n2,
+              l2, lam, AngMom::Moshinsky(N, L, n, l, n1, l1, n2, l2, lam));
 }
 }  // namespace
 
 int main() {
   AngMom::FillFactorialLists(170);
   std::printf(
-      "# imsrg++ AngMom::Moshinsky(N,L,n,l,n1,l1,n2,l2,lam) and AngMom::TalmiB(na,la,nb,lb,p)\n");
+      "# imsrg++ AngMom::Moshinsky(N,L,n,l,n1,l1,n2,l2,lam) and "
+      "AngMom::TalmiB(na,la,nb,lb,p)\n");
   std::printf(
-      "# printed with %%.17g by mosh_sampler.cpp linked against libIMSRG (M1 reference build)\n");
+      "# printed with %%.17g by mosh_sampler.cpp linked against libIMSRG (M1 "
+      "reference build)\n");
   // Exhaustive E <= 4.
   for (int E = 0; E <= 4; ++E)
     for (int N = 0; 2 * N <= E; ++N)
@@ -62,7 +70,8 @@ int main() {
     const int n1 = next_int(e1 / 2 + 1), l1 = e1 - 2 * n1;
     const int n2 = next_int((E - e1) / 2 + 1), l2 = E - e1 - 2 * n2;
     if ((L + l - l1 - l2) % 2 != 0) continue;
-    const int lo = std::abs(L - l) > std::abs(l1 - l2) ? std::abs(L - l) : std::abs(l1 - l2);
+    const int lo = std::abs(L - l) > std::abs(l1 - l2) ? std::abs(L - l)
+                                                       : std::abs(l1 - l2);
     const int hi = L + l < l1 + l2 ? L + l : l1 + l2;
     if (lo > hi) continue;
     print_mosh(N, L, n, l, n1, l1, n2, l2, lo + next_int(hi - lo + 1));

@@ -4,19 +4,21 @@
 #ifndef IMSRG_DRIVER_CONFIG_SCHEMA_H_
 #define IMSRG_DRIVER_CONFIG_SCHEMA_H_
 /// @file
-/// The typed run configuration of the `imsrg` executable (design/16-config-and-cli.md section 2):
-/// the `RunConfig` tree, its enums with their canonical TOML spellings and phases, and the
-/// provenance record.
+/// The typed run configuration of the `imsrg` executable
+/// (design/16-config-and-cli.md section 2): the `RunConfig` tree, its enums
+/// with their canonical TOML spellings and phases, and the provenance record.
 ///
-/// A `RunConfig` is always *resolved*: defaults are filled and derived values computed (effective
-/// `basis.e3max`, file e2max/lmax, mass number, number of stages, output stem and flow file); only
-/// keys whose absence has a meaning of its own stay `std::optional`. It is built by `load_config`
-/// (imsrg/driver/config/load_config.h) and treated as immutable afterwards: pipeline stages
-/// receive it, or one section, by const reference. The keys, their order, docs and defaults are
-/// described once, in `visit_schema` (imsrg/driver/config/schema_keys.h).
+/// A `RunConfig` is always *resolved*: defaults are filled and derived values
+/// computed (effective `basis.e3max`, file e2max/lmax, mass number, number of
+/// stages, output stem and flow file); only keys whose absence has a meaning of
+/// its own stay `std::optional`. It is built by `load_config`
+/// (imsrg/driver/config/load_config.h) and treated as immutable afterwards:
+/// pipeline stages receive it, or one section, by const reference. The keys,
+/// their order, docs and defaults are described once, in `visit_schema`
+/// (imsrg/driver/config/schema_keys.h).
 ///
-/// Generator and solver-method enums are defined here for now; M8 reconciles them with the `flow`
-/// module (QUESTIONS M8a-Q1).
+/// Generator and solver-method enums are defined here for now; M8 reconciles
+/// them with the `flow` module (QUESTIONS M8a-Q1).
 
 #include <array>
 #include <optional>
@@ -32,7 +34,7 @@
 namespace imsrg::driver {
 
 // ---- Enums
-// ---------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 
 /// `run.task`: where the run stops.
 enum class Task { Imsrg, Hf, Mp3, FciExport };
@@ -99,7 +101,7 @@ enum class ValenceFileFormat { Tokyo, Nushellx, Antoine };
 enum class OperatorFileFormat { Navratil, Miyagi };
 
 // ---- Enum spellings
-// ------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 
 /// One enumerator with its canonical TOML spelling and phase.
 template <class E>
@@ -109,9 +111,9 @@ struct EnumEntry {
   Phase phase = Phase::P1;
 };
 
-/// Spellings of a config enum: specialisations provide `type_name` and `entries` (all
-/// enumerators, in declaration order). Only canonical spellings live here; legacy spellings are
-/// the legacy layer's business.
+/// Spellings of a config enum: specialisations provide `type_name` and
+/// `entries` (all enumerators, in declaration order). Only canonical spellings
+/// live here; legacy spellings are the legacy layer's business.
 template <class E>
 struct EnumTraits;
 
@@ -149,7 +151,8 @@ constexpr Phase enum_phase(E value) noexcept {
   return Phase::NotSupported;
 }
 
-/// All canonical spellings of `E`, in declaration order (did-you-mean candidates, docs).
+/// All canonical spellings of `E`, in declaration order (did-you-mean
+/// candidates, docs).
 template <ConfigEnum E>
 std::vector<std::string_view> enum_names() {
   std::vector<std::string_view> names;
@@ -157,79 +160,100 @@ std::vector<std::string_view> enum_names() {
   return names;
 }
 
-#define IMSRG_DRIVER_ENUM_TRAITS(Enum, TypeName, ...)                              \
-  template <>                                                                      \
-  struct EnumTraits<Enum> {                                                        \
-    static constexpr std::string_view type_name = TypeName;                        \
-    static constexpr auto entries = std::to_array<EnumEntry<Enum>>({__VA_ARGS__}); \
+#define IMSRG_DRIVER_ENUM_TRAITS(Enum, TypeName, ...)       \
+  template <>                                               \
+  struct EnumTraits<Enum> {                                 \
+    static constexpr std::string_view type_name = TypeName; \
+    static constexpr auto entries =                         \
+        std::to_array<EnumEntry<Enum>>({__VA_ARGS__});      \
   }
 
-IMSRG_DRIVER_ENUM_TRAITS(Task, "task", {Task::Imsrg, "imsrg"}, {Task::Hf, "hf"}, {Task::Mp3, "mp3"},
+IMSRG_DRIVER_ENUM_TRAITS(Task, "task", {Task::Imsrg, "imsrg"}, {Task::Hf, "hf"},
+                         {Task::Mp3, "mp3"},
                          {Task::FciExport, "fci_export", Phase::Planned});
 IMSRG_DRIVER_ENUM_TRAITS(LogLevel, "log level", {LogLevel::Quiet, "quiet"},
-                         {LogLevel::Normal, "normal"}, {LogLevel::Debug, "debug"});
+                         {LogLevel::Normal, "normal"},
+                         {LogLevel::Debug, "debug"});
 IMSRG_DRIVER_ENUM_TRAITS(BasisKind, "basis kind", {BasisKind::Hf, "hf"},
-                         {BasisKind::Oscillator, "oscillator"}, {BasisKind::Nat, "nat"});
-IMSRG_DRIVER_ENUM_TRAITS(KineticEnergy, "kinetic energy", {KineticEnergy::Intrinsic, "intrinsic"},
-                         {KineticEnergy::Lab, "lab"}, {KineticEnergy::None, "none"});
-IMSRG_DRIVER_ENUM_TRAITS(TwoBodyFormat, "two-body format", {TwoBodyFormat::Me2j, "me2j"},
-                         {TwoBodyFormat::Navratil, "navratil", Phase::Planned},
-                         {TwoBodyFormat::Oslo, "oslo", Phase::Planned},
-                         {TwoBodyFormat::Oakridge, "oakridge", Phase::Planned},
-                         {TwoBodyFormat::OakridgeBin, "oakridge_bin", Phase::Planned},
-                         {TwoBodyFormat::Takayuki, "takayuki", Phase::Planned},
-                         {TwoBodyFormat::Nushellx, "nushellx", Phase::Planned},
-                         {TwoBodyFormat::SchematicMinnesota, "schematic_minnesota",
-                          Phase::Planned});
-IMSRG_DRIVER_ENUM_TRAITS(ThreeBodyType, "three-body type", {ThreeBodyType::Full, "full"},
+                         {BasisKind::Oscillator, "oscillator"},
+                         {BasisKind::Nat, "nat"});
+IMSRG_DRIVER_ENUM_TRAITS(KineticEnergy, "kinetic energy",
+                         {KineticEnergy::Intrinsic, "intrinsic"},
+                         {KineticEnergy::Lab, "lab"},
+                         {KineticEnergy::None, "none"});
+IMSRG_DRIVER_ENUM_TRAITS(
+    TwoBodyFormat, "two-body format", {TwoBodyFormat::Me2j, "me2j"},
+    {TwoBodyFormat::Navratil, "navratil", Phase::Planned},
+    {TwoBodyFormat::Oslo, "oslo", Phase::Planned},
+    {TwoBodyFormat::Oakridge, "oakridge", Phase::Planned},
+    {TwoBodyFormat::OakridgeBin, "oakridge_bin", Phase::Planned},
+    {TwoBodyFormat::Takayuki, "takayuki", Phase::Planned},
+    {TwoBodyFormat::Nushellx, "nushellx", Phase::Planned},
+    {TwoBodyFormat::SchematicMinnesota, "schematic_minnesota", Phase::Planned});
+IMSRG_DRIVER_ENUM_TRAITS(ThreeBodyType, "three-body type",
+                         {ThreeBodyType::Full, "full"},
                          {ThreeBodyType::No2b, "no2b"},
                          {ThreeBodyType::Mono, "mono", Phase::Planned});
-IMSRG_DRIVER_ENUM_TRAITS(ThreeBodyFormat, "three-body format", {ThreeBodyFormat::Me3j, "me3j"},
-                         {ThreeBodyFormat::Navratil, "navratil", Phase::Planned});
-IMSRG_DRIVER_ENUM_TRAITS(No2bPrecision, "NO2B precision", {No2bPrecision::Single, "single"},
+IMSRG_DRIVER_ENUM_TRAITS(ThreeBodyFormat, "three-body format",
+                         {ThreeBodyFormat::Me3j, "me3j"},
+                         {ThreeBodyFormat::Navratil, "navratil",
+                          Phase::Planned});
+IMSRG_DRIVER_ENUM_TRAITS(No2bPrecision, "NO2B precision",
+                         {No2bPrecision::Single, "single"},
                          {No2bPrecision::Half, "half"});
-IMSRG_DRIVER_ENUM_TRAITS(NatOrder, "natural-orbital order", {NatOrder::Occupation, "occupation"},
+IMSRG_DRIVER_ENUM_TRAITS(NatOrder, "natural-orbital order",
+                         {NatOrder::Occupation, "occupation"},
                          {NatOrder::Energy, "energy"});
-IMSRG_DRIVER_ENUM_TRAITS(Method, "method", {Method::Magnus, "magnus"},
-                         {Method::MagnusBackoff, "magnus_backoff", Phase::Planned},
-                         {Method::MagnusModifiedEuler, "magnus_modified_euler", Phase::Planned},
-                         {Method::MagnusAdaptive, "magnus_adaptive", Phase::Planned},
-                         {Method::Flow, "flow"}, {Method::FlowEuler, "flow_euler", Phase::Planned},
-                         {Method::FlowRk4, "flow_rk4"},
-                         {Method::Restore4thOrder, "restore_4th_order", Phase::Planned});
-IMSRG_DRIVER_ENUM_TRAITS(Generator, "generator", {Generator::White, "white"},
-                         {Generator::Atan, "atan"}, {Generator::ImaginaryTime, "imaginary_time"},
-                         {Generator::Wegner, "wegner"},
-                         {Generator::QtransferAtan, "qtransfer_atan"},
-                         {Generator::ShellModel, "shell_model"},
-                         {Generator::ShellModelAtan, "shell_model_atan"},
-                         {Generator::ShellModelWegner, "shell_model_wegner", Phase::Planned},
-                         {Generator::ShellModelImaginaryTime, "shell_model_imaginary_time"},
-                         {Generator::ShellModelAtanNpnh, "shell_model_atan_npnh", Phase::Planned},
-                         {Generator::HartreeFock, "hartree_fock"},
-                         {Generator::OnePa, "one_pa", Phase::Planned});
+IMSRG_DRIVER_ENUM_TRAITS(
+    Method, "method", {Method::Magnus, "magnus"},
+    {Method::MagnusBackoff, "magnus_backoff", Phase::Planned},
+    {Method::MagnusModifiedEuler, "magnus_modified_euler", Phase::Planned},
+    {Method::MagnusAdaptive, "magnus_adaptive", Phase::Planned},
+    {Method::Flow, "flow"}, {Method::FlowEuler, "flow_euler", Phase::Planned},
+    {Method::FlowRk4, "flow_rk4"},
+    {Method::Restore4thOrder, "restore_4th_order", Phase::Planned});
+IMSRG_DRIVER_ENUM_TRAITS(
+    Generator, "generator", {Generator::White, "white"},
+    {Generator::Atan, "atan"}, {Generator::ImaginaryTime, "imaginary_time"},
+    {Generator::Wegner, "wegner"}, {Generator::QtransferAtan, "qtransfer_atan"},
+    {Generator::ShellModel, "shell_model"},
+    {Generator::ShellModelAtan, "shell_model_atan"},
+    {Generator::ShellModelWegner, "shell_model_wegner", Phase::Planned},
+    {Generator::ShellModelImaginaryTime, "shell_model_imaginary_time"},
+    {Generator::ShellModelAtanNpnh, "shell_model_atan_npnh", Phase::Planned},
+    {Generator::HartreeFock, "hartree_fock"},
+    {Generator::OnePa, "one_pa", Phase::Planned});
 IMSRG_DRIVER_ENUM_TRAITS(Partitioning, "denominator partitioning",
                          {Partitioning::EpsteinNesbet, "epstein_nesbet"},
                          {Partitioning::MollerPlesset, "moller_plesset"},
-                         {Partitioning::MpIsospin, "mp_isospin", Phase::Planned});
-IMSRG_DRIVER_ENUM_TRAITS(OmegaStorage, "Omega storage", {OmegaStorage::Memory, "memory"},
-                         {OmegaStorage::Scratch, "scratch"}, {OmegaStorage::Discard, "discard"});
-IMSRG_DRIVER_ENUM_TRAITS(Imsrg3Variant, "IMSRG(3) variant", {Imsrg3Variant::Full, "full"},
-                         {Imsrg3Variant::N7, "n7"}, {Imsrg3Variant::Mp4, "mp4", Phase::Planned});
+                         {Partitioning::MpIsospin, "mp_isospin",
+                          Phase::Planned});
+IMSRG_DRIVER_ENUM_TRAITS(OmegaStorage, "Omega storage",
+                         {OmegaStorage::Memory, "memory"},
+                         {OmegaStorage::Scratch, "scratch"},
+                         {OmegaStorage::Discard, "discard"});
+IMSRG_DRIVER_ENUM_TRAITS(Imsrg3Variant, "IMSRG(3) variant",
+                         {Imsrg3Variant::Full, "full"},
+                         {Imsrg3Variant::N7, "n7"},
+                         {Imsrg3Variant::Mp4, "mp4", Phase::Planned});
 IMSRG_DRIVER_ENUM_TRAITS(ValenceFileFormat, "valence file format",
                          {ValenceFileFormat::Tokyo, "tokyo"},
-                         {ValenceFileFormat::Nushellx, "nushellx", Phase::Planned},
-                         {ValenceFileFormat::Antoine, "antoine", Phase::Planned});
+                         {ValenceFileFormat::Nushellx, "nushellx",
+                          Phase::Planned},
+                         {ValenceFileFormat::Antoine, "antoine",
+                          Phase::Planned});
 IMSRG_DRIVER_ENUM_TRAITS(OperatorFileFormat, "operator file format",
                          {OperatorFileFormat::Navratil, "navratil"},
                          {OperatorFileFormat::Miyagi, "miyagi"});
 
 #undef IMSRG_DRIVER_ENUM_TRAITS
 
-/// True for the shell-model generators (they need valence orbits, design/16 V-41, V-42).
+/// True for the shell-model generators (they need valence orbits, design/16
+/// V-41, V-42).
 constexpr bool is_shell_model_generator(Generator g) noexcept {
   return g == Generator::ShellModel || g == Generator::ShellModelAtan ||
-         g == Generator::ShellModelWegner || g == Generator::ShellModelImaginaryTime ||
+         g == Generator::ShellModelWegner ||
+         g == Generator::ShellModelImaginaryTime ||
          g == Generator::ShellModelAtanNpnh;
 }
 
@@ -240,67 +264,83 @@ constexpr bool is_flow_method(Method m) noexcept {
 }
 
 // ---- Sections
-// ------------------------------------------------------------------------------------ Field docs
-// are short; the authoritative meaning, defaults and rules are in design/16 section 2 and in
-// visit_schema. "Resolved" = always set after load_config (derived if not given).
+// -----------------------------------------------------------------------------
+// Field docs are short; the authoritative meaning, defaults and rules are in
+// design/16 section 2 and in visit_schema. "Resolved" = always set after
+// load_config (derived if not given).
 
 /// `[run]`.
 struct TaskConfig {
   Task task = Task::Imsrg;
-  std::string scratch_dir;  ///< Omega spill directory (used iff imsrg.omega.storage = scratch)
+  std::string scratch_dir;  ///< Omega spill directory (used iff
+                            ///< imsrg.omega.storage = scratch)
   LogLevel log_level = LogLevel::Normal;
   friend bool operator==(const TaskConfig&, const TaskConfig&) = default;
 };
 
 /// `[basis]`: model space and single-particle basis.
 struct BasisConfig {
-  int emax = 0;                   ///< required; e = 2n + l <= emax
-  double hw = 0.0;                ///< required; oscillator frequency in MeV
-  int e3max = 12;                 ///< resolved to the effective value min(e3max, 3 * emax)
-  std::optional<int> lmax;        ///< l cut of the whole calculation; none = no cut
-  std::optional<int> lmax3;       ///< l cut of the 3N interaction; none = no cut
-  std::optional<int> emax_unocc;  ///< emax for (l, j) unoccupied in the reference; none = emax
-  int mass_number = 0;            ///< resolved: A of reference.nucleus, else of the valence core
+  int emax = 0;     ///< required; e = 2n + l <= emax
+  double hw = 0.0;  ///< required; oscillator frequency in MeV
+  int e3max = 12;   ///< resolved to the effective value min(e3max, 3 * emax)
+  std::optional<int> lmax;   ///< l cut of the whole calculation; none = no cut
+  std::optional<int> lmax3;  ///< l cut of the 3N interaction; none = no cut
+  std::optional<int>
+      emax_unocc;  ///< emax for (l, j) unoccupied in the reference; none = emax
+  int mass_number =
+      0;  ///< resolved: A of reference.nucleus, else of the valence core
   BasisKind kind = BasisKind::Hf;
   friend bool operator==(const BasisConfig&, const BasisConfig&) = default;
 };
 
 /// `[reference]`.
 struct ReferenceConfig {
-  std::optional<std::string> nucleus;           ///< e.g. "O16"; none = core of the valence space
+  std::optional<std::string>
+      nucleus;  ///< e.g. "O16"; none = core of the valence space
   std::optional<std::string> occupations_file;  ///< rows "n l 2j 2tz occ"
-  friend bool operator==(const ReferenceConfig&, const ReferenceConfig&) = default;
+  friend bool operator==(const ReferenceConfig&,
+                         const ReferenceConfig&) = default;
 };
 
 /// `[valence]`. Neither set = single-reference decoupling.
 struct ValenceConfig {
-  std::optional<std::string> space;   ///< named space ("sd-shell"), 0hw-shell, jj-shell, comma list
-  std::optional<std::string> custom;  ///< custom orbit lists; exclusive with `space`
-  /// True if a valence space is defined (valence orbits exist; stage 2 possible).
-  bool has_valence_space() const noexcept { return space.has_value() || custom.has_value(); }
+  std::optional<std::string>
+      space;  ///< named space ("sd-shell"), 0hw-shell, jj-shell, comma list
+  std::optional<std::string>
+      custom;  ///< custom orbit lists; exclusive with `space`
+  /// True if a valence space is defined (valence orbits exist; stage 2
+  /// possible).
+  bool has_valence_space() const noexcept {
+    return space.has_value() || custom.has_value();
+  }
   friend bool operator==(const ValenceConfig&, const ValenceConfig&) = default;
 };
 
 /// `[hamiltonian]`: terms added to the input interaction.
 struct HamiltonianConfig {
-  KineticEnergy kinetic = KineticEnergy::Intrinsic;  ///< resolved (nushellx -> none, trap -> lab)
-  std::optional<double> trap_hw;  ///< lab-frame HO trap frequency (MeV); requires kinetic = lab
-  double beta_cm = 0.0;           ///< Lawson term strength; active iff |beta_cm| > 1e-6
-  double beta_cm_hw = 0.0;        ///< resolved: basis.hw if not given
+  KineticEnergy kinetic =
+      KineticEnergy::Intrinsic;  ///< resolved (nushellx -> none, trap -> lab)
+  std::optional<double>
+      trap_hw;  ///< lab-frame HO trap frequency (MeV); requires kinetic = lab
+  double beta_cm = 0.0;  ///< Lawson term strength; active iff |beta_cm| > 1e-6
+  double beta_cm_hw = 0.0;  ///< resolved: basis.hw if not given
   bool nucleon_mass_correction = false;
   bool relativistic_correction = false;  ///< planned
-  friend bool operator==(const HamiltonianConfig&, const HamiltonianConfig&) = default;
+  friend bool operator==(const HamiltonianConfig&,
+                         const HamiltonianConfig&) = default;
 };
 
 /// `[interaction.two_body]`.
 struct TwoBodyInputConfig {
-  std::vector<std::string> file;  ///< required; 1 path (2 for oakridge sp + vnn files)
+  std::vector<std::string>
+      file;  ///< required; 1 path (2 for oakridge sp + vnn files)
   TwoBodyFormat format = TwoBodyFormat::Me2j;
-  int e1max = 0;                    ///< required; single-particle emax stored in the file
-  int e2max = 0;                    ///< resolved: 2 * e1max if not given
-  int lmax = 0;                     ///< resolved: e1max if not given
+  int e1max = 0;  ///< required; single-particle emax stored in the file
+  int e2max = 0;  ///< resolved: 2 * e1max if not given
+  int lmax = 0;   ///< resolved: e1max if not given
   std::optional<std::string> lecs;  ///< planned (hdf5 formats only)
-  friend bool operator==(const TwoBodyInputConfig&, const TwoBodyInputConfig&) = default;
+  friend bool operator==(const TwoBodyInputConfig&,
+                         const TwoBodyInputConfig&) = default;
 };
 
 /// `[interaction.three_body]` (present iff a 3N interaction is read).
@@ -314,35 +354,41 @@ struct ThreeBodyInputConfig {
   std::optional<int> e2max;  ///< none = no extra e2 cut
   bool store_pn = false;
   bool discard_no2b_after_hf = false;  ///< planned (diagnostic)
-  friend bool operator==(const ThreeBodyInputConfig&, const ThreeBodyInputConfig&) = default;
+  friend bool operator==(const ThreeBodyInputConfig&,
+                         const ThreeBodyInputConfig&) = default;
 };
 
 /// `[interaction]`.
 struct InteractionConfig {
   TwoBodyInputConfig two_body;
   std::optional<ThreeBodyInputConfig> three_body;
-  friend bool operator==(const InteractionConfig&, const InteractionConfig&) = default;
+  friend bool operator==(const InteractionConfig&,
+                         const InteractionConfig&) = default;
 };
 
 /// `[hartree_fock]`.
 struct HartreeFockConfig {
   bool freeze_occupations = false;
-  friend bool operator==(const HartreeFockConfig&, const HartreeFockConfig&) = default;
+  friend bool operator==(const HartreeFockConfig&,
+                         const HartreeFockConfig&) = default;
 };
 
 /// `[natural_orbitals]`.
 struct NaturalOrbitalsConfig {
   bool use_occupations = false;
   NatOrder order = NatOrder::Occupation;
-  friend bool operator==(const NaturalOrbitalsConfig&, const NaturalOrbitalsConfig&) = default;
+  friend bool operator==(const NaturalOrbitalsConfig&,
+                         const NaturalOrbitalsConfig&) = default;
 };
 
 /// `[imsrg.generator]`.
 struct GeneratorConfig {
-  Generator core = Generator::Atan;               ///< stage 1 (the only stage if steps = 1)
-  Generator valence = Generator::ShellModelAtan;  ///< stage 2; reset to default if steps = 1
-  int qtransfer_n = 1;                            ///< exponent index of qtransfer_atan (0.5 n)
-  friend bool operator==(const GeneratorConfig&, const GeneratorConfig&) = default;
+  Generator core = Generator::Atan;  ///< stage 1 (the only stage if steps = 1)
+  Generator valence =
+      Generator::ShellModelAtan;  ///< stage 2; reset to default if steps = 1
+  int qtransfer_n = 1;            ///< exponent index of qtransfer_atan (0.5 n)
+  friend bool operator==(const GeneratorConfig&,
+                         const GeneratorConfig&) = default;
 };
 
 /// `[imsrg.denominator]`.
@@ -350,7 +396,8 @@ struct DenominatorConfig {
   Partitioning partitioning = Partitioning::EpsteinNesbet;
   double delta = 0.0;                      ///< requires delta_orbit if nonzero
   std::optional<std::string> delta_orbit;  ///< "all" or an orbit label
-  friend bool operator==(const DenominatorConfig&, const DenominatorConfig&) = default;
+  friend bool operator==(const DenominatorConfig&,
+                         const DenominatorConfig&) = default;
 };
 
 /// `[imsrg.step]` (numerics-defining step control).
@@ -372,13 +419,15 @@ struct OmegaConfig {
   friend bool operator==(const OmegaConfig&, const OmegaConfig&) = default;
 };
 
-/// `[imsrg.space]` (present iff any of its keys was given; all four resolved then).
+/// `[imsrg.space]` (present iff any of its keys was given; all four resolved
+/// then).
 struct ImsrgSpaceConfig {
   int emax = 0;        ///< default basis.emax
   int e2max = 0;       ///< default 2 * emax
   int e3max = 0;       ///< default min(basis.e3max, 3 * emax)
   int emax_3body = 0;  ///< default emax
-  friend bool operator==(const ImsrgSpaceConfig&, const ImsrgSpaceConfig&) = default;
+  friend bool operator==(const ImsrgSpaceConfig&,
+                         const ImsrgSpaceConfig&) = default;
 };
 
 /// `[imsrg]`.
@@ -407,14 +456,15 @@ struct Imsrg3Config {
   bool only_2b_omega = false;
   bool discard_residual_input_3n = false;
   double threebody_threshold = 0.0;
-  std::optional<double> de3max;        ///< none = no energy cut (old default 99)
+  std::optional<double> de3max;  ///< none = no energy cut (old default 99)
   std::optional<double> occ_nat3_cut;  ///< none = no cut (old default -1)
   /// True if any IMSRG(3) evaluation is requested (in the flow or at the end).
   bool active() const noexcept { return in_flow || at_end; }
   friend bool operator==(const Imsrg3Config&, const Imsrg3Config&) = default;
 };
 
-/// One `operators.from_file` entry (old `OperatorsFromFile` tag `Name^J_T_P_R^file2b[^file3b]`).
+/// One `operators.from_file` entry (old `OperatorsFromFile` tag
+/// `Name^J_T_P_R^file2b[^file3b]`).
 struct OperatorFromFile {
   std::string name;
   int rank = 0;           ///< J; rank > 0 is planned
@@ -424,23 +474,29 @@ struct OperatorFromFile {
   std::string file_2b;
   std::optional<std::string> file_3b;
   OperatorFileFormat format = OperatorFileFormat::Navratil;
-  friend bool operator==(const OperatorFromFile&, const OperatorFromFile&) = default;
+  friend bool operator==(const OperatorFromFile&,
+                         const OperatorFromFile&) = default;
 };
 
 /// `[operators]`.
 struct OperatorsConfig {
-  std::vector<OperatorRequest> list;         ///< transformed with the flow (macros expanded)
+  std::vector<OperatorRequest>
+      list;  ///< transformed with the flow (macros expanded)
   std::vector<OperatorRequest> first_order;  ///< planned
   std::vector<OperatorFromFile> from_file;
   /// True if any operator is requested.
-  bool any() const noexcept { return !list.empty() || !first_order.empty() || !from_file.empty(); }
-  friend bool operator==(const OperatorsConfig&, const OperatorsConfig&) = default;
+  bool any() const noexcept {
+    return !list.empty() || !first_order.empty() || !from_file.empty();
+  }
+  friend bool operator==(const OperatorsConfig&,
+                         const OperatorsConfig&) = default;
 };
 
 /// `[output]`.
 struct OutputConfig {
   std::string directory = "output";
-  std::string stem;       ///< resolved: <method>_<reference>_<valence>_hw<hw>_e<emax>_A<A>
+  std::string
+      stem;  ///< resolved: <method>_<reference>_<valence>_hw<hw>_e<emax>_A<A>
   std::string flow_file;  ///< resolved: <directory>/<stem>.flow
   ValenceFileFormat valence_file_format = ValenceFileFormat::Tokyo;
   bool write_omega = false;
@@ -450,16 +506,18 @@ struct OutputConfig {
   friend bool operator==(const OutputConfig&, const OutputConfig&) = default;
 };
 
-/// Where a configuration came from (design/16 section 1.7). Written as `[provenance]` into
-/// `resolved_config.toml`, ignored when that file is read back, and not part of equality.
+/// Where a configuration came from (design/16 section 1.7). Written as
+/// `[provenance]` into `resolved_config.toml`, ignored when that file is read
+/// back, and not part of equality.
 struct Provenance {
-  std::string version;                     ///< imsrg version
-  std::string git_hash;                    ///< "unknown" if not built from git
-  std::string date;                        ///< load time, ISO 8601 UTC
-  std::string command_line;                ///< original command line
-  std::vector<std::string> legacy_args;    ///< legacy tokens, verbatim
-  ConfigIssues warnings;                   ///< warnings of the load (also printed)
-  std::vector<std::string> applied_rules;  ///< shorthand/sentinel rewrites, human readable
+  std::string version;                   ///< imsrg version
+  std::string git_hash;                  ///< "unknown" if not built from git
+  std::string date;                      ///< load time, ISO 8601 UTC
+  std::string command_line;              ///< original command line
+  std::vector<std::string> legacy_args;  ///< legacy tokens, verbatim
+  ConfigIssues warnings;  ///< warnings of the load (also printed)
+  std::vector<std::string>
+      applied_rules;  ///< shorthand/sentinel rewrites, human readable
 };
 
 /// The complete resolved configuration of one run.
@@ -483,8 +541,9 @@ struct RunConfig {
     return a.run == b.run && a.basis == b.basis && a.reference == b.reference &&
            a.valence == b.valence && a.hamiltonian == b.hamiltonian &&
            a.interaction == b.interaction && a.hartree_fock == b.hartree_fock &&
-           a.natural_orbitals == b.natural_orbitals && a.imsrg == b.imsrg && a.imsrg3 == b.imsrg3 &&
-           a.operators == b.operators && a.output == b.output;
+           a.natural_orbitals == b.natural_orbitals && a.imsrg == b.imsrg &&
+           a.imsrg3 == b.imsrg3 && a.operators == b.operators &&
+           a.output == b.output;
   }
 };
 

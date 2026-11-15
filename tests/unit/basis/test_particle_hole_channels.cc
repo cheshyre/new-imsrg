@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Unit tests of ParticleHoleChannels (design/reference/01 sections 2.2-2.3). The expected
-// structure is rebuilt by brute force from the orbits; the golden comparison lives in
-// test_golden_basis.cc.
+// Unit tests of ParticleHoleChannels (design/reference/01 sections 2.2-2.3).
+// The expected structure is rebuilt by brute force from the orbits; the golden
+// comparison lives in test_golden_basis.cc.
 #include <algorithm>
 #include <cstdlib>
 #include <vector>
@@ -28,7 +28,8 @@ TEST(ParticleHoleChannels, CountsMatchTheNormalChannels) {
     EXPECT_EQ(ph.num_kets(), tb.num_kets());
     EXPECT_EQ(ph.max_J(), tb.max_J());
     EXPECT_EQ(ph.num_channels(), 6 * (tb.max_J() + 1));
-    EXPECT_EQ(static_cast<std::int32_t>(ph.channels().size()), ph.num_channels());
+    EXPECT_EQ(static_cast<std::int32_t>(ph.channels().size()),
+              ph.num_channels());
   }
 }
 
@@ -77,7 +78,8 @@ TEST(ParticleHoleChannels, DiagonalKetsAppearForEveryJ) {
   const auto basis = make_basis(2);
   const TwoBodyChannels tb(basis);
   const ParticleHoleChannels ph(tb);
-  // Orbit 0 is 0s1/2: the diagonal ket |00> has J = 0 and 1 (no Pauli rule), and nothing else.
+  // Orbit 0 is 0s1/2: the diagonal ket |00> has J = 0 and 1 (no Pauli rule),
+  // and nothing else.
   const OrbitIndex o{0};
   const KetIndex k = imsrgpp_ket_index(o, o, tb.num_orbits());
   for (const std::int32_t J : {0, 1}) {
@@ -96,7 +98,9 @@ TEST(ParticleHoleChannels, FindChannelAndChannelOf) {
   EXPECT_EQ(ch->value(), 6 * 2 + 2 * 2 + 1);
   EXPECT_FALSE(ph.find_channel(TwoJ{3}, Parity::Odd, TwoTz{2}).has_value());
   EXPECT_FALSE(ph.find_channel(TwoJ{-2}, Parity::Odd, TwoTz{2}).has_value());
-  EXPECT_FALSE(ph.find_channel(TwoJ{2 * (ph.max_J() + 1)}, Parity::Even, TwoTz{0}).has_value());
+  EXPECT_FALSE(
+      ph.find_channel(TwoJ{2 * (ph.max_J() + 1)}, Parity::Even, TwoTz{0})
+          .has_value());
   EXPECT_FALSE(ph.find_channel(TwoJ{2}, Parity::Even, TwoTz{1}).has_value());
 }
 
@@ -110,8 +114,8 @@ TEST(ParticleHoleChannels, PairIndexHandlesBothOrdersAndAbsence) {
     const std::int32_t nk = ph.channel(c).num_kets;
     for (std::int32_t p = 0; p < n; ++p) {
       for (std::int32_t q = 0; q < n; ++q) {
-        const KetIndex k =
-            imsrgpp_ket_index(OrbitIndex{std::min(p, q)}, OrbitIndex{std::max(p, q)}, n);
+        const KetIndex k = imsrgpp_ket_index(OrbitIndex{std::min(p, q)},
+                                             OrbitIndex{std::max(p, q)}, n);
         const auto sorted = ph.local_index(c, k);
         const auto got = ph.pair_index(c, OrbitIndex{p}, OrbitIndex{q});
         if (!sorted) {

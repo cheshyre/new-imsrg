@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Golden OperatorDump files: byte-exact round trip through our reader and writer.
+// Golden OperatorDump files: byte-exact round trip through our reader and
+// writer.
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
@@ -21,8 +22,9 @@ using namespace imsrg;
 using namespace imsrg::op;
 namespace fs = std::filesystem;
 
-const char* const kDirs[] = {"hamiltonian/emax2_O16", "hf/emax2_O16_2N", "hf/emax2_O16_2N3N",
-                             "commutator/emax2_O16", "operator/emax2"};
+const char* const kDirs[] = {"hamiltonian/emax2_O16", "hf/emax2_O16_2N",
+                             "hf/emax2_O16_2N3N", "commutator/emax2_O16",
+                             "operator/emax2"};
 
 std::vector<fs::path> golden_dumps() {
   std::vector<fs::path> out;
@@ -53,8 +55,9 @@ TEST(GoldenDumps, EveryDumpRoundTripsByteForByte) {
     const auto ms = model_space_for_dump(h);
     const Operator op = read_operator_dump(p, ms);
     std::ostringstream os;
-    write_operator_dump(os, op,
-                        OperatorDumpWriteOptions{.source = h.source, .reference = h.reference});
+    write_operator_dump(
+        os, op,
+        OperatorDumpWriteOptions{.source = h.source, .reference = h.reference});
     EXPECT_EQ(os.str(), slurp(p));
   }
 }
@@ -62,7 +65,8 @@ TEST(GoldenDumps, EveryDumpRoundTripsByteForByte) {
 class GoldenH : public ::testing::Test {
  protected:
   void SetUp() override {
-    const fs::path p = fs::path(IMSRG_GOLDEN_DIR) / "hamiltonian/emax2_O16/H.dump";
+    const fs::path p =
+        fs::path(IMSRG_GOLDEN_DIR) / "hamiltonian/emax2_O16/H.dump";
     ms = model_space_for_dump(read_operator_dump_header(p));
     op = std::make_unique<Operator>(read_operator_dump(p, ms));
   }
@@ -72,7 +76,8 @@ class GoldenH : public ::testing::Test {
 
 TEST_F(GoldenH, OneBodySpotValues) {
   EXPECT_EQ(op->one_body().get(OrbitIndex{0}, OrbitIndex{0}), 11.25);
-  EXPECT_EQ(op->one_body().get(OrbitIndex{0}, OrbitIndex{10}), 9.1855865354369168);
+  EXPECT_EQ(op->one_body().get(OrbitIndex{0}, OrbitIndex{10}),
+            9.1855865354369168);
 }
 
 TEST_F(GoldenH, TwoBodyNormalizedInBothOrbitOrders) {

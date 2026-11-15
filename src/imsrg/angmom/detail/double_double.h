@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Private, host-only double-double (dd) arithmetic: a value is the unevaluated sum hi + lo with
-// |lo| <= ulp(hi)/2, giving about 106 bits (~32 decimal digits). Built from the classic exact
-// error-free transformations (Knuth two_sum, fma-based two_prod). Requires strict IEEE
-// evaluation: do not compile with -ffast-math. Not part of the public API.
+// Private, host-only double-double (dd) arithmetic: a value is the unevaluated
+// sum hi + lo with |lo| <= ulp(hi)/2, giving about 106 bits (~32 decimal
+// digits). Built from the classic exact error-free transformations (Knuth
+// two_sum, fma-based two_prod). Requires strict IEEE evaluation: do not compile
+// with -ffast-math. Not part of the public API.
 #ifndef IMSRG_ANGMOM_DETAIL_DOUBLE_DOUBLE_H_
 #define IMSRG_ANGMOM_DETAIL_DOUBLE_DOUBLE_H_
 
@@ -63,7 +64,8 @@ inline DD operator*(DD a, DD b) noexcept {
   return quick_two_sum(p.hi, p.lo);
 }
 
-/// dd division by long division: three quotient doubles with dd remainders. b must be nonzero.
+/// dd division by long division: three quotient doubles with dd remainders. b
+/// must be nonzero.
 inline DD operator/(DD a, DD b) noexcept {
   const double q1 = a.hi / b.hi;
   DD r = a - b * dd(q1);
@@ -74,7 +76,8 @@ inline DD operator/(DD a, DD b) noexcept {
   return q + dd(q3);
 }
 
-/// Square root: s = sqrt(hi), then one dd Newton step s + (x - s^2) / (2 s). Returns 0 for x <= 0.
+/// Square root: s = sqrt(hi), then one dd Newton step s + (x - s^2) / (2 s).
+/// Returns 0 for x <= 0.
 inline DD dd_sqrt(DD x) noexcept {
   if (x.hi <= 0.0) {
     return {};
@@ -85,7 +88,9 @@ inline DD dd_sqrt(DD x) noexcept {
 }
 
 /// Scales by 2^k exactly (barring over/underflow).
-inline DD dd_ldexp(DD a, int k) noexcept { return {std::ldexp(a.hi, k), std::ldexp(a.lo, k)}; }
+inline DD dd_ldexp(DD a, int k) noexcept {
+  return {std::ldexp(a.hi, k), std::ldexp(a.lo, k)};
+}
 
 /// Rounds to the nearest double.
 inline double to_double(DD a) noexcept { return a.hi + a.lo; }

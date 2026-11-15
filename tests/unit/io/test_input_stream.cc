@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// TextInput / GzipWriter: plain and gzip tokens, header skip, malformed tokens, float parsing.
+// TextInput / GzipWriter: plain and gzip tokens, header skip, malformed tokens,
+// float parsing.
+#include <unistd.h>
+
 #include <bit>
 #include <cstdint>
 #include <cstdio>
@@ -13,7 +16,6 @@
 #include <vector>
 
 #include <gtest/gtest.h>
-#include <unistd.h>
 
 #include "imsrg/base/error.h"
 #include "imsrg/io/input_stream.h"
@@ -26,7 +28,8 @@ namespace fs = std::filesystem;
 
 fs::path temp_path(const std::string& name) {
   // Per-process names: ctest runs every test in its own process, in parallel.
-  return fs::temp_directory_path() / ("imsrg_io_test_" + std::to_string(::getpid()) + "_" + name);
+  return fs::temp_directory_path() /
+         ("imsrg_io_test_" + std::to_string(::getpid()) + "_" + name);
 }
 
 void write_plain(const fs::path& p, const std::string& text) {
@@ -49,7 +52,8 @@ std::vector<std::string> tokens(const fs::path& p, bool skip_header) {
   return out;
 }
 
-const char* const kText = "header line with words 1 2 3\n 1.5  -2.25e1\t+3\n\n4.0e-3 5 \r\n6";
+const char* const kText =
+    "header line with words 1 2 3\n 1.5  -2.25e1\t+3\n\n4.0e-3 5 \r\n6";
 
 TEST(InputStream, PlainAndGzipGiveIdenticalTokens) {
   const auto plain = temp_path("plain.txt");
@@ -59,7 +63,8 @@ TEST(InputStream, PlainAndGzipGiveIdenticalTokens) {
   const auto a = tokens(plain, true);
   const auto b = tokens(gz, true);
   EXPECT_EQ(a, b);
-  const std::vector<std::string> expected{"1.5", "-2.25e1", "+3", "4.0e-3", "5", "6"};
+  const std::vector<std::string> expected{"1.5",    "-2.25e1", "+3",
+                                          "4.0e-3", "5",       "6"};
   EXPECT_EQ(a, expected);
   fs::remove(plain);
   fs::remove(gz);
@@ -176,14 +181,16 @@ TEST(InputStream, FloatParsingIsBitIdenticalToIstreamExtraction) {
   text << "header\n";
   std::vector<std::string> strs;
   for (int i = 0; i < 5000; ++i) {
-    // Seven significant digits, optional sign, optional exponent: the me2j number format.
+    // Seven significant digits, optional sign, optional exponent: the me2j
+    // number format.
     std::string s;
     if (rng() % 2 == 0) s += '-';
     s += std::to_string(rng() % 10);
     s += '.';
     for (int d = 0; d < 6; ++d) s += static_cast<char>('0' + rng() % 10);
     if (rng() % 3 == 0)
-      s += "e" + std::string(rng() % 2 == 0 ? "-" : "+") + "0" + std::to_string(rng() % 9 + 1);
+      s += "e" + std::string(rng() % 2 == 0 ? "-" : "+") + "0" +
+           std::to_string(rng() % 9 + 1);
     strs.push_back(s);
     text << s << (i % 4 == 3 ? '\n' : ' ');
   }
@@ -197,7 +204,9 @@ TEST(InputStream, FloatParsingIsBitIdenticalToIstreamExtraction) {
     float want = 0.0F;
     std::istringstream is(s);
     is >> want;
-    ASSERT_EQ(std::bit_cast<std::uint32_t>(got), std::bit_cast<std::uint32_t>(want)) << s;
+    ASSERT_EQ(std::bit_cast<std::uint32_t>(got),
+              std::bit_cast<std::uint32_t>(want))
+        << s;
   }
   float extra = 0.0F;
   EXPECT_FALSE(in.next_float(extra));

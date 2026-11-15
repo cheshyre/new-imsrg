@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// The `imsrg` executable: CLI11 command line -> imsrg::driver (design/16 section 2.12).
-// Exit codes: 0 ok, 1 runtime failure, 2 configuration error, 3 input file error.
+// The `imsrg` executable: CLI11 command line -> imsrg::driver (design/16
+// section 2.12). Exit codes: 0 ok, 1 runtime failure, 2 configuration error, 3
+// input file error.
 #include <exception>
 #include <filesystem>
 #include <iostream>
@@ -23,11 +24,12 @@
 namespace {
 
 constexpr const char* kLegacyHint =
-    "Legacy key=value mode: imsrg key=value ... (old keys and their new names: imsrg "
+    "Legacy key=value mode: imsrg key=value ... (old keys and their new names: "
+    "imsrg "
     "--legacy-keys)";
 
-/// The command line as recorded in the provenance: arguments joined by spaces; those containing
-/// whitespace or quotes are single-quoted.
+/// The command line as recorded in the provenance: arguments joined by spaces;
+/// those containing whitespace or quotes are single-quoted.
 std::string join_command_line(int argc, char** argv) {
   std::string out;
   for (int i = 0; i < argc; ++i) {
@@ -63,16 +65,23 @@ int main(int argc, char** argv) {
   bool list_operators = false;
   bool legacy_keys = false;
 
-  auto* config_opt = app.add_option("--config", config_file, "TOML configuration file");
-  app.add_option("--set", set_overrides, "Override one value: section.key=value (repeatable)")
+  auto* config_opt =
+      app.add_option("--config", config_file, "TOML configuration file");
+  app.add_option("--set", set_overrides,
+                 "Override one value: section.key=value (repeatable)")
       ->expected(1)
       ->multi_option_policy(CLI::MultiOptionPolicy::TakeAll)
       ->type_name("KEY=VALUE");
-  app.add_flag("--validate", validate, "Resolve and validate the configuration, write nothing");
-  app.add_flag("--print-config", print_config, "Print the resolved configuration as TOML");
-  app.add_flag("--list-operators", list_operators, "List the operator names and exit");
-  app.add_flag("--legacy-keys", legacy_keys, "List the legacy key=value keys and exit");
-  app.add_option("tokens", tokens, "Legacy key=value arguments")->type_name("KEY=VALUE");
+  app.add_flag("--validate", validate,
+               "Resolve and validate the configuration, write nothing");
+  app.add_flag("--print-config", print_config,
+               "Print the resolved configuration as TOML");
+  app.add_flag("--list-operators", list_operators,
+               "List the operator names and exit");
+  app.add_flag("--legacy-keys", legacy_keys,
+               "List the legacy key=value keys and exit");
+  app.add_option("tokens", tokens, "Legacy key=value arguments")
+      ->type_name("KEY=VALUE");
 
   for (int i = 1; i < argc; ++i) {
     const std::string a = argv[i];
@@ -109,12 +118,13 @@ int main(int argc, char** argv) {
 
   auto loaded = imsrg::driver::load_config(sources);
   if (!loaded) {
-    // Exit 3 if only input files are at fault (unreadable config file, missing input files).
+    // Exit 3 if only input files are at fault (unreadable config file, missing
+    // input files).
     bool all_input = true;
     for (const auto& issue : loaded.error()) {
       std::cerr << "imsrg: " << issue.to_string() << "\n";
-      if (issue.severity == imsrg::driver::Severity::Error && issue.code != "V-14" &&
-          issue.code != "E-FILE") {
+      if (issue.severity == imsrg::driver::Severity::Error &&
+          issue.code != "V-14" && issue.code != "E-FILE") {
         all_input = false;
       }
     }
@@ -135,8 +145,8 @@ int main(int argc, char** argv) {
   }
 
   try {
-    // MPI first, Kokkos second (design/10 section 4); both live only around the pipeline, which
-    // destroys all operators before they finalize.
+    // MPI first, Kokkos second (design/10 section 4); both live only around the
+    // pipeline, which destroys all operators before they finalize.
     imsrg::comm::Environment environment(argc, argv);
     imsrg::exec::Runtime runtime(argc, argv);
     imsrg::driver::run(config);

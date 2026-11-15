@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Tests of the OperatorDump v1 reader and writer: round trips and one test per reader error.
+// Tests of the OperatorDump v1 reader and writer: round trips and one test per
+// reader error.
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
@@ -23,18 +24,20 @@ using namespace imsrg;
 using namespace imsrg::op;
 
 std::shared_ptr<const basis::ModelSpace> make_ms(int emax = 1) {
-  return basis::ModelSpace::from_names(basis::BasisTruncation{.emax = emax}, 16.0, "O16", "O16");
+  return basis::ModelSpace::from_names(basis::BasisTruncation{.emax = emax},
+                                       16.0, "O16", "O16");
 }
 
 /// Deterministic pseudo-value for index pair (i, j) in channel ch, never zero.
 double val(std::size_t ch, std::size_t i, std::size_t j) {
-  return 0.25 + 0.125 * static_cast<double>(ch) + 0.03125 * static_cast<double>(i) -
-         0.0625 * static_cast<double>(j) + 1.0 / 3.0;
+  return 0.25 + 0.125 * static_cast<double>(ch) +
+         0.03125 * static_cast<double>(i) - 0.0625 * static_cast<double>(j) +
+         1.0 / 3.0;
 }
 
-/// Fills `op` with values obeying its hermiticity (H: symmetric, A: antisymmetric with zero
-/// diagonal, N: no relation) and the scalar one-body selection rule, written with explicit raw
-/// sets.
+/// Fills `op` with values obeying its hermiticity (H: symmetric, A:
+/// antisymmetric with zero diagonal, N: no relation) and the scalar one-body
+/// selection rule, written with explicit raw sets.
 void fill(Operator& op) {
   const auto sgn = hermiticity_sign(op.spec().hermiticity);
   const auto& ms = op.model_space();
@@ -47,9 +50,12 @@ void fill(Operator& op) {
       if (sgn == -1 && a == b) v = 0.0;
       if (a == 1 && b == 4) v = 0.0;  // exercise the nonzero-only filter
       if (sgn != 0 && a == 4 && b == 1) v = 0.0;
-      // Scalar selection rule: only orbits with equal (l, 2j, tz2) are connected.
-      const auto& oa = ms.basis().orbit(OrbitIndex{static_cast<std::int32_t>(a)});
-      const auto& ob = ms.basis().orbit(OrbitIndex{static_cast<std::int32_t>(b)});
+      // Scalar selection rule: only orbits with equal (l, 2j, tz2) are
+      // connected.
+      const auto& oa =
+          ms.basis().orbit(OrbitIndex{static_cast<std::int32_t>(a)});
+      const auto& ob =
+          ms.basis().orbit(OrbitIndex{static_cast<std::int32_t>(b)});
       if (oa.l != ob.l || oa.j2 != ob.j2 || oa.tz2 != ob.tz2) v = 0.0;
       op.one_body().set_element(OrbitIndex{static_cast<std::int32_t>(a)},
                                 OrbitIndex{static_cast<std::int32_t>(b)}, v);
@@ -74,7 +80,8 @@ void fill(Operator& op) {
   }
 }
 
-Operator make_op(const std::shared_ptr<const basis::ModelSpace>& ms, int rank, Hermiticity h) {
+Operator make_op(const std::shared_ptr<const basis::ModelSpace>& ms, int rank,
+                 Hermiticity h) {
   Operator op(ms, OperatorSpec::scalar(rank, h));
   fill(op);
   op.sync_to_device();
@@ -87,7 +94,8 @@ std::string write_text(const Operator& op) {
   return os.str();
 }
 
-Operator read_text(const std::string& text, const std::shared_ptr<const basis::ModelSpace>& ms,
+Operator read_text(const std::string& text,
+                   const std::shared_ptr<const basis::ModelSpace>& ms,
                    const OperatorDumpReadOptions& o = {}) {
   std::istringstream is(text);
   return read_operator_dump(is, "mem", ms, o);
@@ -108,7 +116,8 @@ std::string join_lines(const std::vector<std::string>& v) {
 }
 
 /// Index (0-based) of the first line starting with `prefix`.
-std::size_t find_line(const std::vector<std::string>& v, const std::string& prefix) {
+std::size_t find_line(const std::vector<std::string>& v,
+                      const std::string& prefix) {
   for (std::size_t i = 0; i < v.size(); ++i) {
     if (v[i].rfind(prefix, 0) == 0) return i;
   }
@@ -125,11 +134,13 @@ void expect_error_at(const std::string& text, std::size_t line,
     ADD_FAILURE() << "expected InputError at line " << line;
   } catch (const InputError& e) {
     const std::string want = "mem:" + std::to_string(line) + ":";
-    EXPECT_EQ(std::string(e.what()).rfind(want, 0), 0U) << e.what() << " (wanted " << want << ")";
+    EXPECT_EQ(std::string(e.what()).rfind(want, 0), 0U)
+        << e.what() << " (wanted " << want << ")";
   }
 }
 
-class DumpRoundTrip : public ::testing::TestWithParam<std::pair<Hermiticity, int>> {};
+class DumpRoundTrip
+    : public ::testing::TestWithParam<std::pair<Hermiticity, int>> {};
 
 TEST_P(DumpRoundTrip, WriterReaderIdentity) {
   const auto ms = make_ms();
@@ -143,15 +154,17 @@ TEST_P(DumpRoundTrip, WriterReaderIdentity) {
   EXPECT_EQ(write_text(back), text);
 }
 
-INSTANTIATE_TEST_SUITE_P(Variants, DumpRoundTrip,
-                         ::testing::Values(std::pair{Hermiticity::Hermitian, 2},
-                                           std::pair{Hermiticity::AntiHermitian, 2},
-                                           std::pair{Hermiticity::NonHermitian, 2},
-                                           std::pair{Hermiticity::Hermitian, 1}));
+INSTANTIATE_TEST_SUITE_P(
+    Variants, DumpRoundTrip,
+    ::testing::Values(std::pair{Hermiticity::Hermitian, 2},
+                      std::pair{Hermiticity::AntiHermitian, 2},
+                      std::pair{Hermiticity::NonHermitian, 2},
+                      std::pair{Hermiticity::Hermitian, 1}));
 
 TEST(OperatorDump, WriterRecordsAndFormat) {
   const auto ms = make_ms();
-  const auto lines = split_lines(write_text(make_op(ms, 2, Hermiticity::Hermitian)));
+  const auto lines =
+      split_lines(write_text(make_op(ms, 2, Hermiticity::Hermitian)));
   EXPECT_EQ(lines.front(), "# imsrg-operator-dump v1");
   EXPECT_EQ(lines[1], "source unit test");
   EXPECT_EQ(lines[2], "basis emax 1 lmax 1 hw 16");
@@ -168,15 +181,17 @@ TEST(OperatorDump, WriterRecordsAndFormat) {
 TEST(OperatorDump, WriterReferenceOverride) {
   const auto ms = make_ms();
   std::ostringstream os;
-  write_operator_dump(os, make_op(ms, 1, Hermiticity::Hermitian),
-                      OperatorDumpWriteOptions{.source = "s", .reference = "Custom"});
+  write_operator_dump(
+      os, make_op(ms, 1, Hermiticity::Hermitian),
+      OperatorDumpWriteOptions{.source = "s", .reference = "Custom"});
   EXPECT_NE(os.str().find("\nreference Custom\n"), std::string::npos);
 }
 
 TEST(OperatorDump, HeaderAndModelSpaceRoundTrip) {
   const auto ms = make_ms();
   const std::string text = write_text(make_op(ms, 2, Hermiticity::Hermitian));
-  const auto path = std::filesystem::temp_directory_path() / "imsrg_dump_header_test.dump";
+  const auto path =
+      std::filesystem::temp_directory_path() / "imsrg_dump_header_test.dump";
   {
     std::ofstream f(path);
     f << text;
@@ -200,7 +215,9 @@ TEST(OperatorDump, ReadsSmallerDumpIntoLargerModelSpace) {
   const Operator small = make_op(ms2, 2, Hermiticity::Hermitian);
   const Operator big = read_text(write_text(small), ms4);
   const auto& tbc = ms2->two_body();
-  auto map = [&](OrbitIndex a) { return *ms4->basis().find(ms2->basis().orbit(a)); };
+  auto map = [&](OrbitIndex a) {
+    return *ms4->basis().find(ms2->basis().orbit(a));
+  };
   int checked = 0;
   for (std::int32_t c = 0; c < tbc.num_channels(); ++c) {
     const ChannelIndex ch{c};
@@ -210,7 +227,8 @@ TEST(OperatorDump, ReadsSmallerDumpIntoLargerModelSpace) {
         const auto bk = tbc.ket(ki);
         const auto kk = tbc.ket(kj);
         const TwoJ J = tbc.channel(ch).two_j;
-        EXPECT_EQ(big.two_body().get_normalized(map(bk.p), map(bk.q), map(kk.p), map(kk.q), J),
+        EXPECT_EQ(big.two_body().get_normalized(map(bk.p), map(bk.q), map(kk.p),
+                                                map(kk.q), J),
                   small.two_body().get_normalized(bk.p, bk.q, kk.p, kk.q, J));
         ++checked;
       }
@@ -260,7 +278,8 @@ TEST_F(DumpErrors, WrongCount) {
   const auto k = find_line(lines, "one_body ");
   const auto n = std::stoul(lines[k].substr(9));
   lines[k] = "one_body " + std::to_string(n - 1);
-  // The last one-body entry (the line before "two_body") is read where "two_body" is expected.
+  // The last one-body entry (the line before "two_body") is read where
+  // "two_body" is expected.
   expect_error_at(join_lines(lines), find_line(lines, "two_body "), ms);
 }
 

@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Tests of the validation table (design/16 section 6.1) through `resolve` and `validate`.
+// Tests of the validation table (design/16 section 6.1) through `resolve` and
+// `validate`.
+#include <unistd.h>
+
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -12,7 +15,6 @@
 #include <vector>
 
 #include <gtest/gtest.h>
-#include <unistd.h>
 
 #include "imsrg/driver/config/resolve.h"
 
@@ -31,7 +33,8 @@ RawValue::Data B(bool v) { return v; }
 /// `operators.from_file` with one entry whose dTz is `dtz` (V-62 rows).
 RawValue::Data from_file_entry(std::int64_t dtz) {
   auto val = [](RawValue::Data d) {
-    return RawValue{std::move(d), SourceRef{SourceRef::Kind::TomlString, "test", 3, 1}};
+    return RawValue{std::move(d),
+                    SourceRef{SourceRef::Kind::TomlString, "test", 3, 1}};
   };
   RawTable entry{{"name", val(std::string("op"))},
                  {"dtz", val(dtz)},
@@ -42,7 +45,8 @@ RawValue::Data from_file_entry(std::int64_t dtz) {
 RawTree minimal() {
   RawTree t;
   auto set = [&](const char* p, RawValue::Data d) {
-    t.set(p, RawValue{std::move(d), SourceRef{SourceRef::Kind::TomlString, "test", 1, 1}});
+    t.set(p, RawValue{std::move(d),
+                      SourceRef{SourceRef::Kind::TomlString, "test", 1, 1}});
   };
   set("basis.emax", I(4));
   set("basis.hw", I(16));
@@ -54,12 +58,14 @@ RawTree minimal() {
 
 RawTree with(RawTree t, std::initializer_list<Entry> extra) {
   for (const auto& [path, data] : extra) {
-    t.set(path, RawValue{data, SourceRef{SourceRef::Kind::TomlString, "test", 2, 1}});
+    t.set(path,
+          RawValue{data, SourceRef{SourceRef::Kind::TomlString, "test", 2, 1}});
   }
   return t;
 }
 
-const ConfigIssue* find_issue(const ConfigIssues& issues, const std::string& code,
+const ConfigIssue* find_issue(const ConfigIssues& issues,
+                              const std::string& code,
                               const std::string& key = "") {
   for (const auto& i : issues) {
     if (i.code == code && (key.empty() || i.key_path == key)) return &i;
@@ -78,8 +84,18 @@ struct Row {
 
 std::vector<Row> rows() {
   return {
-      {"V02_hw_positive", {{"basis.hw", D(-1.0)}}, "V-02", "basis.hw", "must be > 0", false},
-      {"V02_steps", {{"imsrg.steps", I(3)}}, "V-02", "imsrg.steps", "must be 1 or 2", false},
+      {"V02_hw_positive",
+       {{"basis.hw", D(-1.0)}},
+       "V-02",
+       "basis.hw",
+       "must be > 0",
+       false},
+      {"V02_steps",
+       {{"imsrg.steps", I(3)}},
+       "V-02",
+       "imsrg.steps",
+       "must be 1 or 2",
+       false},
       {"V02_dsmax",
        {{"imsrg.step.dsmax", D(0.0)}},
        "V-02",
@@ -104,7 +120,12 @@ std::vector<Row> rows() {
        "interaction.two_body.e2max",
        "smaller than 2*basis.emax",
        false},
-      {"V12_lmax", {{"basis.lmax", I(20)}}, "V-12", "basis.lmax", "exceeds", false},
+      {"V12_lmax",
+       {{"basis.lmax", I(20)}},
+       "V-12",
+       "basis.lmax",
+       "exceeds",
+       false},
       {"V13_three_body_e1max",
        {{"interaction.three_body.file", S("f.me3j")},
         {"interaction.three_body.e1max", I(2)},
@@ -122,7 +143,8 @@ std::vector<Row> rows() {
        "exceeds interaction.three_body.e3max",
        false},
       {"V20_trap_needs_lab",
-       {{"hamiltonian.trap_hw", D(20.0)}, {"hamiltonian.kinetic", S("intrinsic")}},
+       {{"hamiltonian.trap_hw", D(20.0)},
+        {"hamiltonian.kinetic", S("intrinsic")}},
        "V-20",
        "hamiltonian.trap_hw",
        "requires hamiltonian.kinetic",
@@ -134,7 +156,8 @@ std::vector<Row> rows() {
        "requires basis.kind",
        true},
       {"V22_freeze_oscillator",
-       {{"basis.kind", S("oscillator")}, {"hartree_fock.freeze_occupations", B(true)}},
+       {{"basis.kind", S("oscillator")},
+        {"hartree_fock.freeze_occupations", B(true)}},
        "V-22",
        "hartree_fock.freeze_occupations",
        "no effect",
@@ -180,7 +203,8 @@ std::vector<Row> rows() {
        "not set",
        true},
       {"V43_delta_orbit_garbage",
-       {{"imsrg.denominator.delta", D(0.5)}, {"imsrg.denominator.delta_orbit", S("zzz")}},
+       {{"imsrg.denominator.delta", D(0.5)},
+        {"imsrg.denominator.delta_orbit", S("zzz")}},
        "V-43",
        "imsrg.denominator.delta_orbit",
        "neither",
@@ -288,16 +312,19 @@ TEST(Validate, table_of_rules) {
   for (const auto& row : rows()) {
     SCOPED_TRACE(row.name);
     RawTree t = minimal();
-    // Rows that set no reference.nucleus rely on `extra` to override the minimal tree.
+    // Rows that set no reference.nucleus rely on `extra` to override the
+    // minimal tree.
     for (const auto& [path, data] : row.extra) {
-      t.set(path, RawValue{data, SourceRef{SourceRef::Kind::TomlString, "test", 2, 1}});
+      t.set(path, RawValue{data, SourceRef{SourceRef::Kind::TomlString, "test",
+                                           2, 1}});
     }
     const auto r = resolve(t, ResolveOptions{false, false});
     const auto* i = find_issue(r.issues, row.code, row.key);
     ASSERT_NE(i, nullptr) << "missing " << row.code << " at " << row.key;
     EXPECT_NE(i->message.find(row.fragment), std::string::npos) << i->message;
     const bool is_warning_rule =
-        std::string(row.code) == "W-Q11" || std::string(row.name) == "V22_freeze_oscillator";
+        std::string(row.code) == "W-Q11" ||
+        std::string(row.name) == "V22_freeze_oscillator";
     if (!is_warning_rule && std::string(row.name) != "V52_at_end_without_3n") {
       EXPECT_EQ(i->severity, Severity::Error);
     }
@@ -311,7 +338,8 @@ TEST(Validate, legacy_downgrades_selected_rules_to_warnings) {
     SCOPED_TRACE(row.name);
     RawTree t = minimal();
     for (const auto& [path, data] : row.extra) {
-      t.set(path, RawValue{data, SourceRef{SourceRef::Kind::TomlString, "test", 2, 1}});
+      t.set(path, RawValue{data, SourceRef{SourceRef::Kind::TomlString, "test",
+                                           2, 1}});
     }
     const auto r = resolve(t, ResolveOptions{true, false});
     const auto* i = find_issue(r.issues, row.code, row.key);
@@ -324,7 +352,8 @@ TEST(Validate, legacy_downgrades_selected_rules_to_warnings) {
 }
 
 TEST(Validate, warning_rules_stay_warnings_without_legacy) {
-  const auto r = resolve(with(minimal(), {{"imsrg3.at_end", B(true)}}), {false, false});
+  const auto r =
+      resolve(with(minimal(), {{"imsrg3.at_end", B(true)}}), {false, false});
   const auto* i = find_issue(r.issues, "W-Q11");
   ASSERT_NE(i, nullptr);
   EXPECT_EQ(i->severity, Severity::Warning);
@@ -346,7 +375,8 @@ TEST(Validate, v32_occupations_file_without_reference_or_valence) {
 }
 
 TEST(Validate, v22_only_when_explicitly_set) {
-  const auto quiet = resolve(with(minimal(), {{"basis.kind", S("oscillator")}}), {false, false});
+  const auto quiet = resolve(with(minimal(), {{"basis.kind", S("oscillator")}}),
+                             {false, false});
   EXPECT_EQ(find_issue(quiet.issues, "V-22"), nullptr);
 }
 
@@ -362,12 +392,15 @@ TEST(Validate, independent_errors_accumulate) {
   EXPECT_NE(find_issue(r.issues, "V-01", "valence.space"), nullptr);
   EXPECT_NE(find_issue(r.issues, "V-63", "output.stem"), nullptr);
   int errors = 0;
-  for (const auto& i : r.issues) errors += i.severity == Severity::Error ? 1 : 0;
+  for (const auto& i : r.issues)
+    errors += i.severity == Severity::Error ? 1 : 0;
   EXPECT_GE(errors, 4);
 }
 
-TEST(Validate, unknown_valence_space_suggests_nearest_and_single_reference_hint) {
-  const auto r = resolve(with(minimal(), {{"valence.space", S("sd-shel")}}), {false, false});
+TEST(Validate,
+     unknown_valence_space_suggests_nearest_and_single_reference_hint) {
+  const auto r = resolve(with(minimal(), {{"valence.space", S("sd-shel")}}),
+                         {false, false});
   const auto* i = find_issue(r.issues, "V-01", "valence.space");
   ASSERT_NE(i, nullptr);
   ASSERT_TRUE(i->suggestion.has_value());
@@ -384,9 +417,10 @@ TEST(Validate, valid_tree_has_no_errors) {
 }
 
 TEST(Validate, valid_single_stage_and_two_stage_trees_have_no_errors) {
-  const auto two = resolve(
-      with(minimal(), {{"valence.space", S("sd-shell")}, {"imsrg.generator.core", S("atan")}}),
-      {false, false});
+  const auto two =
+      resolve(with(minimal(), {{"valence.space", S("sd-shell")},
+                               {"imsrg.generator.core", S("atan")}}),
+              {false, false});
   EXPECT_FALSE(has_errors(two.issues));
   EXPECT_EQ(two.config.imsrg.steps, 2);
 }
@@ -396,7 +430,8 @@ TEST(Validate, valid_single_stage_and_two_stage_trees_have_no_errors) {
 class FileChecks : public ::testing::Test {
  protected:
   void SetUp() override {
-    dir_ = fs::temp_directory_path() / ("imsrg_validate_" + std::to_string(::getpid()));
+    dir_ = fs::temp_directory_path() /
+           ("imsrg_validate_" + std::to_string(::getpid()));
     fs::create_directories(dir_);
     std::ofstream(dir_ / "x.me2j") << "data\n";
   }
@@ -405,8 +440,10 @@ class FileChecks : public ::testing::Test {
     fs::remove_all(dir_, ec);
   }
   RawTree tree(const fs::path& file, const fs::path& out) {
-    return with(minimal(), {{"interaction.two_body.file", RawValue::Data(file.generic_string())},
-                            {"output.directory", RawValue::Data(out.generic_string())}});
+    return with(
+        minimal(),
+        {{"interaction.two_body.file", RawValue::Data(file.generic_string())},
+         {"output.directory", RawValue::Data(out.generic_string())}});
   }
   fs::path dir_;
 };
@@ -430,25 +467,31 @@ TEST_F(FileChecks, directory_as_input_file_is_v14) {
 }
 
 TEST_F(FileChecks, output_directory_under_a_regular_file_is_v14) {
-  const auto r = resolve(tree(dir_ / "x.me2j", dir_ / "x.me2j" / "sub"), {false, true});
+  const auto r =
+      resolve(tree(dir_ / "x.me2j", dir_ / "x.me2j" / "sub"), {false, true});
   EXPECT_NE(find_issue(r.issues, "V-14", "output.directory"), nullptr);
 }
 
 TEST_F(FileChecks, missing_operator_and_occupation_files_are_v14) {
   RawTable e;
   e.emplace_back("name", RawValue{S("Rsq"), {}});
-  e.emplace_back("file_2b", RawValue{RawValue::Data((dir_ / "r2.me2j").generic_string()), {}});
+  e.emplace_back(
+      "file_2b",
+      RawValue{RawValue::Data((dir_ / "r2.me2j").generic_string()), {}});
   auto t = tree(dir_ / "x.me2j", dir_ / "out");
   t.set("operators.from_file", RawValue{RawArray{RawValue{e, {}}}, {}});
   t.set("reference.occupations_file",
         RawValue{RawValue::Data((dir_ / "occ.txt").generic_string()), {}});
   const auto r = resolve(t, {false, true});
-  EXPECT_NE(find_issue(r.issues, "V-14", "operators.from_file[0].file_2b"), nullptr);
-  EXPECT_NE(find_issue(r.issues, "V-14", "reference.occupations_file"), nullptr);
+  EXPECT_NE(find_issue(r.issues, "V-14", "operators.from_file[0].file_2b"),
+            nullptr);
+  EXPECT_NE(find_issue(r.issues, "V-14", "reference.occupations_file"),
+            nullptr);
 }
 
 TEST_F(FileChecks, files_are_not_touched_when_check_files_is_off) {
-  const auto r = resolve(tree(dir_ / "nope.me2j", dir_ / "out"), {false, false});
+  const auto r =
+      resolve(tree(dir_ / "nope.me2j", dir_ / "out"), {false, false});
   EXPECT_EQ(find_issue(r.issues, "V-14"), nullptr);
 }
 

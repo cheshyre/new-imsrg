@@ -25,7 +25,8 @@ void Environment::init(int* argc, char*** argv) {
     MPI_Query_thread(&thread_level_);
     return;
   }
-  if (MPI_Init_thread(argc, argv, MPI_THREAD_FUNNELED, &thread_level_) != MPI_SUCCESS) {
+  if (MPI_Init_thread(argc, argv, MPI_THREAD_FUNNELED, &thread_level_) !=
+      MPI_SUCCESS) {
     throw RuntimeError("comm::Environment: MPI_Init_thread failed");
   }
   owns_ = true;

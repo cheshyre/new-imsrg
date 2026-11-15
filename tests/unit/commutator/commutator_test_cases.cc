@@ -9,10 +9,14 @@ namespace imsrg::commutator_test {
 
 const std::vector<GoldenPair>& golden_pairs() {
   static const std::vector<GoldenPair> pairs = {
-      {"emax2_O16", "eta_white", "H"},         {"emax2_O16", "random_A", "random_H"},
-      {"emax1_He4", "random_A1", "random_H1"}, {"emax1_He4", "random_H1", "random_A1"},
-      {"emax1_He4", "random_H1", "random_H2"}, {"emax1_He4", "random_A1", "random_A2"},
-      {"emax1_He6", "random_A1", "random_H1"}, {"emax1_He6", "random_H1", "random_H2"},
+      {"emax2_O16", "eta_white", "H"},
+      {"emax2_O16", "random_A", "random_H"},
+      {"emax1_He4", "random_A1", "random_H1"},
+      {"emax1_He4", "random_H1", "random_A1"},
+      {"emax1_He4", "random_H1", "random_H2"},
+      {"emax1_He4", "random_A1", "random_A2"},
+      {"emax1_He6", "random_A1", "random_H1"},
+      {"emax1_He6", "random_H1", "random_H2"},
   };
   return pairs;
 }
@@ -27,8 +31,10 @@ std::string result_path(const GoldenPair& p, const std::string& term) {
 
 const std::vector<SpaceCase>& space_cases() {
   static const std::vector<SpaceCase> cases = {
-      {"He4_emax1", 1, "He4", false},           {"He4_emax1_fractional", 1, "He4", true},
-      {"O16_emax2", 2, "O16", false},           {"O18_emax2", 2, "O18", false},
+      {"He4_emax1", 1, "He4", false},
+      {"He4_emax1_fractional", 1, "He4", true},
+      {"O16_emax2", 2, "O16", false},
+      {"O18_emax2", 2, "O18", false},
       {"O16_emax2_fractional", 2, "O16", true},
   };
   return cases;

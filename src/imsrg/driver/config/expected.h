@@ -4,9 +4,10 @@
 #ifndef IMSRG_DRIVER_CONFIG_EXPECTED_H_
 #define IMSRG_DRIVER_CONFIG_EXPECTED_H_
 /// @file
-/// A minimal `Expected<T, E>` (value or error), standing in for C++23 `std::expected`, which the
-/// C++20 toolchains of this project do not provide. Only the operations the driver needs exist.
-/// If `base` grows the same facility later, this header becomes an alias to it.
+/// A minimal `Expected<T, E>` (value or error), standing in for C++23
+/// `std::expected`, which the C++20 toolchains of this project do not provide.
+/// Only the operations the driver needs exist. If `base` grows the same
+/// facility later, this header becomes an alias to it.
 
 #include <type_traits>
 #include <utility>
@@ -25,8 +26,9 @@ struct Unexpected {
 template <class E>
 Unexpected(E) -> Unexpected<E>;
 
-/// Either a value of type `T` or an error of type `E` (never both, never neither). `T` and `E`
-/// may be the same type. Accessing the wrong alternative throws `InvariantError`.
+/// Either a value of type `T` or an error of type `E` (never both, never
+/// neither). `T` and `E` may be the same type. Accessing the wrong alternative
+/// throws `InvariantError`.
 template <class T, class E>
 class [[nodiscard]] Expected {
  public:
@@ -35,7 +37,8 @@ class [[nodiscard]] Expected {
   /// Holds a value.
   Expected(T&& value) : data_(std::in_place_index<0>, std::move(value)) {}
   /// Holds an error.
-  Expected(Unexpected<E> error) : data_(std::in_place_index<1>, std::move(error.error)) {}
+  Expected(Unexpected<E> error)
+      : data_(std::in_place_index<1>, std::move(error.error)) {}
 
   /// True if a value is held.
   bool has_value() const noexcept { return data_.index() == 0; }
@@ -79,10 +82,12 @@ class [[nodiscard]] Expected {
 
  private:
   void require_value() const {
-    if (!has_value()) throw InvariantError("Expected: value() called on an error");
+    if (!has_value())
+      throw InvariantError("Expected: value() called on an error");
   }
   void require_error() const {
-    if (has_value()) throw InvariantError("Expected: error() called on a value");
+    if (has_value())
+      throw InvariantError("Expected: error() called on a value");
   }
 
   std::variant<T, E> data_;

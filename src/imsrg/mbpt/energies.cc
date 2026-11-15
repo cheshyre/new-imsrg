@@ -14,7 +14,9 @@ namespace imsrg::mbpt {
 
 namespace {
 std::size_t u(std::int64_t i) { return static_cast<std::size_t>(i); }
-double diag(const op::Operator& H, OrbitIndex a) { return H.one_body().get(a, a); }
+double diag(const op::Operator& H, OrbitIndex a) {
+  return H.one_body().get(a, a);
+}
 }  // namespace
 
 double mp2_energy(op::Operator& H) {
@@ -31,7 +33,8 @@ double mp2_energy(op::Operator& H) {
       const auto& oa = basis.orbit(a);
       const double ea = diag(H, a);
       const double fia = H.one_body().get(i, a);
-      if (std::abs(fia) > 1e-9) e2 += (oa.j2.twice + 1) * ref.occupation(a) * fia * fia / (ea - ei);
+      if (std::abs(fia) > 1e-9)
+        e2 += (oa.j2.twice + 1) * ref.occupation(a) * fia * fia / (ea - ei);
       for (const OrbitIndex j : ref.particles()) {
         if (j.value() < i.value()) continue;
         const auto& oj = basis.orbit(j);
@@ -40,12 +43,15 @@ double mp2_energy(op::Operator& H) {
           if (b.value() < a.value()) continue;
           const auto& ob = basis.orbit(b);
           if ((oi.l + oj.l + oa.l + ob.l) % 2 > 0) continue;
-          if (oi.tz2.twice + oj.tz2.twice != oa.tz2.twice + ob.tz2.twice) continue;
+          if (oi.tz2.twice + oj.tz2.twice != oa.tz2.twice + ob.tz2.twice)
+            continue;
           const double denom = ea + diag(H, b) - ei - ej;
-          int jmin =
-              std::max(std::abs(oi.j2.twice - oj.j2.twice), std::abs(oa.j2.twice - ob.j2.twice)) /
+          int jmin = std::max(std::abs(oi.j2.twice - oj.j2.twice),
+                              std::abs(oa.j2.twice - ob.j2.twice)) /
+                     2;
+          const int jmax =
+              std::min(oi.j2.twice + oj.j2.twice, oa.j2.twice + ob.j2.twice) /
               2;
-          const int jmax = std::min(oi.j2.twice + oj.j2.twice, oa.j2.twice + ob.j2.twice) / 2;
           int dj = 1;
           if (a == b || i == j) {
             jmin += jmin % 2;
@@ -54,7 +60,8 @@ double mp2_energy(op::Operator& H) {
           for (int J = jmin; J <= jmax; J += dj) {
             const double t = two.get_normalized(a, b, i, j, TwoJ{2 * J});
             if (std::abs(t) > 1e-9)
-              e2 += (2 * J + 1) * ref.occupation(a) * ref.occupation(b) * t * t / denom;
+              e2 += (2 * J + 1) * ref.occupation(a) * ref.occupation(b) * t *
+                    t / denom;
           }
         }
       }
@@ -81,7 +88,8 @@ Mp3Energy mp3_energy(op::Operator& H) {
     if (hh.empty() || pp.empty()) continue;
     const auto V = H.two_body().host_block(ch);
     const auto kets = tb.channel_kets(ch);
-    const auto nh = static_cast<std::int64_t>(hh.size()), np = static_cast<std::int64_t>(pp.size());
+    const auto nh = static_cast<std::int64_t>(hh.size()),
+               np = static_cast<std::int64_t>(pp.size());
     linalg::Matrix<double> M(nh, np);
     for (std::int64_t I = 0; I < nh; ++I) {
       const auto& kh = tb.ket(kets[u(hh[u(I)].value())]);
@@ -124,7 +132,12 @@ Mp3Energy mp3_energy(op::Operator& H) {
       const bool hp = ref.occupation(ket.p) >= basis::kOccupationCut;
       const bool hq = ref.occupation(ket.q) >= basis::kOccupationCut;
       if (hp == hq) continue;
-      PhKet x{ket.p, ket.q, basis.orbit(ket.p).j2.twice, basis.orbit(ket.q).j2.twice, 1.0, 0.0};
+      PhKet x{ket.p,
+              ket.q,
+              basis.orbit(ket.p).j2.twice,
+              basis.orbit(ket.q).j2.twice,
+              1.0,
+              0.0};
       const int e = (x.ja2 + x.ji2) / 2 - Jph;
       x.phase_ia = -((e % 2 == 0) ? 1.0 : -1.0);
       if (ref.occupation(ket.p) < ref.occupation(ket.q)) {
@@ -144,20 +157,28 @@ Mp3Energy mp3_energy(op::Operator& H) {
       for (std::int64_t II = 0; II < n; ++II) {
         const auto& x = pk[u(I)];
         const auto& y = pk[u(II)];  // (b, j)
-        const double delta = diag(H, x.i) + diag(H, y.i) - diag(H, x.a) - diag(H, y.a);
+        const double delta =
+            diag(H, x.i) + diag(H, y.i) - diag(H, x.a) - diag(H, y.a);
         V1(I, II) = 0.0;
         V2(II, I) = 0.0;
         const TwoJ ja{x.ja2}, ji{x.ji2}, jb{y.ja2}, jj{y.ji2};
-        if (!angmom::triangle(jj, jb, tJph) || !angmom::triangle(ji, ja, tJph)) continue;
+        if (!angmom::triangle(jj, jb, tJph) || !angmom::triangle(ji, ja, tJph))
+          continue;
         double t1 = 0.0;
-        for (int J1 = std::max(std::abs(ja.twice - jb.twice), std::abs(ji.twice - jj.twice)) / 2;
+        for (int J1 = std::max(std::abs(ja.twice - jb.twice),
+                               std::abs(ji.twice - jj.twice)) /
+                      2;
              J1 <= std::min(ja.twice + jb.twice, ji.twice + jj.twice) / 2; ++J1)
-          t1 -= angmom::wigner_6j(ja, ji, tJph, jj, jb, TwoJ{2 * J1}) * (2 * J1 + 1) *
+          t1 -= angmom::wigner_6j(ja, ji, tJph, jj, jb, TwoJ{2 * J1}) *
+                (2 * J1 + 1) *
                 two.get_unnormalized(x.i, y.i, y.a, x.a, TwoJ{2 * J1});
         double t2 = 0.0;
-        for (int J1 = std::max(std::abs(ji.twice - jb.twice), std::abs(ja.twice - jj.twice)) / 2;
+        for (int J1 = std::max(std::abs(ji.twice - jb.twice),
+                               std::abs(ja.twice - jj.twice)) /
+                      2;
              J1 <= std::min(ji.twice + jb.twice, ja.twice + jj.twice) / 2; ++J1)
-          t2 -= angmom::wigner_6j(jb, jj, tJph, ja, ji, TwoJ{2 * J1}) * (2 * J1 + 1) *
+          t2 -= angmom::wigner_6j(jb, jj, tJph, ja, ji, TwoJ{2 * J1}) *
+                (2 * J1 + 1) *
                 two.get_unnormalized(y.a, x.i, x.a, y.i, TwoJ{2 * J1});
         V1(I, II) = t1 * x.phase_ia * y.phase_ai / delta;
         V2(II, I) = t2 * y.phase_ai * x.phase_ai;

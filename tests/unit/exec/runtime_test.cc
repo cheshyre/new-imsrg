@@ -13,17 +13,25 @@ namespace {
 
 using imsrg::exec::Runtime;
 
-TEST(ExecRuntime, IsInitializedUnderTestMain) { EXPECT_TRUE(Runtime::is_initialized()); }
-
-TEST(ExecRuntime, ExecutionSpaceNameMatchesConfiguredBackend) {
-  EXPECT_EQ(Runtime::execution_space_name(), std::string(IMSRG_EXPECTED_KOKKOS_SPACE));
+TEST(ExecRuntime, IsInitializedUnderTestMain) {
+  EXPECT_TRUE(Runtime::is_initialized());
 }
 
-TEST(ExecRuntime, ConcurrencyIsPositive) { EXPECT_GE(Runtime::concurrency(), 1); }
+TEST(ExecRuntime, ExecutionSpaceNameMatchesConfiguredBackend) {
+  EXPECT_EQ(Runtime::execution_space_name(),
+            std::string(IMSRG_EXPECTED_KOKKOS_SPACE));
+}
 
-TEST(ExecRuntime, SecondRuntimeThrows) { EXPECT_THROW(Runtime second, imsrg::RuntimeError); }
+TEST(ExecRuntime, ConcurrencyIsPositive) {
+  EXPECT_GE(Runtime::concurrency(), 1);
+}
 
-// Options are validated before Kokkos sees them (Kokkos aborts on --kokkos-num-threads=0).
+TEST(ExecRuntime, SecondRuntimeThrows) {
+  EXPECT_THROW(Runtime second, imsrg::RuntimeError);
+}
+
+// Options are validated before Kokkos sees them (Kokkos aborts on
+// --kokkos-num-threads=0).
 TEST(ExecRuntime, InvalidOptionsThrowConfigError) {
   imsrg::exec::RuntimeOptions zero_threads;
   zero_threads.num_threads = 0;

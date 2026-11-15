@@ -28,8 +28,9 @@ std::string_view orbit_class_name(OrbitClass c) noexcept {
 Partition Partition::from_classes(const SingleParticleBasis& basis,
                                   std::vector<OrbitClass> classes) {
   if (static_cast<std::int32_t>(classes.size()) != basis.num_orbits()) {
-    throw InputError(fmt::format("Partition: {} classes given for a basis of {} orbits",
-                                 classes.size(), basis.num_orbits()));
+    throw InputError(
+        fmt::format("Partition: {} classes given for a basis of {} orbits",
+                    classes.size(), basis.num_orbits()));
   }
   Partition p;
   p.classes_ = std::move(classes);
@@ -56,35 +57,44 @@ Partition Partition::from_classes(const SingleParticleBasis& basis,
 
 Partition Partition::from_definition(const SingleParticleBasis& basis,
                                      const ValenceSpaceDefinition& def) {
-  std::vector<OrbitClass> classes(static_cast<std::size_t>(basis.num_orbits()), OrbitClass::QSpace);
+  std::vector<OrbitClass> classes(static_cast<std::size_t>(basis.num_orbits()),
+                                  OrbitClass::QSpace);
   for (const Orbit& o : def.valence) {
     if (const auto idx = basis.find(o)) {
       classes[idx->to_size()] = OrbitClass::Valence;
     } else {
-      log::warn("valence orbit {} is not in the basis and is dropped", orbit_label(o));
+      log::warn("valence orbit {} is not in the basis and is dropped",
+                orbit_label(o));
     }
   }
   for (const Orbit& o : def.core) {
     const auto idx = basis.find(o);
     if (!idx) {
-      throw InputError(fmt::format("Partition: core orbit {} is not in the basis", orbit_label(o)));
+      throw InputError(fmt::format(
+          "Partition: core orbit {} is not in the basis", orbit_label(o)));
     }
     if (classes[idx->to_size()] == OrbitClass::Valence) {
-      log::warn("orbit {} is in both the core and the valence space; it is core", orbit_label(o));
+      log::warn(
+          "orbit {} is in both the core and the valence space; it is core",
+          orbit_label(o));
     }
     classes[idx->to_size()] = OrbitClass::Core;
   }
   return from_classes(basis, std::move(classes));
 }
 
-Partition Partition::with_holes_as_core(const Partition& previous, const Reference& ref,
+Partition Partition::with_holes_as_core(const Partition& previous,
+                                        const Reference& ref,
                                         const SingleParticleBasis& basis) {
-  if (previous.num_orbits() != ref.num_orbits() || ref.num_orbits() != basis.num_orbits()) {
+  if (previous.num_orbits() != ref.num_orbits() ||
+      ref.num_orbits() != basis.num_orbits()) {
     throw InputError(fmt::format(
-        "Partition::with_holes_as_core: sizes differ (partition {}, reference {}, basis {})",
+        "Partition::with_holes_as_core: sizes differ (partition {}, reference "
+        "{}, basis {})",
         previous.num_orbits(), ref.num_orbits(), basis.num_orbits()));
   }
-  std::vector<OrbitClass> classes(static_cast<std::size_t>(basis.num_orbits()), OrbitClass::QSpace);
+  std::vector<OrbitClass> classes(static_cast<std::size_t>(basis.num_orbits()),
+                                  OrbitClass::QSpace);
   for (const OrbitIndex h : ref.holes()) {
     classes[h.to_size()] = OrbitClass::Core;
   }
@@ -95,7 +105,8 @@ Partition Partition::with_holes_as_core(const Partition& previous, const Referen
 }
 
 OrbitClass Partition::orbit_class(OrbitIndex a) const {
-  IMSRG_ASSERT(a.value() >= 0 && a.value() < num_orbits(), "orbit index out of range");
+  IMSRG_ASSERT(a.value() >= 0 && a.value() < num_orbits(),
+               "orbit index out of range");
   return classes_[a.to_size()];
 }
 

@@ -14,49 +14,68 @@ namespace imsrg::commutator {
 
 namespace detail {
 
-void check_term_inputs(const op::Operator& X, const op::Operator& Y, const op::Operator& Z,
-                       const Workspace& ws) {
-  IMSRG_CHECK(ws.compatible(X), "commutator: X is not on the workspace's model space");
-  IMSRG_CHECK(ws.compatible(Y), "commutator: Y is not on the workspace's model space");
-  IMSRG_CHECK(ws.compatible(Z), "commutator: Z is not on the workspace's model space");
+void check_term_inputs(const op::Operator& X, const op::Operator& Y,
+                       const op::Operator& Z, const Workspace& ws) {
+  IMSRG_CHECK(ws.compatible(X),
+              "commutator: X is not on the workspace's model space");
+  IMSRG_CHECK(ws.compatible(Y),
+              "commutator: Y is not on the workspace's model space");
+  IMSRG_CHECK(ws.compatible(Z),
+              "commutator: Z is not on the workspace's model space");
   IMSRG_CHECK(&Z != &X && &Z != &Y, "commutator: Z must not alias X or Y");
-  if (X.hermiticity() == Hermiticity::NonHermitian || Y.hermiticity() == Hermiticity::NonHermitian)
-    throw NotImplementedError("commutator: NonHermitian X or Y is not supported");
-  IMSRG_CHECK(Z.hermiticity() == commutator_spec(X.spec(), Y.spec()).hermiticity,
-              "commutator: Z's hermiticity must be that of [X, Y] (Hermitian if X and Y differ in "
-              "hermiticity, anti-Hermitian otherwise)");
+  if (X.hermiticity() == Hermiticity::NonHermitian ||
+      Y.hermiticity() == Hermiticity::NonHermitian)
+    throw NotImplementedError(
+        "commutator: NonHermitian X or Y is not supported");
+  IMSRG_CHECK(
+      Z.hermiticity() == commutator_spec(X.spec(), Y.spec()).hermiticity,
+      "commutator: Z's hermiticity must be that of [X, Y] (Hermitian if X and "
+      "Y differ in "
+      "hermiticity, anti-Hermitian otherwise)");
 }
 
 int commutator_hermiticity_sign(const op::Operator& X, const op::Operator& Y) {
-  return -op::hermiticity_sign(X.hermiticity()) * op::hermiticity_sign(Y.hermiticity());
+  return -op::hermiticity_sign(X.hermiticity()) *
+         op::hermiticity_sign(Y.hermiticity());
 }
 
 }  // namespace detail
 
-op::OperatorSpec commutator_spec(const op::OperatorSpec& x, const op::OperatorSpec& y) {
+op::OperatorSpec commutator_spec(const op::OperatorSpec& x,
+                                 const op::OperatorSpec& y) {
   if (!x.is_scalar() || !y.is_scalar())
-    throw NotImplementedError("commutator: only scalar operators are supported");
+    throw NotImplementedError(
+        "commutator: only scalar operators are supported");
   if (!x.is_number_conserving() || !y.is_number_conserving())
-    throw NotImplementedError("commutator: only number-conserving operators are supported");
+    throw NotImplementedError(
+        "commutator: only number-conserving operators are supported");
   if (x.particle_rank > 2 || y.particle_rank > 2)
-    throw NotImplementedError("commutator: particle rank 3 is not supported (IMSRG(3), M10)");
-  op::OperatorSpec z = op::OperatorSpec::scalar(std::max(x.particle_rank, y.particle_rank));
-  if (x.hermiticity == Hermiticity::NonHermitian || y.hermiticity == Hermiticity::NonHermitian) {
+    throw NotImplementedError(
+        "commutator: particle rank 3 is not supported (IMSRG(3), M10)");
+  op::OperatorSpec z =
+      op::OperatorSpec::scalar(std::max(x.particle_rank, y.particle_rank));
+  if (x.hermiticity == Hermiticity::NonHermitian ||
+      y.hermiticity == Hermiticity::NonHermitian) {
     z.hermiticity = Hermiticity::NonHermitian;
   } else {
-    z.hermiticity =
-        (x.hermiticity == y.hermiticity) ? Hermiticity::AntiHermitian : Hermiticity::Hermitian;
+    z.hermiticity = (x.hermiticity == y.hermiticity)
+                        ? Hermiticity::AntiHermitian
+                        : Hermiticity::Hermitian;
   }
   return z;
 }
 
 void commutator(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                 const CommutatorOptions& opts, Workspace& ws) {
-  IMSRG_CHECK(ws.compatible(X), "commutator: X is not on the workspace's model space");
-  IMSRG_CHECK(ws.compatible(Y), "commutator: Y is not on the workspace's model space");
+  IMSRG_CHECK(ws.compatible(X),
+              "commutator: X is not on the workspace's model space");
+  IMSRG_CHECK(ws.compatible(Y),
+              "commutator: Y is not on the workspace's model space");
   IMSRG_CHECK(&Z != &X && &Z != &Y, "commutator: Z must not alias X or Y");
-  if (X.hermiticity() == Hermiticity::NonHermitian || Y.hermiticity() == Hermiticity::NonHermitian)
-    throw NotImplementedError("commutator: NonHermitian X or Y is not supported");
+  if (X.hermiticity() == Hermiticity::NonHermitian ||
+      Y.hermiticity() == Hermiticity::NonHermitian)
+    throw NotImplementedError(
+        "commutator: NonHermitian X or Y is not supported");
 
   const op::OperatorSpec spec = commutator_spec(X.spec(), Y.spec());
   if (!Z.empty() && Z.spec() == spec && ws.compatible(Z)) {
@@ -80,8 +99,8 @@ void commutator(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   if (m.test(Term::comm222_phss)) terms::comm222_phss(X, Y, Z, ws);
 }
 
-op::Operator commutator(const op::Operator& X, const op::Operator& Y, const CommutatorOptions& opts,
-                        Workspace& ws) {
+op::Operator commutator(const op::Operator& X, const op::Operator& Y,
+                        const CommutatorOptions& opts, Workspace& ws) {
   op::Operator Z;
   commutator(X, Y, Z, opts, ws);
   return Z;

@@ -35,12 +35,15 @@ TEST(LinalgSolve, RandomSystems) {
       Matrix<double> Acopy = A;
       solve(A.const_view(), X.view());
       for (int j = 0; j < n; ++j)
-        for (int i = 0; i < n; ++i) ASSERT_EQ(A(i, j), Acopy(i, j));  // A untouched
+        for (int i = 0; i < n; ++i)
+          ASSERT_EQ(A(i, j), Acopy(i, j));  // A untouched
       Matrix<double> R(n, nrhs);
-      gemm(1.0, A.const_view(), Op::NoTrans, X.const_view(), Op::NoTrans, 0.0, R.view());
+      gemm(1.0, A.const_view(), Op::NoTrans, X.const_view(), Op::NoTrans, 0.0,
+           R.view());
       double res = 0;
       for (int j = 0; j < nrhs; ++j)
-        for (int i = 0; i < n; ++i) res = std::max(res, std::abs(R(i, j) - B(i, j)));
+        for (int i = 0; i < n; ++i)
+          res = std::max(res, std::abs(R(i, j) - B(i, j)));
       EXPECT_LE(res, 1e-12 * frob(A) * frob(X)) << "n=" << n;
     }
   }

@@ -18,7 +18,9 @@ using imsrg::log::Logger;
 struct Capture {
   std::vector<std::pair<Level, std::string>> lines;
   Logger::Sink sink() {
-    return [this](Level l, std::string_view s) { lines.emplace_back(l, std::string(s)); };
+    return [this](Level l, std::string_view s) {
+      lines.emplace_back(l, std::string(s));
+    };
   }
 };
 

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// RunConfig -> TOML (resolved_config.toml, design/16 sections 1.3, 1.7 and 6.1).
+// RunConfig -> TOML (resolved_config.toml, design/16 sections 1.3, 1.7 and
+// 6.1).
 #include "imsrg/driver/config/writer.h"
 
 #include <cmath>
@@ -21,8 +22,9 @@
 namespace imsrg::driver {
 namespace {
 
-/// A TOML basic string: escapes `"`, `\`, the named control characters, and other control
-/// characters (< 0x20, 0x7F) as \u00XX; all other bytes are copied verbatim.
+/// A TOML basic string: escapes `"`, `\`, the named control characters, and
+/// other control characters (< 0x20, 0x7F) as \u00XX; all other bytes are
+/// copied verbatim.
 std::string quote(std::string_view s) {
   std::string out = "\"";
   for (const char ch : s) {
@@ -89,7 +91,8 @@ std::string from_file_array(const std::vector<OperatorFromFile>& items) {
     const OperatorFromFile& f = items[i];
     if (i != 0) out += ", ";
     out += "{ name = " + quote(f.name) + ", rank = " + std::to_string(f.rank) +
-           ", dtz = " + std::to_string(f.dtz) + ", parity = " + std::to_string(f.parity) +
+           ", dtz = " + std::to_string(f.dtz) +
+           ", parity = " + std::to_string(f.parity) +
            ", particle_rank = " + std::to_string(f.particle_rank) +
            ", file_2b = " + quote(f.file_2b);
     if (f.file_3b) out += ", file_3b = " + quote(*f.file_3b);
@@ -128,11 +131,13 @@ std::string format_value(const KeyInfo& key, const T& value) {
   }
 }
 
-/// `visit_schema` visitor: collects (table, "key = value") lines in canonical order.
+/// `visit_schema` visitor: collects (table, "key = value") lines in canonical
+/// order.
 struct LineWriter {
   std::vector<std::pair<std::string, std::string>> lines;
-  /// One-stage run: imsrg.generator.valence is inert (resolve resets it to its default) and an
-  /// explicit value is V-41 with a valence space, so it is left out to keep the file loadable.
+  /// One-stage run: imsrg.generator.valence is inert (resolve resets it to its
+  /// default) and an explicit value is V-41 with a valence space, so it is left
+  /// out to keep the file loadable.
   bool one_stage = false;
 
   template <class T>
@@ -146,8 +151,8 @@ struct LineWriter {
   }
 
   template <class Section, class Body>
-  void optional_table(std::string_view /*table*/, const std::optional<Section>& section,
-                      Body&& body) {
+  void optional_table(std::string_view /*table*/,
+                      const std::optional<Section>& section, Body&& body) {
     if (section) body(*section);
   }
 
@@ -156,8 +161,9 @@ struct LineWriter {
   void emit(const KeyInfo& key, const T& value) {
     const std::string_view path = key.path;
     const std::size_t dot = path.rfind('.');
-    lines.emplace_back(std::string(path.substr(0, dot)),
-                       std::string(path.substr(dot + 1)) + " = " + format_value(key, value));
+    lines.emplace_back(
+        std::string(path.substr(0, dot)),
+        std::string(path.substr(dot + 1)) + " = " + format_value(key, value));
   }
 };
 
@@ -165,7 +171,8 @@ struct LineWriter {
 
 std::string to_toml(const RunConfig& config, bool include_provenance) {
   std::string out =
-      "# imsrg resolved configuration (design/16-config-and-cli.md); reproduce with: imsrg "
+      "# imsrg resolved configuration (design/16-config-and-cli.md); reproduce "
+      "with: imsrg "
       "--config <this file>\n";
   LineWriter writer;
   writer.one_stage = config.imsrg.steps == 1;
@@ -196,20 +203,22 @@ std::string to_toml(const RunConfig& config, bool include_provenance) {
   return out;
 }
 
-void write_resolved_config(const RunConfig& config, const std::filesystem::path& file) {
+void write_resolved_config(const RunConfig& config,
+                           const std::filesystem::path& file) {
   const std::string text = to_toml(config);
   if (file.has_parent_path()) {
     std::error_code ec;
     std::filesystem::create_directories(file.parent_path(), ec);
     if (ec) {
-      throw InputError("cannot create directory for resolved config '" + file.string() +
-                       "': " + ec.message());
+      throw InputError("cannot create directory for resolved config '" +
+                       file.string() + "': " + ec.message());
     }
   }
   std::ofstream out(file, std::ios::binary | std::ios::trunc);
   out << text;
   out.flush();
-  if (!out) throw InputError("cannot write resolved config '" + file.string() + "'");
+  if (!out)
+    throw InputError("cannot write resolved config '" + file.string() + "'");
 }
 
 }  // namespace imsrg::driver

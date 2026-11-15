@@ -26,7 +26,8 @@ TEST(CommSerial, Basics) {
   EXPECT_TRUE(c.is_root());
   EXPECT_TRUE(c.is_serial());
   c.barrier();
-  const Communicator by_default;  // default construction gives the serial communicator
+  const Communicator
+      by_default;  // default construction gives the serial communicator
   EXPECT_TRUE(by_default.is_serial());
   EXPECT_EQ(by_default.size(), 1);
 }
@@ -85,7 +86,8 @@ TEST(CommSerial, AlltoallvCopies) {
   c.alltoallv(send, counts, sd, recv, counts, rd);
   EXPECT_EQ(recv, (std::vector<double>{0, 0, 2, 3, 4}));
   const std::array<int, 1> too_many{4};
-  EXPECT_THROW(c.alltoallv(send, too_many, sd, recv, too_many, rd), imsrg::InvariantError);
+  EXPECT_THROW(c.alltoallv(send, too_many, sd, recv, too_many, rd),
+               imsrg::InvariantError);
 }
 
 TEST(CommSerial, SplitAndDuplicate) {
@@ -100,7 +102,8 @@ TEST(CommSerial, SplitAndDuplicate) {
 }
 
 TEST(CommSerial, EnvironmentQueries) {
-  // No Environment is created here: only the static queries and the MPI-free serial path.
+  // No Environment is created here: only the static queries and the MPI-free
+  // serial path.
   EXPECT_FALSE(imsrg::comm::Environment::is_initialized());
   (void)imsrg::comm::Environment::mpi_enabled();
 }

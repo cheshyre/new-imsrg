@@ -5,8 +5,9 @@
 #include <limits>
 #include <vector>
 
-#include "kernels_impl.h"
 #include <gtest/gtest.h>
+
+#include "kernels_impl.h"
 
 namespace {
 

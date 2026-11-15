@@ -60,7 +60,8 @@ TEST(OneBody, AddAccumulatesWithPartner) {
   b.add(oi(0), oi(2), 2.0);
   EXPECT_EQ(b.get(oi(0), oi(2)), 3.0);
   EXPECT_EQ(b.get(oi(2), oi(0)), -3.0);
-  b.add(oi(2), oi(0), 1.0);  // the partner entry gets +1, the (0,2) entry gets -1
+  b.add(oi(2), oi(0),
+        1.0);  // the partner entry gets +1, the (0,2) entry gets -1
   EXPECT_EQ(b.get(oi(0), oi(2)), 2.0);
   EXPECT_EQ(b.get(oi(2), oi(0)), -2.0);
 }

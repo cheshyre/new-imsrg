@@ -25,17 +25,21 @@ Workspace::Impl::Impl(const std::shared_ptr<const basis::ModelSpace>& ms)
   std::vector<std::int32_t> orbits;
   std::vector<std::int32_t> owner;
   for (std::size_t p = 0; p < norb; ++p) {
-    for (const OrbitIndex q : ms->basis().same_ljtz(OrbitIndex{static_cast<std::int32_t>(p)})) {
+    for (const OrbitIndex q :
+         ms->basis().same_ljtz(OrbitIndex{static_cast<std::int32_t>(p)})) {
       orbits.push_back(static_cast<std::int32_t>(q.value()));
       owner.push_back(static_cast<std::int32_t>(p));
     }
     offsets[p + 1] = static_cast<std::int32_t>(orbits.size());
   }
-  ob_offsets = exec::DeviceBuffer<std::int32_t>(offsets.size(), "commutator::ob_offsets");
+  ob_offsets = exec::DeviceBuffer<std::int32_t>(offsets.size(),
+                                                "commutator::ob_offsets");
   ob_offsets.copy_from_host(offsets);
-  ob_orbits = exec::DeviceBuffer<std::int32_t>(orbits.size(), "commutator::ob_orbits");
+  ob_orbits =
+      exec::DeviceBuffer<std::int32_t>(orbits.size(), "commutator::ob_orbits");
   ob_orbits.copy_from_host(orbits);
-  ob_owner = exec::DeviceBuffer<std::int32_t>(owner.size(), "commutator::ob_owner");
+  ob_owner =
+      exec::DeviceBuffer<std::int32_t>(owner.size(), "commutator::ob_owner");
   ob_owner.copy_from_host(owner);
 
   // Block offsets exactly as `op::TwoBody` stores a scalar rank-2 operator.
@@ -47,8 +51,8 @@ Workspace::Impl::Impl(const std::shared_ptr<const basis::ModelSpace>& ms)
       block_offsets_host.push_back(m.block_info(k).offset);
     two_body_size = m.total_size();
     block_offsets_host.push_back(two_body_size);
-    block_offsets =
-        exec::DeviceBuffer<std::int64_t>(block_offsets_host.size(), "commutator::block_offsets");
+    block_offsets = exec::DeviceBuffer<std::int64_t>(
+        block_offsets_host.size(), "commutator::block_offsets");
     block_offsets.copy_from_host(block_offsets_host);
   }
 
@@ -60,20 +64,25 @@ Workspace::Impl::Impl(const std::shared_ptr<const basis::ModelSpace>& ms)
       const auto n = channels.channel_kets(ChannelIndex{ch}).size();
       ec.insert(ec.end(), n, ch);
     }
-    entry_channel = exec::DeviceBuffer<std::int32_t>(ec.size(), "commutator::entry_channel");
+    entry_channel = exec::DeviceBuffer<std::int32_t>(
+        ec.size(), "commutator::entry_channel");
     entry_channel.copy_from_host(ec);
   }
 }
 
-detail::TwoBodyView Workspace::Impl::two_body_view(const op::Operator& op) const {
+detail::TwoBodyView Workspace::Impl::two_body_view(
+    const op::Operator& op) const {
   detail::TwoBodyView v;
   v.tb = tables.two_body();
   v.block_offset = block_offsets.device_data();
-  v.data = op.two_body().allocated() ? op.two_body().matrix().buffer().device_data() : nullptr;
+  v.data = op.two_body().allocated()
+               ? op.two_body().matrix().buffer().device_data()
+               : nullptr;
   return v;
 }
 
-Workspace::Workspace(std::shared_ptr<const basis::ModelSpace> ms) : ms_(std::move(ms)) {
+Workspace::Workspace(std::shared_ptr<const basis::ModelSpace> ms)
+    : ms_(std::move(ms)) {
   IMSRG_CHECK(ms_ != nullptr, "Workspace: model space is null");
   impl_ = std::make_unique<Impl>(ms_);
 }

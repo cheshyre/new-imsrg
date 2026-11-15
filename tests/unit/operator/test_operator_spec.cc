@@ -34,8 +34,8 @@ TEST(OperatorSpec, HermiticitySigns) {
 }
 
 TEST(OperatorSpec, ScalarRanksOneAndTwoAreValid) {
-  for (const auto h :
-       {Hermiticity::Hermitian, Hermiticity::AntiHermitian, Hermiticity::NonHermitian}) {
+  for (const auto h : {Hermiticity::Hermitian, Hermiticity::AntiHermitian,
+                       Hermiticity::NonHermitian}) {
     EXPECT_NO_THROW(validate(OperatorSpec::scalar(1, h)));
     EXPECT_NO_THROW(validate(OperatorSpec::scalar(2, h)));
   }

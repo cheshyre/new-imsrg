@@ -2,24 +2,26 @@
 // Copyright 2026 The imsrg authors
 
 /// @file
-/// imsrg.Runtime: process singleton for Kokkos (and optionally MPI), design/18 section 4.3.
+/// imsrg.Runtime: process singleton for Kokkos (and optionally MPI), design/18
+/// section 4.3.
 
 #include "imsrg/exec/runtime.h"
 
 #include <memory>
 #include <mutex>
 
-#include "bindings.h"
 #include <nanobind/stl/string.h>
 
+#include "bindings.h"
 #include "imsrg/base/error.h"
 #include "imsrg/comm/environment.h"
 
 namespace imsrg::py {
 namespace {
 
-// Process singleton (design/18 section 4.3). Heap-allocated and never deleted: its members are
-// torn down explicitly by finalize_locked(), never by static destruction order.
+// Process singleton (design/18 section 4.3). Heap-allocated and never deleted:
+// its members are torn down explicitly by finalize_locked(), never by static
+// destruction order.
 struct State {
   std::mutex mutex;
   std::unique_ptr<comm::Environment> env;
@@ -33,7 +35,9 @@ State& state() {
 }
 
 void init_locked(State& s, const exec::RuntimeOptions& opt, bool mpi) {
-  if (s.finalized) throw imsrg::RuntimeError("imsrg Runtime was finalized; it cannot be restarted");
+  if (s.finalized)
+    throw imsrg::RuntimeError(
+        "imsrg Runtime was finalized; it cannot be restarted");
   if (s.rt) throw imsrg::RuntimeError("imsrg Runtime is already initialized");
   if (mpi) s.env = std::make_unique<comm::Environment>();
   s.rt = std::make_unique<exec::Runtime>(opt);
@@ -42,7 +46,8 @@ void init_locked(State& s, const exec::RuntimeOptions& opt, bool mpi) {
 void finalize_locked(State& s) {
   if (!s.rt) return;
   if (live_operators().load() > 0)
-    throw imsrg::RuntimeError("cannot finalize the imsrg Runtime while Operator objects are alive");
+    throw imsrg::RuntimeError(
+        "cannot finalize the imsrg Runtime while Operator objects are alive");
   s.rt.reset();
   s.env.reset();
   s.finalized = true;
@@ -60,11 +65,12 @@ void ensure_runtime() {
 }
 
 void bind_runtime(nb::module_& m) {
-  nb::class_<RuntimeHandle>(
-      m, "Runtime",
-      "Process-wide Kokkos (and optional MPI) runtime. Constructing it initializes explicitly; "
-      "otherwise it is initialized lazily by the first ModelSpace or Operator. Usable as a "
-      "context manager (finalizes on exit).")
+  nb::class_<RuntimeHandle>(m, "Runtime",
+                            "Process-wide Kokkos (and optional MPI) runtime. "
+                            "Constructing it initializes explicitly; "
+                            "otherwise it is initialized lazily by the first "
+                            "ModelSpace or Operator. Usable as a "
+                            "context manager (finalizes on exit).")
       .def(
           "__init__",
           [](RuntimeHandle* self, int num_threads, int device_id, bool mpi,
@@ -72,12 +78,13 @@ void bind_runtime(nb::module_& m) {
             auto& s = state();
             {
               std::lock_guard lock(s.mutex);
-              init_locked(s, {num_threads, device_id, print_configuration}, mpi);
+              init_locked(s, {num_threads, device_id, print_configuration},
+                          mpi);
             }
             new (self) RuntimeHandle();
           },
-          nb::arg("num_threads") = -1, nb::arg("device_id") = -1, nb::arg("mpi") = false,
-          nb::arg("print_configuration") = false)
+          nb::arg("num_threads") = -1, nb::arg("device_id") = -1,
+          nb::arg("mpi") = false, nb::arg("print_configuration") = false)
       .def("__enter__", [](nb::object self) { return self; })
       .def("__exit__",
            [](RuntimeHandle&, nb::args) {
@@ -85,7 +92,8 @@ void bind_runtime(nb::module_& m) {
              std::lock_guard lock(s.mutex);
              finalize_locked(s);
            })
-      .def_static("ensure", &ensure_runtime, "Initializes with defaults if not yet initialized.")
+      .def_static("ensure", &ensure_runtime,
+                  "Initializes with defaults if not yet initialized.")
       .def_static(
           "finalize",
           [] {
@@ -93,13 +101,18 @@ void bind_runtime(nb::module_& m) {
             std::lock_guard lock(s.mutex);
             finalize_locked(s);
           },
-          "Finalizes Kokkos (and MPI); raises if Operators are alive. No re-init after.")
-      .def_static("is_initialized", [] { return exec::Runtime::is_initialized(); })
-      .def_static("execution_space", [] { return exec::Runtime::execution_space_name(); })
+          "Finalizes Kokkos (and MPI); raises if Operators are alive. No "
+          "re-init after.")
+      .def_static("is_initialized",
+                  [] { return exec::Runtime::is_initialized(); })
+      .def_static("execution_space",
+                  [] { return exec::Runtime::execution_space_name(); })
       .def_static("concurrency", [] { return exec::Runtime::concurrency(); })
-      .def_static("mpi_enabled", [] { return comm::Environment::mpi_enabled(); });
+      .def_static("mpi_enabled",
+                  [] { return comm::Environment::mpi_enabled(); });
 
-  // Called by imsrg's atexit handler after gc.collect(): finalize only if nothing is alive.
+  // Called by imsrg's atexit handler after gc.collect(): finalize only if
+  // nothing is alive.
   m.def("_atexit", [] {
     auto& s = state();
     std::lock_guard lock(s.mutex);

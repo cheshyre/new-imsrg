@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Hartree-Fock (linear mixing, 2N only) against the imsrg++ harness output at emax 2, O16.
+// Hartree-Fock (linear mixing, 2N only) against the imsrg++ harness output at
+// emax 2, O16.
 #include <chrono>
 
 #include "hf_test_support.h"
@@ -12,11 +13,15 @@ using namespace imsrg;
 using namespace imsrg::hftest;
 
 TEST(HfGolden2N, Emax2O16Linear) {
-  const op::Operator H = load_hamiltonian(fs::path(IMSRG_GOLDEN_DIR) / "hamiltonian/emax2_O16");
-  const Golden g = load_golden(fs::path(IMSRG_GOLDEN_DIR) / "hf/emax2_O16_2N/hf.json");
+  const op::Operator H =
+      load_hamiltonian(fs::path(IMSRG_GOLDEN_DIR) / "hamiltonian/emax2_O16");
+  const Golden g =
+      load_golden(fs::path(IMSRG_GOLDEN_DIR) / "hf/emax2_O16_2N/hf.json");
   const auto t0 = std::chrono::steady_clock::now();
   const hf::HFResult r = hf::solve(H, nullptr);
-  const double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+  const double secs =
+      std::chrono::duration<double>(std::chrono::steady_clock::now() - t0)
+          .count();
   std::cout << "[emax2_2N] solve time " << secs << " s\n";
   RecordProperty("solve_seconds", std::to_string(secs));
   compare_to_golden(r, g, "emax2_2N", 1e-8, 1e-8, 1e-7);

@@ -15,9 +15,11 @@ namespace imsrg::op {
 
 namespace {
 
-std::uint64_t state_key(std::int32_t a, std::int32_t b, std::int32_t c, std::int32_t tab) noexcept {
+std::uint64_t state_key(std::int32_t a, std::int32_t b, std::int32_t c,
+                        std::int32_t tab) noexcept {
   return static_cast<std::uint64_t>(a) | (static_cast<std::uint64_t>(b) << 16) |
-         (static_cast<std::uint64_t>(c) << 32) | (static_cast<std::uint64_t>(tab) << 48);
+         (static_cast<std::uint64_t>(c) << 32) |
+         (static_cast<std::uint64_t>(tab) << 48);
 }
 
 // Twice-unit triangle condition including the parity of the sum.
@@ -25,9 +27,11 @@ bool triangle2(std::int32_t a, std::int32_t b, std::int32_t c) noexcept {
   return (a + b + c) % 2 == 0 && c >= std::abs(a - b) && c <= a + b;
 }
 
-// Dense channel table: J2 in 0..J2max, P2 in {0,1}, (J1-1)/2 in 0..lmax, P1 in {0,1}, (T3-1)/2.
-std::size_t lookup_index(std::int32_t J2, std::int32_t P2, std::int32_t J1, std::int32_t P1,
-                         std::int32_t T3, std::int32_t lmax) noexcept {
+// Dense channel table: J2 in 0..J2max, P2 in {0,1}, (J1-1)/2 in 0..lmax, P1 in
+// {0,1}, (T3-1)/2.
+std::size_t lookup_index(std::int32_t J2, std::int32_t P2, std::int32_t J1,
+                         std::int32_t P1, std::int32_t T3,
+                         std::int32_t lmax) noexcept {
   return ((((static_cast<std::size_t>(J2) * 2 + static_cast<std::size_t>(P2)) *
                 static_cast<std::size_t>(lmax + 1) +
             static_cast<std::size_t>((J1 - 1) / 2)) *
@@ -53,8 +57,9 @@ No2bThreeBody::No2bThreeBody(const No2bTruncation& t) : trunc_(t) {
   }
   const auto norb = static_cast<std::int32_t>(orbits_.size());
   const std::int32_t j2max = std::min(2 * t.lmax + 1, t.e2max + 1);
-  channel_lookup_.assign(
-      static_cast<std::size_t>(j2max + 1) * 2 * static_cast<std::size_t>(t.lmax + 1) * 2 * 2, -1);
+  channel_lookup_.assign(static_cast<std::size_t>(j2max + 1) * 2 *
+                             static_cast<std::size_t>(t.lmax + 1) * 2 * 2,
+                         -1);
   std::size_t offset = 0;
   for (std::int32_t J2 = 0; J2 <= j2max; ++J2) {
     for (std::int32_t P2 : {0, 1}) {
@@ -89,7 +94,8 @@ No2bThreeBody::No2bThreeBody(const No2bTruncation& t) : trunc_(t) {
                     if (!triangle2(2 * tab, 1, T3)) continue;
                     if ((J2 + tab) % 2 == 0 && ia == ib) continue;
                     const std::int32_t ph =
-                        1 - 2 * (((oa.j2.twice + ob.j2.twice) / 2 + J2 + tab) % 2);
+                        1 -
+                        2 * (((oa.j2.twice + ob.j2.twice) / 2 + J2 + tab) % 2);
                     ch.states[state_key(ia, ib, ic, tab)] = {ndim, 1};
                     ch.states[state_key(ib, ia, ic, tab)] = {ndim, ph};
                     ++ndim;
@@ -100,7 +106,8 @@ No2bThreeBody::No2bThreeBody(const No2bTruncation& t) : trunc_(t) {
             if (ndim < 1) continue;
             ch.num_states = ndim;
             ch.offset = offset;
-            offset += static_cast<std::size_t>(ndim) * (static_cast<std::size_t>(ndim) + 1) / 2;
+            offset += static_cast<std::size_t>(ndim) *
+                      (static_cast<std::size_t>(ndim) + 1) / 2;
             channel_lookup_[lookup_index(J2, P2, J1, P1, T3, t.lmax)] =
                 static_cast<std::int32_t>(channels_.size());
             channels_.push_back(std::move(ch));
@@ -112,8 +119,8 @@ No2bThreeBody::No2bThreeBody(const No2bTruncation& t) : trunc_(t) {
   values_.assign(offset, 0.0F);
 }
 
-std::optional<std::int32_t> No2bThreeBody::isospin_orbit_index(std::int32_t n, std::int32_t l,
-                                                               TwoJ j2) const noexcept {
+std::optional<std::int32_t> No2bThreeBody::isospin_orbit_index(
+    std::int32_t n, std::int32_t l, TwoJ j2) const noexcept {
   for (std::size_t i = 0; i < orbits_.size(); ++i) {
     if (orbits_[i].n == n && orbits_[i].l == l && orbits_[i].j2 == j2) {
       return static_cast<std::int32_t>(i);
@@ -122,25 +129,30 @@ std::optional<std::int32_t> No2bThreeBody::isospin_orbit_index(std::int32_t n, s
   return std::nullopt;
 }
 
-std::optional<std::int32_t> No2bThreeBody::channel_index(std::int32_t J2, std::int32_t P2,
-                                                         std::int32_t J1, std::int32_t P1,
-                                                         std::int32_t T3) const noexcept {
+std::optional<std::int32_t> No2bThreeBody::channel_index(
+    std::int32_t J2, std::int32_t P2, std::int32_t J1, std::int32_t P1,
+    std::int32_t T3) const noexcept {
   if (channel_lookup_.empty()) return std::nullopt;
   const std::int32_t j2max = std::min(2 * trunc_.lmax + 1, trunc_.e2max + 1);
-  if (J2 < 0 || J2 > j2max || (P2 != 0 && P2 != 1) || (P1 != 0 && P1 != 1)) return std::nullopt;
+  if (J2 < 0 || J2 > j2max || (P2 != 0 && P2 != 1) || (P1 != 0 && P1 != 1))
+    return std::nullopt;
   if (J1 < 1 || J1 > 2 * trunc_.lmax + 1 || J1 % 2 == 0) return std::nullopt;
   if (T3 != 1 && T3 != 3) return std::nullopt;
-  const std::int32_t c = channel_lookup_[lookup_index(J2, P2, J1, P1, T3, trunc_.lmax)];
+  const std::int32_t c =
+      channel_lookup_[lookup_index(J2, P2, J1, P1, T3, trunc_.lmax)];
   if (c < 0) return std::nullopt;
   return c;
 }
 
-void No2bThreeBody::set_isospin(std::int32_t a, std::int32_t b, std::int32_t c, std::int32_t Tab,
-                                std::int32_t d, std::int32_t e, std::int32_t f, std::int32_t Tde,
-                                std::int32_t J2, std::int32_t twoT, double v) {
+void No2bThreeBody::set_isospin(std::int32_t a, std::int32_t b, std::int32_t c,
+                                std::int32_t Tab, std::int32_t d,
+                                std::int32_t e, std::int32_t f,
+                                std::int32_t Tde, std::int32_t J2,
+                                std::int32_t twoT, double v) {
   const auto norb = static_cast<std::int32_t>(orbits_.size());
   for (std::int32_t i : {a, b, c, d, e, f}) {
-    IMSRG_CHECK(i >= 0 && i < norb, "No2bThreeBody::set_isospin: orbit index out of range");
+    IMSRG_CHECK(i >= 0 && i < norb,
+                "No2bThreeBody::set_isospin: orbit index out of range");
   }
   const auto& oa = orbits_[static_cast<std::size_t>(a)];
   const auto& ob = orbits_[static_cast<std::size_t>(b)];
@@ -149,17 +161,20 @@ void No2bThreeBody::set_isospin(std::int32_t a, std::int32_t b, std::int32_t c, 
   const auto& oe = orbits_[static_cast<std::size_t>(e)];
   const auto& of = orbits_[static_cast<std::size_t>(f)];
   const std::int32_t P1 = oc.l % 2;
-  IMSRG_CHECK(P1 == of.l % 2, "No2bThreeBody::set_isospin: parity of c and f differs");
+  IMSRG_CHECK(P1 == of.l % 2,
+              "No2bThreeBody::set_isospin: parity of c and f differs");
   IMSRG_CHECK(oc.j2 == of.j2, "No2bThreeBody::set_isospin: j_c != j_f");
   const std::int32_t P2 = (oa.l + ob.l) % 2;
-  IMSRG_CHECK(P2 == (od.l + oe.l) % 2, "No2bThreeBody::set_isospin: pair parities differ");
+  IMSRG_CHECK(P2 == (od.l + oe.l) % 2,
+              "No2bThreeBody::set_isospin: pair parities differ");
   const auto ch = channel_index(J2, P2, oc.j2.twice, P1, twoT);
   IMSRG_CHECK(ch.has_value(), "No2bThreeBody::set_isospin: channel not stored");
   const Channel& channel = channels_[static_cast<std::size_t>(*ch)];
   const auto bra = channel.states.find(state_key(a, b, c, Tab));
   const auto ket = channel.states.find(state_key(d, e, f, Tde));
-  IMSRG_CHECK(bra != channel.states.end() && ket != channel.states.end(),
-              "No2bThreeBody::set_isospin: state not stored (truncation or Pauli)");
+  IMSRG_CHECK(
+      bra != channel.states.end() && ket != channel.states.end(),
+      "No2bThreeBody::set_isospin: state not stored (truncation or Pauli)");
   const auto ib = static_cast<std::size_t>(bra->second.first);
   const auto ik = static_cast<std::size_t>(ket->second.first);
   const std::size_t hi = std::max(ib, ik);
@@ -168,9 +183,12 @@ void No2bThreeBody::set_isospin(std::int32_t a, std::int32_t b, std::int32_t c, 
   values_[channel.offset + hi * (hi + 1) / 2 + lo] = static_cast<float>(v * ph);
 }
 
-double No2bThreeBody::get_isospin(std::int32_t a, std::int32_t b, std::int32_t c, std::int32_t Tab,
-                                  std::int32_t d, std::int32_t e, std::int32_t f, std::int32_t Tde,
-                                  std::int32_t J2, std::int32_t twoT) const noexcept {
+double No2bThreeBody::get_isospin(std::int32_t a, std::int32_t b,
+                                  std::int32_t c, std::int32_t Tab,
+                                  std::int32_t d, std::int32_t e,
+                                  std::int32_t f, std::int32_t Tde,
+                                  std::int32_t J2,
+                                  std::int32_t twoT) const noexcept {
   const auto norb = static_cast<std::int32_t>(orbits_.size());
   for (std::int32_t i : {a, b, c, d, e, f}) {
     if (i < 0 || i >= norb) return 0.0;
@@ -196,11 +214,13 @@ double No2bThreeBody::get_isospin(std::int32_t a, std::int32_t b, std::int32_t c
   const std::size_t hi = std::max(ib, ik);
   const std::size_t lo = std::min(ib, ik);
   const std::int32_t ph = bra->second.second * ket->second.second;
-  return ph * static_cast<double>(values_[channel.offset + hi * (hi + 1) / 2 + lo]);
+  return ph *
+         static_cast<double>(values_[channel.offset + hi * (hi + 1) / 2 + lo]);
 }
 
-double No2bThreeBody::get_pn(const basis::Orbit& a, const basis::Orbit& b, const basis::Orbit& c,
-                             const basis::Orbit& d, const basis::Orbit& e, const basis::Orbit& f,
+double No2bThreeBody::get_pn(const basis::Orbit& a, const basis::Orbit& b,
+                             const basis::Orbit& c, const basis::Orbit& d,
+                             const basis::Orbit& e, const basis::Orbit& f,
                              std::int32_t J2) const noexcept {
   if (c.l % 2 != f.l % 2 || c.j2 != f.j2) return 0.0;
   if ((a.l + b.l) % 2 != (d.l + e.l) % 2) return 0.0;
@@ -221,17 +241,22 @@ double No2bThreeBody::get_pn(const basis::Orbit& a, const basis::Orbit& b, const
     if (std::abs(zab) > 2 * t12) continue;
     for (std::int32_t t45 : {0, 1}) {
       if (std::abs(zde) > 2 * t45) continue;
-      for (std::int32_t twoT = 1; twoT <= std::min(2 * t12 + 1, 2 * t45 + 1); twoT += 2) {
-        const double w = get_isospin(*i1, *i2, *i3, t12, *i4, *i5, *i6, t45, J2, twoT);
-        vout += w *
-                angmom::clebsch_gordan(half, TwoM{a.tz2.twice}, half, TwoM{b.tz2.twice},
-                                       TwoJ{2 * t12}, TwoM{zab}) *
-                angmom::clebsch_gordan(half, TwoM{d.tz2.twice}, half, TwoM{e.tz2.twice},
-                                       TwoJ{2 * t45}, TwoM{zde}) *
-                angmom::clebsch_gordan(TwoJ{2 * t12}, TwoM{zab}, half, TwoM{c.tz2.twice},
-                                       TwoJ{twoT}, TwoM{z3}) *
-                angmom::clebsch_gordan(TwoJ{2 * t45}, TwoM{zde}, half, TwoM{f.tz2.twice},
-                                       TwoJ{twoT}, TwoM{z3});
+      for (std::int32_t twoT = 1; twoT <= std::min(2 * t12 + 1, 2 * t45 + 1);
+           twoT += 2) {
+        const double w =
+            get_isospin(*i1, *i2, *i3, t12, *i4, *i5, *i6, t45, J2, twoT);
+        vout +=
+            w *
+            angmom::clebsch_gordan(half, TwoM{a.tz2.twice}, half,
+                                   TwoM{b.tz2.twice}, TwoJ{2 * t12},
+                                   TwoM{zab}) *
+            angmom::clebsch_gordan(half, TwoM{d.tz2.twice}, half,
+                                   TwoM{e.tz2.twice}, TwoJ{2 * t45},
+                                   TwoM{zde}) *
+            angmom::clebsch_gordan(TwoJ{2 * t12}, TwoM{zab}, half,
+                                   TwoM{c.tz2.twice}, TwoJ{twoT}, TwoM{z3}) *
+            angmom::clebsch_gordan(TwoJ{2 * t45}, TwoM{zde}, half,
+                                   TwoM{f.tz2.twice}, TwoJ{twoT}, TwoM{z3});
       }
     }
   }
@@ -240,7 +265,8 @@ double No2bThreeBody::get_pn(const basis::Orbit& a, const basis::Orbit& b, const
 
 double No2bThreeBody::norm() const noexcept {
   double s = 0.0;
-  for (const float v : values_) s += static_cast<double>(v) * static_cast<double>(v);
+  for (const float v : values_)
+    s += static_cast<double>(v) * static_cast<double>(v);
   return std::sqrt(s);
 }
 

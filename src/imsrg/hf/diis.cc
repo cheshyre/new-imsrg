@@ -14,7 +14,8 @@ namespace imsrg::hf::detail {
 
 namespace {
 
-double weighted_dot(const std::vector<double>& w, const linalg::Matrix<double>& x,
+double weighted_dot(const std::vector<double>& w,
+                    const linalg::Matrix<double>& x,
                     const linalg::Matrix<double>& y) {
   double s = 0.0;
   for (std::int64_t b = 0; b < x.cols(); ++b) {
@@ -32,7 +33,8 @@ PulayDiis::PulayDiis(std::vector<double> weights, std::size_t max_vectors)
   IMSRG_CHECK(max_vectors_ >= 1, "DIIS subspace must hold at least one vector");
 }
 
-void PulayDiis::push(const linalg::Matrix<double>& F, const linalg::Matrix<double>& e) {
+void PulayDiis::push(const linalg::Matrix<double>& F,
+                     const linalg::Matrix<double>& e) {
   IMSRG_CHECK(F.rows() == e.rows() && F.cols() == e.cols() &&
                   F.rows() == static_cast<std::int64_t>(weights_.size()),
               "DIIS pair has the wrong shape");
@@ -58,7 +60,8 @@ linalg::Matrix<double> PulayDiis::extrapolate() const {
   IMSRG_CHECK(!fock_.empty(), "DIIS extrapolation needs at least one pair");
   const std::size_t m = fock_.size();
 
-  linalg::Matrix<double> B(static_cast<std::int64_t>(m), static_cast<std::int64_t>(m));
+  linalg::Matrix<double> B(static_cast<std::int64_t>(m),
+                           static_cast<std::int64_t>(m));
   double bmax = 0.0;
   for (std::size_t i = 0; i < m; ++i) {
     for (std::size_t j = i; j < m; ++j) {
@@ -73,15 +76,19 @@ linalg::Matrix<double> PulayDiis::extrapolate() const {
   coeff[m - 1] = 1.0;  // fallback: newest pair only
   last_used_ = 1;
   if (bmax > 0.0) {
-    // Drop the oldest pairs one at a time until the bordered system is well posed.
+    // Drop the oldest pairs one at a time until the bordered system is well
+    // posed.
     for (std::size_t start = 0; start + 1 < m; ++start) {
       const std::size_t k = m - start;
-      linalg::Matrix<double> A(static_cast<std::int64_t>(k + 1), static_cast<std::int64_t>(k + 1));
+      linalg::Matrix<double> A(static_cast<std::int64_t>(k + 1),
+                               static_cast<std::int64_t>(k + 1));
       linalg::Matrix<double> rhs(static_cast<std::int64_t>(k + 1), 1);
       for (std::size_t i = 0; i < k; ++i) {
         for (std::size_t j = 0; j < k; ++j) {
           A(static_cast<std::int64_t>(i), static_cast<std::int64_t>(j)) =
-              B(static_cast<std::int64_t>(start + i), static_cast<std::int64_t>(start + j)) / bmax;
+              B(static_cast<std::int64_t>(start + i),
+                static_cast<std::int64_t>(start + j)) /
+              bmax;
         }
         A(static_cast<std::int64_t>(i), static_cast<std::int64_t>(k)) = 1.0;
         A(static_cast<std::int64_t>(k), static_cast<std::int64_t>(i)) = 1.0;
@@ -99,7 +106,8 @@ linalg::Matrix<double> PulayDiis::extrapolate() const {
       }
       if (!ok) continue;
       std::fill(coeff.begin(), coeff.end(), 0.0);
-      for (std::size_t i = 0; i < k; ++i) coeff[start + i] = rhs(static_cast<std::int64_t>(i), 0);
+      for (std::size_t i = 0; i < k; ++i)
+        coeff[start + i] = rhs(static_cast<std::int64_t>(i), 0);
       last_used_ = k;
       break;
     }
@@ -109,7 +117,8 @@ linalg::Matrix<double> PulayDiis::extrapolate() const {
   for (std::size_t k = 0; k < m; ++k) {
     if (coeff[k] == 0.0) continue;
     for (std::int64_t b = 0; b < out.cols(); ++b) {
-      for (std::int64_t a = 0; a < out.rows(); ++a) out(a, b) += coeff[k] * fock_[k](a, b);
+      for (std::int64_t a = 0; a < out.rows(); ++a)
+        out(a, b) += coeff[k] * fock_[k](a, b);
     }
   }
   return out;

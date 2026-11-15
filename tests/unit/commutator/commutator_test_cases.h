@@ -5,8 +5,9 @@
 #define TESTS_UNIT_COMMUTATOR_COMMUTATOR_TEST_CASES_H_
 
 /// @file
-/// Test data shared by the commutator unit tests: the golden pairs, the random-operator model
-/// spaces and hermiticity pairs, and the comparison helpers.
+/// Test data shared by the commutator unit tests: the golden pairs, the
+/// random-operator model spaces and hermiticity pairs, and the comparison
+/// helpers.
 
 #include <memory>
 #include <string>
@@ -21,20 +22,23 @@ namespace imsrg::commutator_test {
 /// Tolerance of design/30 section 2 on `testing::relative_deviation`.
 inline constexpr double kTol = 1e-10;
 
-/// One golden pair: directory below tests/golden/commutator and the names of the X and Y dumps.
+/// One golden pair: directory below tests/golden/commutator and the names of
+/// the X and Y dumps.
 struct GoldenPair {
   std::string dir;
   std::string x;
   std::string y;
 };
 
-/// All golden pairs of the three golden directories (emax2_O16, emax1_He4, emax1_He6).
+/// All golden pairs of the three golden directories (emax2_O16, emax1_He4,
+/// emax1_He6).
 const std::vector<GoldenPair>& golden_pairs();
 
 /// Relative path ("commutator/<dir>/<name>.dump") of a dump of `p.dir`.
 std::string dump_path(const GoldenPair& p, const std::string& name);
 
-/// Relative path of the golden result of `term` (an imsrg++ term name or "all") for `p`.
+/// Relative path of the golden result of `term` (an imsrg++ term name or "all")
+/// for `p`.
 std::string result_path(const GoldenPair& p, const std::string& term);
 
 /// A model space of the random-operator tests.
@@ -51,7 +55,8 @@ const std::vector<SpaceCase>& space_cases();
 /// Builds the model space of `c` (integer or fractional occupations).
 std::shared_ptr<const basis::ModelSpace> make_space(const SpaceCase& c);
 
-/// A pair of hermiticities and the particle ranks of X and Y of a random-operator case.
+/// A pair of hermiticities and the particle ranks of X and Y of a
+/// random-operator case.
 struct HermPair {
   const char* label;
   Hermiticity x;

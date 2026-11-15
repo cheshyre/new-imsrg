@@ -4,9 +4,10 @@
 #ifndef TESTS_UNIT_DRIVER_INTEGRATION_SNT_COMPARE_H_
 #define TESTS_UNIT_DRIVER_INTEGRATION_SNT_COMPARE_H_
 /// @file
-/// Reader and comparison of tokyo-format `.snt` files (the format of imsrg++ `int.snt` and of
-/// `io::write_tokyo`): zero body from the "! Zero body term:" comment, the orbit table, one-body
-/// elements `a b value` and two-body elements `a b c d J value`.
+/// Reader and comparison of tokyo-format `.snt` files (the format of imsrg++
+/// `int.snt` and of `io::write_tokyo`): zero body from the "! Zero body term:"
+/// comment, the orbit table, one-body elements `a b value` and two-body
+/// elements `a b c d J value`.
 
 #include <algorithm>
 #include <array>
@@ -28,10 +29,12 @@ struct SntData {
   double zero_body = 0.0;
   std::vector<std::array<int, 5>> orbits;  ///< idx n l 2j 2tz
   std::map<std::array<int, 2>, double> one_body;
-  /// key (a, b, c, d, J) with a <= b, c <= d, (a, b) <= (c, d); value carries the pair-swap phases.
+  /// key (a, b, c, d, J) with a <= b, c <= d, (a, b) <= (c, d); value carries
+  /// the pair-swap phases.
   std::map<std::array<int, 5>, double> two_body;
-  std::size_t two_body_lines = 0;   ///< lines read
-  std::size_t duplicate_lines = 0;  ///< lines whose canonical key was already present
+  std::size_t two_body_lines = 0;  ///< lines read
+  std::size_t duplicate_lines =
+      0;  ///< lines whose canonical key was already present
 
   /// 2j of orbit index `idx` (1-based). @throws std::runtime_error if unknown.
   int two_j(int idx) const {
@@ -41,9 +44,10 @@ struct SntData {
   }
 };
 
-/// Reads `path`. Elements are stored canonically: one-body (a <= b); two-body with each pair
-/// ordered a <= b (phase -(-1)^{ja + jb - J} on a swap) and bra <= ket (the matrices are real
-/// symmetric). @throws std::runtime_error on a malformed or missing file.
+/// Reads `path`. Elements are stored canonically: one-body (a <= b); two-body
+/// with each pair ordered a <= b (phase -(-1)^{ja + jb - J} on a swap) and bra
+/// <= ket (the matrices are real symmetric). @throws std::runtime_error on a
+/// malformed or missing file.
 inline SntData read_snt(const std::filesystem::path& path) {
   std::ifstream in(path);
   if (!in) throw std::runtime_error("cannot open " + path.string());
@@ -65,15 +69,17 @@ inline SntData read_snt(const std::filesystem::path& path) {
   std::size_t r = 0;
   auto need = [&](std::size_t ntok) -> const std::vector<std::string>& {
     if (r >= rows.size() || rows[r].size() < ntok)
-      throw std::runtime_error("snt: malformed line " + std::to_string(r) + " in " + path.string());
+      throw std::runtime_error("snt: malformed line " + std::to_string(r) +
+                               " in " + path.string());
     return rows[r++];
   };
   const auto& ms = need(4);
   const int norb = std::atoi(ms[0].c_str()) + std::atoi(ms[1].c_str());
   for (int i = 0; i < norb; ++i) {
     const auto& t = need(5);
-    d.orbits.push_back({std::atoi(t[0].c_str()), std::atoi(t[1].c_str()), std::atoi(t[2].c_str()),
-                        std::atoi(t[3].c_str()), std::atoi(t[4].c_str())});
+    d.orbits.push_back({std::atoi(t[0].c_str()), std::atoi(t[1].c_str()),
+                        std::atoi(t[2].c_str()), std::atoi(t[3].c_str()),
+                        std::atoi(t[4].c_str())});
   }
   const auto n1 = static_cast<std::size_t>(std::atoi(need(3)[0].c_str()));
   for (std::size_t i = 0; i < n1; ++i) {
@@ -97,13 +103,16 @@ inline SntData read_snt(const std::filesystem::path& path) {
         if (((e % 2) + 2) % 2 == 0) v = -v;  // -(-1)^e
       }
     }
-    if (std::array<int, 2>{idx[0], idx[1]} > std::array<int, 2>{idx[2], idx[3]}) {
+    if (std::array<int, 2>{idx[0], idx[1]} >
+        std::array<int, 2>{idx[2], idx[3]}) {
       std::swap(idx[0], idx[2]);
       std::swap(idx[1], idx[3]);
     }
     ++d.two_body_lines;
     const bool fresh =
-        d.two_body.emplace(std::array<int, 5>{idx[0], idx[1], idx[2], idx[3], J}, v).second;
+        d.two_body
+            .emplace(std::array<int, 5>{idx[0], idx[1], idx[2], idx[3], J}, v)
+            .second;
     if (!fresh) ++d.duplicate_lines;
   }
   return d;
@@ -114,18 +123,23 @@ struct SntComparison {
   double zero_dev = 0.0;    ///< |zero body difference|
   double max_dev_1b = 0.0;  ///< largest one-body deviation
   double max_dev_2b = 0.0;  ///< largest two-body deviation
-  std::size_t missing = 0;  ///< elements > `threshold` in one file and absent in the other
+  std::size_t missing =
+      0;  ///< elements > `threshold` in one file and absent in the other
   std::size_t n1b_a = 0, n1b_b = 0, n2b_a = 0, n2b_b = 0;
   bool orbits_equal = true;
   std::string worst;  ///< description of the largest two-body deviation
 
   /// Largest deviation of any kind.
-  double max_dev() const { return std::max({zero_dev, max_dev_1b, max_dev_2b}); }
+  double max_dev() const {
+    return std::max({zero_dev, max_dev_1b, max_dev_2b});
+  }
 };
 
-/// Compares `a` (computed) with `b` (golden). An element absent from one side counts as 0 there
-/// and is tallied in `missing` if its magnitude on the other side exceeds `threshold`.
-inline SntComparison compare_snt(const SntData& a, const SntData& b, double threshold) {
+/// Compares `a` (computed) with `b` (golden). An element absent from one side
+/// counts as 0 there and is tallied in `missing` if its magnitude on the other
+/// side exceeds `threshold`.
+inline SntComparison compare_snt(const SntData& a, const SntData& b,
+                                 double threshold) {
   SntComparison c;
   c.zero_dev = std::abs(a.zero_body - b.zero_body);
   c.n1b_a = a.one_body.size();
@@ -133,7 +147,8 @@ inline SntComparison compare_snt(const SntData& a, const SntData& b, double thre
   c.n2b_a = a.two_body.size();
   c.n2b_b = b.two_body.size();
   c.orbits_equal = (a.orbits == b.orbits);
-  auto walk = [&](const auto& ma, const auto& mb, double& maxdev, auto describe) {
+  auto walk = [&](const auto& ma, const auto& mb, double& maxdev,
+                  auto describe) {
     auto ia = ma.begin();
     auto ib = mb.begin();
     while (ia != ma.end() || ib != mb.end()) {
@@ -162,13 +177,15 @@ inline SntComparison compare_snt(const SntData& a, const SntData& b, double thre
       }
     }
   };
-  walk(a.one_body, b.one_body, c.max_dev_1b, [](const auto&, double, double) {});
-  walk(a.two_body, b.two_body, c.max_dev_2b, [&](const auto& k, double va, double vb) {
-    std::ostringstream os;
-    os << "(" << k[0] << " " << k[1] << " " << k[2] << " " << k[3] << ") J=" << k[4] << " computed "
-       << va << " golden " << vb;
-    c.worst = os.str();
-  });
+  walk(a.one_body, b.one_body, c.max_dev_1b,
+       [](const auto&, double, double) {});
+  walk(a.two_body, b.two_body, c.max_dev_2b,
+       [&](const auto& k, double va, double vb) {
+         std::ostringstream os;
+         os << "(" << k[0] << " " << k[1] << " " << k[2] << " " << k[3]
+            << ") J=" << k[4] << " computed " << va << " golden " << vb;
+         c.worst = os.str();
+       });
   return c;
 }
 

@@ -3,8 +3,9 @@
 
 #ifndef TESTS_UNIT_HF_HF_TEST_SUPPORT_H_
 #define TESTS_UNIT_HF_HF_TEST_SUPPORT_H_
-// Shared helpers of the hf tests: a tiny JSON reader for the golden hf.json files, loading of
-// the Hamiltonian / NO2B inputs, and the comparison of an HFResult with the golden values.
+// Shared helpers of the hf tests: a tiny JSON reader for the golden hf.json
+// files, loading of the Hamiltonian / NO2B inputs, and the comparison of an
+// HFResult with the golden values.
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -30,7 +31,8 @@ namespace imsrg::hftest {
 
 namespace fs = std::filesystem;
 
-/// A JSON value reduced to what the golden files contain: numbers, arrays, objects.
+/// A JSON value reduced to what the golden files contain: numbers, arrays,
+/// objects.
 struct Json {
   double number = 0.0;
   std::vector<Json> items;
@@ -56,7 +58,8 @@ class JsonParser {
 
  private:
   void ws() {
-    while (p_ < s_.size() && std::isspace(static_cast<unsigned char>(s_[p_]))) ++p_;
+    while (p_ < s_.size() && std::isspace(static_cast<unsigned char>(s_[p_])))
+      ++p_;
   }
   std::string str() {
     std::string out;
@@ -98,7 +101,8 @@ class JsonParser {
       ++p_;
     } else if (c == '"') {
       str();
-    } else if (s_.compare(p_, 4, "null") == 0 || s_.compare(p_, 4, "true") == 0) {
+    } else if (s_.compare(p_, 4, "null") == 0 ||
+               s_.compare(p_, 4, "true") == 0) {
       p_ += 4;
     } else if (s_.compare(p_, 5, "false") == 0) {
       p_ += 5;
@@ -143,29 +147,35 @@ inline Golden load_golden(const fs::path& path) {
   return g;
 }
 
-/// Max |spe - golden|, printed with the other deviations by `compare_to_golden`.
+/// Max |spe - golden|, printed with the other deviations by
+/// `compare_to_golden`.
 inline double max_spe_diff(const hf::HFResult& r, const Golden& g) {
   double d = 0.0;
-  for (std::size_t i = 0; i < g.spe.size(); ++i) d = std::max(d, std::abs(r.spe[i] - g.spe[i]));
+  for (std::size_t i = 0; i < g.spe.size(); ++i)
+    d = std::max(d, std::abs(r.spe[i] - g.spe[i]));
   return d;
 }
 
-/// Compares and prints every deviation. Tolerances: E_HF `e_tol`, spe `spe_tol`, C `c_tol`.
-inline void compare_to_golden(const hf::HFResult& r, const Golden& g, const std::string& tag,
-                              double e_tol, double spe_tol, double c_tol) {
+/// Compares and prints every deviation. Tolerances: E_HF `e_tol`, spe
+/// `spe_tol`, C `c_tol`.
+inline void compare_to_golden(const hf::HFResult& r, const Golden& g,
+                              const std::string& tag, double e_tol,
+                              double spe_tol, double c_tol) {
   ASSERT_EQ(r.spe.size(), g.spe.size());
   double dc = 0.0, docc = 0.0;
   for (std::size_t i = 0; i < g.spe.size(); ++i) {
     docc = std::max(docc, std::abs(r.occupations[i] - g.occupation[i]));
     for (std::size_t a = 0; a < g.spe.size(); ++a) {
-      dc = std::max(dc, std::abs(r.C(static_cast<std::int64_t>(i), static_cast<std::int64_t>(a)) -
+      dc = std::max(dc, std::abs(r.C(static_cast<std::int64_t>(i),
+                                     static_cast<std::int64_t>(a)) -
                                  g.C[i][a]));
     }
   }
   const double dspe = max_spe_diff(r, g);
-  std::cout << "[" << tag << "] dE_HF " << r.e_hf - g.e_hf << ", de1 " << r.e1 - g.e1 << ", de2 "
-            << r.e2 - g.e2 << ", de3 " << r.e3 - g.e3 << ", max|dspe| " << dspe << ", max|dC| "
-            << dc << ", max|docc| " << docc << ", iterations " << r.iterations << " (golden "
+  std::cout << "[" << tag << "] dE_HF " << r.e_hf - g.e_hf << ", de1 "
+            << r.e1 - g.e1 << ", de2 " << r.e2 - g.e2 << ", de3 " << r.e3 - g.e3
+            << ", max|dspe| " << dspe << ", max|dC| " << dc << ", max|docc| "
+            << docc << ", iterations " << r.iterations << " (golden "
             << g.iterations << ")\n";
   EXPECT_NEAR(r.e_hf, g.e_hf, e_tol);
   EXPECT_NEAR(r.e1, g.e1, 10 * e_tol);
@@ -187,13 +197,16 @@ inline op::Operator load_hamiltonian(const fs::path& dir) {
 
 /// The NO2B file of the 2N+3N cases (outside the repo); empty path if absent.
 inline fs::path no2b_file() {
-  const fs::path p = fs::path(IMSRG_TEST_DATA_DIR) /
-                     "NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin";
+  const fs::path p =
+      fs::path(IMSRG_TEST_DATA_DIR) /
+      "NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin";
   return fs::exists(p) ? p : fs::path{};
 }
 
-/// Reads the NO2B file (stored with truncation {6,12,18,6}) into a container with `trunc`.
-inline op::No2bThreeBody load_v3(const fs::path& file, const op::No2bTruncation& trunc) {
+/// Reads the NO2B file (stored with truncation {6,12,18,6}) into a container
+/// with `trunc`.
+inline op::No2bThreeBody load_v3(const fs::path& file,
+                                 const op::No2bTruncation& trunc) {
   op::No2bThreeBody v3(trunc);
   io::read_no2b(file, {.file = {6, 12, 18, 6}}, v3);
   return v3;

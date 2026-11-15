@@ -29,7 +29,8 @@ std::vector<int> range(int lo, int hi) {  // [lo, hi]
 }
 
 SingleParticleBasis make_basis(int emax) {
-  return SingleParticleBasis::harmonic_oscillator(BasisTruncation{emax, -1, -1, -1}, 16.0);
+  return SingleParticleBasis::harmonic_oscillator(
+      BasisTruncation{emax, -1, -1, -1}, 16.0);
 }
 
 TEST(Reference, O16Emax2) {
@@ -45,7 +46,8 @@ TEST(Reference, O16Emax2) {
   EXPECT_EQ(ref.name(), "O16");
   EXPECT_DOUBLE_EQ(ref.e_fermi(kProton), 1.5);
   EXPECT_DOUBLE_EQ(ref.e_fermi(kNeutron), 1.5);
-  for (int a = 0; a < 12; ++a) EXPECT_EQ(ref.occupation(OrbitIndex{a}), a < 6 ? 1.0 : 0.0);
+  for (int a = 0; a < 12; ++a)
+    EXPECT_EQ(ref.occupation(OrbitIndex{a}), a < 6 ? 1.0 : 0.0);
   EXPECT_TRUE(ref.is_hole(OrbitIndex{5}));
   EXPECT_FALSE(ref.is_hole(OrbitIndex{6}));
 }
@@ -81,7 +83,8 @@ TEST(Reference, Ne20FractionalSd) {
 
 TEST(Reference, VacuumHasNoHoles) {
   const auto basis = make_basis(2);
-  const Reference ref = Reference::from_nucleus(basis, Nucleus::parse("vacuum"));
+  const Reference ref =
+      Reference::from_nucleus(basis, Nucleus::parse("vacuum"));
   EXPECT_TRUE(ref.holes().empty());
   EXPECT_EQ(ints(ref.particles()), range(0, 11));
   EXPECT_DOUBLE_EQ(ref.A(), 0.0);
@@ -92,11 +95,13 @@ TEST(Reference, VacuumHasNoHoles) {
 }
 
 TEST(Reference, EnsembleMix) {
-  // mix_A4.5_Z2.5: protons 2.5 = 0s1/2 (2) + 0.5 in 0p3/2 (occ 0.125); neutrons 2 = 0s1/2 full.
-  // Protons: occmax 0.125, last hole shell 1 -> e_fermi 1. Neutrons: occmax 1, last hole shell 0,
-  // lowest neutron particle shell 1 -> 0.5.
+  // mix_A4.5_Z2.5: protons 2.5 = 0s1/2 (2) + 0.5 in 0p3/2 (occ 0.125); neutrons
+  // 2 = 0s1/2 full. Protons: occmax 0.125, last hole shell 1 -> e_fermi 1.
+  // Neutrons: occmax 1, last hole shell 0, lowest neutron particle shell 1 ->
+  // 0.5.
   const auto basis = make_basis(2);
-  const Reference ref = Reference::from_nucleus(basis, Nucleus::parse("mix_A4.5_Z2.5"));
+  const Reference ref =
+      Reference::from_nucleus(basis, Nucleus::parse("mix_A4.5_Z2.5"));
   EXPECT_DOUBLE_EQ(ref.A(), 4.5);
   EXPECT_DOUBLE_EQ(ref.Z(), 2.5);
   EXPECT_DOUBLE_EQ(ref.N(), 2.0);
@@ -112,7 +117,8 @@ TEST(Reference, Emax4) {
   const auto basis = make_basis(4);
   const Reference o16 = Reference::from_nucleus(basis, Nucleus::parse("O16"));
   EXPECT_EQ(ints(o16.holes()), range(0, 5));
-  EXPECT_EQ(o16.particles().size(), static_cast<std::size_t>(basis.num_orbits() - 6));
+  EXPECT_EQ(o16.particles().size(),
+            static_cast<std::size_t>(basis.num_orbits() - 6));
   EXPECT_DOUBLE_EQ(o16.e_fermi(kProton), 1.5);
   EXPECT_DOUBLE_EQ(o16.A(), 16.0);
 
@@ -120,7 +126,8 @@ TEST(Reference, Emax4) {
   EXPECT_DOUBLE_EQ(ca48.A(), 48.0);
   EXPECT_DOUBLE_EQ(ca48.Z(), 20.0);
 
-  const Reference vac = Reference::from_nucleus(basis, Nucleus::parse("vacuum"));
+  const Reference vac =
+      Reference::from_nucleus(basis, Nucleus::parse("vacuum"));
   EXPECT_TRUE(vac.holes().empty());
   EXPECT_DOUBLE_EQ(vac.e_fermi(kNeutron), -1.0);
 
@@ -133,8 +140,10 @@ TEST(Reference, Emax4) {
 
 TEST(Reference, FromOccupationsErrors) {
   const auto basis = make_basis(2);
-  EXPECT_THROW(Reference::from_occupations(basis, std::vector<double>(11, 0.0)), InputError);
-  EXPECT_THROW(Reference::from_occupations(basis, std::vector<double>(13, 0.0)), InputError);
+  EXPECT_THROW(Reference::from_occupations(basis, std::vector<double>(11, 0.0)),
+               InputError);
+  EXPECT_THROW(Reference::from_occupations(basis, std::vector<double>(13, 0.0)),
+               InputError);
   std::vector<double> occ(12, 0.0);
   occ[3] = 1.5;
   EXPECT_THROW(Reference::from_occupations(basis, occ), InputError);
@@ -160,10 +169,13 @@ TEST(Reference, TinyOccupationIsParticle) {
 
 TEST(Reference, FromNucleusErrors) {
   // lmax = 0 removes p orbits: O16 cannot be filled.
-  const auto s_only = SingleParticleBasis::harmonic_oscillator(BasisTruncation{2, 0, -1, -1}, 16.0);
-  EXPECT_THROW(Reference::from_nucleus(s_only, Nucleus::parse("O16")), InputError);
+  const auto s_only = SingleParticleBasis::harmonic_oscillator(
+      BasisTruncation{2, 0, -1, -1}, 16.0);
+  EXPECT_THROW(Reference::from_nucleus(s_only, Nucleus::parse("O16")),
+               InputError);
   // Ca48 does not fit into emax 2.
-  EXPECT_THROW(Reference::from_nucleus(make_basis(2), Nucleus::parse("Ca48")), InputError);
+  EXPECT_THROW(Reference::from_nucleus(make_basis(2), Nucleus::parse("Ca48")),
+               InputError);
 }
 
 TEST(Reference, FromOrbitOccupations) {
@@ -174,15 +186,18 @@ TEST(Reference, FromOrbitOccupations) {
       {p0s1, 0.5}, {n0p3, 1e-9}, {parse_orbit_label("n0s1"), 1.0}, {p0s1, 1.0}};
   const Reference ref = Reference::from_orbit_occupations(basis, entries);
   EXPECT_EQ(ref.name(), "custom");
-  EXPECT_EQ(ints(ref.holes()), (std::vector<int>{0, 1}));  // |occ| < 1e-8 ignored
-  EXPECT_EQ(ref.occupation(OrbitIndex{0}), 1.0);           // later entry overrides
+  EXPECT_EQ(ints(ref.holes()),
+            (std::vector<int>{0, 1}));            // |occ| < 1e-8 ignored
+  EXPECT_EQ(ref.occupation(OrbitIndex{0}), 1.0);  // later entry overrides
   EXPECT_DOUBLE_EQ(ref.A(), 4.0);
 
-  const Reference named = Reference::from_orbit_occupations(basis, entries, "mine");
+  const Reference named =
+      Reference::from_orbit_occupations(basis, entries, "mine");
   EXPECT_EQ(named.name(), "mine");
 
   // Orbit outside the basis.
-  const std::vector<OrbitOccupation> missing = {{parse_orbit_label("p0f7"), 1.0}};
+  const std::vector<OrbitOccupation> missing = {
+      {parse_orbit_label("p0f7"), 1.0}};
   EXPECT_THROW(Reference::from_orbit_occupations(basis, missing), InputError);
   // Occupation out of range.
   const std::vector<OrbitOccupation> bad = {{p0s1, 1.5}};

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Tests of the operator-name grammar and catalog (design/16 section 6.3 item 9).
+// Tests of the operator-name grammar and catalog (design/16 section 6.3 item
+// 9).
 #include <set>
 #include <string>
 #include <vector>
@@ -15,10 +16,16 @@ namespace {
 
 const ModelSpaceInfo kInfo{4};
 
-RawValue str(std::string s) { return RawValue{RawValue::Data{std::move(s)}, SourceRef{}}; }
+RawValue str(std::string s) {
+  return RawValue{RawValue::Data{std::move(s)}, SourceRef{}};
+}
 RawValue num(double d) { return RawValue{RawValue::Data{d}, SourceRef{}}; }
-RawValue integer(std::int64_t i) { return RawValue{RawValue::Data{i}, SourceRef{}}; }
-RawValue table(RawTable t) { return RawValue{RawValue::Data{std::move(t)}, SourceRef{}}; }
+RawValue integer(std::int64_t i) {
+  return RawValue{RawValue::Data{i}, SourceRef{}};
+}
+RawValue table(RawTable t) {
+  return RawValue{RawValue::Data{std::move(t)}, SourceRef{}};
+}
 
 /// Parses one string; the result must be a single request.
 OperatorRequest parse_one(const std::string& spec) {
@@ -47,7 +54,10 @@ TEST(OperatorRequest, EveryP1RowParsesAndRoundTrips) {
       {"Trel", OperatorKind::Trel, {}, "Trel"},
       {"TCM", OperatorKind::Tcm, {}, "TCM"},
       {"Tlab", OperatorKind::Tlab, {}, "Tlab"},
-      {"TrelMassCorrection", OperatorKind::TrelMassCorrection, {}, "TrelMassCorrection"},
+      {"TrelMassCorrection",
+       OperatorKind::TrelMassCorrection,
+       {},
+       "TrelMassCorrection"},
       {"HCM", OperatorKind::Hcm, {}, "HCM"},
       {"HCM_20", OperatorKind::Hcm, {20.0}, "HCM_20"},
       {"HCM_16.5", OperatorKind::Hcm, {16.5}, "HCM_16.5"},
@@ -58,7 +68,10 @@ TEST(OperatorRequest, EveryP1RowParsesAndRoundTrips) {
       {"Rm2", OperatorKind::Rm2, {}, "Rm2"},
       {"Rm2lab", OperatorKind::Rm2lab, {}, "Rm2lab"},
       {"Rp2Z_8", OperatorKind::Rp2Z, {std::int64_t{8}}, "Rp2Z_8"},
-      {"Rp2AZ_16_8", OperatorKind::Rp2AZ, {std::int64_t{16}, std::int64_t{8}}, "Rp2AZ_16_8"},
+      {"Rp2AZ_16_8",
+       OperatorKind::Rp2AZ,
+       {std::int64_t{16}, std::int64_t{8}},
+       "Rp2AZ_16_8"},
       {"Rn2Z_8", OperatorKind::Rn2Z, {std::int64_t{8}}, "Rn2Z_8"},
       {"R2_p1", OperatorKind::R2p1, {}, "R2_p1"},
       {"R2_n1", OperatorKind::R2n1, {}, "R2_n1"},
@@ -67,8 +80,14 @@ TEST(OperatorRequest, EveryP1RowParsesAndRoundTrips) {
       {"Rso", OperatorKind::Rso, {}, "Rso"},
       {"E0", OperatorKind::E0, {}, "E0"},
       {"OccRef", OperatorKind::OccRef, {}, "OccRef"},
-      {"OneOcc_p0s1", OperatorKind::OneOcc, {std::string("p0s1")}, "OneOcc_p0s1"},
-      {"AllOcc_p0d5", OperatorKind::AllOcc, {std::string("p0d5")}, "AllOcc_p0d5"},
+      {"OneOcc_p0s1",
+       OperatorKind::OneOcc,
+       {std::string("p0s1")},
+       "OneOcc_p0s1"},
+      {"AllOcc_p0d5",
+       OperatorKind::AllOcc,
+       {std::string("p0d5")},
+       "AllOcc_p0d5"},
       {"OBD_p0s1_n0p3",
        OperatorKind::Obd,
        {std::string("p0s1"), std::string("n0p3")},
@@ -120,7 +139,9 @@ TEST(OperatorRequest, InlineTableEqualsStringForm) {
 
   // Orbit and integer parameters, and an omitted optional parameter.
   const RawValue more[] = {
-      table({{"name", str("OBD")}, {"orbit1", str("p0s1")}, {"orbit2", str("n0p3")}}),
+      table({{"name", str("OBD")},
+             {"orbit1", str("p0s1")},
+             {"orbit2", str("n0p3")}}),
       table({{"name", str("Rp2AZ")}, {"a", integer(16)}, {"z", integer(8)}}),
       table({{"name", str("HCM")}}),
   };
@@ -137,17 +158,21 @@ TEST(OperatorRequest, InlineTableErrors) {
     const RawValue specs[] = {table(std::move(t))};
     auto r = parse_operator_list(specs, kInfo, "operators.list");
     EXPECT_FALSE(r.has_value());
-    return r.has_value() || r.error().empty() ? std::string() : r.error().front().code;
+    return r.has_value() || r.error().empty() ? std::string()
+                                              : r.error().front().code;
   };
   EXPECT_EQ(code_of({{"name", str("rhop")}}), "E-OP-PARAMS");  // missing
   EXPECT_EQ(code_of({{"name", str("rhop")}, {"r", num(1.0)}, {"x", num(1.0)}}),
-            "E-OP-PARAMS");                                                      // extra
-  EXPECT_EQ(code_of({{"name", str("rhop")}, {"r", str("a")}}), "E-OP-PARAMS");   // type
-  EXPECT_EQ(code_of({{"name", str("rhop")}, {"r", num(-1.0)}}), "E-OP-PARAMS");  // sign
-  EXPECT_EQ(code_of({{"r", num(1.0)}}), "E-OP-PARAMS");                          // no name
+            "E-OP-PARAMS");  // extra
+  EXPECT_EQ(code_of({{"name", str("rhop")}, {"r", str("a")}}),
+            "E-OP-PARAMS");  // type
+  EXPECT_EQ(code_of({{"name", str("rhop")}, {"r", num(-1.0)}}),
+            "E-OP-PARAMS");                              // sign
+  EXPECT_EQ(code_of({{"r", num(1.0)}}), "E-OP-PARAMS");  // no name
   EXPECT_EQ(code_of({{"name", str("Rp3")}}), "E-OP-UNKNOWN");
   EXPECT_EQ(code_of({{"name", str("E2")}}), "E-PLANNED");
-  EXPECT_EQ(code_of({{"name", str("OneOcc")}, {"orbit", str("p9s1")}}), "E-OP-ORBIT");
+  EXPECT_EQ(code_of({{"name", str("OneOcc")}, {"orbit", str("p9s1")}}),
+            "E-OP-ORBIT");
   EXPECT_EQ(code_of({{"name", str("Rp2Z")}, {"z", num(8.5)}}), "E-OP-PARAMS");
 }
 
@@ -155,14 +180,16 @@ TEST(OperatorRequest, WrongArityAndType) {
   const auto issues = errors_of("rhop");
   ASSERT_EQ(issues.size(), 1u);
   EXPECT_EQ(issues[0].code, "E-OP-PARAMS");
-  EXPECT_NE(issues[0].message.find("'rhop' expects 1 parameter (r: number >= 0), got 0"),
+  EXPECT_NE(issues[0].message.find(
+                "'rhop' expects 1 parameter (r: number >= 0), got 0"),
             std::string::npos)
       << issues[0].message;
 
   const auto typed = errors_of("rhop_x");
   ASSERT_EQ(typed.size(), 1u);
   EXPECT_EQ(typed[0].code, "E-OP-PARAMS");
-  EXPECT_NE(typed[0].message.find("'rhop_x': 'x' is not a number"), std::string::npos)
+  EXPECT_NE(typed[0].message.find("'rhop_x': 'x' is not a number"),
+            std::string::npos)
       << typed[0].message;
 
   EXPECT_EQ(errors_of("rhop_1_2")[0].code, "E-OP-PARAMS");
@@ -183,7 +210,8 @@ TEST(OperatorRequest, OrbitErrors) {
   const auto out = errors_of("OneOcc_p3s1");
   ASSERT_EQ(out.size(), 1u);
   EXPECT_EQ(out[0].code, "E-OP-ORBIT");
-  // Malformed label: reported as E-OP-PARAMS (a syntax error, not a model-space error).
+  // Malformed label: reported as E-OP-PARAMS (a syntax error, not a model-space
+  // error).
   EXPECT_EQ(errors_of("OneOcc_xyz")[0].code, "E-OP-PARAMS");
   EXPECT_EQ(errors_of("OBD_p0s1_p3s1")[0].code, "E-OP-ORBIT");
   // Inside emax.
@@ -194,7 +222,8 @@ TEST(OperatorRequest, UnknownNamesGetSuggestions) {
   const auto issues = errors_of("Rp3");
   ASSERT_EQ(issues.size(), 1u);
   EXPECT_EQ(issues[0].code, "E-OP-UNKNOWN");
-  EXPECT_NE(issues[0].message.find("operator 'Rp3' is not known"), std::string::npos);
+  EXPECT_NE(issues[0].message.find("operator 'Rp3' is not known"),
+            std::string::npos);
   ASSERT_TRUE(issues[0].suggestion.has_value());
   EXPECT_EQ(*issues[0].suggestion, "Rp2");
 
@@ -264,7 +293,8 @@ TEST(OperatorRequest, PlannedAndNotSupported) {
   for (const auto& e : operator_catalog()) {
     if (e.phase == Phase::Planned) {
       ++planned;
-      const std::string name = e.name == "QdotQ" ? "QdotQ_2" : std::string(e.name);
+      const std::string name =
+          e.name == "QdotQ" ? "QdotQ_2" : std::string(e.name);
       SCOPED_TRACE(name);
       const auto issues = errors_of(name);
       ASSERT_EQ(issues.size(), 1u);
@@ -273,7 +303,8 @@ TEST(OperatorRequest, PlannedAndNotSupported) {
   }
   EXPECT_GT(planned, 60u);
   const auto e2 = errors_of("E2");
-  EXPECT_NE(e2[0].message.find("operator 'E2' is not available in this build"), std::string::npos);
+  EXPECT_NE(e2[0].message.find("operator 'E2' is not available in this build"),
+            std::string::npos);
   // Parameters on planned operators are accepted at this stage.
   EXPECT_EQ(errors_of("M0nu_GT_1_2")[0].code, "E-PLANNED");
   EXPECT_EQ(errors_of("QdotQ_whatever")[0].code, "E-PLANNED");
@@ -301,8 +332,9 @@ TEST(OperatorRequest, PlannedShapes) {
 }
 
 TEST(OperatorRequest, ErrorsAccumulateOverAList) {
-  const RawValue specs[] = {str("Trel"), str("Rp3"), str("rhop_x"), str("E2"), str("hfsNMS"),
-                            str("Rp2"),  integer(7), str("Trel"),   str("")};
+  const RawValue specs[] = {str("Trel"), str("Rp3"),    str("rhop_x"),
+                            str("E2"),   str("hfsNMS"), str("Rp2"),
+                            integer(7),  str("Trel"),   str("")};
   auto r = parse_operator_list(specs, kInfo, "operators.list");
   ASSERT_FALSE(r.has_value());
   std::vector<std::string> codes;
@@ -310,9 +342,9 @@ TEST(OperatorRequest, ErrorsAccumulateOverAList) {
     codes.push_back(i.code);
     EXPECT_EQ(i.key_path, "operators.list");
   }
-  const std::vector<std::string> expected = {"E-OP-UNKNOWN", "E-OP-PARAMS", "E-PLANNED",
-                                             "E-OP-NS",      "E-OP-PARAMS", "E-OP-DUPLICATE",
-                                             "E-OP-PARAMS"};
+  const std::vector<std::string> expected = {
+      "E-OP-UNKNOWN", "E-OP-PARAMS",    "E-PLANNED",  "E-OP-NS",
+      "E-OP-PARAMS",  "E-OP-DUPLICATE", "E-OP-PARAMS"};
   EXPECT_EQ(codes, expected);
 }
 
@@ -338,9 +370,11 @@ TEST(OperatorCatalog, Sanity) {
   std::set<std::string_view> names;
   bool saw_p1 = false, saw_planned = false, saw_ns = false;
   for (const auto& e : cat) {
-    EXPECT_TRUE(names.insert(e.name).second) << "duplicate catalog name " << e.name;
+    EXPECT_TRUE(names.insert(e.name).second)
+        << "duplicate catalog name " << e.name;
     EXPECT_GE(e.min_params, 0);
-    EXPECT_LE(static_cast<std::size_t>(e.min_params), e.params.size()) << e.name;
+    EXPECT_LE(static_cast<std::size_t>(e.min_params), e.params.size())
+        << e.name;
     switch (e.phase) {
       case Phase::P1:
         saw_p1 = true;

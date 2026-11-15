@@ -25,7 +25,8 @@ using linalg::Matrix;
 /// Everything the iteration needs, built once.
 class Solver {
  public:
-  Solver(const op::Operator& H, const op::No2bThreeBody* v3, const HFOptions& opt)
+  Solver(const op::Operator& H, const op::No2bThreeBody* v3,
+         const HFOptions& opt)
       : H_(H), opt_(opt), norb_(H.model_space().num_orbits()) {
     H_.sync_to_host();
     const auto& basis = H_.model_space().basis();
@@ -45,7 +46,8 @@ class Solver {
       }
     }
     mono2_ = std::make_unique<detail::Monopole2B>(H_);
-    if (v3 != nullptr) mono3_ = std::make_unique<detail::Monopole3B>(H_, *v3, opt.e3max);
+    if (v3 != nullptr)
+      mono3_ = std::make_unique<detail::Monopole3B>(H_, *v3, opt.e3max);
   }
 
   HFResult run() {
@@ -65,11 +67,13 @@ class Solver {
     build_fock(rho_, F_);
 
     std::vector<double> energies(n), prev(n, 0.0);
-    for (std::int32_t i = 0; i < norb_; ++i) energies[static_cast<std::size_t>(i)] = KE_(i, i);
+    for (std::int32_t i = 0; i < norb_; ++i)
+      energies[static_cast<std::size_t>(i)] = KE_(i, i);
 
     std::vector<double> diis_weights(n);
     for (std::size_t i = 0; i < n; ++i) diis_weights[i] = two_j_[i] + 1.0;
-    detail::PulayDiis diis(diis_weights, static_cast<std::size_t>(opt_.diis_subspace));
+    detail::PulayDiis diis(diis_weights,
+                           static_cast<std::size_t>(opt_.diis_subspace));
 
     bool use_diis = opt_.mixing == Mixing::Diis;
     bool freeze = opt_.freeze_occupations;
@@ -83,7 +87,8 @@ class Solver {
         if (fill_lowest_orbits()) diis.clear();
         fill_modulus = (fill_modulus % 5) + 1;
       }
-      if (it == 800) freeze = true;  // imsrg++: stop re-filling a run that does not settle
+      if (it == 800)
+        freeze = true;  // imsrg++: stop re-filling a run that does not settle
 
       Matrix<double> rho_new = density();
       if (use_diis) {
@@ -108,15 +113,17 @@ class Solver {
       energy(res);
 
       double diff = 0.0;
-      for (std::size_t i = 0; i < n; ++i) diff += (energies[i] - prev[i]) * (energies[i] - prev[i]);
+      for (std::size_t i = 0; i < n; ++i)
+        diff += (energies[i] - prev[i]) * (energies[i] - prev[i]);
       diff = std::sqrt(diff) / static_cast<double>(norb_);
       res.ediff_history.push_back(diff);
       if (diff < opt_.tolerance) {
         res.converged = true;
         break;
       }
-      // imsrg++ falls back to DIIS when linear mixing stalls (its own variant, after
-      // iteration 100); here the Pulay DIIS of this module takes over with a fresh history.
+      // imsrg++ falls back to DIIS when linear mixing stalls (its own variant,
+      // after iteration 100); here the Pulay DIIS of this module takes over
+      // with a fresh history.
       if (!use_diis && it == 100) {
         use_diis = true;
         diis.clear();
@@ -166,7 +173,8 @@ class Solver {
     }
   }
 
-  /// e1, e2, e3 from the current rho and the V2, V3 of the last `build_fock(rho_, .)`.
+  /// e1, e2, e3 from the current rho and the V2, V3 of the last
+  /// `build_fock(rho_, .)`.
   void energy(HFResult& res) const {
     double e1 = 0.0, e2 = 0.0, e3 = 0.0;
     for (const auto& ch : channels_) {
@@ -186,8 +194,9 @@ class Solver {
     res.e_hf = e1 + e2 + e3;
   }
 
-  /// Channel-wise diagonalization of F: C columns = eigenvectors (ascending energy), the
-  /// eigenvalue of rank k in a channel is stored at the orbit index of rank k.
+  /// Channel-wise diagonalization of F: C columns = eigenvectors (ascending
+  /// energy), the eigenvalue of rank k in a channel is stored at the orbit
+  /// index of rank k.
   void diagonalize(const Matrix<double>& F, std::vector<double>& energies) {
     C_ = Matrix<double>(norb_, norb_);
     for (const auto& ch : channels_) {
@@ -195,7 +204,8 @@ class Solver {
       Matrix<double> Fc(m, m);
       for (std::int64_t q = 0; q < m; ++q) {
         for (std::int64_t p = 0; p < m; ++p) {
-          Fc(p, q) = F(ch[static_cast<std::size_t>(p)], ch[static_cast<std::size_t>(q)]);
+          Fc(p, q) = F(ch[static_cast<std::size_t>(p)],
+                       ch[static_cast<std::size_t>(q)]);
         }
       }
       auto eig = linalg::eigh(Fc.const_view());
@@ -216,8 +226,8 @@ class Solver {
     }
   }
 
-  /// imsrg++ `FillLowestOrbits`: occupy the lowest HF orbits of each species up to Z and N.
-  /// Returns true if the occupations changed.
+  /// imsrg++ `FillLowestOrbits`: occupy the lowest HF orbits of each species up
+  /// to Z and N. Returns true if the occupations changed.
   bool fill_lowest_orbits() {
     const auto n = static_cast<std::size_t>(norb_);
     // diag(C^T F C)
@@ -233,9 +243,11 @@ class Solver {
     }
     std::vector<std::int32_t> order(n);
     std::iota(order.begin(), order.end(), 0);
-    std::stable_sort(order.begin(), order.end(), [&](std::int32_t x, std::int32_t y) {
-      return e[static_cast<std::size_t>(x)] < e[static_cast<std::size_t>(y)];
-    });
+    std::stable_sort(order.begin(), order.end(),
+                     [&](std::int32_t x, std::int32_t y) {
+                       return e[static_cast<std::size_t>(x)] <
+                              e[static_cast<std::size_t>(y)];
+                     });
     std::vector<double> occ(n, 0.0);
     double placed_p = 0.0, placed_n = 0.0;
     for (std::int32_t alpha : order) {
@@ -256,13 +268,14 @@ class Solver {
   }
 
   /// e = F rho - rho F.
-  static Matrix<double> commutator(const Matrix<double>& F, const Matrix<double>& rho) {
+  static Matrix<double> commutator(const Matrix<double>& F,
+                                   const Matrix<double>& rho) {
     const auto n = F.rows();
     Matrix<double> e(n, n);
-    linalg::gemm(1.0, F.const_view(), linalg::Op::NoTrans, rho.const_view(), linalg::Op::NoTrans,
-                 0.0, e.view());
-    linalg::gemm(-1.0, rho.const_view(), linalg::Op::NoTrans, F.const_view(), linalg::Op::NoTrans,
-                 1.0, e.view());
+    linalg::gemm(1.0, F.const_view(), linalg::Op::NoTrans, rho.const_view(),
+                 linalg::Op::NoTrans, 0.0, e.view());
+    linalg::gemm(-1.0, rho.const_view(), linalg::Op::NoTrans, F.const_view(),
+                 linalg::Op::NoTrans, 1.0, e.view());
     return e;
   }
 
@@ -280,7 +293,8 @@ class Solver {
 
 }  // namespace
 
-HFResult solve(const op::Operator& H, const op::No2bThreeBody* v3, const HFOptions& options) {
+HFResult solve(const op::Operator& H, const op::No2bThreeBody* v3,
+               const HFOptions& options) {
   IMSRG_CHECK(!H.empty(), "hf::solve needs a non-empty Hamiltonian");
   IMSRG_CHECK(options.max_iterations >= 1 && options.tolerance > 0.0,
               "invalid Hartree-Fock options");
@@ -293,13 +307,17 @@ op::Operator to_hf_basis(const op::Operator& O, const HFResult& r) {
   return op::transform_basis(O, r.C.const_view());
 }
 
-op::Operator normal_ordered_hamiltonian(const op::Operator& H, const op::No2bThreeBody* v3,
-                                        const HFResult& r, const HFOptions& options) {
-  IMSRG_CHECK(!H.empty(), "normal_ordered_hamiltonian needs a non-empty Hamiltonian");
+op::Operator normal_ordered_hamiltonian(const op::Operator& H,
+                                        const op::No2bThreeBody* v3,
+                                        const HFResult& r,
+                                        const HFOptions& options) {
+  IMSRG_CHECK(!H.empty(),
+              "normal_ordered_hamiltonian needs a non-empty Hamiltonian");
   const auto ms = H.model_space_ptr();
   const auto& basis = ms->basis();
   const std::int32_t norb = basis.num_orbits();
-  IMSRG_CHECK(r.F.rows() == norb && r.rho.rows() == norb && r.C.rows() == norb &&
+  IMSRG_CHECK(r.F.rows() == norb && r.rho.rows() == norb &&
+                  r.C.rows() == norb &&
                   static_cast<std::int32_t>(r.occupations.size()) == norb,
               "HFResult does not match the model space of H");
 
@@ -314,7 +332,8 @@ op::Operator normal_ordered_hamiltonian(const op::Operator& H, const op::No2bThr
 
   if (v3 != nullptr) {
     const auto channels = detail::one_body_channels(basis);
-    std::vector<const std::vector<std::int32_t>*> channel_of(static_cast<std::size_t>(norb));
+    std::vector<const std::vector<std::int32_t>*> channel_of(
+        static_cast<std::size_t>(norb));
     for (const auto& ch : channels)
       for (std::int32_t i : ch) channel_of[static_cast<std::size_t>(i)] = &ch;
     const auto& tbc = ms->two_body();

@@ -17,7 +17,8 @@ namespace {
 constexpr std::int32_t kNumParities = 2;
 constexpr std::int32_t kChannelsPerJ = 6;
 
-/// Integer J range [jmin, jmax] of a pair of orbits allowed by the triangle rule.
+/// Integer J range [jmin, jmax] of a pair of orbits allowed by the triangle
+/// rule.
 struct JRange {
   std::int32_t jmin;
   std::int32_t jmax;
@@ -54,11 +55,13 @@ std::string_view ket_class_name(KetClass c) noexcept {
 }
 
 TwoBodyChannels::TwoBodyChannels(const SingleParticleBasis& basis)
-    : orbits_(basis.orbits().begin(), basis.orbits().end()), max_J_(basis.max_two_body_J()) {
+    : orbits_(basis.orbits().begin(), basis.orbits().end()),
+      max_J_(basis.max_two_body_J()) {
   const std::int32_t n = num_orbits();
 
   // Kets in imsrg++ order (lexicographic, p <= q).
-  kets_.reserve(static_cast<std::size_t>(n) * static_cast<std::size_t>(n + 1) / 2);
+  kets_.reserve(static_cast<std::size_t>(n) * static_cast<std::size_t>(n + 1) /
+                2);
   for (std::int32_t p = 0; p < n; ++p) {
     for (std::int32_t q = p; q < n; ++q) {
       IMSRG_CHECK(imsrgpp_ket_index(OrbitIndex{p}, OrbitIndex{q}, n).value() ==
@@ -77,7 +80,8 @@ TwoBodyChannels::TwoBodyChannels(const SingleParticleBasis& basis)
     c.parity = (ch % kNumParities == 0) ? Parity::Even : Parity::Odd;
   }
 
-  // One pass over the kets in ascending order: each channel list is ascending (the local order).
+  // One pass over the kets in ascending order: each channel list is ascending
+  // (the local order).
   std::vector<std::vector<KetIndex>> members(static_cast<std::size_t>(nch));
   ket_J_offsets_.assign(kets_.size() + 1, 0);
   for (std::size_t k = 0; k < kets_.size(); ++k) {
@@ -91,9 +95,11 @@ TwoBodyChannels::TwoBodyChannels(const SingleParticleBasis& basis)
         local_index_table_.push_back(-1);
         continue;
       }
-      const ChannelIndex ch = imsrgpp_channel_index(TwoJ{2 * J}, a.parity() * b.parity(),
-                                                    TwoTz{a.tz2.twice + b.tz2.twice});
-      IMSRG_CHECK(ch.value() >= 0 && ch.value() < nch, "ket channel out of range");
+      const ChannelIndex ch =
+          imsrgpp_channel_index(TwoJ{2 * J}, a.parity() * b.parity(),
+                                TwoTz{a.tz2.twice + b.tz2.twice});
+      IMSRG_CHECK(ch.value() >= 0 && ch.value() < nch,
+                  "ket channel out of range");
       auto& list = members[static_cast<std::size_t>(ch.value())];
       local_index_table_.push_back(static_cast<std::int32_t>(list.size()));
       list.push_back(KetIndex{static_cast<std::int32_t>(k)});
@@ -107,63 +113,77 @@ TwoBodyChannels::TwoBodyChannels(const SingleParticleBasis& basis)
     c.num_kets = static_cast<std::int32_t>(list.size());
     c.ket_offset = offset;
     offset += c.num_kets;
-    channel_ket_table_.insert(channel_ket_table_.end(), list.begin(), list.end());
+    channel_ket_table_.insert(channel_ket_table_.end(), list.begin(),
+                              list.end());
     if (c.num_kets > 0) channels_by_size_.push_back(ChannelIndex{ch});
   }
-  std::stable_sort(channels_by_size_.begin(), channels_by_size_.end(),
-                   [this](ChannelIndex x, ChannelIndex y) {
-                     return channels_[static_cast<std::size_t>(x.value())].num_kets >
-                            channels_[static_cast<std::size_t>(y.value())].num_kets;
-                   });
+  std::stable_sort(
+      channels_by_size_.begin(), channels_by_size_.end(),
+      [this](ChannelIndex x, ChannelIndex y) {
+        return channels_[static_cast<std::size_t>(x.value())].num_kets >
+               channels_[static_cast<std::size_t>(y.value())].num_kets;
+      });
 }
 
 const Ket& TwoBodyChannels::ket(KetIndex k) const {
-  IMSRG_ASSERT(k.value() >= 0 && k.value() < num_kets(), "ket index out of range");
+  IMSRG_ASSERT(k.value() >= 0 && k.value() < num_kets(),
+               "ket index out of range");
   return kets_[static_cast<std::size_t>(k.value())];
 }
 
 KetIndex TwoBodyChannels::ket_index(OrbitIndex p, OrbitIndex q) const {
-  IMSRG_ASSERT(p.value() >= 0 && p <= q && q.value() < num_orbits(), "need 0 <= p <= q < N");
+  IMSRG_ASSERT(p.value() >= 0 && p <= q && q.value() < num_orbits(),
+               "need 0 <= p <= q < N");
   return imsrgpp_ket_index(p, q, num_orbits());
 }
 
 const TwoBodyChannel& TwoBodyChannels::channel(ChannelIndex ch) const {
-  IMSRG_ASSERT(ch.value() >= 0 && ch.value() < num_channels(), "channel index out of range");
+  IMSRG_ASSERT(ch.value() >= 0 && ch.value() < num_channels(),
+               "channel index out of range");
   return channels_[static_cast<std::size_t>(ch.value())];
 }
 
-std::optional<ChannelIndex> TwoBodyChannels::find_channel(TwoJ two_j, Parity parity,
-                                                          TwoTz two_tz) const noexcept {
-  if (two_j.twice < 0 || two_j.twice % 2 != 0 || two_j.twice / 2 > max_J_) return std::nullopt;
-  if (two_tz.twice != -2 && two_tz.twice != 0 && two_tz.twice != 2) return std::nullopt;
+std::optional<ChannelIndex> TwoBodyChannels::find_channel(
+    TwoJ two_j, Parity parity, TwoTz two_tz) const noexcept {
+  if (two_j.twice < 0 || two_j.twice % 2 != 0 || two_j.twice / 2 > max_J_)
+    return std::nullopt;
+  if (two_tz.twice != -2 && two_tz.twice != 0 && two_tz.twice != 2)
+    return std::nullopt;
   return imsrgpp_channel_index(two_j, parity, two_tz);
 }
 
-ChannelIndex TwoBodyChannels::channel_of(OrbitIndex p, OrbitIndex q, TwoJ two_j) const {
+ChannelIndex TwoBodyChannels::channel_of(OrbitIndex p, OrbitIndex q,
+                                         TwoJ two_j) const {
+  IMSRG_ASSERT(p.value() >= 0 && p.value() < num_orbits() && q.value() >= 0 &&
+                   q.value() < num_orbits(),
+               "orbit index out of range");
   IMSRG_ASSERT(
-      p.value() >= 0 && p.value() < num_orbits() && q.value() >= 0 && q.value() < num_orbits(),
-      "orbit index out of range");
-  IMSRG_ASSERT(two_j.twice >= 0 && two_j.twice % 2 == 0 && two_j.twice / 2 <= max_J_,
-               "J out of range");
+      two_j.twice >= 0 && two_j.twice % 2 == 0 && two_j.twice / 2 <= max_J_,
+      "J out of range");
   const Orbit& a = orbits_[static_cast<std::size_t>(p.value())];
   const Orbit& b = orbits_[static_cast<std::size_t>(q.value())];
-  return imsrgpp_channel_index(two_j, a.parity() * b.parity(), TwoTz{a.tz2.twice + b.tz2.twice});
+  return imsrgpp_channel_index(two_j, a.parity() * b.parity(),
+                               TwoTz{a.tz2.twice + b.tz2.twice});
 }
 
 std::span<const KetIndex> TwoBodyChannels::channel_kets(ChannelIndex ch) const {
   const TwoBodyChannel& c = channel(ch);
   return std::span<const KetIndex>(channel_ket_table_)
-      .subspan(static_cast<std::size_t>(c.ket_offset), static_cast<std::size_t>(c.num_kets));
+      .subspan(static_cast<std::size_t>(c.ket_offset),
+               static_cast<std::size_t>(c.num_kets));
 }
 
 KetIndex TwoBodyChannels::global_ket(ChannelIndex ch, LocalKetIndex i) const {
   const TwoBodyChannel& c = channel(ch);
-  IMSRG_ASSERT(i.value() >= 0 && i.value() < c.num_kets, "local ket index out of range");
+  IMSRG_ASSERT(i.value() >= 0 && i.value() < c.num_kets,
+               "local ket index out of range");
   return channel_ket_table_[static_cast<std::size_t>(c.ket_offset + i.value())];
 }
 
-std::optional<LocalKetIndex> TwoBodyChannels::local_index(KetIndex k, TwoJ two_j) const {
-  IMSRG_ASSERT(k.value() >= 0 && k.value() < num_kets(), "ket index out of range");
+std::optional<LocalKetIndex> TwoBodyChannels::local_index(KetIndex k,
+                                                          TwoJ two_j) const {
+  IMSRG_ASSERT(k.value() >= 0 && k.value() < num_kets(),
+               "ket index out of range");
   if (two_j.twice < 0 || two_j.twice % 2 != 0) return std::nullopt;
   const Ket& kt = kets_[static_cast<std::size_t>(k.value())];
   const JRange jr = j_range(orbits_[static_cast<std::size_t>(kt.p.value())],
@@ -176,15 +196,17 @@ std::optional<LocalKetIndex> TwoBodyChannels::local_index(KetIndex k, TwoJ two_j
   return LocalKetIndex{v};
 }
 
-std::optional<LocalKetIndex> TwoBodyChannels::local_index(ChannelIndex ch, KetIndex k) const {
+std::optional<LocalKetIndex> TwoBodyChannels::local_index(ChannelIndex ch,
+                                                          KetIndex k) const {
   const TwoBodyChannel& c = channel(ch);
-  IMSRG_ASSERT(k.value() >= 0 && k.value() < num_kets(), "ket index out of range");
+  IMSRG_ASSERT(k.value() >= 0 && k.value() < num_kets(),
+               "ket index out of range");
   const Ket& kt = kets_[static_cast<std::size_t>(k.value())];
   if (channel_of(kt.p, kt.q, c.two_j) != ch) return std::nullopt;
   return local_index(k, c.two_j);
 }
 
-// ---------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 
 TwoBodyKetSubsets::TwoBodyKetSubsets(const TwoBodyChannels& channels,
                                      std::span<const double> occupations,
@@ -193,14 +215,17 @@ TwoBodyKetSubsets::TwoBodyKetSubsets(const TwoBodyChannels& channels,
   const auto n = static_cast<std::size_t>(channels.num_orbits());
   if (occupations.size() != n) {
     throw InputError("TwoBodyKetSubsets: occupations has size " +
-                     std::to_string(occupations.size()) + ", expected " + std::to_string(n));
+                     std::to_string(occupations.size()) + ", expected " +
+                     std::to_string(n));
   }
   if (classes.size() != n) {
-    throw InputError("TwoBodyKetSubsets: classes has size " + std::to_string(classes.size()) +
-                     ", expected " + std::to_string(n));
+    throw InputError("TwoBodyKetSubsets: classes has size " +
+                     std::to_string(classes.size()) + ", expected " +
+                     std::to_string(n));
   }
 
-  subset_offsets_.reserve(static_cast<std::size_t>(num_channels_) * kNumKetClasses + 1);
+  subset_offsets_.reserve(
+      static_cast<std::size_t>(num_channels_) * kNumKetClasses + 1);
   subset_offsets_.push_back(0);
   for (std::int32_t ch = 0; ch < num_channels_; ++ch) {
     std::array<std::vector<LocalKetIndex>, kNumKetClasses> lists;
@@ -219,7 +244,8 @@ TwoBodyKetSubsets::TwoBodyKetSubsets(const TwoBodyChannels& channels,
         lists[ci].push_back(li);
         const bool track = (c == KetClass::HH || c == KetClass::PH);
         occ_prod[ci].push_back(track ? occupations[p] * occupations[q] : 0.0);
-        vac_prod[ci].push_back(track ? (1.0 - occupations[p]) * (1.0 - occupations[q]) : 0.0);
+        vac_prod[ci].push_back(
+            track ? (1.0 - occupations[p]) * (1.0 - occupations[q]) : 0.0);
       };
       if (!hole_p && !hole_q) add(KetClass::PP);
       if (hole_p && hole_q) add(KetClass::HH);
@@ -234,11 +260,14 @@ TwoBodyKetSubsets::TwoBodyKetSubsets(const TwoBodyChannels& channels,
       if (cp + cq == 4) add(KetClass::QQ);
     }
     for (std::size_t c = 0; c < kNumKetClasses; ++c) {
-      subset_table_.insert(subset_table_.end(), lists[c].begin(), lists[c].end());
-      occupation_products_.insert(occupation_products_.end(), occ_prod[c].begin(),
-                                  occ_prod[c].end());
-      vacancy_products_.insert(vacancy_products_.end(), vac_prod[c].begin(), vac_prod[c].end());
-      subset_offsets_.push_back(static_cast<std::int32_t>(subset_table_.size()));
+      subset_table_.insert(subset_table_.end(), lists[c].begin(),
+                           lists[c].end());
+      occupation_products_.insert(occupation_products_.end(),
+                                  occ_prod[c].begin(), occ_prod[c].end());
+      vacancy_products_.insert(vacancy_products_.end(), vac_prod[c].begin(),
+                               vac_prod[c].end());
+      subset_offsets_.push_back(
+          static_cast<std::int32_t>(subset_table_.size()));
     }
   }
 }
@@ -246,30 +275,39 @@ TwoBodyKetSubsets::TwoBodyKetSubsets(const TwoBodyChannels& channels,
 namespace {
 /// Slot of (ch, c) in the offsets table.
 std::size_t subset_slot(ChannelIndex ch, KetClass c) noexcept {
-  return static_cast<std::size_t>(ch.value() * kNumKetClasses + static_cast<std::int32_t>(c));
+  return static_cast<std::size_t>(ch.value() * kNumKetClasses +
+                                  static_cast<std::int32_t>(c));
 }
 }  // namespace
 
-std::span<const LocalKetIndex> TwoBodyKetSubsets::kets(ChannelIndex ch, KetClass c) const {
-  IMSRG_ASSERT(ch.value() >= 0 && ch.value() < num_channels_, "channel index out of range");
+std::span<const LocalKetIndex> TwoBodyKetSubsets::kets(ChannelIndex ch,
+                                                       KetClass c) const {
+  IMSRG_ASSERT(ch.value() >= 0 && ch.value() < num_channels_,
+               "channel index out of range");
   const auto slot = subset_slot(ch, c);
   const auto b = static_cast<std::size_t>(subset_offsets_[slot]);
   const auto e = static_cast<std::size_t>(subset_offsets_[slot + 1]);
   return std::span<const LocalKetIndex>(subset_table_).subspan(b, e - b);
 }
 
-std::span<const double> TwoBodyKetSubsets::occupation_products(ChannelIndex ch, KetClass c) const {
-  IMSRG_CHECK(c == KetClass::HH || c == KetClass::PH, "occupation_products needs class HH or PH");
-  IMSRG_ASSERT(ch.value() >= 0 && ch.value() < num_channels_, "channel index out of range");
+std::span<const double> TwoBodyKetSubsets::occupation_products(
+    ChannelIndex ch, KetClass c) const {
+  IMSRG_CHECK(c == KetClass::HH || c == KetClass::PH,
+              "occupation_products needs class HH or PH");
+  IMSRG_ASSERT(ch.value() >= 0 && ch.value() < num_channels_,
+               "channel index out of range");
   const auto slot = subset_slot(ch, c);
   const auto b = static_cast<std::size_t>(subset_offsets_[slot]);
   const auto e = static_cast<std::size_t>(subset_offsets_[slot + 1]);
   return std::span<const double>(occupation_products_).subspan(b, e - b);
 }
 
-std::span<const double> TwoBodyKetSubsets::vacancy_products(ChannelIndex ch, KetClass c) const {
-  IMSRG_CHECK(c == KetClass::HH || c == KetClass::PH, "vacancy_products needs class HH or PH");
-  IMSRG_ASSERT(ch.value() >= 0 && ch.value() < num_channels_, "channel index out of range");
+std::span<const double> TwoBodyKetSubsets::vacancy_products(ChannelIndex ch,
+                                                            KetClass c) const {
+  IMSRG_CHECK(c == KetClass::HH || c == KetClass::PH,
+              "vacancy_products needs class HH or PH");
+  IMSRG_ASSERT(ch.value() >= 0 && ch.value() < num_channels_,
+               "channel index out of range");
   const auto slot = subset_slot(ch, c);
   const auto b = static_cast<std::size_t>(subset_offsets_[slot]);
   const auto e = static_cast<std::size_t>(subset_offsets_[slot + 1]);

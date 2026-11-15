@@ -31,25 +31,28 @@ LiftedData build_lifted_data(const basis::ModelSpace& ms) {
       const int i = ket.p.value();
       const int j = ket.q.value();
       const double norm = (i == j) ? 1.0 / constants::sqrt2 : 1.0;
-      // Adds the entry for the lifted pair (a, b) (any order); `one_from` -> `one_to` is the
-      // one-body element.
+      // Adds the entry for the lifted pair (a, b) (any order); `one_from` ->
+      // `one_to` is the one-body element.
       auto add = [&](int a, int b, int one_from, int one_to) {
         const bool swap = a > b;
         const int lo = swap ? b : a;
         const int hi = swap ? a : b;
-        const auto loc =
-            channels.local_index(channels.ket_index(OrbitIndex{lo}, OrbitIndex{hi}), two_j);
+        const auto loc = channels.local_index(
+            channels.ket_index(OrbitIndex{lo}, OrbitIndex{hi}), two_j);
         if (!loc) return;
         double c = norm * ((a == b) ? constants::sqrt2 : 1.0);
         if (swap)
-          c *= basis::exchange_phase(sp.orbit(OrbitIndex{a}).j2, sp.orbit(OrbitIndex{b}).j2, two_j);
+          c *= basis::exchange_phase(sp.orbit(OrbitIndex{a}).j2,
+                                     sp.orbit(OrbitIndex{b}).j2, two_j);
         m_list.push_back(static_cast<std::int32_t>(loc->value()));
         from_list.push_back(one_from);
         to_list.push_back(one_to);
         coef_list.push_back(c);
       };
-      for (const OrbitIndex c : sp.same_ljtz(OrbitIndex{i})) add(c.value(), j, i, c.value());
-      for (const OrbitIndex c : sp.same_ljtz(OrbitIndex{j})) add(i, c.value(), j, c.value());
+      for (const OrbitIndex c : sp.same_ljtz(OrbitIndex{i}))
+        add(c.value(), j, i, c.value());
+      for (const OrbitIndex c : sp.same_ljtz(OrbitIndex{j}))
+        add(i, c.value(), j, c.value());
       entry_offset.push_back(static_cast<std::int32_t>(m_list.size()));
     }
     row_base[ch + 1] = row_base[ch] + static_cast<std::int32_t>(kets.size());

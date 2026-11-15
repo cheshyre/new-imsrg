@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// App-level tests of the `imsrg` executable (design/16 section 6.3 item 10): spawn it in a fresh
-// temporary directory and check stdout, stderr, files and exit codes.
+// App-level tests of the `imsrg` executable (design/16 section 6.3 item 10):
+// spawn it in a fresh temporary directory and check stdout, stderr, files and
+// exit codes.
+#include <sys/wait.h>
+
 #include <atomic>
 #include <chrono>
 #include <cstdlib>
@@ -12,14 +15,15 @@
 #include <string>
 
 #include <gtest/gtest.h>
-#include <sys/wait.h>
 
 namespace fs = std::filesystem;
 
 namespace {
 
-constexpr const char* kMe2j = "VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz";
-constexpr const char* kStream = "NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin";
+constexpr const char* kMe2j =
+    "VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz";
+constexpr const char* kStream =
+    "NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin";
 
 std::string slurp(const fs::path& p) {
   std::ifstream in(p);
@@ -41,8 +45,9 @@ class TempDir {
     static std::atomic<int> counter{0};
     path_ = fs::temp_directory_path() /
             ("imsrg_cli_test_" +
-             std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + "_" +
-             std::to_string(counter++));
+             std::to_string(
+                 std::chrono::steady_clock::now().time_since_epoch().count()) +
+             "_" + std::to_string(counter++));
     fs::create_directories(path_);
     if (with_inputs) {
       std::ofstream(path_ / kMe2j).put('\n');
@@ -59,8 +64,9 @@ class TempDir {
 
   /// Runs the executable with `args` (a shell fragment) in this directory.
   Result run(const std::string& args) const {
-    const std::string cmd =
-        "cd '" + path_.string() + "' && '" + IMSRG_EXE_PATH + "' " + args + " > out.txt 2> err.txt";
+    const std::string cmd = "cd '" + path_.string() + "' && '" +
+                            IMSRG_EXE_PATH + "' " + args +
+                            " > out.txt 2> err.txt";
     const int status = std::system(cmd.c_str());
     Result r;
     r.code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
@@ -93,7 +99,8 @@ struct ExampleCase {
 };
 
 std::string common2n(const std::string& emax, const std::string& hw) {
-  return std::string("2bme=") + kMe2j + " file2e1max=14 file2e2max=28 file2lmax=14 emax=" + emax +
+  return std::string("2bme=") + kMe2j +
+         " file2e1max=14 file2e2max=28 file2lmax=14 emax=" + emax +
          " hw=" + hw + " reference=O16 ";
 }
 
@@ -106,10 +113,14 @@ std::string three_n() {
 
 TEST(DriverCli, ExamplesTomlAndLegacyResolveIdentically) {
   const ExampleCase cases[] = {
-      {"a_o16_imsrg2.toml", common2n("4", "16") + "valence_space=O16 Operators=Rp2"},
-      {"b_o16_imsrg2_3n.toml", common2n("4", "16") + "valence_space=O16" + three_n()},
-      {"c_o16_sd_shell.toml", common2n("6", "20") + "valence_space=sd-shell Operators=Rp2"},
-      {"d_o16_imsrg3_n7.toml", common2n("2", "16") + "e3max=6 valence_space=O16" + three_n() +
+      {"a_o16_imsrg2.toml",
+       common2n("4", "16") + "valence_space=O16 Operators=Rp2"},
+      {"b_o16_imsrg2_3n.toml",
+       common2n("4", "16") + "valence_space=O16" + three_n()},
+      {"c_o16_sd_shell.toml",
+       common2n("6", "20") + "valence_space=sd-shell Operators=Rp2"},
+      {"d_o16_imsrg3_n7.toml", common2n("2", "16") +
+                                   "e3max=6 valence_space=O16" + three_n() +
                                    " IMSRG3=true imsrg3_n7=true"},
   };
   for (const auto& c : cases) {
@@ -133,9 +144,9 @@ TEST(DriverCli, ValidateWritesNothingAndRunStopsOnPlaceholderInput) {
   EXPECT_TRUE(contains(v.out, "configuration is valid"));
   EXPECT_FALSE(fs::exists(d.path() / "output"));
 
-  // Since M8 the pipeline runs: the one-byte placeholder me2j file passes the V-14 preflight but
-  // is not an interaction, so the reader stops the run with an input error (exit 3) after the
-  // resolved config was written.
+  // Since M8 the pipeline runs: the one-byte placeholder me2j file passes the
+  // V-14 preflight but is not an interaction, so the reader stops the run with
+  // an input error (exit 3) after the resolved config was written.
   const Result r = d.run("--config " + a);
   EXPECT_EQ(r.code, 3) << r.err;
   EXPECT_TRUE(contains(r.err, "data ended")) << r.err;
@@ -164,7 +175,8 @@ TEST(DriverCli, SetOverrides) {
 
   r = d.run(base + "--set 'operators.list=[\"Rp2\",\"Rm2\"]'");
   EXPECT_EQ(r.code, 0) << r.err;
-  EXPECT_TRUE(contains(r.out, "\"Rp2\"") && contains(r.out, "\"Rm2\"")) << r.out;
+  EXPECT_TRUE(contains(r.out, "\"Rp2\"") && contains(r.out, "\"Rm2\""))
+      << r.out;
 
   r = d.run(base + "--set basis.emax=2 --set basis.emax=3");
   EXPECT_EQ(r.code, 0) << r.err;
@@ -202,7 +214,8 @@ TEST(DriverCli, ExitCodes) {
   }
   {
     TempDir d(/*with_inputs=*/false);
-    const Result r = d.run("--validate --config " + example("a_o16_imsrg2.toml"));
+    const Result r =
+        d.run("--validate --config " + example("a_o16_imsrg2.toml"));
     EXPECT_EQ(r.code, 3) << r.err;
     EXPECT_TRUE(contains(r.err, "V-14")) << r.err;
   }
@@ -214,7 +227,8 @@ TEST(DriverCli, ExitCodes) {
   }
   {
     TempDir d;
-    const Result r = d.run("--validate " + common2n("4.5", "16") + "valence_space=O16");
+    const Result r =
+        d.run("--validate " + common2n("4.5", "16") + "valence_space=O16");
     EXPECT_EQ(r.code, 2) << r.err;
   }
 }
@@ -226,7 +240,8 @@ TEST(DriverCli, InformationOutputs) {
   EXPECT_TRUE(contains(r.out, "2bme"));
   EXPECT_TRUE(contains(r.out, "OperatorsTDA"));
   // 85 keys: one table row per key; the header and the notes make up the rest.
-  std::ifstream keys(std::string(IMSRG_SOURCE_DIR) + "/tests/unit/driver/data/legacy_keys.txt");
+  std::ifstream keys(std::string(IMSRG_SOURCE_DIR) +
+                     "/tests/unit/driver/data/legacy_keys.txt");
   std::string key;
   int n = 0;
   while (keys >> key) {

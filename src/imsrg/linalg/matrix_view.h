@@ -4,9 +4,9 @@
 #ifndef IMSRG_LINALG_MATRIX_VIEW_H_
 #define IMSRG_LINALG_MATRIX_VIEW_H_
 /// @file
-/// Column-major matrix views and an owning host matrix. Column-major (element (i, j) at
-/// `data[i + j * ld]`) matches BLAS/LAPACK and imsrg++ (Armadillo), so blocks can be handed to
-/// BLAS without transposition.
+/// Column-major matrix views and an owning host matrix. Column-major (element
+/// (i, j) at `data[i + j * ld]`) matches BLAS/LAPACK and imsrg++ (Armadillo),
+/// so blocks can be handed to BLAS without transposition.
 
 #include <cstddef>
 #include <cstdint>
@@ -21,9 +21,10 @@ namespace imsrg::linalg {
 /// Whether a gemm operand is used as is or transposed.
 enum class Op : std::uint8_t { NoTrans, Trans };
 
-/// Non-owning column-major view of a `rows x cols` matrix with leading dimension `ld >= rows`.
-/// Trivially copyable, so it can be captured by value in kernels (design/12 section 5). The view
-/// does not know which memory space `data` points to. Indices are not bounds-checked here.
+/// Non-owning column-major view of a `rows x cols` matrix with leading
+/// dimension `ld >= rows`. Trivially copyable, so it can be captured by value
+/// in kernels (design/12 section 5). The view does not know which memory space
+/// `data` points to. Indices are not bounds-checked here.
 template <class T>
 struct MatrixView {
   T* data = nullptr;
@@ -47,8 +48,8 @@ struct MatrixView {
 static_assert(std::is_trivially_copyable_v<MatrixView<double>>);
 static_assert(std::is_trivially_copyable_v<MatrixView<const float>>);
 
-/// Owning dense column-major host matrix (`ld == rows`), zero-initialized. Value semantics.
-/// Instantiated for double and float.
+/// Owning dense column-major host matrix (`ld == rows`), zero-initialized.
+/// Value semantics. Instantiated for double and float.
 template <class T>
 class Matrix {
  public:
@@ -76,7 +77,9 @@ class Matrix {
   /// Mutable view (ld = rows).
   MatrixView<T> view() noexcept { return {data_.data(), rows_, cols_, rows_}; }
   /// Read-only view (ld = rows).
-  MatrixView<const T> const_view() const noexcept { return {data_.data(), rows_, cols_, rows_}; }
+  MatrixView<const T> const_view() const noexcept {
+    return {data_.data(), rows_, cols_, rows_};
+  }
 
  private:
   std::int64_t rows_ = 0;

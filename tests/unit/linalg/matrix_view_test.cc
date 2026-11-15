@@ -30,8 +30,10 @@ TEST(LinalgMatrixView, ConstConversion) {
   MatrixView<const double> c = v;
   EXPECT_EQ(c.data, buf);
   EXPECT_EQ(c(1, 1), 4.0);
-  static_assert(std::is_convertible_v<MatrixView<double>, MatrixView<const double>>);
-  static_assert(!std::is_convertible_v<MatrixView<const double>, MatrixView<double>>);
+  static_assert(
+      std::is_convertible_v<MatrixView<double>, MatrixView<const double>>);
+  static_assert(
+      !std::is_convertible_v<MatrixView<const double>, MatrixView<double>>);
 }
 
 TEST(LinalgMatrix, ZeroInitAndViews) {

@@ -22,15 +22,18 @@ namespace {
 constexpr std::size_t kBufferSize = std::size_t{1} << 16;
 
 bool is_space(char c) noexcept {
-  return c == ' ' || c == '\n' || c == '\t' || c == '\r' || c == '\f' || c == '\v';
+  return c == ' ' || c == '\n' || c == '\t' || c == '\r' || c == '\f' ||
+         c == '\v';
 }
 
-/// Parses `s` (the whole string) as a float. Returns false if it is not fully a number.
+/// Parses `s` (the whole string) as a float. Returns false if it is not fully a
+/// number.
 bool parse_float(const std::string& s, float& out) {
 #if defined(__cpp_lib_to_chars) && __cpp_lib_to_chars >= 201611L
   const char* first = s.data();
   const char* last = s.data() + s.size();
-  if (first != last && *first == '+') ++first;  // from_chars rejects a leading '+'
+  if (first != last && *first == '+')
+    ++first;  // from_chars rejects a leading '+'
   float v = 0.0F;
   const auto r = std::from_chars(first, last, v);
   if (r.ec != std::errc{} || r.ptr != last) return false;
@@ -64,7 +67,8 @@ struct TextInput::Impl {
     if (file != nullptr) gzclose(file);
   }
 
-  /// Ensures at least one unread byte is buffered. Returns false at the end of data.
+  /// Ensures at least one unread byte is buffered. Returns false at the end of
+  /// data.
   bool fill() {
     if (pos < len) return true;
     if (eof) return false;
@@ -72,7 +76,8 @@ struct TextInput::Impl {
     if (n < 0) {
       int errnum = 0;
       const char* msg = gzerror(file, &errnum);
-      throw InputError("read error in '" + path.string() + "': " + (msg != nullptr ? msg : "?"));
+      throw InputError("read error in '" + path.string() +
+                       "': " + (msg != nullptr ? msg : "?"));
     }
     pos = 0;
     len = static_cast<std::size_t>(n);
@@ -92,10 +97,12 @@ struct TextInput::Impl {
   }
 };
 
-TextInput::TextInput(const std::filesystem::path& path) : impl_(std::make_unique<Impl>()) {
+TextInput::TextInput(const std::filesystem::path& path)
+    : impl_(std::make_unique<Impl>()) {
   impl_->path = path;
   impl_->file = gzopen(path.c_str(), "rb");
-  if (impl_->file == nullptr) throw InputError("cannot open input file '" + path.string() + "'");
+  if (impl_->file == nullptr)
+    throw InputError("cannot open input file '" + path.string() + "'");
   gzbuffer(impl_->file, static_cast<unsigned>(2 * kBufferSize));
 }
 
@@ -103,7 +110,9 @@ TextInput::~TextInput() = default;
 TextInput::TextInput(TextInput&&) noexcept = default;
 TextInput& TextInput::operator=(TextInput&&) noexcept = default;
 
-const std::filesystem::path& TextInput::path() const noexcept { return impl_->path; }
+const std::filesystem::path& TextInput::path() const noexcept {
+  return impl_->path;
+}
 
 bool TextInput::skip_line() {
   Impl& s = *impl_;
@@ -116,13 +125,16 @@ bool TextInput::skip_line() {
   return any;
 }
 
-bool TextInput::next_token(std::string& token) { return impl_->read_token(token); }
+bool TextInput::next_token(std::string& token) {
+  return impl_->read_token(token);
+}
 
 bool TextInput::next_float(float& value) {
   Impl& s = *impl_;
   if (!s.read_token(s.scratch)) return false;
   if (!parse_float(s.scratch, value)) {
-    throw InputError("'" + s.path.string() + "': malformed numeric token '" + s.scratch + "'");
+    throw InputError("'" + s.path.string() + "': malformed numeric token '" +
+                     s.scratch + "'");
   }
   return true;
 }
@@ -138,7 +150,8 @@ struct GzipWriter::Impl {
   }
 };
 
-GzipWriter::GzipWriter(const std::filesystem::path& path) : impl_(std::make_unique<Impl>()) {
+GzipWriter::GzipWriter(const std::filesystem::path& path)
+    : impl_(std::make_unique<Impl>()) {
   impl_->path = path;
   impl_->file = gzopen(path.c_str(), "wb");
   if (impl_->file == nullptr) {
@@ -151,12 +164,15 @@ GzipWriter::GzipWriter(GzipWriter&&) noexcept = default;
 GzipWriter& GzipWriter::operator=(GzipWriter&&) noexcept = default;
 
 void GzipWriter::write(std::string_view text) {
-  if (impl_ == nullptr || impl_->file == nullptr) throw InputError("write to a closed GzipWriter");
+  if (impl_ == nullptr || impl_->file == nullptr)
+    throw InputError("write to a closed GzipWriter");
   std::size_t done = 0;
   while (done < text.size()) {
-    const auto chunk = static_cast<unsigned>(std::min<std::size_t>(text.size() - done, 1U << 30));
+    const auto chunk = static_cast<unsigned>(
+        std::min<std::size_t>(text.size() - done, 1U << 30));
     const int n = gzwrite(impl_->file, text.data() + done, chunk);
-    if (n <= 0) throw InputError("write error in '" + impl_->path.string() + "'");
+    if (n <= 0)
+      throw InputError("write error in '" + impl_->path.string() + "'");
     done += static_cast<std::size_t>(n);
   }
 }
@@ -165,7 +181,8 @@ void GzipWriter::close() {
   if (impl_ == nullptr || impl_->file == nullptr) return;
   const int rc = gzclose(impl_->file);
   impl_->file = nullptr;
-  if (rc != Z_OK) throw InputError("error closing '" + impl_->path.string() + "'");
+  if (rc != Z_OK)
+    throw InputError("error closing '" + impl_->path.string() + "'");
 }
 
 }  // namespace imsrg::io

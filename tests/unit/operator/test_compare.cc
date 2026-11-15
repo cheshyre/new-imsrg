@@ -16,11 +16,13 @@ using namespace imsrg;
 using namespace imsrg::op;
 
 std::shared_ptr<const basis::ModelSpace> make_ms(const char* nucleus = "O16") {
-  return basis::ModelSpace::from_names(basis::BasisTruncation{.emax = 1}, 16.0, nucleus, nucleus);
+  return basis::ModelSpace::from_names(basis::BasisTruncation{.emax = 1}, 16.0,
+                                       nucleus, nucleus);
 }
 
 void put_2b(Operator& o, double v) {
-  o.two_body().set(ChannelIndex{0}, ChannelIndex{0}, LocalKetIndex{0}, LocalKetIndex{0}, v);
+  o.two_body().set(ChannelIndex{0}, ChannelIndex{0}, LocalKetIndex{0},
+                   LocalKetIndex{0}, v);
 }
 
 TEST(OperatorCompare, ZeroOperatorHasZeroMaxima) {
@@ -38,7 +40,8 @@ TEST(OperatorCompare, MaxAbsPicksLargestMagnitudePerPart) {
   o.one_body().set(OrbitIndex{0}, OrbitIndex{1}, -3.0);
   o.one_body().set(OrbitIndex{1}, OrbitIndex{1}, 1.0);
   put_2b(o, 5.0);
-  o.two_body().set(ChannelIndex{0}, ChannelIndex{0}, LocalKetIndex{0}, LocalKetIndex{0}, -7.0);
+  o.two_body().set(ChannelIndex{0}, ChannelIndex{0}, LocalKetIndex{0},
+                   LocalKetIndex{0}, -7.0);
   const PartMaxima m = max_abs(o);
   EXPECT_EQ(m.zero_body, 2.0);
   EXPECT_EQ(m.one_body, 3.0);
@@ -91,9 +94,10 @@ TEST(OperatorCompare, MismatchedModelSpacesThrow) {
 }
 
 TEST(OperatorCompare, MismatchedSymmetryThrows) {
-  // Only symmetries that differ and are constructible matter here; same_symmetry covers rank_J,
-  // parity, delta_Tz and delta_particle_number, none of which can be built yet (design/13), so
-  // check the accepted case: a differing hermiticity is not an error.
+  // Only symmetries that differ and are constructible matter here;
+  // same_symmetry covers rank_J, parity, delta_Tz and delta_particle_number,
+  // none of which can be built yet (design/13), so check the accepted case: a
+  // differing hermiticity is not an error.
   const auto ms = make_ms();
   const Operator a(ms, OperatorSpec::scalar(2, Hermiticity::Hermitian));
   const Operator b(ms, OperatorSpec::scalar(2, Hermiticity::AntiHermitian));

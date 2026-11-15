@@ -3,14 +3,14 @@
 
 #ifndef TESTS_UNIT_MBPT_MBPT_TEST_SUPPORT_H_
 #define TESTS_UNIT_MBPT_MBPT_TEST_SUPPORT_H_
-/// Test-side assembly of the NAT-basis Hamiltonian. mbpt does not depend on hf, so the test
-/// drives the hf internals (design/13, M9-Q1): the HF result is modified to describe the NAT
-/// orbitals (C = C_ho2hf C_hf2nat, rho = reference density in the oscillator basis,
-/// F = T + V2[rho] + 1/2 V3[rho], E_HF for rho) and passed to hf::normal_ordered_hamiltonian.
+/// Test-side assembly of the NAT-basis Hamiltonian. mbpt does not depend on hf,
+/// so the test drives the hf internals (design/13, M9-Q1): the HF result is
+/// modified to describe the NAT orbitals (C = C_ho2hf C_hf2nat, rho = reference
+/// density in the oscillator basis, F = T + V2[rho] + 1/2 V3[rho], E_HF for
+/// rho) and passed to hf::normal_ordered_hamiltonian.
 #include <memory>
 
 #include "../hf/hf_test_support.h"
-
 #include "imsrg/hf/monopole.h"
 #include "imsrg/mbpt/energies.h"
 #include "imsrg/mbpt/natural_orbitals.h"
@@ -27,7 +27,8 @@ struct NatResult {
   double e_hf_nat = 0.0;          ///< E_HF in the NAT basis
 };
 
-/// Runs HF, the MBPT(2) density, natural orbitals and builds the NAT-basis Hamiltonian.
+/// Runs HF, the MBPT(2) density, natural orbitals and builds the NAT-basis
+/// Hamiltonian.
 inline NatResult build_nat(op::Operator H, const op::No2bThreeBody* v3) {
   H.sync_to_host();
   const auto& ms = H.model_space();
@@ -38,7 +39,8 @@ inline NatResult build_nat(op::Operator H, const op::No2bThreeBody* v3) {
   linalg::Matrix<double> rho_hf = mbpt::mbpt2_density_matrix(hno);
   mbpt::NaturalOrbitals nat = mbpt::natural_orbitals(rho_hf, ms);
   const linalg::Matrix<double> c_ho2nat = mbpt::matmul(r.C, nat.c_hf2nat);
-  const linalg::Matrix<double> rho_ho = mbpt::reference_density_ho(c_ho2nat, ms);
+  const linalg::Matrix<double> rho_ho =
+      mbpt::reference_density_ho(c_ho2nat, ms);
 
   hf::detail::Monopole2B mono2(H);
   linalg::Matrix<double> v2ij, v3ij;
@@ -74,9 +76,11 @@ inline NatResult build_nat(op::Operator H, const op::No2bThreeBody* v3) {
   m.e3 = e3;
   m.e_hf = e1 + e2 + e3;
   for (std::int32_t a = 0; a < norb; ++a)
-    m.occupations[static_cast<std::size_t>(a)] = ms.reference().occupation(OrbitIndex(a));
+    m.occupations[static_cast<std::size_t>(a)] =
+        ms.reference().occupation(OrbitIndex(a));
   op::Operator hnat = hf::normal_ordered_hamiltonian(H, v3, m);
-  return NatResult{std::move(hnat), std::move(nat), std::move(rho_hf), r.e_hf, m.e_hf};
+  return NatResult{std::move(hnat), std::move(nat), std::move(rho_hf), r.e_hf,
+                   m.e_hf};
 }
 
 }  // namespace imsrg::mbtest

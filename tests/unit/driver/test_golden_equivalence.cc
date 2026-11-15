@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Golden equivalence of the design/16 section 2.11 examples: TOML vs legacy command line
-// (design/16 section 6.3). The four TOML blocks and the four "Equivalent legacy command" lines
-// are extracted from the design document itself; examples/config holds verbatim copies.
+// Golden equivalence of the design/16 section 2.11 examples: TOML vs legacy
+// command line (design/16 section 6.3). The four TOML blocks and the four
+// "Equivalent legacy command" lines are extracted from the design document
+// itself; examples/config holds verbatim copies.
 #include <fstream>
 #include <optional>
 #include <sstream>
@@ -52,14 +53,15 @@ struct Example {
   std::vector<std::string> legacy;  ///< from the design doc
 };
 
-/// The four examples extracted from design/16 between "### 2.11" and "### 2.12".
+/// The four examples extracted from design/16 between "### 2.11" and "###
+/// 2.12".
 std::vector<Example> extract_examples() {
   std::vector<Example> ex = {{'a', "a_o16_imsrg2.toml", {}, {}},
                              {'b', "b_o16_imsrg2_3n.toml", {}, {}},
                              {'c', "c_o16_sd_shell.toml", {}, {}},
                              {'d', "d_o16_imsrg3_n7.toml", {}, {}}};
-  const auto lines =
-      split_lines(slurp(std::string(IMSRG_SOURCE_DIR) + "/design/16-config-and-cli.md"));
+  const auto lines = split_lines(
+      slurp(std::string(IMSRG_SOURCE_DIR) + "/design/16-config-and-cli.md"));
   bool inside_section = false;
   bool in_block = false;
   std::size_t block = 0;
@@ -95,7 +97,8 @@ std::vector<Example> extract_examples() {
       }
     }
   }
-  EXPECT_EQ(block, 4u) << "expected exactly 4 toml blocks in design/16 section 2.11";
+  EXPECT_EQ(block, 4u)
+      << "expected exactly 4 toml blocks in design/16 section 2.11";
   return ex;
 }
 
@@ -117,8 +120,9 @@ RunConfig load_ok(const ConfigSources& sources, const std::string& what) {
     ADD_FAILURE() << what << " failed:\n" << issues_text(r.error());
     return RunConfig{};
   }
-  EXPECT_TRUE(r.value().provenance.warnings.empty()) << what << " produced warnings:\n"
-                                                     << issues_text(r.value().provenance.warnings);
+  EXPECT_TRUE(r.value().provenance.warnings.empty())
+      << what << " produced warnings:\n"
+      << issues_text(r.value().provenance.warnings);
   return std::move(r).value();
 }
 
@@ -145,7 +149,8 @@ TEST(GoldenEquivalence, ExtractionFindsFourExamples) {
 
 TEST(GoldenEquivalence, ExampleFilesAreVerbatimCopiesOfTheDocBlocks) {
   for (const auto& e : examples()) {
-    const std::string path = std::string(IMSRG_SOURCE_DIR) + "/examples/config/" + e.file;
+    const std::string path =
+        std::string(IMSRG_SOURCE_DIR) + "/examples/config/" + e.file;
     EXPECT_EQ(slurp(path), e.toml) << path;
   }
 }

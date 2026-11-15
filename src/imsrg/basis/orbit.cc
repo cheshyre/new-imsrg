@@ -20,13 +20,14 @@ constexpr std::string_view kLetters = "spdfghijklmno";
 
 bool is_digit(char c) { return c >= '0' && c <= '9'; }
 
-// Parses the run of decimal digits of `s` starting at `pos`; advances `pos`. Returns false if
-// there is no digit or the value overflows.
+// Parses the run of decimal digits of `s` starting at `pos`; advances `pos`.
+// Returns false if there is no digit or the value overflows.
 bool parse_number(std::string_view s, std::size_t& pos, std::int32_t& value) {
   const std::size_t start = pos;
   while (pos < s.size() && is_digit(s[pos])) ++pos;
   if (pos == start) return false;
-  const auto [ptr, ec] = std::from_chars(s.data() + start, s.data() + pos, value);
+  const auto [ptr, ec] =
+      std::from_chars(s.data() + start, s.data() + pos, value);
   return ec == std::errc() && ptr == s.data() + pos;
 }
 
@@ -35,7 +36,8 @@ bool parse_number(std::string_view s, std::size_t& pos, std::int32_t& value) {
 std::string orbit_label(const Orbit& o) {
   if (!is_valid(o) || o.l >= static_cast<std::int32_t>(kLetters.size())) {
     throw InputError("orbit_label: invalid orbit (n=" + std::to_string(o.n) +
-                     ", l=" + std::to_string(o.l) + ", 2j=" + std::to_string(o.j2.twice) +
+                     ", l=" + std::to_string(o.l) +
+                     ", 2j=" + std::to_string(o.j2.twice) +
                      ", 2tz=" + std::to_string(o.tz2.twice) + ")");
   }
   std::string s;
@@ -48,9 +50,11 @@ std::string orbit_label(const Orbit& o) {
 
 Orbit parse_orbit_label(std::string_view label) {
   const auto fail = [&](const char* why) {
-    return InputError("invalid orbit label '" + std::string(label) + "': " + why);
+    return InputError("invalid orbit label '" + std::string(label) +
+                      "': " + why);
   };
-  if (label.size() < 4) throw fail("expected <p|n><n><l letter><2j>, e.g. p0d5");
+  if (label.size() < 4)
+    throw fail("expected <p|n><n><l letter><2j>, e.g. p0d5");
   Orbit o;
   if (label[0] == 'p') {
     o.tz2 = TwoTz::proton();
@@ -60,10 +64,12 @@ Orbit parse_orbit_label(std::string_view label) {
     throw fail("the first character must be 'p' or 'n'");
   }
   std::size_t pos = 1;
-  if (!parse_number(label, pos, o.n)) throw fail("missing radial quantum number n");
+  if (!parse_number(label, pos, o.n))
+    throw fail("missing radial quantum number n");
   if (pos >= label.size()) throw fail("missing l letter");
   const std::size_t l = kLetters.find(label[pos]);
-  if (l == std::string_view::npos) throw fail("unknown l letter (expected one of spdfghijklmno)");
+  if (l == std::string_view::npos)
+    throw fail("unknown l letter (expected one of spdfghijklmno)");
   o.l = static_cast<std::int32_t>(l);
   ++pos;
   if (!parse_number(label, pos, o.j2.twice)) throw fail("missing 2j");

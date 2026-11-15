@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Tests of SixJTable, NineJLSjjTable and MoshinskyTable (host lookups and device views).
+// Tests of SixJTable, NineJLSjjTable and MoshinskyTable (host lookups and
+// device views).
 #include "imsrg/angmom/tables.h"
 
 #include <algorithm>
@@ -10,11 +11,11 @@
 #include <cstdint>
 #include <vector>
 
-#include "tables_kernels.h"
 #include <gtest/gtest.h>
 
 #include "imsrg/angmom/moshinsky.h"
 #include "imsrg/angmom/wigner.h"
+#include "tables_kernels.h"
 
 namespace {
 
@@ -33,8 +34,11 @@ TEST(AngmomTables, SixJEqualsWignerExhaustively) {
         for (int c = 1; c <= tmax; c += 2) {
           for (int d = 1; d <= tmax; d += 2) {
             for (int Jp = 0; Jp <= tmax; Jp += 2) {
-              const double ref = wigner_6j(TwoJ{a}, TwoJ{b}, TwoJ{J}, TwoJ{c}, TwoJ{d}, TwoJ{Jp});
-              ASSERT_EQ(t(TwoJ{a}, TwoJ{b}, TwoJ{J}, TwoJ{c}, TwoJ{d}, TwoJ{Jp}), ref);
+              const double ref = wigner_6j(TwoJ{a}, TwoJ{b}, TwoJ{J}, TwoJ{c},
+                                           TwoJ{d}, TwoJ{Jp});
+              ASSERT_EQ(
+                  t(TwoJ{a}, TwoJ{b}, TwoJ{J}, TwoJ{c}, TwoJ{d}, TwoJ{Jp}),
+                  ref);
               ++checked;
             }
           }
@@ -47,12 +51,18 @@ TEST(AngmomTables, SixJEqualsWignerExhaustively) {
 
 TEST(AngmomTables, SixJOutOfRangeIsZero) {
   const SixJTable t(3);
-  EXPECT_EQ(t(TwoJ{9}, TwoJ{1}, TwoJ{0}, TwoJ{1}, TwoJ{1}, TwoJ{0}), 0.0);   // ja too large
-  EXPECT_EQ(t(TwoJ{1}, TwoJ{1}, TwoJ{20}, TwoJ{1}, TwoJ{1}, TwoJ{0}), 0.0);  // J too large
-  EXPECT_EQ(t(TwoJ{1}, TwoJ{1}, TwoJ{-2}, TwoJ{1}, TwoJ{1}, TwoJ{0}), 0.0);  // J negative
-  EXPECT_EQ(t(TwoJ{2}, TwoJ{1}, TwoJ{0}, TwoJ{1}, TwoJ{1}, TwoJ{0}), 0.0);   // even 2j
-  EXPECT_EQ(t(TwoJ{1}, TwoJ{1}, TwoJ{1}, TwoJ{1}, TwoJ{1}, TwoJ{0}), 0.0);   // odd 2J
-  EXPECT_EQ(t(TwoJ{-1}, TwoJ{1}, TwoJ{0}, TwoJ{1}, TwoJ{1}, TwoJ{0}), 0.0);  // negative 2j
+  EXPECT_EQ(t(TwoJ{9}, TwoJ{1}, TwoJ{0}, TwoJ{1}, TwoJ{1}, TwoJ{0}),
+            0.0);  // ja too large
+  EXPECT_EQ(t(TwoJ{1}, TwoJ{1}, TwoJ{20}, TwoJ{1}, TwoJ{1}, TwoJ{0}),
+            0.0);  // J too large
+  EXPECT_EQ(t(TwoJ{1}, TwoJ{1}, TwoJ{-2}, TwoJ{1}, TwoJ{1}, TwoJ{0}),
+            0.0);  // J negative
+  EXPECT_EQ(t(TwoJ{2}, TwoJ{1}, TwoJ{0}, TwoJ{1}, TwoJ{1}, TwoJ{0}),
+            0.0);  // even 2j
+  EXPECT_EQ(t(TwoJ{1}, TwoJ{1}, TwoJ{1}, TwoJ{1}, TwoJ{1}, TwoJ{0}),
+            0.0);  // odd 2J
+  EXPECT_EQ(t(TwoJ{-1}, TwoJ{1}, TwoJ{0}, TwoJ{1}, TwoJ{1}, TwoJ{0}),
+            0.0);  // negative 2j
 }
 
 TEST(AngmomTables, NineJEqualsNormNineJ) {
@@ -73,9 +83,11 @@ TEST(AngmomTables, NineJEqualsNormNineJ) {
           for (int L = 0; L <= 2 * lmax; ++L) {
             for (int S = 0; S <= 1; ++S) {
               for (int J = 0; J <= 2 * lmax + 1; ++J) {
-                const double ref = norm_9j(TwoJ{2 * la}, TwoJ{1}, TwoJ{ja}, TwoJ{2 * lb}, TwoJ{1},
-                                           TwoJ{jb}, TwoJ{2 * L}, TwoJ{2 * S}, TwoJ{2 * J});
-                ASSERT_EQ(t(la, TwoJ{ja}, lb, TwoJ{jb}, L, S, TwoJ{2 * J}), ref);
+                const double ref = norm_9j(
+                    TwoJ{2 * la}, TwoJ{1}, TwoJ{ja}, TwoJ{2 * lb}, TwoJ{1},
+                    TwoJ{jb}, TwoJ{2 * L}, TwoJ{2 * S}, TwoJ{2 * J});
+                ASSERT_EQ(t(la, TwoJ{ja}, lb, TwoJ{jb}, L, S, TwoJ{2 * J}),
+                          ref);
               }
             }
           }
@@ -109,7 +121,8 @@ TEST(AngmomTables, MoshinskyEqualsFunctionForEveryStoredEntry) {
     for (int lam = 0; lam <= E; ++lam) {
       for (const auto& c : tup) {
         for (const auto& u : tup) {
-          const HoNL cm{c[0], c[1]}, rel{c[2], c[3]}, a{u[0], u[1]}, b{u[2], u[3]};
+          const HoNL cm{c[0], c[1]}, rel{c[2], c[3]}, a{u[0], u[1]},
+              b{u[2], u[3]};
           ASSERT_EQ(t(cm, rel, a, b, lam), moshinsky(cm, rel, a, b, lam));
           ++count;
         }
@@ -117,10 +130,13 @@ TEST(AngmomTables, MoshinskyEqualsFunctionForEveryStoredEntry) {
     }
   }
   EXPECT_EQ(count, MoshinskyTable::value_count(e2max));
-  EXPECT_EQ(t(HoNL{0, 0}, HoNL{0, 0}, HoNL{0, 1}, HoNL{0, 0}, 0), 0.0);  // energy mismatch
-  EXPECT_EQ(t(HoNL{0, 0}, HoNL{0, 0}, HoNL{0, 0}, HoNL{0, 0}, 1), 0.0);  // lambda > E
+  EXPECT_EQ(t(HoNL{0, 0}, HoNL{0, 0}, HoNL{0, 1}, HoNL{0, 0}, 0),
+            0.0);  // energy mismatch
+  EXPECT_EQ(t(HoNL{0, 0}, HoNL{0, 0}, HoNL{0, 0}, HoNL{0, 0}, 1),
+            0.0);  // lambda > E
   EXPECT_EQ(t(HoNL{0, 0}, HoNL{0, 0}, HoNL{-1, 0}, HoNL{0, 0}, 0), 0.0);
-  EXPECT_EQ(t(HoNL{7, 0}, HoNL{0, 0}, HoNL{7, 0}, HoNL{0, 0}, 0), 0.0);  // E > e2max
+  EXPECT_EQ(t(HoNL{7, 0}, HoNL{0, 0}, HoNL{7, 0}, HoNL{0, 0}, 0),
+            0.0);  // E > e2max
   EXPECT_GT(t.size_bytes(), 0u);
 }
 
@@ -140,8 +156,9 @@ TEST(AngmomTables, DeviceViewsReproduceHostSums) {
         for (int ic = 0; ic < nj; ++ic) {
           for (int id = 0; id < nj; ++id) {
             for (int Jp = 0; Jp < nJ; ++Jp) {
-              const double x = hv(TwoJ{2 * ia + 1}, TwoJ{2 * ib + 1}, TwoJ{2 * J}, TwoJ{2 * ic + 1},
-                                  TwoJ{2 * id + 1}, TwoJ{2 * Jp});
+              const double x =
+                  hv(TwoJ{2 * ia + 1}, TwoJ{2 * ib + 1}, TwoJ{2 * J},
+                     TwoJ{2 * ic + 1}, TwoJ{2 * id + 1}, TwoJ{2 * Jp});
               host += x;
               host_abs += std::abs(x);
             }
@@ -165,8 +182,8 @@ TEST(AngmomTables, DeviceViewsReproduceHostSums) {
           for (int L = 0; L <= 2 * lmax; ++L) {
             for (int S = 0; S < 2; ++S) {
               for (int J = 0; J <= 2 * lmax + 1; ++J) {
-                host9 += h9(la, TwoJ{2 * la - 1 + 2 * sja}, lb, TwoJ{2 * lb - 1 + 2 * sjb}, L, S,
-                            TwoJ{2 * J});
+                host9 += h9(la, TwoJ{2 * la - 1 + 2 * sja}, lb,
+                            TwoJ{2 * lb - 1 + 2 * sjb}, L, S, TwoJ{2 * J});
               }
             }
           }
@@ -174,7 +191,8 @@ TEST(AngmomTables, DeviceViewsReproduceHostSums) {
       }
     }
   }
-  EXPECT_NEAR(test::sum_ninej_device(nt), host9, 1e-9 * std::max(1.0, std::abs(host9)));
+  EXPECT_NEAR(test::sum_ninej_device(nt), host9,
+              1e-9 * std::max(1.0, std::abs(host9)));
 
   const MoshinskyTable m(6);
   std::vector<std::int32_t> q;
@@ -193,7 +211,8 @@ TEST(AngmomTables, DeviceViewsReproduceHostSums) {
               for (int v : {0, L, rem / 2, 0, a1, l1, a2, l2, lam}) {
                 q.push_back(v);
               }
-              expect.push_back(m(HoNL{0, L}, HoNL{rem / 2, 0}, HoNL{a1, l1}, HoNL{a2, l2}, lam));
+              expect.push_back(m(HoNL{0, L}, HoNL{rem / 2, 0}, HoNL{a1, l1},
+                                 HoNL{a2, l2}, lam));
             }
           }
         }

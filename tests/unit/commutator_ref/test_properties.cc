@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Algebraic property tests of the reference commutator on random operators (design/30 section 2):
-// antisymmetry, linearity, element-wise hermiticity, the Jacobi identity for one-body operators
-// and consistency for non-Hermitian operands.
+// Algebraic property tests of the reference commutator on random operators
+// (design/30 section 2): antisymmetry, linearity, element-wise hermiticity, the
+// Jacobi identity for one-body operators and consistency for non-Hermitian
+// operands.
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -12,9 +13,9 @@
 #include <string>
 #include <vector>
 
-#include "commutator_test_support.h"
 #include <gtest/gtest.h>
 
+#include "commutator_test_support.h"
 #include "imsrg/commutator_ref/commutator_ref.h"
 #include "imsrg/operator/arithmetic.h"
 #include "imsrg/operator/operator.h"
@@ -76,12 +77,14 @@ struct HPair {
   Hermiticity hx;
   Hermiticity hy;
 };
-const HPair kHPairs[] = {{"HH", Hermiticity::Hermitian, Hermiticity::Hermitian},
-                         {"HA", Hermiticity::Hermitian, Hermiticity::AntiHermitian},
-                         {"AH", Hermiticity::AntiHermitian, Hermiticity::Hermitian},
-                         {"AA", Hermiticity::AntiHermitian, Hermiticity::AntiHermitian}};
+const HPair kHPairs[] = {
+    {"HH", Hermiticity::Hermitian, Hermiticity::Hermitian},
+    {"HA", Hermiticity::Hermitian, Hermiticity::AntiHermitian},
+    {"AH", Hermiticity::AntiHermitian, Hermiticity::Hermitian},
+    {"AA", Hermiticity::AntiHermitian, Hermiticity::AntiHermitian}};
 
-/// Largest |Z_ij - h Z_ji| / max(1, max|Z|) over the one-body and all two-body blocks.
+/// Largest |Z_ij - h Z_ji| / max(1, max|Z|) over the one-body and all two-body
+/// blocks.
 double hermiticity_violation(const Operator& Z, double h) {
   const auto& ms = Z.model_space();
   double maxabs = 1.0;
@@ -101,10 +104,10 @@ double hermiticity_violation(const Operator& Z, double h) {
       const int nk = chans.channel(ch).num_kets;
       for (int i = 0; i < nk; ++i) {
         for (int j = 0; j < nk; ++j) {
-          const double a =
-              Z.two_body().get(ch, ch, imsrg::LocalKetIndex{i}, imsrg::LocalKetIndex{j});
-          const double b =
-              Z.two_body().get(ch, ch, imsrg::LocalKetIndex{j}, imsrg::LocalKetIndex{i});
+          const double a = Z.two_body().get(ch, ch, imsrg::LocalKetIndex{i},
+                                            imsrg::LocalKetIndex{j});
+          const double b = Z.two_body().get(ch, ch, imsrg::LocalKetIndex{j},
+                                            imsrg::LocalKetIndex{i});
           maxabs = std::max(maxabs, std::abs(a));
           dev = std::max(dev, std::abs(a - h * b));
         }
@@ -115,7 +118,9 @@ double hermiticity_violation(const Operator& Z, double h) {
 }
 
 double sign_of(Hermiticity h) {
-  return h == Hermiticity::Hermitian ? 1.0 : (h == Hermiticity::AntiHermitian ? -1.0 : 0.0);
+  return h == Hermiticity::Hermitian
+             ? 1.0
+             : (h == Hermiticity::AntiHermitian ? -1.0 : 0.0);
 }
 
 TEST(commutator_ref_properties, antisymmetry) {
@@ -128,12 +133,15 @@ TEST(commutator_ref_properties, antisymmetry) {
           const Operator zxy = apply(t, X, Y);
           const Operator zyx = apply(t, Y, X);
           const double dev = relative_deviation(zxy, -zyx);
-          std::printf("[prop] antisym %s %s seed %llu %s: %.3e\n", c.name.c_str(), hp.name,
+          std::printf("[prop] antisym %s %s seed %llu %s: %.3e\n",
+                      c.name.c_str(), hp.name,
                       static_cast<unsigned long long>(seed), t.name, dev);
           EXPECT_LE(dev, kTol) << c.name << " " << hp.name << " " << t.name;
         }
-        const double dev = relative_deviation(cr::commutator(X, Y), -cr::commutator(Y, X));
-        std::printf("[prop] antisym %s %s seed %llu full: %.3e\n", c.name.c_str(), hp.name,
+        const double dev =
+            relative_deviation(cr::commutator(X, Y), -cr::commutator(Y, X));
+        std::printf("[prop] antisym %s %s seed %llu full: %.3e\n",
+                    c.name.c_str(), hp.name,
                     static_cast<unsigned long long>(seed), dev);
         EXPECT_LE(dev, kTol) << c.name << " " << hp.name << " full";
       }
@@ -153,7 +161,8 @@ TEST(commutator_ref_properties, linearity) {
           const Operator lhs = apply(t, Xs, Y);
           const Operator rhs = 0.7 * apply(t, X1, Y) - 1.3 * apply(t, X2, Y);
           const double dev = relative_deviation(lhs, rhs);
-          std::printf("[prop] linear %s %s seed %llu %s: %.3e\n", c.name.c_str(), hp.name,
+          std::printf("[prop] linear %s %s seed %llu %s: %.3e\n",
+                      c.name.c_str(), hp.name,
                       static_cast<unsigned long long>(seed), t.name, dev);
           EXPECT_LE(dev, kTol) << c.name << " " << hp.name << " " << t.name;
         }
@@ -172,15 +181,19 @@ TEST(commutator_ref_properties, hermiticity) {
         const double h = (hp.hx == hp.hy) ? -1.0 : 1.0;
         for (const auto& t : kTerms) {
           const Operator Z = apply(t, X, Y);
-          if (std::string(t.name) == "comm110ss" || std::string(t.name) == "comm220ss") continue;
+          if (std::string(t.name) == "comm110ss" ||
+              std::string(t.name) == "comm220ss")
+            continue;
           const double dev = hermiticity_violation(Z, h);
-          std::printf("[prop] herm %s %s seed %llu %s: %.3e\n", c.name.c_str(), hp.name,
-                      static_cast<unsigned long long>(seed), t.name, dev);
+          std::printf("[prop] herm %s %s seed %llu %s: %.3e\n", c.name.c_str(),
+                      hp.name, static_cast<unsigned long long>(seed), t.name,
+                      dev);
           EXPECT_LE(dev, kTol) << c.name << " " << hp.name << " " << t.name;
         }
         const Operator Z = cr::commutator(X, Y);
         EXPECT_EQ(sign_of(Z.hermiticity()), h);
-        EXPECT_LE(hermiticity_violation(Z, h), kTol) << c.name << " " << hp.name << " full";
+        EXPECT_LE(hermiticity_violation(Z, h), kTol)
+            << c.name << " " << hp.name << " full";
       }
     }
   }
@@ -190,8 +203,10 @@ TEST(commutator_ref_properties, jacobi_one_body) {
   for (const auto& c : cases()) {
     for (const auto seed : c.seeds) {
       const Operator X = random_operator(c.ms, Hermiticity::Hermitian, seed, 1);
-      const Operator Y = random_operator(c.ms, Hermiticity::Hermitian, seed + 1, 1);
-      const Operator W = random_operator(c.ms, Hermiticity::Hermitian, seed + 2, 1);
+      const Operator Y =
+          random_operator(c.ms, Hermiticity::Hermitian, seed + 1, 1);
+      const Operator W =
+          random_operator(c.ms, Hermiticity::Hermitian, seed + 2, 1);
       Operator J = cr::commutator(X, cr::commutator(Y, W));
       J += cr::commutator(Y, cr::commutator(W, X));
       J += cr::commutator(W, cr::commutator(X, Y));
@@ -208,10 +223,12 @@ TEST(commutator_ref_properties, non_hermitian_consistency) {
   for (const auto& c : cases()) {
     for (const auto seed : c.seeds) {
       const Operator XH = random_operator(c.ms, Hermiticity::Hermitian, seed);
-      const Operator XA = random_operator(c.ms, Hermiticity::AntiHermitian, seed + 500);
+      const Operator XA =
+          random_operator(c.ms, Hermiticity::AntiHermitian, seed + 500);
       Operator X = XH + XA;
       X.set_hermiticity(Hermiticity::NonHermitian);
-      for (const auto& hp : {Hermiticity::Hermitian, Hermiticity::AntiHermitian}) {
+      for (const auto& hp :
+           {Hermiticity::Hermitian, Hermiticity::AntiHermitian}) {
         const Operator Y = random_operator(c.ms, hp, seed + 1000);
         for (const auto& t : kTerms) {
           Operator lhs = apply(t, X, Y);
@@ -225,7 +242,8 @@ TEST(commutator_ref_properties, non_hermitian_consistency) {
                       static_cast<unsigned long long>(seed), t.name, dev);
           EXPECT_LE(dev, kTol) << c.name << " " << t.name;
         }
-        EXPECT_EQ(cr::commutator(X, Y).hermiticity(), Hermiticity::NonHermitian);
+        EXPECT_EQ(cr::commutator(X, Y).hermiticity(),
+                  Hermiticity::NonHermitian);
       }
     }
   }

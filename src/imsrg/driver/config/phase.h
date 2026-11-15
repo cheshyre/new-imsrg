@@ -4,14 +4,16 @@
 #ifndef IMSRG_DRIVER_CONFIG_PHASE_H_
 #define IMSRG_DRIVER_CONFIG_PHASE_H_
 /// @file
-/// Implementation phase of a configuration value, key or operator (design/16 section 2).
+/// Implementation phase of a configuration value, key or operator (design/16
+/// section 2).
 
 #include <string_view>
 
 namespace imsrg::driver {
 
-/// P1 = implemented in the first phase; Planned = parsed, but requesting it fails validation with
-/// `E-PLANNED` ("not available in this build"); NotSupported = rejected with a message.
+/// P1 = implemented in the first phase; Planned = parsed, but requesting it
+/// fails validation with `E-PLANNED` ("not available in this build");
+/// NotSupported = rejected with a message.
 enum class Phase { P1, Planned, NotSupported };
 
 /// "P1", "PL" or "NS" (the abbreviations of design/16).

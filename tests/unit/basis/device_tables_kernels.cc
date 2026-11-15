@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Kernels evaluating the device accessors of DeviceTables. Free functions only (design/12 s5);
-// lambdas capture the (trivially copyable) views and raw output pointers by value.
+// Kernels evaluating the device accessors of DeviceTables. Free functions only
+// (design/12 s5); lambdas capture the (trivially copyable) views and raw output
+// pointers by value.
 #include "device_tables_kernels.h"
 
 #include "imsrg/exec/kokkos_backend.h"
@@ -47,7 +48,8 @@ void eval_invalid_two_j(const TwoBodyTableView& tb_in, std::int32_t max_J,
   exec::fence("test::eval_invalid_two_j");
 }
 
-void eval_global_kets(const TwoBodyTableView& tb_in, exec::DeviceBuffer<std::int32_t>& out) {
+void eval_global_kets(const TwoBodyTableView& tb_in,
+                      exec::DeviceBuffer<std::int32_t>& out) {
   const TwoBodyTableView tb = tb_in;
   std::int32_t* o = out.device_data();
   exec::parallel_for(
@@ -55,15 +57,19 @@ void eval_global_kets(const TwoBodyTableView& tb_in, exec::DeviceBuffer<std::int
       IMSRG_LAMBDA(const exec::Index c) {
         const ChannelIndex ch{static_cast<std::int32_t>(c)};
         for (std::int32_t i = 0; i < tb.channel_num_kets[c]; ++i) {
-          o[tb.channel_ket_offset[c] + i] = tb.global_ket(ch, LocalKetIndex{i}).value();
+          o[tb.channel_ket_offset[c] + i] =
+              tb.global_ket(ch, LocalKetIndex{i}).value();
         }
       });
   exec::fence("test::eval_global_kets");
 }
 
-void eval_subsets(const KetSubsetTableView& sv_in, exec::DeviceBuffer<std::int32_t>& begin,
-                  exec::DeviceBuffer<std::int32_t>& end, exec::DeviceBuffer<std::int32_t>& size,
-                  exec::DeviceBuffer<std::int32_t>& kets, exec::DeviceBuffer<double>& occ,
+void eval_subsets(const KetSubsetTableView& sv_in,
+                  exec::DeviceBuffer<std::int32_t>& begin,
+                  exec::DeviceBuffer<std::int32_t>& end,
+                  exec::DeviceBuffer<std::int32_t>& size,
+                  exec::DeviceBuffer<std::int32_t>& kets,
+                  exec::DeviceBuffer<double>& occ,
                   exec::DeviceBuffer<double>& vac) {
   const KetSubsetTableView sv = sv_in;
   std::int32_t* ob = begin.device_data();
@@ -73,7 +79,8 @@ void eval_subsets(const KetSubsetTableView& sv_in, exec::DeviceBuffer<std::int32
   double* oo = occ.device_data();
   double* ov = vac.device_data();
   exec::parallel_for(
-      "test::eval_subsets", static_cast<exec::Index>(sv.num_channels) * kNumKetClasses,
+      "test::eval_subsets",
+      static_cast<exec::Index>(sv.num_channels) * kNumKetClasses,
       IMSRG_LAMBDA(const exec::Index t) {
         const ChannelIndex ch{static_cast<std::int32_t>(t / kNumKetClasses)};
         const KetClass c = static_cast<KetClass>(t % kNumKetClasses);
@@ -91,9 +98,12 @@ void eval_subsets(const KetSubsetTableView& sv_in, exec::DeviceBuffer<std::int32
   exec::fence("test::eval_subsets");
 }
 
-void eval_orbits(const OrbitTableView& ov_in, exec::DeviceBuffer<std::int32_t>& n,
-                 exec::DeviceBuffer<std::int32_t>& l, exec::DeviceBuffer<std::int32_t>& j2,
-                 exec::DeviceBuffer<std::int32_t>& tz2, exec::DeviceBuffer<std::int32_t>& cvq,
+void eval_orbits(const OrbitTableView& ov_in,
+                 exec::DeviceBuffer<std::int32_t>& n,
+                 exec::DeviceBuffer<std::int32_t>& l,
+                 exec::DeviceBuffer<std::int32_t>& j2,
+                 exec::DeviceBuffer<std::int32_t>& tz2,
+                 exec::DeviceBuffer<std::int32_t>& cvq,
                  exec::DeviceBuffer<double>& occ) {
   const OrbitTableView ov = ov_in;
   std::int32_t* on = n.device_data();

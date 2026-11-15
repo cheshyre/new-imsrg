@@ -14,7 +14,8 @@ namespace imsrg::opslib {
 namespace {
 
 double b_squared(const basis::ModelSpace& ms) {
-  return constants::hbarc * constants::hbarc / constants::m_nucleon / ms.basis().hbar_omega();
+  return constants::hbarc * constants::hbarc / constants::m_nucleon /
+         ms.basis().hbar_omega();
 }
 
 bool in_species(const basis::Orbit& o, Species s) {
@@ -50,38 +51,45 @@ Species species_from_string(const std::string& option) {
   throw InputError("species_from_string: unknown option '" + option + "'");
 }
 
-op::Operator r2_one_body(const std::shared_ptr<const basis::ModelSpace>& ms, Species species) {
+op::Operator r2_one_body(const std::shared_ptr<const basis::ModelSpace>& ms,
+                         Species species) {
   op::Operator r(ms, op::OperatorSpec::scalar(2, Hermiticity::Hermitian));
   detail::add_oscillator_one_body(
-      r, b_squared(*ms), -1.0, [species](const basis::Orbit& o) { return in_species(o, species); });
+      r, b_squared(*ms), -1.0,
+      [species](const basis::Orbit& o) { return in_species(o, species); });
   r.sync_to_device();
   return r;
 }
 
-op::Operator r2_two_body(const std::shared_ptr<const basis::ModelSpace>& ms, Species species) {
+op::Operator r2_two_body(const std::shared_ptr<const basis::ModelSpace>& ms,
+                         Species species) {
   op::Operator r(ms, op::OperatorSpec::scalar(2, Hermiticity::Hermitian));
-  const detail::PairEngine engine(detail::max_orbit_shell(*ms), ms->basis().lmax(),
-                                  ms->basis().hbar_omega());
-  // Channel filter and pn prefactor are applied inside the value callback (zero skips the entry).
+  const detail::PairEngine engine(detail::max_orbit_shell(*ms),
+                                  ms->basis().lmax(), ms->basis().hbar_omega());
+  // Channel filter and pn prefactor are applied inside the value callback (zero
+  // skips the entry).
   detail::add_two_body(
       r, 0.0,
-      [&](const basis::TwoBodyChannel& ch, const basis::Orbit& a, const basis::Orbit& b,
-          const basis::Orbit& c, const basis::Orbit& d) {
+      [&](const basis::TwoBodyChannel& ch, const basis::Orbit& a,
+          const basis::Orbit& b, const basis::Orbit& c, const basis::Orbit& d) {
         if ((species == Species::Proton && ch.Tz() > 0) ||
             (species == Species::Neutron && ch.Tz() < 0)) {
           return 0.0;
         }
-        const double prefactor = (ch.Tz() == 0 && species != Species::Matter) ? 0.5 : 1.0;
-        return prefactor * engine.element(detail::PairKind::Position, a, b, c, d, ch.two_j);
+        const double prefactor =
+            (ch.Tz() == 0 && species != Species::Matter) ? 0.5 : 1.0;
+        return prefactor *
+               engine.element(detail::PairKind::Position, a, b, c, d, ch.two_j);
       });
   r.sync_to_device();
   return r;
 }
 
-op::Operator rp_spin_orbit_correction(const std::shared_ptr<const basis::ModelSpace>& ms) {
+op::Operator rp_spin_orbit_correction(
+    const std::shared_ptr<const basis::ModelSpace>& ms) {
   op::Operator r(ms, op::OperatorSpec::scalar(2, Hermiticity::Hermitian));
-  const double m2 =
-      constants::m_nucleon * constants::m_nucleon / (constants::hbarc * constants::hbarc);
+  const double m2 = constants::m_nucleon * constants::m_nucleon /
+                    (constants::hbarc * constants::hbarc);
   const auto& basis = ms->basis();
   for (std::int32_t i = 0; i < basis.num_orbits(); ++i) {
     const basis::Orbit& o = basis.orbit(OrbitIndex{i});
@@ -93,8 +101,8 @@ op::Operator rp_spin_orbit_correction(const std::shared_ptr<const basis::ModelSp
   return r;
 }
 
-op::Operator rp2(const std::shared_ptr<const basis::ModelSpace>& ms, int A, int Z,
-                 bool include_spin_orbit) {
+op::Operator rp2(const std::shared_ptr<const basis::ModelSpace>& ms, int A,
+                 int Z, bool include_spin_orbit) {
   if (Z == 0) {
     return zero_operator(ms);
   }
@@ -109,7 +117,8 @@ op::Operator rp2(const std::shared_ptr<const basis::ModelSpace>& ms, int A, int 
   return r;
 }
 
-op::Operator rn2(const std::shared_ptr<const basis::ModelSpace>& ms, int A, int Z) {
+op::Operator rn2(const std::shared_ptr<const basis::ModelSpace>& ms, int A,
+                 int Z) {
   if (Z == A) {
     return zero_operator(ms);
   }

@@ -2,8 +2,9 @@
 // Copyright 2026 The imsrg authors
 
 /// @file
-/// Multi-rank tests of imsrg::comm. CTest runs this under mpiexec with 2 and 4 ranks; every rank
-/// runs the tests, only rank 0 prints, and the exit code is the maximum over ranks.
+/// Multi-rank tests of imsrg::comm. CTest runs this under mpiexec with 2 and 4
+/// ranks; every rank runs the tests, only rank 0 prints, and the exit code is
+/// the maximum over ranks.
 
 #include <array>
 #include <cstdint>
@@ -47,7 +48,8 @@ TEST(CommMpi, ExactIntegerReductions) {
   EXPECT_EQ(v[0], n * (n - 1) / 2);
   EXPECT_EQ(v[1], n);
   EXPECT_EQ(v[2], -n * (n - 1) / 2);
-  std::array<std::int32_t, 2> w{static_cast<std::int32_t>(r), static_cast<std::int32_t>(-r)};
+  std::array<std::int32_t, 2> w{static_cast<std::int32_t>(r),
+                                static_cast<std::int32_t>(-r)};
   g_world.allreduce_max(w);
   EXPECT_EQ(w[0], n - 1);
   EXPECT_EQ(w[1], 0);
@@ -57,14 +59,16 @@ TEST(CommMpi, ExactIntegerReductions) {
   g_world.allreduce_sum(s32);
   EXPECT_EQ(s32[0], n * (n + 1) / 2);
   // 64-bit values beyond 32-bit range.
-  EXPECT_EQ(g_world.allreduce_sum(std::int64_t{1} << 40), n * (std::int64_t{1} << 40));
+  EXPECT_EQ(g_world.allreduce_sum(std::int64_t{1} << 40),
+            n * (std::int64_t{1} << 40));
 }
 
 TEST(CommMpi, FloatingPointReductions) {
   const int n = g_world.size();
   const double r = g_world.rank();
   // Sums of dyadic rationals are exact.
-  EXPECT_DOUBLE_EQ(g_world.allreduce_sum(0.25 * (r + 1)), 0.25 * n * (n + 1) / 2);
+  EXPECT_DOUBLE_EQ(g_world.allreduce_sum(0.25 * (r + 1)),
+                   0.25 * n * (n + 1) / 2);
   EXPECT_EQ(g_world.allreduce_max(r * 0.5), (n - 1) * 0.5);
   EXPECT_EQ(g_world.allreduce_min(r * 0.5 + 1.0), 1.0);
   std::array<double, 2> d{r, 2.0};
@@ -84,8 +88,8 @@ TEST(CommMpi, FloatingPointReductions) {
 TEST(CommMpi, BroadcastFromNonZeroRoot) {
   const int root = g_world.size() - 1;
   const bool is_root = g_world.rank() == root;
-  std::array<double, 3> d =
-      is_root ? std::array<double, 3>{1.5, 2.5, -3.5} : std::array<double, 3>{0, 0, 0};
+  std::array<double, 3> d = is_root ? std::array<double, 3>{1.5, 2.5, -3.5}
+                                    : std::array<double, 3>{0, 0, 0};
   g_world.broadcast(d, root);
   EXPECT_EQ(d, (std::array<double, 3>{1.5, 2.5, -3.5}));
 
@@ -97,12 +101,14 @@ TEST(CommMpi, BroadcastFromNonZeroRoot) {
   g_world.broadcast(i, root);
   EXPECT_EQ(i[1], -12);
 
-  std::array<std::int64_t, 2> l{is_root ? (std::int64_t{1} << 45) : 0, is_root ? 3 : 0};
+  std::array<std::int64_t, 2> l{is_root ? (std::int64_t{1} << 45) : 0,
+                                is_root ? 3 : 0};
   g_world.broadcast(l, root);
   EXPECT_EQ(l[0], std::int64_t{1} << 45);
 
   std::array<std::byte, 4> b{};
-  if (is_root) b = {std::byte{0xde}, std::byte{0xad}, std::byte{0xbe}, std::byte{0xef}};
+  if (is_root)
+    b = {std::byte{0xde}, std::byte{0xad}, std::byte{0xbe}, std::byte{0xef}};
   g_world.broadcast(b, root);
   EXPECT_EQ(b[0], std::byte{0xde});
   EXPECT_EQ(b[3], std::byte{0xef});
@@ -111,7 +117,8 @@ TEST(CommMpi, BroadcastFromNonZeroRoot) {
   g_world.broadcast(s, root);
   EXPECT_EQ(s, "a string from the last rank");
 
-  std::string longer = is_root ? "" : "stale content that is longer than the root's";
+  std::string longer =
+      is_root ? "" : "stale content that is longer than the root's";
   g_world.broadcast(longer, root);
   EXPECT_EQ(longer, "");
 
@@ -122,15 +129,18 @@ TEST(CommMpi, AllgatherOrderedByRank) {
   const auto n = static_cast<std::size_t>(g_world.size());
   const auto di = g_world.allgather(static_cast<double>(g_world.rank()) * 2.0);
   ASSERT_EQ(di.size(), n);
-  for (std::size_t k = 0; k < n; ++k) EXPECT_EQ(di[k], 2.0 * static_cast<double>(k));
-  const auto li = g_world.allgather(static_cast<std::int64_t>(g_world.rank()) * 100);
+  for (std::size_t k = 0; k < n; ++k)
+    EXPECT_EQ(di[k], 2.0 * static_cast<double>(k));
+  const auto li =
+      g_world.allgather(static_cast<std::int64_t>(g_world.rank()) * 100);
   ASSERT_EQ(li.size(), n);
-  for (std::size_t k = 0; k < n; ++k) EXPECT_EQ(li[k], static_cast<std::int64_t>(k) * 100);
+  for (std::size_t k = 0; k < n; ++k)
+    EXPECT_EQ(li[k], static_cast<std::int64_t>(k) * 100);
 }
 
 TEST(CommMpi, Alltoallv) {
-  // Rank r sends (r + 1 + dest) doubles of value 100 r + dest to each dest; so rank d receives
-  // from rank s (s + 1 + d) doubles of value 100 s + d.
+  // Rank r sends (r + 1 + dest) doubles of value 100 r + dest to each dest; so
+  // rank d receives from rank s (s + 1 + d) doubles of value 100 s + d.
   const int me = g_world.rank();
   const auto n = static_cast<std::size_t>(g_world.size());
   std::vector<int> sc(n), sd(n), rc(n), rd(n);
@@ -149,7 +159,8 @@ TEST(CommMpi, Alltoallv) {
   g_world.alltoallv(send, sc, sd, recv, rc, rd);
   for (std::size_t u = 0; u < n; ++u) {
     for (int j = 0; j < rc[u]; ++j) {
-      EXPECT_EQ(recv[static_cast<std::size_t>(rd[u] + j)], 100.0 * static_cast<double>(u) + me);
+      EXPECT_EQ(recv[static_cast<std::size_t>(rd[u] + j)],
+                100.0 * static_cast<double>(u) + me);
     }
   }
 }
@@ -169,7 +180,8 @@ TEST(CommMpi, SplitEvenOdd) {
   const auto gathered = sub.allgather(static_cast<std::int64_t>(me));
   ASSERT_EQ(gathered.size(), static_cast<std::size_t>(expected_size));
   for (std::size_t k = 0; k < gathered.size(); ++k) {
-    EXPECT_EQ(gathered[k], static_cast<std::int64_t>(2 * k + static_cast<std::size_t>(me % 2)));
+    EXPECT_EQ(gathered[k], static_cast<std::int64_t>(
+                               2 * k + static_cast<std::size_t>(me % 2)));
   }
   std::string s = sub.is_root() ? "group " + std::to_string(me % 2) : "";
   sub.broadcast(s, 0);
@@ -200,7 +212,8 @@ TEST(CommMpi, Duplicate) {
 TEST(CommMpi, SerialCommunicatorWorksAlongside) {
   const auto s = Communicator::serial();
   EXPECT_EQ(s.size(), 1);
-  EXPECT_EQ(s.allreduce_sum(static_cast<double>(g_world.rank())), g_world.rank());
+  EXPECT_EQ(s.allreduce_sum(static_cast<double>(g_world.rank())),
+            g_world.rank());
 }
 
 }  // namespace
@@ -217,9 +230,11 @@ int main(int argc, char** argv) {
     }
     const int failed = RUN_ALL_TESTS();
     if (failed != 0 && g_world.rank() != 0) {
-      std::fprintf(stderr, "comm_mpi: tests failed on rank %d\n", g_world.rank());
+      std::fprintf(stderr, "comm_mpi: tests failed on rank %d\n",
+                   g_world.rank());
     }
-    exit_code = static_cast<int>(g_world.allreduce_max(static_cast<std::int64_t>(failed)));
+    exit_code = static_cast<int>(
+        g_world.allreduce_max(static_cast<std::int64_t>(failed)));
     g_world = Communicator::serial();
   }
   return exit_code;

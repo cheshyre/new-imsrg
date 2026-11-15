@@ -30,7 +30,8 @@ Hermiticity hermiticity_from_code(char c) {
     case 'N':
       return Hermiticity::NonHermitian;
     default:
-      throw InputError(std::string("invalid hermiticity code '") + c + "' (expected H, A or N)");
+      throw InputError(std::string("invalid hermiticity code '") + c +
+                       "' (expected H, A or N)");
   }
 }
 
@@ -40,25 +41,32 @@ void validate(const OperatorSpec& s) {
                      std::to_string(s.particle_rank));
   }
   if (s.rank_J < 0) {
-    throw InputError("operator rank_J must be >= 0, got " + std::to_string(s.rank_J));
+    throw InputError("operator rank_J must be >= 0, got " +
+                     std::to_string(s.rank_J));
   }
   if (s.delta_Tz < 0) {
-    throw InputError("operator delta_Tz must be >= 0, got " + std::to_string(s.delta_Tz));
+    throw InputError("operator delta_Tz must be >= 0, got " +
+                     std::to_string(s.delta_Tz));
   }
   if (s.delta_particle_number < -1 || s.delta_particle_number > 1) {
     throw InputError("operator delta_particle_number must be -1, 0 or 1, got " +
                      std::to_string(s.delta_particle_number));
   }
-  if (s.rank_J != 0) throw NotImplementedError("tensor operators (rank_J > 0) are not implemented");
+  if (s.rank_J != 0)
+    throw NotImplementedError(
+        "tensor operators (rank_J > 0) are not implemented");
   if (s.parity != Parity::Even) {
     throw NotImplementedError("parity-changing operators are not implemented");
   }
-  if (s.delta_Tz != 0) throw NotImplementedError("Tz-changing operators are not implemented");
+  if (s.delta_Tz != 0)
+    throw NotImplementedError("Tz-changing operators are not implemented");
   if (s.delta_particle_number != 0) {
-    throw NotImplementedError("non-number-conserving operators are not implemented");
+    throw NotImplementedError(
+        "non-number-conserving operators are not implemented");
   }
   if (s.particle_rank == 3) {
-    throw NotImplementedError("three-body operators (particle_rank 3) are not implemented yet");
+    throw NotImplementedError(
+        "three-body operators (particle_rank 3) are not implemented yet");
   }
 }
 

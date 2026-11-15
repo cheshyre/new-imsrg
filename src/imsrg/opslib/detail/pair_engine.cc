@@ -13,16 +13,19 @@ namespace imsrg::opslib::detail {
 PairEngine::PairEngine(int emax, int lmax, double hbar_omega)
     : hbar_omega_(hbar_omega), mosh_(2 * emax), nj_(lmax) {}
 
-double PairEngine::element(PairKind kind, const basis::Orbit& oa, const basis::Orbit& ob,
-                           const basis::Orbit& oc, const basis::Orbit& od, TwoJ two_j) const {
+double PairEngine::element(PairKind kind, const basis::Orbit& oa,
+                           const basis::Orbit& ob, const basis::Orbit& oc,
+                           const basis::Orbit& od, TwoJ two_j) const {
   const int fab = oa.e() + ob.e();
   const int fcd = oc.e() + od.e();
-  // p1.p2 and r1.r2 only connect pair energies that differ by 0 or 2 (parity conserved).
+  // p1.p2 and r1.r2 only connect pair energies that differ by 0 or 2 (parity
+  // conserved).
   if (std::abs(fab - fcd) % 2 > 0 || std::abs(fab - fcd) > 2) {
     return 0.0;
   }
   const int J = two_j.twice / 2;
-  const double off = (kind == PairKind::Momentum) ? 1.0 : -1.0;  // sign of the sqrt terms
+  const double off =
+      (kind == PairKind::Momentum) ? 1.0 : -1.0;  // sign of the sqrt terms
   const auto mosh = mosh_.host_view();
   const auto nj = nj_.host_view();
 
@@ -42,11 +45,13 @@ double PairEngine::element(PairKind kind, const basis::Orbit& oa, const basis::O
       }
       for (int Nab = 0; Nab <= fab / 2; ++Nab) {
         for (int Lam = 0; Lam <= fab - 2 * Nab; ++Lam) {
-          for (int lam = (fab - 2 * Nab - Lam) % 2; lam <= fab - 2 * Nab - Lam; lam += 2) {
+          for (int lam = (fab - 2 * Nab - Lam) % 2; lam <= fab - 2 * Nab - Lam;
+               lam += 2) {
             if (Lab < std::abs(Lam - lam) || Lab > Lam + lam) {
               continue;
             }
-            // Antisymmetrization factor of imsrg++ (integer arithmetic, phase (-1)^(lam+S)).
+            // Antisymmetrization factor of imsrg++ (integer arithmetic, phase
+            // (-1)^(lam+S)).
             const int phase = ((lam + Sab) % 2 == 0) ? 1 : -1;
             const int asymm = (std::abs(oa.tz2.twice + oc.tz2.twice) +
                                std::abs(oa.tz2.twice + od.tz2.twice) * phase) /
@@ -55,7 +60,8 @@ double PairEngine::element(PairKind kind, const basis::Orbit& oa, const basis::O
               continue;
             }
             const int nab = (fab - 2 * Nab - Lam - lam) / 2;
-            const double mab = mosh({Nab, Lam}, {nab, lam}, {oa.n, oa.l}, {ob.n, ob.l}, Lab);
+            const double mab =
+                mosh({Nab, Lam}, {nab, lam}, {oa.n, oa.l}, {ob.n, ob.l}, Lab);
             if (std::abs(mab) < 1e-8) {
               continue;
             }
@@ -67,7 +73,8 @@ double PairEngine::element(PairKind kind, const basis::Orbit& oa, const basis::O
               if (nab != ncd && Nab != Ncd) {
                 continue;
               }
-              const double mcd = mosh({Ncd, Lam}, {ncd, lam}, {oc.n, oc.l}, {od.n, od.l}, Lab);
+              const double mcd =
+                  mosh({Ncd, Lam}, {ncd, lam}, {oc.n, oc.l}, {od.n, od.l}, Lab);
               if (std::abs(mcd) < 1e-8) {
                 continue;
               }
@@ -101,9 +108,10 @@ double PairEngine::element(PairKind kind, const basis::Orbit& oa, const basis::O
 
   const double dab = (oa == ob) ? 2.0 : 1.0;
   const double dcd = (oc == od) ? 2.0 : 1.0;
-  const double unit = (kind == PairKind::Momentum) ? hbar_omega_
-                                                   : constants::hbarc * constants::hbarc /
-                                                         constants::m_nucleon / hbar_omega_;
+  const double unit = (kind == PairKind::Momentum)
+                          ? hbar_omega_
+                          : constants::hbarc * constants::hbarc /
+                                constants::m_nucleon / hbar_omega_;
   return sum * 0.5 * unit / std::sqrt(dab * dcd);
 }
 

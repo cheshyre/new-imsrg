@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// MBPT(2) density matrix and natural orbitals at emax 2 (O16, 2N): structural invariants.
+// MBPT(2) density matrix and natural orbitals at emax 2 (O16, 2N): structural
+// invariants.
 #include <algorithm>
 
 #include "mbpt_test_support.h"
@@ -12,7 +13,8 @@ using namespace imsrg;
 using namespace imsrg::mbtest;
 
 TEST(MbptNaturalOrbitals, Emax2Invariants) {
-  op::Operator H = load_hamiltonian(fs::path(IMSRG_GOLDEN_DIR) / "hamiltonian/emax2_O16");
+  op::Operator H =
+      load_hamiltonian(fs::path(IMSRG_GOLDEN_DIR) / "hamiltonian/emax2_O16");
   NatResult res = build_nat(H, nullptr);
   const auto& ms = H.model_space();
   const auto& basis = ms.basis();
@@ -37,15 +39,16 @@ TEST(MbptNaturalOrbitals, Emax2Invariants) {
         max_offblock = std::max(max_offblock, std::abs(C(a, b)));
     }
     for (std::size_t k = 1; k < ch.size(); ++k)
-      EXPECT_GE(res.nat.occupations[static_cast<std::size_t>(ch[k - 1].value())],
-                res.nat.occupations[static_cast<std::size_t>(ch[k].value())]);
+      EXPECT_GE(
+          res.nat.occupations[static_cast<std::size_t>(ch[k - 1].value())],
+          res.nat.occupations[static_cast<std::size_t>(ch[k].value())]);
   }
   EXPECT_LT(max_orth, 1e-12);
   EXPECT_EQ(max_offblock, 0.0);
 
-  std::cout << "[nat emax2] E_HF(HF) " << res.e_hf_hf << " E_HF(NAT) " << res.e_hf_nat
-            << " E0(NAT H) " << res.h_nat.zero_body() << " MP2(NAT) " << mbpt::mp2_energy(res.h_nat)
-            << "\n";
+  std::cout << "[nat emax2] E_HF(HF) " << res.e_hf_hf << " E_HF(NAT) "
+            << res.e_hf_nat << " E0(NAT H) " << res.h_nat.zero_body()
+            << " MP2(NAT) " << mbpt::mp2_energy(res.h_nat) << "\n";
   EXPECT_GE(res.e_hf_nat, res.e_hf_hf - 1e-8);  // HF is the variational minimum
   EXPECT_NEAR(res.h_nat.zero_body(), res.e_hf_nat, 1e-9);
 }

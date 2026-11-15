@@ -32,7 +32,9 @@ TEST(LinalgEigh, RandomSymmetricSizes) {
       for (int i = 0; i < n; ++i) {
         double s = 0;
         for (int p = 0; p < n; ++p) s += A(i, p) * V(p, c);
-        ASSERT_NEAR(s, r.eigenvalues[static_cast<std::size_t>(c)] * V(i, c), tol) << "n=" << n;
+        ASSERT_NEAR(s, r.eigenvalues[static_cast<std::size_t>(c)] * V(i, c),
+                    tol)
+            << "n=" << n;
       }
       for (int c2 = 0; c2 <= c; ++c2) {
         double s = 0;

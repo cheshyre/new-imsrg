@@ -18,7 +18,9 @@ std::vector<std::string>& events() {
   static std::vector<std::string> e;
   return e;
 }
-void push_hook(const char* name) { events().push_back(std::string("push:") + name); }
+void push_hook(const char* name) {
+  events().push_back(std::string("push:") + name);
+}
 void pop_hook() { events().push_back("pop"); }
 
 TEST(Timer, AccumulatesCountsAndTimes) {
@@ -36,7 +38,8 @@ TEST(Timer, AccumulatesCountsAndTimes) {
   EXPECT_EQ(es[1].name, "b_region");
   EXPECT_EQ(es[1].count, 3);
   EXPECT_GE(es[1].seconds, 0.005);
-  // An empty region may take less than one steady_clock tick, so only non-negativity holds.
+  // An empty region may take less than one steady_clock tick, so only
+  // non-negativity holds.
   EXPECT_GE(es[0].seconds, 0.0);
   EXPECT_EQ(es[0].count, 1);
   reg.clear();
@@ -78,7 +81,8 @@ TEST(Timer, HooksCalledInOrder) {
   events().clear();
   TimerRegistry reg;
   reg.set_region_hooks(&push_hook, &pop_hook);
-  TimerRegistry other;  // hooks are per registry: timers on `other` must not call them
+  TimerRegistry
+      other;  // hooks are per registry: timers on `other` must not call them
   {
     IMSRG_SCOPED_TIMER(other, "elsewhere");
   }
@@ -92,7 +96,8 @@ TEST(Timer, HooksCalledInOrder) {
   {
     IMSRG_SCOPED_TIMER(reg, "unhooked");
   }
-  const std::vector<std::string> expected = {"push:outer", "push:inner", "pop", "pop"};
+  const std::vector<std::string> expected = {"push:outer", "push:inner", "pop",
+                                             "pop"};
   EXPECT_EQ(events(), expected);
   EXPECT_EQ(reg.entries().size(), std::size_t{3});
 }

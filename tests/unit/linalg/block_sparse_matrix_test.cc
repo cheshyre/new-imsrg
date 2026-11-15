@@ -13,7 +13,10 @@ namespace {
 BlockIndex B(int v) { return BlockIndex{v}; }
 
 std::vector<BlockShape> shapes() {
-  return {{B(2), B(2), 3, 3}, {B(0), B(0), 2, 4}, {B(5), B(1), 0, 2}, {B(1), B(7), 1, 1}};
+  return {{B(2), B(2), 3, 3},
+          {B(0), B(0), 2, 4},
+          {B(5), B(1), 0, 2},
+          {B(1), B(7), 1, 1}};
 }
 }  // namespace
 
@@ -63,13 +66,15 @@ TEST(LinalgBlockSparse, DeepCopy) {
 }
 
 TEST(LinalgBlockSparse, DuplicateRejected) {
-  std::vector<BlockShape> s = {{B(1), B(1), 2, 2}, {B(0), B(0), 1, 1}, {B(1), B(1), 3, 3}};
+  std::vector<BlockShape> s = {
+      {B(1), B(1), 2, 2}, {B(0), B(0), 1, 1}, {B(1), B(1), 3, 3}};
   EXPECT_THROW(BlockSparseMatrix<double>{s}, imsrg::InvariantError);
 }
 
 TEST(LinalgBlockSparse, NegativeSizeRejectedAndFloat) {
-  EXPECT_THROW(BlockSparseMatrix<double>(std::vector<BlockShape>{{B(0), B(0), -1, 2}}),
-               imsrg::InvariantError);
+  EXPECT_THROW(
+      BlockSparseMatrix<double>(std::vector<BlockShape>{{B(0), B(0), -1, 2}}),
+      imsrg::InvariantError);
   BlockSparseMatrix<float> f(shapes());
   f.host_block(0)(0, 0) = 1.5f;
   EXPECT_EQ(f.host_block(0)(0, 0), 1.5f);

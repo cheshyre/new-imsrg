@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Communicator backed by MPI. The serial communicator (Communicator::serial()) makes no MPI calls.
+// Communicator backed by MPI. The serial communicator (Communicator::serial())
+// makes no MPI calls.
 #include <algorithm>
 #include <cstring>
 #include <string>
@@ -41,15 +42,16 @@ void check_mpi(int rc, const char* call) {
   char text[MPI_MAX_ERROR_STRING] = {};
   int len = 0;
   if (MPI_Error_string(rc, text, &len) != MPI_SUCCESS) len = 0;
-  throw RuntimeError(std::string("comm: ") + call +
-                     " failed: " + std::string(text, static_cast<std::size_t>(len)));
+  throw RuntimeError(std::string("comm: ") + call + " failed: " +
+                     std::string(text, static_cast<std::size_t>(len)));
 }
 
 std::shared_ptr<const Communicator::Impl> wrap(MPI_Comm comm, bool owned) {
   auto impl = std::make_shared<Communicator::Impl>();
   impl->comm = comm;
   impl->owned = owned;
-  check_mpi(MPI_Comm_set_errhandler(comm, MPI_ERRORS_RETURN), "MPI_Comm_set_errhandler");
+  check_mpi(MPI_Comm_set_errhandler(comm, MPI_ERRORS_RETURN),
+            "MPI_Comm_set_errhandler");
   check_mpi(MPI_Comm_rank(comm, &impl->rank), "MPI_Comm_rank");
   check_mpi(MPI_Comm_size(comm, &impl->size), "MPI_Comm_size");
   return impl;
@@ -68,8 +70,8 @@ int checked_count(std::size_t n) {
 }
 
 template <class T>
-void reduce_inplace(const Communicator::Impl& impl, std::span<T> data, MPI_Op op,
-                    const char* name) {
+void reduce_inplace(const Communicator::Impl& impl, std::span<T> data,
+                    MPI_Op op, const char* name) {
   if (impl.serial || data.empty()) return;
   check_mpi(MPI_Allreduce(MPI_IN_PLACE, data.data(), checked_count(data.size()),
                           mpi_type(data.data()), op, impl.comm),
@@ -77,7 +79,8 @@ void reduce_inplace(const Communicator::Impl& impl, std::span<T> data, MPI_Op op
 }
 
 template <class T>
-T reduce_scalar(const Communicator::Impl& impl, T x, MPI_Op op, const char* name) {
+T reduce_scalar(const Communicator::Impl& impl, T x, MPI_Op op,
+                const char* name) {
   reduce_inplace(impl, std::span<T>(&x, 1), op, name);
   return x;
 }
@@ -86,16 +89,17 @@ template <class T>
 void bcast(const Communicator::Impl& impl, std::span<T> data, int root) {
   IMSRG_CHECK(root >= 0 && root < impl.size, "broadcast: root out of range");
   if (impl.serial || data.empty()) return;
-  check_mpi(
-      MPI_Bcast(data.data(), checked_count(data.size()), mpi_type(data.data()), root, impl.comm),
-      "MPI_Bcast");
+  check_mpi(MPI_Bcast(data.data(), checked_count(data.size()),
+                      mpi_type(data.data()), root, impl.comm),
+            "MPI_Bcast");
 }
 
 template <class T>
 std::vector<T> gather_all(const Communicator::Impl& impl, T x) {
   std::vector<T> out(static_cast<std::size_t>(impl.size), x);
   if (impl.serial) return out;
-  check_mpi(MPI_Allgather(&x, 1, mpi_type(&x), out.data(), 1, mpi_type(&x), impl.comm),
+  check_mpi(MPI_Allgather(&x, 1, mpi_type(&x), out.data(), 1, mpi_type(&x),
+                          impl.comm),
             "MPI_Allgather");
   return out;
 }
@@ -160,11 +164,21 @@ std::int64_t Communicator::allreduce_min(std::int64_t x) const {
   return reduce_scalar(*impl_, x, MPI_MIN, "MPI_Allreduce(min)");
 }
 
-void Communicator::broadcast(std::span<double> d, int root) const { bcast(*impl_, d, root); }
-void Communicator::broadcast(std::span<float> d, int root) const { bcast(*impl_, d, root); }
-void Communicator::broadcast(std::span<std::int32_t> d, int root) const { bcast(*impl_, d, root); }
-void Communicator::broadcast(std::span<std::int64_t> d, int root) const { bcast(*impl_, d, root); }
-void Communicator::broadcast(std::span<std::byte> d, int root) const { bcast(*impl_, d, root); }
+void Communicator::broadcast(std::span<double> d, int root) const {
+  bcast(*impl_, d, root);
+}
+void Communicator::broadcast(std::span<float> d, int root) const {
+  bcast(*impl_, d, root);
+}
+void Communicator::broadcast(std::span<std::int32_t> d, int root) const {
+  bcast(*impl_, d, root);
+}
+void Communicator::broadcast(std::span<std::int64_t> d, int root) const {
+  bcast(*impl_, d, root);
+}
+void Communicator::broadcast(std::span<std::byte> d, int root) const {
+  bcast(*impl_, d, root);
+}
 
 void Communicator::broadcast(std::string& s, int root) const {
   IMSRG_CHECK(root >= 0 && root < impl_->size, "broadcast: root out of range");
@@ -172,32 +186,38 @@ void Communicator::broadcast(std::string& s, int root) const {
   std::int64_t n = static_cast<std::int64_t>(s.size());
   bcast(*impl_, std::span<std::int64_t>(&n, 1), root);
   if (impl_->rank != root) s.resize(static_cast<std::size_t>(n));
-  bcast(*impl_, std::as_writable_bytes(std::span<char>(s.data(), s.size())), root);
+  bcast(*impl_, std::as_writable_bytes(std::span<char>(s.data(), s.size())),
+        root);
 }
 
-std::vector<double> Communicator::allgather(double x) const { return gather_all(*impl_, x); }
+std::vector<double> Communicator::allgather(double x) const {
+  return gather_all(*impl_, x);
+}
 std::vector<std::int64_t> Communicator::allgather(std::int64_t x) const {
   return gather_all(*impl_, x);
 }
 
-void Communicator::alltoallv(std::span<const double> send, std::span<const int> send_counts,
-                             std::span<const int> send_displs, std::span<double> recv,
+void Communicator::alltoallv(std::span<const double> send,
+                             std::span<const int> send_counts,
+                             std::span<const int> send_displs,
+                             std::span<double> recv,
                              std::span<const int> recv_counts,
                              std::span<const int> recv_displs) const {
   const auto p = static_cast<std::size_t>(impl_->size);
-  IMSRG_CHECK(send_counts.size() == p && send_displs.size() == p && recv_counts.size() == p &&
-                  recv_displs.size() == p,
+  IMSRG_CHECK(send_counts.size() == p && send_displs.size() == p &&
+                  recv_counts.size() == p && recv_displs.size() == p,
               "alltoallv: count/displacement spans must have length size()");
   for (std::size_t r = 0; r < p; ++r) {
-    IMSRG_CHECK(
-        send_counts[r] >= 0 && send_displs[r] >= 0 && recv_counts[r] >= 0 && recv_displs[r] >= 0,
-        "alltoallv: negative count or displacement");
-    IMSRG_CHECK(
-        static_cast<std::size_t>(send_displs[r]) + static_cast<std::size_t>(send_counts[r]) <=
-                send.size() &&
-            static_cast<std::size_t>(recv_displs[r]) + static_cast<std::size_t>(recv_counts[r]) <=
-                recv.size(),
-        "alltoallv: buffer too small");
+    IMSRG_CHECK(send_counts[r] >= 0 && send_displs[r] >= 0 &&
+                    recv_counts[r] >= 0 && recv_displs[r] >= 0,
+                "alltoallv: negative count or displacement");
+    IMSRG_CHECK(static_cast<std::size_t>(send_displs[r]) +
+                            static_cast<std::size_t>(send_counts[r]) <=
+                        send.size() &&
+                    static_cast<std::size_t>(recv_displs[r]) +
+                            static_cast<std::size_t>(recv_counts[r]) <=
+                        recv.size(),
+                "alltoallv: buffer too small");
   }
   if (impl_->serial) {
     if (send_counts[0] > 0) {
@@ -206,10 +226,10 @@ void Communicator::alltoallv(std::span<const double> send, std::span<const int> 
     }
     return;
   }
-  check_mpi(
-      MPI_Alltoallv(send.data(), send_counts.data(), send_displs.data(), MPI_DOUBLE, recv.data(),
-                    recv_counts.data(), recv_displs.data(), MPI_DOUBLE, impl_->comm),
-      "MPI_Alltoallv");
+  check_mpi(MPI_Alltoallv(send.data(), send_counts.data(), send_displs.data(),
+                          MPI_DOUBLE, recv.data(), recv_counts.data(),
+                          recv_displs.data(), MPI_DOUBLE, impl_->comm),
+            "MPI_Alltoallv");
 }
 
 Communicator Communicator::split(int color, int key) const {

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Tests of the TOML reader and of --set (design/16-config-and-cli.md sections 2.11, 2.12, 6.1).
+// Tests of the TOML reader and of --set (design/16-config-and-cli.md sections
+// 2.11, 2.12, 6.1).
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -158,7 +159,8 @@ const T& value_of(const RawTree& tree, std::string_view path) {
   return p != nullptr ? *p : fallback;
 }
 
-// ---- value types -----------------------------------------------------------------------------
+// ---- value types
+// -----------------------------------------------------------------------------
 
 TEST(TomlReader, IntegerValue) {
   const Read r = read("[basis]\nemax = 4\n");
@@ -189,7 +191,8 @@ TEST(TomlReader, BoolStringAndArray) {
 }
 
 TEST(TomlReader, InlineTableInsideArray) {
-  const Read r = read("[operators]\nlist = [\"Rp2\", { name = \"X\", rank = 2 }]\n");
+  const Read r =
+      read("[operators]\nlist = [\"Rp2\", { name = \"X\", rank = 2 }]\n");
   EXPECT_TRUE(r.issues.empty());
   const RawArray& list = value_of<RawArray>(r.tree, "operators.list");
   ASSERT_EQ(list.size(), 2u);
@@ -204,8 +207,10 @@ TEST(TomlReader, InlineTableInsideArray) {
 TEST(TomlReader, ArrayOfTablesFromFile) {
   const Read r = read(
       "[[operators.from_file]]\nname = \"a\"\nrank = 0\nfile_2b = \"f1\"\n"
-      "[[operators.from_file]]\nname = \"b\"\nfile_2b = \"f2\"\nfile_3b = \"g2\"\n");
-  EXPECT_TRUE(r.issues.empty()) << (r.issues.empty() ? "" : r.issues[0].to_string());
+      "[[operators.from_file]]\nname = \"b\"\nfile_2b = \"f2\"\nfile_3b = "
+      "\"g2\"\n");
+  EXPECT_TRUE(r.issues.empty())
+      << (r.issues.empty() ? "" : r.issues[0].to_string());
   const RawArray& arr = value_of<RawArray>(r.tree, "operators.from_file");
   ASSERT_EQ(arr.size(), 2u);
   const RawTable* second = arr[1].get_if<RawTable>();
@@ -236,7 +241,8 @@ TEST(TomlReader, DottedKeysAndHeaders) {
   EXPECT_EQ(value_of<std::string>(r.tree, "imsrg.generator.core"), "atan");
 }
 
-// ---- errors ----------------------------------------------------------------------------------
+// ---- errors
+// -----------------------------------------------------------------------------
 
 struct UnknownCase {
   const char* name;
@@ -269,20 +275,25 @@ TEST_P(TomlReaderUnknown, ReportsKeyWithSuggestion) {
 
 INSTANTIATE_TEST_SUITE_P(
     Cases, TomlReaderUnknown,
-    ::testing::Values(UnknownCase{"KeyInTable", "[basis]\nemaxx = 4\n", "basis.emaxx",
-                                  "unknown key 'basis.emaxx'", "basis.emax"},
-                      UnknownCase{"TopLevelTable", "[basiss]\nemax = 4\n", "basiss",
-                                  "unknown table '[basiss]'", "basis"},
-                      UnknownCase{"NestedKey", "[imsrg.generator]\ncor = \"atan\"\n",
-                                  "imsrg.generator.cor", "unknown key 'imsrg.generator.cor'",
-                                  "imsrg.generator.core"},
-                      UnknownCase{"NoSuggestion", "[basis]\nzzzzzzzzzz = 4\n", "basis.zzzzzzzzzz",
-                                  "unknown key 'basis.zzzzzzzzzz'", nullptr}),
-    [](const ::testing::TestParamInfo<UnknownCase>& info) { return std::string(info.param.name); });
+    ::testing::Values(
+        UnknownCase{"KeyInTable", "[basis]\nemaxx = 4\n", "basis.emaxx",
+                    "unknown key 'basis.emaxx'", "basis.emax"},
+        UnknownCase{"TopLevelTable", "[basiss]\nemax = 4\n", "basiss",
+                    "unknown table '[basiss]'", "basis"},
+        UnknownCase{"NestedKey", "[imsrg.generator]\ncor = \"atan\"\n",
+                    "imsrg.generator.cor", "unknown key 'imsrg.generator.cor'",
+                    "imsrg.generator.core"},
+        UnknownCase{"NoSuggestion", "[basis]\nzzzzzzzzzz = 4\n",
+                    "basis.zzzzzzzzzz", "unknown key 'basis.zzzzzzzzzz'",
+                    nullptr}),
+    [](const ::testing::TestParamInfo<UnknownCase>& info) {
+      return std::string(info.param.name);
+    });
 
 TEST(TomlReader, SeveralUnknownKeysAreReportedTogether) {
-  const Read r =
-      read("[basis]\nemaxx = 4\nemax = 6\n[basiss]\nx = 1\n[imsrg.generator]\ncor = 1\n");
+  const Read r = read(
+      "[basis]\nemaxx = 4\nemax = 6\n[basiss]\nx = 1\n[imsrg.generator]\ncor = "
+      "1\n");
   ASSERT_EQ(r.issues.size(), 3u);
   EXPECT_EQ(r.issues[0].key_path, "basis.emaxx");
   EXPECT_EQ(r.issues[1].key_path, "basiss");
@@ -339,24 +350,27 @@ TEST(TomlReader, SyntaxErrorHasLine) {
 }
 
 TEST(TomlReader, ProvenanceTableIsSkipped) {
-  const Read r =
-      read("[basis]\nemax = 4\n[provenance]\nversion = \"1\"\nwarnings = []\nwhatever = 3\n");
+  const Read r = read(
+      "[basis]\nemax = 4\n[provenance]\nversion = \"1\"\nwarnings = "
+      "[]\nwhatever = 3\n");
   EXPECT_TRUE(r.issues.empty());
   EXPECT_EQ(r.tree.entries().size(), 1u);
 }
 
 TEST(TomlReader, MissingFileIsEFile) {
   RawTree tree;
-  const ConfigIssues issues = read_toml_file("/nonexistent-dir-imsrg/none.toml", tree);
+  const ConfigIssues issues =
+      read_toml_file("/nonexistent-dir-imsrg/none.toml", tree);
   ASSERT_EQ(issues.size(), 1u);
   EXPECT_EQ(issues[0].code, "E-FILE");
-  EXPECT_EQ(issues[0].message, "cannot read config file '/nonexistent-dir-imsrg/none.toml'");
+  EXPECT_EQ(issues[0].message,
+            "cannot read config file '/nonexistent-dir-imsrg/none.toml'");
   EXPECT_TRUE(tree.empty());
 }
 
 TEST(TomlReader, FileUsesPathAsGiven) {
-  const std::filesystem::path path =
-      std::filesystem::temp_directory_path() / "imsrg_test_toml_reader_file.toml";
+  const std::filesystem::path path = std::filesystem::temp_directory_path() /
+                                     "imsrg_test_toml_reader_file.toml";
   {
     std::ofstream out(path);
     out << "[basis]\nemax = 4\nemaxx = 1\n";
@@ -381,23 +395,27 @@ TEST(TomlReader, ReadingTwiceReplacesEntries) {
   EXPECT_EQ(value_of<std::int64_t>(tree, "basis.emax"), 6);
 }
 
-// ---- design examples -------------------------------------------------------------------------
+// ---- design examples
+// -------------------------------------------------------------------------
 
 class TomlReaderExamples : public ::testing::TestWithParam<std::string_view> {};
 
 TEST_P(TomlReaderExamples, ReadWithoutIssues) {
   const Read r = read(GetParam());
-  EXPECT_TRUE(r.issues.empty()) << (r.issues.empty() ? "" : r.issues[0].to_string());
+  EXPECT_TRUE(r.issues.empty())
+      << (r.issues.empty() ? "" : r.issues[0].to_string());
   EXPECT_TRUE(r.tree.contains("basis.emax"));
 }
 
 INSTANTIATE_TEST_SUITE_P(Section211, TomlReaderExamples,
-                         ::testing::Values(kExampleA, kExampleB, kExampleC, kExampleD));
+                         ::testing::Values(kExampleA, kExampleB, kExampleC,
+                                           kExampleD));
 
 TEST(TomlReader, ExampleAContent) {
   const Read r = read(kExampleA);
   EXPECT_EQ(value_of<std::int64_t>(r.tree, "interaction.two_body.lmax"), 14);
-  EXPECT_EQ(value_of<std::string>(r.tree, "interaction.two_body.format"), "me2j");
+  EXPECT_EQ(value_of<std::string>(r.tree, "interaction.two_body.format"),
+            "me2j");
   EXPECT_EQ(value_of<std::string>(r.tree, "imsrg.generator.core"), "atan");
   EXPECT_EQ(value_of<RawArray>(r.tree, "operators.list").size(), 1u);
 }
@@ -409,7 +427,8 @@ TEST(TomlReader, ExampleDHasThreeBodyAndImsrg3) {
   EXPECT_EQ(value_of<double>(r.tree, "imsrg3.threebody_threshold"), 0.0);
 }
 
-// ---- --set -----------------------------------------------------------------------------------
+// ---- --set
+// -----------------------------------------------------------------------------
 
 struct SetCase {
   const char* name;
@@ -455,7 +474,8 @@ TEST(SetOverride, BareStringWithSpacesIsTrimmed) {
 
 TEST(SetOverride, Array) {
   RawTree tree;
-  EXPECT_TRUE(apply_set_override("operators.list=[\"Rp2\",\"E2\"]", tree).empty());
+  EXPECT_TRUE(
+      apply_set_override("operators.list=[\"Rp2\",\"E2\"]", tree).empty());
   const RawArray& list = value_of<RawArray>(tree, "operators.list");
   ASSERT_EQ(list.size(), 2u);
   EXPECT_EQ(*list[1].get_if<std::string>(), "E2");

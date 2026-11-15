@@ -106,7 +106,8 @@ TEST(ExecDeviceBuffer, ResizeKeepsPrefix) {
   EXPECT_EQ(b.to_vector(), (std::vector<std::int64_t>{0, 0, 0}));
 }
 
-// Empty buffers hold no allocation (so they may outlive the Runtime) and report no device data.
+// Empty buffers hold no allocation (so they may outlive the Runtime) and report
+// no device data.
 TEST(ExecDeviceBuffer, EmptyBuffersHoldNoAllocation) {
   DeviceBuffer<double> zero(0, "zero");
   EXPECT_TRUE(zero.empty());

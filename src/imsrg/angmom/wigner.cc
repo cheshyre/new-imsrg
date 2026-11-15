@@ -3,10 +3,11 @@
 
 // Wigner 3j/6j/9j symbols and Clebsch-Gordan coefficients (see wigner.h).
 //
-// All internal arithmetic is on doubled integers; every factorial argument below is an exact
-// integer by the parity checks done before. Racah's single-sum formulas are evaluated with the
-// square roots taken factor by factor (so no product of factorials ever overflows) and the
-// summands formed as a ratio of factorials divided one denominator group at a time.
+// All internal arithmetic is on doubled integers; every factorial argument
+// below is an exact integer by the parity checks done before. Racah's
+// single-sum formulas are evaluated with the square roots taken factor by
+// factor (so no product of factorials ever overflows) and the summands formed
+// as a ratio of factorials divided one denominator group at a time.
 
 #include "imsrg/angmom/wigner.h"
 
@@ -32,13 +33,17 @@ constexpr std::array<double, kMaxFactorial + 1> make_factorials() {
 
 constexpr std::array<double, kMaxFactorial + 1> kFact = make_factorials();
 
-/// n! from the table. Precondition: 0 <= n <= 170 (callers only pass non-negative integers).
-inline double fact(int n) noexcept { return kFact[static_cast<std::size_t>(n)]; }
+/// n! from the table. Precondition: 0 <= n <= 170 (callers only pass
+/// non-negative integers).
+inline double fact(int n) noexcept {
+  return kFact[static_cast<std::size_t>(n)];
+}
 
 /// sqrt(n!).
 inline double sqrt_fact(int n) noexcept { return std::sqrt(fact(n)); }
 
-/// sqrt of the triangle coefficient (a! b! c!)/(s+1)!, with doubled arguments of a valid triad.
+/// sqrt of the triangle coefficient (a! b! c!)/(s+1)!, with doubled arguments
+/// of a valid triad.
 inline double sqrt_delta(int t1, int t2, int t3) noexcept {
   const int a = (t1 + t2 - t3) / 2;
   const int b = (t1 - t2 + t3) / 2;
@@ -55,12 +60,14 @@ inline bool valid_projection(int tj, int tm) noexcept {
   return std::abs(tm) <= tj && (tj - tm) % 2 == 0;
 }
 
-/// Largest factorial argument that the 6j sum can reach, for the overflow guard.
+/// Largest factorial argument that the 6j sum can reach, for the overflow
+/// guard.
 inline bool within_table(int n) noexcept { return n <= kMaxFactorial; }
 
 }  // namespace
 
-double wigner_3j(TwoJ j1, TwoJ j2, TwoJ j3, TwoM m1, TwoM m2, TwoM m3) noexcept {
+double wigner_3j(TwoJ j1, TwoJ j2, TwoJ j3, TwoM m1, TwoM m2,
+                 TwoM m3) noexcept {
   const int t1 = j1.twice;
   const int t2 = j2.twice;
   const int t3 = j3.twice;
@@ -92,11 +99,13 @@ double wigner_3j(TwoJ j1, TwoJ j2, TwoJ j3, TwoM m1, TwoM m2, TwoM m3) noexcept 
     sum += sign_of(t) / den1 / den2;
   }
   const double pref = sqrt_delta(t1, t2, t3) * (sqrt_fact(p1) * sqrt_fact(q1)) *
-                      (sqrt_fact(p2) * sqrt_fact(q2)) * (sqrt_fact(p3) * sqrt_fact(q3));
+                      (sqrt_fact(p2) * sqrt_fact(q2)) *
+                      (sqrt_fact(p3) * sqrt_fact(q3));
   return sign_of((t1 - t2 - u3) / 2) * pref * sum;
 }
 
-double clebsch_gordan(TwoJ j1, TwoM m1, TwoJ j2, TwoM m2, TwoJ J, TwoM M) noexcept {
+double clebsch_gordan(TwoJ j1, TwoM m1, TwoJ j2, TwoM m2, TwoJ J,
+                      TwoM M) noexcept {
   if (M.twice != m1.twice + m2.twice) return 0.0;
   const double w = wigner_3j(j1, j2, J, m1, m2, TwoM{-M.twice});
   if (w == 0.0) return 0.0;
@@ -105,7 +114,8 @@ double clebsch_gordan(TwoJ j1, TwoM m1, TwoJ j2, TwoM m2, TwoJ J, TwoM M) noexce
          std::sqrt(static_cast<double>(J.twice + 1)) * w;
 }
 
-double wigner_6j(TwoJ j1, TwoJ j2, TwoJ j3, TwoJ j4, TwoJ j5, TwoJ j6) noexcept {
+double wigner_6j(TwoJ j1, TwoJ j2, TwoJ j3, TwoJ j4, TwoJ j5,
+                 TwoJ j6) noexcept {
   const int t1 = j1.twice;
   const int t2 = j2.twice;
   const int t3 = j3.twice;
@@ -139,16 +149,20 @@ double wigner_6j(TwoJ j1, TwoJ j2, TwoJ j3, TwoJ j4, TwoJ j5, TwoJ j6) noexcept 
   return pref * sum;
 }
 
-double wigner_9j(TwoJ j11, TwoJ j12, TwoJ j13, TwoJ j21, TwoJ j22, TwoJ j23, TwoJ j31, TwoJ j32,
-                 TwoJ j33) noexcept {
-  if (!triangle(j11, j12, j13) || !triangle(j21, j22, j23) || !triangle(j31, j32, j33) ||
-      !triangle(j11, j21, j31) || !triangle(j12, j22, j32) || !triangle(j13, j23, j33)) {
+double wigner_9j(TwoJ j11, TwoJ j12, TwoJ j13, TwoJ j21, TwoJ j22, TwoJ j23,
+                 TwoJ j31, TwoJ j32, TwoJ j33) noexcept {
+  if (!triangle(j11, j12, j13) || !triangle(j21, j22, j23) ||
+      !triangle(j31, j32, j33) || !triangle(j11, j21, j31) ||
+      !triangle(j12, j22, j32) || !triangle(j13, j23, j33)) {
     return 0.0;
   }
-  // x must satisfy the triangle conditions of all three 6j symbols (see header).
-  const int lo = std::max({std::abs(j11.twice - j33.twice), std::abs(j21.twice - j32.twice),
+  // x must satisfy the triangle conditions of all three 6j symbols (see
+  // header).
+  const int lo = std::max({std::abs(j11.twice - j33.twice),
+                           std::abs(j21.twice - j32.twice),
                            std::abs(j12.twice - j23.twice)});
-  const int hi = std::min({j11.twice + j33.twice, j21.twice + j32.twice, j12.twice + j23.twice});
+  const int hi = std::min(
+      {j11.twice + j33.twice, j21.twice + j32.twice, j12.twice + j23.twice});
   double sum = 0.0;
   for (int tx = lo; tx <= hi; ++tx) {
     if ((tx + j11.twice + j33.twice) % 2 != 0) continue;
@@ -163,12 +177,13 @@ double wigner_9j(TwoJ j11, TwoJ j12, TwoJ j13, TwoJ j21, TwoJ j22, TwoJ j23, Two
   return sum;
 }
 
-double norm_9j(TwoJ j11, TwoJ j12, TwoJ j13, TwoJ j21, TwoJ j22, TwoJ j23, TwoJ j31, TwoJ j32,
-               TwoJ j33) noexcept {
+double norm_9j(TwoJ j11, TwoJ j12, TwoJ j13, TwoJ j21, TwoJ j22, TwoJ j23,
+               TwoJ j31, TwoJ j32, TwoJ j33) noexcept {
   const double w = wigner_9j(j11, j12, j13, j21, j22, j23, j31, j32, j33);
   if (w == 0.0) return 0.0;
-  const double f = static_cast<double>(j13.twice + 1) * static_cast<double>(j23.twice + 1) *
-                   static_cast<double>(j31.twice + 1) * static_cast<double>(j32.twice + 1);
+  const double f =
+      static_cast<double>(j13.twice + 1) * static_cast<double>(j23.twice + 1) *
+      static_cast<double>(j31.twice + 1) * static_cast<double>(j32.twice + 1);
   return std::sqrt(f) * w;
 }
 

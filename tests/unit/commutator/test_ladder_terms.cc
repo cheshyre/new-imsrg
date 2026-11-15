@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// The pp/hh ladder terms (comm222_pp_hhss, comm221ss and their fusion comm222_pp_hh_221ss) of the
-// fast commutator: golden acceptance, comparison with commutator_ref on random operators, fused
-// versus separate evaluation, an emax-4 timing report and the NonHermitian guard.
+// The pp/hh ladder terms (comm222_pp_hhss, comm221ss and their fusion
+// comm222_pp_hh_221ss) of the fast commutator: golden acceptance, comparison
+// with commutator_ref on random operators, fused versus separate evaluation, an
+// emax-4 timing report and the NonHermitian guard.
 #include <chrono>
 #include <cstdio>
 #include <filesystem>
 #include <string>
 
-#include "commutator_test_cases.h"
-#include "commutator_test_support.h"
 #include <gtest/gtest.h>
 
+#include "commutator_test_cases.h"
+#include "commutator_test_support.h"
 #include "imsrg/base/error.h"
 #include "imsrg/commutator/commutator.h"
 #include "imsrg/commutator_ref/commutator_ref.h"
@@ -27,7 +28,8 @@ using imsrg::testing::read_golden;
 using imsrg::testing::relative_deviation;
 using op::Operator;
 
-using FastFn = void (*)(const Operator&, const Operator&, Operator&, Workspace&);
+using FastFn = void (*)(const Operator&, const Operator&, Operator&,
+                        Workspace&);
 using RefFn = void (*)(const Operator&, const Operator&, Operator&);
 
 struct TermCase {
@@ -37,7 +39,8 @@ struct TermCase {
 };
 
 const TermCase kTerms[] = {
-    {"comm222_pp_hhss", &commutator::terms::comm222_pp_hhss, &commutator_ref::comm222_pp_hhss},
+    {"comm222_pp_hhss", &commutator::terms::comm222_pp_hhss,
+     &commutator_ref::comm222_pp_hhss},
     {"comm221ss", &commutator::terms::comm221ss, &commutator_ref::comm221ss},
     {"comm222_pp_hh_221ss", &commutator::terms::comm222_pp_hh_221ss,
      &commutator_ref::comm222_pp_hh_221ss},
@@ -45,23 +48,25 @@ const TermCase kTerms[] = {
 
 TEST(commutator_ladder_terms, golden) {
   for (const auto& p : commutator_test::golden_pairs()) {
-    const auto ms = imsrg::testing::golden_model_space(commutator_test::dump_path(p, p.y));
+    const auto ms =
+        imsrg::testing::golden_model_space(commutator_test::dump_path(p, p.y));
     Workspace ws(ms);
     const Operator X = read_golden(commutator_test::dump_path(p, p.x), ms);
     const Operator Y = read_golden(commutator_test::dump_path(p, p.y), ms);
     for (const auto& t : kTerms) {
       const std::string file = commutator_test::result_path(p, t.name);
       if (!std::filesystem::exists(imsrg::testing::golden_path(file))) {
-        std::printf("[golden] %s %s: %s, %s: no golden file, skipped\n", p.dir.c_str(), t.name,
-                    p.x.c_str(), p.y.c_str());
+        std::printf("[golden] %s %s: %s, %s: no golden file, skipped\n",
+                    p.dir.c_str(), t.name, p.x.c_str(), p.y.c_str());
         continue;
       }
       Operator Z(ms, commutator::commutator_spec(X.spec(), Y.spec()));
       t.fast(X, Y, Z, ws);
       const double dev = relative_deviation(Z, read_golden(file, ms));
-      std::printf("[golden] %s %s: %s, %s: %.3e\n", p.dir.c_str(), t.name, p.x.c_str(), p.y.c_str(),
-                  dev);
-      EXPECT_LE(dev, kTol) << p.dir << " " << t.name << " " << p.x << " " << p.y;
+      std::printf("[golden] %s %s: %s, %s: %.3e\n", p.dir.c_str(), t.name,
+                  p.x.c_str(), p.y.c_str(), dev);
+      EXPECT_LE(dev, kTol) << p.dir << " " << t.name << " " << p.x << " "
+                           << p.y;
     }
   }
 }
@@ -80,7 +85,8 @@ TEST(commutator_ladder_terms, fast_vs_reference) {
         t.fast(X, Y, Z, ws);
         t.ref(X, Y, Zref);
         const double dev = relative_deviation(Z, Zref);
-        std::printf("[fast-vs-ref] %s %s %s: %.3e\n", sc.label.c_str(), hp.label, t.name, dev);
+        std::printf("[fast-vs-ref] %s %s %s: %.3e\n", sc.label.c_str(),
+                    hp.label, t.name, dev);
         EXPECT_LE(dev, kTol) << sc.label << " " << hp.label << " " << t.name;
       }
     }
@@ -101,7 +107,8 @@ TEST(commutator_ladder_terms, fused_equals_separate) {
       commutator::terms::comm222_pp_hhss(X, Y, Zs, ws);
       commutator::terms::comm221ss(X, Y, Zs, ws);
       const double dev = relative_deviation(Zf, Zs);
-      std::printf("[fused-vs-sum] %s %s: %.3e\n", sc.label.c_str(), hp.label, dev);
+      std::printf("[fused-vs-sum] %s %s: %.3e\n", sc.label.c_str(), hp.label,
+                  dev);
       EXPECT_LE(dev, 1e-14) << sc.label << " " << hp.label;
     }
   }

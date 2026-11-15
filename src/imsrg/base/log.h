@@ -4,9 +4,10 @@
 #ifndef IMSRG_BASE_LOG_H_
 #define IMSRG_BASE_LOG_H_
 /// @file
-/// Minimal thread-safe logging (design/10 section 3.1). A `Logger` is an explicit object; the one
-/// process-wide instance `default_logger()` only configures output and never affects results.
-/// Line format: `[imsrg] <level>: <message>` (`[imsrg r<k>] ...` when all ranks print).
+/// Minimal thread-safe logging (design/10 section 3.1). A `Logger` is an
+/// explicit object; the one process-wide instance `default_logger()` only
+/// configures output and never affects results. Line format: `[imsrg] <level>:
+/// <message>` (`[imsrg r<k>] ...` when all ranks print).
 
 #include <atomic>
 #include <functional>
@@ -24,31 +25,39 @@ enum class Level { Trace, Debug, Info, Warn, Error, Off };
 /// Lower-case name of a level ("trace", ..., "error", "off").
 std::string_view to_string(Level level) noexcept;
 
-/// Thread-safe logger. The level is atomic; writes are serialized by a mutex. By default only
-/// rank 0 prints (see `set_rank`). Not copyable.
+/// Thread-safe logger. The level is atomic; writes are serialized by a mutex.
+/// By default only rank 0 prints (see `set_rank`). Not copyable.
 class Logger {
  public:
-  /// Receives (level, message) where message has no prefix and no trailing newline.
+  /// Receives (level, message) where message has no prefix and no trailing
+  /// newline.
   using Sink = std::function<void(Level, std::string_view)>;
 
   /// Logger writing formatted lines to stdout.
   explicit Logger(Level level = Level::Info);
-  /// Logger delivering each enabled message to `sink` instead of stdout (for capture in tests).
+  /// Logger delivering each enabled message to `sink` instead of stdout (for
+  /// capture in tests).
   Logger(Level level, Sink sink);
 
   Logger(const Logger&) = delete;
   Logger& operator=(const Logger&) = delete;
 
   /// Sets the minimum level that is written.
-  void set_level(Level level) noexcept { level_.store(level, std::memory_order_relaxed); }
+  void set_level(Level level) noexcept {
+    level_.store(level, std::memory_order_relaxed);
+  }
   /// The current minimum level.
-  Level level() const noexcept { return level_.load(std::memory_order_relaxed); }
+  Level level() const noexcept {
+    return level_.load(std::memory_order_relaxed);
+  }
 
-  /// Declares this process's MPI rank. Only rank 0 writes unless `all_ranks`; with `all_ranks`
-  /// and rank > 0 the line prefix carries the rank (`[imsrg r3]`).
+  /// Declares this process's MPI rank. Only rank 0 writes unless `all_ranks`;
+  /// with `all_ranks` and rank > 0 the line prefix carries the rank (`[imsrg
+  /// r3]`).
   void set_rank(int rank, bool all_ranks = false) noexcept;
 
-  /// True if a message of `lvl` would be written (level passes and this rank may print).
+  /// True if a message of `lvl` would be written (level passes and this rank
+  /// may print).
   bool enabled(Level lvl) const noexcept;
 
   /// Writes `message` at `lvl` if enabled. Thread-safe.
@@ -93,8 +102,9 @@ class Logger {
   std::mutex mutex_;
 };
 
-/// The process-wide logger: the single sanctioned global. It only configures output (level, rank
-/// filtering, destination) and never affects numerical results.
+/// The process-wide logger: the single sanctioned global. It only configures
+/// output (level, rank filtering, destination) and never affects numerical
+/// results.
 Logger& default_logger();
 
 /// Formats and writes to `default_logger()` at Trace.

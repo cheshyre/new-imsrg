@@ -4,9 +4,10 @@
 #ifndef TESTS_UNIT_DRIVER_INTEGRATION_MINI_JSON_H_
 #define TESTS_UNIT_DRIVER_INTEGRATION_MINI_JSON_H_
 /// @file
-/// A minimal JSON reader for the integration tests (objects, arrays, strings, numbers, true,
-/// false, null). The driver's `results.json` is machine written with `%.17g` numbers, so no
-/// escapes beyond the common ones and no unicode handling are needed.
+/// A minimal JSON reader for the integration tests (objects, arrays, strings,
+/// numbers, true, false, null). The driver's `results.json` is machine written
+/// with `%.17g` numbers, so no escapes beyond the common ones and no unicode
+/// handling are needed.
 
 #include <cctype>
 #include <cstddef>
@@ -25,8 +26,9 @@ struct Json {
   bool boolean = false;
   double number = 0.0;
   std::string text;
-  std::vector<Json> items;                           ///< array elements
-  std::vector<std::pair<std::string, Json>> fields;  ///< object members, in file order
+  std::vector<Json> items;  ///< array elements
+  std::vector<std::pair<std::string, Json>>
+      fields;  ///< object members, in file order
 
   /// True if this is an object with member `key`.
   bool has(const std::string& key) const {
@@ -63,10 +65,13 @@ class JsonParser {
   std::size_t pos_ = 0;
 
   [[noreturn]] void fail(const std::string& what) const {
-    throw std::runtime_error("JSON parse error at offset " + std::to_string(pos_) + ": " + what);
+    throw std::runtime_error("JSON parse error at offset " +
+                             std::to_string(pos_) + ": " + what);
   }
   void skip() {
-    while (pos_ < s_.size() && std::isspace(static_cast<unsigned char>(s_[pos_]))) ++pos_;
+    while (pos_ < s_.size() &&
+           std::isspace(static_cast<unsigned char>(s_[pos_])))
+      ++pos_;
   }
   char peek() {
     skip();
@@ -179,7 +184,9 @@ class JsonParser {
 }  // namespace detail
 
 /// Parses `text`. @throws std::runtime_error on malformed input.
-inline Json parse_json(const std::string& text) { return detail::JsonParser(text).parse(); }
+inline Json parse_json(const std::string& text) {
+  return detail::JsonParser(text).parse();
+}
 
 }  // namespace imsrg::it
 

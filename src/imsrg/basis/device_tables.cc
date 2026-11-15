@@ -25,8 +25,10 @@ exec::DeviceBuffer<T> upload(const std::vector<T>& src, const char* label) {
 
 }  // namespace
 
-DeviceTables::DeviceTables(const SingleParticleBasis& basis, const Reference& reference,
-                           const Partition& partition, const TwoBodyChannels& channels,
+DeviceTables::DeviceTables(const SingleParticleBasis& basis,
+                           const Reference& reference,
+                           const Partition& partition,
+                           const TwoBodyChannels& channels,
                            const TwoBodyKetSubsets& subsets) {
   const auto orbs = basis.orbits();
   const std::size_t no = orbs.size();
@@ -72,18 +74,25 @@ DeviceTables::DeviceTables(const SingleParticleBasis& basis, const Reference& re
 
   const auto ckt = channels.channel_ket_table();
   std::vector<std::int32_t> ck(ckt.size());
-  std::transform(ckt.begin(), ckt.end(), ck.begin(), [](KetIndex k) { return k.value(); });
+  std::transform(ckt.begin(), ckt.end(), ck.begin(),
+                 [](KetIndex k) { return k.value(); });
   ch_kets_ = upload(ck, "basis::channel_kets");
-  ket_j_offsets_ = upload<std::int32_t>(channels.ket_J_offsets(), "basis::ket_J_offsets");
-  local_index_ = upload<std::int32_t>(channels.local_index_table(), "basis::local_index");
+  ket_j_offsets_ =
+      upload<std::int32_t>(channels.ket_J_offsets(), "basis::ket_J_offsets");
+  local_index_ =
+      upload<std::int32_t>(channels.local_index_table(), "basis::local_index");
 
   const auto st = subsets.subset_table();
   std::vector<std::int32_t> sk(st.size());
-  std::transform(st.begin(), st.end(), sk.begin(), [](LocalKetIndex k) { return k.value(); });
-  sub_offsets_ = upload<std::int32_t>(subsets.subset_offsets(), "basis::subset_offsets");
+  std::transform(st.begin(), st.end(), sk.begin(),
+                 [](LocalKetIndex k) { return k.value(); });
+  sub_offsets_ =
+      upload<std::int32_t>(subsets.subset_offsets(), "basis::subset_offsets");
   sub_kets_ = upload(sk, "basis::subset_kets");
-  sub_occ_ = upload<double>(subsets.occupation_product_table(), "basis::subset_occ_products");
-  sub_vac_ = upload<double>(subsets.vacancy_product_table(), "basis::subset_vac_products");
+  sub_occ_ = upload<double>(subsets.occupation_product_table(),
+                            "basis::subset_occ_products");
+  sub_vac_ = upload<double>(subsets.vacancy_product_table(),
+                            "basis::subset_vac_products");
 
   const auto ni = static_cast<std::int32_t>(no);
   orbits_view_ = {orb_n_.device_data(),
@@ -109,8 +118,9 @@ DeviceTables::DeviceTables(const SingleParticleBasis& basis, const Reference& re
   two_body_view_.orbit_j2 = orb_j2_.device_data();
   two_body_view_.orbit_l = orb_l_.device_data();
   two_body_view_.orbit_tz2 = orb_tz2_.device_data();
-  subsets_view_ = {sub_offsets_.device_data(), sub_kets_.device_data(), sub_occ_.device_data(),
-                   sub_vac_.device_data(), subsets.num_channels()};
+  subsets_view_ = {sub_offsets_.device_data(), sub_kets_.device_data(),
+                   sub_occ_.device_data(), sub_vac_.device_data(),
+                   subsets.num_channels()};
 }
 
 }  // namespace imsrg::basis

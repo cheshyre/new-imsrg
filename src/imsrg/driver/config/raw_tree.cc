@@ -52,7 +52,8 @@ bool RawTree::has_table(std::string_view table) const {
 }
 
 void RawTree::merge(const RawTree& overlay) {
-  for (const auto& [path, value] : overlay.entries_) entries_.insert_or_assign(path, value);
+  for (const auto& [path, value] : overlay.entries_)
+    entries_.insert_or_assign(path, value);
 }
 
 }  // namespace imsrg::driver

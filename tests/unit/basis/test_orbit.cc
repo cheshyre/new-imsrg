@@ -13,7 +13,9 @@
 namespace imsrg::basis {
 namespace {
 
-Orbit make(int n, int l, int j2, int tz2) { return Orbit{n, l, TwoJ{j2}, TwoTz{tz2}}; }
+Orbit make(int n, int l, int j2, int tz2) {
+  return Orbit{n, l, TwoJ{j2}, TwoTz{tz2}};
+}
 
 // The untruncated orbit list in imsrg++ generation order (ModelSpace::Init).
 std::vector<Orbit> generate(int emax) {
@@ -63,7 +65,8 @@ TEST(Orbit, NumOrbitsUntruncated) {
   EXPECT_EQ(num_orbits_untruncated(2), 12);
   EXPECT_EQ(num_orbits_untruncated(6), 56);
   for (int emax = 0; emax <= 6; ++emax) {
-    EXPECT_EQ(static_cast<int>(generate(emax).size()), num_orbits_untruncated(emax));
+    EXPECT_EQ(static_cast<int>(generate(emax).size()),
+              num_orbits_untruncated(emax));
   }
 }
 
@@ -86,8 +89,9 @@ TEST(Orbit, HashEqualsIndexInUntruncatedBasis) {
 }
 
 TEST(Orbit, FirstOrbitsOfImsrgpp) {
-  const std::vector<std::string> expected = {"p0s1", "n0s1", "p0p3", "n0p3", "p0p1", "n0p1", "p0d5",
-                                             "n0d5", "p0d3", "n0d3", "p1s1", "n1s1", "p0f7"};
+  const std::vector<std::string> expected = {
+      "p0s1", "n0s1", "p0p3", "n0p3", "p0p1", "n0p1", "p0d5",
+      "n0d5", "p0d3", "n0d3", "p1s1", "n1s1", "p0f7"};
   const auto orbits = generate(3);
   ASSERT_GE(orbits.size(), expected.size());
   for (std::size_t i = 0; i < expected.size(); ++i) {
@@ -108,7 +112,8 @@ TEST(Orbit, LabelLetters) {
   const std::string letters = "spdfghijklmno";
   for (int l = 0; l <= 12; ++l) {
     const std::string label = orbit_label(make(0, l, 2 * l + 1, 1));
-    EXPECT_EQ(label, "n0" + std::string(1, letters[static_cast<std::size_t>(l)]) +
+    EXPECT_EQ(label, "n0" +
+                         std::string(1, letters[static_cast<std::size_t>(l)]) +
                          std::to_string(2 * l + 1));
   }
   // imsrg++ writes j for l = 7.
@@ -132,7 +137,8 @@ TEST(Orbit, LabelOfInvalidOrbitThrows) {
   EXPECT_THROW((void)orbit_label(make(0, 0, 2, 1)), InputError);
   EXPECT_THROW((void)orbit_label(make(0, 0, 1, 0)), InputError);
   EXPECT_THROW((void)orbit_label(make(-1, 0, 1, 1)), InputError);
-  EXPECT_THROW((void)orbit_label(make(0, 13, 27, 1)), InputError);  // no letter for l = 13
+  EXPECT_THROW((void)orbit_label(make(0, 13, 27, 1)),
+               InputError);  // no letter for l = 13
 }
 
 TEST(Orbit, ParseErrors) {
@@ -141,9 +147,12 @@ TEST(Orbit, ParseErrors) {
   EXPECT_THROW((void)parse_orbit_label("P0s1"), InputError);  // case sensitive
   EXPECT_THROW((void)parse_orbit_label("0s1"), InputError);   // no species
   EXPECT_THROW((void)parse_orbit_label("p0z1"), InputError);  // unknown letter
-  EXPECT_THROW((void)parse_orbit_label("p0d4"), InputError);  // 2j inconsistent with l
-  EXPECT_THROW((void)parse_orbit_label("p0d7"), InputError);  // 2j inconsistent with l
-  EXPECT_THROW((void)parse_orbit_label("p0s3"), InputError);  // 2j inconsistent with l
+  EXPECT_THROW((void)parse_orbit_label("p0d4"),
+               InputError);  // 2j inconsistent with l
+  EXPECT_THROW((void)parse_orbit_label("p0d7"),
+               InputError);  // 2j inconsistent with l
+  EXPECT_THROW((void)parse_orbit_label("p0s3"),
+               InputError);  // 2j inconsistent with l
   EXPECT_THROW((void)parse_orbit_label("p0s-1"), InputError);
   EXPECT_THROW((void)parse_orbit_label("p0d5x"), InputError);  // trailing junk
   EXPECT_THROW((void)parse_orbit_label("p0d5 "), InputError);
@@ -160,7 +169,8 @@ TEST(Orbit, ParseErrorNamesTheLabel) {
     (void)parse_orbit_label("p0d4");
     FAIL() << "no exception";
   } catch (const InputError& e) {
-    EXPECT_NE(std::string(e.what()).find("p0d4"), std::string::npos) << e.what();
+    EXPECT_NE(std::string(e.what()).find("p0d4"), std::string::npos)
+        << e.what();
   }
 }
 

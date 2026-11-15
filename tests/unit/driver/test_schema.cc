@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// The single schema table and the enum spellings (design/16 sections 2 and 6.1; 6.3 item 7 for
-// the enum round trip).
+// The single schema table and the enum spellings (design/16 sections 2 and 6.1;
+// 6.3 item 7 for the enum round trip).
 
 #include <algorithm>
 #include <set>
@@ -25,7 +25,8 @@ void expect_enum_round_trip() {
     ASSERT_TRUE(parsed.has_value()) << entry.name;
     EXPECT_EQ(*parsed, entry.value);
     EXPECT_EQ(enum_phase(entry.value), entry.phase);
-    EXPECT_TRUE(seen.insert(entry.name).second) << "duplicate spelling " << entry.name;
+    EXPECT_TRUE(seen.insert(entry.name).second)
+        << "duplicate spelling " << entry.name;
     // Canonical spellings are lower snake_case.
     EXPECT_TRUE(std::all_of(entry.name.begin(), entry.name.end(), [](char c) {
       return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
@@ -75,7 +76,8 @@ TEST(DriverSchema, KeysAreUniqueSnakeCaseAndFindable) {
   for (const KeyInfo& key : keys) {
     EXPECT_TRUE(paths.insert(key.path).second) << "duplicate key " << key.path;
     EXPECT_TRUE(std::all_of(key.path.begin(), key.path.end(), [](char c) {
-      return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '.';
+      return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' ||
+             c == '.';
     })) << key.path;
     EXPECT_FALSE(key.doc.empty()) << key.path;
     EXPECT_FALSE(key.default_text.empty()) << key.path;
@@ -113,11 +115,14 @@ TEST(DriverSchema, TablesAndChildren) {
                                                   "imsrg3",
                                                   "operators",
                                                   "output"};
-  EXPECT_EQ(std::vector<std::string_view>(tables.begin(), tables.end()), expected);
+  EXPECT_EQ(std::vector<std::string_view>(tables.begin(), tables.end()),
+            expected);
 
   const auto imsrg = schema_children("imsrg");
-  for (std::string_view child : {"method", "steps", "generator", "step", "space"}) {
-    EXPECT_NE(std::find(imsrg.begin(), imsrg.end(), child), imsrg.end()) << child;
+  for (std::string_view child :
+       {"method", "steps", "generator", "step", "space"}) {
+    EXPECT_NE(std::find(imsrg.begin(), imsrg.end(), child), imsrg.end())
+        << child;
   }
   const auto top = schema_children("");
   EXPECT_NE(std::find(top.begin(), top.end(), "interaction"), top.end());
@@ -136,7 +141,8 @@ TEST(DriverSchema, RunConfigEqualityIgnoresProvenance) {
 TEST(DriverSchema, DidYouMean) {
   const std::vector<std::string> keys = {"emax", "e3max", "hw", "lmax"};
   EXPECT_EQ(did_you_mean("emaxx", keys), "emax");
-  EXPECT_EQ(did_you_mean("hw", keys), std::nullopt);  // exact match is never suggested
+  EXPECT_EQ(did_you_mean("hw", keys),
+            std::nullopt);  // exact match is never suggested
   EXPECT_EQ(did_you_mean("xyzzy", keys), std::nullopt);
   const std::vector<std::string> methods = {"magnus", "magnus_euler", "flow"};
   EXPECT_EQ(did_you_mean("magnus_eular", methods), "magnus_euler");

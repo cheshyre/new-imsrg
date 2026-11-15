@@ -4,9 +4,10 @@
 #ifndef IMSRG_BASE_TIMER_H_
 #define IMSRG_BASE_TIMER_H_
 /// @file
-/// Wall-clock timing of named regions (design/10 section 3.1). `TimerRegistry` is an explicit,
-/// thread-safe object (no globals); `ScopedTimer` measures one region with
-/// `std::chrono::steady_clock` and optionally notifies a profiler through region hooks.
+/// Wall-clock timing of named regions (design/10 section 3.1). `TimerRegistry`
+/// is an explicit, thread-safe object (no globals); `ScopedTimer` measures one
+/// region with `std::chrono::steady_clock` and optionally notifies a profiler
+/// through region hooks.
 
 #include <atomic>
 #include <chrono>
@@ -19,12 +20,14 @@
 
 namespace imsrg {
 
-/// Called when a timed region starts; receives the region name (valid during the call only).
+/// Called when a timed region starts; receives the region name (valid during
+/// the call only).
 using RegionPushHook = void (*)(const char*);
 /// Called when a timed region ends.
 using RegionPopHook = void (*)();
 
-/// Accumulates (total seconds, call count) per region name. Thread-safe; not copyable.
+/// Accumulates (total seconds, call count) per region name. Thread-safe; not
+/// copyable.
 class TimerRegistry {
  public:
   /// One accumulated region.
@@ -34,23 +37,30 @@ class TimerRegistry {
     std::int64_t count;  ///< Number of recorded calls.
   };
 
-  /// Adds `seconds` and `count` calls to region `name` (created on first use). Thread-safe.
+  /// Adds `seconds` and `count` calls to region `name` (created on first use).
+  /// Thread-safe.
   void add(std::string_view name, double seconds, std::int64_t count = 1);
   /// Snapshot of all regions, sorted by name.
   std::vector<Entry> entries() const;
   /// Removes all regions.
   void clear();
-  /// Aligned text table with columns name, total [s], count, mean [ms]; one row per region.
+  /// Aligned text table with columns name, total [s], count, mean [ms]; one row
+  /// per region.
   std::string report() const;
 
-  /// Installs profiler hooks that every `ScopedTimer` on this registry calls on entry and exit
-  /// (e.g. `exec::push_profiling_region` / `exec::pop_profiling_region`, so NVTX/rocTX tools see
-  /// the same regions). `nullptr` means no hook. Thread-safe; per registry, never global.
+  /// Installs profiler hooks that every `ScopedTimer` on this registry calls on
+  /// entry and exit (e.g. `exec::push_profiling_region` /
+  /// `exec::pop_profiling_region`, so NVTX/rocTX tools see the same regions).
+  /// `nullptr` means no hook. Thread-safe; per registry, never global.
   void set_region_hooks(RegionPushHook push, RegionPopHook pop) noexcept;
   /// The installed push hook (or nullptr).
-  RegionPushHook push_hook() const noexcept { return push_.load(std::memory_order_acquire); }
+  RegionPushHook push_hook() const noexcept {
+    return push_.load(std::memory_order_acquire);
+  }
   /// The installed pop hook (or nullptr).
-  RegionPopHook pop_hook() const noexcept { return pop_.load(std::memory_order_acquire); }
+  RegionPopHook pop_hook() const noexcept {
+    return pop_.load(std::memory_order_acquire);
+  }
 
  private:
   struct Acc {
@@ -63,9 +73,9 @@ class TimerRegistry {
   std::atomic<RegionPopHook> pop_{nullptr};
 };
 
-/// RAII timer: on construction calls the registry's push hook (if any) and starts the clock; on
-/// destruction calls the pop hook and adds the elapsed time to the registry. Non-copyable. The
-/// registry must outlive the timer.
+/// RAII timer: on construction calls the registry's push hook (if any) and
+/// starts the clock; on destruction calls the pop hook and adds the elapsed
+/// time to the registry. Non-copyable. The registry must outlive the timer.
 class ScopedTimer {
  public:
   /// Starts timing region `name`, recorded in `registry` on destruction.
@@ -86,7 +96,8 @@ class ScopedTimer {
 #define IMSRG_DETAIL_CONCAT_(a, b) a##b
 #define IMSRG_DETAIL_CONCAT(a, b) IMSRG_DETAIL_CONCAT_(a, b)
 /// Declares a uniquely named `ScopedTimer` for the rest of the enclosing scope.
-#define IMSRG_SCOPED_TIMER(registry, name) \
-  ::imsrg::ScopedTimer IMSRG_DETAIL_CONCAT(imsrg_scoped_timer_, __LINE__)((registry), (name))
+#define IMSRG_SCOPED_TIMER(registry, name)                                 \
+  ::imsrg::ScopedTimer IMSRG_DETAIL_CONCAT(imsrg_scoped_timer_, __LINE__)( \
+      (registry), (name))
 
 #endif  // IMSRG_BASE_TIMER_H_

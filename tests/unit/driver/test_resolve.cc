@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Tests of `resolve`: typed reading, defaults and derived values (design/16 sections 1 and 6.1).
+// Tests of `resolve`: typed reading, defaults and derived values (design/16
+// sections 1 and 6.1).
 #include <cstdint>
 #include <initializer_list>
 #include <string>
@@ -19,7 +20,8 @@ using Entry = std::pair<std::string, RawValue::Data>;
 RawTree make_tree(std::initializer_list<Entry> entries) {
   RawTree t;
   for (const auto& [path, data] : entries) {
-    t.set(path, RawValue{data, SourceRef{SourceRef::Kind::TomlString, "test", 1, 1}});
+    t.set(path,
+          RawValue{data, SourceRef{SourceRef::Kind::TomlString, "test", 1, 1}});
   }
   return t;
 }
@@ -39,7 +41,8 @@ RawTree minimal() {
 
 RawTree with(RawTree t, std::initializer_list<Entry> extra) {
   for (const auto& [path, data] : extra) {
-    t.set(path, RawValue{data, SourceRef{SourceRef::Kind::TomlString, "test", 2, 1}});
+    t.set(path,
+          RawValue{data, SourceRef{SourceRef::Kind::TomlString, "test", 2, 1}});
   }
   return t;
 }
@@ -48,7 +51,8 @@ ResolveResult run(const RawTree& t, bool legacy = false) {
   return resolve(t, ResolveOptions{legacy, false});
 }
 
-const ConfigIssue* find_issue(const ConfigIssues& issues, const std::string& code,
+const ConfigIssue* find_issue(const ConfigIssues& issues,
+                              const std::string& code,
                               const std::string& key = "") {
   for (const auto& i : issues) {
     if (i.code == code && (key.empty() || i.key_path == key)) return &i;
@@ -108,7 +112,8 @@ TEST(Resolve, mass_number_undeterminable_is_v23) {
   const auto* i = find_issue(r.issues, "V-23");
   ASSERT_NE(i, nullptr);
   EXPECT_EQ(i->severity, Severity::Error);
-  EXPECT_NE(i->message.find("cannot determine the mass number"), std::string::npos);
+  EXPECT_NE(i->message.find("cannot determine the mass number"),
+            std::string::npos);
 }
 
 TEST(Resolve, stems) {
@@ -122,13 +127,16 @@ TEST(Resolve, stems) {
 }
 
 TEST(Resolve, stem_uses_task_when_not_imsrg_and_fractional_hw) {
-  const auto r = run(with(minimal(), {{"run.task", S("hf")}, {"basis.hw", D(13.5)}}));
+  const auto r =
+      run(with(minimal(), {{"run.task", S("hf")}, {"basis.hw", D(13.5)}}));
   EXPECT_EQ(r.config.output.stem, "hf_O16_O16_hw13.5_e4_A16");
 }
 
 TEST(Resolve, flow_file_follows_directory_and_stem) {
-  EXPECT_EQ(run(minimal()).config.output.flow_file, "output/magnus_O16_O16_hw16_e4_A16.flow");
-  const auto r = run(with(minimal(), {{"output.directory", S("out/d")}, {"output.stem", S("s")}}));
+  EXPECT_EQ(run(minimal()).config.output.flow_file,
+            "output/magnus_O16_O16_hw16_e4_A16.flow");
+  const auto r = run(with(
+      minimal(), {{"output.directory", S("out/d")}, {"output.stem", S("s")}}));
   EXPECT_EQ(r.config.output.flow_file, "out/d/s.flow");
 }
 
@@ -142,7 +150,8 @@ TEST(Resolve, steps_follow_valence_space) {
 }
 
 TEST(Resolve, valence_generator_reset_for_single_stage) {
-  const auto r = run(with(minimal(), {{"imsrg.generator.valence", S("white")}}));
+  const auto r =
+      run(with(minimal(), {{"imsrg.generator.valence", S("white")}}));
   EXPECT_EQ(r.config.imsrg.generator.valence, GeneratorConfig{}.valence);
   auto t = with(minimal(), {{"imsrg.generator.valence", S("white")},
                             {"imsrg.generator.core", S("shell-model-atan")},
@@ -166,20 +175,25 @@ TEST(Resolve, imsrg_space_defaults) {
 
 TEST(Resolve, e3max_clamped_to_three_emax) {
   EXPECT_EQ(run(minimal()).config.basis.e3max, 12);
-  const auto r = run(with(minimal(), {{"basis.emax", I(2)}, {"basis.e3max", I(10)}}));
+  const auto r =
+      run(with(minimal(), {{"basis.emax", I(2)}, {"basis.e3max", I(10)}}));
   EXPECT_EQ(r.config.basis.e3max, 6);
   const auto r2 = run(with(minimal(), {{"basis.e3max", I(8)}}));
   EXPECT_EQ(r2.config.basis.e3max, 8);
 }
 
 TEST(Resolve, kinetic_default_depends_on_format_and_trap) {
-  EXPECT_EQ(run(minimal()).config.hamiltonian.kinetic, KineticEnergy::Intrinsic);
-  EXPECT_EQ(run(with(minimal(), {{"hamiltonian.trap_hw", I(20)}})).config.hamiltonian.kinetic,
-            KineticEnergy::Lab);
-  EXPECT_EQ(run(with(minimal(), {{"interaction.two_body.format", S("nushellx")}}))
+  EXPECT_EQ(run(minimal()).config.hamiltonian.kinetic,
+            KineticEnergy::Intrinsic);
+  EXPECT_EQ(run(with(minimal(), {{"hamiltonian.trap_hw", I(20)}}))
                 .config.hamiltonian.kinetic,
-            KineticEnergy::None);
-  EXPECT_EQ(run(with(minimal(), {{"hamiltonian.kinetic", S("lab")}})).config.hamiltonian.kinetic,
+            KineticEnergy::Lab);
+  EXPECT_EQ(
+      run(with(minimal(), {{"interaction.two_body.format", S("nushellx")}}))
+          .config.hamiltonian.kinetic,
+      KineticEnergy::None);
+  EXPECT_EQ(run(with(minimal(), {{"hamiltonian.kinetic", S("lab")}}))
+                .config.hamiltonian.kinetic,
             KineticEnergy::Lab);
 }
 
@@ -197,22 +211,26 @@ TEST(Resolve, two_body_cuts_and_beta_cm_default) {
 }
 
 TEST(Resolve, two_body_file_string_or_array) {
-  const auto r = run(with(minimal(), {{"interaction.two_body.file",
-                                       RawArray{RawValue{S("a"), {}}, RawValue{S("b"), {}}}}}));
+  const auto r = run(with(
+      minimal(), {{"interaction.two_body.file",
+                   RawArray{RawValue{S("a"), {}}, RawValue{S("b"), {}}}}}));
   ASSERT_EQ(r.config.interaction.two_body.file.size(), 2u);
   EXPECT_EQ(r.config.interaction.two_body.file[1], "b");
-  const auto r3 = run(with(minimal(), {{"interaction.two_body.file", RawArray{}}}));
+  const auto r3 =
+      run(with(minimal(), {{"interaction.two_body.file", RawArray{}}}));
   const auto* i = find_issue(r3.issues, "V-02", "interaction.two_body.file");
   ASSERT_NE(i, nullptr);
   EXPECT_NE(i->message.find("1 or 2"), std::string::npos);
 }
 
 TEST(Resolve, double_accepts_integer_and_bool_rejects_int) {
-  const auto r = run(with(minimal(), {{"basis.hw", I(20)}, {"imsrg.use_brueckner_bch", B(true)}}));
+  const auto r = run(with(
+      minimal(), {{"basis.hw", I(20)}, {"imsrg.use_brueckner_bch", B(true)}}));
   EXPECT_DOUBLE_EQ(r.config.basis.hw, 20.0);
   EXPECT_TRUE(r.config.imsrg.use_brueckner_bch);
   const auto r2 = run(with(minimal(), {{"imsrg.use_brueckner_bch", I(1)}}));
-  EXPECT_NE(find_issue(r2.issues, "E-TYPE", "imsrg.use_brueckner_bch"), nullptr);
+  EXPECT_NE(find_issue(r2.issues, "E-TYPE", "imsrg.use_brueckner_bch"),
+            nullptr);
 }
 
 TEST(Resolve, float_for_int_is_type_error) {
@@ -224,7 +242,8 @@ TEST(Resolve, float_for_int_is_type_error) {
 }
 
 TEST(Resolve, int_overflow_is_v02) {
-  const auto r = run(with(minimal(), {{"basis.emax", I(std::int64_t{1} << 40)}}));
+  const auto r =
+      run(with(minimal(), {{"basis.emax", I(std::int64_t{1} << 40)}}));
   EXPECT_NE(find_issue(r.issues, "V-02", "basis.emax"), nullptr);
 }
 
@@ -240,13 +259,15 @@ TEST(Resolve, unknown_enum_gives_v01_with_suggestion) {
   const auto* i = find_issue(r.issues, "V-01", "imsrg.method");
   ASSERT_NE(i, nullptr);
   EXPECT_NE(i->message.find("unknown"), std::string::npos);
-  EXPECT_NE(i->message.find("magnus_modified_euler"), std::string::npos);  // allowed list
+  EXPECT_NE(i->message.find("magnus_modified_euler"),
+            std::string::npos);  // allowed list
   ASSERT_TRUE(i->suggestion.has_value());
   EXPECT_EQ(i->suggestion->rfind("magnus", 0), 0u);
 }
 
 TEST(Resolve, optional_values_are_engaged_when_present) {
-  const auto r = run(with(minimal(), {{"basis.lmax", I(3)}, {"hamiltonian.trap_hw", D(12.5)}}));
+  const auto r = run(with(
+      minimal(), {{"basis.lmax", I(3)}, {"hamiltonian.trap_hw", D(12.5)}}));
   EXPECT_EQ(r.config.basis.lmax, 3);
   ASSERT_TRUE(r.config.hamiltonian.trap_hw.has_value());
   EXPECT_DOUBLE_EQ(*r.config.hamiltonian.trap_hw, 12.5);
@@ -255,27 +276,31 @@ TEST(Resolve, optional_values_are_engaged_when_present) {
 
 TEST(Resolve, required_keys_missing_are_v03) {
   const auto r = run(RawTree{});
-  for (const char* key :
-       {"basis.emax", "basis.hw", "interaction.two_body.file", "interaction.two_body.e1max"}) {
+  for (const char* key : {"basis.emax", "basis.hw", "interaction.two_body.file",
+                          "interaction.two_body.e1max"}) {
     const auto* i = find_issue(r.issues, "V-03", key);
     ASSERT_NE(i, nullptr) << key;
     EXPECT_EQ(i->message, std::string("required key '") + key + "' is missing");
     EXPECT_EQ(i->severity, Severity::Error);
   }
   // Absent three_body table: no three-body requirements.
-  EXPECT_EQ(find_issue(r.issues, "V-03", "interaction.three_body.file"), nullptr);
+  EXPECT_EQ(find_issue(r.issues, "V-03", "interaction.three_body.file"),
+            nullptr);
 }
 
 TEST(Resolve, three_body_required_keys_only_when_table_present) {
-  const auto r = run(with(minimal(), {{"interaction.three_body.type", S("full")}}));
+  const auto r =
+      run(with(minimal(), {{"interaction.three_body.type", S("full")}}));
   ASSERT_TRUE(r.config.interaction.three_body.has_value());
-  for (const char* key : {"interaction.three_body.file", "interaction.three_body.e1max",
-                          "interaction.three_body.e3max"}) {
+  for (const char* key :
+       {"interaction.three_body.file", "interaction.three_body.e1max",
+        "interaction.three_body.e3max"}) {
     EXPECT_NE(find_issue(r.issues, "V-03", key), nullptr) << key;
   }
-  const auto ok = run(with(minimal(), {{"interaction.three_body.file", S("f.me3j")},
-                                       {"interaction.three_body.e1max", I(14)},
-                                       {"interaction.three_body.e3max", I(16)}}));
+  const auto ok =
+      run(with(minimal(), {{"interaction.three_body.file", S("f.me3j")},
+                           {"interaction.three_body.e1max", I(14)},
+                           {"interaction.three_body.e3max", I(16)}}));
   ASSERT_TRUE(ok.config.interaction.three_body.has_value());
   EXPECT_FALSE(has_errors(ok.issues));
   EXPECT_EQ(ok.config.interaction.three_body->e3max, 16);
@@ -287,7 +312,8 @@ TEST(Resolve, from_file_entries_are_read) {
   e.emplace_back("name", RawValue{S("Rsq"), {}});
   e.emplace_back("file_2b", RawValue{S("r2.me2j"), {}});
   e.emplace_back("particle_rank", RawValue{I(2), {}});
-  const auto r = run(with(minimal(), {{"operators.from_file", RawArray{RawValue{e, {}}}}}));
+  const auto r = run(
+      with(minimal(), {{"operators.from_file", RawArray{RawValue{e, {}}}}}));
   ASSERT_EQ(r.config.operators.from_file.size(), 1u);
   EXPECT_EQ(r.config.operators.from_file[0].name, "Rsq");
   EXPECT_EQ(r.config.operators.from_file[0].file_2b, "r2.me2j");
@@ -297,13 +323,16 @@ TEST(Resolve, from_file_entries_are_read) {
 TEST(Resolve, from_file_unknown_key_and_missing_required) {
   RawTable e;
   e.emplace_back("nme", RawValue{S("Rsq"), {}});
-  const auto r = run(with(minimal(), {{"operators.from_file", RawArray{RawValue{e, {}}}}}));
+  const auto r = run(
+      with(minimal(), {{"operators.from_file", RawArray{RawValue{e, {}}}}}));
   const auto* u = find_issue(r.issues, "E-KEY-UNKNOWN");
   ASSERT_NE(u, nullptr);
   ASSERT_TRUE(u->suggestion.has_value());
   EXPECT_NE(u->suggestion->find("name"), std::string::npos);
-  EXPECT_NE(find_issue(r.issues, "V-03", "operators.from_file[0].name"), nullptr);
-  EXPECT_NE(find_issue(r.issues, "V-03", "operators.from_file[0].file_2b"), nullptr);
+  EXPECT_NE(find_issue(r.issues, "V-03", "operators.from_file[0].name"),
+            nullptr);
+  EXPECT_NE(find_issue(r.issues, "V-03", "operators.from_file[0].file_2b"),
+            nullptr);
 }
 
 TEST(Resolve, valid_tree_yields_no_issues_at_all) {

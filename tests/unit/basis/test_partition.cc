@@ -39,12 +39,14 @@ class PartitionGolden : public ::testing::TestWithParam<Golden> {};
 
 TEST_P(PartitionGolden, Emax2) {
   const Golden& g = GetParam();
-  const auto basis = SingleParticleBasis::harmonic_oscillator(BasisTruncation{2, -1, -1, -1}, 16.0);
-  const Nucleus refnuc = std::string(g.reference) == "default" ? default_reference_nucleus(g.space)
-                                                               : Nucleus::parse(g.reference);
+  const auto basis = SingleParticleBasis::harmonic_oscillator(
+      BasisTruncation{2, -1, -1, -1}, 16.0);
+  const Nucleus refnuc = std::string(g.reference) == "default"
+                             ? default_reference_nucleus(g.space)
+                             : Nucleus::parse(g.reference);
   const Reference ref = Reference::from_nucleus(basis, refnuc);
-  const Partition part =
-      Partition::from_definition(basis, define_valence_space(g.space, basis, refnuc));
+  const Partition part = Partition::from_definition(
+      basis, define_valence_space(g.space, basis, refnuc));
   EXPECT_DOUBLE_EQ(ref.A(), g.A);
   EXPECT_DOUBLE_EQ(ref.Z(), g.Z);
   EXPECT_DOUBLE_EQ(part.A_core(), g.A_core);
@@ -57,50 +59,70 @@ TEST_P(PartitionGolden, Emax2) {
   EXPECT_EQ(part.is_single_reference(), g.valence.empty());
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    Setups, PartitionGolden,
-    ::testing::Values(
-        Golden{"He4", "He4", 4, 2, 4, 2, range(0, 1), range(2, 11), range(0, 1), {}, range(2, 11)},
-        Golden{
-            "O16", "O16", 16, 8, 16, 8, range(0, 5), range(6, 11), range(0, 5), {}, range(6, 11)},
-        Golden{"Ne20",
-               "Ne20",
-               20,
-               10,
-               28,
-               14,
-               range(0, 7),
-               range(8, 11),
-               range(0, 7),
-               {},
-               range(8, 11)},
-        Golden{"Ne20",
-               "sd-shell",
-               20,
-               10,
-               16,
-               8,
-               range(0, 7),
-               range(8, 11),
-               range(0, 5),
-               range(6, 11),
-               {}},
-        Golden{"default", "p-shell", 4, 2, 4, 2, range(0, 1), range(2, 11), range(0, 1),
-               range(2, 5), range(6, 11)},
-        Golden{"default",
-               "sd-shell",
-               16,
-               8,
-               16,
-               8,
-               range(0, 5),
-               range(6, 11),
-               range(0, 5),
-               range(6, 11),
-               {}}));
+INSTANTIATE_TEST_SUITE_P(Setups, PartitionGolden,
+                         ::testing::Values(Golden{"He4",
+                                                  "He4",
+                                                  4,
+                                                  2,
+                                                  4,
+                                                  2,
+                                                  range(0, 1),
+                                                  range(2, 11),
+                                                  range(0, 1),
+                                                  {},
+                                                  range(2, 11)},
+                                           Golden{"O16",
+                                                  "O16",
+                                                  16,
+                                                  8,
+                                                  16,
+                                                  8,
+                                                  range(0, 5),
+                                                  range(6, 11),
+                                                  range(0, 5),
+                                                  {},
+                                                  range(6, 11)},
+                                           Golden{"Ne20",
+                                                  "Ne20",
+                                                  20,
+                                                  10,
+                                                  28,
+                                                  14,
+                                                  range(0, 7),
+                                                  range(8, 11),
+                                                  range(0, 7),
+                                                  {},
+                                                  range(8, 11)},
+                                           Golden{"Ne20",
+                                                  "sd-shell",
+                                                  20,
+                                                  10,
+                                                  16,
+                                                  8,
+                                                  range(0, 7),
+                                                  range(8, 11),
+                                                  range(0, 5),
+                                                  range(6, 11),
+                                                  {}},
+                                           Golden{"default", "p-shell", 4, 2, 4,
+                                                  2, range(0, 1), range(2, 11),
+                                                  range(0, 1), range(2, 5),
+                                                  range(6, 11)},
+                                           Golden{"default",
+                                                  "sd-shell",
+                                                  16,
+                                                  8,
+                                                  16,
+                                                  8,
+                                                  range(0, 5),
+                                                  range(6, 11),
+                                                  range(0, 5),
+                                                  range(6, 11),
+                                                  {}}));
 
 SingleParticleBasis basis2() {
-  return SingleParticleBasis::harmonic_oscillator(BasisTruncation{2, -1, -1, -1}, 16.0);
+  return SingleParticleBasis::harmonic_oscillator(
+      BasisTruncation{2, -1, -1, -1}, 16.0);
 }
 
 TEST(Partition, FromClassesAndAccessors) {
@@ -116,7 +138,8 @@ TEST(Partition, FromClassesAndAccessors) {
   EXPECT_EQ(p.orbit_class(OrbitIndex{7}), OrbitClass::QSpace);
   EXPECT_DOUBLE_EQ(p.A_core(), 4.0);
   EXPECT_DOUBLE_EQ(p.Z_core(), 2.0);
-  EXPECT_THROW(Partition::from_classes(basis, std::vector<OrbitClass>(11, OrbitClass::Core)),
+  EXPECT_THROW(Partition::from_classes(
+                   basis, std::vector<OrbitClass>(11, OrbitClass::Core)),
                InputError);
   EXPECT_EQ(orbit_class_name(OrbitClass::Core), "core");
   EXPECT_EQ(orbit_class_name(OrbitClass::Valence), "valence");
@@ -137,7 +160,8 @@ TEST(Partition, CoreWinsOnOverlap) {
 
 TEST(Partition, ValenceOrbitMissingFromBasisIsDropped) {
   // lmax = 0 keeps only the s orbits: p0s1, n0s1, p1s1, n1s1.
-  const auto basis = SingleParticleBasis::harmonic_oscillator(BasisTruncation{2, 0, -1, -1}, 16.0);
+  const auto basis = SingleParticleBasis::harmonic_oscillator(
+      BasisTruncation{2, 0, -1, -1}, 16.0);
   ValenceSpaceDefinition def;
   def.core = {parse_orbit_label("p0s1"), parse_orbit_label("n0s1")};
   def.valence = {parse_orbit_label("p0d5"), parse_orbit_label("p1s1")};
@@ -150,7 +174,8 @@ TEST(Partition, ValenceOrbitMissingFromBasisIsDropped) {
 }
 
 TEST(Partition, CoreOrbitMissingFromBasisThrows) {
-  const auto basis = SingleParticleBasis::harmonic_oscillator(BasisTruncation{2, 0, -1, -1}, 16.0);
+  const auto basis = SingleParticleBasis::harmonic_oscillator(
+      BasisTruncation{2, 0, -1, -1}, 16.0);
   ValenceSpaceDefinition def;
   def.core = {parse_orbit_label("p0p3")};
   EXPECT_THROW(Partition::from_definition(basis, def), InputError);
@@ -158,11 +183,12 @@ TEST(Partition, CoreOrbitMissingFromBasisThrows) {
 
 TEST(Partition, WithHolesAsCore) {
   const auto basis = basis2();
-  // Single-reference He4 partition, new reference O16: the holes become the core.
+  // Single-reference He4 partition, new reference O16: the holes become the
+  // core.
   const Reference he4 = Reference::from_nucleus(basis, Nucleus::parse("He4"));
   const Reference o16 = Reference::from_nucleus(basis, Nucleus::parse("O16"));
-  const Partition prev =
-      Partition::from_definition(basis, define_valence_space("He4", basis, Nucleus::parse("He4")));
+  const Partition prev = Partition::from_definition(
+      basis, define_valence_space("He4", basis, Nucleus::parse("He4")));
   const Partition p = Partition::with_holes_as_core(prev, o16, basis);
   EXPECT_EQ(ints(p.core()), range(0, 5));
   EXPECT_TRUE(p.valence().empty());
@@ -180,20 +206,24 @@ TEST(Partition, WithHolesAsCore) {
   EXPECT_TRUE(q.qspace().empty());
 
   // Size mismatch.
-  const auto basis4 =
-      SingleParticleBasis::harmonic_oscillator(BasisTruncation{4, -1, -1, -1}, 16.0);
-  EXPECT_THROW(Partition::with_holes_as_core(
-                   prev, Reference::from_nucleus(basis4, Nucleus::parse("He4")), basis4),
-               InputError);
+  const auto basis4 = SingleParticleBasis::harmonic_oscillator(
+      BasisTruncation{4, -1, -1, -1}, 16.0);
+  EXPECT_THROW(
+      Partition::with_holes_as_core(
+          prev, Reference::from_nucleus(basis4, Nucleus::parse("He4")), basis4),
+      InputError);
   (void)he4;
 }
 
 TEST(Partition, Equality) {
   const auto basis = basis2();
-  const auto def = define_valence_space("sd-shell", basis, Nucleus::parse("O16"));
-  EXPECT_EQ(Partition::from_definition(basis, def), Partition::from_definition(basis, def));
+  const auto def =
+      define_valence_space("sd-shell", basis, Nucleus::parse("O16"));
+  EXPECT_EQ(Partition::from_definition(basis, def),
+            Partition::from_definition(basis, def));
   const auto def2 = define_valence_space("O16", basis, Nucleus::parse("O16"));
-  EXPECT_FALSE(Partition::from_definition(basis, def) == Partition::from_definition(basis, def2));
+  EXPECT_FALSE(Partition::from_definition(basis, def) ==
+               Partition::from_definition(basis, def2));
 }
 
 }  // namespace

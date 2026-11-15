@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Tests of the NO2B three-nucleon input container `No2bThreeBody` (layout of imsrg++
-// ThreeBodyStorage_no2b<float>): orbits, channel/state counts against a brute-force enumeration,
-// set/get round trips with ordering phases, float storage, and the pn recoupling.
+// Tests of the NO2B three-nucleon input container `No2bThreeBody` (layout of
+// imsrg++ ThreeBodyStorage_no2b<float>): orbits, channel/state counts against a
+// brute-force enumeration, set/get round trips with ordering phases, float
+// storage, and the pn recoupling.
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -80,18 +81,23 @@ BfCounts brute_force(const No2bTruncation& t) {
   return out;
 }
 
-basis::Orbit orb(int n, int l, int tj, int tz) { return basis::Orbit{n, l, TwoJ{tj}, TwoTz{tz}}; }
+basis::Orbit orb(int n, int l, int tj, int tz) {
+  return basis::Orbit{n, l, TwoJ{tj}, TwoTz{tz}};
+}
 
 TEST(No2b, OrbitList) {
   const No2bThreeBody w(No2bTruncation{2, 4, 6, 2});
   const auto orbs = w.isospin_orbits();
   ASSERT_EQ(orbs.size(), 6U);
-  const int expect[6][3] = {{0, 0, 1}, {0, 1, 1}, {0, 1, 3}, {1, 0, 1}, {0, 2, 3}, {0, 2, 5}};
+  const int expect[6][3] = {{0, 0, 1}, {0, 1, 1}, {0, 1, 3},
+                            {1, 0, 1}, {0, 2, 3}, {0, 2, 5}};
   for (int i = 0; i < 6; ++i) {
     EXPECT_EQ(orbs[static_cast<std::size_t>(i)].n, expect[i][0]);
     EXPECT_EQ(orbs[static_cast<std::size_t>(i)].l, expect[i][1]);
     EXPECT_EQ(orbs[static_cast<std::size_t>(i)].j2.twice, expect[i][2]);
-    EXPECT_EQ(w.isospin_orbit_index(expect[i][0], expect[i][1], TwoJ{expect[i][2]}), i);
+    EXPECT_EQ(
+        w.isospin_orbit_index(expect[i][0], expect[i][1], TwoJ{expect[i][2]}),
+        i);
   }
   EXPECT_FALSE(w.isospin_orbit_index(0, 3, TwoJ{5}).has_value());
   EXPECT_FALSE(w.isospin_orbit_index(0, 0, TwoJ{3}).has_value());
@@ -105,7 +111,8 @@ TEST(No2b, NegativeTruncationThrows) {
 }
 
 TEST(No2b, CountsMatchBruteForce) {
-  for (const auto& t : {No2bTruncation{2, 4, 6, 2}, No2bTruncation{3, 4, 5, 3}}) {
+  for (const auto& t :
+       {No2bTruncation{2, 4, 6, 2}, No2bTruncation{3, 4, 5, 3}}) {
     const No2bThreeBody w(t);
     const BfCounts bf = brute_force(t);
     EXPECT_GT(bf.channels, 0);
@@ -137,7 +144,8 @@ TEST(No2b, SetGetRoundTrip) {
   // Different Tab: another element, still zero.
   EXPECT_EQ(w.get_isospin(0, 1, 0, 0, 0, 1, 0, 1, 1, 1), 0.0);
 
-  // Off-diagonal element and its transpose; Tab = 0 has even sum: no sign on swap.
+  // Off-diagonal element and its transpose; Tab = 0 has even sum: no sign on
+  // swap.
   w.set_isospin(0, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0.25);
   EXPECT_EQ(w.get_isospin(0, 1, 0, 0, 0, 1, 0, 1, 1, 1), 0.25);
   EXPECT_EQ(w.get_isospin(0, 1, 0, 1, 0, 1, 0, 0, 1, 1), 0.25);
@@ -155,23 +163,30 @@ TEST(No2b, AbsentElementsAreZero) {
   EXPECT_EQ(w.get_isospin(0, 1, 0, 1, 0, 1, 0, 1, 1, 1), 0.0);  // stored zero
   EXPECT_EQ(w.get_isospin(-1, 1, 0, 1, 0, 1, 0, 1, 1, 1), 0.0);
   EXPECT_EQ(w.get_isospin(0, 1, 0, 1, 0, 1, 99, 1, 1, 1), 0.0);
-  EXPECT_EQ(w.get_isospin(0, 1, 0, 1, 0, 1, 0, 1, 99, 1), 0.0);  // J2 out of range
-  EXPECT_EQ(w.get_isospin(0, 1, 0, 1, 0, 1, 0, 1, 1, 5), 0.0);   // bad T3
-  EXPECT_EQ(w.get_isospin(0, 0, 0, 0, 0, 0, 0, 0, 0, 1), 0.0);   // Pauli-forbidden
-  EXPECT_EQ(w.get_isospin(0, 1, 1, 1, 0, 1, 2, 1, 1, 1), 0.0);   // j_c != j_f
+  EXPECT_EQ(w.get_isospin(0, 1, 0, 1, 0, 1, 0, 1, 99, 1),
+            0.0);  // J2 out of range
+  EXPECT_EQ(w.get_isospin(0, 1, 0, 1, 0, 1, 0, 1, 1, 5), 0.0);  // bad T3
+  EXPECT_EQ(w.get_isospin(0, 0, 0, 0, 0, 0, 0, 0, 0, 1),
+            0.0);  // Pauli-forbidden
+  EXPECT_EQ(w.get_isospin(0, 1, 1, 1, 0, 1, 2, 1, 1, 1), 0.0);  // j_c != j_f
 }
 
 TEST(No2b, InvalidSetThrows) {
   No2bThreeBody w(No2bTruncation{2, 4, 6, 2});
   // a == b with J2 + Tab even: Pauli forbidden (J2 = 0, Tab = 0 on s1/2 s1/2).
-  EXPECT_THROW(w.set_isospin(0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1.0), InvariantError);
+  EXPECT_THROW(w.set_isospin(0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1.0),
+               InvariantError);
   // j_c != j_f (p1/2 vs p3/2).
-  EXPECT_THROW(w.set_isospin(0, 3, 1, 1, 0, 3, 2, 1, 1, 1, 1.0), InvariantError);
+  EXPECT_THROW(w.set_isospin(0, 3, 1, 1, 0, 3, 2, 1, 1, 1, 1.0),
+               InvariantError);
   // Parity of c, f differs.
-  EXPECT_THROW(w.set_isospin(0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1.0), InvariantError);
+  EXPECT_THROW(w.set_isospin(0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1.0),
+               InvariantError);
   // Out-of-range orbit index and channel.
-  EXPECT_THROW(w.set_isospin(0, 1, 0, 1, 0, 1, 77, 1, 1, 1, 1.0), InvariantError);
-  EXPECT_THROW(w.set_isospin(0, 1, 0, 1, 0, 1, 0, 1, 99, 1, 1.0), InvariantError);
+  EXPECT_THROW(w.set_isospin(0, 1, 0, 1, 0, 1, 77, 1, 1, 1, 1.0),
+               InvariantError);
+  EXPECT_THROW(w.set_isospin(0, 1, 0, 1, 0, 1, 0, 1, 99, 1, 1.0),
+               InvariantError);
   EXPECT_EQ(w.norm(), 0.0);
 }
 
@@ -184,26 +199,27 @@ TEST(No2b, PnDiagonalCases) {
     const auto p = orb(0, 1, 1, tz);
     EXPECT_NEAR(w.get_pn(s, p, s, s, p, s, 1), v, 1e-15) << tz;
   }
-  // Mixed Tz in the isospin-3/2 element only: ppn gets CGs < 1 but T = 3/2 only, Tab = 1:
-  // <1/2 -1/2 1/2 -1/2|1 -1> = 1, <1 -1, 1/2 +1/2 | 3/2 -1/2> = sqrt(1/3).
-  EXPECT_NEAR(w.get_pn(orb(0, 0, 1, -1), orb(0, 1, 1, -1), orb(0, 0, 1, +1), orb(0, 0, 1, -1),
-                       orb(0, 1, 1, -1), orb(0, 0, 1, +1), 1),
+  // Mixed Tz in the isospin-3/2 element only: ppn gets CGs < 1 but T = 3/2
+  // only, Tab = 1: <1/2 -1/2 1/2 -1/2|1 -1> = 1, <1 -1, 1/2 +1/2 | 3/2 -1/2> =
+  // sqrt(1/3).
+  EXPECT_NEAR(w.get_pn(orb(0, 0, 1, -1), orb(0, 1, 1, -1), orb(0, 0, 1, +1),
+                       orb(0, 0, 1, -1), orb(0, 1, 1, -1), orb(0, 0, 1, +1), 1),
               v / 3.0, 1e-7);
   // Tz mismatch between bra and ket.
-  EXPECT_EQ(w.get_pn(orb(0, 0, 1, -1), orb(0, 1, 1, -1), orb(0, 0, 1, -1), orb(0, 0, 1, -1),
-                     orb(0, 1, 1, -1), orb(0, 0, 1, +1), 1),
+  EXPECT_EQ(w.get_pn(orb(0, 0, 1, -1), orb(0, 1, 1, -1), orb(0, 0, 1, -1),
+                     orb(0, 0, 1, -1), orb(0, 1, 1, -1), orb(0, 0, 1, +1), 1),
             0.0);
   // Parity mismatch of the pair (a b = s p, d e = s s).
-  EXPECT_EQ(w.get_pn(orb(0, 0, 1, -1), orb(0, 1, 1, -1), orb(0, 0, 1, -1), orb(0, 0, 1, -1),
-                     orb(0, 0, 1, -1), orb(0, 0, 1, -1), 1),
+  EXPECT_EQ(w.get_pn(orb(0, 0, 1, -1), orb(0, 1, 1, -1), orb(0, 0, 1, -1),
+                     orb(0, 0, 1, -1), orb(0, 0, 1, -1), orb(0, 0, 1, -1), 1),
             0.0);
   // j_c != j_f (p1/2 vs p3/2, same parity).
-  EXPECT_EQ(w.get_pn(orb(0, 0, 1, -1), orb(0, 0, 1, +1), orb(0, 1, 1, -1), orb(0, 0, 1, -1),
-                     orb(0, 0, 1, +1), orb(0, 1, 3, -1), 0),
+  EXPECT_EQ(w.get_pn(orb(0, 0, 1, -1), orb(0, 0, 1, +1), orb(0, 1, 1, -1),
+                     orb(0, 0, 1, -1), orb(0, 0, 1, +1), orb(0, 1, 3, -1), 0),
             0.0);
   // Orbit not stored (l = 3 > lmax).
-  EXPECT_EQ(w.get_pn(orb(0, 3, 5, -1), orb(0, 1, 1, -1), orb(0, 0, 1, -1), orb(0, 0, 1, -1),
-                     orb(0, 1, 1, -1), orb(0, 0, 1, -1), 1),
+  EXPECT_EQ(w.get_pn(orb(0, 3, 5, -1), orb(0, 1, 1, -1), orb(0, 0, 1, -1),
+                     orb(0, 0, 1, -1), orb(0, 1, 1, -1), orb(0, 0, 1, -1), 1),
             0.0);
 }
 
@@ -215,18 +231,21 @@ TEST(No2b, PnAgainstHandCgProducts) {
   w.set_isospin(0, 1, 0, 0, 0, 1, 0, 1, 1, 1, w01);
   w.set_isospin(0, 1, 0, 1, 0, 1, 0, 1, 1, 1, w11a);
   w.set_isospin(0, 1, 0, 1, 0, 1, 0, 1, 1, 3, w11b);
-  // proton, neutron, proton -> proton, neutron, proton (Z3 = -1/2).
-  // Pair CGs <1/2 -1/2 1/2 +1/2 | T12 0>: T12 = 0 -> -1/sqrt2, T12 = 1 -> +1/sqrt2.
-  // Third CGs with M = -1/2, (T12, 0; 1/2, -1/2): (0, 1/2) -> 1; (1, 1/2) -> +sqrt(1/3);
-  // (1, 3/2) -> sqrt(2/3).
+  // proton, neutron, proton -> proton, neutron, proton (Z3 = -1/2). Pair CGs
+  // <1/2 -1/2 1/2 +1/2 | T12 0>: T12 = 0 -> -1/sqrt2, T12 = 1 -> +1/sqrt2.
+  // Third CGs with M = -1/2, (T12, 0; 1/2, -1/2): (0, 1/2) -> 1; (1, 1/2) ->
+  // +sqrt(1/3); (1, 3/2) -> sqrt(2/3).
   const double r2 = std::sqrt(0.5);
   const double c0 = -r2, c1 = r2;
-  const double t0 = 1.0, t1_half = std::sqrt(1.0 / 3.0), t1_32 = std::sqrt(2.0 / 3.0);
+  const double t0 = 1.0, t1_half = std::sqrt(1.0 / 3.0),
+               t1_32 = std::sqrt(2.0 / 3.0);
   const double expect = w00 * c0 * c0 * t0 * t0 + w01 * c0 * c1 * t0 * t1_half +
-                        w01 * c1 * c0 * t1_half * t0 + w11a * c1 * c1 * t1_half * t1_half +
+                        w01 * c1 * c0 * t1_half * t0 +
+                        w11a * c1 * c1 * t1_half * t1_half +
                         w11b * c1 * c1 * t1_32 * t1_32;
-  const auto got = w.get_pn(orb(0, 0, 1, -1), orb(0, 1, 1, +1), orb(0, 0, 1, -1), orb(0, 0, 1, -1),
-                            orb(0, 1, 1, +1), orb(0, 0, 1, -1), 1);
+  const auto got =
+      w.get_pn(orb(0, 0, 1, -1), orb(0, 1, 1, +1), orb(0, 0, 1, -1),
+               orb(0, 0, 1, -1), orb(0, 1, 1, +1), orb(0, 0, 1, -1), 1);
   EXPECT_NEAR(got, expect, 1e-7);
   EXPECT_GT(std::abs(got), 0.1);
 }

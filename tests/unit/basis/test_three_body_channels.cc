@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Unit tests of ThreeBodyChannels (design/reference/01 section 3). Kets are rebuilt by brute
-// force; the golden comparison lives in test_golden_basis.cc.
+// Unit tests of ThreeBodyChannels (design/reference/01 section 3). Kets are
+// rebuilt by brute force; the golden comparison lives in test_golden_basis.cc.
 #include <cmath>
 #include <cstdlib>
 #include <tuple>
@@ -20,7 +20,8 @@ SingleParticleBasis make_basis(std::int32_t emax) {
   return SingleParticleBasis::harmonic_oscillator(BasisTruncation{emax}, 16.0);
 }
 
-std::int64_t brute_force_ket_count(const SingleParticleBasis& b, std::int32_t e3max) {
+std::int64_t brute_force_ket_count(const SingleParticleBasis& b,
+                                   std::int32_t e3max) {
   std::int64_t n = 0;
   const std::int32_t no = b.num_orbits();
   for (std::int32_t p = 0; p < no; ++p) {
@@ -57,8 +58,10 @@ TEST(ThreeBodyChannels, KetCountMatchesBruteForceAndOrderIsLexicographic) {
     for (std::size_t i = 1; i < kets.size(); ++i) {
       const auto& x = kets[i - 1];
       const auto& y = kets[i];
-      EXPECT_TRUE(std::make_tuple(x.p.value(), x.q.value(), x.r.value(), x.two_jpq.twice) <
-                  std::make_tuple(y.p.value(), y.q.value(), y.r.value(), y.two_jpq.twice));
+      EXPECT_TRUE(std::make_tuple(x.p.value(), x.q.value(), x.r.value(),
+                                  x.two_jpq.twice) <
+                  std::make_tuple(y.p.value(), y.q.value(), y.r.value(),
+                                  y.two_jpq.twice));
     }
   }
 }
@@ -85,11 +88,15 @@ TEST(ThreeBodyChannels, FindKetRoundTripsAndRejectsAbsentKets) {
     EXPECT_TRUE(tb.ket(*found) == k);
   }
   const Ket3& k0 = tb.kets()[0];
-  EXPECT_FALSE(tb.find_ket(k0.p, k0.q, k0.r, TwoJ{k0.two_jpq.twice + 100}).has_value());
+  EXPECT_FALSE(
+      tb.find_ket(k0.p, k0.q, k0.r, TwoJ{k0.two_jpq.twice + 100}).has_value());
   // Unordered orbits are never present.
-  EXPECT_FALSE(tb.find_ket(OrbitIndex{3}, OrbitIndex{2}, OrbitIndex{5}, TwoJ{0}).has_value());
-  // p == q with odd Jpq is dropped: orbit 2 (0p1/2 or 0p3/2) with itself and Jpq = 1.
-  EXPECT_FALSE(tb.find_ket(OrbitIndex{2}, OrbitIndex{2}, OrbitIndex{4}, TwoJ{2}).has_value());
+  EXPECT_FALSE(tb.find_ket(OrbitIndex{3}, OrbitIndex{2}, OrbitIndex{5}, TwoJ{0})
+                   .has_value());
+  // p == q with odd Jpq is dropped: orbit 2 (0p1/2 or 0p3/2) with itself and
+  // Jpq = 1.
+  EXPECT_FALSE(tb.find_ket(OrbitIndex{2}, OrbitIndex{2}, OrbitIndex{4}, TwoJ{2})
+                   .has_value());
 }
 
 TEST(ThreeBodyChannels, ChannelIndexFormulaAndLookup) {
@@ -98,15 +105,19 @@ TEST(ThreeBodyChannels, ChannelIndexFormulaAndLookup) {
   EXPECT_EQ(tb.num_channels(), 8 * (3 * 2 + 1));
   for (std::int32_t ch = 0; ch < tb.num_channels(); ++ch) {
     const ThreeBodyChannel& c = tb.channel(Channel3Index{ch});
-    EXPECT_EQ(ThreeBodyChannels::channel_index(c.two_j, c.parity, c.two_tz).value(), ch);
+    EXPECT_EQ(
+        ThreeBodyChannels::channel_index(c.two_j, c.parity, c.two_tz).value(),
+        ch);
     const auto f = tb.find_channel(c.two_j, c.parity, c.two_tz);
     ASSERT_TRUE(f.has_value());
     EXPECT_EQ(f->value(), ch);
   }
   EXPECT_FALSE(tb.find_channel(TwoJ{2}, Parity::Even, TwoTz{1}).has_value());
   EXPECT_FALSE(tb.find_channel(TwoJ{1}, Parity::Even, TwoTz{0}).has_value());
-  EXPECT_FALSE(tb.find_channel(TwoJ{6 * 2 + 3}, Parity::Even, TwoTz{1}).has_value());
-  EXPECT_EQ(tb.find_channel(TwoJ{3}, Parity::Odd, TwoTz{-1})->value(), 1 * 8 + 4 + 1);
+  EXPECT_FALSE(
+      tb.find_channel(TwoJ{6 * 2 + 3}, Parity::Even, TwoTz{1}).has_value());
+  EXPECT_EQ(tb.find_channel(TwoJ{3}, Parity::Odd, TwoTz{-1})->value(),
+            1 * 8 + 4 + 1);
 }
 
 TEST(ThreeBodyChannels, MembershipAndLocalIndexAreConsistent) {
@@ -142,15 +153,15 @@ TEST(ThreeBodyChannels, MembershipAndLocalIndexAreConsistent) {
   const Orbit& o3 = b.orbit(k0.r);
   const int parity = (o1.l + o2.l + o3.l) % 2;
   const auto wrong = static_cast<Parity>(1 - parity);
-  const auto ch =
-      tb.find_channel(TwoJ{1}, wrong, TwoTz{o1.tz2.twice + o2.tz2.twice + o3.tz2.twice});
+  const auto ch = tb.find_channel(
+      TwoJ{1}, wrong, TwoTz{o1.tz2.twice + o2.tz2.twice + o3.tz2.twice});
   ASSERT_TRUE(ch.has_value());
   EXPECT_FALSE(tb.local_index(*ch, Ket3Index{0}).has_value());
 }
 
 TEST(ThreeBodyChannels, StretchedStateRulesDropRedundantKets) {
-  // A ket of three identical orbits is absent from every channel above 2J = 3 (2j) - 3
-  // (rule copied from imsrg++).
+  // A ket of three identical orbits is absent from every channel above 2J = 3
+  // (2j) - 3 (rule copied from imsrg++).
   const auto b = make_basis(2);
   const ThreeBodyChannels tb(b, ThreeBodyCuts{6});
   int checked = 0;
@@ -160,8 +171,9 @@ TEST(ThreeBodyChannels, StretchedStateRulesDropRedundantKets) {
     const std::int32_t j = b.orbit(k.p).j2.twice;
     for (std::int32_t ch = 0; ch < tb.num_channels(); ++ch) {
       if (tb.channel(Channel3Index{ch}).two_j.twice > 3 * j - 3) {
-        EXPECT_FALSE(
-            tb.local_index(Channel3Index{ch}, Ket3Index{static_cast<std::int32_t>(i)}).has_value());
+        EXPECT_FALSE(tb.local_index(Channel3Index{ch},
+                                    Ket3Index{static_cast<std::int32_t>(i)})
+                         .has_value());
         ++checked;
       }
     }
@@ -173,8 +185,8 @@ TEST(ThreeBodyChannels, ConfigurationCutOnAHandCheckedKet) {
   const auto b = make_basis(2);
   const auto ref = Reference::from_nucleus(b, Nucleus::parse("O16"));
   const ThreeBodyChannels tb(b, ThreeBodyCuts{6});
-  // Ket 0 holds the two s1/2 orbits (e = 0) and one more orbit. O16 has e_fermi = 1 for both
-  // species, so sum |e - e_F| = 1 + 1 + |e_r - 1|.
+  // Ket 0 holds the two s1/2 orbits (e = 0) and one more orbit. O16 has e_fermi
+  // = 1 for both species, so sum |e - e_F| = 1 + 1 + |e_r - 1|.
   const Ket3Index k{0};
   const Ket3& kt = tb.ket(k);
   ASSERT_EQ(b.orbit(kt.p).e(), 0);
@@ -187,13 +199,14 @@ TEST(ThreeBodyChannels, ConfigurationCutOnAHandCheckedKet) {
   ASSERT_GT(de, 0.5);
   EXPECT_TRUE(tb.passes_configuration_cut(k, b, ref, de, 0.0));
   EXPECT_FALSE(tb.passes_configuration_cut(k, b, ref, de - 0.1, 0.0));
-  // The s orbits are fully occupied: n (1 - n) = 0, so any positive occupation cut rejects the
-  // ket with the reference occupations ...
+  // The s orbits are fully occupied: n (1 - n) = 0, so any positive occupation
+  // cut rejects the ket with the reference occupations ...
   EXPECT_FALSE(tb.passes_configuration_cut(k, b, ref, 10.0, 1e-3));
   // ... while natural occupations of 1/2 give a product of (1/4)^3.
   const std::vector<double> half(static_cast<std::size_t>(b.num_orbits()), 0.5);
   EXPECT_TRUE(tb.passes_configuration_cut(k, b, ref, 10.0, 1.0 / 64.0, half));
-  EXPECT_FALSE(tb.passes_configuration_cut(k, b, ref, 10.0, 1.0 / 64.0 + 1e-6, half));
+  EXPECT_FALSE(
+      tb.passes_configuration_cut(k, b, ref, 10.0, 1.0 / 64.0 + 1e-6, half));
 }
 
 }  // namespace

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Construction of the Pandya data of the particle-hole term (design/12 section 4.2). Host-side
-// only; no Kokkos.
+// Construction of the Pandya data of the particle-hole term (design/12 section
+// 4.2). Host-side only; no Kokkos.
 
 #include <cstdint>
 #include <vector>
@@ -70,7 +70,8 @@ PandyaData build_pandya_data(const basis::ModelSpace& ms) {
     ket_off[cs + 1] = ket_off[cs] + static_cast<std::int32_t>(n);
     k_off[cs + 1] = k_off[cs] + nk;
     d.xk_off_host[cs + 1] = d.xk_off_host[cs] + n * nk;
-    d.yk_off_host[cs + 1] = d.yk_off_host[cs] + static_cast<std::int64_t>(nk) * 2 * n;
+    d.yk_off_host[cs + 1] =
+        d.yk_off_host[cs] + static_cast<std::int64_t>(nk) * 2 * n;
     d.w_off_host[cs + 1] = d.w_off_host[cs] + n * 2 * n;
   }
 
@@ -88,10 +89,10 @@ PandyaData build_pandya_data(const basis::ModelSpace& ms) {
   d.w_off = upload(d.w_off_host, "pandya::w_off");
   const auto jo = ph.ket_J_offsets();
   const auto lt = ph.local_index_table();
-  d.ket_J_offsets =
-      upload(std::vector<std::int32_t>(jo.begin(), jo.end()), "pandya::ket_J_offsets");
-  d.local_index_table =
-      upload(std::vector<std::int32_t>(lt.begin(), lt.end()), "pandya::local_index_table");
+  d.ket_J_offsets = upload(std::vector<std::int32_t>(jo.begin(), jo.end()),
+                           "pandya::ket_J_offsets");
+  d.local_index_table = upload(std::vector<std::int32_t>(lt.begin(), lt.end()),
+                               "pandya::local_index_table");
 
   const auto sz = [](const std::vector<std::int64_t>& off) {
     return static_cast<std::size_t>(off.back());
@@ -126,15 +127,16 @@ PandyaData build_pandya_data(const basis::ModelSpace& ms) {
     const auto cs = static_cast<std::size_t>(c);
     const std::int64_t n = d.ncc_host[cs];
     const std::int64_t nk = d.nk_host[cs];
-    // k == 0 (nk == 0) blocks are skipped: their W stays zero (zero-initialized, never written).
-    // The problems run on host BLAS (see the host_is_device check in comm222_phss, design/12
-    // section 3).
+    // k == 0 (nk == 0) blocks are skipped: their W stays zero
+    // (zero-initialized, never written). The problems run on host BLAS (see the
+    // host_is_device check in comm222_phss, design/12 section 3).
     if (n == 0 || nk == 0) continue;
     linalg::GemmProblem g;
     g.alpha = 1.0;
     g.A = linalg::MatrixView<const double>{v.xk + d.xk_off_host[cs], n, nk, n};
     g.opA = linalg::Op::NoTrans;
-    g.B = linalg::MatrixView<const double>{v.yk + d.yk_off_host[cs], nk, 2 * n, nk};
+    g.B = linalg::MatrixView<const double>{v.yk + d.yk_off_host[cs], nk, 2 * n,
+                                           nk};
     g.opB = linalg::Op::NoTrans;
     g.beta = 0.0;
     g.C = linalg::MatrixView<double>{v.w + d.w_off_host[cs], n, 2 * n, n};

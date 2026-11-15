@@ -14,16 +14,19 @@
 namespace imsrg::basis {
 
 Reference Reference::from_occupations(const SingleParticleBasis& basis,
-                                      std::vector<double> occupations, std::string name) {
+                                      std::vector<double> occupations,
+                                      std::string name) {
   if (static_cast<std::int32_t>(occupations.size()) != basis.num_orbits()) {
-    throw InputError(fmt::format("Reference: {} occupations given for a basis of {} orbits",
-                                 occupations.size(), basis.num_orbits()));
+    throw InputError(
+        fmt::format("Reference: {} occupations given for a basis of {} orbits",
+                    occupations.size(), basis.num_orbits()));
   }
   for (std::size_t a = 0; a < occupations.size(); ++a) {
     const double n = occupations[a];
     if (!std::isfinite(n) || n < 0.0 || n > 1.0) {
-      throw InputError(fmt::format("Reference: occupation {} of orbit {} ({}) is outside [0, 1]", n,
-                                   a, orbit_label(basis.orbits()[a])));
+      throw InputError(fmt::format(
+          "Reference: occupation {} of orbit {} ({}) is outside [0, 1]", n, a,
+          orbit_label(basis.orbits()[a])));
     }
   }
 
@@ -31,7 +34,8 @@ Reference Reference::from_occupations(const SingleParticleBasis& basis,
   ref.occ_ = std::move(occupations);
   ref.name_ = std::move(name);
 
-  // Same operation order as imsrg++ (CountInSet over holes ascending, FindEFermi).
+  // Same operation order as imsrg++ (CountInSet over holes ascending,
+  // FindEFermi).
   double e_fermi_p = -1.0;
   double e_fermi_n = -1.0;
   double occmax_p = 0.0;
@@ -77,22 +81,24 @@ Reference Reference::from_occupations(const SingleParticleBasis& basis,
   return ref;
 }
 
-Reference Reference::from_nucleus(const SingleParticleBasis& basis, const Nucleus& nucleus) {
+Reference Reference::from_nucleus(const SingleParticleBasis& basis,
+                                  const Nucleus& nucleus) {
   std::vector<double> occ(static_cast<std::size_t>(basis.num_orbits()), 0.0);
   for (const OrbitOccupation& oo : naive_filling(nucleus, basis.emax())) {
     const auto idx = basis.find(oo.orbit);
     if (!idx) {
-      throw InputError(fmt::format("Reference for {}: occupied orbit {} is not in the basis",
-                                   nucleus.name(), orbit_label(oo.orbit)));
+      throw InputError(
+          fmt::format("Reference for {}: occupied orbit {} is not in the basis",
+                      nucleus.name(), orbit_label(oo.orbit)));
     }
     occ[idx->to_size()] = oo.occupation;
   }
   return from_occupations(basis, std::move(occ), nucleus.name());
 }
 
-Reference Reference::from_orbit_occupations(const SingleParticleBasis& basis,
-                                            std::span<const OrbitOccupation> entries,
-                                            std::string name) {
+Reference Reference::from_orbit_occupations(
+    const SingleParticleBasis& basis, std::span<const OrbitOccupation> entries,
+    std::string name) {
   std::vector<double> occ(static_cast<std::size_t>(basis.num_orbits()), 0.0);
   for (const OrbitOccupation& oo : entries) {
     if (std::abs(oo.occupation) < 1e-8) {
@@ -103,8 +109,9 @@ Reference Reference::from_orbit_occupations(const SingleParticleBasis& basis,
     }
     const auto idx = basis.find(oo.orbit);
     if (!idx) {
-      throw InputError(fmt::format("Reference: orbit {} of the occupation list is not in the basis",
-                                   orbit_label(oo.orbit)));
+      throw InputError(fmt::format(
+          "Reference: orbit {} of the occupation list is not in the basis",
+          orbit_label(oo.orbit)));
     }
     occ[idx->to_size()] = oo.occupation;
   }
@@ -112,7 +119,8 @@ Reference Reference::from_orbit_occupations(const SingleParticleBasis& basis,
 }
 
 double Reference::occupation(OrbitIndex a) const {
-  IMSRG_ASSERT(a.value() >= 0 && a.value() < num_orbits(), "orbit index out of range");
+  IMSRG_ASSERT(a.value() >= 0 && a.value() < num_orbits(),
+               "orbit index out of range");
   return occ_[a.to_size()];
 }
 
@@ -120,7 +128,8 @@ double Reference::e_fermi(TwoTz species) const {
   if (species == TwoTz{-1}) return e_fermi_proton_;
   if (species == TwoTz{+1}) return e_fermi_neutron_;
   throw InputError(
-      fmt::format("Reference::e_fermi: species 2tz = {} is neither -1 nor +1", species.twice));
+      fmt::format("Reference::e_fermi: species 2tz = {} is neither -1 nor +1",
+                  species.twice));
 }
 
 }  // namespace imsrg::basis

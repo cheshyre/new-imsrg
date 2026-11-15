@@ -15,20 +15,22 @@
 namespace imsrg::basis {
 namespace {
 
-SingleParticleBasis make_basis(int emax, int lmax = -1, int emax_unocc = -1, int lmax_unocc = -1,
-                               double hw = 16.0) {
+SingleParticleBasis make_basis(int emax, int lmax = -1, int emax_unocc = -1,
+                               int lmax_unocc = -1, double hw = 16.0) {
   return SingleParticleBasis::harmonic_oscillator(
       BasisTruncation{emax, lmax, emax_unocc, lmax_unocc}, hw);
 }
 
-// The untruncated orbit list generated independently of the class, in imsrg++ order.
+// The untruncated orbit list generated independently of the class, in imsrg++
+// order.
 std::vector<Orbit> reference_orbits(int emax) {
   std::vector<Orbit> v;
   for (int N = 0; N <= emax; ++N) {
     for (int l = N; l >= 0; l -= 2) {
       for (const int j2 : {2 * l + 1, 2 * l - 1}) {
         if (j2 <= 0) continue;
-        for (const int tz2 : {-1, 1}) v.push_back(Orbit{(N - l) / 2, l, TwoJ{j2}, TwoTz{tz2}});
+        for (const int tz2 : {-1, 1})
+          v.push_back(Orbit{(N - l) / 2, l, TwoJ{j2}, TwoTz{tz2}});
       }
     }
   }
@@ -63,16 +65,18 @@ TEST(SingleParticleBasis, LmaxTruncation) {
   const auto full = make_basis(4);
   const auto b = make_basis(4, 1);
   EXPECT_EQ(b.lmax(), 1);
-  // Orbits with l <= 1 up to e = 4: s (n=0,1,2), p (n=0,1): 2 j-values each for p, 1 for s, x2 tz.
-  // s: 3 orbits x 1 j x 2 = 6; p: 2 x 2 j x 2 = 8.
+  // Orbits with l <= 1 up to e = 4: s (n=0,1,2), p (n=0,1): 2 j-values each for
+  // p, 1 for s, x2 tz. s: 3 orbits x 1 j x 2 = 6; p: 2 x 2 j x 2 = 8.
   EXPECT_EQ(b.num_orbits(), 14);
   std::vector<Orbit> expected;
   for (const Orbit& o : full.orbits()) {
     if (o.l <= 1) expected.push_back(o);
   }
   ASSERT_EQ(expected.size(), 14u);
-  for (std::size_t i = 0; i < expected.size(); ++i) EXPECT_EQ(b.orbits()[i], expected[i]) << i;
-  // The first orbit with l > lmax is not found; proton/neutron parity of the index is kept.
+  for (std::size_t i = 0; i < expected.size(); ++i)
+    EXPECT_EQ(b.orbits()[i], expected[i]) << i;
+  // The first orbit with l > lmax is not found; proton/neutron parity of the
+  // index is kept.
   EXPECT_FALSE(b.contains(Orbit{0, 2, TwoJ{5}, TwoTz{-1}}));
   for (int i = 0; i < b.num_orbits(); ++i) {
     EXPECT_EQ(i % 2 == 0, b.orbit(OrbitIndex{i}).is_proton());
@@ -97,7 +101,8 @@ TEST(SingleParticleBasis, EmaxUnoccTruncation) {
   }
   ASSERT_EQ(static_cast<std::size_t>(b.num_orbits()), expected.size());
   EXPECT_LT(b.num_orbits(), full.num_orbits());
-  for (std::size_t i = 0; i < expected.size(); ++i) EXPECT_EQ(b.orbits()[i], expected[i]) << i;
+  for (std::size_t i = 0; i < expected.size(); ++i)
+    EXPECT_EQ(b.orbits()[i], expected[i]) << i;
 
   // Removed orbits are not found and not contained; kept ones are.
   for (const Orbit& o : full.orbits()) {
@@ -109,7 +114,8 @@ TEST(SingleParticleBasis, EmaxUnoccTruncation) {
       EXPECT_THROW((void)b.index_of(o), InputError);
     }
   }
-  // Specific cases: 0g9/2 (e = 4, l = 4 > 2) is gone; 1d5/2 (e = 4, l = 2) stays.
+  // Specific cases: 0g9/2 (e = 4, l = 4 > 2) is gone; 1d5/2 (e = 4, l = 2)
+  // stays.
   EXPECT_FALSE(b.contains(Orbit{0, 4, TwoJ{9}, TwoTz{-1}}));
   EXPECT_TRUE(b.contains(Orbit{1, 2, TwoJ{5}, TwoTz{-1}}));
   // Protons still even, neutron partner at +1.
@@ -171,7 +177,8 @@ TEST(SingleParticleBasis, FindIndexOfContains) {
     (void)b.index_of(e5);
     FAIL() << "no exception";
   } catch (const InputError& e) {
-    EXPECT_NE(std::string(e.what()).find("n0h11"), std::string::npos) << e.what();
+    EXPECT_NE(std::string(e.what()).find("n0h11"), std::string::npos)
+        << e.what();
   }
   EXPECT_FALSE(b.contains(Orbit{0, 0, TwoJ{2}, TwoTz{1}}));
   EXPECT_FALSE(b.contains(Orbit{0, 0, TwoJ{1}, TwoTz{0}}));
@@ -180,12 +187,14 @@ TEST(SingleParticleBasis, FindIndexOfContains) {
 
 TEST(SingleParticleBasis, SameLjtz) {
   const auto b = make_basis(4);
-  // p0d5 (index 6): same l, 2j, tz = p1d5? e = 2+2 = 4: 1d5/2 proton is in the basis.
+  // p0d5 (index 6): same l, 2j, tz = p1d5? e = 2+2 = 4: 1d5/2 proton is in the
+  // basis.
   const auto same = b.same_ljtz(OrbitIndex{6});
   std::vector<OrbitIndex> expected;
   for (int i = 0; i < b.num_orbits(); ++i) {
     const Orbit& o = b.orbit(OrbitIndex{i});
-    if (o.l == 2 && o.j2.twice == 5 && o.tz2.twice == -1) expected.push_back(OrbitIndex{i});
+    if (o.l == 2 && o.j2.twice == 5 && o.tz2.twice == -1)
+      expected.push_back(OrbitIndex{i});
   }
   ASSERT_EQ(same.size(), 2u);  // 0d5/2 and 1d5/2
   EXPECT_EQ(same, expected);
@@ -219,8 +228,8 @@ TEST(SingleParticleBasis, MaxJ2AndMaxTwoBodyJ) {
   EXPECT_EQ(make_basis(6, 2).max_j2().twice, 5);
   EXPECT_EQ(make_basis(6, 2).max_two_body_J(), 5);
   EXPECT_EQ(make_basis(6, 0).max_j2().twice, 1);
-  // unoccupied-shell cut: 6 -> highest kept is max(l <= lmax_unocc at high e, any l at e <=
-  // emax_unocc)
+  // unoccupied-shell cut: 6 -> highest kept is max(l <= lmax_unocc at high e,
+  // any l at e <= emax_unocc)
   const auto b = make_basis(6, -1, 3, 1);
   EXPECT_EQ(b.max_j2().twice, 7);  // 0f7/2 at e = 3
 }

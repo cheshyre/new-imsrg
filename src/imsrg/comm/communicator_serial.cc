@@ -57,16 +57,21 @@ void Communicator::broadcast(std::string&, int root) const {
 }
 
 std::vector<double> Communicator::allgather(double x) const { return {x}; }
-std::vector<std::int64_t> Communicator::allgather(std::int64_t x) const { return {x}; }
+std::vector<std::int64_t> Communicator::allgather(std::int64_t x) const {
+  return {x};
+}
 
-void Communicator::alltoallv(std::span<const double> send, std::span<const int> send_counts,
-                             std::span<const int> send_displs, std::span<double> recv,
+void Communicator::alltoallv(std::span<const double> send,
+                             std::span<const int> send_counts,
+                             std::span<const int> send_displs,
+                             std::span<double> recv,
                              std::span<const int> recv_counts,
                              std::span<const int> recv_displs) const {
-  IMSRG_CHECK(send_counts.size() == 1 && send_displs.size() == 1 && recv_counts.size() == 1 &&
-                  recv_displs.size() == 1,
+  IMSRG_CHECK(send_counts.size() == 1 && send_displs.size() == 1 &&
+                  recv_counts.size() == 1 && recv_displs.size() == 1,
               "alltoallv: count/displacement spans must have length size()");
-  IMSRG_CHECK(send_counts[0] == recv_counts[0], "alltoallv: send and receive counts differ");
+  IMSRG_CHECK(send_counts[0] == recv_counts[0],
+              "alltoallv: send and receive counts differ");
   IMSRG_CHECK(send_counts[0] >= 0 && send_displs[0] >= 0 && recv_displs[0] >= 0,
               "alltoallv: negative count or displacement");
   const auto n = static_cast<std::size_t>(send_counts[0]);
@@ -74,7 +79,8 @@ void Communicator::alltoallv(std::span<const double> send, std::span<const int> 
                   static_cast<std::size_t>(recv_displs[0]) + n <= recv.size(),
               "alltoallv: buffer too small");
   if (n > 0) {
-    std::memmove(recv.data() + recv_displs[0], send.data() + send_displs[0], n * sizeof(double));
+    std::memmove(recv.data() + recv_displs[0], send.data() + send_displs[0],
+                 n * sizeof(double));
   }
 }
 

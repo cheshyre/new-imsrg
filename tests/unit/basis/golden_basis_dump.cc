@@ -14,7 +14,8 @@ namespace imsrg::basis::testing {
 
 namespace {
 
-// Line-oriented reader; every failure carries the file name and the 1-based line number.
+// Line-oriented reader; every failure carries the file name and the 1-based
+// line number.
 class Reader {
  public:
   explicit Reader(const std::filesystem::path& file) : file_(file) {
@@ -25,11 +26,12 @@ class Reader {
   }
 
   [[noreturn]] void fail(const std::string& why) const {
-    throw std::runtime_error(file_.filename().string() + ":" + std::to_string(line_no_) + ": " +
-                             why);
+    throw std::runtime_error(file_.filename().string() + ":" +
+                             std::to_string(line_no_) + ": " + why);
   }
 
-  // Advances to the next line, splits it into tokens and requires the first one to be `keyword`.
+  // Advances to the next line, splits it into tokens and requires the first one
+  // to be `keyword`.
   std::vector<std::string> record(const std::string& keyword) {
     if (pos_ >= lines_.size()) {
       line_no_ = static_cast<int>(lines_.size()) + 1;
@@ -58,7 +60,8 @@ class Reader {
     char* end = nullptr;
     errno = 0;
     const long v = std::strtol(s.c_str(), &end, 10);
-    if (s.empty() || *end != '\0' || errno != 0 || v < -2147483647L || v > 2147483647L) {
+    if (s.empty() || *end != '\0' || errno != 0 || v < -2147483647L ||
+        v > 2147483647L) {
       fail("not an integer: '" + s + "'");
     }
     return static_cast<int>(v);
@@ -67,7 +70,8 @@ class Reader {
     char* end = nullptr;
     errno = 0;
     const long long v = std::strtoll(s.c_str(), &end, 10);
-    if (s.empty() || *end != '\0' || errno != 0) fail("not an integer: '" + s + "'");
+    if (s.empty() || *end != '\0' || errno != 0)
+      fail("not an integer: '" + s + "'");
     return v;
   }
   double to_double(const std::string& s) const {
@@ -79,20 +83,22 @@ class Reader {
 
   void expect_size(const std::vector<std::string>& tok, std::size_t n) const {
     if (tok.size() != n) {
-      fail("record '" + tok[0] + "' has " + std::to_string(tok.size()) + " fields, expected " +
-           std::to_string(n));
+      fail("record '" + tok[0] + "' has " + std::to_string(tok.size()) +
+           " fields, expected " + std::to_string(n));
     }
   }
   void expect_word(const std::vector<std::string>& tok, std::size_t at,
                    const std::string& name) const {
     if (tok.size() <= at || tok[at] != name) {
-      fail("record '" + tok[0] + "': expected field name '" + name + "' at position " +
-           std::to_string(at));
+      fail("record '" + tok[0] + "': expected field name '" + name +
+           "' at position " + std::to_string(at));
     }
   }
 
-  // `<count> <indices...>` starting at tok[first]; the count must equal the number of indices.
-  std::vector<int> counted_list(const std::vector<std::string>& tok, std::size_t first) const {
+  // `<count> <indices...>` starting at tok[first]; the count must equal the
+  // number of indices.
+  std::vector<int> counted_list(const std::vector<std::string>& tok,
+                                std::size_t first) const {
     if (tok.size() <= first) fail("record '" + tok[0] + "': missing count");
     const int count = to_int(tok[first]);
     if (count < 0) fail("record '" + tok[0] + "': negative count");
@@ -101,7 +107,8 @@ class Reader {
            std::to_string(tok.size() - first - 1) + " indices");
     }
     std::vector<int> v;
-    for (std::size_t i = first + 1; i < tok.size(); ++i) v.push_back(to_int(tok[i]));
+    for (std::size_t i = first + 1; i < tok.size(); ++i)
+      v.push_back(to_int(tok[i]));
     return v;
   }
 
@@ -121,7 +128,8 @@ class Reader {
   int line_no_ = 1;
 };
 
-const char* const kSubsetNames[9] = {"pp", "hh", "ph", "cc", "vc", "qc", "vv", "qv", "qq"};
+const char* const kSubsetNames[9] = {"pp", "hh", "ph", "cc", "vc",
+                                     "qc", "vv", "qv", "qq"};
 
 }  // namespace
 
@@ -131,7 +139,8 @@ GoldenBasisDump read_golden_basis_dump(const std::filesystem::path& file) {
 
   if (r.empty_file()) r.fail("empty file");
   r.record("#");
-  if (r.raw_line() != "# imsrg-basis-dump v1") r.fail("first line must be '# imsrg-basis-dump v1'");
+  if (r.raw_line() != "# imsrg-basis-dump v1")
+    r.fail("first line must be '# imsrg-basis-dump v1'");
 
   r.record("source");
   d.source = r.raw_line().size() > 7 ? r.raw_line().substr(7) : "";
@@ -160,7 +169,8 @@ GoldenBasisDump read_golden_basis_dump(const std::filesystem::path& file) {
   {
     const auto t = r.record("counts");
     r.expect_size(t, 13);
-    const char* names[6] = {"Aref", "Zref", "Acore", "Zcore", "target_mass", "target_Z"};
+    const char* names[6] = {"Aref",  "Zref",        "Acore",
+                            "Zcore", "target_mass", "target_Z"};
     for (std::size_t i = 0; i < 6; ++i) r.expect_word(t, 1 + 2 * i, names[i]);
     d.Aref = r.to_double(t[2]);
     d.Zref = r.to_double(t[4]);
@@ -195,7 +205,8 @@ GoldenBasisDump read_golden_basis_dump(const std::filesystem::path& file) {
     const auto t = r.record("ket");
     r.expect_size(t, 4);
     if (r.to_int(t[1]) != i) {
-      r.fail("ket index " + t[1] + " out of order, expected " + std::to_string(i));
+      r.fail("ket index " + t[1] + " out of order, expected " +
+             std::to_string(i));
     }
     d.kets.emplace_back(r.to_int(t[2]), r.to_int(t[3]));
   }
@@ -210,19 +221,24 @@ GoldenBasisDump read_golden_basis_dump(const std::filesystem::path& file) {
     c.parity = r.to_int(t[3]);
     c.Tz = r.to_int(t[4]);
     c.nkets = r.to_int(t[5]);
-    if (c.ch != i) r.fail("channel index out of order, expected " + std::to_string(i));
+    if (c.ch != i)
+      r.fail("channel index out of order, expected " + std::to_string(i));
     t = r.record("channel_kets");
-    if (t.size() < 2 || r.to_int(t[1]) != c.ch) r.fail("channel_kets for the wrong channel");
+    if (t.size() < 2 || r.to_int(t[1]) != c.ch)
+      r.fail("channel_kets for the wrong channel");
     for (std::size_t k = 2; k < t.size(); ++k) c.kets.push_back(r.to_int(t[k]));
     if (static_cast<int>(c.kets.size()) != c.nkets) {
-      r.fail("channel " + std::to_string(c.ch) + " declares " + std::to_string(c.nkets) +
-             " kets but channel_kets lists " + std::to_string(c.kets.size()));
+      r.fail("channel " + std::to_string(c.ch) + " declares " +
+             std::to_string(c.nkets) + " kets but channel_kets lists " +
+             std::to_string(c.kets.size()));
     }
     for (const char* name : kSubsetNames) {
       t = r.record("channel_subset");
-      if (t.size() < 4 || r.to_int(t[1]) != c.ch) r.fail("channel_subset for the wrong channel");
+      if (t.size() < 4 || r.to_int(t[1]) != c.ch)
+        r.fail("channel_subset for the wrong channel");
       if (t[2] != name) {
-        r.fail(std::string("expected subset '") + name + "', found '" + t[2] + "'");
+        r.fail(std::string("expected subset '") + name + "', found '" + t[2] +
+               "'");
       }
       c.subsets[name] = r.counted_list(t, 3);
     }
@@ -239,13 +255,16 @@ GoldenBasisDump read_golden_basis_dump(const std::filesystem::path& file) {
     c.parity = r.to_int(t[3]);
     c.Tz = r.to_int(t[4]);
     c.nkets = r.to_int(t[5]);
-    if (c.ch != i) r.fail("ph_channel index out of order, expected " + std::to_string(i));
+    if (c.ch != i)
+      r.fail("ph_channel index out of order, expected " + std::to_string(i));
     t = r.record("ph_channel_kets");
-    if (t.size() < 2 || r.to_int(t[1]) != c.ch) r.fail("ph_channel_kets for the wrong channel");
+    if (t.size() < 2 || r.to_int(t[1]) != c.ch)
+      r.fail("ph_channel_kets for the wrong channel");
     for (std::size_t k = 2; k < t.size(); ++k) c.kets.push_back(r.to_int(t[k]));
     if (static_cast<int>(c.kets.size()) != c.nkets) {
-      r.fail("ph_channel " + std::to_string(c.ch) + " declares " + std::to_string(c.nkets) +
-             " kets but ph_channel_kets lists " + std::to_string(c.kets.size()));
+      r.fail("ph_channel " + std::to_string(c.ch) + " declares " +
+             std::to_string(c.nkets) + " kets but ph_channel_kets lists " +
+             std::to_string(c.kets.size()));
     }
     d.ph_channels.push_back(std::move(c));
   }
@@ -260,7 +279,9 @@ GoldenBasisDump read_golden_basis_dump(const std::filesystem::path& file) {
     c.parity = r.to_int(t[3]);
     c.twoTz = r.to_int(t[4]);
     c.nkets = r.to_int(t[5]);
-    if (c.ch != i) r.fail("threebody_channel index out of order, expected " + std::to_string(i));
+    if (c.ch != i)
+      r.fail("threebody_channel index out of order, expected " +
+             std::to_string(i));
     d.channels3.push_back(c);
   }
   {
@@ -282,7 +303,8 @@ std::filesystem::path golden_basis_dir() {
 std::vector<std::string> golden_basis_files() {
   std::vector<std::string> names;
   for (const char* e : {"emax2", "emax4"}) {
-    for (const char* s : {"He4", "Ne20", "Ne20_sd-shell", "O16", "p-shell", "sd-shell"}) {
+    for (const char* s :
+         {"He4", "Ne20", "Ne20_sd-shell", "O16", "p-shell", "sd-shell"}) {
       names.push_back(std::string(e) + "_" + s + ".txt");
     }
   }

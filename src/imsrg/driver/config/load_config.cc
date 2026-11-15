@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Config loading entry point: sources -> raw tree -> resolved, validated RunConfig.
+// Config loading entry point: sources -> raw tree -> resolved, validated
+// RunConfig.
 #include "imsrg/driver/config/load_config.h"
 
 #include <algorithm>
@@ -40,14 +41,16 @@ void append(ConfigIssues& dst, ConfigIssues&& src) {
 
 }  // namespace
 
-Expected<RunConfig, ConfigIssues> load_config(const ConfigSources& src, const LoadOptions& opt) {
-  const int n_sources =
-      (src.config_file ? 1 : 0) + (src.config_text ? 1 : 0) + (src.legacy_args.empty() ? 0 : 1);
+Expected<RunConfig, ConfigIssues> load_config(const ConfigSources& src,
+                                              const LoadOptions& opt) {
+  const int n_sources = (src.config_file ? 1 : 0) + (src.config_text ? 1 : 0) +
+                        (src.legacy_args.empty() ? 0 : 1);
   if (n_sources > 1) {
-    return Unexpected<ConfigIssues>{ConfigIssues{
-        make_error("E-CLI-MIX", "",
-                   "use exactly one of a config file, config text or legacy arguments; got " +
-                       std::to_string(n_sources))}};
+    return Unexpected<ConfigIssues>{
+        ConfigIssues{make_error("E-CLI-MIX", "",
+                                "use exactly one of a config file, config text "
+                                "or legacy arguments; got " +
+                                    std::to_string(n_sources))}};
   }
 
   ConfigIssues issues;
@@ -58,12 +61,15 @@ Expected<RunConfig, ConfigIssues> load_config(const ConfigSources& src, const Lo
   if (src.config_file || src.config_text) {
     append(issues, src.config_file
                        ? read_toml_file(*src.config_file, tree)
-                       : read_toml_string(*src.config_text, src.config_text_name, tree));
-    // An unreadable or unparsable document yields no tree: resolving it would only add
-    // consequential errors (missing required keys) to the one that matters.
-    const bool unreadable = std::any_of(issues.begin(), issues.end(), [](const ConfigIssue& i) {
-      return i.code == "E-FILE" || i.code == "E-TOML-SYNTAX";
-    });
+                       : read_toml_string(*src.config_text,
+                                          src.config_text_name, tree));
+    // An unreadable or unparsable document yields no tree: resolving it would
+    // only add consequential errors (missing required keys) to the one that
+    // matters.
+    const bool unreadable =
+        std::any_of(issues.begin(), issues.end(), [](const ConfigIssue& i) {
+          return i.code == "E-FILE" || i.code == "E-TOML-SYNTAX";
+        });
     if (unreadable) return Unexpected<ConfigIssues>{std::move(issues)};
   } else if (legacy) {
     auto t = translate_legacy(std::span<const std::string>(src.legacy_args));

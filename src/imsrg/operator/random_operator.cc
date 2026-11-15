@@ -35,13 +35,16 @@ class SplitMix64 {
   std::uint64_t x_;
 };
 
-/// Fills the elements (a, b) of an n x n matrix in the documented order and calls
-/// `store(a, b, value)` for each drawn element, with the triangle rules of `h`.
+/// Fills the elements (a, b) of an n x n matrix in the documented order and
+/// calls `store(a, b, value)` for each drawn element, with the triangle rules
+/// of `h`.
 template <class Store>
 void draw_matrix(SplitMix64& rng, std::int32_t n, Hermiticity h, double scale,
-                 bool (*allowed)(void*, std::int32_t, std::int32_t), void* ctx, Store&& store) {
+                 bool (*allowed)(void*, std::int32_t, std::int32_t), void* ctx,
+                 Store&& store) {
   for (std::int32_t a = 0; a < n; ++a) {
-    for (std::int32_t b = (h == Hermiticity::NonHermitian ? 0 : a); b < n; ++b) {
+    for (std::int32_t b = (h == Hermiticity::NonHermitian ? 0 : a); b < n;
+         ++b) {
       if (h == Hermiticity::AntiHermitian && a == b) continue;
       if (allowed != nullptr && !allowed(ctx, a, b)) continue;
       store(a, b, rng.uniform(scale));
@@ -51,7 +54,8 @@ void draw_matrix(SplitMix64& rng, std::int32_t n, Hermiticity h, double scale,
 
 }  // namespace
 
-Operator random_operator(std::shared_ptr<const basis::ModelSpace> ms, const OperatorSpec& spec,
+Operator random_operator(std::shared_ptr<const basis::ModelSpace> ms,
+                         const OperatorSpec& spec,
                          const RandomOperatorOptions& options) {
   Operator op(std::move(ms), spec);
   SplitMix64 rng(options.seed);
@@ -75,8 +79,9 @@ Operator random_operator(std::shared_ptr<const basis::ModelSpace> ms, const Oper
               [&](std::int32_t a, std::int32_t b, double v) {
                 op.one_body().set_element(OrbitIndex{a}, OrbitIndex{b}, v);
                 if (a != b && h != Hermiticity::NonHermitian) {
-                  op.one_body().set_element(OrbitIndex{b}, OrbitIndex{a},
-                                            static_cast<double>(hermiticity_sign(h)) * v);
+                  op.one_body().set_element(
+                      OrbitIndex{b}, OrbitIndex{a},
+                      static_cast<double>(hermiticity_sign(h)) * v);
                 }
               });
 
@@ -86,14 +91,15 @@ Operator random_operator(std::shared_ptr<const basis::ModelSpace> ms, const Oper
     for (std::int32_t c = 0; c < chans.num_channels(); ++c) {
       const ChannelIndex ch{c};
       const std::int32_t n = chans.channel(ch).num_kets;
-      draw_matrix(rng, n, h, options.two_body_scale, nullptr, nullptr,
-                  [&](std::int32_t i, std::int32_t j, double v) {
-                    op.two_body().set(ch, ch, LocalKetIndex{i}, LocalKetIndex{j}, v);
-                    if (i != j && h != Hermiticity::NonHermitian) {
-                      op.two_body().set(ch, ch, LocalKetIndex{j}, LocalKetIndex{i},
-                                        static_cast<double>(hermiticity_sign(h)) * v);
-                    }
-                  });
+      draw_matrix(
+          rng, n, h, options.two_body_scale, nullptr, nullptr,
+          [&](std::int32_t i, std::int32_t j, double v) {
+            op.two_body().set(ch, ch, LocalKetIndex{i}, LocalKetIndex{j}, v);
+            if (i != j && h != Hermiticity::NonHermitian) {
+              op.two_body().set(ch, ch, LocalKetIndex{j}, LocalKetIndex{i},
+                                static_cast<double>(hermiticity_sign(h)) * v);
+            }
+          });
     }
   }
   op.sync_to_device();

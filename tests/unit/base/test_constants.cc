@@ -17,7 +17,8 @@ namespace {
 
 namespace c = imsrg::constants;
 
-// Reference name -> our value, for the constants written as a plain numeric literal.
+// Reference name -> our value, for the constants written as a plain numeric
+// literal.
 const std::map<std::string, double>& literal_table() {
   static const std::map<std::string, double> t = {
       {"HBARC", c::hbarc},
@@ -79,21 +80,24 @@ TEST(Constants, InvSqrt2IsTruncatedReferenceValue) {
 TEST(Constants, MatchReferenceFile) {
   std::ifstream in(IMSRG_REFERENCE_PHYSICAL_CONSTANTS);
   if (!in) GTEST_SKIP() << "reference file not available";
-  const std::regex line_re(R"(^const double\s+([A-Z0-9_]+)\s*=\s*([-+0-9.eE]+)\s*;)");
+  const std::regex line_re(
+      R"(^const double\s+([A-Z0-9_]+)\s*=\s*([-+0-9.eE]+)\s*;)");
   std::size_t matched = 0;
   std::string line;
   while (std::getline(in, line)) {
     std::smatch m;
     if (!std::regex_search(line, m, line_re)) continue;
     const auto it = literal_table().find(m[1].str());
-    ASSERT_NE(it, literal_table().end()) << "constant not covered: " << m[1].str();
+    ASSERT_NE(it, literal_table().end())
+        << "constant not covered: " << m[1].str();
     const double ref = std::strtod(m[2].str().c_str(), nullptr);
-    EXPECT_EQ(std::bit_cast<std::uint64_t>(it->second), std::bit_cast<std::uint64_t>(ref))
+    EXPECT_EQ(std::bit_cast<std::uint64_t>(it->second),
+              std::bit_cast<std::uint64_t>(ref))
         << m[1].str();
     ++matched;
   }
-  // Every plain-literal constant of the reference was found (M_NUCLEON and ALPHA_FS are
-  // expressions and covered above).
+  // Every plain-literal constant of the reference was found (M_NUCLEON and
+  // ALPHA_FS are expressions and covered above).
   EXPECT_EQ(matched, literal_table().size());
 }
 

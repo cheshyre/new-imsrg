@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Norms of every golden OperatorDump against the imsrg-devel norms recorded next to it
-// (design/30 section 2: norms on fixed inputs agree to 1e-10 relative; the actual deviations are
-// printed). The dumps are read with our reader, so this also checks that reading loses nothing.
+// Norms of every golden OperatorDump against the imsrg-devel norms recorded
+// next to it (design/30 section 2: norms on fixed inputs agree to 1e-10
+// relative; the actual deviations are printed). The dumps are read with our
+// reader, so this also checks that reading loses nothing.
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -40,17 +41,19 @@ std::string slurp(const fs::path& p) {
   return ss.str();
 }
 
-// Every norms object written by the harness (`norms_json`) has the same five fields in the same
-// order, so a regex over the flat JSON text is enough.
+// Every norms object written by the harness (`norms_json`) has the same five
+// fields in the same order, so a regex over the flat JSON text is enough.
 std::map<std::string, GoldenNorms> parse_norms(const std::string& text) {
   static const std::regex re(
       R"re("([A-Za-z0-9_]+)":\s*\{\s*"zero_body":\s*([^,\s]+),\s*"one_body_norm":\s*([^,\s]+),)re"
       R"re(\s*"two_body_norm":\s*([^,\s]+),\s*"three_body_norm":\s*([^,\s]+),\s*"norm":\s*([^,\s}]+))re");
   std::map<std::string, GoldenNorms> out;
-  for (std::sregex_iterator it(text.begin(), text.end(), re), end; it != end; ++it) {
+  for (std::sregex_iterator it(text.begin(), text.end(), re), end; it != end;
+       ++it) {
     const auto& m = *it;
-    out[m[1].str()] = {std::stod(m[2].str()), std::stod(m[3].str()), std::stod(m[4].str()),
-                       std::stod(m[5].str()), std::stod(m[6].str())};
+    out[m[1].str()] = {std::stod(m[2].str()), std::stod(m[3].str()),
+                       std::stod(m[4].str()), std::stod(m[5].str()),
+                       std::stod(m[6].str())};
   }
   return out;
 }
@@ -63,7 +66,8 @@ struct Case {
 std::vector<Case> golden_cases() {
   const fs::path root = IMSRG_GOLDEN_DIR;
   std::vector<Case> cases;
-  for (const char* dir : {"hamiltonian/emax2_O16", "commutator/emax2_O16", "operator/emax2"}) {
+  for (const char* dir :
+       {"hamiltonian/emax2_O16", "commutator/emax2_O16", "operator/emax2"}) {
     const auto norms = parse_norms(slurp(root / dir / "norms.json"));
     for (const auto& e : fs::directory_iterator(root / dir)) {
       if (e.path().extension() != ".dump") continue;
@@ -89,13 +93,15 @@ double rel_dev(double ours, double ref) {
 
 TEST(OperatorGoldenNorms, EveryGoldenDumpMatchesImsrgDevelNorms) {
   const auto cases = golden_cases();
-  ASSERT_GE(cases.size(), 35u) << "golden dumps with recorded norms are missing";
+  ASSERT_GE(cases.size(), 35u)
+      << "golden dumps with recorded norms are missing";
   double worst = 0.0;
   std::string worst_name;
   for (const auto& c : cases) {
     SCOPED_TRACE(c.dump.string());
     const auto header = op::read_operator_dump_header(c.dump);
-    const auto op = op::read_operator_dump(c.dump, op::model_space_for_dump(header));
+    const auto op =
+        op::read_operator_dump(c.dump, op::model_space_for_dump(header));
     const double d0 = rel_dev(op.zero_body(), c.golden.zero_body);
     const double d1 = rel_dev(op::one_body_norm(op), c.golden.one_body);
     const double d2 = rel_dev(op::two_body_norm(op), c.golden.two_body);
@@ -112,6 +118,6 @@ TEST(OperatorGoldenNorms, EveryGoldenDumpMatchesImsrgDevelNorms) {
       worst_name = c.dump.filename().string();
     }
   }
-  std::printf("[golden norms] %zu dumps, max relative deviation %.3g (%s)\n", cases.size(), worst,
-              worst_name.c_str());
+  std::printf("[golden norms] %zu dumps, max relative deviation %.3g (%s)\n",
+              cases.size(), worst, worst_name.c_str());
 }

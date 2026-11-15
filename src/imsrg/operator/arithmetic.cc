@@ -12,10 +12,13 @@ namespace imsrg::op {
 
 Operator& axpy(double a, const Operator& x, Operator& y) {
   IMSRG_CHECK(!x.empty() && !y.empty(), "axpy: empty operator");
-  IMSRG_CHECK(same_model_space(x, y), "axpy: operators live on different model spaces");
-  IMSRG_CHECK(x.spec().same_symmetry(y.spec()), "axpy: operators differ in symmetry");
+  IMSRG_CHECK(same_model_space(x, y),
+              "axpy: operators live on different model spaces");
+  IMSRG_CHECK(x.spec().same_symmetry(y.spec()),
+              "axpy: operators differ in symmetry");
   IMSRG_CHECK(x.spec().particle_rank <= y.spec().particle_rank,
-              "axpy: y must hold every part of x (particle_rank of x exceeds that of y)");
+              "axpy: y must hold every part of x (particle_rank of x exceeds "
+              "that of y)");
   if (a == 0.0) {
     return y;
   }
@@ -23,7 +26,8 @@ Operator& axpy(double a, const Operator& x, Operator& y) {
   detail::axpy(a, x.one_body().buffer(), y.one_body().buffer());
   if (x.two_body().allocated()) {
     IMSRG_CHECK(y.two_body().allocated(), "axpy: y has no two-body part");
-    detail::axpy(a, x.two_body().matrix().buffer(), y.two_body().matrix().buffer());
+    detail::axpy(a, x.two_body().matrix().buffer(),
+                 y.two_body().matrix().buffer());
   }
   y.set_hermiticity(combined_hermiticity(y.hermiticity(), x.hermiticity()));
   return y;
@@ -39,7 +43,9 @@ Operator& scale(Operator& x, double a) {
 }
 
 Operator& operator+=(Operator& y, const Operator& x) { return axpy(1.0, x, y); }
-Operator& operator-=(Operator& y, const Operator& x) { return axpy(-1.0, x, y); }
+Operator& operator-=(Operator& y, const Operator& x) {
+  return axpy(-1.0, x, y);
+}
 Operator& operator*=(Operator& x, double a) { return scale(x, a); }
 Operator& operator/=(Operator& x, double a) {
   IMSRG_CHECK(a != 0.0, "operator/=: division by zero");
@@ -91,8 +97,8 @@ Operator operator/(const Operator& x, double a) {
   return r;
 }
 
-// A nonzero constant is Hermitian, so adding it to an anti-Hermitian operator gives a
-// non-Hermitian one.
+// A nonzero constant is Hermitian, so adding it to an anti-Hermitian operator
+// gives a non-Hermitian one.
 Operator& operator+=(Operator& x, double c) {
   x.zero_body() += c;
   if (c != 0.0 && x.hermiticity() == Hermiticity::AntiHermitian) {

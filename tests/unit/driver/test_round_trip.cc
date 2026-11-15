@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Round-trip tests of the resolved-config writer (design/16 sections 1.3, 6.3): for every
-// loadable config cfg1, load_config(to_toml(cfg1)) succeeds, equals cfg1, and writes the same text.
+// Round-trip tests of the resolved-config writer (design/16 sections 1.3, 6.3):
+// for every loadable config cfg1, load_config(to_toml(cfg1)) succeeds, equals
+// cfg1, and writes the same text.
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -40,18 +41,20 @@ std::string slurp(const std::string& path) {
   return ss.str();
 }
 
-Expected<RunConfig, ConfigIssues> load_text(const std::string& text, const std::string& name) {
+Expected<RunConfig, ConfigIssues> load_text(const std::string& text,
+                                            const std::string& name) {
   ConfigSources s;
   s.config_text = text;
   s.config_text_name = name;
   return load_config(s, LoadOptions{.check_files = false});
 }
 
-/// Checks the round-trip property of `text`; returns the loaded config's written TOML (or "" on
-/// failure of the property, after reporting it).
+/// Checks the round-trip property of `text`; returns the loaded config's
+/// written TOML (or "" on failure of the property, after reporting it).
 void expect_round_trip(const std::string& text, const std::string& name) {
   auto r1 = load_text(text, name);
-  ASSERT_TRUE(r1.has_value()) << name << " does not load:\n" << issues_text(r1.error());
+  ASSERT_TRUE(r1.has_value()) << name << " does not load:\n"
+                              << issues_text(r1.error());
   const RunConfig& cfg1 = r1.value();
   const std::string written = to_toml(cfg1, true);
   auto r2 = load_text(written, name + " (written)");
@@ -65,20 +68,25 @@ void expect_round_trip(const std::string& text, const std::string& name) {
                             << text << "\nwritten:\n"
                             << written << "\nrewritten:\n"
                             << to_toml(cfg2, false);
-  EXPECT_EQ(to_toml(cfg2, false), to_toml(cfg1, false)) << name << "\noriginal text:\n" << text;
+  EXPECT_EQ(to_toml(cfg2, false), to_toml(cfg1, false))
+      << name << "\noriginal text:\n"
+      << text;
 }
 
-// ---- the four design examples ------------------------------------------------------------
+// ---- the four design examples
+// ------------------------------------------------------------
 
 TEST(RoundTrip, DesignExamples) {
-  for (const char* f : {"a_o16_imsrg2.toml", "b_o16_imsrg2_3n.toml", "c_o16_sd_shell.toml",
-                        "d_o16_imsrg3_n7.toml"}) {
+  for (const char* f : {"a_o16_imsrg2.toml", "b_o16_imsrg2_3n.toml",
+                        "c_o16_sd_shell.toml", "d_o16_imsrg3_n7.toml"}) {
     SCOPED_TRACE(f);
-    expect_round_trip(slurp(std::string(IMSRG_SOURCE_DIR) + "/examples/config/" + f), f);
+    expect_round_trip(
+        slurp(std::string(IMSRG_SOURCE_DIR) + "/examples/config/" + f), f);
   }
 }
 
-// ---- every key set to a valid non-default value --------------------------------------------
+// ---- every key set to a valid non-default value
+// --------------------------------------------
 
 const char* const kAllKeys = R"toml(
 [run]
@@ -194,7 +202,8 @@ write_omega = true
 spwf = ["valence", "p0s1"]
 )toml";
 
-/// Paths of the keys written in `toml` ("table.key"), by a line scan of the writer's output.
+/// Paths of the keys written in `toml` ("table.key"), by a line scan of the
+/// writer's output.
 std::set<std::string> written_key_paths(const std::string& toml) {
   std::set<std::string> paths;
   std::istringstream in(toml);
@@ -218,35 +227,41 @@ TEST(RoundTrip, EveryKeySetToANonDefaultValue) {
   auto r = load_text(kAllKeys, "all_keys");
   ASSERT_TRUE(r.has_value()) << issues_text(r.error());
   const RunConfig& cfg = r.value();
-  EXPECT_TRUE(cfg.provenance.warnings.empty()) << issues_text(cfg.provenance.warnings);
+  EXPECT_TRUE(cfg.provenance.warnings.empty())
+      << issues_text(cfg.provenance.warnings);
   expect_round_trip(kAllKeys, "all_keys");
 
   const std::string written = to_toml(cfg, false);
   const std::set<std::string> present = written_key_paths(written);
   for (const KeyInfo& k : schema_keys()) {
     const std::string path(k.path);
-    // Deliberately left out: planned keys (default only) and valence.custom (exclusive with
-    // valence.space).
+    // Deliberately left out: planned keys (default only) and valence.custom
+    // (exclusive with valence.space).
     if (k.phase == Phase::Planned || path == "valence.custom") continue;
-    EXPECT_TRUE(present.count(path) == 1) << "key not in the written output: " << path;
+    EXPECT_TRUE(present.count(path) == 1)
+        << "key not in the written output: " << path;
   }
   // Spot-check some values of the config itself.
   EXPECT_EQ(cfg.operators.list.size(), 4u);
   ASSERT_EQ(cfg.operators.from_file.size(), 1u);
   EXPECT_EQ(cfg.operators.from_file[0].rank, 0);
   EXPECT_TRUE(cfg.imsrg3.in_flow);
-  EXPECT_EQ(cfg.imsrg.denominator.delta_orbit, std::optional<std::string>("all"));
+  EXPECT_EQ(cfg.imsrg.denominator.delta_orbit,
+            std::optional<std::string>("all"));
   EXPECT_EQ(cfg.output.spwf.size(), 2u);
   EXPECT_TRUE(cfg.imsrg.space.has_value());
   EXPECT_TRUE(cfg.interaction.three_body.has_value());
 }
 
-// A one-stage valence-space run: generator.valence is inert, so the writer leaves it out; an
-// explicit value would be V-41 on re-reading (found in review).
+// A one-stage valence-space run: generator.valence is inert, so the writer
+// leaves it out; an explicit value would be V-41 on re-reading (found in
+// review).
 TEST(RoundTrip, OneStageValenceSpaceRunReloads) {
   expect_round_trip(
-      "[basis]\nemax = 4\nhw = 20.0\n[reference]\nnucleus = \"O16\"\n[valence]\n"
-      "space = \"sd-shell\"\n[interaction.two_body]\nfile = \"x.me2j\"\ne1max = 14\n"
+      "[basis]\nemax = 4\nhw = 20.0\n[reference]\nnucleus = "
+      "\"O16\"\n[valence]\n"
+      "space = \"sd-shell\"\n[interaction.two_body]\nfile = \"x.me2j\"\ne1max "
+      "= 14\n"
       "[imsrg]\nsteps = 1\n[imsrg.generator]\ncore = \"shell_model_atan\"\n",
       "one_stage_toml");
 
@@ -255,7 +270,8 @@ TEST(RoundTrip, OneStageValenceSpaceRunReloads) {
                    "reference=O16", "valence_space=sd-shell", "nsteps=1"};
   auto legacy = load_config(s, LoadOptions{.check_files = false});
   ASSERT_TRUE(legacy.has_value()) << issues_text(legacy.error());
-  EXPECT_EQ(to_toml(legacy.value(), false).find("\nvalence = "), std::string::npos);
+  EXPECT_EQ(to_toml(legacy.value(), false).find("\nvalence = "),
+            std::string::npos);
   expect_round_trip(to_toml(legacy.value(), false), "one_stage_legacy");
 }
 
@@ -264,21 +280,25 @@ TEST(RoundTrip, SpellingsOfOneOperatorWriteTheSameCanonicalName) {
       "[basis]\nemax = 2\nhw = 16.0\n[reference]\nnucleus = \"O16\"\n"
       "[interaction.two_body]\nfile = \"f.me2j\"\ne1max = 4\n";
   auto a = load_text(base + "[operators]\nlist = [\"rhop_0.2\"]\n", "a");
-  auto b = load_text(base + "[operators]\nlist = [{ name = \"rhop\", r = 0.2 }]\n", "b");
+  auto b = load_text(
+      base + "[operators]\nlist = [{ name = \"rhop\", r = 0.2 }]\n", "b");
   ASSERT_TRUE(a.has_value()) << issues_text(a.error());
   ASSERT_TRUE(b.has_value()) << issues_text(b.error());
   EXPECT_TRUE(a.value() == b.value());
   EXPECT_EQ(to_toml(a.value(), false), to_toml(b.value(), false));
 }
 
-// ---- randomised ----------------------------------------------------------------------------
+// ---- randomised
+// ----------------------------------------------------------------------------
 
 class Gen {
  public:
   explicit Gen(std::uint64_t seed) : rng_(seed) {}
 
   double u() { return std::uniform_real_distribution<double>(0.0, 1.0)(rng_); }
-  int in(int lo, int hi) { return std::uniform_int_distribution<int>(lo, hi)(rng_); }
+  int in(int lo, int hi) {
+    return std::uniform_int_distribution<int>(lo, hi)(rng_);
+  }
   bool coin(double p = 0.5) { return u() < p; }
   template <class T>
   const T& pick(const std::vector<T>& v) {
@@ -289,7 +309,8 @@ class Gen {
     char buf[64];
     std::snprintf(buf, sizeof buf, "%.17g", x);
     std::string s = buf;
-    if (s.find_first_of(".eEn") == std::string::npos) s += ".0";  // keep it a TOML float
+    if (s.find_first_of(".eEn") == std::string::npos)
+      s += ".0";  // keep it a TOML float
     return s;
   }
   double any_hw() { return 0.1 + u() * 7.3 * 5; }
@@ -313,7 +334,9 @@ class Gen {
     const bool shell_valence = valence;
 
     t << "[run]\n";
-    if (coin()) t << "log_level = \"" << pick<std::string>({"quiet", "normal", "debug"}) << "\"\n";
+    if (coin())
+      t << "log_level = \"" << pick<std::string>({"quiet", "normal", "debug"})
+        << "\"\n";
     const bool scratch = coin(0.3);
     if (scratch) t << "scratch_dir = \"/tmp/imsrg_scratch\"\n";
 
@@ -321,52 +344,68 @@ class Gen {
     if (coin()) t << "e3max = " << in(emax, 3 * emax + 3) << "\n";
     if (coin()) t << "lmax = " << in(0, emax) << "\n";
     if (coin(0.3)) t << "emax_unocc = " << in(0, emax) << "\n";
-    if (coin(0.3)) t << "kind = \"" << pick<std::string>({"hf", "oscillator"}) << "\"\n";
+    if (coin(0.3))
+      t << "kind = \"" << pick<std::string>({"hf", "oscillator"}) << "\"\n";
 
     t << "[reference]\nnucleus = \"" << nucleus << "\"\n";
     if (valence) t << "[valence]\nspace = \"" << space << "\"\n";
 
     t << "[hamiltonian]\n";
-    if (coin()) t << "kinetic = \"" << pick<std::string>({"intrinsic", "lab", "none"}) << "\"\n";
+    if (coin())
+      t << "kinetic = \"" << pick<std::string>({"intrinsic", "lab", "none"})
+        << "\"\n";
     if (coin()) t << "beta_cm = " << num(0.1 + u() * 2.0) << "\n";
     if (coin()) t << "beta_cm_hw = " << num(any_hw()) << "\n";
-    if (coin()) t << "nucleon_mass_correction = " << (coin() ? "true" : "false") << "\n";
+    if (coin())
+      t << "nucleon_mass_correction = " << (coin() ? "true" : "false") << "\n";
 
-    t << "[interaction.two_body]\nfile = \"vnn.me2j.gz\"\ne1max = " << e1max << "\n";
+    t << "[interaction.two_body]\nfile = \"vnn.me2j.gz\"\ne1max = " << e1max
+      << "\n";
     if (coin()) t << "e2max = " << in(emax, 2 * e1max) << "\n";
     if (coin()) t << "lmax = " << in(0, e1max) << "\n";
 
     if (three) {
       const int e3 = in(emax, 3 * emax + 6);
-      t << "[interaction.three_body]\nfile = \"v3n.bin\"\ne1max = " << (emax + in(0, 2))
-        << "\ne3max = " << e3 << "\n";
-      if (coin()) t << "type = \"" << pick<std::string>({"full", "no2b"}) << "\"\n";
+      t << "[interaction.three_body]\nfile = \"v3n.bin\"\ne1max = "
+        << (emax + in(0, 2)) << "\ne3max = " << e3 << "\n";
+      if (coin())
+        t << "type = \"" << pick<std::string>({"full", "no2b"}) << "\"\n";
       if (coin()) t << "e2max = " << in(emax, 2 * emax + 2) << "\n";
       if (coin()) t << "store_pn = " << (coin() ? "true" : "false") << "\n";
     }
 
     t << "[hartree_fock]\n";
-    if (coin()) t << "freeze_occupations = " << (coin() ? "true" : "false") << "\n";
+    if (coin())
+      t << "freeze_occupations = " << (coin() ? "true" : "false") << "\n";
     t << "[natural_orbitals]\n";
-    if (coin()) t << "order = \"" << pick<std::string>({"occupation", "energy"}) << "\"\n";
+    if (coin())
+      t << "order = \"" << pick<std::string>({"occupation", "energy"})
+        << "\"\n";
 
     t << "[imsrg]\n";
-    if (coin()) t << "method = \"" << pick<std::string>({"magnus", "flow", "flow_rk4"}) << "\"\n";
-    if (coin()) t << "use_brueckner_bch = " << (coin() ? "true" : "false") << "\n";
-    if (coin()) t << "perturbative_triples = " << (coin() ? "true" : "false") << "\n";
+    if (coin())
+      t << "method = \"" << pick<std::string>({"magnus", "flow", "flow_rk4"})
+        << "\"\n";
+    if (coin())
+      t << "use_brueckner_bch = " << (coin() ? "true" : "false") << "\n";
+    if (coin())
+      t << "perturbative_triples = " << (coin() ? "true" : "false") << "\n";
     t << "[imsrg.generator]\n";
     if (coin()) {
-      t << "core = \"" << pick<std::string>({"white", "atan", "imaginary_time", "wegner"})
+      t << "core = \""
+        << pick<std::string>({"white", "atan", "imaginary_time", "wegner"})
         << "\"\n";
     }
     if (shell_valence && coin()) {
       t << "valence = \""
-        << pick<std::string>({"shell_model", "shell_model_atan", "shell_model_imaginary_time"})
+        << pick<std::string>({"shell_model", "shell_model_atan",
+                              "shell_model_imaginary_time"})
         << "\"\n";
     }
     t << "[imsrg.denominator]\n";
     if (coin())
-      t << "partitioning = \"" << pick<std::string>({"epstein_nesbet", "moller_plesset"}) << "\"\n";
+      t << "partitioning = \""
+        << pick<std::string>({"epstein_nesbet", "moller_plesset"}) << "\"\n";
     if (coin()) t << "delta = " << num(decade()) << "\ndelta_orbit = \"all\"\n";
     t << "[imsrg.step]\n";
     if (coin()) t << "smax = " << num(1.0 + u() * 300.0) << "\n";
@@ -381,7 +420,8 @@ class Gen {
                     : pick<std::string>({"memory", "discard"}))
         << "\"\n";
     }
-    if (coin()) t << "hunter_gatherer = " << (coin() ? "true" : "false") << "\n";
+    if (coin())
+      t << "hunter_gatherer = " << (coin() ? "true" : "false") << "\n";
     if (coin(0.3)) {
       t << "[imsrg.space]\nemax = " << in(0, emax) << "\n";
       if (coin()) t << "e2max = " << in(0, 2 * emax) << "\n";
@@ -389,7 +429,8 @@ class Gen {
 
     if (three && coin(0.5)) {
       t << "[imsrg3]\n" << (coin() ? "in_flow" : "at_end") << " = true\n";
-      if (coin()) t << "variant = \"" << pick<std::string>({"full", "n7"}) << "\"\n";
+      if (coin())
+        t << "variant = \"" << pick<std::string>({"full", "n7"}) << "\"\n";
       if (coin()) t << "factorized = " << (coin() ? "true" : "false") << "\n";
       if (coin()) t << "threebody_threshold = " << num(decade()) << "\n";
       if (coin()) t << "de3max = " << num(1.0 + u() * 50.0) << "\n";
@@ -398,11 +439,13 @@ class Gen {
 
     if (coin(0.7)) {
       const std::vector<std::string> catalog = {
-          "Trel", "TCM", "Rp2",   "Rn2",    "Rm2",      "R2CM",          "E0",
-          "Iso2", "Tz2", "LdotS", "HCM_16", "rhop_0.2", "OBD_p0s1_p0s1", "rhon_1.5"};
+          "Trel",   "TCM",      "Rp2",           "Rn2",     "Rm2",
+          "R2CM",   "E0",       "Iso2",          "Tz2",     "LdotS",
+          "HCM_16", "rhop_0.2", "OBD_p0s1_p0s1", "rhon_1.5"};
       t << "[operators]\nlist = [";
       const int n = in(1, 4);
-      for (int i = 0; i < n; ++i) t << (i ? ", " : "") << '"' << pick(catalog) << '"';
+      for (int i = 0; i < n; ++i)
+        t << (i ? ", " : "") << '"' << pick(catalog) << '"';
       t << "]\n";
     }
     t << "[output]\n";
@@ -428,15 +471,19 @@ TEST(RoundTrip, RandomConfigs) {
       continue;
     }
     ++accepted;
-    SCOPED_TRACE("seed " + std::to_string(kSeed) + ", candidate " + std::to_string(i));
+    SCOPED_TRACE("seed " + std::to_string(kSeed) + ", candidate " +
+                 std::to_string(i));
     expect_round_trip(text, "random#" + std::to_string(i));
     if (::testing::Test::HasFailure()) {
-      ADD_FAILURE() << "seed " << kSeed << " candidate " << i << " failing text:\n" << text;
+      ADD_FAILURE() << "seed " << kSeed << " candidate " << i
+                    << " failing text:\n"
+                    << text;
       return;
     }
   }
-  EXPECT_GE(accepted, 100) << "seed " << kSeed << ": accepted " << accepted << ", rejected "
-                           << rejected << " of " << kCandidates;
+  EXPECT_GE(accepted, 100) << "seed " << kSeed << ": accepted " << accepted
+                           << ", rejected " << rejected << " of "
+                           << kCandidates;
 }
 
 }  // namespace

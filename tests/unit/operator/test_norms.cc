@@ -18,7 +18,8 @@ using namespace imsrg;
 using namespace imsrg::op;
 
 std::shared_ptr<const basis::ModelSpace> make_ms() {
-  return basis::ModelSpace::from_names(basis::BasisTruncation{.emax = 2}, 16.0, "O16", "O16");
+  return basis::ModelSpace::from_names(basis::BasisTruncation{.emax = 2}, 16.0,
+                                       "O16", "O16");
 }
 
 class Lcg {
@@ -26,14 +27,17 @@ class Lcg {
   explicit Lcg(std::uint64_t seed) : s_(seed) {}
   double next() {
     s_ = s_ * 6364136223846793005ULL + 1442695040888963407ULL;
-    return static_cast<double>(static_cast<std::int64_t>(s_ >> 11)) / 4503599627370496.0 - 1.0;
+    return static_cast<double>(static_cast<std::int64_t>(s_ >> 11)) /
+               4503599627370496.0 -
+           1.0;
   }
 
  private:
   std::uint64_t s_;
 };
 
-/// Random Hermitian operator; 1B entries between all orbit pairs (also different l, j, tz).
+/// Random Hermitian operator; 1B entries between all orbit pairs (also
+/// different l, j, tz).
 Operator make_op(int rank, std::uint64_t seed) {
   Operator o(make_ms(), OperatorSpec::scalar(rank));
   Lcg rng(seed);
@@ -51,10 +55,11 @@ Operator make_op(int rank, std::uint64_t seed) {
       for (int i = 0; i < nk; ++i) {
         for (int j = i; j < nk; ++j) {
           const double v = rng.next();
-          o.two_body().set(ChannelIndex{c}, ChannelIndex{c}, LocalKetIndex{i}, LocalKetIndex{j}, v);
+          o.two_body().set(ChannelIndex{c}, ChannelIndex{c}, LocalKetIndex{i},
+                           LocalKetIndex{j}, v);
           if (i != j) {
-            o.two_body().set(ChannelIndex{c}, ChannelIndex{c}, LocalKetIndex{j}, LocalKetIndex{i},
-                             v);
+            o.two_body().set(ChannelIndex{c}, ChannelIndex{c}, LocalKetIndex{j},
+                             LocalKetIndex{i}, v);
           }
         }
       }
@@ -89,8 +94,8 @@ double brute_two_body(const Operator& o) {
     const double w = 2.0 * info.J() + 1.0;
     for (int i = 0; i < info.num_kets; ++i) {
       for (int j = 0; j < info.num_kets; ++j) {
-        const double v =
-            o.two_body().get(ChannelIndex{c}, ChannelIndex{c}, LocalKetIndex{i}, LocalKetIndex{j});
+        const double v = o.two_body().get(ChannelIndex{c}, ChannelIndex{c},
+                                          LocalKetIndex{i}, LocalKetIndex{j});
         s += w * w * v * v;
       }
     }
@@ -98,7 +103,9 @@ double brute_two_body(const Operator& o) {
   return std::sqrt(s);
 }
 
-void expect_rel(double a, double b) { EXPECT_NEAR(a, b, 1e-12 * std::max(1.0, std::abs(b))); }
+void expect_rel(double a, double b) {
+  EXPECT_NEAR(a, b, 1e-12 * std::max(1.0, std::abs(b)));
+}
 
 TEST(OperatorNorms, ZeroOperatorHasZeroNorms) {
   const Operator o(make_ms(), OperatorSpec::scalar(2));
@@ -123,7 +130,8 @@ TEST(OperatorNorms, MatchBruteForce) {
 TEST(OperatorNorms, OneBodyIgnoresDifferentLjtzEntries) {
   Operator o(make_ms(), OperatorSpec::scalar(1));
   const auto& b = o.model_space().basis();
-  // find two orbits that differ in (l, 2j, tz2), and one orbit pair with equal labels
+  // find two orbits that differ in (l, 2j, tz2), and one orbit pair with equal
+  // labels
   OrbitIndex p{0};
   OrbitIndex q{-1};
   for (int i = 1; i < b.num_orbits(); ++i) {

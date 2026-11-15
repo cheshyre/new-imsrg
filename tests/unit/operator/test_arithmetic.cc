@@ -22,7 +22,8 @@ using namespace imsrg;
 using namespace imsrg::op;
 
 std::shared_ptr<const basis::ModelSpace> make_ms(const char* ref = "O16") {
-  return basis::ModelSpace::from_names(basis::BasisTruncation{.emax = 2}, 16.0, ref, ref);
+  return basis::ModelSpace::from_names(basis::BasisTruncation{.emax = 2}, 16.0,
+                                       ref, ref);
 }
 
 /// Small deterministic generator, values in (-1, 1).
@@ -31,15 +32,18 @@ class Lcg {
   explicit Lcg(std::uint64_t seed) : s_(seed) {}
   double next() {
     s_ = s_ * 6364136223846793005ULL + 1442695040888963407ULL;
-    return static_cast<double>(static_cast<std::int64_t>(s_ >> 11)) / 4503599627370496.0 - 1.0;
+    return static_cast<double>(static_cast<std::int64_t>(s_ >> 11)) /
+               4503599627370496.0 -
+           1.0;
   }
 
  private:
   std::uint64_t s_;
 };
 
-/// Fills all parts with pseudo-random values obeying the hermiticity of the operator
-/// (including entries between orbits of different (l, j, tz): they are legal storage).
+/// Fills all parts with pseudo-random values obeying the hermiticity of the
+/// operator (including entries between orbits of different (l, j, tz): they are
+/// legal storage).
 void fill(Operator& o, std::uint64_t seed) {
   Lcg rng(seed);
   const int h = hermiticity_sign(o.hermiticity());
@@ -70,8 +74,8 @@ void fill(Operator& o, std::uint64_t seed) {
   }
 }
 
-Operator make_op(const std::shared_ptr<const basis::ModelSpace>& ms, int rank, std::uint64_t seed,
-                 Hermiticity h = Hermiticity::Hermitian) {
+Operator make_op(const std::shared_ptr<const basis::ModelSpace>& ms, int rank,
+                 std::uint64_t seed, Hermiticity h = Hermiticity::Hermitian) {
   Operator o(ms, OperatorSpec::scalar(rank, h));
   fill(o, seed);
   return o;
@@ -84,8 +88,9 @@ double symmetry_violation(const Operator& o) {
   const int n = o.model_space().num_orbits();
   for (int p = 0; p < n; ++p) {
     for (int q = 0; q < n; ++q) {
-      worst = std::max(worst, std::abs(o.one_body().get(OrbitIndex{p}, OrbitIndex{q}) -
-                                       h * o.one_body().get(OrbitIndex{q}, OrbitIndex{p})));
+      worst = std::max(
+          worst, std::abs(o.one_body().get(OrbitIndex{p}, OrbitIndex{q}) -
+                          h * o.one_body().get(OrbitIndex{q}, OrbitIndex{p})));
     }
   }
   if (o.two_body().allocated()) {
@@ -102,7 +107,8 @@ double symmetry_violation(const Operator& o) {
   return worst;
 }
 
-// ---- kernels -------------------------------------------------------------------------------
+// ---- kernels
+// -----------------------------------------------------------------------------
 
 exec::DeviceBuffer<double> make_buffer(const std::vector<double>& v) {
   exec::DeviceBuffer<double> b(v.size());
@@ -154,7 +160,8 @@ TEST(PartKernels, EmptyBuffersWork) {
   EXPECT_DOUBLE_EQ(op::detail::sum_of_squares(x, 0, 0), 0.0);
 }
 
-// ---- arithmetic ----------------------------------------------------------------------------
+// ---- arithmetic
+// ----------------------------------------------------------------------------
 
 TEST(OperatorArithmetic, AxpyEqualsElementwiseSum) {
   const auto ms = make_ms();
@@ -173,10 +180,12 @@ TEST(OperatorArithmetic, AxpyEqualsElementwiseSum) {
                    y0.one_body().get(OrbitIndex{3}, OrbitIndex{5}) -
                        0.75 * x.one_body().get(OrbitIndex{3}, OrbitIndex{5}));
   EXPECT_DOUBLE_EQ(
-      y.two_body().get(ChannelIndex{6}, ChannelIndex{6}, LocalKetIndex{0}, LocalKetIndex{1}),
-      y0.two_body().get(ChannelIndex{6}, ChannelIndex{6}, LocalKetIndex{0}, LocalKetIndex{1}) -
-          0.75 * x.two_body().get(ChannelIndex{6}, ChannelIndex{6}, LocalKetIndex{0},
-                                  LocalKetIndex{1}));
+      y.two_body().get(ChannelIndex{6}, ChannelIndex{6}, LocalKetIndex{0},
+                       LocalKetIndex{1}),
+      y0.two_body().get(ChannelIndex{6}, ChannelIndex{6}, LocalKetIndex{0},
+                        LocalKetIndex{1}) -
+          0.75 * x.two_body().get(ChannelIndex{6}, ChannelIndex{6},
+                                  LocalKetIndex{0}, LocalKetIndex{1}));
 }
 
 TEST(OperatorArithmetic, ZeroCoefficientIsNoOp) {
@@ -267,9 +276,10 @@ TEST(OperatorArithmetic, RankPromotion) {
   EXPECT_DOUBLE_EQ(d.one_body().get(OrbitIndex{2}, OrbitIndex{4}),
                    t.one_body().get(OrbitIndex{2}, OrbitIndex{4}) -
                        v.one_body().get(OrbitIndex{2}, OrbitIndex{4}));
-  EXPECT_DOUBLE_EQ(
-      d.two_body().get(ChannelIndex{3}, ChannelIndex{3}, LocalKetIndex{0}, LocalKetIndex{0}),
-      -v.two_body().get(ChannelIndex{3}, ChannelIndex{3}, LocalKetIndex{0}, LocalKetIndex{0}));
+  EXPECT_DOUBLE_EQ(d.two_body().get(ChannelIndex{3}, ChannelIndex{3},
+                                    LocalKetIndex{0}, LocalKetIndex{0}),
+                   -v.two_body().get(ChannelIndex{3}, ChannelIndex{3},
+                                     LocalKetIndex{0}, LocalKetIndex{0}));
   // in-place promotion into rank 2
   Operator y = v;
   y += t;
@@ -342,16 +352,18 @@ TEST(OperatorArithmetic, BlockSymmetryIsPreserved) {
 }  // namespace
 
 TEST(OperatorArithmeticScalarAdd, ConstantMakesAntiHermitianNonHermitian) {
-  const auto ms = imsrg::basis::ModelSpace::from_names(imsrg::basis::BasisTruncation{.emax = 1},
-                                                       16.0, "O16", "O16");
+  const auto ms = imsrg::basis::ModelSpace::from_names(
+      imsrg::basis::BasisTruncation{.emax = 1}, 16.0, "O16", "O16");
   using imsrg::Hermiticity;
-  imsrg::op::Operator a(ms, imsrg::op::OperatorSpec::scalar(2, Hermiticity::AntiHermitian));
+  imsrg::op::Operator a(
+      ms, imsrg::op::OperatorSpec::scalar(2, Hermiticity::AntiHermitian));
   a += 0.0;
   EXPECT_EQ(a.hermiticity(), Hermiticity::AntiHermitian);
   a += 1.5;
   EXPECT_EQ(a.hermiticity(), Hermiticity::NonHermitian);
   EXPECT_EQ(a.zero_body(), 1.5);
-  imsrg::op::Operator h(ms, imsrg::op::OperatorSpec::scalar(2, Hermiticity::Hermitian));
+  imsrg::op::Operator h(
+      ms, imsrg::op::OperatorSpec::scalar(2, Hermiticity::Hermitian));
   h -= 2.0;
   EXPECT_EQ(h.hermiticity(), Hermiticity::Hermitian);
   EXPECT_EQ(h.zero_body(), -2.0);

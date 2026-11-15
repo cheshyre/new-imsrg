@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Tests of the legacy key=value translation (design/16 section 6.3, items 1-5), at the raw-tree
-// level.
+// Tests of the legacy key=value translation (design/16 section 6.3, items 1-5),
+// at the raw-tree level.
 #include <cstdint>
 #include <fstream>
 #include <initializer_list>
@@ -33,7 +33,9 @@ const ConfigIssue* issue(const LegacyTranslation& t, std::string_view code) {
   return nullptr;
 }
 
-bool has(const LegacyTranslation& t, std::string_view code) { return issue(t, code) != nullptr; }
+bool has(const LegacyTranslation& t, std::string_view code) {
+  return issue(t, code) != nullptr;
+}
 
 std::optional<std::string> str(const LegacyTranslation& t, std::string_view p) {
   const RawValue* v = t.tree.find(p);
@@ -41,7 +43,8 @@ std::optional<std::string> str(const LegacyTranslation& t, std::string_view p) {
   const auto* s = std::get_if<std::string>(&v->data);
   return s ? std::optional<std::string>(*s) : std::nullopt;
 }
-std::optional<std::int64_t> num_i(const LegacyTranslation& t, std::string_view p) {
+std::optional<std::int64_t> num_i(const LegacyTranslation& t,
+                                  std::string_view p) {
   const RawValue* v = t.tree.find(p);
   if (v == nullptr) return std::nullopt;
   const auto* s = std::get_if<std::int64_t>(&v->data);
@@ -69,7 +72,7 @@ std::vector<std::string> arr(const LegacyTranslation& t, std::string_view p) {
   return out;
 }
 
-// ---------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // Item 1: key coverage.
 
 TEST(LegacyKeys, ListMatchesGoldenFile) {
@@ -81,7 +84,8 @@ TEST(LegacyKeys, ListMatchesGoldenFile) {
   const auto keys = legacy_keys();
   ASSERT_EQ(keys.size(), 85u);
   ASSERT_EQ(golden.size(), keys.size());
-  for (std::size_t i = 0; i < keys.size(); ++i) EXPECT_EQ(std::string(keys[i].key), golden[i]);
+  for (std::size_t i = 0; i < keys.size(); ++i)
+    EXPECT_EQ(std::string(keys[i].key), golden[i]);
   std::set<std::string_view> unique;
   for (const auto& k : keys) unique.insert(k.key);
   EXPECT_EQ(unique.size(), 85u);
@@ -102,7 +106,8 @@ TEST(LegacyKeys, NewKeysAreSchemaPaths) {
       bool ok = find_schema_key(part) != nullptr;
       for (const auto& tab : schema_tables())
         if (tab == part) ok = true;
-      if (!ok)  // prefix of a schema key (e.g. a table such as operators.from_file)
+      if (!ok)  // prefix of a schema key (e.g. a table such as
+                // operators.from_file)
         for (const auto& tab : schema_tables())
           if (std::string_view(part).substr(0, tab.size()) == tab) ok = true;
       EXPECT_TRUE(ok) << k.key << " -> " << part;
@@ -129,7 +134,7 @@ TEST(LegacyKeys, NotSupportedRows) {
   }
 }
 
-// ---------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // Item 2: per-key rows.
 
 TEST(LegacyTranslate, SuppliedDefaults) {
@@ -139,15 +144,17 @@ TEST(LegacyTranslate, SuppliedDefaults) {
   EXPECT_EQ(num_d(t, "basis.hw"), 20.0);
   EXPECT_EQ(num_i(t, "interaction.two_body.e1max"), 12);
   EXPECT_EQ(str(t, "interaction.two_body.file"), "x.me2j");
-  EXPECT_EQ(t.tree.find("basis.emax")->where.kind, SourceRef::Kind::LegacyDefault);
+  EXPECT_EQ(t.tree.find("basis.emax")->where.kind,
+            SourceRef::Kind::LegacyDefault);
   EXPECT_FALSE(t.tree.contains("interaction.three_body.e1max"));
   const auto t3 = tr({"3bme=x.me3j"});
   EXPECT_EQ(num_i(t3, "interaction.three_body.e1max"), 12);
   EXPECT_EQ(num_i(t3, "interaction.three_body.e3max"), 12);
 }
 
-// An invalid value of a defaulted key is reported once; the old default is still supplied so that
-// resolution adds no consequential "required key missing" (found in review).
+// An invalid value of a defaulted key is reported once; the old default is
+// still supplied so that resolution adds no consequential "required key
+// missing" (found in review).
 TEST(LegacyTranslate, InvalidValueOfDefaultedKeyStillGetsDefault) {
   const auto t = tr({"emax=4.5", "hw=abc"});
   EXPECT_TRUE(has(t, "E-LEGACY-VALUE"));
@@ -157,10 +164,12 @@ TEST(LegacyTranslate, InvalidValueOfDefaultedKeyStillGetsDefault) {
   s.legacy_args = {"2bme=x.me2j", "emax=4.5", "reference=O16"};
   const auto loaded = load_config(s, LoadOptions{.check_files = false});
   ASSERT_FALSE(loaded.has_value());
-  for (const ConfigIssue& i : loaded.error()) EXPECT_NE(i.code, "V-03") << i.to_string();
+  for (const ConfigIssue& i : loaded.error())
+    EXPECT_NE(i.code, "V-03") << i.to_string();
 }
 
-// imsrg++ read numbers with istringstream: a leading '+' is accepted; inf/nan are not values.
+// imsrg++ read numbers with istringstream: a leading '+' is accepted; inf/nan
+// are not values.
 TEST(LegacyTranslate, NumberSyntax) {
   EXPECT_EQ(num_i(tr({"emax=+4"}), "basis.emax"), 4);
   EXPECT_EQ(num_d(tr({"hw=+16.5"}), "basis.hw"), 16.5);
@@ -196,26 +205,39 @@ INSTANTIATE_TEST_SUITE_P(
     ::testing::Values(
         ValueRow{{"core_generator=white"}, "imsrg.generator.core", "white"},
         ValueRow{{"core_generator=atan"}, "imsrg.generator.core", "atan"},
-        ValueRow{{"core_generator=imaginary-time"}, "imsrg.generator.core", "imaginary_time"},
-        ValueRow{{"core_generator=imaginary_time"}, "imsrg.generator.core", "imaginary_time"},
+        ValueRow{{"core_generator=imaginary-time"},
+                 "imsrg.generator.core",
+                 "imaginary_time"},
+        ValueRow{{"core_generator=imaginary_time"},
+                 "imsrg.generator.core",
+                 "imaginary_time"},
         ValueRow{{"core_generator=wegner"}, "imsrg.generator.core", "wegner"},
-        ValueRow{{"core_generator=shell-model"}, "imsrg.generator.core", "shell_model"},
-        ValueRow{{"core_generator=shell-model-atan"}, "imsrg.generator.core", "shell_model_atan"},
-        ValueRow{
-            {"core_generator=shell-model-wegner"}, "imsrg.generator.core", "shell_model_wegner"},
+        ValueRow{{"core_generator=shell-model"},
+                 "imsrg.generator.core",
+                 "shell_model"},
+        ValueRow{{"core_generator=shell-model-atan"},
+                 "imsrg.generator.core",
+                 "shell_model_atan"},
+        ValueRow{{"core_generator=shell-model-wegner"},
+                 "imsrg.generator.core",
+                 "shell_model_wegner"},
         ValueRow{{"core_generator=shell-model-atan-npnh"},
                  "imsrg.generator.core",
                  "shell_model_atan_npnh"},
         ValueRow{{"core_generator=shell-model-imaginary-time"},
                  "imsrg.generator.core",
                  "shell_model_imaginary_time"},
-        ValueRow{{"core_generator=hartree-fock"}, "imsrg.generator.core", "hartree_fock"},
+        ValueRow{{"core_generator=hartree-fock"},
+                 "imsrg.generator.core",
+                 "hartree_fock"},
         ValueRow{{"core_generator=1PA"}, "imsrg.generator.core", "one_pa"},
-        ValueRow{
-            {"valence_generator=shell-model-atan"}, "imsrg.generator.valence", "shell_model_atan"},
+        ValueRow{{"valence_generator=shell-model-atan"},
+                 "imsrg.generator.valence",
+                 "shell_model_atan"},
         ValueRow{{"basis=HF"}, "basis.kind", "hf"},
         ValueRow{{"basis=oscillator"}, "basis.kind", "oscillator"},
-        ValueRow{{"basis=NAT"}, "basis.kind", "nat"}, ValueRow{{"basis=nat"}, "basis.kind", "nat"},
+        ValueRow{{"basis=NAT"}, "basis.kind", "nat"},
+        ValueRow{{"basis=nat"}, "basis.kind", "nat"},
         ValueRow{{"denominator_partitioning=Epstein_Nesbet"},
                  "imsrg.denominator.partitioning",
                  "epstein_nesbet"},
@@ -225,8 +247,12 @@ INSTANTIATE_TEST_SUITE_P(
         ValueRow{{"denominator_partitioning=MP_isospin"},
                  "imsrg.denominator.partitioning",
                  "mp_isospin"},
-        ValueRow{{"3bme=a.me3j", "3bme_type=no2b"}, "interaction.three_body.type", "no2b"},
-        ValueRow{{"3bme=a.me3j", "3bme_type=mono"}, "interaction.three_body.type", "mono"},
+        ValueRow{{"3bme=a.me3j", "3bme_type=no2b"},
+                 "interaction.three_body.type",
+                 "no2b"},
+        ValueRow{{"3bme=a.me3j", "3bme_type=mono"},
+                 "interaction.three_body.type",
+                 "mono"},
         ValueRow{{"3bme=a.me3j", "no2b_precision=half"},
                  "interaction.three_body.no2b_precision",
                  "half"},
@@ -234,14 +260,26 @@ INSTANTIATE_TEST_SUITE_P(
         ValueRow{{"fmt2=navratil"}, "interaction.two_body.format", "navratil"},
         ValueRow{{"fmt2=oslo"}, "interaction.two_body.format", "oslo"},
         ValueRow{{"fmt2=oakridge"}, "interaction.two_body.format", "oakridge"},
-        ValueRow{{"fmt2=oakridgebin"}, "interaction.two_body.format", "oakridge_bin"},
+        ValueRow{{"fmt2=oakridgebin"},
+                 "interaction.two_body.format",
+                 "oakridge_bin"},
         ValueRow{{"fmt2=takayuki"}, "interaction.two_body.format", "takayuki"},
         ValueRow{{"fmt2=nushellx"}, "interaction.two_body.format", "nushellx"},
-        ValueRow{{"3bme=a.me3j", "fmt3=me3j"}, "interaction.three_body.format", "me3j"},
-        ValueRow{{"3bme=a.me3j", "fmt3=navratil"}, "interaction.three_body.format", "navratil"},
-        ValueRow{{"valence_file_format=nushellx"}, "output.valence_file_format", "nushellx"},
-        ValueRow{{"valence_file_format=antoine"}, "output.valence_file_format", "antoine"},
-        ValueRow{{"basis=NAT", "NAT_order=energy"}, "natural_orbitals.order", "energy"},
+        ValueRow{{"3bme=a.me3j", "fmt3=me3j"},
+                 "interaction.three_body.format",
+                 "me3j"},
+        ValueRow{{"3bme=a.me3j", "fmt3=navratil"},
+                 "interaction.three_body.format",
+                 "navratil"},
+        ValueRow{{"valence_file_format=nushellx"},
+                 "output.valence_file_format",
+                 "nushellx"},
+        ValueRow{{"valence_file_format=antoine"},
+                 "output.valence_file_format",
+                 "antoine"},
+        ValueRow{{"basis=NAT", "NAT_order=energy"},
+                 "natural_orbitals.order",
+                 "energy"},
         ValueRow{{"method=magnus_euler"}, "imsrg.method", "magnus"},
         ValueRow{{"method=flow_adaptive"}, "imsrg.method", "flow"},
         ValueRow{{"method=flow_RK4"}, "imsrg.method", "flow_rk4"},
@@ -282,7 +320,8 @@ TEST(LegacyTranslate, Sentinels) {
   }
   EXPECT_FALSE(tr({"OccNat3Cut=-1"}).tree.contains("imsrg3.occ_nat3_cut"));
   EXPECT_FALSE(tr({"OccNat3Cut=0"}).tree.contains("imsrg3.occ_nat3_cut"));
-  EXPECT_FALSE(tr({"file2e2max=-1"}).tree.contains("interaction.two_body.e2max"));
+  EXPECT_FALSE(
+      tr({"file2e2max=-1"}).tree.contains("interaction.two_body.e2max"));
   EXPECT_EQ(num_i(tr({"file2e2max=24"}), "interaction.two_body.e2max"), 24);
   EXPECT_FALSE(tr({"file2lmax=-1"}).tree.contains("interaction.two_body.lmax"));
   {
@@ -290,14 +329,20 @@ TEST(LegacyTranslate, Sentinels) {
     EXPECT_FALSE(t.tree.contains("interaction.two_body.lmax"));
     EXPECT_TRUE(has(t, "W-Q4"));
   }
-  EXPECT_FALSE(tr({"3bme=a.me3j", "file3e2max=-1"}).tree.contains("interaction.three_body.e2max"));
-  EXPECT_EQ(num_i(tr({"3bme=a.me3j", "file3e2max=14"}), "interaction.three_body.e2max"), 14);
+  EXPECT_FALSE(tr({"3bme=a.me3j", "file3e2max=-1"})
+                   .tree.contains("interaction.three_body.e2max"));
+  EXPECT_EQ(num_i(tr({"3bme=a.me3j", "file3e2max=14"}),
+                  "interaction.three_body.e2max"),
+            14);
   EXPECT_FALSE(tr({"nsteps=-1"}).tree.contains("imsrg.steps"));
-  EXPECT_EQ(num_i(tr({"nsteps=1", "valence_space=sd-shell"}), "imsrg.steps"), 1);
-  EXPECT_EQ(num_i(tr({"nsteps=2", "valence_space=sd-shell"}), "imsrg.steps"), 2);
+  EXPECT_EQ(num_i(tr({"nsteps=1", "valence_space=sd-shell"}), "imsrg.steps"),
+            1);
+  EXPECT_EQ(num_i(tr({"nsteps=2", "valence_space=sd-shell"}), "imsrg.steps"),
+            2);
   EXPECT_TRUE(has(tr({"nsteps=3"}), "E-LEGACY-VALUE"));
   EXPECT_TRUE(has(tr({"nsteps=0"}), "E-LEGACY-VALUE"));
-  for (const char* k : {"emax_imsrg", "e2max_imsrg", "e3max_imsrg", "emax_3body_imsrg"}) {
+  for (const char* k :
+       {"emax_imsrg", "e2max_imsrg", "e3max_imsrg", "emax_3body_imsrg"}) {
     const auto none = tr({std::string(k) + "=-1"});
     EXPECT_EQ(none.tree.entries().size(), tr({}).tree.entries().size()) << k;
     const auto set = tr({std::string(k) + "=0"});
@@ -306,8 +351,9 @@ TEST(LegacyTranslate, Sentinels) {
 }
 
 TEST(LegacyTranslate, NumbersAndBools) {
-  const auto t = tr({"smax=3.5", "dsmax=0.25", "BetaCM=1.5", "write_omega=true",
-                     "freeze_occupations=true", "hunter_gatherer=true", "e3max=14"});
+  const auto t =
+      tr({"smax=3.5", "dsmax=0.25", "BetaCM=1.5", "write_omega=true",
+          "freeze_occupations=true", "hunter_gatherer=true", "e3max=14"});
   EXPECT_FALSE(has_errors(t.issues));
   EXPECT_EQ(num_d(t, "imsrg.step.smax"), 3.5);
   EXPECT_EQ(num_d(t, "imsrg.step.dsmax"), 0.25);
@@ -346,7 +392,8 @@ TEST(LegacyTranslate, MissingTwoBodyIsV03) {
 }
 
 TEST(LegacyTranslate, ThreeBodyKeysWithout3bmeWarn) {
-  const auto t = tr({"3bme_type=mono", "no2b_precision=half", "store_3bme_pn=true"});
+  const auto t =
+      tr({"3bme_type=mono", "no2b_precision=half", "store_3bme_pn=true"});
   EXPECT_TRUE(has(t, "W-L1"));
   EXPECT_FALSE(t.tree.contains("interaction.three_body.type"));
   EXPECT_FALSE(t.tree.contains("interaction.three_body.store_pn"));
@@ -362,7 +409,7 @@ TEST(LegacyTranslate, DuplicateKeys) {
   EXPECT_EQ(arr(v, "operators.list"), (std::vector<std::string>{"a", "b"}));
 }
 
-// ---------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // Item 3: shorthands.
 
 TEST(LegacyShorthands, NSmagnus) {
@@ -380,8 +427,8 @@ TEST(LegacyShorthands, Brueckner) {
 }
 
 TEST(LegacyShorthands, Brueckner1step) {
-  const auto t = tr(
-      {"method=brueckner1step", "valence_space=sd-shell", "valence_generator=shell-model-wegner"});
+  const auto t = tr({"method=brueckner1step", "valence_space=sd-shell",
+                     "valence_generator=shell-model-wegner"});
   EXPECT_EQ(str(t, "imsrg.method"), "magnus");
   EXPECT_EQ(flag(t, "imsrg.use_brueckner_bch"), true);
   EXPECT_EQ(num_i(t, "imsrg.steps"), 1);
@@ -408,7 +455,8 @@ TEST(LegacyShorthands, Scratch) {
   }
   {
     const auto t = tr({"scratch=/dev/null", "Operators=E2"});
-    EXPECT_EQ(str(t, "imsrg.omega.storage"), "discard");  // validation judges Operators later
+    EXPECT_EQ(str(t, "imsrg.omega.storage"),
+              "discard");  // validation judges Operators later
     EXPECT_EQ(arr(t, "operators.list"), (std::vector<std::string>{"E2"}));
   }
   {
@@ -429,7 +477,8 @@ TEST(LegacyShorthands, ValenceSpace) {
     EXPECT_EQ(str(t, "reference.nucleus"), "O16");
     EXPECT_FALSE(t.tree.contains("valence.space"));
   }
-  for (const char* v : {"0hw-shell", "jj-shell", "sd-shell-FCI", "p-shell,sd-shell"}) {
+  for (const char* v :
+       {"0hw-shell", "jj-shell", "sd-shell-FCI", "p-shell,sd-shell"}) {
     const auto t = tr({std::string("valence_space=") + v});
     EXPECT_FALSE(has_errors(t.issues)) << v;
     EXPECT_EQ(str(t, "valence.space"), v);
@@ -445,7 +494,8 @@ TEST(LegacyShorthands, CustomValenceSpace) {
   const auto t = tr({"custom_valence_space=p0,p1"});
   EXPECT_EQ(str(t, "valence.custom"), "p0,p1");
   EXPECT_FALSE(has(t, "V-30"));
-  const auto both = tr({"custom_valence_space=p0,p1", "valence_space=sd-shell"});
+  const auto both =
+      tr({"custom_valence_space=p0,p1", "valence_space=sd-shell"});
   EXPECT_TRUE(has(both, "V-30"));
   EXPECT_EQ(str(both, "valence.custom"), "p0,p1");
 }
@@ -477,17 +527,19 @@ TEST(LegacyShorthands, OperatorsFromFileTag) {
 
 TEST(LegacyShorthands, OperatorsPassThrough) {
   const auto t = tr({"Operators=rhop_all,E2"});
-  EXPECT_EQ(arr(t, "operators.list"), (std::vector<std::string>{"rhop_all", "E2"}));
+  EXPECT_EQ(arr(t, "operators.list"),
+            (std::vector<std::string>{"rhop_all", "E2"}));
   const auto p = tr({"OperatorsPT1=E2", "SPWF=0s1/2"});
   EXPECT_EQ(arr(p, "operators.first_order"), (std::vector<std::string>{"E2"}));
   EXPECT_EQ(arr(p, "output.spwf"), (std::vector<std::string>{"0s1/2"}));
 }
 
-// ---------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // Item 4: warning rules.
 
 TEST(LegacyWarnings, Nsteps1ValenceGenerator) {
-  const auto t = tr({"nsteps=1", "valence_space=sd-shell", "valence_generator=shell-model-wegner"});
+  const auto t = tr({"nsteps=1", "valence_space=sd-shell",
+                     "valence_generator=shell-model-wegner"});
   EXPECT_TRUE(has(t, "W-NSTEPS1"));
   EXPECT_FALSE(t.tree.contains("imsrg.generator.valence"));
   EXPECT_FALSE(has_errors(t.issues));
@@ -556,12 +608,12 @@ TEST(LegacyWarnings, V52) {
   EXPECT_FALSE(t.tree.contains("imsrg3.at_end"));
 }
 
-// ---------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // Item 5: rejections.
 
 TEST(LegacyRejections, NotSupported) {
-  for (const char* a : {"physical_system=atomic", "atomicZ=8", "OperatorsRPA=x", "OperatorsTDA=x",
-                        "3bme=a.h5", "fmt3=hdf5"}) {
+  for (const char* a : {"physical_system=atomic", "atomicZ=8", "OperatorsRPA=x",
+                        "OperatorsTDA=x", "3bme=a.h5", "fmt3=hdf5"}) {
     std::vector<std::string> args{a};
     if (std::string(a) == "fmt3=hdf5") args.push_back("3bme=a.h5");
     const auto t = tr(args);
@@ -576,7 +628,8 @@ TEST(LegacyRejections, NotSupported) {
   const auto h = tr({"3bme=a.h5", "fmt3=hdf5"});
   const ConfigIssue* i = issue(h, "E-LEGACY-NS");
   ASSERT_NE(i, nullptr);
-  EXPECT_NE(i->message.find("HDF5 3N files are not supported"), std::string::npos);
+  EXPECT_NE(i->message.find("HDF5 3N files are not supported"),
+            std::string::npos);
 }
 
 TEST(LegacyRejections, NuclearAccepted) {

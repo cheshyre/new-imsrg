@@ -2,10 +2,11 @@
 // Copyright 2026 The imsrg authors
 
 /// @file
-/// Smoke test of the MPI toolchain. CTest runs it as `mpiexec -n N smoke_mpi_hello
-/// --expected-ranks=N`; it checks the size of MPI_COMM_WORLD, the rank range, and an allreduce.
-/// Every rank runs the tests; the exit code is the maximum over ranks, so a failure on any rank
-/// fails the CTest test. Uses MPI directly because the imsrg::comm facade arrives in M2.
+/// Smoke test of the MPI toolchain. CTest runs it as `mpiexec -n N
+/// smoke_mpi_hello --expected-ranks=N`; it checks the size of MPI_COMM_WORLD,
+/// the rank range, and an allreduce. Every rank runs the tests; the exit code
+/// is the maximum over ranks, so a failure on any rank fails the CTest test.
+/// Uses MPI directly because the imsrg::comm facade arrives in M2.
 
 #include <cstdio>
 #include <cstring>
@@ -35,7 +36,9 @@ TEST(MpiSmoke, AllreduceSumsRanks) {
   EXPECT_LT(rank, size);
   long long mine = rank + 1;
   long long total = 0;
-  ASSERT_EQ(MPI_Allreduce(&mine, &total, 1, MPI_LONG_LONG, MPI_SUM, MPI_COMM_WORLD), MPI_SUCCESS);
+  ASSERT_EQ(
+      MPI_Allreduce(&mine, &total, 1, MPI_LONG_LONG, MPI_SUM, MPI_COMM_WORLD),
+      MPI_SUCCESS);
   const long long n = size;
   EXPECT_EQ(total, n * (n + 1) / 2);
 }

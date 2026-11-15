@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Unit tests of TwoBodyChannels and TwoBodyKetSubsets (design/reference/01 sections 2.1-2.4).
-// Hardcoded values come from tests/golden/basis/{emax2_He4,emax2_sd-shell,emax4_O16}.txt.
+// Unit tests of TwoBodyChannels and TwoBodyKetSubsets (design/reference/01
+// sections 2.1-2.4). Hardcoded values come from
+// tests/golden/basis/{emax2_He4,emax2_sd-shell,emax4_O16}.txt.
 #include <cstdlib>
 #include <vector>
 
@@ -33,7 +34,8 @@ std::vector<std::int32_t> locals(std::span<const LocalKetIndex> s) {
 using V = std::vector<std::int32_t>;
 
 TEST(TwoBodyChannels, CountsAndKetOrder) {
-  for (auto [emax, norb, nket, nch] : {std::tuple{2, 12, 78, 36}, std::tuple{4, 30, 465, 60}}) {
+  for (auto [emax, norb, nket, nch] :
+       {std::tuple{2, 12, 78, 36}, std::tuple{4, 30, 465, 60}}) {
     const auto basis = make_basis(emax);
     const TwoBodyChannels tb(basis);
     ASSERT_EQ(tb.num_orbits(), norb);
@@ -58,7 +60,8 @@ TEST(TwoBodyChannels, GoldenChannelsEmax2) {
   EXPECT_EQ(tb.channel(ChannelIndex{0}).parity, Parity::Even);
   EXPECT_EQ(kets_of(tb, 1), (V{4, 29, 48}));
   EXPECT_EQ(kets_of(tb, 2), (V{1, 11, 21, 24, 43, 58, 69, 76}));
-  EXPECT_EQ(kets_of(tb, 8), (V{1, 9, 11, 19, 21, 24, 26, 34, 43, 58, 60, 64, 69, 71, 73, 76}));
+  EXPECT_EQ(kets_of(tb, 8),
+            (V{1, 9, 11, 19, 21, 24, 26, 34, 43, 58, 60, 64, 69, 71, 73, 76}));
   EXPECT_EQ(tb.channel(ChannelIndex{8}).J(), 1);
   EXPECT_EQ(tb.channel(ChannelIndex{8}).Tz(), 0);
   EXPECT_EQ(tb.channel(ChannelIndex{35}).J(), 5);
@@ -70,7 +73,8 @@ TEST(TwoBodyChannels, GoldenChannelsEmax2) {
 
 TEST(TwoBodyChannels, GoldenChannelEmax4) {
   const TwoBodyChannels tb(make_basis(4));
-  EXPECT_EQ(kets_of(tb, 1), (V{4, 18, 65, 83, 120, 138, 173, 220, 263, 304, 339, 370, 397}));
+  EXPECT_EQ(kets_of(tb, 1),
+            (V{4, 18, 65, 83, 120, 138, 173, 220, 263, 304, 339, 370, 397}));
   EXPECT_EQ(tb.channel(ChannelIndex{1}).num_kets, 13);
 }
 
@@ -84,7 +88,8 @@ TEST(TwoBodyChannels, LookupsAndMembership) {
       const Orbit& b = tb.orbits()[static_cast<std::size_t>(kt.q.value())];
       for (std::int32_t J = 0; J <= tb.max_J(); ++J) {
         const bool allowed = std::abs(a.j2.twice - b.j2.twice) <= 2 * J &&
-                             2 * J <= a.j2.twice + b.j2.twice && !(kt.p == kt.q && J % 2 != 0);
+                             2 * J <= a.j2.twice + b.j2.twice &&
+                             !(kt.p == kt.q && J % 2 != 0);
         allowed_pairs += allowed ? 1 : 0;
         const auto li = tb.local_index(KetIndex{k}, TwoJ{2 * J});
         EXPECT_EQ(li.has_value(), allowed);
@@ -126,8 +131,10 @@ TEST(TwoBodyChannels, LookupsAndMembership) {
     }
     EXPECT_EQ(total, allowed_pairs);
     EXPECT_EQ(tb.channel_ket_table().size(), static_cast<std::size_t>(total));
-    EXPECT_EQ(tb.local_index_table().size(), static_cast<std::size_t>(tb.ket_J_offsets().back()));
-    EXPECT_EQ(tb.ket_J_offsets().size(), static_cast<std::size_t>(tb.num_kets() + 1));
+    EXPECT_EQ(tb.local_index_table().size(),
+              static_cast<std::size_t>(tb.ket_J_offsets().back()));
+    EXPECT_EQ(tb.ket_J_offsets().size(),
+              static_cast<std::size_t>(tb.num_kets() + 1));
   }
 }
 
@@ -135,7 +142,8 @@ TEST(TwoBodyChannels, FindChannelRejects) {
   const TwoBodyChannels tb(make_basis(2));
   EXPECT_FALSE(tb.find_channel(TwoJ{1}, Parity::Even, TwoTz{0}));
   EXPECT_FALSE(tb.find_channel(TwoJ{-2}, Parity::Even, TwoTz{0}));
-  EXPECT_FALSE(tb.find_channel(TwoJ{2 * (tb.max_J() + 1)}, Parity::Even, TwoTz{0}));
+  EXPECT_FALSE(
+      tb.find_channel(TwoJ{2 * (tb.max_J() + 1)}, Parity::Even, TwoTz{0}));
   EXPECT_FALSE(tb.find_channel(TwoJ{0}, Parity::Even, TwoTz{1}));
   EXPECT_FALSE(tb.find_channel(TwoJ{0}, Parity::Even, TwoTz{4}));
   EXPECT_EQ(tb.find_channel(TwoJ{2}, Parity::Even, TwoTz{0})->value(), 8);
@@ -170,7 +178,8 @@ TEST(TwoBodyChannels, ClassNames) {
   }
 }
 
-// --- subsets ---------------------------------------------------------------------------------
+// --- subsets
+// -----------------------------------------------------------------------------
 
 struct He4Setup {
   TwoBodyChannels tb{make_basis(2)};
@@ -212,18 +221,23 @@ TEST(TwoBodyKetSubsets, He4GoldenChannels) {
   EXPECT_EQ(locals(sub.kets(ch2, KetClass::PH)), (V{1, 2}));
   EXPECT_EQ(locals(sub.kets(ch2, KetClass::QC)), (V{1, 2}));
   const ChannelIndex ch8{8};
-  EXPECT_EQ(locals(sub.kets(ch8, KetClass::PP)), (V{5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}));
+  EXPECT_EQ(locals(sub.kets(ch8, KetClass::PP)),
+            (V{5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}));
   EXPECT_EQ(locals(sub.kets(ch8, KetClass::HH)), (V{0}));
   EXPECT_EQ(locals(sub.kets(ch8, KetClass::PH)), (V{1, 2, 3, 4}));
   EXPECT_EQ(locals(sub.kets(ch8, KetClass::CC)), (V{0}));
   EXPECT_TRUE(sub.kets(ch8, KetClass::VC).empty());
   EXPECT_EQ(locals(sub.kets(ch8, KetClass::QC)), (V{1, 2, 3, 4}));
-  EXPECT_EQ(locals(sub.kets(ch8, KetClass::QQ)), (V{5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}));
-  for (KetClass c : kAllKetClasses) EXPECT_TRUE(sub.kets(ChannelIndex{35}, c).empty());
+  EXPECT_EQ(locals(sub.kets(ch8, KetClass::QQ)),
+            (V{5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}));
+  for (KetClass c : kAllKetClasses)
+    EXPECT_TRUE(sub.kets(ChannelIndex{35}, c).empty());
 
   // Flat tables are consistent with the accessors.
-  EXPECT_EQ(sub.subset_offsets().size(), static_cast<std::size_t>(36 * kNumKetClasses + 1));
-  EXPECT_EQ(static_cast<std::size_t>(sub.subset_offsets().back()), sub.subset_table().size());
+  EXPECT_EQ(sub.subset_offsets().size(),
+            static_cast<std::size_t>(36 * kNumKetClasses + 1));
+  EXPECT_EQ(static_cast<std::size_t>(sub.subset_offsets().back()),
+            sub.subset_table().size());
 }
 
 TEST(TwoBodyKetSubsets, SdShellChannel8) {
@@ -284,8 +298,10 @@ TEST(TwoBodyKetSubsets, FractionalOccupations) {
 TEST(TwoBodyKetSubsets, Errors) {
   He4Setup s;
   const TwoBodyKetSubsets sub(s.tb, s.occ, s.cls);
-  EXPECT_THROW(sub.occupation_products(ChannelIndex{0}, KetClass::PP), InvariantError);
-  EXPECT_THROW(sub.vacancy_products(ChannelIndex{0}, KetClass::QQ), InvariantError);
+  EXPECT_THROW(sub.occupation_products(ChannelIndex{0}, KetClass::PP),
+               InvariantError);
+  EXPECT_THROW(sub.vacancy_products(ChannelIndex{0}, KetClass::QQ),
+               InvariantError);
   std::vector<double> short_occ(11, 0.0);
   EXPECT_THROW(TwoBodyKetSubsets(s.tb, short_occ, s.cls), InputError);
   std::vector<OrbitClass> short_cls(5, OrbitClass::Core);

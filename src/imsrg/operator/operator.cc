@@ -10,7 +10,8 @@
 
 namespace imsrg::op {
 
-Operator::Operator(std::shared_ptr<const basis::ModelSpace> ms, const OperatorSpec& spec)
+Operator::Operator(std::shared_ptr<const basis::ModelSpace> ms,
+                   const OperatorSpec& spec)
     : ms_(std::move(ms)), spec_(spec) {
   validate(spec_);
   IMSRG_CHECK(ms_ != nullptr);

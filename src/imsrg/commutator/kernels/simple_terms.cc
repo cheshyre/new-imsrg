@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// The one-, two-body-reduced and mixed IMSRG(2) terms: comm110ss, comm220ss, comm111ss, comm121ss,
-// comm122ss (design/12 section 4.1). Kernel TU: the only place of this module (with ladder.cc and
-// particle_hole.cc) that includes the Kokkos vocabulary.
+// The one-, two-body-reduced and mixed IMSRG(2) terms: comm110ss, comm220ss,
+// comm111ss, comm121ss, comm122ss (design/12 section 4.1). Kernel TU: the only
+// place of this module (with ladder.cc and particle_hole.cc) that includes the
+// Kokkos vocabulary.
 
 #include <cmath>
 #include <cstdint>
@@ -36,7 +37,8 @@ static_assert(std::is_trivially_copyable_v<OneBodyArgs>);
 
 }  // namespace
 
-void comm110ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Workspace& ws) {
+void comm110ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+               Workspace& ws) {
   detail::check_term_inputs(X, Y, Z, ws);
   // [X,Y] is anti-Hermitian (hZ = -hX hY = -1) -> the scalar part vanishes.
   if (detail::commutator_hermiticity_sign(X, Y) < 0) return;
@@ -67,7 +69,8 @@ void comm110ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Wo
   Z.zero_body() += sum;
 }
 
-void comm220ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Workspace& ws) {
+void comm220ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+               Workspace& ws) {
   detail::check_term_inputs(X, Y, Z, ws);
   // [X,Y] is anti-Hermitian (hZ = -hX hY = -1) -> the scalar part vanishes.
   if (detail::commutator_hermiticity_sign(X, Y) < 0) return;
@@ -77,7 +80,8 @@ void comm220ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Wo
   const TwoBodyView yv = impl.two_body_view(Y);
   const double* occ = impl.tables.orbits().occupation;
   const std::int32_t* entry_channel = impl.entry_channel.device_data();
-  const exec::Index nentries = static_cast<exec::Index>(impl.entry_channel.size());
+  const exec::Index nentries =
+      static_cast<exec::Index>(impl.entry_channel.size());
   double sum = 0.0;
   exec::parallel_reduce(
       "commutator::comm220ss", nentries,
@@ -99,10 +103,10 @@ void comm220ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Wo
           const double nb_k = (1.0 - occ[pk]) * (1.0 - occ[qk]);
           const double w = nn_i * nb_k;
           if (w == 0.0) continue;
-          s +=
-              w *
-              (xb[i + static_cast<std::int64_t>(k) * n] * yb[k + static_cast<std::int64_t>(i) * n] -
-               yb[i + static_cast<std::int64_t>(k) * n] * xb[k + static_cast<std::int64_t>(i) * n]);
+          s += w * (xb[i + static_cast<std::int64_t>(k) * n] *
+                        yb[k + static_cast<std::int64_t>(i) * n] -
+                    yb[i + static_cast<std::int64_t>(k) * n] *
+                        xb[k + static_cast<std::int64_t>(i) * n]);
         }
         partial += (xv.tb.channel_two_j[ch] + 1) * s;
       },
@@ -110,24 +114,30 @@ void comm220ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Wo
   Z.zero_body() += sum;
 }
 
-void comm111ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Workspace& ws) {
+void comm111ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+               Workspace& ws) {
   detail::check_term_inputs(X, Y, Z, ws);
-  // Host BLAS on the one-body matrices (tiny: norb^3). GPU backends will route gemm to device
-  // BLAS; until then wait for pending device work before touching the data.
+  // Host BLAS on the one-body matrices (tiny: norb^3). GPU backends will route
+  // gemm to device BLAS; until then wait for pending device work before
+  // touching the data.
   exec::fence("commutator::comm111ss");
   const auto x1 = std::as_const(X).one_body().device_view();
   const auto y1 = std::as_const(Y).one_body().device_view();
   const auto z1 = Z.one_body().device_view();
-  // Host BLAS only: on a device backend the buffers are not host-addressable (design/12 section 3).
+  // Host BLAS only: on a device backend the buffers are not host-addressable
+  // (design/12 section 3).
   IMSRG_CHECK(Z.one_body().buffer().host_is_device(),
-              "comm111ss: host BLAS on device memory; needs a device gemm (GPU backends)");
+              "comm111ss: host BLAS on device memory; needs a device gemm (GPU "
+              "backends)");
   linalg::gemm(1.0, x1, linalg::Op::NoTrans, y1, linalg::Op::NoTrans, 1.0, z1);
   linalg::gemm(-1.0, y1, linalg::Op::NoTrans, x1, linalg::Op::NoTrans, 1.0, z1);
 }
 
-void comm121ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Workspace& ws) {
+void comm121ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+               Workspace& ws) {
   detail::check_term_inputs(X, Y, Z, ws);
-  // [X1,Y2] and [X2,Y1] each need only one two-body operand (a missing part reads as zero).
+  // [X1,Y2] and [X2,Y1] each need only one two-body operand (a missing part
+  // reads as zero).
   if (!X.two_body().allocated() && !Y.two_body().allocated()) return;
   const auto& impl = ws.impl();
   OneBodyArgs a;
@@ -180,7 +190,8 @@ void comm121ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Wo
   exec::fence("commutator::comm121ss");
 }
 
-void comm122ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Workspace& ws) {
+void comm122ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+               Workspace& ws) {
   detail::check_term_inputs(X, Y, Z, ws);
   if (!Z.two_body().allocated()) return;
   if (!X.two_body().allocated() && !Y.two_body().allocated()) return;
@@ -200,12 +211,14 @@ void comm122ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Wo
   const std::int32_t* lfrom = impl.lifted.from.device_data();
   const std::int32_t* lto = impl.lifted.to.device_data();
   const double* lcoef = impl.lifted.coef.device_data();
-  const double hz = static_cast<double>(detail::commutator_hermiticity_sign(X, Y));
+  const double hz =
+      static_cast<double>(detail::commutator_hermiticity_sign(X, Y));
   const int nch = xv.tb.num_channels;
   const exec::Index total = static_cast<exec::Index>(impl.two_body_size);
-  // One thread per element (r, c) with r <= c. B(r, c) is the bra part (lifted one-body list of
-  // row r acting on column c of X, Y); the ket part of Z(r, c) is hZ B(c, r) by hermiticity of X,
-  // Y (checked by check_term_inputs), and Z(c, r) = hZ Z(r, c). No division or sqrt.
+  // One thread per element (r, c) with r <= c. B(r, c) is the bra part (lifted
+  // one-body list of row r acting on column c of X, Y); the ket part of Z(r, c)
+  // is hZ B(c, r) by hermiticity of X, Y (checked by check_term_inputs), and
+  // Z(c, r) = hZ Z(r, c). No division or sqrt.
   exec::parallel_for(
       "commutator::comm122ss", total, IMSRG_LAMBDA(const exec::Index e) {
         const int ch = detail::find_block(block_offset, nch, e);
@@ -222,7 +235,8 @@ void comm122ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z, Wo
           const int row = side == 0 ? r : c;
           const std::int64_t col = side == 0 ? c : r;
           double acc = 0.0;
-          for (int t = entry_offset[rb + row]; t < entry_offset[rb + row + 1]; ++t) {
+          for (int t = entry_offset[rb + row]; t < entry_offset[rb + row + 1];
+               ++t) {
             const std::int64_t idx = off + lm[t] + col * n;
             double v = 0.0;
             if (yd != nullptr) v += x1(lfrom[t], lto[t]) * yd[idx];

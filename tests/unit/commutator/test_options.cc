@@ -25,8 +25,10 @@ TEST(commutator_options, set_reset_test) {
 }
 
 TEST(commutator_options, union_intersection_presets) {
-  const TermMask a = TermMask::only(Term::comm110ss) | TermMask::only(Term::comm220ss);
-  const TermMask b = TermMask::only(Term::comm220ss) | TermMask::only(Term::comm111ss);
+  const TermMask a =
+      TermMask::only(Term::comm110ss) | TermMask::only(Term::comm220ss);
+  const TermMask b =
+      TermMask::only(Term::comm220ss) | TermMask::only(Term::comm111ss);
   EXPECT_EQ(a & b, TermMask::only(Term::comm220ss));
   EXPECT_TRUE(TermMask::none().empty());
   const TermMask all = TermMask::imsrg2();
@@ -38,7 +40,8 @@ TEST(commutator_options, union_intersection_presets) {
 TEST(commutator_options, name_round_trip) {
   for (int t = 0; t < imsrg::commutator::kNumTerms; ++t) {
     const auto term = static_cast<Term>(t);
-    const auto back = imsrg::commutator::term_from_name(imsrg::commutator::term_name(term));
+    const auto back =
+        imsrg::commutator::term_from_name(imsrg::commutator::term_name(term));
     ASSERT_TRUE(back.has_value());
     EXPECT_EQ(*back, term);
   }

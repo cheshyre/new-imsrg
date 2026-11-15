@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Tests of Operator: construction, sizing, hermiticity propagation, same_model_space, copies.
+// Tests of Operator: construction, sizing, hermiticity propagation,
+// same_model_space, copies.
 #include <memory>
 #include <utility>
 
@@ -16,9 +17,10 @@ namespace {
 using namespace imsrg;
 using namespace imsrg::op;
 
-std::shared_ptr<const basis::ModelSpace> make_ms(int emax, const char* nucleus = "O16") {
-  return basis::ModelSpace::from_names(basis::BasisTruncation{.emax = emax}, 16.0, nucleus,
-                                       nucleus);
+std::shared_ptr<const basis::ModelSpace> make_ms(int emax,
+                                                 const char* nucleus = "O16") {
+  return basis::ModelSpace::from_names(basis::BasisTruncation{.emax = emax},
+                                       16.0, nucleus, nucleus);
 }
 
 TEST(Operator, DefaultIsEmpty) {
@@ -70,11 +72,13 @@ TEST(Operator, SetZeroClearsAllParts) {
   Operator o(make_ms(1), OperatorSpec::scalar(2));
   o.zero_body() = 3.0;
   o.one_body().set(OrbitIndex{0}, OrbitIndex{0}, 1.0);
-  o.two_body().set(ChannelIndex{0}, ChannelIndex{0}, LocalKetIndex{0}, LocalKetIndex{0}, 2.0);
+  o.two_body().set(ChannelIndex{0}, ChannelIndex{0}, LocalKetIndex{0},
+                   LocalKetIndex{0}, 2.0);
   o.set_zero();
   EXPECT_EQ(o.zero_body(), 0.0);
   EXPECT_EQ(o.one_body().get(OrbitIndex{0}, OrbitIndex{0}), 0.0);
-  EXPECT_EQ(o.two_body().get(ChannelIndex{0}, ChannelIndex{0}, LocalKetIndex{0}, LocalKetIndex{0}),
+  EXPECT_EQ(o.two_body().get(ChannelIndex{0}, ChannelIndex{0}, LocalKetIndex{0},
+                             LocalKetIndex{0}),
             0.0);
 }
 
@@ -108,15 +112,18 @@ TEST(Operator, CopyIsDeepAndShareslModelSpace) {
   Operator a(make_ms(1), OperatorSpec::scalar(2));
   a.zero_body() = 1.0;
   a.one_body().set(OrbitIndex{0}, OrbitIndex{1}, 2.0);
-  a.two_body().set(ChannelIndex{0}, ChannelIndex{0}, LocalKetIndex{0}, LocalKetIndex{0}, 3.0);
+  a.two_body().set(ChannelIndex{0}, ChannelIndex{0}, LocalKetIndex{0},
+                   LocalKetIndex{0}, 3.0);
   Operator c = a;
   EXPECT_EQ(c.model_space_ptr(), a.model_space_ptr());
   c.zero_body() = 10.0;
   c.one_body().set(OrbitIndex{0}, OrbitIndex{1}, 20.0);
-  c.two_body().set(ChannelIndex{0}, ChannelIndex{0}, LocalKetIndex{0}, LocalKetIndex{0}, 30.0);
+  c.two_body().set(ChannelIndex{0}, ChannelIndex{0}, LocalKetIndex{0},
+                   LocalKetIndex{0}, 30.0);
   EXPECT_EQ(a.zero_body(), 1.0);
   EXPECT_EQ(a.one_body().get(OrbitIndex{0}, OrbitIndex{1}), 2.0);
-  EXPECT_EQ(a.two_body().get(ChannelIndex{0}, ChannelIndex{0}, LocalKetIndex{0}, LocalKetIndex{0}),
+  EXPECT_EQ(a.two_body().get(ChannelIndex{0}, ChannelIndex{0}, LocalKetIndex{0},
+                             LocalKetIndex{0}),
             3.0);
 }
 
@@ -125,7 +132,8 @@ TEST(Operator, MovedFromIsEmpty) {
   a.zero_body() = 5.0;
   const auto* data = a.one_body().host_view().data;
   Operator b = std::move(a);
-  EXPECT_TRUE(a.empty());  // NOLINT(bugprone-use-after-move): documented moved-from state
+  EXPECT_TRUE(a.empty());  // NOLINT(bugprone-use-after-move): documented
+                           // moved-from state
   EXPECT_FALSE(b.empty());
   EXPECT_EQ(b.zero_body(), 5.0);
   EXPECT_EQ(b.one_body().host_view().data, data);

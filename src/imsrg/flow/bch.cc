@@ -13,7 +13,8 @@
 
 namespace imsrg::flow {
 
-op::Operator with_particle_rank(const op::Operator& op, std::int32_t particle_rank) {
+op::Operator with_particle_rank(const op::Operator& op,
+                                std::int32_t particle_rank) {
   if (op.spec().particle_rank >= particle_rank) return op;
   op::OperatorSpec spec = op.spec();
   spec.particle_rank = particle_rank;
@@ -22,20 +23,23 @@ op::Operator with_particle_rank(const op::Operator& op, std::int32_t particle_ra
   return out;
 }
 
-op::Operator bch_transform(const op::Operator& X, const op::Operator& Omega, const BchOptions& opts,
-                           const commutator::CommutatorOptions& copts, commutator::Workspace& ws,
-                           BchReport* report) {
+op::Operator bch_transform(const op::Operator& X, const op::Operator& Omega,
+                           const BchOptions& opts,
+                           const commutator::CommutatorOptions& copts,
+                           commutator::Workspace& ws, BchReport* report) {
   if (report != nullptr) *report = BchReport{};
   const double nx = op::norm(X);
   const double ny = op::norm(Omega);
   op::Operator out = with_particle_rank(X, 2);
   if (!(nx > opts.transform_threshold)) return out;
 
-  // Two alternating buffers hold the nested commutators (no allocation after the first one).
+  // Two alternating buffers hold the nested commutators (no allocation after
+  // the first one).
   op::Operator nested = out;
   op::Operator next;
   double factorial_denom = 1.0;
-  // ny == 0 gives +inf under IEEE rules, as in imsrg++ (one commutator, then stop).
+  // ny == 0 gives +inf under IEEE rules, as in imsrg++ (one commutator, then
+  // stop).
   double epsilon = nx * std::exp(-2 * ny) * opts.transform_threshold / (2 * ny);
   int count = 0;
   bool converged = false;
@@ -51,9 +55,11 @@ op::Operator bch_transform(const op::Operator& X, const op::Operator& Omega, con
       break;
     }
     if (i == opts.warn_iterations)
-      log::warn("BCH transform not converged after {} nested commutators", opts.warn_iterations);
+      log::warn("BCH transform not converged after {} nested commutators",
+                opts.warn_iterations);
     else if (i == opts.max_iterations)
-      log::warn("BCH transform did not converge after {} nested commutators", opts.max_iterations);
+      log::warn("BCH transform did not converge after {} nested commutators",
+                opts.max_iterations);
   }
   if (report != nullptr) {
     report->nested_commutators = count;
@@ -62,11 +68,14 @@ op::Operator bch_transform(const op::Operator& X, const op::Operator& Omega, con
   return out;
 }
 
-op::Operator bch_product(const op::Operator& X, const op::Operator& Y, const BchOptions& opts,
-                         const commutator::CommutatorOptions& copts, commutator::Workspace& ws) {
-  constexpr std::array<double, 9> bernoulli = {1.0, -0.5,    1. / 6, 0.0,     -1. / 30,
-                                               0.0, 1. / 42, 0.0,    -1. / 30};
-  constexpr std::array<double, 9> factorial = {1.0, 1.0, 2.0, 6.0, 24., 120., 720., 5040., 40320.};
+op::Operator bch_product(const op::Operator& X, const op::Operator& Y,
+                         const BchOptions& opts,
+                         const commutator::CommutatorOptions& copts,
+                         commutator::Workspace& ws) {
+  constexpr std::array<double, 9> bernoulli = {
+      1.0, -0.5, 1. / 6, 0.0, -1. / 30, 0.0, 1. / 42, 0.0, -1. / 30};
+  constexpr std::array<double, 9> factorial = {1.0,  1.0,  2.0,   6.0,   24.,
+                                               120., 720., 5040., 40320.};
   const double thr = opts.product_threshold;
   const double nx = op::norm(X);
   const double ny = op::norm(Y);

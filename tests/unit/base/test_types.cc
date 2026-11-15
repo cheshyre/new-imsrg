@@ -78,7 +78,8 @@ TEST(Types, ParityProduct) {
   for (int l1 = 0; l1 < 6; ++l1) {
     for (int l2 = 0; l2 < 6; ++l2) {
       EXPECT_EQ(parity_of_l(l1) * parity_of_l(l2), parity_of_l(l1 + l2));
-      EXPECT_EQ(sign(parity_of_l(l1)) * sign(parity_of_l(l2)), sign(parity_of_l(l1 + l2)));
+      EXPECT_EQ(sign(parity_of_l(l1)) * sign(parity_of_l(l2)),
+                sign(parity_of_l(l1 + l2)));
     }
   }
 }

@@ -15,7 +15,8 @@
 namespace imsrg::op {
 
 Operator normal_order(const Operator& op, const No2bThreeBody& v3,
-                      std::span<const double> occupations, NormalOrderDirection direction) {
+                      std::span<const double> occupations,
+                      NormalOrderDirection direction) {
   IMSRG_CHECK(!op.empty(), "normal_order(NO2B): empty operator");
   IMSRG_CHECK(op.hermiticity() == Hermiticity::Hermitian,
               "normal_order(NO2B): the operator must be Hermitian");
@@ -33,7 +34,8 @@ Operator normal_order(const Operator& op, const No2bThreeBody& v3,
   }
   const std::int32_t e3max = v3.truncation().e3max;
 
-  Operator gamma(op.model_space_ptr(), OperatorSpec::scalar(2, Hermiticity::Hermitian));
+  Operator gamma(op.model_space_ptr(),
+                 OperatorSpec::scalar(2, Hermiticity::Hermitian));
   const basis::TwoBodyChannels& tbc = gamma.two_body().channels();
   for (std::int32_t c = 0; c < tbc.num_channels(); ++c) {
     const ChannelIndex ch{c};
@@ -51,14 +53,15 @@ Operator normal_order(const Operator& op, const No2bThreeBody& v3,
         double g = 0.0;
         for (const std::int32_t a : occupied) {
           const basis::Orbit& oa = sp.orbit(OrbitIndex{a});
-          if (op_.e() + oq.e() + oa.e() > e3max || orr.e() + ot.e() + oa.e() > e3max) {
+          if (op_.e() + oq.e() + oa.e() > e3max ||
+              orr.e() + ot.e() + oa.e() > e3max) {
             continue;
           }
-          g +=
-              s * occupations[static_cast<std::size_t>(a)] * v3.get_pn(op_, oq, oa, orr, ot, oa, J);
+          g += s * occupations[static_cast<std::size_t>(a)] *
+               v3.get_pn(op_, oq, oa, orr, ot, oa, J);
         }
-        g /= (2 * J + 1) *
-             std::sqrt((1.0 + (bra.p == bra.q ? 1.0 : 0.0)) * (1.0 + (ket.p == ket.q ? 1.0 : 0.0)));
+        g /= (2 * J + 1) * std::sqrt((1.0 + (bra.p == bra.q ? 1.0 : 0.0)) *
+                                     (1.0 + (ket.p == ket.q ? 1.0 : 0.0)));
         gamma.two_body().set(ch, ch, LocalKetIndex{i}, LocalKetIndex{k}, g);
         gamma.two_body().set(ch, ch, LocalKetIndex{k}, LocalKetIndex{i}, g);
       }

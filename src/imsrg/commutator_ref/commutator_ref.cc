@@ -1,22 +1,26 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// Reference implementations of the scalar IMSRG(2) commutator terms (see commutator_ref.h).
+// Reference implementations of the scalar IMSRG(2) commutator terms (see
+// commutator_ref.h).
 //
-// Everything is written as the plain loops of imsrg++ `ReferenceImplementations/
-// IMSRG2Commutators.cc`, with unnormalized matrix elements and explicit 6j symbols. Deviations
-// from imsrg++ are deliberate and listed here:
-//  * every stored element of Z is computed (both triangles of every block, all (i, j) of the
-//    one-body channels) and written with `TwoBody::set` / `OneBody::set_element`, without
-//    mirroring, so non-Hermitian inputs give the right result;
-//  * the particle-hole term precomputes the Pandya-transformed matrix elements once per call
-//    (a dense table) instead of recomputing them inside the innermost loops; the expressions are
-//    unchanged.
+// Everything is written as the plain loops of imsrg++
+// `ReferenceImplementations/ IMSRG2Commutators.cc`, with unnormalized matrix
+// elements and explicit 6j symbols. Deviations from imsrg++ are deliberate and
+// listed here:
+//  * every stored element of Z is computed (both triangles of every block, all
+//    (i, j) of the one-body channels) and written with `TwoBody::set` /
+//    `OneBody::set_element`, without mirroring, so non-Hermitian inputs give
+//    the right result;
+//  * the particle-hole term precomputes the Pandya-transformed matrix elements
+//    once per call (a dense table) instead of recomputing them inside the
+//    innermost loops; the expressions are unchanged.
 //
-// Memory model: all element accessors read and write the host mirror. The inputs X and Y are
-// const and are assumed to be synchronized with their host mirrors (true on the OpenMP and Serial
-// backends, where host and device memory coincide, and after any host-side construction); Z is
-// synchronized to the device at the end of every function.
+// Memory model: all element accessors read and write the host mirror. The
+// inputs X and Y are const and are assumed to be synchronized with their host
+// mirrors (true on the OpenMP and Serial backends, where host and device memory
+// coincide, and after any host-side construction); Z is synchronized to the
+// device at the end of every function.
 #include "imsrg/commutator_ref/commutator_ref.h"
 
 #include <algorithm>
@@ -41,7 +45,9 @@ class Occupations {
     const auto occ = X.model_space().reference().occupations();
     values_.assign(occ.begin(), occ.end());
   }
-  double operator[](int a) const { return values_[static_cast<std::size_t>(a)]; }
+  double operator[](int a) const {
+    return values_[static_cast<std::size_t>(a)];
+  }
 
  private:
   std::vector<double> values_;
@@ -61,8 +67,9 @@ double tbme(const Operator& O, int J, int a, int b, int c, int d) {
   return O.two_body().get_unnormalized(oi(a), oi(b), oi(c), oi(d), TwoJ{2 * J});
 }
 
-/// Adds f(J, i, j, k, l) (an unnormalized two-body value) to EVERY stored element of Z: divides
-/// by sqrt(2) for i == j and for k == l (imsrg++ normalization before AddToTBME), no mirroring.
+/// Adds f(J, i, j, k, l) (an unnormalized two-body value) to EVERY stored
+/// element of Z: divides by sqrt(2) for i == j and for k == l (imsrg++
+/// normalization before AddToTBME), no mirroring.
 template <class F>
 void add_to_every_two_body_element(Operator& Z, F&& f) {
   const auto& chans = Z.model_space().two_body();
@@ -98,31 +105,41 @@ void add_to_every_one_body_element(Operator& Z, F&& f) {
   for (int i = 0; i < n; ++i) {
     for (const OrbitIndex jo : basis.same_ljtz(oi(i))) {
       const int j = jo.value();
-      Z.one_body().set_element(oi(i), jo, Z.one_body().get(oi(i), jo) + f(i, j));
+      Z.one_body().set_element(oi(i), jo,
+                               Z.one_body().get(oi(i), jo) + f(i, j));
     }
   }
 }
 
-int j2_of(const Operator& O, int a) { return O.model_space().basis().orbit(oi(a)).j2.twice; }
+int j2_of(const Operator& O, int a) {
+  return O.model_space().basis().orbit(oi(a)).j2.twice;
+}
 
 }  // namespace
 
-op::OperatorSpec commutator_spec(const op::OperatorSpec& x, const op::OperatorSpec& y) {
+op::OperatorSpec commutator_spec(const op::OperatorSpec& x,
+                                 const op::OperatorSpec& y) {
   if (!x.is_scalar() || !y.is_scalar()) {
-    throw NotImplementedError("commutator_ref: only scalar operators are supported");
+    throw NotImplementedError(
+        "commutator_ref: only scalar operators are supported");
   }
   if (!x.is_number_conserving() || !y.is_number_conserving()) {
-    throw NotImplementedError("commutator_ref: only number-conserving operators are supported");
+    throw NotImplementedError(
+        "commutator_ref: only number-conserving operators are supported");
   }
   if (x.particle_rank > 2 || y.particle_rank > 2) {
-    throw NotImplementedError("commutator_ref: particle rank 3 is not supported");
+    throw NotImplementedError(
+        "commutator_ref: particle rank 3 is not supported");
   }
-  op::OperatorSpec z = op::OperatorSpec::scalar(std::max(x.particle_rank, y.particle_rank));
-  if (x.hermiticity == Hermiticity::NonHermitian || y.hermiticity == Hermiticity::NonHermitian) {
+  op::OperatorSpec z =
+      op::OperatorSpec::scalar(std::max(x.particle_rank, y.particle_rank));
+  if (x.hermiticity == Hermiticity::NonHermitian ||
+      y.hermiticity == Hermiticity::NonHermitian) {
     z.hermiticity = Hermiticity::NonHermitian;
   } else {
-    z.hermiticity =
-        (x.hermiticity == y.hermiticity) ? Hermiticity::AntiHermitian : Hermiticity::Hermitian;
+    z.hermiticity = (x.hermiticity == y.hermiticity)
+                        ? Hermiticity::AntiHermitian
+                        : Hermiticity::Hermitian;
   }
   return z;
 }
@@ -137,7 +154,8 @@ void comm110ss(const Operator& X, const Operator& Y, Operator& Z) {
       const double yba = Y.one_body().get(oi(b), oi(a));
       const double yab = Y.one_body().get(oi(a), oi(b));
       const double xba = X.one_body().get(oi(b), oi(a));
-      z0 += (j2_of(X, a) + 1) * occ[a] * (1.0 - occ[b]) * (xab * yba - yab * xba);
+      z0 +=
+          (j2_of(X, a) + 1) * occ[a] * (1.0 - occ[b]) * (xab * yba - yab * xba);
     }
   }
   Z.zero_body() += z0;
@@ -156,10 +174,12 @@ void comm220ss(const Operator& X, const Operator& Y, Operator& Z) {
         for (int d = 0; d < n; ++d) {
           const double w = occ[a] * occ[b] * (1.0 - occ[c]) * (1.0 - occ[d]);
           if (w == 0.0) continue;
-          const int Jmin =
-              std::max(std::abs(j2_of(X, a) - j2_of(X, b)), std::abs(j2_of(X, c) - j2_of(X, d))) /
+          const int Jmin = std::max(std::abs(j2_of(X, a) - j2_of(X, b)),
+                                    std::abs(j2_of(X, c) - j2_of(X, d))) /
+                           2;
+          const int Jmax =
+              std::min(j2_of(X, a) + j2_of(X, b), j2_of(X, c) + j2_of(X, d)) /
               2;
-          const int Jmax = std::min(j2_of(X, a) + j2_of(X, b), j2_of(X, c) + j2_of(X, d)) / 2;
           for (int J = Jmin; J <= Jmax; ++J) {
             z0 += 0.25 * (2 * J + 1) * w *
                   (tbme(X, J, a, b, c, d) * tbme(Y, J, c, d, a, b) -
@@ -187,7 +207,8 @@ void comm111ss(const Operator& X, const Operator& Y, Operator& Z) {
 }
 
 void comm121ss(const Operator& X, const Operator& Y, Operator& Z) {
-  // [X1,Y2] and [X2,Y1] each need only one two-body operand: skip only if both are missing.
+  // [X1,Y2] and [X2,Y1] each need only one two-body operand: skip only if both
+  // are missing.
   if (!X.two_body().allocated() && !Y.two_body().allocated()) return;
   const int n = X.model_space().num_orbits();
   const auto occ = occupations_of(X);
@@ -224,8 +245,8 @@ void comm221ss(const Operator& X, const Operator& Y, Operator& Z) {
     for (int c = 0; c < n; ++c) {
       for (int a = 0; a < n; ++a) {
         for (int b = 0; b < n; ++b) {
-          const double w =
-              occ[a] * occ[b] * (1.0 - occ[c]) + (1.0 - occ[a]) * (1.0 - occ[b]) * occ[c];
+          const double w = occ[a] * occ[b] * (1.0 - occ[c]) +
+                           (1.0 - occ[a]) * (1.0 - occ[b]) * occ[c];
           if (w == 0.0) continue;
           const int ja = j2_of(X, a);
           const int jb = j2_of(X, b);
@@ -246,7 +267,8 @@ void comm221ss(const Operator& X, const Operator& Y, Operator& Z) {
 }
 
 void comm122ss(const Operator& X, const Operator& Y, Operator& Z) {
-  // One factor may be a pure one-body operator (its unallocated two-body part reads as zero).
+  // One factor may be a pure one-body operator (its unallocated two-body part
+  // reads as zero).
   if (!Z.two_body().allocated()) return;
   if (!X.two_body().allocated() && !Y.two_body().allocated()) return;
   const int n = X.model_space().num_orbits();
@@ -295,15 +317,18 @@ void comm222_phss(const Operator& X, const Operator& Y, Operator& Z) {
   const auto occ = occupations_of(X);
   const int Jbig = X.model_space().basis().max_two_body_J();
 
-  // Pandya table F[Jp][p][q][r][s] = - sum_Jpp (2 Jpp + 1) {j_p j_q Jp; j_r j_s Jpp}
-  //                                          <p s; Jpp| V |r q; Jpp>   (unnormalized),
+  // Pandya table
+  //   F[Jp][p][q][r][s] = - sum_Jpp (2 Jpp + 1) {j_p j_q Jp; j_r j_s Jpp}
+  //                       <p s; Jpp| V |r q; Jpp>   (unnormalized),
   // so xbar_ilab = F[Jp][i][l][a][b] and xbar_abkj = F[Jp][a][b][k][j].
-  const std::size_t n2 = static_cast<std::size_t>(n) * static_cast<std::size_t>(n);
+  const std::size_t n2 =
+      static_cast<std::size_t>(n) * static_cast<std::size_t>(n);
   const std::size_t n4 = n2 * n2;
   auto idx = [&](int Jp, int p, int q, int r, int s) {
     const auto un = static_cast<std::size_t>(n);
     return static_cast<std::size_t>(Jp) * n4 +
-           ((static_cast<std::size_t>(p) * un + static_cast<std::size_t>(q)) * un +
+           ((static_cast<std::size_t>(p) * un + static_cast<std::size_t>(q)) *
+                un +
             static_cast<std::size_t>(r)) *
                un +
            static_cast<std::size_t>(s);
@@ -319,12 +344,14 @@ void comm222_phss(const Operator& X, const Operator& Y, Operator& Z) {
               const int jq = j2_of(O, q);
               const int jr = j2_of(O, r);
               const int js = j2_of(O, s);
-              const int Jmin = std::max(std::abs(jp - js), std::abs(jr - jq)) / 2;
+              const int Jmin =
+                  std::max(std::abs(jp - js), std::abs(jr - jq)) / 2;
               const int Jmax = std::min(jp + js, jr + jq) / 2;
               double f = 0.0;
               for (int Jpp = Jmin; Jpp <= Jmax; ++Jpp) {
-                const double sixj = angmom::wigner_6j(TwoJ{jp}, TwoJ{jq}, TwoJ{2 * Jp}, TwoJ{jr},
-                                                      TwoJ{js}, TwoJ{2 * Jpp});
+                const double sixj =
+                    angmom::wigner_6j(TwoJ{jp}, TwoJ{jq}, TwoJ{2 * Jp},
+                                      TwoJ{jr}, TwoJ{js}, TwoJ{2 * Jpp});
                 f -= (2 * Jpp + 1) * sixj * tbme(O, Jpp, p, s, r, q);
               }
               F[idx(Jp, p, q, r, s)] = f;
@@ -346,7 +373,8 @@ void comm222_phss(const Operator& X, const Operator& Y, Operator& Z) {
     const int Jpmin = std::min(std::max(std::abs(ji - jl), std::abs(jj - jk)),
                                std::max(std::abs(jj - jl), std::abs(ji - jk))) /
                       2;
-    const int Jpmax = std::max(std::min(ji + jl, jj + jk), std::min(jj + jl, ji + jk)) / 2;
+    const int Jpmax =
+        std::max(std::min(ji + jl, jj + jk), std::min(jj + jl, ji + jk)) / 2;
     double z = 0.0;
     for (int Jp = Jpmin; Jp <= Jpmax; ++Jp) {
       double zbar_ilkj = 0.0;
@@ -361,10 +389,10 @@ void comm222_phss(const Operator& X, const Operator& Y, Operator& Z) {
                             FY[idx(Jp, j, l, a, b)] * FX[idx(Jp, a, b, k, i)]);
         }
       }
-      const double sixj_ijkl =
-          angmom::wigner_6j(TwoJ{ji}, TwoJ{jj}, TwoJ{2 * J}, TwoJ{jk}, TwoJ{jl}, TwoJ{2 * Jp});
-      const double sixj_jikl =
-          angmom::wigner_6j(TwoJ{jj}, TwoJ{ji}, TwoJ{2 * J}, TwoJ{jk}, TwoJ{jl}, TwoJ{2 * Jp});
+      const double sixj_ijkl = angmom::wigner_6j(
+          TwoJ{ji}, TwoJ{jj}, TwoJ{2 * J}, TwoJ{jk}, TwoJ{jl}, TwoJ{2 * Jp});
+      const double sixj_jikl = angmom::wigner_6j(
+          TwoJ{jj}, TwoJ{ji}, TwoJ{2 * J}, TwoJ{jk}, TwoJ{jl}, TwoJ{2 * Jp});
       const int phase_ij = phase_of((ji + jj - 2 * J) / 2);
       z += (2 * Jp + 1) * sixj_ijkl * zbar_ilkj;
       z -= (2 * Jp + 1) * sixj_jikl * zbar_jlki * phase_ij;

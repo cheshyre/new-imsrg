@@ -23,8 +23,8 @@ struct KeyCollector {
   }
 
   template <class Section, class Body>
-  void optional_table(std::string_view /*table*/, const std::optional<Section>& /*section*/,
-                      Body&& body) {
+  void optional_table(std::string_view /*table*/,
+                      const std::optional<Section>& /*section*/, Body&& body) {
     const Section tmp{};
     body(tmp);
   }
@@ -41,12 +41,14 @@ struct SchemaLists {
     visit_schema(defaults, collector);
     keys = std::move(collector.keys);
     for (const KeyInfo& key : keys) {
-      // Every proper prefix of the path is a table ("imsrg", "imsrg.generator").
+      // Every proper prefix of the path is a table ("imsrg",
+      // "imsrg.generator").
       std::string_view path = key.path;
       for (std::size_t pos = path.find('.'); pos != std::string_view::npos;
            pos = path.find('.', pos + 1)) {
         std::string table(path.substr(0, pos));
-        if (std::find(table_storage.begin(), table_storage.end(), table) == table_storage.end()) {
+        if (std::find(table_storage.begin(), table_storage.end(), table) ==
+            table_storage.end()) {
           table_storage.push_back(std::move(table));
         }
       }
@@ -75,7 +77,8 @@ std::span<const std::string_view> schema_tables() { return lists().tables; }
 
 std::vector<std::string_view> schema_children(std::string_view table) {
   std::vector<std::string_view> children;
-  const std::string prefix = table.empty() ? std::string() : std::string(table) + ".";
+  const std::string prefix =
+      table.empty() ? std::string() : std::string(table) + ".";
   auto add_child = [&](std::string_view path) {
     if (!path.starts_with(prefix)) return;
     std::string_view rest = path.substr(prefix.size());

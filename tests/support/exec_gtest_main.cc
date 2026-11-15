@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// GoogleTest main for tests that need the execution runtime. Link with NO_GTEST_MAIN and add this
-// source to the test: it initializes the exec::Runtime (Kokkos, honouring --kokkos-* arguments)
-// around RUN_ALL_TESTS. Other modules' kernel tests reuse it.
+// GoogleTest main for tests that need the execution runtime. Link with
+// NO_GTEST_MAIN and add this source to the test: it initializes the
+// exec::Runtime (Kokkos, honouring --kokkos-* arguments) around RUN_ALL_TESTS.
+// Other modules' kernel tests reuse it.
 #include <gtest/gtest.h>
 
 #include "imsrg/exec/runtime.h"

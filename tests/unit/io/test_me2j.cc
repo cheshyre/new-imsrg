@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright 2026 The imsrg authors
 
-// me2j value counts and the reader on a tiny synthetic file with hand-checked elements.
+// me2j value counts and the reader on a tiny synthetic file with hand-checked
+// elements.
+#include <unistd.h>
+
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -15,7 +18,6 @@
 #include <vector>
 
 #include <gtest/gtest.h>
-#include <unistd.h>
 
 #include "imsrg/base/error.h"
 #include "imsrg/base/types.h"
@@ -30,10 +32,11 @@ using namespace imsrg;
 using namespace imsrg::io;
 namespace fs = std::filesystem;
 
-// ---------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // Value counts.
 
-/// Independent brute-force count of the records of a me2j file over explicit (e, l, 2j) orbits.
+/// Independent brute-force count of the records of a me2j file over explicit
+/// (e, l, 2j) orbits.
 std::int64_t brute_force_count(int e1max, int e2max, int lmax, int emax_read) {
   struct O {
     int e, l, j2;
@@ -56,10 +59,13 @@ std::int64_t brute_force_count(int e1max, int e2max, int lmax, int emax_read) {
       for (std::size_t c = 0; c <= a; ++c) {
         for (std::size_t d = 0; d <= (c == a ? b : c); ++d) {
           if (orbs[c].e + orbs[d].e > e2max) continue;
-          if ((orbs[a].l + orbs[b].l + orbs[c].l + orbs[d].l) % 2 != 0) continue;
-          const int jmin =
-              std::max(std::abs(orbs[a].j2 - orbs[b].j2), std::abs(orbs[c].j2 - orbs[d].j2)) / 2;
-          const int jmax = std::min(orbs[a].j2 + orbs[b].j2, orbs[c].j2 + orbs[d].j2) / 2;
+          if ((orbs[a].l + orbs[b].l + orbs[c].l + orbs[d].l) % 2 != 0)
+            continue;
+          const int jmin = std::max(std::abs(orbs[a].j2 - orbs[b].j2),
+                                    std::abs(orbs[c].j2 - orbs[d].j2)) /
+                           2;
+          const int jmax =
+              std::min(orbs[a].j2 + orbs[b].j2, orbs[c].j2 + orbs[d].j2) / 2;
           if (jmax >= jmin) n += jmax - jmin + 1;
         }
       }
@@ -73,7 +79,8 @@ TEST(Me2jCount, ReferenceValueOfTheEmax14File) {
 }
 
 TEST(Me2jCount, SmallCountsFromTheReferenceScript) {
-  // Values computed with tools/reference/me2j_value_count.py (imsrg++ loop order).
+  // Values computed with tools/reference/me2j_value_count.py (imsrg++ loop
+  // order).
   EXPECT_EQ(me2j_value_count({1, 2, 1}), 100);
   EXPECT_EQ(me2j_value_count({2, 4, 2}), 904);
   EXPECT_EQ(me2j_value_count({2, 4, 1}), 224);
@@ -87,7 +94,8 @@ TEST(Me2jCount, AgreesWithBruteForce) {
     for (int e2 : {e1, e1 + 1, 2 * e1}) {
       for (int lm : {1, 2, e1}) {
         if (e2 <= 0 || lm <= 0) continue;
-        EXPECT_EQ(me2j_value_count({e1, e2, lm}), brute_force_count(e1, e2, lm, 99))
+        EXPECT_EQ(me2j_value_count({e1, e2, lm}),
+                  brute_force_count(e1, e2, lm, 99))
             << e1 << ' ' << e2 << ' ' << lm;
       }
     }
@@ -96,7 +104,8 @@ TEST(Me2jCount, AgreesWithBruteForce) {
 
 TEST(Me2jCount, DefaultsAreTwiceE1maxAndE1max) {
   EXPECT_EQ(me2j_value_count({3, -1, -1}), me2j_value_count({3, 6, 3}));
-  EXPECT_EQ(me2j_value_count({3, 0, 0}), me2j_value_count({3, 6, 3}));  // imsrg++ tests > 0
+  EXPECT_EQ(me2j_value_count({3, 0, 0}),
+            me2j_value_count({3, 6, 3}));  // imsrg++ tests > 0
 }
 
 TEST(Me2jCount, PrefixIsSmallerAndUsesTheFileE2max) {
@@ -108,13 +117,16 @@ TEST(Me2jCount, PrefixIsSmallerAndUsesTheFileE2max) {
   EXPECT_EQ(me2j_value_count(f, 0), brute_force_count(4, 8, 4, 0));
 }
 
-// ---------------------------------------------------------------------------------------------
-// The synthetic file: e1max = 1 (orbits 0: s1/2, 1: p1/2, 2: p3/2), e2max = 2, lmax = 1.
+// -----------------------------------------------------------------------------
+// The synthetic file: e1max = 1 (orbits 0: s1/2, 1: p1/2, 2: p3/2), e2max = 2,
+// lmax = 1.
 
-using Record = std::tuple<int, int, int, int, int>;  // file-order orbit indices and J
-using Values = std::array<double, 4>;                // T0 pn, nn, T1 pn, pp
+using Record =
+    std::tuple<int, int, int, int, int>;  // file-order orbit indices and J
+using Values = std::array<double, 4>;     // T0 pn, nn, T1 pn, pp
 
-/// File text: one header line, then 4 values per record (zeros unless set in `values`).
+/// File text: one header line, then 4 values per record (zeros unless set in
+/// `values`).
 std::string synthetic_text(const std::map<Record, Values>& values) {
   struct O {
     int e, l, j2;
@@ -129,13 +141,18 @@ std::string synthetic_text(const std::map<Record, Values>& values) {
       for (std::size_t c = 0; c <= a; ++c) {
         for (std::size_t d = 0; d <= (c == a ? b : c); ++d) {
           if (orbs[c].e + orbs[d].e > 2) continue;
-          if ((orbs[a].l + orbs[b].l + orbs[c].l + orbs[d].l) % 2 != 0) continue;
-          const int jmin =
-              std::max(std::abs(orbs[a].j2 - orbs[b].j2), std::abs(orbs[c].j2 - orbs[d].j2)) / 2;
-          const int jmax = std::min(orbs[a].j2 + orbs[b].j2, orbs[c].j2 + orbs[d].j2) / 2;
+          if ((orbs[a].l + orbs[b].l + orbs[c].l + orbs[d].l) % 2 != 0)
+            continue;
+          const int jmin = std::max(std::abs(orbs[a].j2 - orbs[b].j2),
+                                    std::abs(orbs[c].j2 - orbs[d].j2)) /
+                           2;
+          const int jmax =
+              std::min(orbs[a].j2 + orbs[b].j2, orbs[c].j2 + orbs[d].j2) / 2;
           for (int J = jmin; J <= jmax; ++J) {
             Values v{0, 0, 0, 0};
-            if (const auto it = values.find({a, b, c, d, J}); it != values.end()) v = it->second;
+            if (const auto it = values.find({a, b, c, d, J});
+                it != values.end())
+              v = it->second;
             os << v[0] << ' ' << v[1] << ' ' << v[2] << ' ' << v[3] << '\n';
             tokens += 4;
           }
@@ -147,11 +164,13 @@ std::string synthetic_text(const std::map<Record, Values>& values) {
   return os.str();
 }
 
-fs::path write_synthetic(const std::string& name, const std::string& text, bool gz) {
-  // The process id keeps parallel ctest processes (one per test) from sharing, and deleting,
-  // each other's files.
+fs::path write_synthetic(const std::string& name, const std::string& text,
+                         bool gz) {
+  // The process id keeps parallel ctest processes (one per test) from sharing,
+  // and deleting, each other's files.
   const fs::path p =
-      fs::temp_directory_path() / ("imsrg_me2j_test_" + std::to_string(::getpid()) + "_" + name);
+      fs::temp_directory_path() /
+      ("imsrg_me2j_test_" + std::to_string(::getpid()) + "_" + name);
   if (gz) {
     GzipWriter w(p);
     w.write(text);
@@ -177,7 +196,8 @@ class Me2jSynthetic : public ::testing::Test {
  protected:
   void SetUp() override {
     ms = model_space(1);
-    // s1/2 pair, J = 0: T0 = 0.25, nn = 0.5, T1 = 0.75, pp = 1.0 (all exactly representable).
+    // s1/2 pair, J = 0: T0 = 0.25, nn = 0.5, T1 = 0.75, pp = 1.0 (all exactly
+    // representable).
     values[{0, 0, 0, 0, 0}] = {0.25, 0.5, 0.75, 1.0};
     // s1/2 pair, J = 1: only T = 0 is allowed for identical orbits.
     values[{0, 0, 0, 0, 1}] = {1.25, 1.5, 1.75, 2.0};
@@ -200,11 +220,13 @@ TEST_F(Me2jSynthetic, IdenticalOrbitJ0HasNormalizationAndPauliGating) {
   const op::TwoBody& tb = H.two_body();
   const OrbitIndex sp = orbit(*ms, 0, 0, 1, -1);
   const OrbitIndex sn = orbit(*ms, 0, 0, 1, +1);
-  // pp, nn: file value / sqrt2 per identical pair (up to the float widening of exact values).
+  // pp, nn: file value / sqrt2 per identical pair (up to the float widening of
+  // exact values).
   EXPECT_NEAR(tb.get_normalized(sp, sp, sp, sp, TwoJ{0}), 1.0 / 2.0, 1e-14);
   EXPECT_NEAR(tb.get_normalized(sn, sn, sn, sn, TwoJ{0}), 0.5 / 2.0, 1e-14);
-  // pn: (V_T1 + V_T0)/2 with T0 gated off for even J of identical orbits: 0.75 / 2 in the
-  // unnormalized-pair convention, times sqrt2 * sqrt2 * 1/2 for the normalized pn state.
+  // pn: (V_T1 + V_T0)/2 with T0 gated off for even J of identical orbits: 0.75
+  // / 2 in the unnormalized-pair convention, times sqrt2 * sqrt2 * 1/2 for the
+  // normalized pn state.
   EXPECT_NEAR(tb.get_normalized(sp, sn, sp, sn, TwoJ{0}), 0.75 / 2.0, 1e-14);
 }
 
@@ -213,9 +235,11 @@ TEST_F(Me2jSynthetic, IdenticalOrbitJ1UsesOnlyIsospinZero) {
   const op::TwoBody& tb = H.two_body();
   const OrbitIndex sp = orbit(*ms, 0, 0, 1, -1);
   const OrbitIndex sn = orbit(*ms, 0, 0, 1, +1);
-  // T0 = 1.25 -> 1.25 / 2; the T1 value 1.75 is Pauli-forbidden for odd J of identical orbits.
+  // T0 = 1.25 -> 1.25 / 2; the T1 value 1.75 is Pauli-forbidden for odd J of
+  // identical orbits.
   EXPECT_NEAR(tb.get_normalized(sp, sn, sp, sn, TwoJ{2}), 1.25 / 2.0, 1e-14);
-  EXPECT_EQ(tb.get_normalized(sp, sp, sp, sp, TwoJ{2}), 0.0);  // no such two-proton state
+  EXPECT_EQ(tb.get_normalized(sp, sp, sp, sp, TwoJ{2}),
+            0.0);  // no such two-proton state
 }
 
 TEST_F(Me2jSynthetic, DistinctOrbitsGivePnpnAndPnnpFromT1AndT0) {
@@ -236,7 +260,8 @@ TEST_F(Me2jSynthetic, DistinctOrbitsGivePnpnAndPnnpFromT1AndT0) {
 }
 
 TEST_F(Me2jSynthetic, GzipAndPlainGiveTheSameOperator) {
-  const auto gz = write_synthetic("synthetic.me2j.gz", synthetic_text(values), true);
+  const auto gz =
+      write_synthetic("synthetic.me2j.gz", synthetic_text(values), true);
   const op::Operator a = read_me2j(path, {.file = {1, 2, 1}}, ms);
   const op::Operator b = read_me2j(gz, {.file = {1, 2, 1}}, ms);
   fs::remove(gz);
@@ -253,9 +278,12 @@ TEST_F(Me2jSynthetic, SmallerModelSpaceReadsOnlyThePrefix) {
   EXPECT_EQ(rep.values_read, 8);  // (s s s s) with J = 0, 1: two records
   const OrbitIndex sp = orbit(*ms0, 0, 0, 1, -1);
   const OrbitIndex sn = orbit(*ms0, 0, 0, 1, +1);
-  EXPECT_NEAR(H.two_body().get_normalized(sp, sn, sp, sn, TwoJ{0}), 0.375, 1e-14);
-  EXPECT_NEAR(H.two_body().get_normalized(sp, sn, sp, sn, TwoJ{2}), 0.625, 1e-14);
-  // A model space larger than the file: records beyond the file's e1max do not exist.
+  EXPECT_NEAR(H.two_body().get_normalized(sp, sn, sp, sn, TwoJ{0}), 0.375,
+              1e-14);
+  EXPECT_NEAR(H.two_body().get_normalized(sp, sn, sp, sn, TwoJ{2}), 0.625,
+              1e-14);
+  // A model space larger than the file: records beyond the file's e1max do not
+  // exist.
   const auto ms2 = model_space(2);
   const op::Operator H2 = read_me2j(path, {.file = {1, 2, 1}}, ms2, &rep);
   EXPECT_EQ(rep.values_read, 100);
@@ -265,26 +293,34 @@ TEST_F(Me2jSynthetic, SmallerModelSpaceReadsOnlyThePrefix) {
 TEST_F(Me2jSynthetic, WholeFileModeVerifiesTheValueCount) {
   Me2jReadReport rep;
   const auto ms0 = model_space(0);
-  (void)read_me2j(path, {.file = {1, 2, 1}, .read_whole_file = true}, ms0, &rep);
-  EXPECT_EQ(rep.values_read, 100);  // the whole file is consumed although ms is small
+  (void)read_me2j(path, {.file = {1, 2, 1}, .read_whole_file = true}, ms0,
+                  &rep);
+  EXPECT_EQ(rep.values_read,
+            100);  // the whole file is consumed although ms is small
   // A truncation that describes fewer values than the file holds is detected.
-  EXPECT_THROW(read_me2j(path, {.file = {1, 1, 1}, .read_whole_file = true}, ms0), InputError);
+  EXPECT_THROW(
+      read_me2j(path, {.file = {1, 1, 1}, .read_whole_file = true}, ms0),
+      InputError);
 }
 
 TEST_F(Me2jSynthetic, TruncatedFileThrowsInputError) {
   const std::string text = synthetic_text(values);
-  const auto p = write_synthetic("truncated.me2j", text.substr(0, text.size() / 2), false);
+  const auto p =
+      write_synthetic("truncated.me2j", text.substr(0, text.size() / 2), false);
   EXPECT_THROW(read_me2j(p, {.file = {1, 2, 1}}, ms), InputError);
   // Claiming a larger truncation than the file has also ends the data early.
-  EXPECT_THROW(read_me2j(path, {.file = {2, 4, 2}}, model_space(2)), InputError);
+  EXPECT_THROW(read_me2j(path, {.file = {2, 4, 2}}, model_space(2)),
+               InputError);
   fs::remove(p);
 }
 
 TEST_F(Me2jSynthetic, MalformedTokenAndMissingFileThrowInputError) {
-  const auto p = write_synthetic("malformed.me2j", "header\n0.25 oops 0.75 1.0\n", false);
+  const auto p =
+      write_synthetic("malformed.me2j", "header\n0.25 oops 0.75 1.0\n", false);
   EXPECT_THROW(read_me2j(p, {.file = {1, 2, 1}}, ms), InputError);
   fs::remove(p);
-  EXPECT_THROW(read_me2j(fs::temp_directory_path() / "imsrg_no_such.me2j", {.file = {1, 2, 1}}, ms),
+  EXPECT_THROW(read_me2j(fs::temp_directory_path() / "imsrg_no_such.me2j",
+                         {.file = {1, 2, 1}}, ms),
                InputError);
   EXPECT_THROW(read_me2j(path, {.file = {1, 2, 1}}, nullptr), InputError);
 }

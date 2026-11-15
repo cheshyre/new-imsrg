@@ -35,24 +35,32 @@ std::string fmt17(double x) {
   return buf;
 }
 
-[[noreturn]] void fail_at(std::string_view name, int line, const std::string& msg) {
+[[noreturn]] void fail_at(std::string_view name, int line,
+                          const std::string& msg) {
   throw InputError(std::string(name) + ":" + std::to_string(line) + ": " + msg);
 }
 
 /// Whitespace-separated fields of one record line.
 class Fields {
  public:
-  Fields(std::string_view line, std::string_view name, int lineno) : name_(name), lineno_(lineno) {
+  Fields(std::string_view line, std::string_view name, int lineno)
+      : name_(name), lineno_(lineno) {
     std::size_t i = 0;
     while (i < line.size()) {
-      while (i < line.size() && (line[i] == ' ' || line[i] == '\t' || line[i] == '\r')) ++i;
+      while (i < line.size() &&
+             (line[i] == ' ' || line[i] == '\t' || line[i] == '\r'))
+        ++i;
       std::size_t j = i;
-      while (j < line.size() && line[j] != ' ' && line[j] != '\t' && line[j] != '\r') ++j;
+      while (j < line.size() && line[j] != ' ' && line[j] != '\t' &&
+             line[j] != '\r')
+        ++j;
       if (j > i) tokens_.emplace_back(line.substr(i, j - i));
       i = j;
     }
   }
-  [[noreturn]] void fail(const std::string& msg) const { fail_at(name_, lineno_, msg); }
+  [[noreturn]] void fail(const std::string& msg) const {
+    fail_at(name_, lineno_, msg);
+  }
   bool empty() const { return pos_ >= tokens_.size(); }
   std::string next_token(const char* what) {
     if (empty()) fail(std::string("missing field ") + what);
@@ -61,7 +69,8 @@ class Fields {
   std::int32_t next_int(const char* what) {
     const std::string tok = next_token(what);
     std::int32_t v = 0;
-    const auto [ptr, ec] = std::from_chars(tok.data(), tok.data() + tok.size(), v);
+    const auto [ptr, ec] =
+        std::from_chars(tok.data(), tok.data() + tok.size(), v);
     if (ec != std::errc() || ptr != tok.data() + tok.size()) {
       fail(std::string("cannot parse ") + what + " '" + tok + "'");
     }
@@ -92,12 +101,15 @@ class Fields {
   std::size_t pos_ = 0;
 };
 
-/// Line reader that skips comments (except line 1) and blank lines and tracks line numbers.
+/// Line reader that skips comments (except line 1) and blank lines and tracks
+/// line numbers.
 class LineReader {
  public:
   LineReader(std::istream& in, std::string_view name) : in_(in), name_(name) {}
 
-  [[noreturn]] void fail(const std::string& msg) const { fail_at(name_, lineno_ + 1, msg); }
+  [[noreturn]] void fail(const std::string& msg) const {
+    fail_at(name_, lineno_ + 1, msg);
+  }
   /// Next significant line; false at end of file.
   bool next(std::string& line) {
     while (std::getline(in_, line)) {
@@ -125,10 +137,12 @@ class LineReader {
   }
   void check_version() {
     std::string line;
-    if (!next(line)) fail("empty file, expected '" + std::string(kVersionLine) + "'");
+    if (!next(line))
+      fail("empty file, expected '" + std::string(kVersionLine) + "'");
     if (line != kVersionLine) {
       fail_at(name_, lineno_,
-              "missing or unsupported version line (expected '" + std::string(kVersionLine) + "')");
+              "missing or unsupported version line (expected '" +
+                  std::string(kVersionLine) + "')");
     }
   }
   int lineno() const { return lineno_; }
@@ -226,7 +240,8 @@ ParsedHeader parse_header(LineReader& r) {
   return h;
 }
 
-/// A located ket side: channel label, channel index, local index and exchange phase.
+/// A located ket side: channel label, channel index, local index and exchange
+/// phase.
 struct Side {
   TwoJ two_j{0};
   Parity parity = Parity::Even;
@@ -236,7 +251,8 @@ struct Side {
   int phase = 1;
 };
 
-Side locate_side(const basis::TwoBodyChannels& tb, OrbitIndex a, OrbitIndex b, TwoJ two_j) {
+Side locate_side(const basis::TwoBodyChannels& tb, OrbitIndex a, OrbitIndex b,
+                 TwoJ two_j) {
   const auto orbits = tb.orbits();
   const basis::Orbit& oa = orbits[a.to_size()];
   const basis::Orbit& ob = orbits[b.to_size()];
@@ -254,9 +270,10 @@ Side locate_side(const basis::TwoBodyChannels& tb, OrbitIndex a, OrbitIndex b, T
   return s;
 }
 
-/// Accumulates max|m| and max|m - sgn m^T| of a column-major n x n block at `data`.
-void accumulate_symmetry(const double* data, std::int64_t n, double sgn, double& vmax,
-                         double& dev) {
+/// Accumulates max|m| and max|m - sgn m^T| of a column-major n x n block at
+/// `data`.
+void accumulate_symmetry(const double* data, std::int64_t n, double sgn,
+                         double& vmax, double& dev) {
   for (std::int64_t j = 0; j < n; ++j) {
     for (std::int64_t i = 0; i < n; ++i) {
       const double v = data[i + j * n];
@@ -268,7 +285,8 @@ void accumulate_symmetry(const double* data, std::int64_t n, double sgn, double&
 
 }  // namespace
 
-OperatorDumpHeader read_operator_dump_header(const std::filesystem::path& path) {
+OperatorDumpHeader read_operator_dump_header(
+    const std::filesystem::path& path) {
   std::ifstream in(path);
   const std::string name = path.string();
   if (!in) throw InputError(name + ":0: cannot open file");
@@ -276,26 +294,31 @@ OperatorDumpHeader read_operator_dump_header(const std::filesystem::path& path) 
   return parse_header(r).header;
 }
 
-std::shared_ptr<const basis::ModelSpace> model_space_for_dump(const OperatorDumpHeader& header) {
+std::shared_ptr<const basis::ModelSpace> model_space_for_dump(
+    const OperatorDumpHeader& header) {
   auto b = basis::SingleParticleBasis::harmonic_oscillator(
-      basis::BasisTruncation{.emax = header.emax, .lmax = header.lmax}, header.hw);
+      basis::BasisTruncation{.emax = header.emax, .lmax = header.lmax},
+      header.hw);
   std::vector<double> occ(static_cast<std::size_t>(b.num_orbits()), 0.0);
   for (const auto& d : header.orbits) {
     const auto k = b.find(d.orbit);
     if (!k) {
-      throw InputError("dump orbit " + basis::orbit_label(d.orbit) +
-                       " is not in the harmonic-oscillator basis of the dump header");
+      throw InputError(
+          "dump orbit " + basis::orbit_label(d.orbit) +
+          " is not in the harmonic-oscillator basis of the dump header");
     }
     occ[k->to_size()] = d.occupation;
   }
   std::vector<basis::OrbitClass> classes(occ.size());
   for (std::size_t i = 0; i < occ.size(); ++i) {
-    classes[i] =
-        occ[i] >= basis::kOccupationCut ? basis::OrbitClass::Core : basis::OrbitClass::QSpace;
+    classes[i] = occ[i] >= basis::kOccupationCut ? basis::OrbitClass::Core
+                                                 : basis::OrbitClass::QSpace;
   }
-  auto ref = basis::Reference::from_occupations(b, std::move(occ), header.reference);
+  auto ref =
+      basis::Reference::from_occupations(b, std::move(occ), header.reference);
   auto part = basis::Partition::from_classes(b, std::move(classes));
-  return basis::ModelSpace::create(std::move(b), std::move(ref), std::move(part));
+  return basis::ModelSpace::create(std::move(b), std::move(ref),
+                                   std::move(part));
 }
 
 Operator read_operator_dump(std::istream& in, std::string_view name,
@@ -307,9 +330,11 @@ Operator read_operator_dump(std::istream& in, std::string_view name,
   const OperatorDumpHeader& hd = ph.header;
 
   const double hw_ms = ms->basis().hbar_omega();
-  if (std::abs(hd.hw - hw_ms) > 1e-12 * std::max(std::abs(hd.hw), std::abs(hw_ms))) {
+  if (std::abs(hd.hw - hw_ms) >
+      1e-12 * std::max(std::abs(hd.hw), std::abs(hw_ms))) {
     fail_at(name, ph.basis_line,
-            "hw " + fmt17(hd.hw) + " differs from the model space's " + fmt17(hw_ms));
+            "hw " + fmt17(hd.hw) + " differs from the model space's " +
+                fmt17(hw_ms));
   }
   const std::int32_t norb = static_cast<std::int32_t>(hd.orbits.size());
   std::vector<OrbitIndex> map(hd.orbits.size());
@@ -318,15 +343,21 @@ Operator read_operator_dump(std::istream& in, std::string_view name,
     const auto& d = hd.orbits[static_cast<std::size_t>(i)];
     const int line = ph.orbit_lines[static_cast<std::size_t>(i)];
     const auto k = ms->basis().find(d.orbit);
-    if (!k) fail_at(name, line, "orbit " + basis::orbit_label(d.orbit) + " not in the model space");
+    if (!k)
+      fail_at(
+          name, line,
+          "orbit " + basis::orbit_label(d.orbit) + " not in the model space");
     if (options.check_occupations &&
-        std::abs(ms->reference().occupation(*k) - d.occupation) > options.occupation_tolerance) {
+        std::abs(ms->reference().occupation(*k) - d.occupation) >
+            options.occupation_tolerance) {
       fail_at(name, line,
-              "occupation " + fmt17(d.occupation) + " of orbit " + basis::orbit_label(d.orbit) +
+              "occupation " + fmt17(d.occupation) + " of orbit " +
+                  basis::orbit_label(d.orbit) +
                   " differs from the model-space reference");
     }
     if (mapped[k->to_size()]) {
-      fail_at(name, line, "orbit " + basis::orbit_label(d.orbit) + " is listed twice");
+      fail_at(name, line,
+              "orbit " + basis::orbit_label(d.orbit) + " is listed twice");
     }
     mapped[k->to_size()] = true;
     map[static_cast<std::size_t>(i)] = *k;
@@ -358,18 +389,23 @@ Operator read_operator_dump(std::istream& in, std::string_view name,
     const auto b = f.next_int("b");
     const double v = f.next_double("value");
     f.expect_end();
-    if (a < 0 || b < 0 || a >= norb || b >= norb) f.fail("orbit index out of range");
+    if (a < 0 || b < 0 || a >= norb || b >= norb)
+      f.fail("orbit index out of range");
     {
-      // A scalar one-body operator only connects orbits with equal (l, 2j, tz2); the norms and
-      // the normal ordering ignore other entries, so they must not be accepted silently.
+      // A scalar one-body operator only connects orbits with equal (l, 2j,
+      // tz2); the norms and the normal ordering ignore other entries, so they
+      // must not be accepted silently.
       const auto& oa = hd.orbits[static_cast<std::size_t>(a)].orbit;
       const auto& ob = hd.orbits[static_cast<std::size_t>(b)].orbit;
-      if (hd.spec.is_scalar() && (oa.l != ob.l || oa.j2 != ob.j2 || oa.tz2 != ob.tz2)) {
-        f.fail("one-body entry between orbits of different (l, 2j, tz2) in a scalar operator");
+      if (hd.spec.is_scalar() &&
+          (oa.l != ob.l || oa.j2 != ob.j2 || oa.tz2 != ob.tz2)) {
+        f.fail(
+            "one-body entry between orbits of different (l, 2j, tz2) in a "
+            "scalar operator");
       }
     }
-    op.one_body().set_element(map[static_cast<std::size_t>(a)], map[static_cast<std::size_t>(b)],
-                              v);
+    op.one_body().set_element(map[static_cast<std::size_t>(a)],
+                              map[static_cast<std::size_t>(b)], v);
   }
   std::int32_t n2 = 0;
   {
@@ -391,24 +427,30 @@ Operator read_operator_dump(std::istream& in, std::string_view name,
       if (x[k] < 0 || x[k] >= norb) f.fail("orbit index out of range");
     }
     if (jb < 0 || jk < 0) f.fail("negative J");
-    if (x[0] > x[1] || x[2] > x[3]) f.fail("two-body entries need p <= q and r <= s");
-    if (!op.two_body().allocated()) f.fail("two-body entry in an operator with particle_rank 1");
+    if (x[0] > x[1] || x[2] > x[3])
+      f.fail("two-body entries need p <= q and r <= s");
+    if (!op.two_body().allocated())
+      f.fail("two-body entry in an operator with particle_rank 1");
     const auto m = [&](int k) { return map[static_cast<std::size_t>(x[k])]; };
     const Side bra = locate_side(tbc, m(0), m(1), TwoJ::from_integer(jb));
     const Side ket = locate_side(tbc, m(2), m(3), TwoJ::from_integer(jk));
     if (!bra.idx) f.fail("bra ket |p q; J> is not present in its channel");
     if (!ket.idx) f.fail("ket |r s; J> is not present in its channel");
     if (bra.ch != ket.ch) {
-      f.fail("bra and ket are in different channels (not allowed for a scalar operator)");
+      f.fail(
+          "bra and ket are in different channels (not allowed for a scalar "
+          "operator)");
     }
-    op.two_body().set(*bra.ch, *ket.ch, *bra.idx, *ket.idx, bra.phase * ket.phase * v);
+    op.two_body().set(*bra.ch, *ket.ch, *bra.idx, *ket.idx,
+                      bra.phase * ket.phase * v);
   }
   {
     auto f = r.expect("three_body");
     const std::string w = f.next_token("count");
     f.expect_end();
     if (w != "none" && w != "0") {
-      throw NotImplementedError(std::string(name) + ":" + std::to_string(f.lineno()) +
+      throw NotImplementedError(std::string(name) + ":" +
+                                std::to_string(f.lineno()) +
                                 ": three_body entries are not supported yet");
     }
   }
@@ -420,11 +462,13 @@ Operator read_operator_dump(std::istream& in, std::string_view name,
 
   // Hermiticity check, tolerance 1e-12 * max|V| (design/15).
   if (hd.spec.hermiticity != Hermiticity::NonHermitian) {
-    const double sgn = hd.spec.hermiticity == Hermiticity::Hermitian ? 1.0 : -1.0;
+    const double sgn =
+        hd.spec.hermiticity == Hermiticity::Hermitian ? 1.0 : -1.0;
     double vmax = 0.0;
     double dev = 0.0;
     const auto ob = std::as_const(op).one_body().buffer().to_vector();
-    accumulate_symmetry(ob.data(), norb == 0 ? 0 : ms->num_orbits(), sgn, vmax, dev);
+    accumulate_symmetry(ob.data(), norb == 0 ? 0 : ms->num_orbits(), sgn, vmax,
+                        dev);
     if (op.two_body().allocated()) {
       const auto& mat = std::as_const(op).two_body().matrix();
       const auto tb = mat.buffer().to_vector();
@@ -434,9 +478,9 @@ Operator read_operator_dump(std::istream& in, std::string_view name,
       }
     }
     if (dev > 1e-12 * std::max(vmax, 1e-300)) {
-      fail_at(
-          name, r.lineno(),
-          "hermiticity check failed: max deviation " + fmt17(dev) + " for max|V| " + fmt17(vmax));
+      fail_at(name, r.lineno(),
+              "hermiticity check failed: max deviation " + fmt17(dev) +
+                  " for max|V| " + fmt17(vmax));
     }
   }
   return std::move(op);
@@ -458,28 +502,33 @@ void write_operator_dump(std::ostream& out, const Operator& op,
   const std::string& ref_name =
       options.reference.empty() ? ms.reference().name() : options.reference;
   if (options.source.find('\n') != std::string::npos) {
-    throw InputError("OperatorDump writer: the source text must not contain a newline");
+    throw InputError(
+        "OperatorDump writer: the source text must not contain a newline");
   }
-  if (ref_name.empty() || ref_name.find_first_of(" \t\n") != std::string::npos) {
-    throw InputError("OperatorDump writer: the reference name must be one non-empty word, got '" +
-                     ref_name + "'");
+  if (ref_name.empty() ||
+      ref_name.find_first_of(" \t\n") != std::string::npos) {
+    throw InputError(
+        "OperatorDump writer: the reference name must be one non-empty word, "
+        "got '" +
+        ref_name + "'");
   }
   out << kVersionLine << "\n";
   out << "source " << options.source << "\n";
-  out << "basis emax " << b.emax() << " lmax " << b.lmax() << " hw " << fmt17(b.hbar_omega())
-      << "\n";
+  out << "basis emax " << b.emax() << " lmax " << b.lmax() << " hw "
+      << fmt17(b.hbar_omega()) << "\n";
   out << "reference " << ref_name << "\n";
   const std::int32_t norb = ms.num_orbits();
   out << "norbits " << norb << "\n";
   for (std::int32_t i = 0; i < norb; ++i) {
     const basis::Orbit& o = b.orbit(OrbitIndex{i});
-    out << "orbit " << i << " " << o.n << " " << o.l << " " << o.j2.twice << " " << o.tz2.twice
-        << " " << fmt17(ms.reference().occupation(OrbitIndex{i})) << "\n";
+    out << "orbit " << i << " " << o.n << " " << o.l << " " << o.j2.twice << " "
+        << o.tz2.twice << " " << fmt17(ms.reference().occupation(OrbitIndex{i}))
+        << "\n";
   }
   const OperatorSpec& s = op.spec();
-  out << "spec particle_rank " << s.particle_rank << " rank_J " << s.rank_J << " parity "
-      << static_cast<int>(s.parity) << " delta_Tz " << s.delta_Tz << " hermiticity "
-      << hermiticity_code(s.hermiticity) << "\n";
+  out << "spec particle_rank " << s.particle_rank << " rank_J " << s.rank_J
+      << " parity " << static_cast<int>(s.parity) << " delta_Tz " << s.delta_Tz
+      << " hermiticity " << hermiticity_code(s.hermiticity) << "\n";
   out << "zero_body " << fmt17(op.zero_body()) << "\n";
 
   const auto ob = op.one_body().buffer().to_vector();
@@ -488,8 +537,9 @@ void write_operator_dump(std::ostream& out, const Operator& op,
   out << "one_body " << n1 << "\n";
   for (std::int32_t a = 0; a < norb; ++a) {
     for (std::int32_t c = 0; c < norb; ++c) {
-      const double v = ob[static_cast<std::size_t>(a) +
-                          static_cast<std::size_t>(c) * static_cast<std::size_t>(norb)];
+      const double v =
+          ob[static_cast<std::size_t>(a) +
+             static_cast<std::size_t>(c) * static_cast<std::size_t>(norb)];
       if (v != 0.0) out << a << " " << c << " " << fmt17(v) << "\n";
     }
   }
@@ -503,7 +553,8 @@ void write_operator_dump(std::ostream& out, const Operator& op,
   out << "two_body " << n2 << "\n";
   if (has2) {
     for (std::int32_t ch = 0; ch < tbc.num_channels(); ++ch) {
-      const auto k = op.two_body().block_index(ChannelIndex{ch}, ChannelIndex{ch});
+      const auto k =
+          op.two_body().block_index(ChannelIndex{ch}, ChannelIndex{ch});
       if (!k) continue;
       const auto& info = op.two_body().matrix().block_info(*k);
       const auto kets = tbc.channel_kets(ChannelIndex{ch});
@@ -511,11 +562,13 @@ void write_operator_dump(std::ostream& out, const Operator& op,
       for (std::int64_t i = 0; i < info.rows; ++i) {
         const auto& bk = tbc.ket(kets[static_cast<std::size_t>(i)]);
         for (std::int64_t j = 0; j < info.cols; ++j) {
-          const double v = tb[static_cast<std::size_t>(info.offset + i + j * info.rows)];
+          const double v =
+              tb[static_cast<std::size_t>(info.offset + i + j * info.rows)];
           if (v == 0.0) continue;
           const auto& kk = tbc.ket(kets[static_cast<std::size_t>(j)]);
-          out << bk.p.value() << " " << bk.q.value() << " " << kk.p.value() << " " << kk.q.value()
-              << " " << J << " " << J << " " << fmt17(v) << "\n";
+          out << bk.p.value() << " " << bk.q.value() << " " << kk.p.value()
+              << " " << kk.q.value() << " " << J << " " << J << " " << fmt17(v)
+              << "\n";
         }
       }
     }

@@ -15,8 +15,10 @@
 namespace imsrg::basis {
 namespace {
 
-// Occupation of the orbit with the given label in `filling`, or -1 if it is absent.
-double occupation_of(const std::vector<OrbitOccupation>& filling, const char* label) {
+// Occupation of the orbit with the given label in `filling`, or -1 if it is
+// absent.
+double occupation_of(const std::vector<OrbitOccupation>& filling,
+                     const char* label) {
   const Orbit o = parse_orbit_label(label);
   for (const auto& f : filling) {
     if (f.orbit == o) return f.occupation;
@@ -43,8 +45,9 @@ TEST(Nucleus, ParseElements) {
 }
 
 TEST(Nucleus, ParseNeutronSymbol) {
-  // "n" is the element with Z = 0; as in imsrg++ the A is then part of the name, and a bare "n0"
-  // parses to A = Z = 0 without error (documented behavior, same as "vacuum").
+  // "n" is the element with Z = 0; as in imsrg++ the A is then part of the
+  // name, and a bare "n0" parses to A = Z = 0 without error (documented
+  // behavior, same as "vacuum").
   const Nucleus n0 = Nucleus::parse("n0");
   EXPECT_EQ(n0.A, 0.0);
   EXPECT_EQ(n0.Z, 0.0);
@@ -66,8 +69,9 @@ TEST(Nucleus, ParseErrors) {
   EXPECT_THROW((void)Nucleus::parse("Xx12"), InputError);  // unknown element
   EXPECT_THROW((void)Nucleus::parse("O"), InputError);     // missing A
   EXPECT_THROW((void)Nucleus::parse("16O"), InputError);   // A first
-  EXPECT_THROW((void)Nucleus::parse("O16x"), InputError);  // trailing characters
-  EXPECT_THROW((void)Nucleus::parse("O4"), InputError);    // A < Z
+  EXPECT_THROW((void)Nucleus::parse("O16x"),
+               InputError);                              // trailing characters
+  EXPECT_THROW((void)Nucleus::parse("O4"), InputError);  // A < Z
   EXPECT_THROW((void)Nucleus::parse(""), InputError);
   EXPECT_THROW((void)Nucleus::parse("o16"), InputError);  // case sensitive
   EXPECT_THROW((void)Nucleus::parse("mix_A4.5"), InputError);
@@ -81,12 +85,14 @@ TEST(Nucleus, ParseErrorNamesTheInput) {
     (void)Nucleus::parse("Xx12");
     FAIL() << "no exception";
   } catch (const InputError& e) {
-    EXPECT_NE(std::string(e.what()).find("Xx12"), std::string::npos) << e.what();
+    EXPECT_NE(std::string(e.what()).find("Xx12"), std::string::npos)
+        << e.what();
   }
 }
 
 TEST(Nucleus, NameRoundTrip) {
-  for (const char* n : {"O16", "He4", "Ca48", "Pb208", "H1", "vacuum", "mix_A4.5_Z2.5"}) {
+  for (const char* n :
+       {"O16", "He4", "Ca48", "Pb208", "H1", "vacuum", "mix_A4.5_Z2.5"}) {
     const Nucleus nuc = Nucleus::parse(n);
     EXPECT_EQ(nuc.name(), n);
     EXPECT_EQ(Nucleus::parse(nuc.name()), nuc);
@@ -94,7 +100,8 @@ TEST(Nucleus, NameRoundTrip) {
   EXPECT_EQ((Nucleus{0.0, 0.0}).name(), "vacuum");
   EXPECT_EQ((Nucleus{16.0, 8.0}).name(), "O16");
   // Fractional values go through the mix_ form and survive the round trip.
-  for (const Nucleus n : {Nucleus{4.5, 2.5}, Nucleus{17.25, 8.0}, Nucleus{0.1, 0.05}}) {
+  for (const Nucleus n :
+       {Nucleus{4.5, 2.5}, Nucleus{17.25, 8.0}, Nucleus{0.1, 0.05}}) {
     EXPECT_EQ(Nucleus::parse(n.name()), n) << n.name();
   }
 }
@@ -127,7 +134,8 @@ TEST(NaiveFilling, O16) {
   const auto f = naive_filling(Nucleus::parse("O16"), 4);
   // 0s1/2, 0p3/2, 0p1/2 for protons and neutrons: six full orbits.
   ASSERT_EQ(f.size(), 6u);
-  const std::vector<std::string> order = {"p0s1", "n0s1", "p0p3", "n0p3", "p0p1", "n0p1"};
+  const std::vector<std::string> order = {"p0s1", "n0s1", "p0p3",
+                                          "n0p3", "p0p1", "n0p1"};
   for (std::size_t i = 0; i < f.size(); ++i) {
     EXPECT_EQ(orbit_label(f[i].orbit), order[i]);
     EXPECT_EQ(f[i].occupation, 1.0);
@@ -155,10 +163,13 @@ TEST(NaiveFilling, Ca48AtEmax4) {
   EXPECT_EQ(occupation_of(f, "n0p3") + occupation_of(f, "n0d3"), 2.0);
   EXPECT_EQ(occupation_of(f, "n1p3"), -1.0);
   EXPECT_EQ(occupation_of(f, "n0f5"), -1.0);
-  EXPECT_EQ(f.size(), 13u);  // 6 proton orbits (s1 p3 p1 d5 d3 s1) + 7 neutron (adds n0f7)
+  EXPECT_EQ(
+      f.size(),
+      13u);  // 6 proton orbits (s1 p3 p1 d5 d3 s1) + 7 neutron (adds n0f7)
   double protons = 0, neutrons = 0;
   for (const auto& o : f) {
-    (o.orbit.is_proton() ? protons : neutrons) += o.occupation * (o.orbit.j2.twice + 1);
+    (o.orbit.is_proton() ? protons : neutrons) +=
+        o.occupation * (o.orbit.j2.twice + 1);
   }
   EXPECT_EQ(protons, 20.0);
   EXPECT_EQ(neutrons, 28.0);
@@ -190,7 +201,8 @@ TEST(NaiveFilling, He4AndSingleShell) {
 TEST(NaiveFilling, SkipList) {
   const Orbit skip[] = {parse_orbit_label("p0p1"), parse_orbit_label("n0p1")};
   const auto f = naive_filling(Nucleus::parse("O16"), 4, skip);
-  // The p1/2 orbits are passed over, so the remaining 2 nucleons of each species go to d5/2.
+  // The p1/2 orbits are passed over, so the remaining 2 nucleons of each
+  // species go to d5/2.
   EXPECT_EQ(occupation_of(f, "p0p1"), -1.0);
   EXPECT_EQ(occupation_of(f, "n0p1"), -1.0);
   EXPECT_EQ(occupation_of(f, "p0s1"), 1.0);

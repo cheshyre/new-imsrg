@@ -5,8 +5,9 @@
 #define IMSRG_COMMUTATOR_OPTIONS_H_
 
 /// @file
-/// Explicit options of the commutator module (design/00 D10, design/13 section 6): the term
-/// selection `TermMask` (an enum bitset, no string keys, no globals) and `CommutatorOptions`.
+/// Explicit options of the commutator module (design/00 D10, design/13 section
+/// 6): the term selection `TermMask` (an enum bitset, no string keys, no
+/// globals) and `CommutatorOptions`.
 
 #include <cstdint>
 #include <optional>
@@ -14,10 +15,10 @@
 
 namespace imsrg::commutator {
 
-/// The scalar IMSRG(2) commutator terms, named as in imsrg++ (`Commutator.cc`): `commABCss`
-/// takes the A-body part of X and the B-body part of Y (plus the X <-> Y exchange) to the
-/// C-body part of Z = [X, Y]. The enumerator order is the call order of imsrg++
-/// `CommutatorScalarScalar`.
+/// The scalar IMSRG(2) commutator terms, named as in imsrg++ (`Commutator.cc`):
+/// `commABCss` takes the A-body part of X and the B-body part of Y (plus the X
+/// <-> Y exchange) to the C-body part of Z = [X, Y]. The enumerator order is
+/// the call order of imsrg++ `CommutatorScalarScalar`.
 enum class Term : std::uint8_t {
   comm110ss = 0,    ///< [X1, Y1] -> Z0.
   comm220ss,        ///< [X2, Y2] -> Z0.
@@ -25,8 +26,9 @@ enum class Term : std::uint8_t {
   comm121ss,        ///< [X1, Y2] + [X2, Y1] -> Z1.
   comm221ss,        ///< [X2, Y2] -> Z1.
   comm122ss,        ///< [X1, Y2] + [X2, Y1] -> Z2.
-  comm222_pp_hhss,  ///< [X2, Y2] -> Z2, particle-particle and hole-hole ladders.
-  comm222_phss,     ///< [X2, Y2] -> Z2, particle-hole (Pandya-transformed) part.
+  comm222_pp_hhss,  ///< [X2, Y2] -> Z2, particle-particle and hole-hole
+                    ///< ladders.
+  comm222_phss,  ///< [X2, Y2] -> Z2, particle-hole (Pandya-transformed) part.
 };
 
 /// Number of `Term` values.
@@ -38,8 +40,9 @@ std::string_view term_name(Term t) noexcept;
 /// Inverse of `term_name`; nullopt for an unknown name.
 std::optional<Term> term_from_name(std::string_view name) noexcept;
 
-/// A set of `Term`s (bitset over the enumerators). Value type; the IMSRG(3) terms of M10 will
-/// add enumerators (the 64-bit storage leaves room) and presets `imsrg3_n7`, `imsrg3_full`.
+/// A set of `Term`s (bitset over the enumerators). Value type; the IMSRG(3)
+/// terms of M10 will add enumerators (the 64-bit storage leaves room) and
+/// presets `imsrg3_n7`, `imsrg3_full`.
 class TermMask {
  public:
   /// The empty set.
@@ -95,7 +98,8 @@ class TermMask {
   std::uint64_t bits_ = 0;
 };
 
-/// Options of `commutator()`. Passed explicitly to every call (no global state, design/00 D10).
+/// Options of `commutator()`. Passed explicitly to every call (no global state,
+/// design/00 D10).
 struct CommutatorOptions {
   /// The terms to evaluate; default: all IMSRG(2) terms.
   TermMask terms = TermMask::imsrg2();

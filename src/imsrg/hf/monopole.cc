@@ -13,7 +13,8 @@ namespace imsrg::hf::detail {
 
 namespace {
 
-/// (Tz, parity) block of a pair: (Tz + 1) * 2 + parity, Tz = (tz2_p + tz2_q) / 2.
+/// (Tz, parity) block of a pair: (Tz + 1) * 2 + parity, Tz = (tz2_p + tz2_q) /
+/// 2.
 int block_of(const basis::Orbit& p, const basis::Orbit& q) {
   const int tz = (p.tz2.twice + q.tz2.twice) / 2;
   return (tz + 1) * 2 + (p.l + q.l) % 2;
@@ -21,7 +22,8 @@ int block_of(const basis::Orbit& p, const basis::Orbit& q) {
 
 }  // namespace
 
-std::vector<std::vector<std::int32_t>> one_body_channels(const basis::SingleParticleBasis& basis) {
+std::vector<std::vector<std::int32_t>> one_body_channels(
+    const basis::SingleParticleBasis& basis) {
   std::vector<std::vector<std::int32_t>> out;
   for (std::int32_t i = 0; i < basis.num_orbits(); ++i) {
     std::vector<std::int32_t> ch;
@@ -48,10 +50,13 @@ Monopole2B::Monopole2B(const op::Operator& H) {
   for (std::int32_t p = 0; p < norb_; ++p) {
     two_j_[static_cast<std::size_t>(p)] = basis.orbit(OrbitIndex{p}).j2.twice;
     for (std::int32_t q = p; q < norb_; ++q) {
-      const int blk = block_of(basis.orbit(OrbitIndex{p}), basis.orbit(OrbitIndex{q}));
-      const auto key = static_cast<std::size_t>(p) * n + static_cast<std::size_t>(q);
+      const int blk =
+          block_of(basis.orbit(OrbitIndex{p}), basis.orbit(OrbitIndex{q}));
+      const auto key =
+          static_cast<std::size_t>(p) * n + static_cast<std::size_t>(q);
       blk_[key] = blk;
-      local_[key] = static_cast<std::int32_t>(kets[static_cast<std::size_t>(blk)].size());
+      local_[key] =
+          static_cast<std::int32_t>(kets[static_cast<std::size_t>(blk)].size());
       kets[static_cast<std::size_t>(blk)].push_back({p, q});
     }
   }
@@ -86,12 +91,14 @@ Monopole2B::Monopole2B(const op::Operator& H) {
   }
 }
 
-void Monopole2B::apply(const linalg::Matrix<double>& rho, linalg::Matrix<double>& Vij) const {
+void Monopole2B::apply(const linalg::Matrix<double>& rho,
+                       linalg::Matrix<double>& Vij) const {
   IMSRG_CHECK(rho.rows() == norb_ && rho.cols() == norb_, "rho must be N x N");
   Vij = linalg::Matrix<double>(norb_, norb_);
   const auto n = static_cast<std::size_t>(norb_);
   const auto key = [n](std::int32_t p, std::int32_t q) {
-    return static_cast<std::size_t>(std::min(p, q)) * n + static_cast<std::size_t>(std::max(p, q));
+    return static_cast<std::size_t>(std::min(p, q)) * n +
+           static_cast<std::size_t>(std::max(p, q));
   };
   for (std::int32_t i = 0; i < norb_; ++i) {
     for (std::int32_t j : channel_of_[static_cast<std::size_t>(i)]) {
@@ -117,11 +124,13 @@ void Monopole2B::apply(const linalg::Matrix<double>& rho, linalg::Matrix<double>
   }
 }
 
-Monopole3B::Monopole3B(const op::Operator& H, const op::No2bThreeBody& v3, std::int32_t e3max) {
+Monopole3B::Monopole3B(const op::Operator& H, const op::No2bThreeBody& v3,
+                       std::int32_t e3max) {
   const auto& basis = H.model_space().basis();
   norb_ = basis.num_orbits();
   const auto chans = one_body_channels(basis);
-  std::vector<const std::vector<std::int32_t>*> channel_of(static_cast<std::size_t>(norb_));
+  std::vector<const std::vector<std::int32_t>*> channel_of(
+      static_cast<std::size_t>(norb_));
   for (const auto& ch : chans) {
     for (std::int32_t i : ch) channel_of[static_cast<std::size_t>(i)] = &ch;
   }
@@ -148,12 +157,16 @@ Monopole3B::Monopole3B(const op::Operator& H, const op::No2bThreeBody& v3, std::
               double v = 0.0;
               const int jlo = std::abs(oa.j2.twice - oc.j2.twice) / 2;
               const int jhi = (oa.j2.twice + oc.j2.twice) / 2;
-              // imsrg++ passes the integer J itself as the J2 argument (no (2J+1) weight).
-              for (int J = jlo; J <= jhi; ++J) v += v3.get_pn(oa, oc, oi, ob, od, oj, J);
+              // imsrg++ passes the integer J itself as the J2 argument (no
+              // (2J+1) weight).
+              for (int J = jlo; J <= jhi; ++J)
+                v += v3.get_pn(oa, oc, oi, ob, od, oj, J);
               if (v == 0.0) continue;
-              keys_.push_back({static_cast<std::uint16_t>(i), static_cast<std::uint16_t>(j),
-                               static_cast<std::uint16_t>(a), static_cast<std::uint16_t>(b),
-                               static_cast<std::uint16_t>(c), static_cast<std::uint16_t>(d)});
+              keys_.push_back(
+                  {static_cast<std::uint16_t>(i), static_cast<std::uint16_t>(j),
+                   static_cast<std::uint16_t>(a), static_cast<std::uint16_t>(b),
+                   static_cast<std::uint16_t>(c),
+                   static_cast<std::uint16_t>(d)});
               values_.push_back(v / static_cast<double>(oi.j2.twice + 1));
             }
           }
@@ -163,7 +176,8 @@ Monopole3B::Monopole3B(const op::Operator& H, const op::No2bThreeBody& v3, std::
   }
 }
 
-void Monopole3B::apply(const linalg::Matrix<double>& rho, linalg::Matrix<double>& V3ij) const {
+void Monopole3B::apply(const linalg::Matrix<double>& rho,
+                       linalg::Matrix<double>& V3ij) const {
   IMSRG_CHECK(rho.rows() == norb_ && rho.cols() == norb_, "rho must be N x N");
   V3ij = linalg::Matrix<double>(norb_, norb_);
   for (std::size_t k = 0; k < keys_.size(); ++k) {
