@@ -500,3 +500,24 @@ validation); the round-trip tests use `memory`.
   defaults only: `use_occupations = true` and `order = "energy"` are `E-PLANNED` (M9-Q3, D36). The NAT
   reference occupations are those of the HF solution (closed shells; ensemble references untested).
   New `hf::SolutionInBasis` is the public API replacing the test-only `hf::detail` coupling (M9-Q1).
+
+### M8-Q40 (F2b: deviations of the ODE flow methods from imsrg++)
+(1) imsrg++'s adaptive `flow` method integrates a COPY of the solver (`auto system = *this;`,
+IMSRGSolver.cc:826), so the member `s` (and `ds`) never advance during stage 1; a second stage then
+restarts at s = 0 and integrates [0, smax] again (RK4 does not have this). **Assumed/implemented:** the
+flow parameter continues across stages for both methods; the results agree whenever stage 1 has
+converged, the flow log shows continued s. (2) Non-finite or runaway (> 1e12 / 1e9) ||eta|| or E0 ends
+`flow` and `flow_rk4` as `kDiverged` (imsrg++: no guard in these paths; its Magnus path has one). (3)
+imsrg++'s ODE monitor (`monitor.report()`) prints times with 3 decimals from a stale `Eta`; not
+reproduced. (4) `hunter_gatherer = true` with a flow method is a ConfigError (imsrg++ gathers an Omega
+that is always zero). (5) Tensor operators and operators that are not number conserving cannot flow
+(`OdeSolver` throws InputError; `PrepareOperator` supplies scalars only today). (6) `flow_euler`,
+`restore_4th_order`, `magnus_backoff`, ... stay E-PLANNED. (7) The Magnus path lacks imsrg++'s
+`shell-model-atan` denominator-cutoff switch (1e-6 after ||eta|| < 1): a no-op there because the
+default cutoff is already 1e-6; `flow_rk4` reproduces the 1.0 -> 1e-6 switch.
+
+### M8-Q41 (F2b: `ode_tolerance` as float)
+The tolerance is rounded to float (`static_cast<double>(static_cast<float>(tol))`) like imsrg++'s
+`SetODETolerance(float)`, so 1e-6 is 9.99999997e-7; the goldens' step counts depend on it only at
+round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as for `eta_criterion`
+(quirk P7). One line to change if the owner prefers double.

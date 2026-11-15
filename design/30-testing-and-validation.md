@@ -122,6 +122,7 @@ file3e1max=6 file3e2max=12 file3e3max=18`. **Never emax > 6. IMSRG(3) only at em
 | IT-10 | IMSRG(3f2) Magnus (owner's recipe, D32: hunter-gatherer, `omega_norm_max` 0.1, 1b intermediates on, 2b off), O16, emax 2 and 3 (golden data from `refharness flow --factorized`, regenerated with the recipe; imsrg++ has no executable switch) | E0 |
 | IT-11 | IT-2 with `mpirun -n 2` and `-n 4` | identical to IT-2 within 1e-10 relative |
 | IT-12 | IT-2 driven through legacy `key=value` arguments vs TOML config | identical results |
+| IT-14 | ODE flow methods `flow_rk4` and `flow` (adaptive dopri5) with `Operators=Rp2` flowing alongside H: He4 emax 2, O16 emax 3 and 4, 2N only (goldens from the patched `imsrg++`, D42) | step and flow-line counts identical (the flow file of `flow` has one line per right-hand-side evaluation), every line within 5e-8 (printing precision), E0 within 1e-6 (acceptance 1e-3), Rp2 within 1e-6; O16 emax 4 under `slow` |
 | IT-13 | emax 6 O16 IMSRG(2), release build (label `slow`, `perf`) | E0 vs golden, wall time vs imsrg-devel (recorded, not asserted) |
 
 ## 5. Performance tracking

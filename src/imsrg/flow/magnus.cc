@@ -34,7 +34,8 @@ op::Operator ZeroOmega(const std::shared_ptr<const basis::ModelSpace>& ms) {
                       op::OperatorSpec::Scalar(2, Hermiticity::kAntiHermitian));
 }
 
-/// @throws InputError for step options that never terminate or give NaN steps.
+}  // namespace
+
 void ValidateSolverOptions(const SolverOptions& o) {
   auto positive = [](double x) { return std::isfinite(x) && x > 0.0; };
   if (!positive(o.dsmax))
@@ -51,8 +52,6 @@ void ValidateSolverOptions(const SolverOptions& o) {
   if (std::isnan(o.eta_criterion))
     throw InputError("SolverOptions: eta_criterion must not be NaN");
 }
-
-}  // namespace
 
 void MagnusSolver::set_solver_options(const SolverOptions& solver) {
   ValidateSolverOptions(solver);
