@@ -19,6 +19,11 @@
 //                   is gathered (GatherOmega) instead of pushing a new Omega (NewOmega), and the
 //                   solve ends with one more gather (IMSRGSolver::Solve, IMSRGSolver.cc:236-239).
 //                   Default off (imsrg++ default hunter_gatherer=false).
+//   --perturbative-triples  after the solve (and after the final gather with --hunter-gatherer) call
+//                   IMSRGSolver::CalculatePerturbativeTriples() (IMSRGSolver.cc:1172-1214; uses Omega,
+//                   FlowingOps[0] and H_0; imsrg++ raises E3max to 3 emax inside). Prints
+//                   `perturbative_triples <dE>` and `e0_plus_triples <E0 + dE>` (%.17g) to stdout and adds
+//                   perturbative_triples / e0_plus_triples to result.json (only when the flag is given).
 //   --omega-norm-max X  same as omega_norm_max=X (the dashed form wins if both are given).
 //   --factorized-1b-intermediates B / --factorized-2b-intermediates B  (B = 0 or 1)
 //                   Commutator::FactorizedDoubleCommutator::SetUse_1b_Intermediates / _2b_ (only
@@ -160,6 +165,15 @@ int cmd_flow(const Args& a) {
     norm_omega_gathered = solver.Omega[solver.Omega.size() - 2].Norm();
   }
 
+  const bool triples = a.flag("perturbative-triples");
+  double d_triples = 0, e0_triples = 0;
+  if (triples) {
+    d_triples = solver.CalculatePerturbativeTriples();
+    e0_triples = solver.FlowingOps[0].ZeroBody + d_triples;
+    std::printf("perturbative_triples %s\n", fmt17(d_triples).c_str());
+    std::printf("e0_plus_triples %s\n", fmt17(e0_triples).c_str());
+  }
+
   Json j;
   j.str("source", reference_version() + " refharness flow");
   j.integer("emax", ms.GetEmax());
@@ -182,6 +196,10 @@ int cmd_flow(const Args& a) {
     j.num("norm_omega_gathered", norm_omega_gathered);
     j.boolean("factorized_1b_intermediates", Commutator::FactorizedDoubleCommutator::use_1b_intermediates);
     j.boolean("factorized_2b_intermediates", Commutator::FactorizedDoubleCommutator::use_2b_intermediates);
+  }
+  if (triples) {
+    j.num("perturbative_triples", d_triples);
+    j.num("e0_plus_triples", e0_triples);
   }
   j.integer("omp_threads", omp_get_max_threads());
   j.num("wall_time_s", omp_get_wtime() - t0);

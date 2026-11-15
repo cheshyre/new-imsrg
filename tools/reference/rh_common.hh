@@ -94,7 +94,8 @@ struct DumpMeta {
 };
 
 /// Writes `op` in OperatorDump v1 format. The 3B section is written as `three_body none`
-/// (reserved for M10) unless with_3b is set and the operator has pn-mode 3B storage.
+/// unless with_3b is set and the operator has particle rank 3 (scalar operators only: every
+/// nonzero element of every 3B channel block, labels of imsrg++'s Ket3, values GetME_pn_ch).
 void write_opdump(const std::string& path, const Operator& op, const DumpMeta& meta,
                   bool with_3b = false);
 

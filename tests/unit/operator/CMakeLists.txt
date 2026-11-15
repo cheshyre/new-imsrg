@@ -17,7 +17,8 @@ imsrg_add_test(NAME operator_arithmetic
   NO_GTEST_MAIN)
 
 imsrg_add_test(NAME operator_dump
-  SOURCES test_operator_dump.cc test_operator_dump_3b.cc test_golden_dumps.cc ${_imsrg_exec_main}
+  SOURCES test_operator_dump.cc test_operator_dump_3b.cc test_golden_dumps.cc
+          test_golden_imsrg3_dump.cc ${_imsrg_exec_main}
   DEPS operator
   LABELS unit
   NO_GTEST_MAIN)

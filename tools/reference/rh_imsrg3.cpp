@@ -1,11 +1,13 @@
 // rh_imsrg3.cpp -- IMSRG(3) [2,2]->3 term (comm223ss) of the OLD imsrg++ for the M10 layout
 // benchmark (design/reference/02-commutators.md sections 5.4 and 5.9).
 //
-//   refharness comm223 emax=N e3max=M reference=O16 x=X.dump y=Y.dump [epsilon=eps.txt] [reps=5]
+//   refharness comm223 emax=N e3max=M reference=O16 x=X.dump y=Y.dump [epsilon=eps.txt] [out=Z3.dump] [reps=5]
 //
 // X (anti-Hermitian) and Y (Hermitian) are 1B/2B OperatorDumps written by the new code. The
 // model space is built as for the other subcommands (hw 16, valence = reference, E3max = e3max,
 // emax_3body = emax, no dE3max / OccNat cut).
+//   out=Z3.dump (full mode): also writes Z as an OperatorDump v1 with a three_body section (one-
+//     and two-body parts are zero), see design/15-operator-dump-format.md.
 //   Full mode: Z = particle-rank-3 scalar operator with pn three-body storage (Hermitian);
 //     Commutator::comm223ss(X, Y, Z) once as warm-up plus `reps` timed calls (the 3B part of Z is
 //     zeroed before each call because the term adds). Prints the 3B norm and min/mean times.
@@ -66,7 +68,7 @@ int cmd_comm223(const Args& a) {
   if (reps < 1) throw std::runtime_error("reps must be >= 1");
   if (!a.has("x") || !a.has("y"))
     throw std::runtime_error(
-        "usage: refharness comm223 emax=N e3max=M reference=O16 x=X.dump y=Y.dump [epsilon=eps.txt] [reps=5]");
+        "usage: refharness comm223 emax=N e3max=M reference=O16 x=X.dump y=Y.dump [epsilon=eps.txt] [out=Z3.dump] [reps=5]");
 
   auto ms = make_modelspace(p);
   Commutator::SetUseIMSRG3(false);
@@ -101,6 +103,9 @@ int cmd_comm223(const Args& a) {
       t.mean_ms += ms_ / reps;
     }
     std::printf("comm223ss_three_body_norm %s\n", fmt17(Z.ThreeBodyNorm()).c_str());
+    if (a.has("out")) {  // the last call's result as an OperatorDump v1 with a three_body section
+      write_opdump(a.str("out", ""), Z, {"imsrg++ comm223ss Z=[X,Y]_3 " + reference_version(), p.reference}, true);
+    }
     std::printf("comm223ss_ms %.6g %.6g\n", t.min_ms, t.mean_ms);
   }
 

@@ -150,9 +150,35 @@ void write_opdump(const std::string& path, const Operator& op, const DumpMeta& m
     o << e.p << " " << e.q << " " << e.r << " " << e.s << " " << e.jb << " " << e.jk << " "
       << fmt17(e.v) << "\n";
 
-  if (with_3b && op.GetParticleRank() >= 3)
-    throw std::runtime_error("3B section of OperatorDump is not implemented yet (reserved for M10)");
-  o << "three_body none\n";
+  if (with_3b && prank >= 3) {
+    // Every nonzero element of every (J, parity, Tz) channel block, both (bra, ket) and (ket, bra),
+    // channel by channel, bra row then ket column. Labels are those of imsrg++'s Ket3 (p <= q <= r,
+    // Jpq); value = ThreeBody.GetME_pn_ch (stored upper triangle, lower via hermiticity).
+    // Scalar operators only: bra and ket lie in the same channel.
+    if (op.GetJRank() != 0 || op.GetParity() != 0 || op.GetTRank() != 0)
+      throw std::runtime_error("3B dump is only implemented for scalar operators");
+    std::ostringstream body;
+    size_t count = 0;
+    for (size_t ch = 0; ch < ms->GetNumberThreeBodyChannels(); ++ch) {
+      ThreeBodyChannel& tbc = ms->GetThreeBodyChannel(ch);
+      const size_t nk = tbc.GetNumberKets();
+      for (size_t ib = 0; ib < nk; ++ib) {
+        const Ket3& bra = tbc.GetKet(ib);
+        for (size_t ik = 0; ik < nk; ++ik) {
+          const double v = op.ThreeBody.GetME_pn_ch(ch, ch, ib, ik);
+          if (v == 0.0) continue;
+          const Ket3& ket = tbc.GetKet(ik);
+          body << bra.p << " " << bra.q << " " << bra.r << " " << bra.Jpq << " " << ket.p << " "
+               << ket.q << " " << ket.r << " " << ket.Jpq << " " << tbc.twoJ << " " << fmt17(v)
+               << "\n";
+          ++count;
+        }
+      }
+    }
+    o << "three_body " << count << "\n" << body.str();
+  } else {
+    o << "three_body none\n";
+  }
   o << "end\n";
 }
 
