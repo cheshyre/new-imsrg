@@ -34,6 +34,10 @@
 
 namespace imsrg::commutator::detail {
 
+/// Largest number of two-body J values of an orbit pair the element readers
+/// handle (2 emax + 2 <= 32 up to emax 15).
+inline constexpr int kMaxKetTerms = 32;
+
 /// The three-body part of an operand or of Z: layout-A blocks (offsets in
 /// `Space3View::ch_packed_offset` / `ch_dense_offset`). `data == nullptr`
 /// represents a missing part, which reads as zero.
@@ -182,6 +186,22 @@ IMSRG_INLINE_FUNCTION double ThreeBodyElement(const N7Views& v,
   const int jde_lo =
       (jd.twice > je.twice ? jd.twice - je.twice : je.twice - jd.twice) / 2;
   const int jde_hi = (jd.twice + je.twice) / 2;
+  // The ket expansion once (rows and coefficients); a two-body J range has at
+  // most j_d + j_e - |j_d - j_e| + 1 <= 2 emax + 2 values.
+  int ket_row[kMaxKetTerms];
+  double ket_coef[kMaxKetTerms];
+  int nk = 0;
+  for (int j2 = jde_lo; j2 <= jde_hi && nk < kMaxKetTerms; ++j2) {
+    const double ck =
+        angmom::RecouplingCoefficient(pk, jd, je, jf, jde, j2, two_J, v.sj);
+    if (ck == 0.0) continue;
+    const int rk = FindRow(v, ch, sd, se, sf, 2 * j2);
+    if (rk < 0) continue;
+    ket_row[nk] = rk;
+    ket_coef[nk] = ck;
+    ++nk;
+  }
+  if (nk == 0) return 0.0;
   double sum = 0.0;
   for (int j1 = jab_lo; j1 <= jab_hi; ++j1) {
     const double cb =
@@ -189,14 +209,11 @@ IMSRG_INLINE_FUNCTION double ThreeBodyElement(const N7Views& v,
     if (cb == 0.0) continue;
     const int rb = FindRow(v, ch, sa, sb, sc, 2 * j1);
     if (rb < 0) continue;
-    for (int j2 = jde_lo; j2 <= jde_hi; ++j2) {
-      const double ck =
-          angmom::RecouplingCoefficient(pk, jd, je, jf, jde, j2, two_J, v.sj);
-      if (ck == 0.0) continue;
-      const int rk = FindRow(v, ch, sd, se, sf, 2 * j2);
-      if (rk < 0) continue;
-      sum += cb * ck * ThreeBodyLocal(t, v.sp, ch, rb, rk);
+    double inner = 0.0;
+    for (int k = 0; k < nk; ++k) {
+      inner += ket_coef[k] * ThreeBodyLocal(t, v.sp, ch, rb, ket_row[k]);
     }
+    sum += cb * inner;
   }
   return phase * sum;
 }

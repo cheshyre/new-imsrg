@@ -505,11 +505,19 @@ const ThreeBodyContext::Impl& ThreeBodyContext::impl() const {
 
 op::ThreeBody Comm223(const op::Operator& X, const op::Operator& Y,
                       const ThreeBodyContext& ctx) {
+  op::ThreeBody z(ctx.model_space_ptr(), CommutatorHermiticity(X, Y));
+  detail::AddComm223(X, Y, z, ctx);
+  return z;
+}
+
+void detail::AddComm223(const op::Operator& X, const op::Operator& Y,
+                        op::ThreeBody& z, const ThreeBodyContext& ctx) {
   const ThreeBodyContext::Impl& impl = ctx.impl();
   CheckOperand("Comm223", X, "X", ctx);
   CheckOperand("Comm223", Y, "Y", ctx);
   const Hermiticity h = CommutatorHermiticity(X, Y);
-  op::ThreeBody z(ctx.model_space_ptr(), h);
+  IMSRG_CHECK(z.hermiticity() == h,
+              "Comm223: Z's three-body hermiticity must be that of [X, Y]");
   const std::vector<std::int64_t>& expected =
       z.packed() ? impl.packed_offset_host : impl.dense_offset_host;
   IMSRG_CHECK(std::equal(z.block_offsets().begin(), z.block_offsets().end(),
@@ -527,7 +535,6 @@ op::ThreeBody Comm223(const op::Operator& X, const op::Operator& Y,
     detail::RunComm223Tiles(v, detail::TileMode::kFullDense,
                             impl.order_full.device_data(), impl.num_triples);
   }
-  return z;
 }
 
 double PerturbativeTriplesEnergy(const op::Operator& X, const op::Operator& Y,

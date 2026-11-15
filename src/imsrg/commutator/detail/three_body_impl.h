@@ -91,6 +91,17 @@ struct ThreeBodyContext::Impl {
   detail::N7Views N7(const op::Operator* X, const op::Operator* Y) const;
 };
 
+namespace detail {
+
+/// Adds the [2,2]->3 term of [X, Y] (`Comm223`, three_body.h) to `z` in
+/// place (no temporary three-body part). Preconditions as `Comm223`, and `z`
+/// laid out as the context's kept space with the hermiticity of [X, Y]
+/// (InvariantError otherwise).
+void AddComm223(const op::Operator& X, const op::Operator& Y, op::ThreeBody& z,
+                const ThreeBodyContext& ctx);
+
+}  // namespace detail
+
 }  // namespace imsrg::commutator
 
 #endif  // IMSRG_COMMUTATOR_DETAIL_THREE_BODY_IMPL_H_

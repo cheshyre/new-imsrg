@@ -466,8 +466,10 @@ IMSRG_INLINE_FUNCTION void TeamTiles(const Member& team, const TileViews& v,
                   }
                   if (v.zero_diagonal != 0 && diagonal && k == kc) zv = 0.0;
                   const std::int64_t i = rb + k;
+                  // Each stored element belongs to exactly one tile entry, so
+                  // the accumulation is race-free.
                   v.z[off + (packed ? op::ThreeBody::PackedIndex(n_dim, i, j)
-                                    : i + j * n_dim)] = zv;
+                                    : i + j * n_dim)] += zv;
                 });
           });
     }

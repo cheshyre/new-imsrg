@@ -4,6 +4,7 @@
 // The N7 term comm330ss, [X3, Y3] -> Z0 (imsrg3.h). Kernel TU.
 
 #include <cstdint>
+#include <type_traits>
 
 #include "imsrg/commutator/detail/n7_common.h"
 #include "imsrg/commutator/detail/n7_views.h"
@@ -22,6 +23,7 @@ struct RowOcc {
   double nbar = 0.0;
   double sym6 = 0.0;
 };
+static_assert(std::is_trivially_copyable_v<RowOcc>);
 
 IMSRG_INLINE_FUNCTION RowOcc RowOccupation(const detail::N7Views& v,
                                            std::int64_t r) noexcept {

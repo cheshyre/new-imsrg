@@ -10,6 +10,7 @@
 /// commutator module; no Kokkos.
 
 #include <cstdint>
+#include <type_traits>
 
 #include "imsrg/commutator/detail/n7_views.h"
 #include "imsrg/commutator/three_body.h"
@@ -24,6 +25,7 @@ struct TwoBodyOutView {
   double* data = nullptr;                      ///< Z's two-body data.
   const std::int64_t* block_offset = nullptr;  ///< num_channels + 1 entries.
 };
+static_assert(std::is_trivially_copyable_v<TwoBodyOutView>);
 
 /// Checks the operands of an N7 term `term` and returns the kernel views:
 /// X, Y and Z non-empty, scalar and number-conserving, on model spaces with

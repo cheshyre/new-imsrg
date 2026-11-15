@@ -5,7 +5,6 @@
 
 #include <algorithm>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "imsrg/base/assert.h"
@@ -13,8 +12,6 @@
 #include "imsrg/commutator/commutator.h"
 #include "imsrg/commutator/detail/n7_common.h"
 #include "imsrg/commutator/detail/three_body_impl.h"
-#include "imsrg/operator/arithmetic.h"
-#include "imsrg/operator/operator_spec.h"
 
 namespace imsrg::commutator {
 
@@ -122,11 +119,9 @@ void Comm223ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   (void)detail::PrepareN7("Comm223ss", X, Y, Z, ctx);
   (void)detail::ThreeBodyOut("Comm223ss", Z, ctx);
   if (!X.two_body().allocated() || !Y.two_body().allocated()) return;
-  op::ThreeBody z3 = Comm223(X, Y, ctx);
-  op::Operator tmp(ctx.model_space_ptr(),
-                   op::OperatorSpec::Scalar(3, z3.hermiticity()));
-  *tmp.three_body() = std::move(z3);
-  op::Axpy(1.0, tmp, Z);
+  // In place: no temporary three-body part (the largest object of an
+  // IMSRG(3) flow at the production sizes).
+  detail::AddComm223(X, Y, *Z.three_body(), ctx);
 }
 
 }  // namespace terms
