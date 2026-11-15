@@ -160,7 +160,12 @@ TEST(GoldenEquivalence, TomlAndLegacyResolveToTheSameConfig) {
   for (const auto& e : Examples()) {
     SCOPED_TRACE(std::string("example (") + e.tag + ")");
     const RunConfig t = LoadToml(e);
-    const RunConfig l = LoadLegacy(e);
+    RunConfig l = LoadLegacy(e);
+    // The one documented difference (D37): an absent `hartree_fock.mixing` is
+    // DIIS in TOML and imsrg++'s linear mixing for legacy command lines.
+    EXPECT_EQ(t.hartree_fock.mixing, HartreeFockMixing::kDiis);
+    EXPECT_EQ(l.hartree_fock.mixing, HartreeFockMixing::kLinear);
+    l.hartree_fock.mixing = HartreeFockMixing::kDiis;
     EXPECT_TRUE(t == l) << "RunConfig differs; TOML-side:\n"
                         << ToToml(t, false) << "\nlegacy-side:\n"
                         << ToToml(l, false);
@@ -209,6 +214,25 @@ TEST(GoldenEquivalence, ExampleD) {
   EXPECT_EQ(c.basis.e3max, 6);
   ASSERT_TRUE(c.interaction.three_body.has_value());
   EXPECT_EQ(c.interaction.three_body->type, ThreeBodyType::kNo2b);
+}
+
+TEST(HartreeFockMixingKey, LegacyIsLinearTomlIsDiisAndBothAreRecorded) {
+  const Example& e = Examples()[0];
+  const RunConfig toml = LoadToml(e);
+  const RunConfig legacy = LoadLegacy(e);
+  EXPECT_EQ(toml.hartree_fock.mixing, HartreeFockMixing::kDiis);
+  EXPECT_EQ(legacy.hartree_fock.mixing, HartreeFockMixing::kLinear);
+  // The key shows up in resolved_config.toml, with the resolved value.
+  EXPECT_NE(ToToml(toml, false).find("mixing = \"diis\""), std::string::npos);
+  EXPECT_NE(ToToml(legacy, false).find("mixing = \"linear\""),
+            std::string::npos);
+
+  // An explicit `--set` wins over the legacy default.
+  ConfigSources s;
+  s.legacy_args = e.legacy;
+  s.set_overrides = {"hartree_fock.mixing=diis"};
+  EXPECT_EQ(LoadOk(s, "legacy with --set").hartree_fock.mixing,
+            HartreeFockMixing::kDiis);
 }
 
 }  // namespace

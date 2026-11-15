@@ -131,7 +131,16 @@ TEST(DriverCli, ExamplesTomlAndLegacyResolveIdentically) {
     EXPECT_EQ(t.code, 0) << t.err;
     EXPECT_EQ(l.code, 0) << l.err;
     EXPECT_FALSE(t.out.empty());
-    EXPECT_EQ(BeforeProvenance(t.out), BeforeProvenance(l.out));
+    // The one documented difference (D37): an absent hartree_fock.mixing is
+    // diis in TOML and linear for legacy command lines.
+    EXPECT_TRUE(Contains(t.out, "mixing = \"diis\""));
+    EXPECT_TRUE(Contains(l.out, "mixing = \"linear\""));
+    std::string toml_out = BeforeProvenance(t.out);
+    const std::string diis = "mixing = \"diis\"";
+    const auto pos = toml_out.find(diis);
+    if (pos != std::string::npos)
+      toml_out.replace(pos, diis.size(), "mixing = \"linear\"");
+    EXPECT_EQ(toml_out, BeforeProvenance(l.out));
     EXPECT_TRUE(Contains(t.out, "[provenance]"));
   }
 }

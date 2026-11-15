@@ -99,7 +99,7 @@ For single-reference runs set only `reference.nucleus`.
 
 | key | type | default | meaning |
 |---|---|---|---|
-| `hartree_fock.mixing` | enum `diis`, `linear` | `diis` (TOML); the legacy layer sets `linear` | HF update: Pulay DIIS on the Fock matrix (M6-Q3) or imsrg++'s linear density mixing (for reproducing imsrg++ iteration counts). Both reach the same solution. *(owner, 2026-11-15, D37; to be implemented in run 2, the driver uses linear today)* |
+| `hartree_fock.mixing` | enum `diis`, `linear` | `diis` (TOML); an absent key resolves to `linear` for a legacy command line | HF update: Pulay DIIS on the Fock matrix (M6-Q3) or imsrg++'s linear density mixing (weight 0.2 of the old density; reproduces imsrg++ iteration counts). Both reach the same solution to the HF tolerance (1e-8 on the single-particle energies), so energies differ at the 1e-9 MeV level and flow step counts may differ from imsrg++ with `diis`. An explicit key (also `--set`) wins in both modes; `resolved_config.toml` always records the resolved value. *(owner, 2026-11-15, D37; implemented in run 2)* |
 | `hartree_fock.freeze_occupations` | bool | `false` | keep reference occupations fixed (default: fractional/ensemble occupations may follow HF energies). Ignored for `basis.kind="oscillator"`. |
 | `natural_orbitals.use_occupations` | bool | `false` | use NAT occupations for the reference. |
 | `natural_orbitals.order` | enum `occupation`, `energy` | `occupation` | orbit labelling order. Only valid with `basis.kind="nat"`. |
@@ -496,7 +496,7 @@ Columns: old key (type) | new key | type / enum | old default | status | notes. 
 | `HCM_<hw>` built internally for `BetaCM` | done by the Hamiltonian-assembly stage from `hamiltonian.beta_cm*`, not via the operator list | S |
 | `help`, `-help`, `--help` | CLI11 help | S |
 
-### 3.6 Quirk decisions (Q1-Q16)
+### 3.6 Quirk decisions (Q1-Q17)
 
 Default = keep numerics; "fix" = behaviour changed deliberately. "Legacy" column = what the legacy layer does. Items marked **HUMAN** want a decision.
 
@@ -518,6 +518,7 @@ Default = keep numerics; "fix" = behaviour changed deliberately. "Legacy" column
 | Q14 | `eta_criterion`, `ode_tolerance` pass through `float` | fix (double); effect on thresholds ~1e-8 relative | -- | -- |
 | Q15 | `NSmagnus`/`brueckner*` overwrite `omega_norm_max` | keep | n/a | override + warning if user value differs |
 | Q16 | `write_omega` writes nothing without `scratch` | fix | always writes | same |
+| Q17 | imsrg++ has no HF-accelerator key: it always uses linear density mixing (D37) | add `hartree_fock.mixing` | default `diis` | default `linear` (absent key); an explicit `--set hartree_fock.mixing=diis` is honoured |
 
 Legacy warning rules: **L1** an explicitly given key that the old code ignored in this context (e.g. `valence_generator` with `nsteps=1`) -> warning, key dropped or kept inert; **L2** an explicitly given `imsrg3_*`/`only_2b_*`/`dE3max` key while no IMSRG(3)/perturbative-triples is active -> warning, key dropped; **L3** deprecated-but-working spellings -> no warning. Warnings are printed and stored in `provenance.warnings`.
 

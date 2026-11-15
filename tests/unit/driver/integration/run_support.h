@@ -176,6 +176,10 @@ inline std::string TomlText(const std::filesystem::path& dir,
     t << "[interaction.three_body]\nfile = \""
       << DataFile(ThreeBodyName()).string() << "\"\n"
       << "type = \"no2b\"\ne1max = 6\ne2max = 12\ne3max = 18\n\n";
+  // The integration tests reproduce imsrg++ step counts and trajectories, so
+  // they use its linear HF mixing; the TOML default (diis, D37) reaches the
+  // same solution only to the HF tolerance.
+  t << "[hartree_fock]\nmixing = \"linear\"\n\n";
   t << "[imsrg]\nmethod = \"magnus\"\n\n";
   if (!smax.empty()) t << "[imsrg.step]\nsmax = " << smax << "\n\n";
   t << extra << "\n[output]\ndirectory = \"" << dir.string() << "\"\n";

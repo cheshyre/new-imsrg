@@ -45,9 +45,9 @@ struct PreparedHamiltonian {
 /// Builds the model space, reads the interaction(s), adds the kinetic energy
 /// (intrinsic Trel with the config's A, or lab-frame T) and the Lawson term
 /// (|beta_cm| > 1e-6: beta_cm * HCM(hw = beta_cm_hw)), solves Hartree-Fock
-/// (linear mixing, occupations unfrozen unless hartree_fock.freeze_occupations)
-/// and returns the normal-ordered Hamiltonian (NO2B for a 3N input). Logs E_HF
-/// and its parts.
+/// (mixing as `hartree_fock.mixing`, occupations unfrozen unless
+/// hartree_fock.freeze_occupations) and returns the normal-ordered Hamiltonian
+/// (NO2B for a 3N input). Logs E_HF and its parts.
 /// @throws InputError for unreadable input files; ConfigError ("E-PLANNED ...")
 ///         for options that are not implemented yet (NAT basis, formats other
 ///         than me2j / no2b, ...).

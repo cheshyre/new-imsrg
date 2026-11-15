@@ -122,6 +122,9 @@ PreparedHamiltonian PrepareHamiltonian(const RunConfig& config) {
 
   if (b.kind == BasisKind::kHf) {
     hf::HFOptions ho;
+    ho.mixing = config.hartree_fock.mixing == HartreeFockMixing::kDiis
+                    ? hf::Mixing::kDiis
+                    : hf::Mixing::kLinear;
     ho.freeze_occupations = config.hartree_fock.freeze_occupations;
     ho.e3max = b.e3max;
     hf::HFResult r = hf::Solve(H, v3p, ho);
