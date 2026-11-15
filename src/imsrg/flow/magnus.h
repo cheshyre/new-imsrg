@@ -53,15 +53,17 @@ struct FlowStatus {
   int stage = 1;  ///< 1-based number of the `solve` call.
   int istep =
       0;  ///< Step within the stage (restarts at 0 per stage, as imsrg++).
-  double s = 0.0;              ///< Flow parameter (continues across stages).
-  double ds = 0.0;             ///< Step just taken (0 for istep 0).
-  double e0 = 0.0;             ///< Zero-body part of H(s).
-  double norm_h = 0.0;         ///< ||H(s)|| (op::norm, zero-body excluded).
-  double norm_eta_1b = 0.0;    ///< One-body norm of eta(s).
-  double norm_eta_2b = 0.0;    ///< Two-body norm of eta(s).
-  double norm_eta = 0.0;       ///< ||eta(s)||.
+  double s = 0.0;            ///< Flow parameter (continues across stages).
+  double ds = 0.0;           ///< Step just taken (0 for istep 0).
+  double e0 = 0.0;           ///< Zero-body part of H(s).
+  double norm_h = 0.0;       ///< ||H(s)|| (op::norm, zero-body excluded).
+  double norm_eta_1b = 0.0;  ///< One-body norm of eta(s).
+  double norm_eta_2b = 0.0;  ///< Two-body norm of eta(s).
+  double norm_eta = 0.0;     ///< ||eta(s)||.
+  double norm_eta_3b = 0.0;  ///< Three-body norm of eta(s) (IMSRG(3); else 0).
   double norm_omega_1b = 0.0;  ///< One-body norm of the current (last) Omega.
   double norm_omega_2b = 0.0;  ///< Two-body norm of the current Omega.
+  double norm_omega_3b = 0.0;  ///< Three-body norm of the current Omega.
   double norm_omega = 0.0;     ///< ||current Omega||.
   std::size_t num_omegas = 1;  ///< Size of the Omega stack.
   double wall_seconds = 0.0;   ///< Wall time since the solver was constructed.
@@ -98,8 +100,13 @@ class MagnusSolver {
   /// Callback receiving every flow-log line (istep 0 and each step).
   using StatusCallback = std::function<void(const FlowStatus&)>;
 
-  /// Sets up the solver for H0 (copied; scalar, Hermitian, particle_rank 2,
-  /// normal ordered with respect to the reference of its model space): s = 0,
+  /// Sets up the solver for H0 (copied; scalar, Hermitian, particle_rank 2 or
+  /// 3, normal ordered with respect to the reference of its model space). With
+  /// `comm.terms` selecting IMSRG(3) terms H0 is promoted to particle_rank 3
+  /// (zero three-body part) and eta, every Omega and H(s) have rank 3: the
+  /// model space of H0 then needs a three-body space (InputError otherwise).
+  /// A rank-3 H0 needs IMSRG(3) terms in `comm` as well (else the commutator
+  /// results would not match its rank; InputError): s = 0,
   /// Omega stack = {0}, eta not computed yet. Builds the commutator workspace
   /// (needs an initialized exec::Runtime).
   /// @throws InputError if `solver.dsmax`, `domega`, `ds_0` or
