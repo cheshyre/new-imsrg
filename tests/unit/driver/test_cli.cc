@@ -43,7 +43,10 @@ class TempDir {
  public:
   explicit TempDir(bool with_inputs = true) {
     static std::atomic<int> counter{0};
-    path_ = fs::temp_directory_path() /
+    std::error_code ec;
+    // Canonical: the working directory of a legacy command (getcwd) is
+    // physical.
+    path_ = fs::canonical(fs::temp_directory_path(), ec) /
             ("imsrg_cli_test_" +
              std::to_string(
                  std::chrono::steady_clock::now().time_since_epoch().count()) +
@@ -62,6 +65,15 @@ class TempDir {
   TempDir& operator=(const TempDir&) = delete;
   const fs::path& path() const { return path_; }
 
+  /// Copies `examples/config/<name>` into this directory and returns its path.
+  /// Relative paths of a config file resolve against the file's directory
+  /// (D37), so the examples run from here, next to the placeholder inputs.
+  std::string CopyExample(const char* name) const {
+    fs::copy_file(std::string(IMSRG_SOURCE_DIR) + "/examples/config/" + name,
+                  path_ / name, fs::copy_options::overwrite_existing);
+    return (path_ / name).string();
+  }
+
   /// Runs the executable with `args` (a shell fragment) in this directory.
   Result Run(const std::string& args) const {
     const std::string cmd = "cd '" + path_.string() + "' && '" +
@@ -78,10 +90,6 @@ class TempDir {
  private:
   fs::path path_;
 };
-
-std::string Example(const char* name) {
-  return std::string(IMSRG_SOURCE_DIR) + "/examples/config/" + name;
-}
 
 /// stdout up to (not including) the `[provenance]` line.
 std::string BeforeProvenance(const std::string& s) {
@@ -126,7 +134,7 @@ TEST(DriverCli, ExamplesTomlAndLegacyResolveIdentically) {
   for (const auto& c : cases) {
     SCOPED_TRACE(c.file);
     TempDir d;
-    const Result t = d.Run("--print-config --config " + Example(c.file));
+    const Result t = d.Run("--print-config --config " + d.CopyExample(c.file));
     const Result l = d.Run("--print-config " + c.legacy);
     EXPECT_EQ(t.code, 0) << t.err;
     EXPECT_EQ(l.code, 0) << l.err;
@@ -147,7 +155,7 @@ TEST(DriverCli, ExamplesTomlAndLegacyResolveIdentically) {
 
 TEST(DriverCli, ValidateWritesNothingAndRunStopsOnPlaceholderInput) {
   TempDir d;
-  const std::string a = Example("a_o16_imsrg2.toml");
+  const std::string a = d.CopyExample("a_o16_imsrg2.toml");
   const Result v = d.Run("--validate --config " + a);
   EXPECT_EQ(v.code, 0) << v.err;
   EXPECT_TRUE(Contains(v.out, "configuration is valid"));
@@ -167,7 +175,7 @@ TEST(DriverCli, ValidateWritesNothingAndRunStopsOnPlaceholderInput) {
 
 TEST(DriverCli, SetOverrides) {
   TempDir d;
-  const std::string a = Example("a_o16_imsrg2.toml");
+  const std::string a = d.CopyExample("a_o16_imsrg2.toml");
   const std::string base = "--print-config --config " + a + " ";
 
   Result r = d.Run(base + "--set basis.emax=2");
@@ -200,7 +208,8 @@ TEST(DriverCli, SetOverrides) {
 
 TEST(DriverCli, CommandLineErrors) {
   TempDir d;
-  Result r = d.Run("--config " + Example("a_o16_imsrg2.toml") + " emax=4");
+  Result r =
+      d.Run("--config " + d.CopyExample("a_o16_imsrg2.toml") + " emax=4");
   EXPECT_EQ(r.code, 2);
   EXPECT_TRUE(Contains(r.err, "E-CLI-MIX")) << r.err;
 
@@ -224,7 +233,7 @@ TEST(DriverCli, ExitCodes) {
   {
     TempDir d(/*with_inputs=*/false);
     const Result r =
-        d.Run("--validate --config " + Example("a_o16_imsrg2.toml"));
+        d.Run("--validate --config " + d.CopyExample("a_o16_imsrg2.toml"));
     EXPECT_EQ(r.code, 3) << r.err;
     EXPECT_TRUE(Contains(r.err, "V-14")) << r.err;
   }

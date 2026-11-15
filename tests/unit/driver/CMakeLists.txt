@@ -14,6 +14,9 @@ imsrg_add_test(NAME driver_reader SOURCES test_toml_reader.cc test_writer.cc DEP
 imsrg_add_test(NAME driver_resolve SOURCES test_resolve.cc test_validate.cc DEPS driver
                LABELS unit)
 
+# Relative-path rules of load_config (config-file directory vs working directory, D37).
+imsrg_add_test(NAME driver_paths SOURCES test_paths.cc DEPS driver LABELS unit)
+
 # Legacy key=value translation (items 1-5); data/legacy_keys.txt lists the 85 old keys.
 imsrg_add_test(NAME driver_legacy SOURCES test_legacy_parameters.cc DEPS driver LABELS unit)
 target_compile_definitions(driver_legacy PRIVATE

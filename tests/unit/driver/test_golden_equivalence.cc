@@ -5,6 +5,7 @@
 // command line (design/16 section 6.3). The four TOML blocks and the four
 // "Equivalent legacy command" lines are extracted from the design document
 // itself; examples/config holds verbatim copies.
+#include <filesystem>
 #include <fstream>
 #include <optional>
 #include <sstream>
@@ -16,6 +17,7 @@
 
 #include "imsrg/driver/config/load_config.h"
 #include "imsrg/driver/config/writer.h"
+#include "tests/support/scratch_dir.h"
 
 #ifndef IMSRG_SOURCE_DIR
 #error "IMSRG_SOURCE_DIR must be defined by the build"
@@ -127,10 +129,21 @@ RunConfig LoadOk(const ConfigSources& sources, const std::string& what) {
   return std::move(r).value();
 }
 
-RunConfig LoadToml(const Example& e) {
+/// A scratch directory that is the working directory for the test's lifetime.
+/// The examples name their input files without a directory: in a TOML file
+/// they resolve against the file's directory, in the legacy command against the
+/// working directory (D37), so the example file is copied into the working
+/// directory to make both sides agree.
+struct Workdir {
+  test_support::ScratchDir dir;
+  test_support::ScopedCwd cwd{dir.path()};
+};
+
+RunConfig LoadToml(const Example& e, const Workdir& wd) {
+  const std::filesystem::path file = wd.dir.path() / e.file;
+  std::ofstream(file) << e.toml;
   ConfigSources s;
-  s.config_text = e.toml;
-  s.config_text_name = e.file;
+  s.config_file = file;
   return LoadOk(s, std::string("TOML of (") + e.tag + ")");
 }
 
@@ -159,7 +172,8 @@ TEST(GoldenEquivalence, ExampleFilesAreVerbatimCopiesOfTheDocBlocks) {
 TEST(GoldenEquivalence, TomlAndLegacyResolveToTheSameConfig) {
   for (const auto& e : Examples()) {
     SCOPED_TRACE(std::string("example (") + e.tag + ")");
-    const RunConfig t = LoadToml(e);
+    const Workdir wd;
+    const RunConfig t = LoadToml(e, wd);
     RunConfig l = LoadLegacy(e);
     // The one documented difference (D37): an absent `hartree_fock.mixing` is
     // DIIS in TOML and imsrg++'s linear mixing for legacy command lines.
@@ -174,11 +188,19 @@ TEST(GoldenEquivalence, TomlAndLegacyResolveToTheSameConfig) {
 }
 
 TEST(GoldenEquivalence, ExampleA) {
-  const RunConfig c = LoadToml(Examples()[0]);
+  const Workdir wd;
+  const RunConfig c = LoadToml(Examples()[0], wd);
   EXPECT_EQ(c.basis.mass_number, 16);
   EXPECT_EQ(c.imsrg.steps, 1);
   EXPECT_EQ(c.output.stem, "magnus_O16_O16_hw16_e4_A16");
-  EXPECT_EQ(c.output.flow_file, "output/magnus_O16_O16_hw16_e4_A16.flow");
+  EXPECT_EQ(
+      c.output.flow_file,
+      (wd.dir.path() / "output/magnus_O16_O16_hw16_e4_A16.flow").string());
+  EXPECT_EQ(c.output.directory, (wd.dir.path() / "output").string());
+  EXPECT_EQ(
+      c.interaction.two_body.file.at(0),
+      (wd.dir.path() / "VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz")
+          .string());
   ASSERT_EQ(c.operators.list.size(), 1u);
   EXPECT_EQ(c.operators.list[0].canonical_name, "Rp2");
   EXPECT_EQ(c.interaction.two_body.e2max, 28);
@@ -188,7 +210,8 @@ TEST(GoldenEquivalence, ExampleA) {
 }
 
 TEST(GoldenEquivalence, ExampleB) {
-  const RunConfig c = LoadToml(Examples()[1]);
+  const Workdir wd;
+  const RunConfig c = LoadToml(Examples()[1], wd);
   ASSERT_TRUE(c.interaction.three_body.has_value());
   EXPECT_EQ(c.interaction.three_body->type, ThreeBodyType::kNo2b);
   EXPECT_EQ(c.interaction.three_body->e1max, 6);
@@ -199,7 +222,8 @@ TEST(GoldenEquivalence, ExampleB) {
 }
 
 TEST(GoldenEquivalence, ExampleC) {
-  const RunConfig c = LoadToml(Examples()[2]);
+  const Workdir wd;
+  const RunConfig c = LoadToml(Examples()[2], wd);
   EXPECT_EQ(c.imsrg.steps, 2);
   EXPECT_EQ(c.valence.space, std::optional<std::string>("sd-shell"));
   EXPECT_EQ(c.imsrg.generator.core, Generator::kAtan);
@@ -208,7 +232,8 @@ TEST(GoldenEquivalence, ExampleC) {
 }
 
 TEST(GoldenEquivalence, ExampleD) {
-  const RunConfig c = LoadToml(Examples()[3]);
+  const Workdir wd;
+  const RunConfig c = LoadToml(Examples()[3], wd);
   EXPECT_TRUE(c.imsrg3.in_flow);
   EXPECT_EQ(c.imsrg3.variant, Imsrg3Variant::kN7);
   EXPECT_EQ(c.basis.e3max, 6);
@@ -218,7 +243,8 @@ TEST(GoldenEquivalence, ExampleD) {
 
 TEST(HartreeFockMixingKey, LegacyIsLinearTomlIsDiisAndBothAreRecorded) {
   const Example& e = Examples()[0];
-  const RunConfig toml = LoadToml(e);
+  const Workdir wd;
+  const RunConfig toml = LoadToml(e, wd);
   const RunConfig legacy = LoadLegacy(e);
   EXPECT_EQ(toml.hartree_fock.mixing, HartreeFockMixing::kDiis);
   EXPECT_EQ(legacy.hartree_fock.mixing, HartreeFockMixing::kLinear);
