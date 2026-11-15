@@ -538,91 +538,128 @@ struct PairThirdOut {
 };
 static_assert(std::is_trivially_copyable_v<PairThirdOut>);
 
-/// The active rows of W = E B3 E^T (and of V = E B3^T E^T where requested)
-/// of X3 and Y3 for the block elements [w_base, w_base + size) of the layout
-/// `pb.w_off` (the channels of one batch), written to `o` at index (element
-/// - w_base): one work item per element, W[t, u] = sum_{I in E_t, K in E_u}
-/// E_tI E_uK B3[I, K] with E the map `e` (rows: PairThirdSpace flat states,
-/// columns: channel-local kept rows). Cost O(size nnz(E row)^2).
+/// Kernel of the pair-third build: the active rows of W = E B3 E^T (and of
+/// V = E B3^T E^T where requested) of X3 and Y3 for the block elements
+/// [w_base, w_base + size) of the layout `pb.w_off` (the channels of one
+/// batch), written to `o` at index (element - w_base). Element (t, u):
+/// W[t, u] = sum_{I in E_t, K in E_u} E_tI E_uK B3[I, K] with E the map `e`
+/// (rows: PairThirdSpace flat states, columns: channel-local kept rows).
+/// A functor rather than a lambda, so the launch may sit in a function of
+/// this TU's unnamed namespace (nvcc restricts the enclosing functions of
+/// extended lambdas). Cost per element O(nnz(E row)^2).
+struct BuildBlocksFunctor {
+  detail::N7Views v;
+  PairBlocksView pb;
+  op::CsrView e;
+  PairThirdOut o;
+  std::int64_t w_base = 0;
+
+  IMSRG_FUNCTION void operator()(const exec::Index idx) const {
+    const std::int64_t g = idx + w_base;
+    const int ch = detail::FindBlock(pb.w_off, pb.num_channels, g);
+    const std::int64_t na = pb.ch_active[ch];
+    const std::int64_t loc = g - pb.w_off[ch];
+    const int fr = pb.orig[pb.act_row[pb.act_begin[ch] + loc % na]];
+    const int fc = pb.orig[pb.ch_begin[ch] + loc / na];
+    double wx = 0.0;
+    double vx = 0.0;
+    double wy = 0.0;
+    double vy = 0.0;
+    for (std::int64_t a = e.ptr[fr]; a < e.ptr[fr + 1]; ++a) {
+      const int I = e.col[a];
+      for (std::int64_t b = e.ptr[fc]; b < e.ptr[fc + 1]; ++b) {
+        const int K = e.col[b];
+        const double ee = e.val[a] * e.val[b];
+        if (o.wx != nullptr) {
+          wx += ee * detail::ThreeBodyLocal(v.x3, v.sp, ch, I, K);
+        }
+        if (o.vx != nullptr) {
+          vx += ee * detail::ThreeBodyLocal(v.x3, v.sp, ch, K, I);
+        }
+        if (o.wy != nullptr) {
+          wy += ee * detail::ThreeBodyLocal(v.y3, v.sp, ch, I, K);
+        }
+        if (o.vy != nullptr) {
+          vy += ee * detail::ThreeBodyLocal(v.y3, v.sp, ch, K, I);
+        }
+      }
+    }
+    if (o.wx != nullptr) o.wx[idx] = wx;
+    if (o.vx != nullptr) o.vx[idx] = vx;
+    if (o.wy != nullptr) o.wy[idx] = wy;
+    if (o.vy != nullptr) o.vy[idx] = vy;
+  }
+};
+static_assert(std::is_trivially_copyable_v<BuildBlocksFunctor>);
+
+/// Builds the blocks of one batch (`BuildBlocksFunctor`, one work item per
+/// block element).
 void BuildPairThirdBlocks(const detail::N7Views& v, const PairBlocksView& pb,
                           const op::CsrView& e, std::int64_t w_base,
                           std::int64_t size, const PairThirdOut& o) {
   if (size == 0) return;
-  Kokkos::parallel_for(
-      "commutator::comm232ss_pair_third", DynamicPolicy(0, size),
-      IMSRG_LAMBDA(const exec::Index idx) {
-        const std::int64_t g = idx + w_base;
-        const int ch = detail::FindBlock(pb.w_off, pb.num_channels, g);
-        const std::int64_t na = pb.ch_active[ch];
-        const std::int64_t loc = g - pb.w_off[ch];
-        const int fr = pb.orig[pb.act_row[pb.act_begin[ch] + loc % na]];
-        const int fc = pb.orig[pb.ch_begin[ch] + loc / na];
-        double wx = 0.0;
-        double vx = 0.0;
-        double wy = 0.0;
-        double vy = 0.0;
-        for (std::int64_t a = e.ptr[fr]; a < e.ptr[fr + 1]; ++a) {
-          const int I = e.col[a];
-          for (std::int64_t b = e.ptr[fc]; b < e.ptr[fc + 1]; ++b) {
-            const int K = e.col[b];
-            const double ee = e.val[a] * e.val[b];
-            if (o.wx != nullptr) {
-              wx += ee * detail::ThreeBodyLocal(v.x3, v.sp, ch, I, K);
-            }
-            if (o.vx != nullptr) {
-              vx += ee * detail::ThreeBodyLocal(v.x3, v.sp, ch, K, I);
-            }
-            if (o.wy != nullptr) {
-              wy += ee * detail::ThreeBodyLocal(v.y3, v.sp, ch, I, K);
-            }
-            if (o.vy != nullptr) {
-              vy += ee * detail::ThreeBodyLocal(v.y3, v.sp, ch, K, I);
-            }
-          }
-        }
-        if (o.wx != nullptr) o.wx[idx] = wx;
-        if (o.vx != nullptr) o.vx[idx] = vx;
-        if (o.wy != nullptr) o.wy[idx] = wy;
-        if (o.vy != nullptr) o.vy[idx] = vy;
-      });
+  BuildBlocksFunctor f;
+  f.v = v;
+  f.pb = pb;
+  f.e = e;
+  f.o = o;
+  f.w_base = w_base;
+  Kokkos::parallel_for("commutator::comm232ss_pair_third",
+                       DynamicPolicy(0, size), f);
 }
 
+/// Kernel of the element pass: adds the contribution of the channels of the
+/// batch `bb` to the stored Z2 element `e` (functor for the reason given at
+/// `BuildBlocksFunctor`). Cost per element O(8 HalfSumPairThird).
+struct AddBatchFunctor {
+  detail::N7Views v;
+  PairBlocksView pb;
+  BatchBlocks bb;
+  detail::TwoBodyOutView out;
+
+  IMSRG_FUNCTION void operator()(const exec::Index e) const {
+    const basis::TwoBodyTableView& tb = v.x2.tb;
+    const int ch = detail::FindBlock(out.block_offset, tb.num_channels, e);
+    const std::int64_t n = tb.channel_num_kets[ch];
+    const std::int64_t idx = e - out.block_offset[ch];
+    const int ib = static_cast<int>(idx % n);
+    const int ik = static_cast<int>(idx / n);
+    const int J = tb.channel_two_j[ch] / 2;
+    const int koff = tb.channel_ket_offset[ch];
+    const int bra = tb.channel_kets[koff + ib];
+    const int ket = tb.channel_kets[koff + ik];
+    const int i = tb.ket_p[bra];
+    const int j = tb.ket_q[bra];
+    const int k = tb.ket_p[ket];
+    const int l = tb.ket_q[ket];
+    double z = 0.0;
+    if (bb.wy != nullptr) {
+      z += BracketPairThird(v, pb, bb, v.x2, bb.wy, bb.wyt, bb.syt, i, j, k, l,
+                            J);
+    }
+    if (bb.wx != nullptr) {
+      z -= BracketPairThird(v, pb, bb, v.y2, bb.wx, bb.wxt, bb.sxt, i, j, k, l,
+                            J);
+    }
+    z *= kSign;
+    if (i == j) z /= constants::kSqrt2;
+    if (k == l) z /= constants::kSqrt2;
+    out.data[e] += z;
+  }
+};
+static_assert(std::is_trivially_copyable_v<AddBatchFunctor>);
+
 /// Adds the contribution of the channels of batch `bb` to every stored Z2
-/// element (one work item per element). O(elements * 8 HalfSumPairThird).
+/// element (`AddBatchFunctor`, one work item per element; `total` elements).
 void AddBatch(const detail::N7Views& v, const PairBlocksView& pb,
               const BatchBlocks& bb, const detail::TwoBodyOutView& out,
               std::int64_t total) {
-  const basis::TwoBodyTableView tb = v.x2.tb;
-  Kokkos::parallel_for(
-      "commutator::comm232ss", DynamicPolicy(0, total),
-      IMSRG_LAMBDA(const exec::Index e) {
-        const int ch = detail::FindBlock(out.block_offset, tb.num_channels, e);
-        const std::int64_t n = tb.channel_num_kets[ch];
-        const std::int64_t idx = e - out.block_offset[ch];
-        const int ib = static_cast<int>(idx % n);
-        const int ik = static_cast<int>(idx / n);
-        const int J = tb.channel_two_j[ch] / 2;
-        const int koff = tb.channel_ket_offset[ch];
-        const int bra = tb.channel_kets[koff + ib];
-        const int ket = tb.channel_kets[koff + ik];
-        const int i = tb.ket_p[bra];
-        const int j = tb.ket_q[bra];
-        const int k = tb.ket_p[ket];
-        const int l = tb.ket_q[ket];
-        double z = 0.0;
-        if (bb.wy != nullptr) {
-          z += BracketPairThird(v, pb, bb, v.x2, bb.wy, bb.wyt, bb.syt, i, j, k,
-                                l, J);
-        }
-        if (bb.wx != nullptr) {
-          z -= BracketPairThird(v, pb, bb, v.y2, bb.wx, bb.wxt, bb.sxt, i, j, k,
-                                l, J);
-        }
-        z *= kSign;
-        if (i == j) z /= constants::kSqrt2;
-        if (k == l) z /= constants::kSqrt2;
-        out.data[e] += z;
-      });
+  AddBatchFunctor f;
+  f.v = v;
+  f.pb = pb;
+  f.bb = bb;
+  f.out = out;
+  Kokkos::parallel_for("commutator::comm232ss", DynamicPolicy(0, total), f);
 }
 
 /// A batch of consecutive three-body channels [lo, hi) and the doubles of
