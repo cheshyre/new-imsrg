@@ -86,3 +86,20 @@ target_compile_definitions(driver_integration_slow PRIVATE IMSRG_IT10_SLOW
   "IMSRG_SOURCE_DIR=\"${PROJECT_SOURCE_DIR}\""
   "IMSRG_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden\""
   "IMSRG_TEST_DATA_DIR=\"${IMSRG_TEST_DATA_DIR}\"")
+
+# IT-8 perturbative triples after the Magnus flow (He4 emax 2 in the regular suite, O16 emax 3 under
+# `slow`; the same source compiled twice).
+foreach(_variant "" "_slow")
+  if(_variant STREQUAL "")
+    set(_triples_labels integration)
+  else()
+    set(_triples_labels slow integration)
+  endif()
+  imsrg_add_test(NAME driver_triples${_variant}
+    SOURCES test_triples.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
+    DEPS driver LABELS ${_triples_labels} NO_GTEST_MAIN)
+  target_compile_definitions(driver_triples${_variant} PRIVATE
+    "IMSRG_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden\""
+    "IMSRG_TEST_DATA_DIR=\"${IMSRG_TEST_DATA_DIR}\"")
+endforeach()
+target_compile_definitions(driver_triples_slow PRIVATE IMSRG_TRIPLES_SLOW=1)
