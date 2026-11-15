@@ -24,7 +24,7 @@ namespace imsrg::opslib {
 /// `KineticEnergy_Op`. Complexity O(num_orbits^2) host operations; the result
 /// is synchronised to the device before returning.
 /// @pre `ms` is not null.
-op::Operator kinetic_energy(const std::shared_ptr<const basis::ModelSpace>& ms);
+op::Operator KineticEnergy(const std::shared_ptr<const basis::ModelSpace>& ms);
 
 }  // namespace imsrg::opslib
 

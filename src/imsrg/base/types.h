@@ -39,8 +39,8 @@ class StrongIndex {
                 "StrongIndex needs an integral representation");
 
  public:
-  using rep_type = Rep;
-  using tag_type = Tag;
+  using RepType = Rep;
+  using TagType = Tag;
 
   /// Index 0.
   StrongIndex() = default;
@@ -52,7 +52,7 @@ class StrongIndex {
   IMSRG_INLINE_FUNCTION constexpr Rep value() const noexcept { return value_; }
   /// The raw value as `std::size_t`, for indexing arrays. Precondition:
   /// `value() >= 0`.
-  IMSRG_INLINE_FUNCTION constexpr std::size_t to_size() const noexcept {
+  IMSRG_INLINE_FUNCTION constexpr std::size_t ToSize() const noexcept {
     return static_cast<std::size_t>(value_);
   }
 
@@ -156,14 +156,14 @@ static_assert(!std::is_convertible_v<OrbitIndex, KetIndex>,
 
 /// Twice an angular momentum: 2j of an orbit, or 2J of a coupled state.
 /// `TwoJ{3}` is j = 3/2. Construct explicitly (`TwoJ{2 * J}` or
-/// `TwoJ::from_integer(J)`); there is no conversion from int.
+/// `TwoJ::FromInteger(J)`); there is no conversion from int.
 struct TwoJ {
   std::int32_t twice = 0;
 
   IMSRG_DETAIL_TWICE_COMPARISONS(TwoJ)
 
   /// 2J for an integer J.
-  IMSRG_INLINE_FUNCTION static constexpr TwoJ from_integer(
+  IMSRG_INLINE_FUNCTION static constexpr TwoJ FromInteger(
       std::int32_t j) noexcept {
     return TwoJ{2 * j};
   }
@@ -184,11 +184,11 @@ struct TwoTz {
   IMSRG_DETAIL_TWICE_COMPARISONS(TwoTz)
 
   /// tz2 of a proton (-1).
-  IMSRG_INLINE_FUNCTION static constexpr TwoTz proton() noexcept {
+  IMSRG_INLINE_FUNCTION static constexpr TwoTz Proton() noexcept {
     return TwoTz{-1};
   }
   /// tz2 of a neutron (+1).
-  IMSRG_INLINE_FUNCTION static constexpr TwoTz neutron() noexcept {
+  IMSRG_INLINE_FUNCTION static constexpr TwoTz Neutron() noexcept {
     return TwoTz{+1};
   }
 };
@@ -207,29 +207,29 @@ static_assert(std::is_aggregate_v<TwoJ> && TwoJ{3}.twice == 3);
 #undef IMSRG_DETAIL_TWICE_COMPARISONS
 
 /// Degeneracy 2j + 1 of an angular momentum.
-IMSRG_INLINE_FUNCTION constexpr std::int32_t degeneracy(TwoJ j) noexcept {
+IMSRG_INLINE_FUNCTION constexpr std::int32_t Degeneracy(TwoJ j) noexcept {
   return j.twice + 1;
 }
 /// The angular momentum j itself (e.g. 1.5 for `TwoJ{3}`).
-IMSRG_INLINE_FUNCTION constexpr double as_double(TwoJ j) noexcept {
+IMSRG_INLINE_FUNCTION constexpr double AsDouble(TwoJ j) noexcept {
   return 0.5 * j.twice;
 }
 /// The projection m itself (e.g. -0.5 for `TwoM{-1}`).
-IMSRG_INLINE_FUNCTION constexpr double as_double(TwoM m) noexcept {
+IMSRG_INLINE_FUNCTION constexpr double AsDouble(TwoM m) noexcept {
   return 0.5 * m.twice;
 }
 /// True if j is half-integer (2j odd).
-IMSRG_INLINE_FUNCTION constexpr bool is_half_integer(TwoJ j) noexcept {
+IMSRG_INLINE_FUNCTION constexpr bool IsHalfInteger(TwoJ j) noexcept {
   return (j.twice % 2) != 0;
 }
 
 /// Parity of a state, (-1)^l for an orbit. Combining parities multiplies them
 /// (`operator*`).
-enum class Parity : std::uint8_t { Even = 0, Odd = 1 };
+enum class Parity : std::uint8_t { kEven = 0, kOdd = 1 };
 
 /// Parity (-1)^l of orbital angular momentum l (l >= 0).
-IMSRG_INLINE_FUNCTION constexpr Parity parity_of_l(std::int32_t l) noexcept {
-  return (l % 2 == 0) ? Parity::Even : Parity::Odd;
+IMSRG_INLINE_FUNCTION constexpr Parity ParityOfL(std::int32_t l) noexcept {
+  return (l % 2 == 0) ? Parity::kEven : Parity::kOdd;
 }
 /// Product of two parities.
 IMSRG_INLINE_FUNCTION constexpr Parity operator*(Parity a, Parity b) noexcept {
@@ -237,15 +237,15 @@ IMSRG_INLINE_FUNCTION constexpr Parity operator*(Parity a, Parity b) noexcept {
                              static_cast<std::uint8_t>(b));
 }
 /// +1 for even, -1 for odd parity.
-IMSRG_INLINE_FUNCTION constexpr std::int32_t sign(Parity p) noexcept {
-  return p == Parity::Even ? 1 : -1;
+IMSRG_INLINE_FUNCTION constexpr std::int32_t Sign(Parity p) noexcept {
+  return p == Parity::kEven ? 1 : -1;
 }
 
 /// Hermiticity of an operator: O^dagger = O, O^dagger = -O, or neither.
 enum class Hermiticity : std::uint8_t {
-  Hermitian,
-  AntiHermitian,
-  NonHermitian
+  kHermitian,
+  kAntiHermitian,
+  kNonHermitian
 };
 
 static_assert(std::is_trivially_copyable_v<Parity> && sizeof(Parity) == 1);

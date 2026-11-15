@@ -4,7 +4,7 @@
 #ifndef IMSRG_DRIVER_PIPELINE_HAMILTONIAN_H_
 #define IMSRG_DRIVER_PIPELINE_HAMILTONIAN_H_
 /// @file
-/// Pipeline stage 1 of `driver::run` (design/13 section 9, design/reference/03
+/// Pipeline stage 1 of `driver::Run` (design/13 section 9, design/reference/03
 /// section 1.2 steps 5-11): model space, bare Hamiltonian, Hartree-Fock and
 /// normal ordering; and the construction of the requested operators in the same
 /// basis.
@@ -51,7 +51,7 @@ struct PreparedHamiltonian {
 /// @throws InputError for unreadable input files; ConfigError ("E-PLANNED ...")
 ///         for options that are not implemented yet (NAT basis, formats other
 ///         than me2j / no2b, ...).
-PreparedHamiltonian prepare_hamiltonian(const RunConfig& config);
+PreparedHamiltonian PrepareHamiltonian(const RunConfig& config);
 
 /// The operator `name` (an `OperatorRequest::canonical_name`, e.g. "Rp2") built
 /// on the bare model space, transformed to the HF basis if HF was solved, and
@@ -59,9 +59,9 @@ PreparedHamiltonian prepare_hamiltonian(const RunConfig& config);
 /// it can be transformed with the flow's Omegas (imsrg++.cc:1386-1440).
 /// @throws ConfigError ("E-PLANNED ...") for operators that are not implemented
 ///         yet.
-op::Operator prepare_operator(const OperatorRequest& request,
-                              const PreparedHamiltonian& ph,
-                              const RunConfig& config);
+op::Operator PrepareOperator(const OperatorRequest& request,
+                             const PreparedHamiltonian& ph,
+                             const RunConfig& config);
 
 }  // namespace imsrg::driver::pipeline
 

@@ -66,7 +66,7 @@ class Workspace {
   /// True if `op` lives on this workspace's model space (the same object or a
   /// structurally equal one, `basis::ModelSpace::operator==`). O(1) for the
   /// same object.
-  bool compatible(const op::Operator& op) const noexcept;
+  bool Compatible(const op::Operator& op) const noexcept;
 
   /// Internal data of the kernels (defined in `detail/workspace_impl.h`, not a
   /// public API).

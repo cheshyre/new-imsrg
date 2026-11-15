@@ -66,8 +66,8 @@ static_assert(std::is_trivially_copyable_v<Ket3>);
 
 /// A three-body channel (2J, parity, 2Tz).
 struct ThreeBodyChannel {
-  TwoJ two_j{1};                 ///< 2J (odd).
-  Parity parity = Parity::Even;  ///< (-1)^(l_p + l_q + l_r).
+  TwoJ two_j{1};                  ///< 2J (odd).
+  Parity parity = Parity::kEven;  ///< (-1)^(l_p + l_q + l_r).
   TwoTz two_tz{-3};  ///< 2Tz = tz2_p + tz2_q + tz2_r in {-3, -1, 1, 3}.
   std::int64_t num_kets = 0;  ///< Number of kets (the block dimension).
   std::int64_t ket_offset =
@@ -135,7 +135,7 @@ class ThreeBodyChannels {
                                             Ket3Index k) const;
   /// Sum over channels of the number of kets (a ket belongs to up to j_r + 1
   /// channels).
-  std::int64_t sum_channel_kets() const noexcept {
+  std::int64_t SumChannelKets() const noexcept {
     return static_cast<std::int64_t>(channel_ket_table_.size());
   }
 
@@ -146,7 +146,7 @@ class ThreeBodyChannels {
   /// occupation of `ref`. Orbit shells are e = 2n + l and the Fermi levels are
   /// `ref.e_fermi`. Precondition: `ref` belongs to `basis` (same orbit count;
   /// IMSRG_ASSERT). O(1).
-  bool passes_configuration_cut(
+  bool PassesConfigurationCut(
       Ket3Index k, const SingleParticleBasis& basis, const Reference& ref,
       double de3max, double occnat3_cut,
       std::span<const double> natural_occupations = {}) const;

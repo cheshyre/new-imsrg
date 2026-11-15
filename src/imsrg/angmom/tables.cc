@@ -21,7 +21,7 @@ namespace {
 /// table order.
 using Tuple = std::array<int, 4>;
 
-std::vector<Tuple> tuples_at(int E) {
+std::vector<Tuple> TuplesAt(int E) {
   std::vector<Tuple> t;
   for (int l1 = 0; l1 <= E; ++l1) {
     for (int n1 = 0; 2 * n1 + l1 <= E; ++n1) {
@@ -60,15 +60,15 @@ SixJTable::SixJTable(int emax)
           for (int id = 0; id < nj; ++id) {
             for (int Jp = 0; Jp < nJ; ++Jp, ++i) {
               out[i] =
-                  wigner_6j(TwoJ{2 * ia + 1}, TwoJ{2 * ib + 1}, TwoJ{2 * J},
-                            TwoJ{2 * ic + 1}, TwoJ{2 * id + 1}, TwoJ{2 * Jp});
+                  Wigner6j(TwoJ{2 * ia + 1}, TwoJ{2 * ib + 1}, TwoJ{2 * J},
+                           TwoJ{2 * ic + 1}, TwoJ{2 * id + 1}, TwoJ{2 * Jp});
             }
           }
         }
       }
     }
   }
-  values_.sync_to_device();
+  values_.SyncToDevice();
 }
 
 SixJTable::View SixJTable::host_view() const noexcept {
@@ -105,9 +105,9 @@ NineJLSjjTable::NineJLSjjTable(int lmax)
               for (int J = 0; J < nJ; ++J, ++i) {
                 out[i] = (ja2 < 1 || jb2 < 1)
                              ? 0.0
-                             : norm_9j(TwoJ{2 * la}, TwoJ{1}, TwoJ{ja2},
-                                       TwoJ{2 * lb}, TwoJ{1}, TwoJ{jb2},
-                                       TwoJ{2 * L}, TwoJ{2 * S}, TwoJ{2 * J});
+                             : Norm9j(TwoJ{2 * la}, TwoJ{1}, TwoJ{ja2},
+                                      TwoJ{2 * lb}, TwoJ{1}, TwoJ{jb2},
+                                      TwoJ{2 * L}, TwoJ{2 * S}, TwoJ{2 * J});
               }
             }
           }
@@ -115,7 +115,7 @@ NineJLSjjTable::NineJLSjjTable(int lmax)
       }
     }
   }
-  values_.sync_to_device();
+  values_.SyncToDevice();
 }
 
 NineJLSjjTable::View NineJLSjjTable::host_view() const noexcept {
@@ -130,17 +130,17 @@ NineJLSjjTable::View NineJLSjjTable::device_view() const noexcept {
 
 namespace {
 
-std::int64_t block_count(int E) {
-  const auto K = static_cast<std::int64_t>(tuples_at(E).size());
+std::int64_t BlockCount(int E) {
+  const auto K = static_cast<std::int64_t>(TuplesAt(E).size());
   return static_cast<std::int64_t>(E + 1) * K * K;
 }
 
 }  // namespace
 
-std::int64_t MoshinskyTable::value_count(int e2max) noexcept {
+std::int64_t MoshinskyTable::ValueCount(int e2max) noexcept {
   std::int64_t total = 0;
   for (int E = 0; E <= e2max; ++E) {
-    total += block_count(E);
+    total += BlockCount(E);
   }
   return total;
 }
@@ -149,10 +149,10 @@ MoshinskyTable::MoshinskyTable(int e2max)
     : e2max_(e2max),
       values_([&] {
         IMSRG_CHECK(
-            e2max >= 0 && e2max <= moshinsky_max_energy,
+            e2max >= 0 && e2max <= kMoshinskyMaxEnergy,
             "MoshinskyTable: e2max must be in [0, moshinsky_max_energy]");
         return exec::DeviceBuffer<double>(
-            static_cast<std::size_t>(value_count(e2max)),
+            static_cast<std::size_t>(ValueCount(e2max)),
             "imsrg::MoshinskyTable::values");
       }()),
       position_(static_cast<std::size_t>(e2max / 2 + 1) *
@@ -176,7 +176,7 @@ MoshinskyTable::MoshinskyTable(int e2max)
   }
   std::int64_t next = 0;
   for (int E = 0; E <= e2max; ++E) {
-    const std::vector<Tuple> t = tuples_at(E);
+    const std::vector<Tuple> t = TuplesAt(E);
     const auto K = static_cast<std::int64_t>(t.size());
     ks[static_cast<std::size_t>(E)] = static_cast<std::int32_t>(K);
     for (std::size_t j = 0; j < t.size(); ++j) {
@@ -191,7 +191,7 @@ MoshinskyTable::MoshinskyTable(int e2max)
         for (std::int64_t ilab = 0; ilab < K; ++ilab) {
           const auto& u = t[static_cast<std::size_t>(ilab)];
           out[static_cast<std::size_t>(next + icm * K + ilab)] =
-              moshinsky(HoNL{c[0], c[1]}, HoNL{c[2], c[3]}, HoNL{u[0], u[1]},
+              Moshinsky(HoNL{c[0], c[1]}, HoNL{c[2], c[3]}, HoNL{u[0], u[1]},
                         HoNL{u[2], u[3]}, lambda);
         }
       }
@@ -200,10 +200,10 @@ MoshinskyTable::MoshinskyTable(int e2max)
   }
   IMSRG_CHECK(next == static_cast<std::int64_t>(out.size()),
               "MoshinskyTable: size mismatch");
-  values_.sync_to_device();
-  position_.sync_to_device();
-  offset_.sync_to_device();
-  block_size_.sync_to_device();
+  values_.SyncToDevice();
+  position_.SyncToDevice();
+  offset_.SyncToDevice();
+  block_size_.SyncToDevice();
 }
 
 int MoshinskyTable::block_size(int E) const noexcept {

@@ -15,13 +15,13 @@
 namespace imsrg::basis {
 namespace {
 
-SingleParticleBasis make_basis(std::int32_t emax) {
-  return SingleParticleBasis::harmonic_oscillator(BasisTruncation{emax}, 16.0);
+SingleParticleBasis MakeBasis(std::int32_t emax) {
+  return SingleParticleBasis::HarmonicOscillator(BasisTruncation{emax}, 16.0);
 }
 
 TEST(ParticleHoleChannels, CountsMatchTheNormalChannels) {
   for (const std::int32_t emax : {2, 4}) {
-    const auto basis = make_basis(emax);
+    const auto basis = MakeBasis(emax);
     const TwoBodyChannels tb(basis);
     const ParticleHoleChannels ph(tb);
     EXPECT_EQ(ph.num_orbits(), tb.num_orbits());
@@ -34,7 +34,7 @@ TEST(ParticleHoleChannels, CountsMatchTheNormalChannels) {
 }
 
 TEST(ParticleHoleChannels, MembershipFollowsTheTriangleParityAndTzRules) {
-  const auto basis = make_basis(2);
+  const auto basis = MakeBasis(2);
   const TwoBodyChannels tb(basis);
   const ParticleHoleChannels ph(tb);
   std::int64_t total = 0;
@@ -75,13 +75,13 @@ TEST(ParticleHoleChannels, MembershipFollowsTheTriangleParityAndTzRules) {
 }
 
 TEST(ParticleHoleChannels, DiagonalKetsAppearForEveryJ) {
-  const auto basis = make_basis(2);
+  const auto basis = MakeBasis(2);
   const TwoBodyChannels tb(basis);
   const ParticleHoleChannels ph(tb);
   // Orbit 0 is 0s1/2: the diagonal ket |00> has J = 0 and 1 (no Pauli rule),
   // and nothing else.
   const OrbitIndex o{0};
-  const KetIndex k = imsrgpp_ket_index(o, o, tb.num_orbits());
+  const KetIndex k = ImsrgppKetIndex(o, o, tb.num_orbits());
   for (const std::int32_t J : {0, 1}) {
     const ChannelIndex ch = ph.channel_of(o, o, TwoJ{2 * J});
     EXPECT_TRUE(ph.local_index(ch, k).has_value()) << J;
@@ -90,22 +90,22 @@ TEST(ParticleHoleChannels, DiagonalKetsAppearForEveryJ) {
 }
 
 TEST(ParticleHoleChannels, FindChannelAndChannelOf) {
-  const auto basis = make_basis(2);
+  const auto basis = MakeBasis(2);
   const TwoBodyChannels tb(basis);
   const ParticleHoleChannels ph(tb);
-  const auto ch = ph.find_channel(TwoJ{4}, Parity::Odd, TwoTz{2});
+  const auto ch = ph.find_channel(TwoJ{4}, Parity::kOdd, TwoTz{2});
   ASSERT_TRUE(ch.has_value());
   EXPECT_EQ(ch->value(), 6 * 2 + 2 * 2 + 1);
-  EXPECT_FALSE(ph.find_channel(TwoJ{3}, Parity::Odd, TwoTz{2}).has_value());
-  EXPECT_FALSE(ph.find_channel(TwoJ{-2}, Parity::Odd, TwoTz{2}).has_value());
+  EXPECT_FALSE(ph.find_channel(TwoJ{3}, Parity::kOdd, TwoTz{2}).has_value());
+  EXPECT_FALSE(ph.find_channel(TwoJ{-2}, Parity::kOdd, TwoTz{2}).has_value());
   EXPECT_FALSE(
-      ph.find_channel(TwoJ{2 * (ph.max_J() + 1)}, Parity::Even, TwoTz{0})
+      ph.find_channel(TwoJ{2 * (ph.max_J() + 1)}, Parity::kEven, TwoTz{0})
           .has_value());
-  EXPECT_FALSE(ph.find_channel(TwoJ{2}, Parity::Even, TwoTz{1}).has_value());
+  EXPECT_FALSE(ph.find_channel(TwoJ{2}, Parity::kEven, TwoTz{1}).has_value());
 }
 
 TEST(ParticleHoleChannels, PairIndexHandlesBothOrdersAndAbsence) {
-  const auto basis = make_basis(2);
+  const auto basis = MakeBasis(2);
   const TwoBodyChannels tb(basis);
   const ParticleHoleChannels ph(tb);
   const std::int32_t n = tb.num_orbits();
@@ -114,8 +114,8 @@ TEST(ParticleHoleChannels, PairIndexHandlesBothOrdersAndAbsence) {
     const std::int32_t nk = ph.channel(c).num_kets;
     for (std::int32_t p = 0; p < n; ++p) {
       for (std::int32_t q = 0; q < n; ++q) {
-        const KetIndex k = imsrgpp_ket_index(OrbitIndex{std::min(p, q)},
-                                             OrbitIndex{std::max(p, q)}, n);
+        const KetIndex k = ImsrgppKetIndex(OrbitIndex{std::min(p, q)},
+                                           OrbitIndex{std::max(p, q)}, n);
         const auto sorted = ph.local_index(c, k);
         const auto got = ph.pair_index(c, OrbitIndex{p}, OrbitIndex{q});
         if (!sorted) {
@@ -130,7 +130,7 @@ TEST(ParticleHoleChannels, PairIndexHandlesBothOrdersAndAbsence) {
 }
 
 TEST(ParticleHoleChannels, ChannelsBySizeAreDescendingAndNonEmpty) {
-  const auto basis = make_basis(4);
+  const auto basis = MakeBasis(4);
   const TwoBodyChannels tb(basis);
   const ParticleHoleChannels ph(tb);
   const auto order = ph.channels_by_size();

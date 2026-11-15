@@ -34,8 +34,8 @@ TEST(AngmomTables, SixJEqualsWignerExhaustively) {
         for (int c = 1; c <= tmax; c += 2) {
           for (int d = 1; d <= tmax; d += 2) {
             for (int Jp = 0; Jp <= tmax; Jp += 2) {
-              const double ref = wigner_6j(TwoJ{a}, TwoJ{b}, TwoJ{J}, TwoJ{c},
-                                           TwoJ{d}, TwoJ{Jp});
+              const double ref = Wigner6j(TwoJ{a}, TwoJ{b}, TwoJ{J}, TwoJ{c},
+                                          TwoJ{d}, TwoJ{Jp});
               ASSERT_EQ(
                   t(TwoJ{a}, TwoJ{b}, TwoJ{J}, TwoJ{c}, TwoJ{d}, TwoJ{Jp}),
                   ref);
@@ -83,7 +83,7 @@ TEST(AngmomTables, NineJEqualsNormNineJ) {
           for (int L = 0; L <= 2 * lmax; ++L) {
             for (int S = 0; S <= 1; ++S) {
               for (int J = 0; J <= 2 * lmax + 1; ++J) {
-                const double ref = norm_9j(
+                const double ref = Norm9j(
                     TwoJ{2 * la}, TwoJ{1}, TwoJ{ja}, TwoJ{2 * lb}, TwoJ{1},
                     TwoJ{jb}, TwoJ{2 * L}, TwoJ{2 * S}, TwoJ{2 * J});
                 ASSERT_EQ(t(la, TwoJ{ja}, lb, TwoJ{jb}, L, S, TwoJ{2 * J}),
@@ -123,13 +123,13 @@ TEST(AngmomTables, MoshinskyEqualsFunctionForEveryStoredEntry) {
         for (const auto& u : tup) {
           const HoNL cm{c[0], c[1]}, rel{c[2], c[3]}, a{u[0], u[1]},
               b{u[2], u[3]};
-          ASSERT_EQ(t(cm, rel, a, b, lam), moshinsky(cm, rel, a, b, lam));
+          ASSERT_EQ(t(cm, rel, a, b, lam), Moshinsky(cm, rel, a, b, lam));
           ++count;
         }
       }
     }
   }
-  EXPECT_EQ(count, MoshinskyTable::value_count(e2max));
+  EXPECT_EQ(count, MoshinskyTable::ValueCount(e2max));
   EXPECT_EQ(t(HoNL{0, 0}, HoNL{0, 0}, HoNL{0, 1}, HoNL{0, 0}, 0),
             0.0);  // energy mismatch
   EXPECT_EQ(t(HoNL{0, 0}, HoNL{0, 0}, HoNL{0, 0}, HoNL{0, 0}, 1),
@@ -144,7 +144,7 @@ TEST(AngmomTables, DeviceViewsReproduceHostSums) {
   const int emax = 3;
   const SixJTable s(emax);
   double dev_abs = 0.0;
-  const double dev = test::sum_sixj_device(s, dev_abs);
+  const double dev = test::SumSixjDevice(s, dev_abs);
   const auto hv = s.host_view();
   double host = 0.0;
   double host_abs = 0.0;
@@ -191,7 +191,7 @@ TEST(AngmomTables, DeviceViewsReproduceHostSums) {
       }
     }
   }
-  EXPECT_NEAR(test::sum_ninej_device(nt), host9,
+  EXPECT_NEAR(test::SumNinejDevice(nt), host9,
               1e-9 * std::max(1.0, std::abs(host9)));
 
   const MoshinskyTable m(6);
@@ -221,10 +221,10 @@ TEST(AngmomTables, DeviceViewsReproduceHostSums) {
   }
   ASSERT_FALSE(expect.empty());
   imsrg::exec::DeviceBuffer<std::int32_t> qb(q.size());
-  qb.copy_from_host(q);
+  qb.CopyFromHost(q);
   imsrg::exec::DeviceBuffer<double> out(expect.size());
-  test::eval_moshinsky_device(m, qb, out);
-  const auto got = out.to_vector();
+  test::EvalMoshinskyDevice(m, qb, out);
+  const auto got = out.ToVector();
   double maxdiff = 0.0;
   double maxabs = 0.0;
   for (std::size_t i = 0; i < expect.size(); ++i) {

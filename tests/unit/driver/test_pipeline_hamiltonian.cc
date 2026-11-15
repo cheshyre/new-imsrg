@@ -30,7 +30,7 @@ const fs::path kV3 =
     fs::path(IMSRG_TEST_DATA_DIR) /
     "NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin";
 
-std::string toml(const std::string& reference_block, bool with_3n,
+std::string Toml(const std::string& reference_block, bool with_3n,
                  const std::string& extra = "") {
   std::ostringstream t;
   t << "[basis]\nemax = 4\nhw = 16.0\n"
@@ -44,38 +44,38 @@ std::string toml(const std::string& reference_block, bool with_3n,
   return t.str();
 }
 
-RunConfig load(const std::string& text) {
+RunConfig Load(const std::string& text) {
   ConfigSources s;
   s.config_text = text;
-  auto r = load_config(s, LoadOptions{.check_files = false});
+  auto r = LoadConfig(s, LoadOptions{.check_files = false});
   if (!r.has_value()) {
     std::string msg;
-    for (const auto& i : r.error()) msg += i.to_string() + "\n";
+    for (const auto& i : r.error()) msg += i.ToString() + "\n";
     throw std::runtime_error("config does not load:\n" + msg);
   }
   return r.value();
 }
 
-OperatorRequest request(const std::string& spec) {
-  auto r = parse_operator_spec(spec, ModelSpaceInfo{.emax = 4});
+OperatorRequest Request(const std::string& spec) {
+  auto r = ParseOperatorSpec(spec, ModelSpaceInfo{.emax = 4});
   if (!r.has_value()) throw std::runtime_error("bad operator spec " + spec);
   return r.value().front();
 }
 
-double seconds_since(std::chrono::steady_clock::time_point t0) {
+double SecondsSince(std::chrono::steady_clock::time_point t0) {
   return std::chrono::duration<double>(std::chrono::steady_clock::now() - t0)
       .count();
 }
 
-bool have(const fs::path& p) { return fs::exists(p); }
+bool Have(const fs::path& p) { return fs::exists(p); }
 
 const std::string kO16 = "[reference]\nnucleus = \"O16\"\n";
 
 TEST(PipelineHamiltonian, O16TwoBody) {
-  if (!have(kVnn)) GTEST_SKIP() << "missing " << kVnn;
+  if (!Have(kVnn)) GTEST_SKIP() << "missing " << kVnn;
   const auto t0 = std::chrono::steady_clock::now();
-  const PreparedHamiltonian ph = prepare_hamiltonian(load(toml(kO16, false)));
-  std::cout << "[time] O16 2N: " << seconds_since(t0) << " s\n";
+  const PreparedHamiltonian ph = PrepareHamiltonian(Load(Toml(kO16, false)));
+  std::cout << "[time] O16 2N: " << SecondsSince(t0) << " s\n";
   ASSERT_TRUE(ph.hf.has_value());
   std::cout << "[dev] O16 2N E_HF - golden = "
             << ph.hf->e_hf - -147.89357642845789 << "\n";
@@ -87,12 +87,12 @@ TEST(PipelineHamiltonian, O16TwoBody) {
 }
 
 TEST(PipelineHamiltonian, O16WithNo2b) {
-  if (!have(kVnn) || !have(kV3))
+  if (!Have(kVnn) || !Have(kV3))
     GTEST_SKIP() << "missing input files in " << IMSRG_TEST_DATA_DIR;
   const auto t0 = std::chrono::steady_clock::now();
   const PreparedHamiltonian ph =
-      prepare_hamiltonian(load(toml(kO16, true, "e3max = 12")));
-  std::cout << "[time] O16 2N+NO2B: " << seconds_since(t0) << " s\n";
+      PrepareHamiltonian(Load(Toml(kO16, true, "e3max = 12")));
+  std::cout << "[time] O16 2N+NO2B: " << SecondsSince(t0) << " s\n";
   ASSERT_TRUE(ph.hf.has_value());
   std::cout << "[dev] O16 NO2B E_HF - golden = "
             << ph.hf->e_hf - -313.16848141064463 << "\n";
@@ -100,12 +100,12 @@ TEST(PipelineHamiltonian, O16WithNo2b) {
 }
 
 TEST(PipelineHamiltonian, Ne20Sd) {
-  if (!have(kVnn)) GTEST_SKIP() << "missing " << kVnn;
+  if (!Have(kVnn)) GTEST_SKIP() << "missing " << kVnn;
   const std::string ref =
       "[reference]\nnucleus = \"Ne20\"\n[valence]\nspace = \"sd-shell\"\n";
   const auto t0 = std::chrono::steady_clock::now();
-  const PreparedHamiltonian ph = prepare_hamiltonian(load(toml(ref, false)));
-  std::cout << "[time] Ne20 2N: " << seconds_since(t0) << " s\n";
+  const PreparedHamiltonian ph = PrepareHamiltonian(Load(Toml(ref, false)));
+  std::cout << "[time] Ne20 2N: " << SecondsSince(t0) << " s\n";
   ASSERT_TRUE(ph.hf.has_value());
   std::cout << "[dev] Ne20 E_HF - IT-7 golden = " << ph.hf->e_hf - -170.4417504
             << " e1 = " << ph.hf->e1 << " e2 = " << ph.hf->e2
@@ -117,10 +117,10 @@ TEST(PipelineHamiltonian, Ne20Sd) {
 }
 
 TEST(PipelineHamiltonian, Rp2ZeroBodyMatchesIt6) {
-  if (!have(kVnn)) GTEST_SKIP() << "missing " << kVnn;
-  const RunConfig cfg = load(toml(kO16, false));
-  const PreparedHamiltonian ph = prepare_hamiltonian(cfg);
-  const op::Operator rp2 = prepare_operator(request("Rp2"), ph, cfg);
+  if (!Have(kVnn)) GTEST_SKIP() << "missing " << kVnn;
+  const RunConfig cfg = Load(Toml(kO16, false));
+  const PreparedHamiltonian ph = PrepareHamiltonian(cfg);
+  const op::Operator rp2 = PrepareOperator(Request("Rp2"), ph, cfg);
   std::cout << "[dev] Rp2 zero body - IT-6 golden = "
             << rp2.zero_body() - 4.294907 << " (" << rp2.zero_body() << ")\n";
   EXPECT_NEAR(rp2.zero_body(), 4.294907, 5e-7);
@@ -128,16 +128,16 @@ TEST(PipelineHamiltonian, Rp2ZeroBodyMatchesIt6) {
 }
 
 TEST(PipelineHamiltonian, PlannedOptionsThrow) {
-  const std::string base = toml(kO16, false);
-  const RunConfig nat = load(toml(kO16, false, "kind = \"nat\""));
-  EXPECT_THROW(prepare_hamiltonian(nat), ConfigError);
+  const std::string base = Toml(kO16, false);
+  const RunConfig nat = Load(Toml(kO16, false, "kind = \"nat\""));
+  EXPECT_THROW(PrepareHamiltonian(nat), ConfigError);
   try {
-    prepare_hamiltonian(nat);
+    PrepareHamiltonian(nat);
   } catch (const ConfigError& e) {
     EXPECT_NE(std::string(e.what()).find("E-PLANNED"), std::string::npos)
         << e.what();
   }
-  EXPECT_THROW(prepare_hamiltonian(load(toml(kO16, false, "emax_unocc = 3"))),
+  EXPECT_THROW(PrepareHamiltonian(Load(Toml(kO16, false, "emax_unocc = 3"))),
                ConfigError);
 }
 

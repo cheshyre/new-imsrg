@@ -31,7 +31,7 @@ class DeviceTablesTest : public ::testing::TestWithParam<Case> {};
 TEST_P(DeviceTablesTest, MatchesHost) {
   const Case c = GetParam();
   const auto ms =
-      ModelSpace::from_names(BasisTruncation{c.emax}, 16.0, c.ref, c.val);
+      ModelSpace::FromNames(BasisTruncation{c.emax}, 16.0, c.ref, c.val);
   const TwoBodyChannels& tbc = ms->two_body();
   const TwoBodyKetSubsets& sub = ms->two_body_subsets();
   DeviceTables dt(ms->basis(), ms->reference(), ms->partition(), tbc, sub);
@@ -45,10 +45,10 @@ TEST_P(DeviceTablesTest, MatchesHost) {
   {
     I32 n(no), l(no), j2(no), tz2(no), cvq(no);
     DeviceBuffer<double> occ(no);
-    test::eval_orbits(ov, n, l, j2, tz2, cvq, occ);
-    const auto hn = n.to_vector(), hl = l.to_vector(), hj = j2.to_vector(),
-               ht = tz2.to_vector(), hc = cvq.to_vector();
-    const auto ho = occ.to_vector();
+    test::EvalOrbits(ov, n, l, j2, tz2, cvq, occ);
+    const auto hn = n.ToVector(), hl = l.ToVector(), hj = j2.ToVector(),
+               ht = tz2.ToVector(), hc = cvq.ToVector();
+    const auto ho = occ.ToVector();
     for (std::size_t i = 0; i < no; ++i) {
       const Orbit& o = ms->basis().orbits()[i];
       EXPECT_EQ(hn[i], o.n);
@@ -68,9 +68,9 @@ TEST_P(DeviceTablesTest, MatchesHost) {
   ASSERT_EQ(tb.num_channels, tbc.num_channels());
   {
     I32 local(nk * nj), channel(nk * nj), kidx(nk);
-    test::eval_ket_tables(tb, max_J, local, channel, kidx);
-    const auto hl = local.to_vector(), hc = channel.to_vector(),
-               hk = kidx.to_vector();
+    test::EvalKetTables(tb, max_J, local, channel, kidx);
+    const auto hl = local.ToVector(), hc = channel.ToVector(),
+               hk = kidx.ToVector();
     for (std::int32_t k = 0; k < tbc.num_kets(); ++k) {
       const Ket& kt = tbc.ket(KetIndex{k});
       EXPECT_EQ(hk[static_cast<std::size_t>(k)],
@@ -85,8 +85,8 @@ TEST_P(DeviceTablesTest, MatchesHost) {
       }
     }
     I32 bad(nk * 3);
-    test::eval_invalid_two_j(tb, max_J, bad);
-    for (auto v : bad.to_vector()) EXPECT_EQ(v, -1);
+    test::EvalInvalidTwoJ(tb, max_J, bad);
+    for (auto v : bad.ToVector()) EXPECT_EQ(v, -1);
   }
 
   // Channels and global_ket.
@@ -94,8 +94,8 @@ TEST_P(DeviceTablesTest, MatchesHost) {
     const auto chs = tbc.channels();
     const std::size_t total = tbc.channel_ket_table().size();
     I32 out(total);
-    test::eval_global_kets(tb, out);
-    const auto h = out.to_vector();
+    test::EvalGlobalKets(tb, out);
+    const auto h = out.ToVector();
     for (std::int32_t ch = 0; ch < tbc.num_channels(); ++ch) {
       const TwoBodyChannel& tc = chs[static_cast<std::size_t>(ch)];
       for (std::int32_t i = 0; i < tc.num_kets; ++i) {
@@ -114,10 +114,10 @@ TEST_P(DeviceTablesTest, MatchesHost) {
     const std::size_t total = sub.subset_table().size();
     I32 b(ns), e(ns), s(ns), kets(total);
     DeviceBuffer<double> occ(total), vac(total);
-    test::eval_subsets(sv, b, e, s, kets, occ, vac);
-    const auto hb = b.to_vector(), he = e.to_vector(), hs = s.to_vector(),
-               hk = kets.to_vector();
-    const auto ho = occ.to_vector(), hv = vac.to_vector();
+    test::EvalSubsets(sv, b, e, s, kets, occ, vac);
+    const auto hb = b.ToVector(), he = e.ToVector(), hs = s.ToVector(),
+               hk = kets.ToVector();
+    const auto ho = occ.ToVector(), hv = vac.ToVector();
     for (std::int32_t ch = 0; ch < sub.num_channels(); ++ch) {
       for (KetClass kc : kAllKetClasses) {
         const std::size_t t = static_cast<std::size_t>(ch) * kNumKetClasses +
@@ -125,7 +125,7 @@ TEST_P(DeviceTablesTest, MatchesHost) {
         const auto host = sub.kets(ChannelIndex{ch}, kc);
         ASSERT_EQ(static_cast<std::size_t>(hs[t]), host.size());
         ASSERT_EQ(he[t] - hb[t], hs[t]);
-        const bool prod = kc == KetClass::HH || kc == KetClass::PH;
+        const bool prod = kc == KetClass::kHh || kc == KetClass::kPh;
         for (std::size_t i = 0; i < host.size(); ++i) {
           const std::size_t g = static_cast<std::size_t>(hb[t]) + i;
           EXPECT_EQ(hk[g], host[i].value());
@@ -155,8 +155,7 @@ INSTANTIATE_TEST_SUITE_P(Nuclei, DeviceTablesTest,
 
 // Host-side content of the buffers (host_span / to_vector) and move semantics.
 TEST(DeviceTables, HostContentsAndMove) {
-  const auto ms =
-      ModelSpace::from_names(BasisTruncation{2}, 16.0, "O16", "O16");
+  const auto ms = ModelSpace::FromNames(BasisTruncation{2}, 16.0, "O16", "O16");
   DeviceTables a(ms->basis(), ms->reference(), ms->partition(), ms->two_body(),
                  ms->two_body_subsets());
   const std::int32_t* p = a.orbits().n;
@@ -164,8 +163,8 @@ TEST(DeviceTables, HostContentsAndMove) {
   EXPECT_EQ(b.orbits().n, p);  // device pointers survive a move
   const auto& tbc = ms->two_body();
   I32 offs(tbc.ket_J_offsets().size());
-  offs.copy_from_host(tbc.ket_J_offsets());
-  EXPECT_EQ(offs.to_vector(),
+  offs.CopyFromHost(tbc.ket_J_offsets());
+  EXPECT_EQ(offs.ToVector(),
             std::vector<std::int32_t>(tbc.ket_J_offsets().begin(),
                                       tbc.ket_J_offsets().end()));
   const auto hs = static_cast<const I32&>(offs).host_span();
@@ -180,7 +179,7 @@ TEST(DeviceTables, HostContentsAndMove) {
 // The ModelSpace convenience constructor mirrors the same parts.
 TEST(BasisDeviceTables, FromModelSpace) {
   const auto ms =
-      ModelSpace::from_names(BasisTruncation{2}, 16.0, "Ne20", "sd-shell");
+      ModelSpace::FromNames(BasisTruncation{2}, 16.0, "Ne20", "sd-shell");
   const DeviceTables t(*ms);
   EXPECT_EQ(t.orbits().num_orbits, ms->num_orbits());
   EXPECT_EQ(t.two_body().num_kets, ms->two_body().num_kets());

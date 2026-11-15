@@ -575,7 +575,7 @@ Catalog entry (static table, one row per operator family): `{ name, n_params, pa
 
 **Rp2 and Rso (owner, 2026-11-15, D35):** `Rp2` is the point-proton mean-square radius **without**
 the spin-orbit correction (imsrg++'s `Rp2_corrected_Op` includes it); the correction is the separate
-operator `Rso` (imsrg++ `RpSpinOrbitCorrection`), added explicitly for charge radii. `opslib::rp2`
+operator `Rso` (imsrg++ `RpSpinOrbitCorrection`), added explicitly for charge radii. `opslib::Rp2`
 loses its `include_spin_orbit` parameter (run 2).
 
 | phase | operators |
@@ -668,7 +668,7 @@ Errors are collected; each rule has an id used in tests. TOML = strict; "legacy:
   * `config/writer.cc`: `RunConfig` -> `resolved_config.toml` (deterministic key order, 17-digit doubles, provenance table).
   * `legacy/legacy_parameters.cc`: static table `{ old_key, kind (string/double/int/vector), old_default, apply(RawTree&, value, Context&) }` covering all 85 keys of `Parameters.hh`; the translator (`translate(std::span<std::string_view>) -> Expected<RawTree + warnings>`) plus the shorthand logic of 3.5 and the sentinel conversions of 3.2/3.3. No parsing of operator names here (delegated to `operators/operator_request.cc`).
   * `operators/operator_request.cc` and its catalog table (section 4); `--list-operators` prints it.
-* App `apps/imsrg/main.cc`: the only place that includes CLI11. It collects `--config`, `--set`, positional tokens, flags; calls `driver::load_config(sources) -> Expected<RunConfig>`; prints errors with exit code 2; calls `driver::run(const RunConfig&)`. Python bindings call the same `load_config` from a dict/TOML string, never the legacy path.
+* App `apps/imsrg/main.cc`: the only place that includes CLI11. It collects `--config`, `--set`, positional tokens, flags; calls `driver::LoadConfig(sources) -> Expected<RunConfig>`; prints errors with exit code 2; calls `driver::Run(const RunConfig&)`. Python bindings call the same `load_config` from a dict/TOML string, never the legacy path.
 * `--set` is applied on the raw tree before resolution, so `resolved_config.toml` always reflects the effective values.
 
 ### 6.2 Error type

@@ -20,7 +20,7 @@ namespace imsrg::py {
 namespace {
 
 // Process singleton (design/18 section 4.3). Heap-allocated and never deleted:
-// its members are torn down explicitly by finalize_locked(), never by static
+// its members are torn down explicitly by FinalizeLocked(), never by static
 // destruction order.
 struct State {
   std::mutex mutex;
@@ -29,12 +29,12 @@ struct State {
   bool finalized = false;
 };
 
-State& state() {
+State& GetState() {
   static State* s = new State;
   return *s;
 }
 
-void init_locked(State& s, const exec::RuntimeOptions& opt, bool mpi) {
+void InitLocked(State& s, const exec::RuntimeOptions& opt, bool mpi) {
   if (s.finalized)
     throw imsrg::RuntimeError(
         "imsrg Runtime was finalized; it cannot be restarted");
@@ -43,9 +43,9 @@ void init_locked(State& s, const exec::RuntimeOptions& opt, bool mpi) {
   s.rt = std::make_unique<exec::Runtime>(opt);
 }
 
-void finalize_locked(State& s) {
+void FinalizeLocked(State& s) {
   if (!s.rt) return;
-  if (live_operators().load() > 0)
+  if (LiveOperators().load() > 0)
     throw imsrg::RuntimeError(
         "cannot finalize the imsrg Runtime while Operator objects are alive");
   s.rt.reset();
@@ -57,14 +57,14 @@ struct RuntimeHandle {};
 
 }  // namespace
 
-void ensure_runtime() {
-  auto& s = state();
+void EnsureRuntime() {
+  auto& s = GetState();
   std::lock_guard lock(s.mutex);
   if (s.rt) return;
-  init_locked(s, {}, false);
+  InitLocked(s, {}, false);
 }
 
-void bind_runtime(nb::module_& m) {
+void BindRuntime(nb::module_& m) {
   nb::class_<RuntimeHandle>(m, "Runtime",
                             "Process-wide Kokkos (and optional MPI) runtime. "
                             "Constructing it initializes explicitly; "
@@ -75,11 +75,10 @@ void bind_runtime(nb::module_& m) {
           "__init__",
           [](RuntimeHandle* self, int num_threads, int device_id, bool mpi,
              bool print_configuration) {
-            auto& s = state();
+            auto& s = GetState();
             {
               std::lock_guard lock(s.mutex);
-              init_locked(s, {num_threads, device_id, print_configuration},
-                          mpi);
+              InitLocked(s, {num_threads, device_id, print_configuration}, mpi);
             }
             new (self) RuntimeHandle();
           },
@@ -88,35 +87,35 @@ void bind_runtime(nb::module_& m) {
       .def("__enter__", [](nb::object self) { return self; })
       .def("__exit__",
            [](RuntimeHandle&, nb::args) {
-             auto& s = state();
+             auto& s = GetState();
              std::lock_guard lock(s.mutex);
-             finalize_locked(s);
+             FinalizeLocked(s);
            })
-      .def_static("ensure", &ensure_runtime,
+      .def_static("ensure", &EnsureRuntime,
                   "Initializes with defaults if not yet initialized.")
       .def_static(
           "finalize",
           [] {
-            auto& s = state();
+            auto& s = GetState();
             std::lock_guard lock(s.mutex);
-            finalize_locked(s);
+            FinalizeLocked(s);
           },
           "Finalizes Kokkos (and MPI); raises if Operators are alive. No "
           "re-init after.")
       .def_static("is_initialized",
-                  [] { return exec::Runtime::is_initialized(); })
+                  [] { return exec::Runtime::IsInitialized(); })
       .def_static("execution_space",
-                  [] { return exec::Runtime::execution_space_name(); })
-      .def_static("concurrency", [] { return exec::Runtime::concurrency(); })
+                  [] { return exec::Runtime::ExecutionSpaceName(); })
+      .def_static("concurrency", [] { return exec::Runtime::Concurrency(); })
       .def_static("mpi_enabled",
-                  [] { return comm::Environment::mpi_enabled(); });
+                  [] { return comm::Environment::MpiEnabled(); });
 
   // Called by imsrg's atexit handler after gc.collect(): finalize only if
   // nothing is alive.
   m.def("_atexit", [] {
-    auto& s = state();
+    auto& s = GetState();
     std::lock_guard lock(s.mutex);
-    if (s.rt && live_operators().load() == 0) finalize_locked(s);
+    if (s.rt && LiveOperators().load() == 0) FinalizeLocked(s);
   });
 }
 

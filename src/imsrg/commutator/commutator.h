@@ -38,31 +38,31 @@ namespace imsrg::commutator {
 /// `CommutatorScalarScalar`, Commutator.cc:337-342).
 /// @throws NotImplementedError for non-scalar or non-number-conserving specs
 ///         and for particle_rank 3 (IMSRG(3), milestone M10).
-op::OperatorSpec commutator_spec(const op::OperatorSpec& x,
-                                 const op::OperatorSpec& y);
+op::OperatorSpec CommutatorSpec(const op::OperatorSpec& x,
+                                const op::OperatorSpec& y);
 
 /// Z = [X, Y] restricted to the terms in `opts.terms` (IMSRG(2) truncation: Z
 /// has no 3B part). Z is overwritten: it is reset to zero if it already has
-/// spec `commutator_spec(X, Y)` and the workspace's model space (no allocation,
+/// spec `CommutatorSpec(X, Y)` and the workspace's model space (no allocation,
 /// the flow-loop case), otherwise it is replaced by a new operator of that
 /// spec. Terms that need a part X or Y lacks (particle_rank 1) are skipped. The
 /// 222 ladder and the 221 term share their intermediates when both are selected
 /// (imsrg++ `comm222_pp_hh_221ss`). Preconditions (InvariantError): X, Y on the
 /// workspace's model space (`ws.compatible`); Z is neither X nor Y.
 /// @throws NotImplementedError for NonHermitian X or Y and for specs
-///         `commutator_spec` rejects.
+///         `CommutatorSpec` rejects.
 /// Complexity: dominated by the 2B terms, O(sum over channels of N^3) GEMMs.
-void commutator(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+void Commutator(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                 const CommutatorOptions& opts, Workspace& ws);
 
 /// Allocating form of `commutator`: returns [X, Y] restricted to `opts.terms`.
-op::Operator commutator(const op::Operator& X, const op::Operator& Y,
+op::Operator Commutator(const op::Operator& X, const op::Operator& Y,
                         const CommutatorOptions& opts, Workspace& ws);
 
 /// The individual terms. Each ADDS its contribution to Z (imsrg++ semantics)
 /// and computes every stored element of the part it writes (both triangles; no
 /// final symmetrization step). Common preconditions (InvariantError): X, Y and
-/// Z on the workspace's model space, Z with spec `commutator_spec(X.spec(),
+/// Z on the workspace's model space, Z with spec `CommutatorSpec(X.spec(),
 /// Y.spec())` (or at least the part written allocated and the same
 /// hermiticity). Each throws NotImplementedError for NonHermitian X or Y. A
 /// term whose input parts are missing (particle_rank 1) adds nothing.
@@ -70,18 +70,18 @@ namespace terms {
 
 /// Z0 += sum_ab (2 j_a + 1) n_a nbar_b (X_ab Y_ba - Y_ab X_ba). Adds nothing if
 /// Z is anti-Hermitian (the term vanishes; imsrg++ returns early). O(norb^2).
-void comm110ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+void Comm110ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                Workspace& ws);
 
 /// Z0 += 1/4 sum_abcd sum_J (2J+1) n_a n_b nbar_c nbar_d (X^J_abcd Y^J_cdab -
 /// Y^J_abcd X^J_cdab); on normalized kets per channel: sum_J (2J+1) sum_{i,k}
 /// nn_i nbarnbar_k (X_ik Y_ki - Y_ik X_ki). Adds nothing if Z is
 /// anti-Hermitian. O(sum over channels of N^2).
-void comm220ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+void Comm220ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                Workspace& ws);
 
 /// Z_ij += sum_a (X_ia Y_aj - Y_ia X_aj). O(norb^3).
-void comm111ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+void Comm111ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                Workspace& ws);
 
 /// Z_ij += sum_ab sum_J (2J+1)/(2 j_i + 1) (n_a - n_b) (X_ab Y^J_biaj - Y_ab
@@ -89,7 +89,7 @@ void comm111ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
 /// one-body-channel entries (i, j), the sum over a runs over norb orbits, b
 /// over the c orbits of a's one-body channel, J over Jr <= jmax + 1 values; X1
 /// Y2 and X2 Y1 are each evaluated only if the two-body operand exists.
-void comm121ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+void Comm121ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                Workspace& ws);
 
 /// Z_ij += 1/2 sum_abc sum_J (2J+1)/(2 j_i + 1) (n_a n_b nbar_c + nbar_a nbar_b
@@ -99,20 +99,20 @@ void comm121ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
 /// P_hh Y - Y P_hh X (P = diag(nbar_a nbar_b), diag(n_a n_b) over the kets of a
 /// channel) as Z_ij += sum_c sum_J (2J+1)/(2 j_i + 1) (n_c Mpp^J_cicj + nbar_c
 /// Mhh^J_cicj) (unnormalized M). O(sum over channels of N^3).
-void comm221ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+void Comm221ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                Workspace& ws);
 
 /// Z^J_ijkl += sum_a (X_ia Y^J_ajkl + X_ja Y^J_iakl - Y^J_ijal X_ak - Y^J_ijka
 /// X_al) - (X <-> Y). O(sum over channels of N^2 * orbits per one-body
 /// channel).
-void comm122ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+void Comm122ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                Workspace& ws);
 
 /// Z^J_ijkl += 1/2 sum_ab (nbar_a nbar_b - n_a n_b) (X^J_ijab Y^J_abkl -
 /// Y^J_ijab X^J_abkl), i.e. Z2 += Mpp - Mhh per channel (normalized kets).
 /// O(sum over channels of N^3).
-void comm222_pp_hhss(const op::Operator& X, const op::Operator& Y,
-                     op::Operator& Z, Workspace& ws);
+void Comm222PpHhss(const op::Operator& X, const op::Operator& Y,
+                   op::Operator& Z, Workspace& ws);
 
 /// The particle-hole term (imsrg++ `comm222_phss`):
 ///   Z^J_ijkl += sum_J' (2J'+1) [ {j_i j_j J; j_k j_l J'} Zbar^J'_ilkj
@@ -124,14 +124,14 @@ void comm222_pp_hhss(const op::Operator& X, const op::Operator& Y,
 /// Evaluated with the Pandya transform into the cross-coupled channels, one
 /// GEMM per channel and the inverse transform (design/12 section 4.2). O(sum
 /// over cc channels of Ncc^2 Nph).
-void comm222_phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
-                  Workspace& ws);
+void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+                 Workspace& ws);
 
 /// comm222_pp_hhss + comm221ss with shared intermediates (imsrg++
-/// `comm222_pp_hh_221ss`). O(sum over channels of N^3), the cost of one ladder
+/// `Comm222PpHh221ss`). O(sum over channels of N^3), the cost of one ladder
 /// pair (the 221 part is a lower-order contraction of the same intermediates).
-void comm222_pp_hh_221ss(const op::Operator& X, const op::Operator& Y,
-                         op::Operator& Z, Workspace& ws);
+void Comm222PpHh221ss(const op::Operator& X, const op::Operator& Y,
+                      op::Operator& Z, Workspace& ws);
 
 }  // namespace terms
 

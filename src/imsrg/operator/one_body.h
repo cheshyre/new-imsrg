@@ -24,8 +24,8 @@ namespace imsrg::op {
 ///
 /// Memory model (design/12 section 2): the element accessors read and write the
 /// HOST MIRROR. On backends with separate device memory, call
-/// `sync_to_device()` after host writes and before kernels read the part, and
-/// `sync_to_host()` after kernels wrote it and before host reads. On
+/// `SyncToDevice()` after host writes and before kernels read the part, and
+/// `SyncToHost()` after kernels wrote it and before host reads. On
 /// Serial/OpenMP both are fences only.
 ///
 /// Value semantics: copies are deep, moves are cheap. Needs an initialized
@@ -55,7 +55,7 @@ class OneBody {
   /// not checked). Host mirror. O(1).
   void set(OrbitIndex a, OrbitIndex b, double v);
   /// Adds v to O_ab and, for a != b, h v to O_ba (as `set`). Host mirror. O(1).
-  void add(OrbitIndex a, OrbitIndex b, double v);
+  void Add(OrbitIndex a, OrbitIndex b, double v);
   /// Sets O_ab = v only (no partner). Host mirror. O(1).
   void set_element(OrbitIndex a, OrbitIndex b, double v);
   /// Sets every element to zero (device kernel).
@@ -76,13 +76,13 @@ class OneBody {
   /// The underlying buffer, read-only.
   const exec::DeviceBuffer<double>& buffer() const noexcept { return data_; }
   /// Copies the device data to the host mirror (see the memory model).
-  void sync_to_host() { data_.sync_to_host(); }
+  void SyncToHost() { data_.SyncToHost(); }
   /// Copies the host mirror to the device data (see the memory model).
-  void sync_to_device() { data_.sync_to_device(); }
+  void SyncToDevice() { data_.SyncToDevice(); }
 
  private:
   std::int32_t n_ = 0;
-  Hermiticity hermiticity_ = Hermiticity::Hermitian;
+  Hermiticity hermiticity_ = Hermiticity::kHermitian;
   exec::DeviceBuffer<double> data_;
 };
 

@@ -31,11 +31,10 @@ struct NamedValenceSpace {
 
 /// All named valence spaces, copied exactly from imsrg++ and sorted by name
 /// (std::map order, as in imsrg++).
-std::span<const NamedValenceSpace> named_valence_spaces() noexcept;
+std::span<const NamedValenceSpace> NamedValenceSpaces() noexcept;
 
 /// The named valence space `name`, or nullptr if there is none.
-const NamedValenceSpace* find_named_valence_space(
-    std::string_view name) noexcept;
+const NamedValenceSpace* FindNamedValenceSpace(std::string_view name) noexcept;
 
 /// A decoupling partition given by orbit quantum numbers: the core orbits and
 /// the valence orbits; all other orbits of a basis are q-space (imsrg++ cvq 0,
@@ -66,20 +65,20 @@ struct ValenceSpaceDefinition {
 ///   SKIPS the valence orbits;
 /// * a string containing "FCI": every orbit of `basis` is valence, there is no
 ///   core;
-/// * a name from `named_valence_spaces()`: its valence orbits, and the core =
+/// * a name from `NamedValenceSpaces()`: its valence orbits, and the core =
 ///   naive filling of its core nucleus WITHOUT skipping valence orbits;
 /// * anything else is a nucleus name: single reference, core = its naive
 ///   filling, no valence.
 ///
-/// Core fillings use `naive_filling(core, basis.emax())`; every orbit with
+/// Core fillings use `NaiveFilling(core, basis.emax())`; every orbit with
 /// nonzero filling is a core orbit. The orbits are returned as quantum numbers
 /// in the order of their construction; whether they exist in `basis` is checked
 /// by `Partition`.
 /// @throws InputError for a malformed orbit label or nucleus name, or a core
 ///         that does not fit into shells e <= emax.
-ValenceSpaceDefinition define_valence_space(std::string_view spec,
-                                            const SingleParticleBasis& basis,
-                                            const Nucleus& reference);
+ValenceSpaceDefinition DefineValenceSpace(std::string_view spec,
+                                          const SingleParticleBasis& basis,
+                                          const Nucleus& reference);
 
 /// The nucleus imsrg++ uses as the reference when `reference=default`
 /// (imsrg++.cc:332 and the two-argument ModelSpace constructor,
@@ -88,7 +87,7 @@ ValenceSpaceDefinition define_valence_space(std::string_view spec,
 /// parsed as a nucleus name.
 /// @throws InputError for "0hw-shell", "jj-shell" and "FCI" spaces (they need
 ///         an explicit reference) and for unparsable names.
-Nucleus default_reference_nucleus(std::string_view spec);
+Nucleus DefaultReferenceNucleus(std::string_view spec);
 
 }  // namespace imsrg::basis
 

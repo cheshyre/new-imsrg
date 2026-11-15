@@ -10,7 +10,7 @@
 /// commutator module.
 ///
 /// Conventions (identical to imsrg++, design/00 D11):
-/// * the channel index is the normal one, `imsrgpp_channel_index` = 6 J + 2 (Tz
+/// * the channel index is the normal one, `ImsrgppChannelIndex` = 6 J + 2 (Tz
 ///   + 1) + parity, with 6 (J_max + 1) channels; the struct `TwoBodyChannel` is
 ///   reused, with `two_tz` = 2 Tz = |tz2_p - tz2_q| of the kets, i.e. Tz = 0
 ///   holds pp and nn kets, Tz = +1 holds pn kets; the Tz = -1 channels exist

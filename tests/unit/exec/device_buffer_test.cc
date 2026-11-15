@@ -23,14 +23,14 @@ TEST(ExecDeviceBuffer, DefaultIsEmpty) {
   EXPECT_EQ(b.label(), "imsrg::DeviceBuffer");
   EXPECT_EQ(b.device_data(), nullptr);
   EXPECT_TRUE(b.host_span().empty());
-  EXPECT_TRUE(b.to_vector().empty());
+  EXPECT_TRUE(b.ToVector().empty());
 }
 
 TEST(ExecDeviceBuffer, ZeroInitialized) {
   DeviceBuffer<double> b(17, "zeros");
   EXPECT_EQ(b.size(), 17u);
   EXPECT_EQ(b.label(), "zeros");
-  for (double x : b.to_vector()) {
+  for (double x : b.ToVector()) {
     EXPECT_EQ(x, 0.0);
   }
 }
@@ -38,7 +38,7 @@ TEST(ExecDeviceBuffer, ZeroInitialized) {
 TEST(ExecDeviceBuffer, FillSetsAllElements) {
   DeviceBuffer<double> b(33);
   b.fill(2.5);
-  for (double x : b.to_vector()) {
+  for (double x : b.ToVector()) {
     EXPECT_EQ(x, 2.5);
   }
 }
@@ -50,13 +50,13 @@ TEST(ExecDeviceBuffer, CopyIsDeepAndIndependent) {
   EXPECT_EQ(c.label(), "orig");
   EXPECT_NE(c.device_data(), a.device_data());
   a.fill(1);
-  for (auto x : c.to_vector()) {
+  for (auto x : c.ToVector()) {
     EXPECT_EQ(x, 7);
   }
   DeviceBuffer<std::int32_t> d;
   d = c;
   c.fill(3);
-  for (auto x : d.to_vector()) {
+  for (auto x : d.ToVector()) {
     EXPECT_EQ(x, 7);
   }
 }
@@ -73,37 +73,37 @@ TEST(ExecDeviceBuffer, MoveLeavesSourceEmpty) {
   c = std::move(b);
   EXPECT_TRUE(b.empty());  // NOLINT(bugprone-use-after-move)
   EXPECT_EQ(c.device_data(), p);
-  EXPECT_EQ(c.to_vector()[4], 4.0);
+  EXPECT_EQ(c.ToVector()[4], 4.0);
 }
 
 TEST(ExecDeviceBuffer, CopyFromAndToHost) {
   std::vector<double> src{1, 2, 3, 4};
   DeviceBuffer<double> b(4);
-  b.copy_from_host(src);
+  b.CopyFromHost(src);
   std::vector<double> dst(4, -1.0);
-  b.copy_to_host(dst);
+  b.CopyToHost(dst);
   EXPECT_EQ(dst, src);
-  EXPECT_EQ(b.to_vector(), src);
+  EXPECT_EQ(b.ToVector(), src);
 }
 
 TEST(ExecDeviceBuffer, CopySizeMismatchThrows) {
   DeviceBuffer<double> b(4);
   std::vector<double> wrong(3);
-  EXPECT_THROW(b.copy_from_host(wrong), imsrg::InvariantError);
-  EXPECT_THROW(b.copy_to_host(wrong), imsrg::InvariantError);
+  EXPECT_THROW(b.CopyFromHost(wrong), imsrg::InvariantError);
+  EXPECT_THROW(b.CopyToHost(wrong), imsrg::InvariantError);
 }
 
 TEST(ExecDeviceBuffer, ResizeKeepsPrefix) {
   DeviceBuffer<std::int64_t> b(4);
-  b.copy_from_host(std::vector<std::int64_t>{1, 2, 3, 4});
+  b.CopyFromHost(std::vector<std::int64_t>{1, 2, 3, 4});
   b.resize(6);
-  EXPECT_EQ(b.to_vector(), (std::vector<std::int64_t>{1, 2, 3, 4, 0, 0}));
+  EXPECT_EQ(b.ToVector(), (std::vector<std::int64_t>{1, 2, 3, 4, 0, 0}));
   b.resize(2);
-  EXPECT_EQ(b.to_vector(), (std::vector<std::int64_t>{1, 2}));
+  EXPECT_EQ(b.ToVector(), (std::vector<std::int64_t>{1, 2}));
   b.resize(0);
   EXPECT_TRUE(b.empty());
   b.resize(3);
-  EXPECT_EQ(b.to_vector(), (std::vector<std::int64_t>{0, 0, 0}));
+  EXPECT_EQ(b.ToVector(), (std::vector<std::int64_t>{0, 0, 0}));
 }
 
 // Empty buffers hold no allocation (so they may outlive the Runtime) and report
@@ -118,7 +118,7 @@ TEST(ExecDeviceBuffer, EmptyBuffersHoldNoAllocation) {
   EXPECT_EQ(shrunk.device_data(), nullptr);
   DeviceBuffer<double> grown;
   grown.resize(2);
-  EXPECT_EQ(grown.to_vector(), (std::vector<double>{0.0, 0.0}));
+  EXPECT_EQ(grown.ToVector(), (std::vector<double>{0.0, 0.0}));
 }
 
 TEST(ExecDeviceBuffer, SelfAssignmentKeepsData) {
@@ -126,7 +126,7 @@ TEST(ExecDeviceBuffer, SelfAssignmentKeepsData) {
   b.fill(2.5);
   const DeviceBuffer<double>& alias = b;
   b = alias;
-  EXPECT_EQ(b.to_vector(), (std::vector<double>{2.5, 2.5, 2.5}));
+  EXPECT_EQ(b.ToVector(), (std::vector<double>{2.5, 2.5, 2.5}));
 }
 
 TEST(ExecDeviceBuffer, HostSpanSyncRoundTrip) {
@@ -136,18 +136,18 @@ TEST(ExecDeviceBuffer, HostSpanSyncRoundTrip) {
   for (std::size_t i = 0; i < h.size(); ++i) {
     h[i] = 10.0 + static_cast<double>(i);
   }
-  b.sync_to_device();
+  b.SyncToDevice();
   b.fill(0.0);  // device now zero
-  for (double x : b.to_vector()) {
+  for (double x : b.ToVector()) {
     EXPECT_EQ(x, 0.0);
   }
-  b.sync_to_host();
+  b.SyncToHost();
   for (double x : b.host_span()) {
     EXPECT_EQ(x, 0.0);
   }
   b.host_span()[2] = 5.0;
-  b.sync_to_device();
-  EXPECT_EQ(b.to_vector()[2], 5.0);
+  b.SyncToDevice();
+  EXPECT_EQ(b.ToVector()[2], 5.0);
   const DeviceBuffer<double>& cb = b;
   EXPECT_EQ(cb.host_span().size(), 6u);
 }
@@ -158,25 +158,25 @@ TEST(ExecDeviceBuffer, HostIsDeviceOnHostBackends) {
 }
 
 template <class T>
-void exercise_type() {
+void ExerciseType() {
   DeviceBuffer<T> b(9, "typed");
   b.fill(static_cast<T>(3));
-  std::vector<T> v = b.to_vector();
+  std::vector<T> v = b.ToVector();
   ASSERT_EQ(v.size(), 9u);
   for (T x : v) {
     EXPECT_EQ(x, static_cast<T>(3));
   }
   b.resize(11);
-  EXPECT_EQ(b.to_vector()[10], static_cast<T>(0));
+  EXPECT_EQ(b.ToVector()[10], static_cast<T>(0));
 }
 
 TEST(ExecDeviceBuffer, AllInstantiatedTypes) {
-  exercise_type<double>();
-  exercise_type<float>();
-  exercise_type<std::int32_t>();
-  exercise_type<std::int64_t>();
-  exercise_type<std::uint16_t>();
-  exercise_type<std::uint8_t>();
+  ExerciseType<double>();
+  ExerciseType<float>();
+  ExerciseType<std::int32_t>();
+  ExerciseType<std::int64_t>();
+  ExerciseType<std::uint16_t>();
+  ExerciseType<std::uint8_t>();
 }
 
 }  // namespace

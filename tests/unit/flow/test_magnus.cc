@@ -31,7 +31,7 @@ struct GoldenLine {
   double s = 0, e0 = 0, norm_h = 0, om1 = 0, om2 = 0, eta1 = 0, eta2 = 0;
 };
 
-std::vector<GoldenLine> read_flow_file(const std::string& path) {
+std::vector<GoldenLine> ReadFlowFile(const std::string& path) {
   std::ifstream in(path);
   std::vector<GoldenLine> lines;
   std::string text;
@@ -47,14 +47,14 @@ std::vector<GoldenLine> read_flow_file(const std::string& path) {
   return lines;
 }
 
-op::Operator emax2_hno() {
+op::Operator Emax2Hno() {
   const std::string path =
       std::string(IMSRG_GOLDEN_DIR) + "/hf/emax2_O16_2N/HNO.dump";
-  const auto ms = op::model_space_for_dump(op::read_operator_dump_header(path));
-  return op::read_operator_dump(path, ms);
+  const auto ms = op::ModelSpaceForDump(op::ReadOperatorDumpHeader(path));
+  return op::ReadOperatorDump(path, ms);
 }
 
-flow::SolverOptions short_flow(double smax) {
+flow::SolverOptions ShortFlow(double smax) {
   flow::SolverOptions o;  // imsrg++ executable defaults
   o.smax = smax;
   return o;
@@ -65,16 +65,16 @@ flow::SolverOptions short_flow(double smax) {
 constexpr double kTol = 1e-8;
 
 TEST(MagnusSolver, ShortFlowMatchesImsrgFlowFile) {
-  const auto golden = read_flow_file(std::string(IMSRG_GOLDEN_DIR) +
-                                     "/e2e/IT-8/emax2/flow.dat");
+  const auto golden =
+      ReadFlowFile(std::string(IMSRG_GOLDEN_DIR) + "/e2e/IT-8/emax2/flow.dat");
   ASSERT_GT(golden.size(), 30u);
   const double smax = 4.0;
-  flow::MagnusSolver solver(emax2_hno(), short_flow(smax),
+  flow::MagnusSolver solver(Emax2Hno(), ShortFlow(smax),
                             flow::GeneratorOptions{});
   std::vector<flow::FlowStatus> lines;
   const flow::SolveResult r =
-      solver.solve([&](const flow::FlowStatus& st) { lines.push_back(st); });
-  EXPECT_EQ(r.reason, flow::StopReason::SmaxReached);
+      solver.Solve([&](const flow::FlowStatus& st) { lines.push_back(st); });
+  EXPECT_EQ(r.reason, flow::StopReason::kSmaxReached);
   EXPECT_DOUBLE_EQ(r.s, smax);
   double max_de0 = 0, max_dnorm = 0;
   int compared = 0;
@@ -104,30 +104,29 @@ TEST(MagnusSolver, ShortFlowMatchesImsrgFlowFile) {
 }
 
 TEST(MagnusSolver, ReplayOfOmegaStackReproducesH) {
-  op::Operator h0 = emax2_hno();
-  flow::MagnusSolver solver(h0, short_flow(1.5), flow::GeneratorOptions{});
-  solver.solve();
+  op::Operator h0 = Emax2Hno();
+  flow::MagnusSolver solver(h0, ShortFlow(1.5), flow::GeneratorOptions{});
+  solver.Solve();
   ASSERT_GT(solver.omegas().size(), 2u);
-  const op::Operator replayed = solver.transform(h0);
-  const op::PartMaxima d =
-      op::max_abs_difference(replayed, solver.hamiltonian());
+  const op::Operator replayed = solver.Transform(h0);
+  const op::PartMaxima d = op::MaxAbsDifference(replayed, solver.hamiltonian());
   EXPECT_LT(d.max(), 1e-12)
       << d.zero_body << " " << d.one_body << " " << d.two_body;
 }
 
 TEST(MagnusSolver, SecondStageOpensNewOmegaAndContinuesS) {
-  flow::MagnusSolver solver(emax2_hno(), short_flow(0.8),
+  flow::MagnusSolver solver(Emax2Hno(), ShortFlow(0.8),
                             flow::GeneratorOptions{});
-  const flow::SolveResult r1 = solver.solve();
+  const flow::SolveResult r1 = solver.Solve();
   const std::size_t n1 = solver.omegas().size();
-  ASSERT_GT(op::norm(solver.omegas().back()), 1e-6);
+  ASSERT_GT(op::Norm(solver.omegas().back()), 1e-6);
   solver.set_generator(flow::GeneratorOptions{});
   EXPECT_EQ(solver.omegas().size(), n1 + 1);
-  EXPECT_EQ(op::norm(solver.omegas().back()), 0.0);
+  EXPECT_EQ(op::Norm(solver.omegas().back()), 0.0);
   solver.set_smax(1.6);
   std::vector<flow::FlowStatus> lines;
   const flow::SolveResult r2 =
-      solver.solve([&](const flow::FlowStatus& st) { lines.push_back(st); });
+      solver.Solve([&](const flow::FlowStatus& st) { lines.push_back(st); });
   ASSERT_FALSE(lines.empty());
   EXPECT_EQ(lines.front().stage, 2);
   EXPECT_EQ(lines.front().istep, 0);
@@ -137,11 +136,11 @@ TEST(MagnusSolver, SecondStageOpensNewOmegaAndContinuesS) {
 }
 
 TEST(MagnusSolver, StopsWhenConverged) {
-  flow::SolverOptions o = short_flow(50.0);
+  flow::SolverOptions o = ShortFlow(50.0);
   o.eta_criterion = 0.5;
-  flow::MagnusSolver solver(emax2_hno(), o, flow::GeneratorOptions{});
-  const flow::SolveResult r = solver.solve();
-  EXPECT_EQ(r.reason, flow::StopReason::Converged);
+  flow::MagnusSolver solver(Emax2Hno(), o, flow::GeneratorOptions{});
+  const flow::SolveResult r = solver.Solve();
+  EXPECT_EQ(r.reason, flow::StopReason::kConverged);
   EXPECT_LT(r.norm_eta, 0.5);
   EXPECT_GT(r.steps, 0);
   EXPECT_LT(r.s, 50.0);

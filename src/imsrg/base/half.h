@@ -17,8 +17,7 @@ namespace imsrg {
 
 /// Converts binary16 bits to float. Exact for every input: +-0, subnormals,
 /// normals, +-inf; NaNs stay NaN (payload shifted, sign kept). O(1).
-IMSRG_INLINE_FUNCTION constexpr float half_to_float(
-    std::uint16_t bits) noexcept {
+IMSRG_INLINE_FUNCTION constexpr float HalfToFloat(std::uint16_t bits) noexcept {
   const std::uint32_t sign = static_cast<std::uint32_t>(bits & 0x8000u) << 16;
   const std::uint32_t exp = (bits >> 10) & 0x1Fu;
   std::uint32_t man = bits & 0x3FFu;
@@ -44,7 +43,7 @@ IMSRG_INLINE_FUNCTION constexpr float half_to_float(
 /// Converts float to binary16 bits with round-to-nearest-even. Overflow (after
 /// rounding) gives +-inf, NaN gives a quiet NaN with the input's sign, values
 /// below half the smallest subnormal round to +-0. O(1).
-IMSRG_INLINE_FUNCTION constexpr std::uint16_t float_to_half(
+IMSRG_INLINE_FUNCTION constexpr std::uint16_t FloatToHalf(
     float value) noexcept {
   const std::uint32_t x = std::bit_cast<std::uint32_t>(value);
   const std::uint32_t sign = (x >> 16) & 0x8000u;

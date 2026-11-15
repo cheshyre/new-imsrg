@@ -21,7 +21,7 @@ namespace imsrg::op {
 
 /// Direction of a normal-ordering transformation: imsrg++ `sign` = +1 (vacuum
 /// -> reference) or -1 (reference -> vacuum).
-enum class NormalOrderDirection : std::uint8_t { ToReference, ToVacuum };
+enum class NormalOrderDirection : std::uint8_t { kToReference, kToVacuum };
 
 /// Normal orders the 0B + 1B + 2B parts of a scalar operator w.r.t. the
 /// occupations n_a (one per orbit). The sums run over the "occupied" orbits n_a
@@ -39,23 +39,23 @@ enum class NormalOrderDirection : std::uint8_t { ToReference, ToVacuum };
 ///         orbits.
 /// @throws NotImplementedError for non-scalar operators (by construction none
 ///         exist yet).
-Operator normal_order(const Operator& op, std::span<const double> occupations,
-                      NormalOrderDirection direction);
+Operator NormalOrder(const Operator& op, std::span<const double> occupations,
+                     NormalOrderDirection direction);
 
 /// Normal orders a vacuum-normal-ordered operator w.r.t. the reference of its
 /// model space (imsrg++ `DoNormalOrdering` for particle_rank <= 2).
-Operator normal_order(const Operator& op);
+Operator NormalOrder(const Operator& op);
 
-/// Inverse of `normal_order(op)`: from the reference of the model space back to
+/// Inverse of `NormalOrder(op)`: from the reference of the model space back to
 /// the vacuum (imsrg++ `UndoNormalOrdering`).
-Operator undo_normal_order(const Operator& op);
+Operator UndoNormalOrder(const Operator& op);
 
 /// imsrg++ `DoNormalOrdering3` (Operator.cc:582-674) for an operator whose 0B +
 /// 1B + 2B parts are `op` and whose three-body part is the NO2B input `v3`: the
 /// rank-2 operator
 ///   NO2(op) + [NO2(Gamma) with its zero-body part scaled by 1/3 and its
 ///              one-body part by 1/2],
-/// where NO2 is `normal_order(., occupations, direction)` and Gamma is the
+/// where NO2 is `NormalOrder(., occupations, direction)` and Gamma is the
 /// two-body operator
 ///   Gamma^J_{ij,kl} = s sum_a n_a W_pn(ija, kla; J)
 ///                     / ((2J + 1) sqrt((1 + d_ij)(1 + d_kl)))
@@ -65,14 +65,14 @@ Operator undo_normal_order(const Operator& op);
 /// @throws InvariantError if `occupations.size()` differs from the number of
 ///         orbits or `op` is not Hermitian (the NO2B storage is symmetric, so
 ///         only Hermitian three-body parts can be represented).
-Operator normal_order(const Operator& op, const No2bThreeBody& v3,
-                      std::span<const double> occupations,
-                      NormalOrderDirection direction);
+Operator NormalOrder(const Operator& op, const No2bThreeBody& v3,
+                     std::span<const double> occupations,
+                     NormalOrderDirection direction);
 
-/// `normal_order(op, v3, occupations, ToReference)` with the reference
+/// `NormalOrder(op, v3, occupations, ToReference)` with the reference
 /// occupations of the model space: the normal-ordered Hamiltonian in the NO2B
 /// approximation.
-Operator normal_order(const Operator& op, const No2bThreeBody& v3);
+Operator NormalOrder(const Operator& op, const No2bThreeBody& v3);
 
 }  // namespace imsrg::op
 

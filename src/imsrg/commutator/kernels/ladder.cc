@@ -29,7 +29,7 @@ namespace imsrg::commutator::terms {
 
 namespace {
 
-using detail::find_block;
+using detail::FindBlock;
 using detail::LadderProjector;
 using detail::TwoBodyView;
 using linalg::MatrixView;
@@ -52,7 +52,7 @@ static_assert(std::is_trivially_copyable_v<GatherArgs>);
 
 /// Gathers the operands of `p` (Xg(i, m) = w_m X(i, K_m), Yg(m, j) = Y(K_m, j))
 /// on the device.
-void gather(const char* name, LadderProjector& p, const Workspace::Impl& impl,
+void Gather(const char* name, LadderProjector& p, const Workspace::Impl& impl,
             const TwoBodyView& xv, const TwoBodyView& yv) {
   const std::int64_t total = p.gather_offset_host.back();
   if (total == 0) return;
@@ -68,9 +68,9 @@ void gather(const char* name, LadderProjector& p, const Workspace::Impl& impl,
   a.xg = p.xg.device_data();
   a.yg = p.yg.device_data();
   a.num_channels = xv.tb.num_channels;
-  exec::parallel_for(
+  exec::ParallelFor(
       name, static_cast<exec::Index>(total), IMSRG_LAMBDA(const exec::Index e) {
-        const int ch = find_block(a.gather_offset, a.num_channels, e);
+        const int ch = FindBlock(a.gather_offset, a.num_channels, e);
         const std::int64_t local = e - a.gather_offset[ch];
         const std::int64_t n = a.num_kets[ch];
         const std::int64_t k = (a.list_offset[ch + 1] - a.list_offset[ch]);
@@ -108,14 +108,14 @@ static_assert(std::is_trivially_copyable_v<SymArgs>);
 /// must have an allocated two-body part; `h_z` is the hermiticity sign of the
 /// commutator. Leaves the device idle (fenced). Complexity: two grouped gemms
 /// of sum_c N_c^2 (|Kp| + |Kh|) flops.
-void compute_intermediates(const op::Operator& X, const op::Operator& Y,
-                           int h_z, Workspace::Impl& impl) {
+void ComputeIntermediates(const op::Operator& X, const op::Operator& Y, int h_z,
+                          Workspace::Impl& impl) {
   auto& lad = impl.ladder;
   const TwoBodyView xv = impl.two_body_view(X);
   const TwoBodyView yv = impl.two_body_view(Y);
-  gather("commutator::ladder_gather_pp", lad.pp, impl, xv, yv);
-  gather("commutator::ladder_gather_hh", lad.hh, impl, xv, yv);
-  exec::fence("commutator::ladder_gather");
+  Gather("commutator::ladder_gather_pp", lad.pp, impl, xv, yv);
+  Gather("commutator::ladder_gather_hh", lad.hh, impl, xv, yv);
+  exec::Fence("commutator::ladder_gather");
 
   // W = Xg Yg per channel and projector. A channel without listed kets (k == 0)
   // is skipped: its product block stays zero (zero-initialized at construction,
@@ -152,7 +152,7 @@ void compute_intermediates(const op::Operator& X, const op::Operator& Y,
   IMSRG_CHECK(
       lad.pp.product.host_is_device(),
       "ladder: host BLAS on device memory; needs a device gemm (GPU backends)");
-  linalg::grouped_gemm(lad.problems);
+  linalg::GroupedGemm(lad.problems);
 
   SymArgs s;
   s.block_offset = impl.block_offsets.device_data();
@@ -161,11 +161,11 @@ void compute_intermediates(const op::Operator& X, const op::Operator& Y,
   s.mhh = lad.hh.product.device_data();
   s.h_z = static_cast<double>(h_z);
   s.num_channels = nch;
-  exec::parallel_for(
+  exec::ParallelFor(
       "commutator::ladder_antisymmetrize",
       static_cast<exec::Index>(impl.two_body_size),
       IMSRG_LAMBDA(const exec::Index e) {
-        const int ch = find_block(s.block_offset, s.num_channels, e);
+        const int ch = FindBlock(s.block_offset, s.num_channels, e);
         const std::int64_t local = e - s.block_offset[ch];
         const std::int64_t n = s.num_kets[ch];
         const std::int64_t i = local % n;
@@ -185,19 +185,19 @@ void compute_intermediates(const op::Operator& X, const op::Operator& Y,
           s.mhh[ji] = b_hh + s.h_z * a_hh;
         }
       });
-  exec::fence("commutator::ladder_antisymmetrize");
+  exec::Fence("commutator::ladder_antisymmetrize");
 }
 
 /// Z2 += Mpp - Mhh.
-void add_ladder_two_body(op::Operator& Z, Workspace::Impl& impl) {
+void AddLadderTwoBody(op::Operator& Z, Workspace::Impl& impl) {
   double* z2 = Z.two_body().matrix().buffer().device_data();
   const double* mpp = impl.ladder.pp.product.device_data();
   const double* mhh = impl.ladder.hh.product.device_data();
-  exec::parallel_for(
+  exec::ParallelFor(
       "commutator::comm222_pp_hhss",
       static_cast<exec::Index>(impl.two_body_size),
       IMSRG_LAMBDA(const exec::Index e) { z2[e] += mpp[e] - mhh[e]; });
-  exec::fence("commutator::comm222_pp_hhss");
+  exec::Fence("commutator::comm222_pp_hhss");
 }
 
 /// POD bundle of the 221 kernel.
@@ -215,7 +215,7 @@ static_assert(std::is_trivially_copyable_v<Ladder221Args>);
 
 /// Z1 += sum_c sum_J (2J + 1) / (2 j_i + 1) (n_c Mpp~(ci,cj;J) + (1 - n_c)
 /// Mhh~(ci,cj;J)).
-void add_221(op::Operator& Z, Workspace::Impl& impl, const op::Operator& X) {
+void Add221(op::Operator& Z, Workspace::Impl& impl, const op::Operator& X) {
   Ladder221Args a;
   a.mpp = impl.two_body_view(X);
   a.mpp.data = impl.ladder.pp.product.device_data();
@@ -227,7 +227,7 @@ void add_221(op::Operator& Z, Workspace::Impl& impl, const op::Operator& X) {
   a.orbits = impl.ob_orbits.device_data();
   a.z1 = Z.one_body().device_view();
   a.num_orbits = impl.tables.orbits().num_orbits;
-  exec::parallel_for(
+  exec::ParallelFor(
       "commutator::comm221ss", static_cast<exec::Index>(impl.ob_orbits.size()),
       IMSRG_LAMBDA(const exec::Index e) {
         const int i = a.owner[e];
@@ -254,47 +254,47 @@ void add_221(op::Operator& Z, Workspace::Impl& impl, const op::Operator& X) {
         }
         a.z1(i, j) += z / (ji + 1);
       });
-  exec::fence("commutator::comm221ss");
+  exec::Fence("commutator::comm221ss");
 }
 
-bool has_two_body(const op::Operator& X, const op::Operator& Y) {
+bool HasTwoBody(const op::Operator& X, const op::Operator& Y) {
   return X.two_body().allocated() && Y.two_body().allocated();
 }
 
 /// hZ = -hX hY from X and Y (Z's flag is validated against it by
-/// `check_term_inputs`).
-int z_sign(const op::Operator& X, const op::Operator& Y) {
-  return detail::commutator_hermiticity_sign(X, Y);
+/// `CheckTermInputs`).
+int ZSign(const op::Operator& X, const op::Operator& Y) {
+  return detail::CommutatorHermiticitySign(X, Y);
 }
 
 }  // namespace
 
-void comm222_pp_hhss(const op::Operator& X, const op::Operator& Y,
-                     op::Operator& Z, Workspace& ws) {
-  detail::check_term_inputs(X, Y, Z, ws);
-  if (!has_two_body(X, Y) || !Z.two_body().allocated()) return;
+void Comm222PpHhss(const op::Operator& X, const op::Operator& Y,
+                   op::Operator& Z, Workspace& ws) {
+  detail::CheckTermInputs(X, Y, Z, ws);
+  if (!HasTwoBody(X, Y) || !Z.two_body().allocated()) return;
   auto& impl = ws.impl();
-  compute_intermediates(X, Y, z_sign(X, Y), impl);
-  add_ladder_two_body(Z, impl);
+  ComputeIntermediates(X, Y, ZSign(X, Y), impl);
+  AddLadderTwoBody(Z, impl);
 }
 
-void comm221ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+void Comm221ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                Workspace& ws) {
-  detail::check_term_inputs(X, Y, Z, ws);
-  if (!has_two_body(X, Y)) return;
+  detail::CheckTermInputs(X, Y, Z, ws);
+  if (!HasTwoBody(X, Y)) return;
   auto& impl = ws.impl();
-  compute_intermediates(X, Y, z_sign(X, Y), impl);
-  add_221(Z, impl, X);
+  ComputeIntermediates(X, Y, ZSign(X, Y), impl);
+  Add221(Z, impl, X);
 }
 
-void comm222_pp_hh_221ss(const op::Operator& X, const op::Operator& Y,
-                         op::Operator& Z, Workspace& ws) {
-  detail::check_term_inputs(X, Y, Z, ws);
-  if (!has_two_body(X, Y)) return;
+void Comm222PpHh221ss(const op::Operator& X, const op::Operator& Y,
+                      op::Operator& Z, Workspace& ws) {
+  detail::CheckTermInputs(X, Y, Z, ws);
+  if (!HasTwoBody(X, Y)) return;
   auto& impl = ws.impl();
-  compute_intermediates(X, Y, z_sign(X, Y), impl);
-  if (Z.two_body().allocated()) add_ladder_two_body(Z, impl);
-  add_221(Z, impl, X);
+  ComputeIntermediates(X, Y, ZSign(X, Y), impl);
+  if (Z.two_body().allocated()) AddLadderTwoBody(Z, impl);
+  Add221(Z, impl, X);
 }
 
 }  // namespace imsrg::commutator::terms

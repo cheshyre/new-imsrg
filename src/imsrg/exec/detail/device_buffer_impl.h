@@ -44,7 +44,7 @@ using HostView = typename DeviceView<T>::host_mirror_type;
 /// Device kernel of `DeviceBuffer::fill`: `v(i) = value` for all i. Complexity
 /// O(n). A free function (not a member), see design/12 section 5 rule 8.
 template <class T>
-void fill_view(const DeviceView<T>& v, T value) {
+void FillView(const DeviceView<T>& v, T value) {
   Kokkos::parallel_for(
       "imsrg::DeviceBuffer::fill",
       Kokkos::RangePolicy<DefaultExecSpace, Kokkos::IndexType<Index>>(
@@ -52,7 +52,7 @@ void fill_view(const DeviceView<T>& v, T value) {
       KOKKOS_LAMBDA(const Index i) { v(i) = value; });
 }
 
-inline constexpr bool memory_is_host_accessible =
+inline constexpr bool kMemoryIsHostAccessible =
     Kokkos::SpaceAccessibility<Kokkos::HostSpace,
                                DeviceMemorySpace>::accessible;
 
@@ -71,7 +71,7 @@ struct DeviceBuffer<T>::Impl {
   /// exist yet. The mirror has the view's own `host_mirror_type`, so it aliases
   /// the device data whenever that is host accessible (including unified-memory
   /// architectures) and is a separate copy otherwise.
-  void ensure_host() const {
+  void EnsureHost() const {
     if (!has_host) {
       host = Kokkos::create_mirror_view(dev);
       if (host.data() != dev.data()) {
@@ -97,7 +97,7 @@ struct DeviceBufferAccess {
   }
 };
 
-inline constexpr std::string_view default_label = "imsrg::DeviceBuffer";
+inline constexpr std::string_view kDefaultLabel = "imsrg::DeviceBuffer";
 
 }  // namespace detail
 
@@ -150,7 +150,7 @@ bool DeviceBuffer<T>::empty() const noexcept {
 
 template <class T>
 std::string_view DeviceBuffer<T>::label() const noexcept {
-  return impl_ ? std::string_view(impl_->label) : detail::default_label;
+  return impl_ ? std::string_view(impl_->label) : detail::kDefaultLabel;
 }
 
 template <class T>
@@ -160,7 +160,7 @@ void DeviceBuffer<T>::resize(std::size_t n) {
     return;
   }
   if (!impl_) {
-    impl_ = std::make_unique<Impl>(detail::default_label, n);
+    impl_ = std::make_unique<Impl>(detail::kDefaultLabel, n);
     return;
   }
   const std::size_t keep = std::min(n, impl_->dev.extent(0));
@@ -177,12 +177,12 @@ void DeviceBuffer<T>::resize(std::size_t n) {
 template <class T>
 void DeviceBuffer<T>::fill(T value) {
   if (size() > 0) {
-    detail::fill_view<T>(impl_->dev, value);
+    detail::FillView<T>(impl_->dev, value);
   }
 }
 
 template <class T>
-void DeviceBuffer<T>::copy_from_host(std::span<const T> src) {
+void DeviceBuffer<T>::CopyFromHost(std::span<const T> src) {
   IMSRG_CHECK(src.size() == size(),
               "DeviceBuffer::copy_from_host: size mismatch");
   if (src.empty()) {
@@ -195,7 +195,7 @@ void DeviceBuffer<T>::copy_from_host(std::span<const T> src) {
 }
 
 template <class T>
-void DeviceBuffer<T>::copy_to_host(std::span<T> dst) const {
+void DeviceBuffer<T>::CopyToHost(std::span<T> dst) const {
   IMSRG_CHECK(dst.size() == size(),
               "DeviceBuffer::copy_to_host: size mismatch");
   if (dst.empty()) {
@@ -207,9 +207,9 @@ void DeviceBuffer<T>::copy_to_host(std::span<T> dst) const {
 }
 
 template <class T>
-std::vector<T> DeviceBuffer<T>::to_vector() const {
+std::vector<T> DeviceBuffer<T>::ToVector() const {
   std::vector<T> out(size());
-  copy_to_host(std::span<T>(out));
+  CopyToHost(std::span<T>(out));
   return out;
 }
 
@@ -218,7 +218,7 @@ std::span<T> DeviceBuffer<T>::host_span() {
   if (size() == 0) {
     return {};
   }
-  impl_->ensure_host();
+  impl_->EnsureHost();
   return {impl_->host.data(), impl_->host.extent(0)};
 }
 
@@ -227,18 +227,18 @@ std::span<const T> DeviceBuffer<T>::host_span() const {
   if (size() == 0) {
     return {};
   }
-  impl_->ensure_host();
+  impl_->EnsureHost();
   return {impl_->host.data(), impl_->host.extent(0)};
 }
 
 template <class T>
-void DeviceBuffer<T>::sync_to_host() {
+void DeviceBuffer<T>::SyncToHost() {
   if (size() == 0) {
     return;
   }
   if (!impl_->has_host) {
     Kokkos::fence("imsrg::DeviceBuffer::sync_to_host");
-    impl_->ensure_host();  // created from (or aliasing) the device data
+    impl_->EnsureHost();  // created from (or aliasing) the device data
     return;
   }
   if (impl_->aliases()) {
@@ -249,11 +249,11 @@ void DeviceBuffer<T>::sync_to_host() {
 }
 
 template <class T>
-void DeviceBuffer<T>::sync_to_device() {
+void DeviceBuffer<T>::SyncToDevice() {
   if (size() == 0) {
     return;
   }
-  impl_->ensure_host();
+  impl_->EnsureHost();
   if (impl_->aliases()) {
     Kokkos::fence("imsrg::DeviceBuffer::sync_to_device");
     return;
@@ -263,7 +263,7 @@ void DeviceBuffer<T>::sync_to_device() {
 
 template <class T>
 bool DeviceBuffer<T>::host_is_device() const noexcept {
-  return detail::memory_is_host_accessible;
+  return detail::kMemoryIsHostAccessible;
 }
 
 template <class T>

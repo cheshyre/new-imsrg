@@ -16,12 +16,12 @@
 namespace imsrg::basis {
 namespace {
 
-SingleParticleBasis make_basis(std::int32_t emax) {
-  return SingleParticleBasis::harmonic_oscillator(BasisTruncation{emax}, 16.0);
+SingleParticleBasis MakeBasis(std::int32_t emax) {
+  return SingleParticleBasis::HarmonicOscillator(BasisTruncation{emax}, 16.0);
 }
 
-std::int64_t brute_force_ket_count(const SingleParticleBasis& b,
-                                   std::int32_t e3max) {
+std::int64_t BruteForceKetCount(const SingleParticleBasis& b,
+                                std::int32_t e3max) {
   std::int64_t n = 0;
   const std::int32_t no = b.num_orbits();
   for (std::int32_t p = 0; p < no; ++p) {
@@ -44,16 +44,16 @@ std::int64_t brute_force_ket_count(const SingleParticleBasis& b,
 }
 
 TEST(ThreeBodyChannels, CutsAreResolved) {
-  const auto b = make_basis(3);
+  const auto b = MakeBasis(3);
   EXPECT_EQ(ThreeBodyChannels(b, ThreeBodyCuts{6}).cuts().emax_3body, 3);
   EXPECT_EQ(ThreeBodyChannels(b, ThreeBodyCuts{6, 2}).cuts().emax_3body, 2);
 }
 
 TEST(ThreeBodyChannels, KetCountMatchesBruteForceAndOrderIsLexicographic) {
-  const auto b = make_basis(3);
+  const auto b = MakeBasis(3);
   for (const std::int32_t e3max : {0, 3, 6, 9}) {
     const ThreeBodyChannels tb(b, ThreeBodyCuts{e3max});
-    EXPECT_EQ(tb.num_kets(), brute_force_ket_count(b, e3max)) << e3max;
+    EXPECT_EQ(tb.num_kets(), BruteForceKetCount(b, e3max)) << e3max;
     const auto kets = tb.kets();
     for (std::size_t i = 1; i < kets.size(); ++i) {
       const auto& x = kets[i - 1];
@@ -67,7 +67,7 @@ TEST(ThreeBodyChannels, KetCountMatchesBruteForceAndOrderIsLexicographic) {
 }
 
 TEST(ThreeBodyChannels, EmaxThreeBodyRestrictsOrbits) {
-  const auto b = make_basis(3);
+  const auto b = MakeBasis(3);
   const ThreeBodyChannels tb(b, ThreeBodyCuts{9, 1});
   EXPECT_EQ(tb.num_channels(), 8 * (3 * 1 + 1));
   for (const Ket3& k : tb.kets()) {
@@ -78,7 +78,7 @@ TEST(ThreeBodyChannels, EmaxThreeBodyRestrictsOrbits) {
 }
 
 TEST(ThreeBodyChannels, FindKetRoundTripsAndRejectsAbsentKets) {
-  const auto b = make_basis(2);
+  const auto b = MakeBasis(2);
   const ThreeBodyChannels tb(b, ThreeBodyCuts{6});
   for (std::int64_t i = 0; i < tb.num_kets(); ++i) {
     const Ket3& k = tb.kets()[static_cast<std::size_t>(i)];
@@ -100,7 +100,7 @@ TEST(ThreeBodyChannels, FindKetRoundTripsAndRejectsAbsentKets) {
 }
 
 TEST(ThreeBodyChannels, ChannelIndexFormulaAndLookup) {
-  const auto b = make_basis(2);
+  const auto b = MakeBasis(2);
   const ThreeBodyChannels tb(b, ThreeBodyCuts{6});
   EXPECT_EQ(tb.num_channels(), 8 * (3 * 2 + 1));
   for (std::int32_t ch = 0; ch < tb.num_channels(); ++ch) {
@@ -112,16 +112,16 @@ TEST(ThreeBodyChannels, ChannelIndexFormulaAndLookup) {
     ASSERT_TRUE(f.has_value());
     EXPECT_EQ(f->value(), ch);
   }
-  EXPECT_FALSE(tb.find_channel(TwoJ{2}, Parity::Even, TwoTz{1}).has_value());
-  EXPECT_FALSE(tb.find_channel(TwoJ{1}, Parity::Even, TwoTz{0}).has_value());
+  EXPECT_FALSE(tb.find_channel(TwoJ{2}, Parity::kEven, TwoTz{1}).has_value());
+  EXPECT_FALSE(tb.find_channel(TwoJ{1}, Parity::kEven, TwoTz{0}).has_value());
   EXPECT_FALSE(
-      tb.find_channel(TwoJ{6 * 2 + 3}, Parity::Even, TwoTz{1}).has_value());
-  EXPECT_EQ(tb.find_channel(TwoJ{3}, Parity::Odd, TwoTz{-1})->value(),
+      tb.find_channel(TwoJ{6 * 2 + 3}, Parity::kEven, TwoTz{1}).has_value());
+  EXPECT_EQ(tb.find_channel(TwoJ{3}, Parity::kOdd, TwoTz{-1})->value(),
             1 * 8 + 4 + 1);
 }
 
 TEST(ThreeBodyChannels, MembershipAndLocalIndexAreConsistent) {
-  const auto b = make_basis(2);
+  const auto b = MakeBasis(2);
   const ThreeBodyChannels tb(b, ThreeBodyCuts{6});
   std::int64_t total = 0;
   for (std::int32_t ch = 0; ch < tb.num_channels(); ++ch) {
@@ -145,7 +145,7 @@ TEST(ThreeBodyChannels, MembershipAndLocalIndexAreConsistent) {
       EXPECT_EQ(local->value(), static_cast<std::int32_t>(i));
     }
   }
-  EXPECT_EQ(total, tb.sum_channel_kets());
+  EXPECT_EQ(total, tb.SumChannelKets());
   // A ket is absent from a channel of the wrong parity.
   const Ket3& k0 = tb.kets()[0];
   const Orbit& o1 = b.orbit(k0.p);
@@ -162,7 +162,7 @@ TEST(ThreeBodyChannels, MembershipAndLocalIndexAreConsistent) {
 TEST(ThreeBodyChannels, StretchedStateRulesDropRedundantKets) {
   // A ket of three identical orbits is absent from every channel above 2J = 3
   // (2j) - 3 (rule copied from imsrg++).
-  const auto b = make_basis(2);
+  const auto b = MakeBasis(2);
   const ThreeBodyChannels tb(b, ThreeBodyCuts{6});
   int checked = 0;
   for (std::int64_t i = 0; i < tb.num_kets(); ++i) {
@@ -182,8 +182,8 @@ TEST(ThreeBodyChannels, StretchedStateRulesDropRedundantKets) {
 }
 
 TEST(ThreeBodyChannels, ConfigurationCutOnAHandCheckedKet) {
-  const auto b = make_basis(2);
-  const auto ref = Reference::from_nucleus(b, Nucleus::parse("O16"));
+  const auto b = MakeBasis(2);
+  const auto ref = Reference::FromNucleus(b, Nucleus::Parse("O16"));
   const ThreeBodyChannels tb(b, ThreeBodyCuts{6});
   // Ket 0 holds the two s1/2 orbits (e = 0) and one more orbit. O16 has e_fermi
   // = 1 for both species, so sum |e - e_F| = 1 + 1 + |e_r - 1|.
@@ -197,16 +197,16 @@ TEST(ThreeBodyChannels, ConfigurationCutOnAHandCheckedKet) {
   };
   const double de = dist(kt.p) + dist(kt.q) + dist(kt.r);
   ASSERT_GT(de, 0.5);
-  EXPECT_TRUE(tb.passes_configuration_cut(k, b, ref, de, 0.0));
-  EXPECT_FALSE(tb.passes_configuration_cut(k, b, ref, de - 0.1, 0.0));
+  EXPECT_TRUE(tb.PassesConfigurationCut(k, b, ref, de, 0.0));
+  EXPECT_FALSE(tb.PassesConfigurationCut(k, b, ref, de - 0.1, 0.0));
   // The s orbits are fully occupied: n (1 - n) = 0, so any positive occupation
   // cut rejects the ket with the reference occupations ...
-  EXPECT_FALSE(tb.passes_configuration_cut(k, b, ref, 10.0, 1e-3));
+  EXPECT_FALSE(tb.PassesConfigurationCut(k, b, ref, 10.0, 1e-3));
   // ... while natural occupations of 1/2 give a product of (1/4)^3.
   const std::vector<double> half(static_cast<std::size_t>(b.num_orbits()), 0.5);
-  EXPECT_TRUE(tb.passes_configuration_cut(k, b, ref, 10.0, 1.0 / 64.0, half));
+  EXPECT_TRUE(tb.PassesConfigurationCut(k, b, ref, 10.0, 1.0 / 64.0, half));
   EXPECT_FALSE(
-      tb.passes_configuration_cut(k, b, ref, 10.0, 1.0 / 64.0 + 1e-6, half));
+      tb.PassesConfigurationCut(k, b, ref, 10.0, 1.0 / 64.0 + 1e-6, half));
 }
 
 }  // namespace

@@ -12,7 +12,7 @@ using namespace imsrg::linalg;
 namespace {
 BlockIndex B(int v) { return BlockIndex{v}; }
 
-std::vector<BlockShape> shapes() {
+std::vector<BlockShape> Shapes() {
   return {{B(2), B(2), 3, 3},
           {B(0), B(0), 2, 4},
           {B(5), B(1), 0, 2},
@@ -21,7 +21,7 @@ std::vector<BlockShape> shapes() {
 }  // namespace
 
 TEST(LinalgBlockSparse, ContiguousOffsets) {
-  BlockSparseMatrix<double> m(shapes());
+  BlockSparseMatrix<double> m(Shapes());
   ASSERT_EQ(m.num_blocks(), 4u);
   EXPECT_EQ(m.block_info(0).offset, 0);
   EXPECT_EQ(m.block_info(1).offset, 9);
@@ -33,7 +33,7 @@ TEST(LinalgBlockSparse, ContiguousOffsets) {
 }
 
 TEST(LinalgBlockSparse, FindBlock) {
-  BlockSparseMatrix<double> m(shapes());
+  BlockSparseMatrix<double> m(Shapes());
   EXPECT_EQ(m.find_block(B(2), B(2)), 0u);
   EXPECT_EQ(m.find_block(B(0), B(0)), 1u);
   EXPECT_EQ(m.find_block(B(1), B(7)), 3u);
@@ -43,7 +43,7 @@ TEST(LinalgBlockSparse, FindBlock) {
 }
 
 TEST(LinalgBlockSparse, ZeroInitAndHostBlockAliasing) {
-  BlockSparseMatrix<double> m(shapes());
+  BlockSparseMatrix<double> m(Shapes());
   for (double x : m.buffer().host_span()) EXPECT_EQ(x, 0.0);
   auto b = m.host_block(1);
   EXPECT_EQ(b.rows, 2);
@@ -56,7 +56,7 @@ TEST(LinalgBlockSparse, ZeroInitAndHostBlockAliasing) {
 }
 
 TEST(LinalgBlockSparse, DeepCopy) {
-  BlockSparseMatrix<double> m(shapes());
+  BlockSparseMatrix<double> m(Shapes());
   m.host_block(0)(1, 1) = 3.0;
   BlockSparseMatrix<double> c = m;
   EXPECT_EQ(c.host_block(0)(1, 1), 3.0);
@@ -75,7 +75,7 @@ TEST(LinalgBlockSparse, NegativeSizeRejectedAndFloat) {
   EXPECT_THROW(
       BlockSparseMatrix<double>(std::vector<BlockShape>{{B(0), B(0), -1, 2}}),
       imsrg::InvariantError);
-  BlockSparseMatrix<float> f(shapes());
+  BlockSparseMatrix<float> f(Shapes());
   f.host_block(0)(0, 0) = 1.5f;
   EXPECT_EQ(f.host_block(0)(0, 0), 1.5f);
 }

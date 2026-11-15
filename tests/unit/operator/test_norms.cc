@@ -17,15 +17,15 @@ namespace {
 using namespace imsrg;
 using namespace imsrg::op;
 
-std::shared_ptr<const basis::ModelSpace> make_ms() {
-  return basis::ModelSpace::from_names(basis::BasisTruncation{.emax = 2}, 16.0,
-                                       "O16", "O16");
+std::shared_ptr<const basis::ModelSpace> MakeMs() {
+  return basis::ModelSpace::FromNames(basis::BasisTruncation{.emax = 2}, 16.0,
+                                      "O16", "O16");
 }
 
 class Lcg {
  public:
   explicit Lcg(std::uint64_t seed) : s_(seed) {}
-  double next() {
+  double Next() {
     s_ = s_ * 6364136223846793005ULL + 1442695040888963407ULL;
     return static_cast<double>(static_cast<std::int64_t>(s_ >> 11)) /
                4503599627370496.0 -
@@ -38,14 +38,14 @@ class Lcg {
 
 /// Random Hermitian operator; 1B entries between all orbit pairs (also
 /// different l, j, tz).
-Operator make_op(int rank, std::uint64_t seed) {
-  Operator o(make_ms(), OperatorSpec::scalar(rank));
+Operator MakeOp(int rank, std::uint64_t seed) {
+  Operator o(MakeMs(), OperatorSpec::Scalar(rank));
   Lcg rng(seed);
-  o.zero_body() = 100.0 * rng.next();
+  o.zero_body() = 100.0 * rng.Next();
   const int n = o.model_space().num_orbits();
   for (int p = 0; p < n; ++p) {
     for (int q = p; q < n; ++q) {
-      o.one_body().set(OrbitIndex{p}, OrbitIndex{q}, rng.next());
+      o.one_body().set(OrbitIndex{p}, OrbitIndex{q}, rng.Next());
     }
   }
   if (o.two_body().allocated()) {
@@ -54,7 +54,7 @@ Operator make_op(int rank, std::uint64_t seed) {
       const int nk = chans.channels()[static_cast<std::size_t>(c)].num_kets;
       for (int i = 0; i < nk; ++i) {
         for (int j = i; j < nk; ++j) {
-          const double v = rng.next();
+          const double v = rng.Next();
           o.two_body().set(ChannelIndex{c}, ChannelIndex{c}, LocalKetIndex{i},
                            LocalKetIndex{j}, v);
           if (i != j) {
@@ -68,7 +68,7 @@ Operator make_op(int rank, std::uint64_t seed) {
   return o;
 }
 
-double brute_one_body(const Operator& o) {
+double BruteOneBody(const Operator& o) {
   const auto& b = o.model_space().basis();
   const int n = b.num_orbits();
   double s = 0.0;
@@ -85,7 +85,7 @@ double brute_one_body(const Operator& o) {
   return std::sqrt(s);
 }
 
-double brute_two_body(const Operator& o) {
+double BruteTwoBody(const Operator& o) {
   if (!o.two_body().allocated()) return 0.0;
   const auto& chans = o.two_body().channels();
   double s = 0.0;
@@ -103,32 +103,32 @@ double brute_two_body(const Operator& o) {
   return std::sqrt(s);
 }
 
-void expect_rel(double a, double b) {
+void ExpectRel(double a, double b) {
   EXPECT_NEAR(a, b, 1e-12 * std::max(1.0, std::abs(b)));
 }
 
 TEST(OperatorNorms, ZeroOperatorHasZeroNorms) {
-  const Operator o(make_ms(), OperatorSpec::scalar(2));
-  EXPECT_EQ(one_body_norm(o), 0.0);
-  EXPECT_EQ(two_body_norm(o), 0.0);
-  EXPECT_EQ(three_body_norm(o), 0.0);
-  EXPECT_EQ(norm(o), 0.0);
+  const Operator o(MakeMs(), OperatorSpec::Scalar(2));
+  EXPECT_EQ(OneBodyNorm(o), 0.0);
+  EXPECT_EQ(TwoBodyNorm(o), 0.0);
+  EXPECT_EQ(ThreeBodyNorm(o), 0.0);
+  EXPECT_EQ(Norm(o), 0.0);
 }
 
 TEST(OperatorNorms, MatchBruteForce) {
-  const Operator o = make_op(2, 1);
-  const double n1 = brute_one_body(o);
-  const double n2 = brute_two_body(o);
+  const Operator o = MakeOp(2, 1);
+  const double n1 = BruteOneBody(o);
+  const double n2 = BruteTwoBody(o);
   ASSERT_GT(n1, 1.0);
   ASSERT_GT(n2, 1.0);
-  expect_rel(one_body_norm(o), n1);
-  expect_rel(two_body_norm(o), n2);
-  EXPECT_EQ(three_body_norm(o), 0.0);
-  expect_rel(norm(o), std::sqrt(n1 * n1 + n2 * n2));
+  ExpectRel(OneBodyNorm(o), n1);
+  ExpectRel(TwoBodyNorm(o), n2);
+  EXPECT_EQ(ThreeBodyNorm(o), 0.0);
+  ExpectRel(Norm(o), std::sqrt(n1 * n1 + n2 * n2));
 }
 
 TEST(OperatorNorms, OneBodyIgnoresDifferentLjtzEntries) {
-  Operator o(make_ms(), OperatorSpec::scalar(1));
+  Operator o(MakeMs(), OperatorSpec::Scalar(1));
   const auto& b = o.model_space().basis();
   // find two orbits that differ in (l, 2j, tz2), and one orbit pair with equal
   // labels
@@ -144,43 +144,43 @@ TEST(OperatorNorms, OneBodyIgnoresDifferentLjtzEntries) {
   }
   ASSERT_GE(q.value(), 0);
   o.one_body().set(p, q, 5.0);
-  EXPECT_EQ(one_body_norm(o), 0.0);
+  EXPECT_EQ(OneBodyNorm(o), 0.0);
   const double w = b.orbit(p).j2.twice + 1;
   o.one_body().set(p, p, 2.0);
-  EXPECT_DOUBLE_EQ(one_body_norm(o), std::sqrt(4.0 * w));
+  EXPECT_DOUBLE_EQ(OneBodyNorm(o), std::sqrt(4.0 * w));
   // an off-diagonal pair with equal (l, j, tz) but different n counts
   for (int i = 1; i < b.num_orbits(); ++i) {
     const auto& a = b.orbit(p);
     const auto& c = b.orbit(OrbitIndex{i});
     if (a.l == c.l && a.j2 == c.j2 && a.tz2 == c.tz2) {
       o.one_body().set(p, OrbitIndex{i}, 1.0);
-      EXPECT_DOUBLE_EQ(one_body_norm(o), std::sqrt(4.0 * w + 2.0 * w));
+      EXPECT_DOUBLE_EQ(OneBodyNorm(o), std::sqrt(4.0 * w + 2.0 * w));
       break;
     }
   }
 }
 
 TEST(OperatorNorms, ZeroBodyDoesNotEnterNorm) {
-  Operator o = make_op(2, 2);
-  const double before = norm(o);
+  Operator o = MakeOp(2, 2);
+  const double before = Norm(o);
   o.zero_body() += 1.0e3;
-  EXPECT_EQ(norm(o), before);
+  EXPECT_EQ(Norm(o), before);
 }
 
 TEST(OperatorNorms, RankOneHasNoTwoBodyNorm) {
-  const Operator o = make_op(1, 3);
-  EXPECT_EQ(two_body_norm(o), 0.0);
-  EXPECT_EQ(norm(o), one_body_norm(o));
-  expect_rel(norm(o), brute_one_body(o));
+  const Operator o = MakeOp(1, 3);
+  EXPECT_EQ(TwoBodyNorm(o), 0.0);
+  EXPECT_EQ(Norm(o), OneBodyNorm(o));
+  ExpectRel(Norm(o), BruteOneBody(o));
 }
 
 TEST(OperatorNorms, HomogeneousUnderScaling) {
-  const Operator o = make_op(2, 4);
+  const Operator o = MakeOp(2, 4);
   for (const double a : {2.5, -3.0, 0.0}) {
     const Operator s = a * o;
-    expect_rel(norm(s), std::abs(a) * norm(o));
-    expect_rel(one_body_norm(s), std::abs(a) * one_body_norm(o));
-    expect_rel(two_body_norm(s), std::abs(a) * two_body_norm(o));
+    ExpectRel(Norm(s), std::abs(a) * Norm(o));
+    ExpectRel(OneBodyNorm(s), std::abs(a) * OneBodyNorm(o));
+    ExpectRel(TwoBodyNorm(s), std::abs(a) * TwoBodyNorm(o));
   }
 }
 

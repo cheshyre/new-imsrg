@@ -14,7 +14,7 @@
 /// * `tz2 = -1` is a proton, `tz2 = +1` a neutron;
 /// * orbit order: shell e ascending, then 2j descending (which is l descending,
 ///   then j descending), then proton before neutron. In an untruncated basis
-///   the index of an orbit is `imsrgpp_orbit_hash(o)`: protons have even
+///   the index of an orbit is `ImsrgppOrbitHash(o)`: protons have even
 ///   indices and the neutron partner of proton `a` is `a + 1`;
 /// * labels are written as imsrg++ writes them, e.g. "p0d5" for the proton
 ///   0d5/2 orbit, with the l letters s p d f g h i j k l m n o for l = 0..12
@@ -51,7 +51,7 @@ struct Orbit {
   }
   /// Parity (-1)^l.
   IMSRG_INLINE_FUNCTION constexpr Parity parity() const noexcept {
-    return parity_of_l(l);
+    return ParityOfL(l);
   }
   /// True for a proton orbit (tz2 < 0).
   IMSRG_INLINE_FUNCTION constexpr bool is_proton() const noexcept {
@@ -80,7 +80,7 @@ static_assert(sizeof(Orbit) == 4 * sizeof(std::int32_t));
 
 /// True if `o` has valid quantum numbers: n >= 0, l >= 0, 2j = 2l +- 1 with 2j
 /// > 0, tz2 = +-1.
-IMSRG_INLINE_FUNCTION constexpr bool is_valid(const Orbit& o) noexcept {
+IMSRG_INLINE_FUNCTION constexpr bool IsValid(const Orbit& o) noexcept {
   return o.n >= 0 && o.l >= 0 &&
          (o.j2.twice == 2 * o.l + 1 || o.j2.twice == 2 * o.l - 1) &&
          o.j2.twice > 0 && (o.tz2.twice == -1 || o.tz2.twice == 1);
@@ -90,8 +90,8 @@ IMSRG_INLINE_FUNCTION constexpr bool is_valid(const Orbit& o) noexcept {
 /// (e + 3) + 1 - 2j + (tz2 + 1) / 2` with e = 2n + l. It orders orbits by
 /// shell, then 2j descending, then proton before neutron, and equals the orbit
 /// index in a basis without l or unoccupied-shell truncations (so the index of
-/// an orbit does not depend on emax). Precondition: `is_valid(o)`. O(1).
-IMSRG_INLINE_FUNCTION constexpr std::int32_t imsrgpp_orbit_hash(
+/// an orbit does not depend on emax). Precondition: `IsValid(o)`. O(1).
+IMSRG_INLINE_FUNCTION constexpr std::int32_t ImsrgppOrbitHash(
     const Orbit& o) noexcept {
   const std::int32_t e = o.e();
   return e * (e + 3) + 1 - o.j2.twice + (o.tz2.twice + 1) / 2;
@@ -99,7 +99,7 @@ IMSRG_INLINE_FUNCTION constexpr std::int32_t imsrgpp_orbit_hash(
 
 /// Number of orbits with shell e <= emax in an untruncated two-species basis:
 /// (emax + 1)(emax + 2). Precondition: emax >= -1.
-IMSRG_INLINE_FUNCTION constexpr std::int32_t num_orbits_untruncated(
+IMSRG_INLINE_FUNCTION constexpr std::int32_t NumOrbitsUntruncated(
     std::int32_t emax) noexcept {
   return (emax + 1) * (emax + 2);
 }
@@ -108,14 +108,14 @@ IMSRG_INLINE_FUNCTION constexpr std::int32_t num_orbits_untruncated(
 /// 1s1/2): 'p' or 'n', n, the l letter (s p d f g h i j k l m n o for l =
 /// 0..12), then 2j.
 /// @throws InputError if `o` is not valid or l > 12.
-std::string orbit_label(const Orbit& o);
+std::string OrbitLabel(const Orbit& o);
 
 /// Parses an imsrg++ orbit label ("p0d5", "n1s1", "n0j15"): 'p' or 'n', the
 /// decimal n (several digits are accepted; imsrg++ reads only one), an l letter
 /// from "spdfghijklmno" (j is l = 7, as in imsrg++), then the decimal 2j.
 /// @throws InputError (naming the label) if the label is malformed or the
-///         quantum numbers are not valid (`is_valid`).
-Orbit parse_orbit_label(std::string_view label);
+///         quantum numbers are not valid (`IsValid`).
+Orbit ParseOrbitLabel(std::string_view label);
 
 }  // namespace imsrg::basis
 

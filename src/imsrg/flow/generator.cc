@@ -20,61 +20,62 @@ namespace imsrg::flow {
 
 namespace {
 
-bool is_shell_model(GeneratorKind k) {
-  return k == GeneratorKind::ShellModel || k == GeneratorKind::ShellModelAtan ||
-         k == GeneratorKind::ShellModelWegner ||
-         k == GeneratorKind::ShellModelImaginaryTime;
+bool IsShellModel(GeneratorKind k) {
+  return k == GeneratorKind::kShellModel ||
+         k == GeneratorKind::kShellModelAtan ||
+         k == GeneratorKind::kShellModelWegner ||
+         k == GeneratorKind::kShellModelImaginaryTime;
 }
 
 // Maps a kind to the single-reference kind that has the same function f.
-GeneratorKind function_kind(GeneratorKind k) {
+GeneratorKind FunctionKind(GeneratorKind k) {
   switch (k) {
-    case GeneratorKind::White:
-    case GeneratorKind::ShellModel:
-      return GeneratorKind::White;
-    case GeneratorKind::Atan:
-    case GeneratorKind::ShellModelAtan:
-      return GeneratorKind::Atan;
-    case GeneratorKind::ImaginaryTime:
-    case GeneratorKind::ShellModelImaginaryTime:
-      return GeneratorKind::ImaginaryTime;
-    case GeneratorKind::Wegner:
-    case GeneratorKind::ShellModelWegner:
-      return GeneratorKind::Wegner;
-    case GeneratorKind::QtransferAtan:
-      return GeneratorKind::QtransferAtan;
-    case GeneratorKind::ShellModelAtanNpnh:
+    case GeneratorKind::kWhite:
+    case GeneratorKind::kShellModel:
+      return GeneratorKind::kWhite;
+    case GeneratorKind::kAtan:
+    case GeneratorKind::kShellModelAtan:
+      return GeneratorKind::kAtan;
+    case GeneratorKind::kImaginaryTime:
+    case GeneratorKind::kShellModelImaginaryTime:
+      return GeneratorKind::kImaginaryTime;
+    case GeneratorKind::kWegner:
+    case GeneratorKind::kShellModelWegner:
+      return GeneratorKind::kWegner;
+    case GeneratorKind::kQtransferAtan:
+      return GeneratorKind::kQtransferAtan;
+    case GeneratorKind::kShellModelAtanNpnh:
       throw NotImplementedError(
           "generator shell-model-atan-npnh is not implemented");
-    case GeneratorKind::OnePa:
+    case GeneratorKind::kOnePa:
       throw NotImplementedError("generator 1PA is not implemented");
-    case GeneratorKind::HartreeFock:
+    case GeneratorKind::kHartreeFock:
       throw NotImplementedError(
           "the hartree-fock generator has no generator function");
   }
   throw InvariantError("unknown GeneratorKind");
 }
 
-bool same_ljtz(const basis::Orbit& a, const basis::Orbit& b) {
+bool SameLjtz(const basis::Orbit& a, const basis::Orbit& b) {
   return a.l == b.l && a.j2.twice == b.j2.twice && a.tz2.twice == b.tz2.twice;
 }
 
 }  // namespace
 
-double generator_function(GeneratorKind kind, double h_od, double denominator,
-                          int qtransfer_n) {
-  switch (function_kind(kind)) {
-    case GeneratorKind::White:
+double GeneratorFunction(GeneratorKind kind, double h_od, double denominator,
+                         int qtransfer_n) {
+  switch (FunctionKind(kind)) {
+    case GeneratorKind::kWhite:
       return h_od / denominator;
-    case GeneratorKind::Atan:
+    case GeneratorKind::kAtan:
       return 0.5 * std::atan(2.0 * h_od / denominator);
-    case GeneratorKind::ImaginaryTime:
+    case GeneratorKind::kImaginaryTime:
       return h_od * (denominator < 0.0 ? -1.0 : 1.0);
-    case GeneratorKind::Wegner:
+    case GeneratorKind::kWegner:
       return h_od * denominator;
-    case GeneratorKind::QtransferAtan: {
-      const double w = std::pow(std::abs(denominator) * constants::m_nucleon /
-                                    (constants::hbarc * constants::hbarc),
+    case GeneratorKind::kQtransferAtan: {
+      const double w = std::pow(std::abs(denominator) * constants::kMNucleon /
+                                    (constants::kHbarc * constants::kHbarc),
                                 0.5 * qtransfer_n);
       return w * 0.5 * std::atan(2.0 * h_od / denominator);
     }
@@ -84,7 +85,7 @@ double generator_function(GeneratorKind kind, double h_od, double denominator,
   throw InvariantError("unreachable generator kind");
 }
 
-double floor_denominator(double delta, double cutoff) noexcept {
+double FloorDenominator(double delta, double cutoff) noexcept {
   if (std::abs(delta) < cutoff) return delta < 0.0 ? -cutoff : cutoff;
   return delta;
 }
@@ -93,7 +94,7 @@ Denominators::Denominators(const op::Operator& H, const GeneratorOptions& opts)
     : ms_(H.model_space_ptr()), opts_(opts) {
   IMSRG_CHECK(!H.empty(), "Denominators: empty operator");
   op::Operator Hh(H);
-  Hh.sync_to_host();
+  Hh.SyncToHost();
   const basis::SingleParticleBasis& sp = ms_->basis();
   norb_ = sp.num_orbits();
   const auto n = static_cast<std::size_t>(norb_);
@@ -107,7 +108,7 @@ Denominators::Denominators(const op::Operator& H, const GeneratorOptions& opts)
     isospin_partner_[static_cast<std::size_t>(a)] =
         sp.find(o).value_or(OrbitIndex{a});
   }
-  if (opts_.partitioning == Partitioning::EpsteinNesbet) {
+  if (opts_.partitioning == Partitioning::kEpsteinNesbet) {
     monopole_.assign(n * n, 0.0);
     for (std::int32_t a = 0; a < norb_; ++a) {
       for (std::int32_t b = a; b < norb_; ++b) {
@@ -132,24 +133,24 @@ Denominators::Denominators(const op::Operator& H, const GeneratorOptions& opts)
 
 double Denominators::monopole(OrbitIndex a, OrbitIndex b) const {
   if (monopole_.empty()) return 0.0;
-  return monopole_[a.to_size() + b.to_size() * static_cast<std::size_t>(norb_)];
+  return monopole_[a.ToSize() + b.ToSize() * static_cast<std::size_t>(norb_)];
 }
 
 double Denominators::one_body(OrbitIndex i, OrbitIndex j) const {
   const auto occ = ms_->reference().occupations();
-  double d = f_diag_[i.to_size()] - f_diag_[j.to_size()];
-  if (opts_.partitioning == Partitioning::EpsteinNesbet) {
-    d += (occ[i.to_size()] - occ[j.to_size()]) * monopole(i, j);
-  } else if (opts_.partitioning == Partitioning::MpIsospin) {
-    d = 0.5 * (d + f_diag_[isospin_partner_[i.to_size()].to_size()] -
-               f_diag_[isospin_partner_[j.to_size()].to_size()]);
+  double d = f_diag_[i.ToSize()] - f_diag_[j.ToSize()];
+  if (opts_.partitioning == Partitioning::kEpsteinNesbet) {
+    d += (occ[i.ToSize()] - occ[j.ToSize()]) * monopole(i, j);
+  } else if (opts_.partitioning == Partitioning::kMpIsospin) {
+    d = 0.5 * (d + f_diag_[isospin_partner_[i.ToSize()].ToSize()] -
+               f_diag_[isospin_partner_[j.ToSize()].ToSize()]);
   }
   if (opts_.denominator_delta_all || (opts_.denominator_delta_orbit &&
                                       (*opts_.denominator_delta_orbit == i ||
                                        *opts_.denominator_delta_orbit == j))) {
     d += opts_.denominator_delta;
   }
-  return floor_denominator(d, opts_.denominator_cutoff);
+  return FloorDenominator(d, opts_.denominator_cutoff);
 }
 
 double Denominators::two_body(ChannelIndex ch, LocalKetIndex ibra,
@@ -159,87 +160,87 @@ double Denominators::two_body(ChannelIndex ch, LocalKetIndex ibra,
   const basis::Ket& ket = tb.ket(tb.global_ket(ch, iket));
   const OrbitIndex i = bra.p, j = bra.q, k = ket.p, l = ket.q;
   const auto occ = ms_->reference().occupations();
-  auto f = [&](OrbitIndex x) { return f_diag_[x.to_size()]; };
+  auto f = [&](OrbitIndex x) { return f_diag_[x.ToSize()]; };
   auto fp = [&](OrbitIndex x) {
-    return f_diag_[isospin_partner_[x.to_size()].to_size()];
+    return f_diag_[isospin_partner_[x.ToSize()].ToSize()];
   };
   double d = f(i) + f(j) - f(k) - f(l);
-  if (opts_.partitioning == Partitioning::MpIsospin) {
+  if (opts_.partitioning == Partitioning::kMpIsospin) {
     d = 0.5 * (d + fp(i) + fp(j) - fp(k) - fp(l));
   }
   if (opts_.denominator_delta_all) d += opts_.denominator_delta;
-  if (opts_.partitioning == Partitioning::EpsteinNesbet) {
-    const double ni = occ[i.to_size()], nj = occ[j.to_size()];
-    const double nk = occ[k.to_size()], nl = occ[l.to_size()];
+  if (opts_.partitioning == Partitioning::kEpsteinNesbet) {
+    const double ni = occ[i.ToSize()], nj = occ[j.ToSize()];
+    const double nk = occ[k.ToSize()], nl = occ[l.ToSize()];
     d += (1.0 - ni - nj) * monopole(i, j) - (1.0 - nk - nl) * monopole(k, l) +
          (ni - nk) * monopole(i, k) + (ni - nl) * monopole(i, l) +
          (nj - nk) * monopole(j, k) + (nj - nl) * monopole(j, l);
   }
-  return floor_denominator(d, opts_.denominator_cutoff);
+  return FloorDenominator(d, opts_.denominator_cutoff);
 }
 
-op::OperatorSpec generator_spec(const op::OperatorSpec& h, GeneratorKind kind) {
-  return op::OperatorSpec::scalar(
-      kind == GeneratorKind::HartreeFock ? 1 : h.particle_rank,
-      Hermiticity::AntiHermitian);
+op::OperatorSpec GeneratorSpec(const op::OperatorSpec& h, GeneratorKind kind) {
+  return op::OperatorSpec::Scalar(
+      kind == GeneratorKind::kHartreeFock ? 1 : h.particle_rank,
+      Hermiticity::kAntiHermitian);
 }
 
-void compute_generator(const op::Operator& H, op::Operator& eta,
-                       const GeneratorOptions& opts) {
+void ComputeGenerator(const op::Operator& H, op::Operator& eta,
+                      const GeneratorOptions& opts) {
   IMSRG_CHECK(!H.empty(), "compute_generator: empty H");
   IMSRG_CHECK(H.spec().is_scalar() && H.spec().is_number_conserving(),
               "compute_generator: H must be scalar and number conserving");
   IMSRG_CHECK(H.spec().particle_rank == 2,
               "compute_generator: H must have particle_rank 2");
-  if (opts.kind == GeneratorKind::ShellModelAtanNpnh) {
+  if (opts.kind == GeneratorKind::kShellModelAtanNpnh) {
     throw NotImplementedError(
         "generator shell-model-atan-npnh is not implemented");
   }
-  if (opts.kind == GeneratorKind::OnePa) {
+  if (opts.kind == GeneratorKind::kOnePa) {
     throw NotImplementedError("generator 1PA is not implemented");
   }
 
-  const op::OperatorSpec spec = generator_spec(H.spec(), opts.kind);
-  if (eta.empty() || !(eta.spec() == spec) || !op::same_model_space(eta, H)) {
+  const op::OperatorSpec spec = GeneratorSpec(H.spec(), opts.kind);
+  if (eta.empty() || !(eta.spec() == spec) || !op::SameModelSpace(eta, H)) {
     eta = op::Operator(H.model_space_ptr(), spec);
   }
   eta.set_zero();
-  eta.sync_to_host();
+  eta.SyncToHost();
 
   op::Operator Hh(H);
-  Hh.sync_to_host();
+  Hh.SyncToHost();
   const Denominators den(H, opts);
   const basis::ModelSpace& ms = H.model_space();
   const basis::SingleParticleBasis& sp = ms.basis();
   const basis::Partition& part = ms.partition();
   const int nq = opts.qtransfer_n;
 
-  if (opts.kind == GeneratorKind::HartreeFock) {
+  if (opts.kind == GeneratorKind::kHartreeFock) {
     const std::int32_t norb = sp.num_orbits();
     for (std::int32_t i = 0; i < norb; ++i) {
       for (std::int32_t j = 0; j < i; ++j) {
         const OrbitIndex oi{i}, oj{j};
-        if (!same_ljtz(sp.orbit(oi), sp.orbit(oj))) continue;
+        if (!SameLjtz(sp.orbit(oi), sp.orbit(oj))) continue;
         const double v = Hh.one_body().get(oi, oj) / den.one_body(oi, oj);
         eta.one_body().set_element(oi, oj, v);
         eta.one_body().set_element(oj, oi, -v);
       }
     }
-    eta.sync_to_device();
+    eta.SyncToDevice();
     return;
   }
 
-  const bool shell = is_shell_model(opts.kind);
+  const bool shell = IsShellModel(opts.kind);
   const GeneratorKind kind = opts.kind;
 
   // One-body part.
   auto one_body_pair = [&](OrbitIndex a, OrbitIndex i) {
-    if (a == i || !same_ljtz(sp.orbit(a), sp.orbit(i))) return;
+    if (a == i || !SameLjtz(sp.orbit(a), sp.orbit(i))) return;
     const double d = den.one_body(i, a);
     eta.one_body().set_element(
-        i, a, generator_function(kind, Hh.one_body().get(i, a), d, nq));
+        i, a, GeneratorFunction(kind, Hh.one_body().get(i, a), d, nq));
     eta.one_body().set_element(
-        a, i, generator_function(kind, Hh.one_body().get(a, i), -d, nq));
+        a, i, GeneratorFunction(kind, Hh.one_body().get(a, i), -d, nq));
   };
   auto for_ai = [&](std::span<const OrbitIndex> as,
                     std::span<const OrbitIndex> is) {
@@ -266,8 +267,8 @@ void compute_generator(const op::Operator& H, op::Operator& eta,
           for (KetClass bc : bra_classes) {
             for (LocalKetIndex b : sub.kets(ch, bc)) {
               const double v =
-                  generator_function(kind, Hh.two_body().get(ch, ch, b, k),
-                                     den.two_body(ch, b, k), nq);
+                  GeneratorFunction(kind, Hh.two_body().get(ch, ch, b, k),
+                                    den.two_body(ch, b, k), nq);
               eta.two_body().set(ch, ch, b, k, v);
               eta.two_body().set(ch, ch, k, b, -v);
             }
@@ -275,21 +276,21 @@ void compute_generator(const op::Operator& H, op::Operator& eta,
         }
       };
       if (!shell) {
-        block(KetClass::CC, {KetClass::QQ, KetClass::VV, KetClass::QV});
+        block(KetClass::kCc, {KetClass::kQq, KetClass::kVv, KetClass::kQv});
       } else {
-        block(KetClass::CC, {KetClass::VV, KetClass::QV, KetClass::QQ});
-        block(KetClass::VC, {KetClass::VV, KetClass::QV, KetClass::QQ});
-        block(KetClass::VV, {KetClass::QV, KetClass::QQ});
+        block(KetClass::kCc, {KetClass::kVv, KetClass::kQv, KetClass::kQq});
+        block(KetClass::kVc, {KetClass::kVv, KetClass::kQv, KetClass::kQq});
+        block(KetClass::kVv, {KetClass::kQv, KetClass::kQq});
       }
     }
   }
-  eta.sync_to_device();
+  eta.SyncToDevice();
 }
 
-op::Operator compute_generator(const op::Operator& H,
-                               const GeneratorOptions& opts) {
+op::Operator ComputeGenerator(const op::Operator& H,
+                              const GeneratorOptions& opts) {
   op::Operator eta;
-  compute_generator(H, eta, opts);
+  ComputeGenerator(H, eta, opts);
   return eta;
 }
 

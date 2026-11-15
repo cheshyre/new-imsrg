@@ -33,7 +33,7 @@ struct FileOrbit {
   std::int32_t n, l, j, e;
 };
 
-No2bFileTruncation resolved(const No2bFileTruncation& f) {
+No2bFileTruncation Resolved(const No2bFileTruncation& f) {
   if (f.e1max < 0 || f.e2max < 0 || f.e3max < 0) {
     throw InputError("NO2B file truncations must be non-negative (file3e1max=" +
                      std::to_string(f.e1max) +
@@ -45,7 +45,7 @@ No2bFileTruncation resolved(const No2bFileTruncation& f) {
   return r;
 }
 
-std::vector<FileOrbit> file_orbits(const No2bFileTruncation& f) {
+std::vector<FileOrbit> FileOrbits(const No2bFileTruncation& f) {
   std::vector<FileOrbit> orbs;
   for (std::int32_t e = 0; e <= f.e1max; ++e) {
     for (std::int32_t l = e % 2; l <= std::min(e, f.lmax); l += 2) {
@@ -61,9 +61,8 @@ std::vector<FileOrbit> file_orbits(const No2bFileTruncation& f) {
 /// a non-empty J range, in file order. `emax_first` cuts the first orbit (a
 /// break, as the orbits are ordered by e).
 template <class Block>
-void walk_blocks(const std::vector<FileOrbit>& orbs,
-                 const No2bFileTruncation& f, std::int32_t emax_first,
-                 Block&& block) {
+void WalkBlocks(const std::vector<FileOrbit>& orbs, const No2bFileTruncation& f,
+                std::int32_t emax_first, Block&& block) {
   const std::size_t norb = orbs.size();
   for (std::size_t i1 = 0; i1 < norb; ++i1) {
     const FileOrbit& o1 = orbs[i1];
@@ -109,13 +108,13 @@ class BinarySource {
     if (!in_) throw InputError("cannot open NO2B file " + path.string());
     buf_.resize(kChunkBytes / sizeof(Value));
   }
-  float next() {
-    if (pos_ == len_) refill();
-    return convert(buf_[pos_++]);
+  float Next() {
+    if (pos_ == len_) Refill();
+    return Convert(buf_[pos_++]);
   }
-  void skip(std::int64_t n) {
+  void Skip(std::int64_t n) {
     while (n > 0) {
-      if (pos_ == len_) refill();
+      if (pos_ == len_) Refill();
       const std::int64_t k =
           std::min<std::int64_t>(n, static_cast<std::int64_t>(len_ - pos_));
       pos_ += static_cast<std::size_t>(k);
@@ -124,14 +123,14 @@ class BinarySource {
   }
 
  private:
-  static float convert(Value v) {
+  static float Convert(Value v) {
     if constexpr (std::is_same_v<Value, float>) {
       return v;
     } else {
-      return half_to_float(v);
+      return HalfToFloat(v);
     }
   }
-  void refill() {
+  void Refill() {
     const std::size_t want = static_cast<std::size_t>(std::min<std::int64_t>(
         remaining_, static_cast<std::int64_t>(buf_.size())));
     if (want == 0)
@@ -157,11 +156,11 @@ class BinarySource {
 class TextSource {
  public:
   explicit TextSource(const std::filesystem::path& path) : in_(path) {
-    in_.skip_line();
+    in_.SkipLine();
   }
-  float next() {
+  float Next() {
     float v = 0;
-    if (!in_.next_float(v)) {
+    if (!in_.NextFloat(v)) {
       throw InputError(
           "NO2B file " + in_.path().string() +
           ": data ended before all values were read (check file3e1max, "
@@ -169,8 +168,8 @@ class TextSource {
     }
     return v;
   }
-  void skip(std::int64_t n) {
-    for (; n > 0; --n) next();
+  void Skip(std::int64_t n) {
+    for (; n > 0; --n) Next();
   }
 
  private:
@@ -178,7 +177,7 @@ class TextSource {
 };
 
 template <class Source>
-void fill(Source& src, const std::vector<FileOrbit>& orbs,
+void Fill(Source& src, const std::vector<FileOrbit>& orbs,
           const No2bFileTruncation& f, op::No2bThreeBody& v3,
           No2bReadReport& rep) {
   const op::No2bTruncation tr = v3.truncation();
@@ -189,7 +188,7 @@ void fill(Source& src, const std::vector<FileOrbit>& orbs,
     if (auto k = v3.isospin_orbit_index(orbs[i].n, orbs[i].l, TwoJ{orbs[i].j}))
       cidx[i] = *k;
   }
-  walk_blocks(
+  WalkBlocks(
       orbs, f, tr.emax,
       [&](std::size_t i1, std::size_t i2, std::size_t i3, std::size_t i4,
           std::size_t i5, std::size_t i6, std::int32_t jmin,
@@ -205,7 +204,7 @@ void fill(Source& src, const std::vector<FileOrbit>& orbs,
             e4 + e6 <= tr.e2max && e5 + e6 <= tr.e2max &&
             e1 + e2 + e3 <= tr.e3max && e4 + e5 + e6 <= tr.e3max;
         if (!wanted) {
-          src.skip(n);
+          src.Skip(n);
           return;
         }
         for (std::int32_t J = jmin; J <= jmax; ++J) {
@@ -213,7 +212,7 @@ void fill(Source& src, const std::vector<FileOrbit>& orbs,
             for (std::int32_t T45 : {0, 1}) {
               for (std::int32_t T3 = 1;
                    T3 <= std::min(2 * T12 + 1, 2 * T45 + 1); T3 += 2) {
-                const float v = src.next();
+                const float v = src.Next();
                 if (i1 == i2 && (J + T12) % 2 == 0) continue;  // Pauli
                 if (i4 == i5 && (J + T45) % 2 == 0) continue;
                 if (std::abs(static_cast<double>(v)) > kStoreCut) {
@@ -231,11 +230,11 @@ void fill(Source& src, const std::vector<FileOrbit>& orbs,
 
 }  // namespace
 
-std::int64_t no2b_value_count(const No2bFileTruncation& file) {
-  const No2bFileTruncation f = resolved(file);
-  const auto orbs = file_orbits(f);
+std::int64_t No2bValueCount(const No2bFileTruncation& file) {
+  const No2bFileTruncation f = Resolved(file);
+  const auto orbs = FileOrbits(f);
   std::int64_t count = 0;
-  walk_blocks(
+  WalkBlocks(
       orbs, f, f.e1max,
       [&](std::size_t, std::size_t, std::size_t, std::size_t, std::size_t,
           std::size_t, std::int32_t jmin, std::int32_t jmax) {
@@ -244,12 +243,11 @@ std::int64_t no2b_value_count(const No2bFileTruncation& file) {
   return count;
 }
 
-void read_no2b(const std::filesystem::path& path,
-               const No2bReadOptions& options, op::No2bThreeBody& v3,
-               No2bReadReport* report) {
+void ReadNo2b(const std::filesystem::path& path, const No2bReadOptions& options,
+              op::No2bThreeBody& v3, No2bReadReport* report) {
   const auto t0 = std::chrono::steady_clock::now();
-  const No2bFileTruncation f = resolved(options.file);
-  const auto orbs = file_orbits(f);
+  const No2bFileTruncation f = Resolved(options.file);
+  const auto orbs = FileOrbits(f);
   No2bReadReport rep;
   const bool binary =
       path.filename().string().find("stream.bin") != std::string::npos;
@@ -259,8 +257,8 @@ void read_no2b(const std::filesystem::path& path,
     if (ec)
       throw InputError("cannot open NO2B file " + path.string() + ": " +
                        ec.message());
-    const std::int64_t count = no2b_value_count(f);
-    const bool half = options.precision == No2bPrecision::Half;
+    const std::int64_t count = No2bValueCount(f);
+    const bool half = options.precision == No2bPrecision::kHalf;
     const std::uint64_t expected =
         static_cast<std::uint64_t>(count) *
         (half ? sizeof(std::uint16_t) : sizeof(float));
@@ -276,14 +274,14 @@ void read_no2b(const std::filesystem::path& path,
     }
     if (half) {
       BinarySource<std::uint16_t> src(path, count);
-      fill(src, orbs, f, v3, rep);
+      Fill(src, orbs, f, v3, rep);
     } else {
       BinarySource<float> src(path, count);
-      fill(src, orbs, f, v3, rep);
+      Fill(src, orbs, f, v3, rep);
     }
   } else {
     TextSource src(path);
-    fill(src, orbs, f, v3, rep);
+    Fill(src, orbs, f, v3, rep);
   }
   rep.seconds =
       std::chrono::duration<double>(std::chrono::steady_clock::now() - t0)

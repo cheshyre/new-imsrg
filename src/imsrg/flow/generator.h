@@ -58,33 +58,33 @@ namespace imsrg::flow {
 /// Generator types (imsrg++ `generator_type` strings in the comments; the
 /// driver maps its `driver::Generator` enum 1:1 onto this one).
 enum class GeneratorKind : std::uint8_t {
-  White,             ///< "white"
-  Atan,              ///< "atan" (imsrg++ default core generator)
-  ImaginaryTime,     ///< "imaginary-time"
-  Wegner,            ///< "wegner" (imsrg++: "never tested")
-  QtransferAtan,     ///< "qtransfer-atan" / "qtransfer-atan_<n>"
-  ShellModel,        ///< "shell-model" (white function, shell-model blocks)
-  ShellModelAtan,    ///< "shell-model-atan" (imsrg++ default valence generator)
-  ShellModelWegner,  ///< "shell-model-wegner"
-  ShellModelImaginaryTime,  ///< "shell-model-imaginary-time"
-  ShellModelAtanNpnh,       ///< "shell-model-atan-npnh" (planned:
-                            ///< NotImplementedError)
-  HartreeFock,              ///< "hartree-fock"
-  OnePa                     ///< "1PA" (planned: NotImplementedError)
+  kWhite,           ///< "white"
+  kAtan,            ///< "atan" (imsrg++ default core generator)
+  kImaginaryTime,   ///< "imaginary-time"
+  kWegner,          ///< "wegner" (imsrg++: "never tested")
+  kQtransferAtan,   ///< "qtransfer-atan" / "qtransfer-atan_<n>"
+  kShellModel,      ///< "shell-model" (white function, shell-model blocks)
+  kShellModelAtan,  ///< "shell-model-atan" (imsrg++ default valence generator)
+  kShellModelWegner,         ///< "shell-model-wegner"
+  kShellModelImaginaryTime,  ///< "shell-model-imaginary-time"
+  kShellModelAtanNpnh,       ///< "shell-model-atan-npnh" (planned:
+                             ///< NotImplementedError)
+  kHartreeFock,              ///< "hartree-fock"
+  kOnePa                     ///< "1PA" (planned: NotImplementedError)
 };
 
 /// Energy-denominator partitioning (imsrg++ `denominator_partitioning`).
 enum class Partitioning : std::uint8_t {
-  EpsteinNesbet,  ///< "Epstein_Nesbet" (default): SPE differences plus monopole
-                  ///< terms.
-  MollerPlesset,  ///< "Moller_Plesset": SPE differences only.
-  MpIsospin  ///< "MP_isospin": SPE differences averaged over isospin partners.
+  kEpsteinNesbet,  ///< "Epstein_Nesbet" (default): SPE differences plus
+                   ///< monopole terms.
+  kMollerPlesset,  ///< "Moller_Plesset": SPE differences only.
+  kMpIsospin  ///< "MP_isospin": SPE differences averaged over isospin partners.
 };
 
-/// Options of `compute_generator`. Defaults are the imsrg++ defaults.
+/// Options of `ComputeGenerator`. Defaults are the imsrg++ defaults.
 struct GeneratorOptions {
-  GeneratorKind kind = GeneratorKind::Atan;
-  Partitioning partitioning = Partitioning::EpsteinNesbet;
+  GeneratorKind kind = GeneratorKind::kAtan;
+  Partitioning partitioning = Partitioning::kEpsteinNesbet;
   /// Floor of |Delta| (imsrg++ `denominator_cutoff`, default 1e-6).
   double denominator_cutoff = 1e-6;
   /// Constant added to denominators (imsrg++ `denominator_delta`); active only
@@ -108,12 +108,12 @@ struct GeneratorOptions {
 /// kind (shell-model = white).
 /// @throws NotImplementedError for HartreeFock (it has no function argument),
 ///         ShellModelAtanNpnh and OnePa.
-double generator_function(GeneratorKind kind, double h_od, double denominator,
-                          int qtransfer_n = 1);
+double GeneratorFunction(GeneratorKind kind, double h_od, double denominator,
+                         int qtransfer_n = 1);
 
 /// The denominator floor: returns `delta` if |delta| >= cutoff, else
 /// sign(delta) * cutoff with sign(0) = +1 (D21; imsrg++ returns +cutoff).
-double floor_denominator(double delta, double cutoff) noexcept;
+double FloorDenominator(double delta, double cutoff) noexcept;
 
 /// The (floored) energy denominators of a Hamiltonian, precomputed once per
 /// generator update: the diagonal of the one-body part and the monopole table
@@ -147,23 +147,23 @@ class Denominators {
 
 /// The spec of eta(H): scalar, anti-Hermitian, particle_rank of H (1 for
 /// HartreeFock).
-op::OperatorSpec generator_spec(const op::OperatorSpec& h, GeneratorKind kind);
+op::OperatorSpec GeneratorSpec(const op::OperatorSpec& h, GeneratorKind kind);
 
 /// Overwrites `eta` with eta(H) (imsrg++ `Generator::Update`: erase, then fill
 /// the blocks of the file comment). If `eta` is empty or its spec or model
-/// space differs from (generator_spec(H.spec(), kind), H's model space) it is
+/// space differs from (GeneratorSpec(H.spec(), kind), H's model space) it is
 /// replaced by a new operator; otherwise it is reused without allocation (the
 /// flow-loop case). Host computation on copies of H's device data; eta's device
 /// data are current on return. Preconditions: H scalar, number conserving,
 /// particle_rank 2 (InvariantError).
 /// @throws NotImplementedError for ShellModelAtanNpnh and OnePa.
 /// Complexity: O(norb^2 J) for the tables plus O(#decoupled elements).
-void compute_generator(const op::Operator& H, op::Operator& eta,
-                       const GeneratorOptions& opts);
+void ComputeGenerator(const op::Operator& H, op::Operator& eta,
+                      const GeneratorOptions& opts);
 
-/// Allocating form of `compute_generator`.
-op::Operator compute_generator(const op::Operator& H,
-                               const GeneratorOptions& opts);
+/// Allocating form of `ComputeGenerator`.
+op::Operator ComputeGenerator(const op::Operator& H,
+                              const GeneratorOptions& opts);
 
 }  // namespace imsrg::flow
 

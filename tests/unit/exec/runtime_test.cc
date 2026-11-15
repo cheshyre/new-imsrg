@@ -14,16 +14,16 @@ namespace {
 using imsrg::exec::Runtime;
 
 TEST(ExecRuntime, IsInitializedUnderTestMain) {
-  EXPECT_TRUE(Runtime::is_initialized());
+  EXPECT_TRUE(Runtime::IsInitialized());
 }
 
 TEST(ExecRuntime, ExecutionSpaceNameMatchesConfiguredBackend) {
-  EXPECT_EQ(Runtime::execution_space_name(),
+  EXPECT_EQ(Runtime::ExecutionSpaceName(),
             std::string(IMSRG_EXPECTED_KOKKOS_SPACE));
 }
 
 TEST(ExecRuntime, ConcurrencyIsPositive) {
-  EXPECT_GE(Runtime::concurrency(), 1);
+  EXPECT_GE(Runtime::Concurrency(), 1);
 }
 
 TEST(ExecRuntime, SecondRuntimeThrows) {
@@ -47,13 +47,13 @@ TEST(ExecRuntime, InvalidOptionsThrowConfigError) {
 TEST(ExecRuntime, MemoryAccessibilityMatchesBackend) {
   const std::string expected = IMSRG_EXPECTED_KOKKOS_SPACE;
   if (expected == "Serial" || expected == "OpenMP") {
-    EXPECT_TRUE(imsrg::exec::default_memory_is_host_accessible());
+    EXPECT_TRUE(imsrg::exec::DefaultMemoryIsHostAccessible());
   }
 }
 
 TEST(ExecRuntime, ProfilingRegionsDoNotThrow) {
-  imsrg::exec::push_profiling_region("exec_runtime_test");
-  imsrg::exec::pop_profiling_region();
+  imsrg::exec::PushProfilingRegion("exec_runtime_test");
+  imsrg::exec::PopProfilingRegion();
 }
 
 }  // namespace

@@ -22,15 +22,15 @@ namespace imsrg::basis {
 /// Class of an orbit in the decoupling partition. The numeric values are
 /// imsrg++'s `cvq` (0 core, 1 valence, 2 q-space), which the two-body subset
 /// rules use arithmetically.
-enum class OrbitClass : std::uint8_t { Core = 0, Valence = 1, QSpace = 2 };
+enum class OrbitClass : std::uint8_t { kCore = 0, kValence = 1, kQSpace = 2 };
 
 /// imsrg++ `cvq` value of a class (0, 1 or 2).
-constexpr std::int32_t cvq(OrbitClass c) noexcept {
+constexpr std::int32_t Cvq(OrbitClass c) noexcept {
   return static_cast<std::int32_t>(c);
 }
 
 /// Name of a class: "core", "valence" or "qspace".
-std::string_view orbit_class_name(OrbitClass c) noexcept;
+std::string_view OrbitClassName(OrbitClass c) noexcept;
 
 /// Immutable assignment of every orbit of a basis to the core, the valence
 /// space or the q-space. A single-reference calculation has no valence orbits.
@@ -39,8 +39,8 @@ class Partition {
  public:
   /// Explicit classes, one per orbit of `basis` in index order.
   /// @throws InputError if the size differs from basis.num_orbits().
-  static Partition from_classes(const SingleParticleBasis& basis,
-                                std::vector<OrbitClass> classes);
+  static Partition FromClasses(const SingleParticleBasis& basis,
+                               std::vector<OrbitClass> classes);
 
   /// The partition of `def` on `basis`, as `ModelSpace::Init` (version 0,
   /// ModelSpace.cc:358-422) assigns `cvq`: core if the orbit is in `def.core`,
@@ -49,17 +49,17 @@ class Partition {
   /// @throws InputError if a core orbit is not in the basis (imsrg++ exits in
   ///         `SetLmax`). Valence orbits outside the basis are dropped, as
   ///         imsrg++ does (e.g. under an lmax cut), with a warning in the log.
-  static Partition from_definition(const SingleParticleBasis& basis,
-                                   const ValenceSpaceDefinition& def);
+  static Partition FromDefinition(const SingleParticleBasis& basis,
+                                  const ValenceSpaceDefinition& def);
 
   /// The rule of imsrg++ `ModelSpace::SetReference(map)`
   /// (ModelSpace.cc:807-826), which the HF re-filling uses when the occupations
   /// change: the core becomes the holes of `ref` that are not valence orbits of
   /// `previous`; the valence orbits stay; every other orbit is q-space.
   /// @throws InputError if the sizes of `previous` and `ref` differ.
-  static Partition with_holes_as_core(const Partition& previous,
-                                      const Reference& ref,
-                                      const SingleParticleBasis& basis);
+  static Partition WithHolesAsCore(const Partition& previous,
+                                   const Reference& ref,
+                                   const SingleParticleBasis& basis);
 
   /// Number of orbits.
   std::int32_t num_orbits() const noexcept {

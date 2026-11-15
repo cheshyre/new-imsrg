@@ -30,7 +30,7 @@ constexpr const char* kLegacyHint =
 
 /// The command line as recorded in the provenance: arguments joined by spaces;
 /// those containing whitespace or quotes are single-quoted.
-std::string join_command_line(int argc, char** argv) {
+std::string JoinCommandLine(int argc, char** argv) {
   std::string out;
   for (int i = 0; i < argc; ++i) {
     std::string a = argv[i];
@@ -99,8 +99,8 @@ int main(int argc, char** argv) {
   }
 
   if (legacy_keys || list_operators) {
-    if (legacy_keys) std::cout << imsrg::driver::legacy_keys_text();
-    if (list_operators) std::cout << imsrg::driver::operator_catalog_text();
+    if (legacy_keys) std::cout << imsrg::driver::LegacyKeysText();
+    if (list_operators) std::cout << imsrg::driver::OperatorCatalogText();
     return 0;
   }
 
@@ -114,16 +114,16 @@ int main(int argc, char** argv) {
   if (have_config) sources.config_file = std::filesystem::path(config_file);
   sources.legacy_args = tokens;
   sources.set_overrides = set_overrides;
-  sources.command_line = join_command_line(argc, argv);
+  sources.command_line = JoinCommandLine(argc, argv);
 
-  auto loaded = imsrg::driver::load_config(sources);
+  auto loaded = imsrg::driver::LoadConfig(sources);
   if (!loaded) {
     // Exit 3 if only input files are at fault (unreadable config file, missing
     // input files).
     bool all_input = true;
     for (const auto& issue : loaded.error()) {
-      std::cerr << "imsrg: " << issue.to_string() << "\n";
-      if (issue.severity == imsrg::driver::Severity::Error &&
+      std::cerr << "imsrg: " << issue.ToString() << "\n";
+      if (issue.severity == imsrg::driver::Severity::kError &&
           issue.code != "V-14" && issue.code != "E-FILE") {
         all_input = false;
       }
@@ -132,11 +132,11 @@ int main(int argc, char** argv) {
   }
   const imsrg::driver::RunConfig& config = loaded.value();
   for (const auto& w : config.provenance.warnings) {
-    std::cerr << "imsrg: " << w.to_string() << "\n";
+    std::cerr << "imsrg: " << w.ToString() << "\n";
   }
 
   if (print_config) {
-    std::cout << imsrg::driver::to_toml(config);
+    std::cout << imsrg::driver::ToToml(config);
     return 0;
   }
   if (validate) {
@@ -149,7 +149,7 @@ int main(int argc, char** argv) {
     // pipeline, which destroys all operators before they finalize.
     imsrg::comm::Environment environment(argc, argv);
     imsrg::exec::Runtime runtime(argc, argv);
-    imsrg::driver::run(config);
+    imsrg::driver::Run(config);
   } catch (const imsrg::ConfigError& e) {
     std::cerr << "imsrg: " << e.what() << "\n";
     return 2;

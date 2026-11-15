@@ -19,7 +19,7 @@
 
 namespace imsrg::commutator_test {
 
-/// Tolerance of design/30 section 2 on `testing::relative_deviation`.
+/// Tolerance of design/30 section 2 on `testing::RelativeDeviation`.
 inline constexpr double kTol = 1e-10;
 
 /// One golden pair: directory below tests/golden/commutator and the names of
@@ -32,14 +32,14 @@ struct GoldenPair {
 
 /// All golden pairs of the three golden directories (emax2_O16, emax1_He4,
 /// emax1_He6).
-const std::vector<GoldenPair>& golden_pairs();
+const std::vector<GoldenPair>& GoldenPairs();
 
 /// Relative path ("commutator/<dir>/<name>.dump") of a dump of `p.dir`.
-std::string dump_path(const GoldenPair& p, const std::string& name);
+std::string DumpPath(const GoldenPair& p, const std::string& name);
 
 /// Relative path of the golden result of `term` (an imsrg++ term name or "all")
 /// for `p`.
-std::string result_path(const GoldenPair& p, const std::string& term);
+std::string ResultPath(const GoldenPair& p, const std::string& term);
 
 /// A model space of the random-operator tests.
 struct SpaceCase {
@@ -50,10 +50,10 @@ struct SpaceCase {
 };
 
 /// The five model spaces of the fast-vs-reference tests.
-const std::vector<SpaceCase>& space_cases();
+const std::vector<SpaceCase>& SpaceCases();
 
 /// Builds the model space of `c` (integer or fractional occupations).
-std::shared_ptr<const basis::ModelSpace> make_space(const SpaceCase& c);
+std::shared_ptr<const basis::ModelSpace> MakeSpace(const SpaceCase& c);
 
 /// A pair of hermiticities and the particle ranks of X and Y of a
 /// random-operator case.
@@ -66,7 +66,7 @@ struct HermPair {
 };
 
 /// (A,H), (H,A), (H,H), (A,A) and a rank-1 X with a rank-2 Y.
-const std::vector<HermPair>& herm_pairs();
+const std::vector<HermPair>& HermPairs();
 
 }  // namespace imsrg::commutator_test
 

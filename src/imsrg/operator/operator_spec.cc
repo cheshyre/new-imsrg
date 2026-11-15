@@ -9,33 +9,33 @@
 
 namespace imsrg::op {
 
-char hermiticity_code(Hermiticity h) noexcept {
+char HermiticityCode(Hermiticity h) noexcept {
   switch (h) {
-    case Hermiticity::Hermitian:
+    case Hermiticity::kHermitian:
       return 'H';
-    case Hermiticity::AntiHermitian:
+    case Hermiticity::kAntiHermitian:
       return 'A';
-    case Hermiticity::NonHermitian:
+    case Hermiticity::kNonHermitian:
       return 'N';
   }
   return 'N';
 }
 
-Hermiticity hermiticity_from_code(char c) {
+Hermiticity HermiticityFromCode(char c) {
   switch (c) {
     case 'H':
-      return Hermiticity::Hermitian;
+      return Hermiticity::kHermitian;
     case 'A':
-      return Hermiticity::AntiHermitian;
+      return Hermiticity::kAntiHermitian;
     case 'N':
-      return Hermiticity::NonHermitian;
+      return Hermiticity::kNonHermitian;
     default:
       throw InputError(std::string("invalid hermiticity code '") + c +
                        "' (expected H, A or N)");
   }
 }
 
-void validate(const OperatorSpec& s) {
+void Validate(const OperatorSpec& s) {
   if (s.particle_rank < 1 || s.particle_rank > 3) {
     throw InputError("operator particle_rank must be 1, 2 or 3, got " +
                      std::to_string(s.particle_rank));
@@ -55,7 +55,7 @@ void validate(const OperatorSpec& s) {
   if (s.rank_J != 0)
     throw NotImplementedError(
         "tensor operators (rank_J > 0) are not implemented");
-  if (s.parity != Parity::Even) {
+  if (s.parity != Parity::kEven) {
     throw NotImplementedError("parity-changing operators are not implemented");
   }
   if (s.delta_Tz != 0)

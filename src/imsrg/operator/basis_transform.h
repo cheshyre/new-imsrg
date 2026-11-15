@@ -27,12 +27,11 @@ namespace imsrg::op {
 ///   (-1)^(j_p + j_q - J + 1), times sqrt(2) if p == q and divided by sqrt(2)
 ///   if p' == q' (normalized kets).
 /// The result is on the same model space with the same spec (use
-/// `with_model_space` to attach other occupations, e.g. after a HF re-filling).
+/// `WithModelSpace` to attach other occupations, e.g. after a HF re-filling).
 /// @throws InvariantError if C is not norb x norb.
 /// Complexity: O(norb^3) for the one-body part plus O(sum_ch n_ch^3) (two gemms
 /// per channel).
-Operator transform_basis(const Operator& op,
-                         linalg::MatrixView<const double> C);
+Operator TransformBasis(const Operator& op, linalg::MatrixView<const double> C);
 
 /// The same matrix elements on another model space with the same
 /// single-particle basis (only the reference occupations and/or the partition
@@ -40,8 +39,8 @@ Operator transform_basis(const Operator& op,
 /// to the HF basis. The data are copied unchanged.
 /// @throws InvariantError if `op` is empty, `ms` is null, or the orbits of the
 ///         two bases differ.
-Operator with_model_space(const Operator& op,
-                          std::shared_ptr<const basis::ModelSpace> ms);
+Operator WithModelSpace(const Operator& op,
+                        std::shared_ptr<const basis::ModelSpace> ms);
 
 }  // namespace imsrg::op
 

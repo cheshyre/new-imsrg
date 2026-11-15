@@ -29,8 +29,8 @@ namespace imsrg::op {
 ///   unnormalized formulas (`TwoBodyME.hh:36-50`);
 /// * the "unnormalized" value of imsrg++'s `GetTBME*` is sqrt((1 + delta_pq)(1
 ///   + delta_rs)) times the normalized one (`get_unnormalized`);
-/// * kets with p > q follow from |qp; J> = exchange_phase(j_p, j_q, J) |pq; J>
-///   (`basis::exchange_phase`); |pp; J> with odd J does not exist (Pauli).
+/// * kets with p > q follow from |qp; J> = ExchangePhase(j_p, j_q, J) |pq; J>
+///   (`basis::ExchangePhase`); |pp; J> with odd J does not exist (Pauli).
 ///
 /// Layout: for a scalar operator one dense column-major block per channel, ALL
 /// channels in channel order (empty channels as 0 x 0 blocks), so block k is
@@ -52,7 +52,7 @@ class TwoBody {
   TwoBody() = default;
   /// Zero part for `spec` on `ms`: one block per channel if spec.particle_rank
   /// >= 2, no blocks otherwise. Preconditions: `ms` non-null and
-  /// `validate(spec)` passed (IMSRG_CHECK).
+  /// `Validate(spec)` passed (IMSRG_CHECK).
   TwoBody(std::shared_ptr<const basis::ModelSpace> ms,
           const OperatorSpec& spec);
 
@@ -61,7 +61,7 @@ class TwoBody {
   /// The two-body channels (kets, channel labels, local indices). Precondition:
   /// built from a model space (IMSRG_CHECK).
   const basis::TwoBodyChannels& channels() const;
-  /// The hermiticity used by `set_normalized` and `add_normalized`.
+  /// The hermiticity used by `set_normalized` and `AddNormalized`.
   Hermiticity hermiticity() const noexcept { return hermiticity_; }
   /// Changes the hermiticity flag; the data are not touched.
   void set_hermiticity(Hermiticity h) noexcept { hermiticity_ = h; }
@@ -108,8 +108,8 @@ class TwoBody {
   /// mirror. O(1).
   /// @throws InvariantError if a ket does not exist or bra and ket are not
   ///         connected.
-  void add_normalized(OrbitIndex a, OrbitIndex b, OrbitIndex c, OrbitIndex d,
-                      TwoJ J, double v);
+  void AddNormalized(OrbitIndex a, OrbitIndex b, OrbitIndex c, OrbitIndex d,
+                     TwoJ J, double v);
   /// Sets every element to zero (device kernel).
   void set_zero();
 
@@ -130,13 +130,13 @@ class TwoBody {
     return matrix_;
   }
   /// Copies the device data to the host mirror (see the memory model).
-  void sync_to_host() { matrix_.buffer().sync_to_host(); }
+  void SyncToHost() { matrix_.buffer().SyncToHost(); }
   /// Copies the host mirror to the device data (see the memory model).
-  void sync_to_device() { matrix_.buffer().sync_to_device(); }
+  void SyncToDevice() { matrix_.buffer().SyncToDevice(); }
 
  private:
   std::shared_ptr<const basis::ModelSpace> ms_;
-  Hermiticity hermiticity_ = Hermiticity::Hermitian;
+  Hermiticity hermiticity_ = Hermiticity::kHermitian;
   linalg::BlockSparseMatrix<double> matrix_;
 };
 

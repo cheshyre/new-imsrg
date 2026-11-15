@@ -39,9 +39,9 @@ namespace imsrg::linalg::detail {
 /// C = alpha op(A) op(B) + beta C, column-major; `trans_*` true means
 /// transposed. Dimensions are already validated by the caller (m, n, k, ld* >=
 /// 1 and < 2^31).
-inline void gemm_raw(bool trans_a, bool trans_b, int m, int n, int k,
-                     double alpha, const double* a, int lda, const double* b,
-                     int ldb, double beta, double* c, int ldc) {
+inline void GemmRaw(bool trans_a, bool trans_b, int m, int n, int k,
+                    double alpha, const double* a, int lda, const double* b,
+                    int ldb, double beta, double* c, int ldc) {
 #if defined(IMSRG_BLAS_ACCELERATE) && IMSRG_BLAS_ACCELERATE
   cblas_dgemm(CblasColMajor, trans_a ? CblasTrans : CblasNoTrans,
               trans_b ? CblasTrans : CblasNoTrans, m, n, k, alpha, a, lda, b,
@@ -53,10 +53,10 @@ inline void gemm_raw(bool trans_a, bool trans_b, int m, int n, int k,
 #endif
 }
 
-/// Single-precision counterpart of `gemm_raw`.
-inline void gemm_raw(bool trans_a, bool trans_b, int m, int n, int k,
-                     float alpha, const float* a, int lda, const float* b,
-                     int ldb, float beta, float* c, int ldc) {
+/// Single-precision counterpart of `GemmRaw`.
+inline void GemmRaw(bool trans_a, bool trans_b, int m, int n, int k,
+                    float alpha, const float* a, int lda, const float* b,
+                    int ldb, float beta, float* c, int ldc) {
 #if defined(IMSRG_BLAS_ACCELERATE) && IMSRG_BLAS_ACCELERATE
   cblas_sgemm(CblasColMajor, trans_a ? CblasTrans : CblasNoTrans,
               trans_b ? CblasTrans : CblasNoTrans, m, n, k, alpha, a, lda, b,
@@ -71,7 +71,7 @@ inline void gemm_raw(bool trans_a, bool trans_b, int m, int n, int k,
 /// dsyevd with JOBZ='V', UPLO='L': on entry `a` (n x n, leading dimension lda)
 /// holds the lower triangle; on exit the orthonormal eigenvectors. `w` has n
 /// entries. Returns LAPACK's INFO. Performs the workspace query internally.
-inline int syevd_lower(int n, double* a, int lda, double* w) {
+inline int SyevdLower(int n, double* a, int lda, double* w) {
   int info = 0;
   int lwork = -1;
   int liwork = -1;
@@ -105,7 +105,7 @@ inline int syevd_lower(int n, double* a, int lda, double* w) {
 
 /// dgesv: solves A X = B in place (A overwritten by its LU factors, B by X). A
 /// is n x n, B is n x nrhs. Returns LAPACK's INFO (> 0: singular).
-inline int gesv(int n, int nrhs, double* a, int lda, double* b, int ldb) {
+inline int Gesv(int n, int nrhs, double* a, int lda, double* b, int ldb) {
   std::vector<int> ipiv(static_cast<std::size_t>(std::max(n, 1)));
   int info = 0;
   dgesv_(&n, &nrhs, a, &lda, ipiv.data(), b, &ldb, &info);

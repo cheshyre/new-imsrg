@@ -13,89 +13,89 @@ namespace {
 using namespace imsrg;
 using namespace imsrg::op;
 
-OrbitIndex oi(int i) { return OrbitIndex{i}; }
+OrbitIndex Oi(int i) { return OrbitIndex{i}; }
 
 TEST(OneBody, DefaultIsEmptyAndSizedIsZero) {
   const OneBody e;
   EXPECT_EQ(e.num_orbits(), 0);
-  const OneBody b(5, Hermiticity::Hermitian);
+  const OneBody b(5, Hermiticity::kHermitian);
   EXPECT_EQ(b.num_orbits(), 5);
   for (int a = 0; a < 5; ++a) {
-    for (int c = 0; c < 5; ++c) EXPECT_EQ(b.get(oi(a), oi(c)), 0.0);
+    for (int c = 0; c < 5; ++c) EXPECT_EQ(b.get(Oi(a), Oi(c)), 0.0);
   }
 }
 
 TEST(OneBody, HermitianSetWritesPartner) {
-  OneBody b(4, Hermiticity::Hermitian);
-  b.set(oi(1), oi(3), 2.5);
-  EXPECT_EQ(b.get(oi(1), oi(3)), 2.5);
-  EXPECT_EQ(b.get(oi(3), oi(1)), 2.5);
+  OneBody b(4, Hermiticity::kHermitian);
+  b.set(Oi(1), Oi(3), 2.5);
+  EXPECT_EQ(b.get(Oi(1), Oi(3)), 2.5);
+  EXPECT_EQ(b.get(Oi(3), Oi(1)), 2.5);
 }
 
 TEST(OneBody, AntiHermitianSetNegatesPartner) {
-  OneBody b(4, Hermiticity::AntiHermitian);
-  b.set(oi(1), oi(3), 2.5);
-  EXPECT_EQ(b.get(oi(3), oi(1)), -2.5);
+  OneBody b(4, Hermiticity::kAntiHermitian);
+  b.set(Oi(1), Oi(3), 2.5);
+  EXPECT_EQ(b.get(Oi(3), Oi(1)), -2.5);
 }
 
 TEST(OneBody, NonHermitianSetHasNoPartner) {
-  OneBody b(4, Hermiticity::NonHermitian);
-  b.set(oi(1), oi(3), 2.5);
-  EXPECT_EQ(b.get(oi(1), oi(3)), 2.5);
-  EXPECT_EQ(b.get(oi(3), oi(1)), 0.0);
+  OneBody b(4, Hermiticity::kNonHermitian);
+  b.set(Oi(1), Oi(3), 2.5);
+  EXPECT_EQ(b.get(Oi(1), Oi(3)), 2.5);
+  EXPECT_EQ(b.get(Oi(3), Oi(1)), 0.0);
 }
 
 TEST(OneBody, DiagonalIsWrittenOnce) {
-  OneBody b(3, Hermiticity::Hermitian);
-  b.add(oi(2), oi(2), 1.5);
-  b.add(oi(2), oi(2), 1.5);
-  EXPECT_EQ(b.get(oi(2), oi(2)), 3.0);
-  b.set(oi(0), oi(0), 4.0);
-  EXPECT_EQ(b.get(oi(0), oi(0)), 4.0);
+  OneBody b(3, Hermiticity::kHermitian);
+  b.Add(Oi(2), Oi(2), 1.5);
+  b.Add(Oi(2), Oi(2), 1.5);
+  EXPECT_EQ(b.get(Oi(2), Oi(2)), 3.0);
+  b.set(Oi(0), Oi(0), 4.0);
+  EXPECT_EQ(b.get(Oi(0), Oi(0)), 4.0);
 }
 
 TEST(OneBody, AddAccumulatesWithPartner) {
-  OneBody b(3, Hermiticity::AntiHermitian);
-  b.add(oi(0), oi(2), 1.0);
-  b.add(oi(0), oi(2), 2.0);
-  EXPECT_EQ(b.get(oi(0), oi(2)), 3.0);
-  EXPECT_EQ(b.get(oi(2), oi(0)), -3.0);
-  b.add(oi(2), oi(0),
+  OneBody b(3, Hermiticity::kAntiHermitian);
+  b.Add(Oi(0), Oi(2), 1.0);
+  b.Add(Oi(0), Oi(2), 2.0);
+  EXPECT_EQ(b.get(Oi(0), Oi(2)), 3.0);
+  EXPECT_EQ(b.get(Oi(2), Oi(0)), -3.0);
+  b.Add(Oi(2), Oi(0),
         1.0);  // the partner entry gets +1, the (0,2) entry gets -1
-  EXPECT_EQ(b.get(oi(0), oi(2)), 2.0);
-  EXPECT_EQ(b.get(oi(2), oi(0)), -2.0);
+  EXPECT_EQ(b.get(Oi(0), Oi(2)), 2.0);
+  EXPECT_EQ(b.get(Oi(2), Oi(0)), -2.0);
 }
 
 TEST(OneBody, SetElementHasNoPartner) {
-  OneBody b(3, Hermiticity::Hermitian);
-  b.set_element(oi(0), oi(1), 7.0);
-  EXPECT_EQ(b.get(oi(0), oi(1)), 7.0);
-  EXPECT_EQ(b.get(oi(1), oi(0)), 0.0);
+  OneBody b(3, Hermiticity::kHermitian);
+  b.set_element(Oi(0), Oi(1), 7.0);
+  EXPECT_EQ(b.get(Oi(0), Oi(1)), 7.0);
+  EXPECT_EQ(b.get(Oi(1), Oi(0)), 0.0);
 }
 
 TEST(OneBody, SetHermiticityChangesLaterWritesOnly) {
-  OneBody b(3, Hermiticity::Hermitian);
-  b.set(oi(0), oi(1), 1.0);
-  b.set_hermiticity(Hermiticity::AntiHermitian);
-  EXPECT_EQ(b.hermiticity(), Hermiticity::AntiHermitian);
-  EXPECT_EQ(b.get(oi(1), oi(0)), 1.0);
-  b.set(oi(0), oi(2), 1.0);
-  EXPECT_EQ(b.get(oi(2), oi(0)), -1.0);
+  OneBody b(3, Hermiticity::kHermitian);
+  b.set(Oi(0), Oi(1), 1.0);
+  b.set_hermiticity(Hermiticity::kAntiHermitian);
+  EXPECT_EQ(b.hermiticity(), Hermiticity::kAntiHermitian);
+  EXPECT_EQ(b.get(Oi(1), Oi(0)), 1.0);
+  b.set(Oi(0), Oi(2), 1.0);
+  EXPECT_EQ(b.get(Oi(2), Oi(0)), -1.0);
 }
 
 TEST(OneBody, SetZero) {
-  OneBody b(3, Hermiticity::Hermitian);
-  b.set(oi(0), oi(1), 1.0);
-  b.set(oi(2), oi(2), 3.0);
+  OneBody b(3, Hermiticity::kHermitian);
+  b.set(Oi(0), Oi(1), 1.0);
+  b.set(Oi(2), Oi(2), 3.0);
   b.set_zero();
   for (int a = 0; a < 3; ++a) {
-    for (int c = 0; c < 3; ++c) EXPECT_EQ(b.get(oi(a), oi(c)), 0.0);
+    for (int c = 0; c < 3; ++c) EXPECT_EQ(b.get(Oi(a), Oi(c)), 0.0);
   }
 }
 
 TEST(OneBody, ViewsAreColumnMajor) {
-  OneBody b(4, Hermiticity::NonHermitian);
-  b.set(oi(1), oi(3), 9.0);
+  OneBody b(4, Hermiticity::kNonHermitian);
+  b.set(Oi(1), Oi(3), 9.0);
   const auto v = b.host_view();
   EXPECT_EQ(v.rows, 4);
   EXPECT_EQ(v.cols, 4);
@@ -110,21 +110,21 @@ TEST(OneBody, ViewsAreColumnMajor) {
   EXPECT_EQ(cb.device_view().cols, 4);
   EXPECT_NE(b.device_view().data, nullptr);
   b.host_view()(0, 0) = 5.0;
-  EXPECT_EQ(b.get(oi(0), oi(0)), 5.0);
+  EXPECT_EQ(b.get(Oi(0), Oi(0)), 5.0);
   EXPECT_EQ(b.buffer().host_span().size(), 16u);
 }
 
 TEST(OneBody, CopyIsDeepMoveIsCheap) {
-  OneBody a(3, Hermiticity::Hermitian);
-  a.set(oi(0), oi(1), 1.0);
+  OneBody a(3, Hermiticity::kHermitian);
+  a.set(Oi(0), Oi(1), 1.0);
   OneBody c = a;
-  c.set(oi(0), oi(1), 2.0);
-  EXPECT_EQ(a.get(oi(0), oi(1)), 1.0);
-  EXPECT_EQ(c.get(oi(1), oi(0)), 2.0);
+  c.set(Oi(0), Oi(1), 2.0);
+  EXPECT_EQ(a.get(Oi(0), Oi(1)), 1.0);
+  EXPECT_EQ(c.get(Oi(1), Oi(0)), 2.0);
   const double* p = a.host_view().data;
   OneBody m = std::move(a);
   EXPECT_EQ(m.host_view().data, p);
-  EXPECT_EQ(m.get(oi(1), oi(0)), 1.0);
+  EXPECT_EQ(m.get(Oi(1), Oi(0)), 1.0);
 }
 
 }  // namespace

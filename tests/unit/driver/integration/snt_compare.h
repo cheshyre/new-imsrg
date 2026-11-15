@@ -5,7 +5,7 @@
 #define TESTS_UNIT_DRIVER_INTEGRATION_SNT_COMPARE_H_
 /// @file
 /// Reader and comparison of tokyo-format `.snt` files (the format of imsrg++
-/// `int.snt` and of `io::write_tokyo`): zero body from the "! Zero body term:"
+/// `int.snt` and of `io::WriteTokyo`): zero body from the "! Zero body term:"
 /// comment, the orbit table, one-body elements `a b value` and two-body
 /// elements `a b c d J value`.
 
@@ -48,7 +48,7 @@ struct SntData {
 /// with each pair ordered a <= b (phase -(-1)^{ja + jb - J} on a swap) and bra
 /// <= ket (the matrices are real symmetric). @throws std::runtime_error on a
 /// malformed or missing file.
-inline SntData read_snt(const std::filesystem::path& path) {
+inline SntData ReadSnt(const std::filesystem::path& path) {
   std::ifstream in(path);
   if (!in) throw std::runtime_error("cannot open " + path.string());
   SntData d;
@@ -118,7 +118,7 @@ inline SntData read_snt(const std::filesystem::path& path) {
   return d;
 }
 
-/// Result of `compare_snt`.
+/// Result of `CompareSnt`.
 struct SntComparison {
   double zero_dev = 0.0;    ///< |zero body difference|
   double max_dev_1b = 0.0;  ///< largest one-body deviation
@@ -138,8 +138,8 @@ struct SntComparison {
 /// Compares `a` (computed) with `b` (golden). An element absent from one side
 /// counts as 0 there and is tallied in `missing` if its magnitude on the other
 /// side exceeds `threshold`.
-inline SntComparison compare_snt(const SntData& a, const SntData& b,
-                                 double threshold) {
+inline SntComparison CompareSnt(const SntData& a, const SntData& b,
+                                double threshold) {
   SntComparison c;
   c.zero_dev = std::abs(a.zero_body - b.zero_body);
   c.n1b_a = a.one_body.size();

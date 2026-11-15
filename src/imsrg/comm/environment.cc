@@ -13,7 +13,7 @@ namespace imsrg::comm {
 
 #if IMSRG_COMM_WITH_MPI
 
-void Environment::init(int* argc, char*** argv) {
+void Environment::Init(int* argc, char*** argv) {
   int initialized = 0;
   MPI_Initialized(&initialized);
   if (initialized != 0) {
@@ -39,9 +39,9 @@ Environment::~Environment() {
   if (finalized == 0) MPI_Finalize();
 }
 
-bool Environment::mpi_enabled() noexcept { return true; }
+bool Environment::MpiEnabled() noexcept { return true; }
 
-bool Environment::is_initialized() noexcept {
+bool Environment::IsInitialized() noexcept {
   int initialized = 0;
   int finalized = 0;
   MPI_Initialized(&initialized);
@@ -51,17 +51,17 @@ bool Environment::is_initialized() noexcept {
 
 #else
 
-void Environment::init(int*, char***) {}
+void Environment::Init(int*, char***) {}
 Environment::~Environment() = default;
-bool Environment::mpi_enabled() noexcept { return false; }
-bool Environment::is_initialized() noexcept { return false; }
+bool Environment::MpiEnabled() noexcept { return false; }
+bool Environment::IsInitialized() noexcept { return false; }
 
 #endif
 
-Environment::Environment() { init(nullptr, nullptr); }
+Environment::Environment() { Init(nullptr, nullptr); }
 
-Environment::Environment(int& argc, char**& argv) { init(&argc, &argv); }
+Environment::Environment(int& argc, char**& argv) { Init(&argc, &argv); }
 
-Communicator Environment::world() const { return Communicator::world_(); }
+Communicator Environment::world() const { return Communicator::World(); }
 
 }  // namespace imsrg::comm

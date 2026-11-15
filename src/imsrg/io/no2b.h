@@ -15,8 +15,8 @@ namespace imsrg::io {
 
 /// Value type of a binary NO2B file.
 enum class No2bPrecision {
-  Single,  ///< IEEE binary32 (`float`), 4 bytes per value.
-  Half,    ///< IEEE binary16, 2 bytes per value (converted exactly to float).
+  kSingle,  ///< IEEE binary32 (`float`), 4 bytes per value.
+  kHalf,    ///< IEEE binary16, 2 bytes per value (converted exactly to float).
 };
 
 /// Truncation of a NO2B file (imsrg++ `file3e1max`, `file3e2max`, `file3e3max`,
@@ -32,14 +32,14 @@ struct No2bFileTruncation {
       -1;  ///< Largest single-particle l in the file; -1 selects `e1max`.
 };
 
-/// Options for `read_no2b`.
+/// Options for `ReadNo2b`.
 struct No2bReadOptions {
   No2bFileTruncation file;  ///< Truncation of the file being read.
   No2bPrecision precision =
-      No2bPrecision::Single;  ///< Value type; used for binary files only.
+      No2bPrecision::kSingle;  ///< Value type; used for binary files only.
 };
 
-/// What `read_no2b` did.
+/// What `ReadNo2b` did.
 struct No2bReadReport {
   std::int64_t values_read =
       0;  ///< Values consumed from the file (stored or skipped).
@@ -56,7 +56,7 @@ struct No2bReadReport {
 /// `CountME`, without the model-space cut on the first orbit. Reference value:
 /// `{6, 12, 18}` gives 32685840. Complexity O(number of orbit sextuples).
 /// @throws InputError if a truncation is negative.
-std::int64_t no2b_value_count(const No2bFileTruncation& file);
+std::int64_t No2bValueCount(const No2bFileTruncation& file);
 
 /// Reads a NO2B file into `v3`, filling exactly the elements imsrg++
 /// `ThreeBodyStorage_no2b:: ReadFile` would store, with the container's own
@@ -78,14 +78,13 @@ std::int64_t no2b_value_count(const No2bFileTruncation& file);
 /// without conversion (binary) or parsed for validation only (text). Binary
 /// files are read in 8 MiB chunks. Complexity O(values read).
 /// @throws InputError if the file cannot be opened; for a binary file, if its
-///         size differs from `no2b_value_count(file) * sizeof(value)` (the
+///         size differs from `No2bValueCount(file) * sizeof(value)` (the
 ///         message states both and hints at file3e1max, file3e2max,
 ///         file3e3max); for a text file, if the data end before the required
 ///         values or a token is not a number; or if a file truncation is
 ///         invalid.
-void read_no2b(const std::filesystem::path& path,
-               const No2bReadOptions& options, op::No2bThreeBody& v3,
-               No2bReadReport* report = nullptr);
+void ReadNo2b(const std::filesystem::path& path, const No2bReadOptions& options,
+              op::No2bThreeBody& v3, No2bReadReport* report = nullptr);
 
 }  // namespace imsrg::io
 

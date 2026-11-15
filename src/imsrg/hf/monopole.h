@@ -27,7 +27,7 @@ namespace imsrg::hf::detail {
 /// The one-body channels (l, 2j, tz) of a basis: each entry lists the orbit
 /// indices of one channel in ascending order; every orbit is in exactly one
 /// channel. Channels are ordered by their first orbit.
-std::vector<std::vector<std::int32_t>> one_body_channels(
+std::vector<std::vector<std::int32_t>> OneBodyChannels(
     const basis::SingleParticleBasis& basis);
 
 /// Two-body monopole: for every (Tz, parity) block of pairs p <= q the dense
@@ -37,7 +37,7 @@ std::vector<std::vector<std::int32_t>> one_body_channels(
 class Monopole2B {
  public:
   /// Builds the monopole blocks from the two-body part of `H`.
-  /// Precondition: the host mirror of `H` is current (`H.sync_to_host()`).
+  /// Precondition: the host mirror of `H` is current (`H.SyncToHost()`).
   /// Complexity O(K^2 J) with K the number of pairs (memory O(K^2)).
   explicit Monopole2B(const op::Operator& H);
 
@@ -47,7 +47,7 @@ class Monopole2B {
   /// triangle (j >= i); entries outside the channels are zero. Units: MeV.
   /// Complexity O(N c^2 N') with N orbits and c the channel size. `Vij` is
   /// resized to N x N and overwritten.
-  void apply(const linalg::Matrix<double>& rho,
+  void Apply(const linalg::Matrix<double>& rho,
              linalg::Matrix<double>& Vij) const;
 
  private:
@@ -79,7 +79,7 @@ class Monopole3B {
   /// symmetrized from the upper triangle.
   /// `V3ij` is resized to N x N and overwritten. Units: MeV. Complexity
   /// O(#keys).
-  void apply(const linalg::Matrix<double>& rho,
+  void Apply(const linalg::Matrix<double>& rho,
              linalg::Matrix<double>& V3ij) const;
 
   /// Number of stored keys.

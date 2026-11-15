@@ -13,8 +13,8 @@
 
 namespace imsrg::op {
 
-Operator normal_order(const Operator& op, std::span<const double> occupations,
-                      NormalOrderDirection direction) {
+Operator NormalOrder(const Operator& op, std::span<const double> occupations,
+                     NormalOrderDirection direction) {
   IMSRG_CHECK(!op.empty(), "normal_order: empty operator");
   const basis::ModelSpace& ms = op.model_space();
   const basis::SingleParticleBasis& sp = ms.basis();
@@ -26,11 +26,11 @@ Operator normal_order(const Operator& op, std::span<const double> occupations,
         "normal_order: only scalar operators are supported");
   }
 
-  const double s = direction == NormalOrderDirection::ToReference ? 1.0 : -1.0;
+  const double s = direction == NormalOrderDirection::kToReference ? 1.0 : -1.0;
   Operator result = op;
   // Host loops below: read the host mirrors of the copy, write the one-body
   // part, sync back.
-  result.sync_to_host();
+  result.SyncToHost();
 
   std::vector<std::int32_t>
       occupied;  // ascending, n >= kOccupationCut (imsrg++ "holes")
@@ -52,7 +52,7 @@ Operator normal_order(const Operator& op, std::span<const double> occupations,
   for (const std::int32_t k : occupied) {
     const OrbitIndex ik{k};
     const basis::Orbit& ok = sp.orbit(ik);
-    e0 += s * degeneracy(ok.j2) * occ(k) * f0.get(ik, ik);
+    e0 += s * Degeneracy(ok.j2) * occ(k) * f0.get(ik, ik);
     if (!has_two_body) {
       continue;
     }
@@ -80,11 +80,11 @@ Operator normal_order(const Operator& op, std::span<const double> occupations,
   };
   std::vector<Entry> updates;
   if (has_two_body) {
-    const std::int32_t h_sign = hermiticity_sign(op.hermiticity());
+    const std::int32_t h_sign = HermiticitySign(op.hermiticity());
     for (std::int32_t a = 0; a < norb; ++a) {
       const OrbitIndex ia{a};
       const basis::Orbit& oa = sp.orbit(ia);
-      for (const OrbitIndex ib : sp.same_ljtz(ia)) {
+      for (const OrbitIndex ib : sp.SameLjtz(ia)) {
         const std::int32_t b = ib.value();
         if (h_sign != 0 && b < a) {
           continue;  // (anti-)Hermitian: compute b >= a, mirror below
@@ -100,7 +100,7 @@ Operator normal_order(const Operator& op, std::span<const double> occupations,
             inner +=
                 (2 * J + 1) * v.get_unnormalized(ia, ih, ib, ih, TwoJ{2 * J});
           }
-          sum += s * occ(h) * inner / static_cast<double>(degeneracy(oa.j2));
+          sum += s * occ(h) * inner / static_cast<double>(Degeneracy(oa.j2));
         }
         const double fab = f0.get(ia, ib) + sum;
         updates.push_back({a, b, fab});
@@ -118,20 +118,20 @@ Operator normal_order(const Operator& op, std::span<const double> occupations,
     result.one_body().set_element(OrbitIndex{e.a}, OrbitIndex{e.b}, e.value);
   }
   result.zero_body() = e0;
-  result.sync_to_device();
+  result.SyncToDevice();
   return result;
 }
 
-Operator normal_order(const Operator& op) {
+Operator NormalOrder(const Operator& op) {
   IMSRG_CHECK(!op.empty(), "normal_order: empty operator");
-  return normal_order(op, op.model_space().reference().occupations(),
-                      NormalOrderDirection::ToReference);
+  return NormalOrder(op, op.model_space().reference().occupations(),
+                     NormalOrderDirection::kToReference);
 }
 
-Operator undo_normal_order(const Operator& op) {
+Operator UndoNormalOrder(const Operator& op) {
   IMSRG_CHECK(!op.empty(), "undo_normal_order: empty operator");
-  return normal_order(op, op.model_space().reference().occupations(),
-                      NormalOrderDirection::ToVacuum);
+  return NormalOrder(op, op.model_space().reference().occupations(),
+                     NormalOrderDirection::kToVacuum);
 }
 
 }  // namespace imsrg::op

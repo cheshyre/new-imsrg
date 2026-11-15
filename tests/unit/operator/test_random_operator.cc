@@ -19,41 +19,41 @@ namespace {
 using namespace imsrg;
 using namespace imsrg::op;
 
-std::shared_ptr<const basis::ModelSpace> make_ms() {
-  return basis::ModelSpace::from_names(basis::BasisTruncation{.emax = 2}, 16.0,
-                                       "O16", "O16");
+std::shared_ptr<const basis::ModelSpace> MakeMs() {
+  return basis::ModelSpace::FromNames(basis::BasisTruncation{.emax = 2}, 16.0,
+                                      "O16", "O16");
 }
 
 }  // namespace
 
 TEST(OperatorRandom, SameSeedSameOperatorDifferentSeedDiffers) {
-  const auto ms = make_ms();
+  const auto ms = MakeMs();
   const RandomOperatorOptions o{.seed = 42, .zero_body_scale = 3.0};
-  const Operator a = random_operator(ms, OperatorSpec::scalar(2), o);
-  const Operator b = random_operator(ms, OperatorSpec::scalar(2), o);
-  EXPECT_EQ(max_abs_difference(a, b).max(), 0.0);
-  const Operator c = random_operator(ms, OperatorSpec::scalar(2),
-                                     {.seed = 43, .zero_body_scale = 3.0});
-  EXPECT_GT(max_abs_difference(a, c).one_body, 0.0);
-  EXPECT_GT(max_abs_difference(a, c).two_body, 0.0);
+  const Operator a = RandomOperator(ms, OperatorSpec::Scalar(2), o);
+  const Operator b = RandomOperator(ms, OperatorSpec::Scalar(2), o);
+  EXPECT_EQ(MaxAbsDifference(a, b).max(), 0.0);
+  const Operator c = RandomOperator(ms, OperatorSpec::Scalar(2),
+                                    {.seed = 43, .zero_body_scale = 3.0});
+  EXPECT_GT(MaxAbsDifference(a, c).one_body, 0.0);
+  EXPECT_GT(MaxAbsDifference(a, c).two_body, 0.0);
 }
 
 TEST(OperatorRandom, ZeroBodyFollowsSplitmix64) {
   // splitmix64 with seed 0 starts with 0xE220A8397B1DCDAF.
-  const auto ms = make_ms();
-  const Operator a = random_operator(ms, OperatorSpec::scalar(2),
-                                     {.seed = 0, .zero_body_scale = 2.0});
+  const auto ms = MakeMs();
+  const Operator a = RandomOperator(ms, OperatorSpec::Scalar(2),
+                                    {.seed = 0, .zero_body_scale = 2.0});
   const double u = static_cast<double>(0xE220A8397B1DCDAFULL >> 11) * 0x1.0p-53;
   EXPECT_DOUBLE_EQ(a.zero_body(), 2.0 * (2.0 * u - 1.0));
-  const Operator z = random_operator(ms, OperatorSpec::scalar(2));
+  const Operator z = RandomOperator(ms, OperatorSpec::Scalar(2));
   EXPECT_EQ(z.zero_body(), 0.0);
 }
 
 TEST(OperatorRandom, HermitianSymmetriesAndSelectionRule) {
-  const auto ms = make_ms();
-  const Operator o = random_operator(
-      ms, OperatorSpec::scalar(2),
-      {.seed = 7, .one_body_scale = 0.5, .two_body_scale = 2.0});
+  const auto ms = MakeMs();
+  const Operator o =
+      RandomOperator(ms, OperatorSpec::Scalar(2),
+                     {.seed = 7, .one_body_scale = 0.5, .two_body_scale = 2.0});
   const std::int32_t n = ms->num_orbits();
   double max1 = 0.0;
   bool any_nonzero = false;
@@ -93,10 +93,10 @@ TEST(OperatorRandom, HermitianSymmetriesAndSelectionRule) {
 }
 
 TEST(OperatorRandom, AntiHermitianHasZeroDiagonalAndNoZeroBody) {
-  const auto ms = make_ms();
+  const auto ms = MakeMs();
   const Operator o =
-      random_operator(ms, OperatorSpec::scalar(2, Hermiticity::AntiHermitian),
-                      {.seed = 8, .zero_body_scale = 5.0});
+      RandomOperator(ms, OperatorSpec::Scalar(2, Hermiticity::kAntiHermitian),
+                     {.seed = 8, .zero_body_scale = 5.0});
   EXPECT_EQ(o.zero_body(), 0.0);
   const std::int32_t n = ms->num_orbits();
   for (std::int32_t a = 0; a < n; ++a) {
@@ -124,9 +124,9 @@ TEST(OperatorRandom, AntiHermitianHasZeroDiagonalAndNoZeroBody) {
 }
 
 TEST(OperatorRandom, NonHermitianHasIndependentElements) {
-  const auto ms = make_ms();
-  const Operator o = random_operator(
-      ms, OperatorSpec::scalar(2, Hermiticity::NonHermitian), {.seed = 9});
+  const auto ms = MakeMs();
+  const Operator o = RandomOperator(
+      ms, OperatorSpec::Scalar(2, Hermiticity::kNonHermitian), {.seed = 9});
   const auto& chans = o.two_body().channels();
   bool asymmetric = false;
   for (std::int32_t c = 0; c < chans.num_channels(); ++c) {
@@ -145,8 +145,8 @@ TEST(OperatorRandom, NonHermitianHasIndependentElements) {
 }
 
 TEST(OperatorRandom, OneBodyOnlySpecHasNoTwoBody) {
-  const auto ms = make_ms();
-  const Operator o = random_operator(ms, OperatorSpec::scalar(1), {.seed = 2});
+  const auto ms = MakeMs();
+  const Operator o = RandomOperator(ms, OperatorSpec::Scalar(1), {.seed = 2});
   EXPECT_FALSE(o.two_body().allocated());
-  EXPECT_GT(max_abs(o).one_body, 0.0);
+  EXPECT_GT(MaxAbs(o).one_body, 0.0);
 }

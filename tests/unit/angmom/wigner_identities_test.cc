@@ -26,20 +26,20 @@ constexpr int kTwoJMaxSp = 2 * kEmax + 1;  // largest single-particle 2j
 constexpr int kTwoJMax2B =
     2 * (2 * kEmax + 1);  // largest 2 * (2B J) = doubled 2B J
 
-double sgn(int n) { return (n % 2 == 0) ? 1.0 : -1.0; }
+double Sgn(int n) { return (n % 2 == 0) ? 1.0 : -1.0; }
 
 /// Same acceptance as the reference test: max(1e-12 |exact|, 1e-14).
-bool close(double got, double exact) {
+bool Close(double got, double exact) {
   return std::fabs(got - exact) <= std::max(1e-12 * std::fabs(exact), 1e-14);
 }
 
-std::vector<int> sp_orbits() {
+std::vector<int> SpOrbits() {
   std::vector<int> v;
   for (int t = 1; t <= kTwoJMaxSp; t += 2) v.push_back(t);
   return v;
 }
 
-std::vector<int> two_body_js() {
+std::vector<int> TwoBodyJs() {
   std::vector<int> v;
   for (int t = 0; t <= kTwoJMax2B; t += 2) v.push_back(t);
   return v;
@@ -52,8 +52,8 @@ TEST(WignerIdentities, ThreeJOrthogonalityOverM) {
   // delta_MM'.
   double max_dev = 0.0;
   long checks = 0;
-  for (int ta : sp_orbits()) {
-    for (int tb : sp_orbits()) {
+  for (int ta : SpOrbits()) {
+    for (int tb : SpOrbits()) {
       for (int tJ = std::abs(ta - tb); tJ <= ta + tb; tJ += 2) {
         for (int tJp = std::abs(ta - tb); tJp <= ta + tb; tJp += 2) {
           for (int tM = -tJ; tM <= tJ; tM += 2) {
@@ -66,10 +66,10 @@ TEST(WignerIdentities, ThreeJOrthogonalityOverM) {
                 for (int m2 = -tb; m2 <= tb; m2 += 2) {
                   if (m1 + m2 != tM && m1 + m2 != tMp) continue;
                   sum += (tJ + 1) *
-                         am::wigner_3j(TwoJ{ta}, TwoJ{tb}, TwoJ{tJ}, TwoM{m1},
-                                       TwoM{m2}, TwoM{-tM}) *
-                         am::wigner_3j(TwoJ{ta}, TwoJ{tb}, TwoJ{tJp}, TwoM{m1},
-                                       TwoM{m2}, TwoM{-tMp});
+                         am::Wigner3j(TwoJ{ta}, TwoJ{tb}, TwoJ{tJ}, TwoM{m1},
+                                      TwoM{m2}, TwoM{-tM}) *
+                         am::Wigner3j(TwoJ{ta}, TwoJ{tb}, TwoJ{tJp}, TwoM{m1},
+                                      TwoM{m2}, TwoM{-tMp});
                 }
               }
               const double expect = (tJ == tJp && dM == 0) ? 1.0 : 0.0;
@@ -90,8 +90,8 @@ TEST(WignerIdentities, ThreeJOrthogonalityOverJM) {
   // sum_{J M} (2J+1) (ja jb J; m1 m2 -M)(ja jb J; m1' m2' -M) = delta_m1m1'
   // delta_m2m2'.
   double max_dev = 0.0;
-  for (int ta : sp_orbits()) {
-    for (int tb : sp_orbits()) {
+  for (int ta : SpOrbits()) {
+    for (int tb : SpOrbits()) {
       for (int m1 = -ta; m1 <= ta; m1 += 2) {
         for (int m2 = -tb; m2 <= tb; m2 += 2) {
           for (int n1 = -ta; n1 <= ta; n1 += 2) {
@@ -101,10 +101,10 @@ TEST(WignerIdentities, ThreeJOrthogonalityOverJM) {
             double sum = 0.0;
             for (int tJ = std::abs(ta - tb); tJ <= ta + tb; tJ += 2) {
               sum += (tJ + 1) *
-                     am::wigner_3j(TwoJ{ta}, TwoJ{tb}, TwoJ{tJ}, TwoM{m1},
-                                   TwoM{m2}, TwoM{-(m1 + m2)}) *
-                     am::wigner_3j(TwoJ{ta}, TwoJ{tb}, TwoJ{tJ}, TwoM{n1},
-                                   TwoM{n2}, TwoM{-(m1 + m2)});
+                     am::Wigner3j(TwoJ{ta}, TwoJ{tb}, TwoJ{tJ}, TwoM{m1},
+                                  TwoM{m2}, TwoM{-(m1 + m2)}) *
+                     am::Wigner3j(TwoJ{ta}, TwoJ{tb}, TwoJ{tJ}, TwoM{n1},
+                                  TwoM{n2}, TwoM{-(m1 + m2)});
             }
             const double expect = (m1 == n1) ? 1.0 : 0.0;
             max_dev = std::max(max_dev, std::fabs(sum - expect));
@@ -122,27 +122,27 @@ TEST(WignerIdentities, SixJOrthogonalityPandyaRange) {
   // j3'); j1,j2,j4,j5 single-particle, j3 and j3' two-body J.
   double max_dev = 0.0;
   long checks = 0;
-  const auto sp = sp_orbits();
-  const auto js = two_body_js();
+  const auto sp = SpOrbits();
+  const auto js = TwoBodyJs();
   for (int t1 : sp) {
     for (int t2 : sp) {
       for (int t4 : sp) {
         for (int t5 : sp) {
           for (int t3 : js) {
-            if (!am::triangle(TwoJ{t1}, TwoJ{t5}, TwoJ{t3}) ||
-                !am::triangle(TwoJ{t4}, TwoJ{t2}, TwoJ{t3}))
+            if (!am::Triangle(TwoJ{t1}, TwoJ{t5}, TwoJ{t3}) ||
+                !am::Triangle(TwoJ{t4}, TwoJ{t2}, TwoJ{t3}))
               continue;
             for (int t3p : js) {
-              if (!am::triangle(TwoJ{t1}, TwoJ{t5}, TwoJ{t3p}) ||
-                  !am::triangle(TwoJ{t4}, TwoJ{t2}, TwoJ{t3p}))
+              if (!am::Triangle(TwoJ{t1}, TwoJ{t5}, TwoJ{t3p}) ||
+                  !am::Triangle(TwoJ{t4}, TwoJ{t2}, TwoJ{t3p}))
                 continue;
               double sum = 0.0;
               for (int tx = 0; tx <= kTwoJMax2B; tx += 2) {
                 sum += (tx + 1) * (t3 + 1) *
-                       am::wigner_6j(TwoJ{t1}, TwoJ{t2}, TwoJ{tx}, TwoJ{t4},
-                                     TwoJ{t5}, TwoJ{t3}) *
-                       am::wigner_6j(TwoJ{t1}, TwoJ{t2}, TwoJ{tx}, TwoJ{t4},
-                                     TwoJ{t5}, TwoJ{t3p});
+                       am::Wigner6j(TwoJ{t1}, TwoJ{t2}, TwoJ{tx}, TwoJ{t4},
+                                    TwoJ{t5}, TwoJ{t3}) *
+                       am::Wigner6j(TwoJ{t1}, TwoJ{t2}, TwoJ{tx}, TwoJ{t4},
+                                    TwoJ{t5}, TwoJ{t3p});
               }
               max_dev =
                   std::max(max_dev, std::fabs(sum - (t3 == t3p ? 1.0 : 0.0)));
@@ -165,38 +165,38 @@ TEST(WignerIdentities, SixJSymmetries) {
   long checks = 0, bad = 0;
   auto check = [&](int a, int b, int c, int d, int e, int f) {
     const double v =
-        am::wigner_6j(TwoJ{a}, TwoJ{b}, TwoJ{c}, TwoJ{d}, TwoJ{e}, TwoJ{f});
+        am::Wigner6j(TwoJ{a}, TwoJ{b}, TwoJ{c}, TwoJ{d}, TwoJ{e}, TwoJ{f});
     const double w[] = {
-        am::wigner_6j(TwoJ{b}, TwoJ{a}, TwoJ{c}, TwoJ{e}, TwoJ{d},
-                      TwoJ{f}),  // swap columns 1,2
-        am::wigner_6j(TwoJ{a}, TwoJ{c}, TwoJ{b}, TwoJ{d}, TwoJ{f},
-                      TwoJ{e}),  // swap columns 2,3
-        am::wigner_6j(TwoJ{c}, TwoJ{b}, TwoJ{a}, TwoJ{f}, TwoJ{e},
-                      TwoJ{d}),  // swap columns 1,3
-        am::wigner_6j(TwoJ{d}, TwoJ{e}, TwoJ{c}, TwoJ{a}, TwoJ{b},
-                      TwoJ{f}),  // flip columns 1,2
-        am::wigner_6j(TwoJ{a}, TwoJ{e}, TwoJ{f}, TwoJ{d}, TwoJ{b},
-                      TwoJ{c}),  // flip columns 2,3
-        am::wigner_6j(TwoJ{d}, TwoJ{b}, TwoJ{f}, TwoJ{a}, TwoJ{e},
-                      TwoJ{c}),  // flip columns 1,3
+        am::Wigner6j(TwoJ{b}, TwoJ{a}, TwoJ{c}, TwoJ{e}, TwoJ{d},
+                     TwoJ{f}),  // swap columns 1,2
+        am::Wigner6j(TwoJ{a}, TwoJ{c}, TwoJ{b}, TwoJ{d}, TwoJ{f},
+                     TwoJ{e}),  // swap columns 2,3
+        am::Wigner6j(TwoJ{c}, TwoJ{b}, TwoJ{a}, TwoJ{f}, TwoJ{e},
+                     TwoJ{d}),  // swap columns 1,3
+        am::Wigner6j(TwoJ{d}, TwoJ{e}, TwoJ{c}, TwoJ{a}, TwoJ{b},
+                     TwoJ{f}),  // flip columns 1,2
+        am::Wigner6j(TwoJ{a}, TwoJ{e}, TwoJ{f}, TwoJ{d}, TwoJ{b},
+                     TwoJ{c}),  // flip columns 2,3
+        am::Wigner6j(TwoJ{d}, TwoJ{b}, TwoJ{f}, TwoJ{a}, TwoJ{e},
+                     TwoJ{c}),  // flip columns 1,3
     };
     for (double x : w) {
-      if (!close(x, v)) ++bad;
+      if (!Close(x, v)) ++bad;
       ++checks;
     }
   };
-  const auto sp = sp_orbits();
-  const auto js = two_body_js();
+  const auto sp = SpOrbits();
+  const auto js = TwoBodyJs();
   for (int ja : sp)
     for (int jb : sp)
       for (int jc : sp)
         for (int jd : sp)
           for (int J : js) {
-            if (!am::triangle(TwoJ{ja}, TwoJ{jb}, TwoJ{J})) continue;
+            if (!am::Triangle(TwoJ{ja}, TwoJ{jb}, TwoJ{J})) continue;
             for (int Jp : js) {
-              if (am::triangle(TwoJ{ja}, TwoJ{jd}, TwoJ{Jp}) &&
-                  am::triangle(TwoJ{jc}, TwoJ{jb}, TwoJ{Jp}) &&
-                  am::triangle(TwoJ{jc}, TwoJ{jd}, TwoJ{J})) {
+              if (am::Triangle(TwoJ{ja}, TwoJ{jd}, TwoJ{Jp}) &&
+                  am::Triangle(TwoJ{jc}, TwoJ{jb}, TwoJ{Jp}) &&
+                  am::Triangle(TwoJ{jc}, TwoJ{jd}, TwoJ{J})) {
                 check(ja, jb, J, jc, jd, Jp);
               }
             }
@@ -209,10 +209,10 @@ TEST(WignerIdentities, SixJSymmetries) {
         for (int Jab : js)
           for (int Jbc : js)
             for (int J = 1; J <= 3 * kTwoJMaxSp; J += 2) {
-              if (am::triangle(TwoJ{ja}, TwoJ{jb}, TwoJ{Jab}) &&
-                  am::triangle(TwoJ{ja}, TwoJ{J}, TwoJ{Jbc}) &&
-                  am::triangle(TwoJ{jc}, TwoJ{jb}, TwoJ{Jbc}) &&
-                  am::triangle(TwoJ{jc}, TwoJ{J}, TwoJ{Jab}) &&
+              if (am::Triangle(TwoJ{ja}, TwoJ{jb}, TwoJ{Jab}) &&
+                  am::Triangle(TwoJ{ja}, TwoJ{J}, TwoJ{Jbc}) &&
+                  am::Triangle(TwoJ{jc}, TwoJ{jb}, TwoJ{Jbc}) &&
+                  am::Triangle(TwoJ{jc}, TwoJ{J}, TwoJ{Jab}) &&
                   (n++ % 7 == 0)) {
                 check(ja, jb, Jab, jc, J, Jbc);
               }
@@ -225,40 +225,40 @@ TEST(WignerIdentities, SixJSymmetries) {
 
 TEST(WignerIdentities, ThreeJSymmetries) {
   long checks = 0, bad = 0;
-  for (int ta : sp_orbits()) {
-    for (int tb : sp_orbits()) {
-      for (int tc : two_body_js()) {
-        if (!am::triangle(TwoJ{ta}, TwoJ{tb}, TwoJ{tc})) continue;
-        const double ph = sgn((ta + tb + tc) / 2);
+  for (int ta : SpOrbits()) {
+    for (int tb : SpOrbits()) {
+      for (int tc : TwoBodyJs()) {
+        if (!am::Triangle(TwoJ{ta}, TwoJ{tb}, TwoJ{tc})) continue;
+        const double ph = Sgn((ta + tb + tc) / 2);
         for (int m1 = -ta; m1 <= ta; m1 += 2) {
           for (int m2 = -tb; m2 <= tb; m2 += 2) {
             const int m3 = -(m1 + m2);
             if (std::abs(m3) > tc) continue;
-            const double v = am::wigner_3j(TwoJ{ta}, TwoJ{tb}, TwoJ{tc},
-                                           TwoM{m1}, TwoM{m2}, TwoM{m3});
+            const double v = am::Wigner3j(TwoJ{ta}, TwoJ{tb}, TwoJ{tc},
+                                          TwoM{m1}, TwoM{m2}, TwoM{m3});
             // odd permutations: phase; cyclic: none; all m flipped: phase.
             const double chk[][2] = {
-                {am::wigner_3j(TwoJ{tb}, TwoJ{ta}, TwoJ{tc}, TwoM{m2}, TwoM{m1},
-                               TwoM{m3}),
+                {am::Wigner3j(TwoJ{tb}, TwoJ{ta}, TwoJ{tc}, TwoM{m2}, TwoM{m1},
+                              TwoM{m3}),
                  ph * v},
-                {am::wigner_3j(TwoJ{ta}, TwoJ{tc}, TwoJ{tb}, TwoM{m1}, TwoM{m3},
-                               TwoM{m2}),
+                {am::Wigner3j(TwoJ{ta}, TwoJ{tc}, TwoJ{tb}, TwoM{m1}, TwoM{m3},
+                              TwoM{m2}),
                  ph * v},
-                {am::wigner_3j(TwoJ{tc}, TwoJ{tb}, TwoJ{ta}, TwoM{m3}, TwoM{m2},
-                               TwoM{m1}),
+                {am::Wigner3j(TwoJ{tc}, TwoJ{tb}, TwoJ{ta}, TwoM{m3}, TwoM{m2},
+                              TwoM{m1}),
                  ph * v},
-                {am::wigner_3j(TwoJ{tb}, TwoJ{tc}, TwoJ{ta}, TwoM{m2}, TwoM{m3},
-                               TwoM{m1}),
+                {am::Wigner3j(TwoJ{tb}, TwoJ{tc}, TwoJ{ta}, TwoM{m2}, TwoM{m3},
+                              TwoM{m1}),
                  v},
-                {am::wigner_3j(TwoJ{tc}, TwoJ{ta}, TwoJ{tb}, TwoM{m3}, TwoM{m1},
-                               TwoM{m2}),
+                {am::Wigner3j(TwoJ{tc}, TwoJ{ta}, TwoJ{tb}, TwoM{m3}, TwoM{m1},
+                              TwoM{m2}),
                  v},
-                {am::wigner_3j(TwoJ{ta}, TwoJ{tb}, TwoJ{tc}, TwoM{-m1},
-                               TwoM{-m2}, TwoM{-m3}),
+                {am::Wigner3j(TwoJ{ta}, TwoJ{tb}, TwoJ{tc}, TwoM{-m1},
+                              TwoM{-m2}, TwoM{-m3}),
                  ph * v},
             };
             for (const auto& c : chk) {
-              if (!close(c[0], c[1])) ++bad;
+              if (!Close(c[0], c[1])) ++bad;
               ++checks;
             }
           }
@@ -274,71 +274,67 @@ TEST(WignerIdentities, ThreeJSymmetries) {
 
 TEST(WignerIdentities, InvalidArgumentsGiveExactlyZero) {
   // Triangle violations.
-  EXPECT_EQ(am::wigner_3j(TwoJ{2}, TwoJ{2}, TwoJ{6}, TwoM{0}, TwoM{0}, TwoM{0}),
+  EXPECT_EQ(am::Wigner3j(TwoJ{2}, TwoJ{2}, TwoJ{6}, TwoM{0}, TwoM{0}, TwoM{0}),
             0.0);
   // Odd sum of doubled j (j1+j2+j3 not an integer).
-  EXPECT_EQ(
-      am::wigner_3j(TwoJ{1}, TwoJ{2}, TwoJ{2}, TwoM{1}, TwoM{0}, TwoM{-1}),
-      0.0);
+  EXPECT_EQ(am::Wigner3j(TwoJ{1}, TwoJ{2}, TwoJ{2}, TwoM{1}, TwoM{0}, TwoM{-1}),
+            0.0);
   // |m| > j.
   EXPECT_EQ(
-      am::wigner_3j(TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoM{4}, TwoM{-2}, TwoM{-2}),
+      am::Wigner3j(TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoM{4}, TwoM{-2}, TwoM{-2}),
       0.0);
   // m of the wrong integrality for j.
-  EXPECT_EQ(
-      am::wigner_3j(TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoM{1}, TwoM{-1}, TwoM{0}),
-      0.0);
+  EXPECT_EQ(am::Wigner3j(TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoM{1}, TwoM{-1}, TwoM{0}),
+            0.0);
   // Projections that do not sum to zero.
-  EXPECT_EQ(am::wigner_3j(TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoM{2}, TwoM{0}, TwoM{0}),
+  EXPECT_EQ(am::Wigner3j(TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoM{2}, TwoM{0}, TwoM{0}),
             0.0);
   // Negative 2j.
-  EXPECT_EQ(
-      am::wigner_3j(TwoJ{-2}, TwoJ{2}, TwoJ{0}, TwoM{0}, TwoM{0}, TwoM{0}),
-      0.0);
-  EXPECT_EQ(
-      am::wigner_6j(TwoJ{-2}, TwoJ{2}, TwoJ{0}, TwoJ{2}, TwoJ{2}, TwoJ{0}),
-      0.0);
+  EXPECT_EQ(am::Wigner3j(TwoJ{-2}, TwoJ{2}, TwoJ{0}, TwoM{0}, TwoM{0}, TwoM{0}),
+            0.0);
+  EXPECT_EQ(am::Wigner6j(TwoJ{-2}, TwoJ{2}, TwoJ{0}, TwoJ{2}, TwoJ{2}, TwoJ{0}),
+            0.0);
   // CG: M != m1 + m2.
   EXPECT_EQ(
-      am::clebsch_gordan(TwoJ{1}, TwoM{1}, TwoJ{1}, TwoM{-1}, TwoJ{2}, TwoM{2}),
+      am::ClebschGordan(TwoJ{1}, TwoM{1}, TwoJ{1}, TwoM{-1}, TwoJ{2}, TwoM{2}),
       0.0);
   // CG: triangle fails.
   EXPECT_EQ(
-      am::clebsch_gordan(TwoJ{1}, TwoM{1}, TwoJ{1}, TwoM{1}, TwoJ{4}, TwoM{2}),
+      am::ClebschGordan(TwoJ{1}, TwoM{1}, TwoJ{1}, TwoM{1}, TwoJ{4}, TwoM{2}),
       0.0);
   // 6j: triangle (j1 j2 j3) fails, and each of the other triads in turn.
-  EXPECT_EQ(am::wigner_6j(TwoJ{2}, TwoJ{2}, TwoJ{6}, TwoJ{2}, TwoJ{2}, TwoJ{2}),
+  EXPECT_EQ(am::Wigner6j(TwoJ{2}, TwoJ{2}, TwoJ{6}, TwoJ{2}, TwoJ{2}, TwoJ{2}),
             0.0);
-  EXPECT_EQ(am::wigner_6j(TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{6}, TwoJ{2}),
+  EXPECT_EQ(am::Wigner6j(TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{6}, TwoJ{2}),
             0.0);
-  EXPECT_EQ(am::wigner_6j(TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{6}),
+  EXPECT_EQ(am::Wigner6j(TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{6}),
             0.0);
-  EXPECT_EQ(am::wigner_6j(TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{6}, TwoJ{2}, TwoJ{2}),
+  EXPECT_EQ(am::Wigner6j(TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{6}, TwoJ{2}, TwoJ{2}),
             0.0);
   // 6j: odd doubled sum in one triad.
-  EXPECT_EQ(am::wigner_6j(TwoJ{1}, TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{2}),
+  EXPECT_EQ(am::Wigner6j(TwoJ{1}, TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{2}),
             0.0);
   // 9j: a violated row and a violated column.
-  EXPECT_EQ(am::wigner_9j(TwoJ{2}, TwoJ{2}, TwoJ{8}, TwoJ{2}, TwoJ{2}, TwoJ{2},
-                          TwoJ{2}, TwoJ{2}, TwoJ{2}),
+  EXPECT_EQ(am::Wigner9j(TwoJ{2}, TwoJ{2}, TwoJ{8}, TwoJ{2}, TwoJ{2}, TwoJ{2},
+                         TwoJ{2}, TwoJ{2}, TwoJ{2}),
             0.0);
-  EXPECT_EQ(am::wigner_9j(TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{2},
-                          TwoJ{8}, TwoJ{2}, TwoJ{2}),
+  EXPECT_EQ(am::Wigner9j(TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{2},
+                         TwoJ{8}, TwoJ{2}, TwoJ{2}),
             0.0);
-  EXPECT_EQ(am::norm_9j(TwoJ{2}, TwoJ{2}, TwoJ{8}, TwoJ{2}, TwoJ{2}, TwoJ{2},
-                        TwoJ{2}, TwoJ{2}, TwoJ{2}),
+  EXPECT_EQ(am::Norm9j(TwoJ{2}, TwoJ{2}, TwoJ{8}, TwoJ{2}, TwoJ{2}, TwoJ{2},
+                       TwoJ{2}, TwoJ{2}, TwoJ{2}),
             0.0);
   // Exhaustive: all single-particle triples that violate the triangle give
   // exactly 0.
-  for (int ta : sp_orbits()) {
-    for (int tb : sp_orbits()) {
+  for (int ta : SpOrbits()) {
+    for (int tb : SpOrbits()) {
       for (int tc = 0; tc <= kTwoJMax2B; tc += 2) {
-        if (am::triangle(TwoJ{ta}, TwoJ{tb}, TwoJ{tc})) continue;
-        EXPECT_EQ(am::wigner_3j(TwoJ{ta}, TwoJ{tb}, TwoJ{tc}, TwoM{ta},
-                                TwoM{-ta}, TwoM{0}),
+        if (am::Triangle(TwoJ{ta}, TwoJ{tb}, TwoJ{tc})) continue;
+        EXPECT_EQ(am::Wigner3j(TwoJ{ta}, TwoJ{tb}, TwoJ{tc}, TwoM{ta},
+                               TwoM{-ta}, TwoM{0}),
                   0.0);
-        EXPECT_EQ(am::wigner_6j(TwoJ{ta}, TwoJ{tb}, TwoJ{tc}, TwoJ{ta},
-                                TwoJ{tb}, TwoJ{tc}),
+        EXPECT_EQ(am::Wigner6j(TwoJ{ta}, TwoJ{tb}, TwoJ{tc}, TwoJ{ta}, TwoJ{tb},
+                               TwoJ{tc}),
                   0.0);
       }
     }
@@ -352,13 +348,13 @@ TEST(WignerIdentities, SpecialValues) {
   for (int ta = 0; ta <= 2 * kTwoJMaxSp; ++ta) {
     for (int tb = 0; tb <= kTwoJMaxSp; ++tb) {
       for (int tc = 0; tc <= kTwoJMaxSp; ++tc) {
-        if (!am::triangle(TwoJ{ta}, TwoJ{tb}, TwoJ{tc})) continue;
+        if (!am::Triangle(TwoJ{ta}, TwoJ{tb}, TwoJ{tc})) continue;
         const double exact =
-            sgn((ta + tb + tc) / 2) / std::sqrt(double((tb + 1) * (tc + 1)));
-        const double got = am::wigner_6j(TwoJ{ta}, TwoJ{tb}, TwoJ{tc}, TwoJ{0},
-                                         TwoJ{tc}, TwoJ{tb});
+            Sgn((ta + tb + tc) / 2) / std::sqrt(double((tb + 1) * (tc + 1)));
+        const double got = am::Wigner6j(TwoJ{ta}, TwoJ{tb}, TwoJ{tc}, TwoJ{0},
+                                        TwoJ{tc}, TwoJ{tb});
         max_dev = std::max(max_dev, std::fabs(got - exact));
-        EXPECT_TRUE(close(got, exact)) << ta << " " << tb << " " << tc;
+        EXPECT_TRUE(Close(got, exact)) << ta << " " << tb << " " << tc;
       }
     }
   }
@@ -369,41 +365,41 @@ TEST(WignerIdentities, SpecialValues) {
   // 3j.
   for (int tj = 0; tj <= 2 * kTwoJMaxSp; ++tj) {
     for (int tm = -tj; tm <= tj; tm += 2) {
-      const double exact = sgn((tj - tm) / 2) / std::sqrt(double(tj + 1));
-      EXPECT_TRUE(close(am::clebsch_gordan(TwoJ{tj}, TwoM{tm}, TwoJ{tj},
-                                           TwoM{-tm}, TwoJ{0}, TwoM{0}),
+      const double exact = Sgn((tj - tm) / 2) / std::sqrt(double(tj + 1));
+      EXPECT_TRUE(Close(am::ClebschGordan(TwoJ{tj}, TwoM{tm}, TwoJ{tj},
+                                          TwoM{-tm}, TwoJ{0}, TwoM{0}),
                         exact));
-      EXPECT_TRUE(close(am::wigner_3j(TwoJ{tj}, TwoJ{tj}, TwoJ{0}, TwoM{tm},
-                                      TwoM{-tm}, TwoM{0}),
-                        sgn((tj - tm) / 2) / std::sqrt(double(tj + 1))));
+      EXPECT_TRUE(Close(am::Wigner3j(TwoJ{tj}, TwoJ{tj}, TwoJ{0}, TwoM{tm},
+                                     TwoM{-tm}, TwoM{0}),
+                        Sgn((tj - tm) / 2) / std::sqrt(double(tj + 1))));
     }
   }
 
   // Well-known values.
-  EXPECT_TRUE(close(
-      am::wigner_3j(TwoJ{1}, TwoJ{1}, TwoJ{2}, TwoM{1}, TwoM{-1}, TwoM{0}),
-      1.0 / std::sqrt(6.0)));
-  EXPECT_TRUE(close(
-      am::clebsch_gordan(TwoJ{1}, TwoM{1}, TwoJ{1}, TwoM{-1}, TwoJ{2}, TwoM{0}),
+  EXPECT_TRUE(
+      Close(am::Wigner3j(TwoJ{1}, TwoJ{1}, TwoJ{2}, TwoM{1}, TwoM{-1}, TwoM{0}),
+            1.0 / std::sqrt(6.0)));
+  EXPECT_TRUE(Close(
+      am::ClebschGordan(TwoJ{1}, TwoM{1}, TwoJ{1}, TwoM{-1}, TwoJ{2}, TwoM{0}),
       1.0 / std::sqrt(2.0)));
-  EXPECT_TRUE(close(
-      am::clebsch_gordan(TwoJ{1}, TwoM{1}, TwoJ{1}, TwoM{-1}, TwoJ{0}, TwoM{0}),
+  EXPECT_TRUE(Close(
+      am::ClebschGordan(TwoJ{1}, TwoM{1}, TwoJ{1}, TwoM{-1}, TwoJ{0}, TwoM{0}),
       1.0 / std::sqrt(2.0)));
-  EXPECT_TRUE(close(
-      am::clebsch_gordan(TwoJ{1}, TwoM{-1}, TwoJ{1}, TwoM{1}, TwoJ{0}, TwoM{0}),
+  EXPECT_TRUE(Close(
+      am::ClebschGordan(TwoJ{1}, TwoM{-1}, TwoJ{1}, TwoM{1}, TwoJ{0}, TwoM{0}),
       -1.0 / std::sqrt(2.0)));
   EXPECT_TRUE(
-      close(am::wigner_6j(TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{2}),
+      Close(am::Wigner6j(TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{2}, TwoJ{2}),
             1.0 / 6.0));
   EXPECT_TRUE(
-      close(am::wigner_6j(TwoJ{2}, TwoJ{2}, TwoJ{4}, TwoJ{2}, TwoJ{2}, TwoJ{4}),
+      Close(am::Wigner6j(TwoJ{2}, TwoJ{2}, TwoJ{4}, TwoJ{2}, TwoJ{2}, TwoJ{4}),
             1.0 / 30.0));
   EXPECT_TRUE(
-      close(am::wigner_6j(TwoJ{1}, TwoJ{1}, TwoJ{2}, TwoJ{1}, TwoJ{1}, TwoJ{2}),
+      Close(am::Wigner6j(TwoJ{1}, TwoJ{1}, TwoJ{2}, TwoJ{1}, TwoJ{1}, TwoJ{2}),
             1.0 / 6.0));
   // Stretched CG is 1.
-  EXPECT_TRUE(close(
-      am::clebsch_gordan(TwoJ{5}, TwoM{5}, TwoJ{3}, TwoM{3}, TwoJ{8}, TwoM{8}),
+  EXPECT_TRUE(Close(
+      am::ClebschGordan(TwoJ{5}, TwoM{5}, TwoJ{3}, TwoM{3}, TwoJ{8}, TwoM{8}),
       1.0));
 }
 
@@ -417,22 +413,22 @@ TEST(WignerIdentities, NineJWithZeroReducesToSixJ) {
         for (int td = 0; td <= 8; ++td)
           for (int te = 0; te <= 8; ++te)
             for (int tf = 0; tf <= 8; ++tf) {
-              if (!am::triangle(TwoJ{ta}, TwoJ{tb}, TwoJ{te}) ||
-                  !am::triangle(TwoJ{tc}, TwoJ{td}, TwoJ{te}) ||
-                  !am::triangle(TwoJ{ta}, TwoJ{tc}, TwoJ{tf}) ||
-                  !am::triangle(TwoJ{tb}, TwoJ{td}, TwoJ{tf}))
+              if (!am::Triangle(TwoJ{ta}, TwoJ{tb}, TwoJ{te}) ||
+                  !am::Triangle(TwoJ{tc}, TwoJ{td}, TwoJ{te}) ||
+                  !am::Triangle(TwoJ{ta}, TwoJ{tc}, TwoJ{tf}) ||
+                  !am::Triangle(TwoJ{tb}, TwoJ{td}, TwoJ{tf}))
                 continue;
               const int ph2 = tb + tc + te + tf;
               ASSERT_EQ(ph2 % 2, 0);
-              const double exact = sgn(ph2 / 2) /
+              const double exact = Sgn(ph2 / 2) /
                                    std::sqrt(double((te + 1) * (tf + 1))) *
-                                   am::wigner_6j(TwoJ{ta}, TwoJ{tb}, TwoJ{te},
-                                                 TwoJ{td}, TwoJ{tc}, TwoJ{tf});
-              const double got = am::wigner_9j(TwoJ{ta}, TwoJ{tb}, TwoJ{te},
-                                               TwoJ{tc}, TwoJ{td}, TwoJ{te},
-                                               TwoJ{tf}, TwoJ{tf}, TwoJ{0});
+                                   am::Wigner6j(TwoJ{ta}, TwoJ{tb}, TwoJ{te},
+                                                TwoJ{td}, TwoJ{tc}, TwoJ{tf});
+              const double got =
+                  am::Wigner9j(TwoJ{ta}, TwoJ{tb}, TwoJ{te}, TwoJ{tc}, TwoJ{td},
+                               TwoJ{te}, TwoJ{tf}, TwoJ{tf}, TwoJ{0});
               max_dev = std::max(max_dev, std::fabs(got - exact));
-              ASSERT_TRUE(close(got, exact))
+              ASSERT_TRUE(Close(got, exact))
                   << ta << tb << tc << td << te << tf;
               ++checks;
             }
@@ -456,9 +452,9 @@ TEST(WignerIdentities, NormalizedNineJLsJjUnitarity) {
             for (int ja : {2 * la - 1, 2 * la + 1}) {
               for (int jb : {2 * lb - 1, 2 * lb + 1}) {
                 if (ja < 0 || jb < 0) continue;
-                const double c = am::norm_9j(TwoJ{2 * la}, TwoJ{1}, TwoJ{ja},
-                                             TwoJ{2 * lb}, TwoJ{1}, TwoJ{jb},
-                                             TwoJ{2 * L}, TwoJ{S}, TwoJ{J});
+                const double c = am::Norm9j(TwoJ{2 * la}, TwoJ{1}, TwoJ{ja},
+                                            TwoJ{2 * lb}, TwoJ{1}, TwoJ{jb},
+                                            TwoJ{2 * L}, TwoJ{S}, TwoJ{J});
                 sum += c * c;
               }
             }

@@ -44,7 +44,7 @@ imsrg++ copies linked against the old library), `tests/golden/` and `extern/` ex
 
 | Change | Scale |
 |--------|-------|
-| Functions and methods to PascalCase (`hf::solve` → `hf::Solve`, `mp2_energy` → `Mp2Energy`); accessors/mutators (`norm()`, `set_norm()`) and STL analogs may stay | ~490 function names declared in headers, plus all call sites |
+| Functions and methods to PascalCase (`hf::Solve` → `hf::Solve`, `mp2_energy` → `Mp2Energy`); accessors/mutators (`norm()`, `set_norm()`) and STL analogs may stay | ~490 function names declared in headers, plus all call sites |
 | Enumerators to `kName` (`Mixing::Linear` → `Mixing::kLinear`) | 193 enumerators in 41 enums |
 | Static-storage constants to `kName` (`inv_sqrt2` → `kInvSqrt2`, `moshinsky_max_energy` → `kMoshinskyMaxEnergy`) | ~27 at namespace scope, ~17 static members/locals |
 | Internal namespaces: unique names containing `internal` instead of `detail` (optional) | 8 |

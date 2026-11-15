@@ -21,14 +21,14 @@ namespace {
 
 constexpr std::size_t kBufferSize = std::size_t{1} << 16;
 
-bool is_space(char c) noexcept {
+bool IsSpace(char c) noexcept {
   return c == ' ' || c == '\n' || c == '\t' || c == '\r' || c == '\f' ||
          c == '\v';
 }
 
 /// Parses `s` (the whole string) as a float. Returns false if it is not fully a
 /// number.
-bool parse_float(const std::string& s, float& out) {
+bool ParseFloat(const std::string& s, float& out) {
 #if defined(__cpp_lib_to_chars) && __cpp_lib_to_chars >= 201611L
   const char* first = s.data();
   const char* last = s.data() + s.size();
@@ -69,7 +69,7 @@ struct TextInput::Impl {
 
   /// Ensures at least one unread byte is buffered. Returns false at the end of
   /// data.
-  bool fill() {
+  bool Fill() {
     if (pos < len) return true;
     if (eof) return false;
     const int n = gzread(file, buf.data(), static_cast<unsigned>(buf.size()));
@@ -85,14 +85,14 @@ struct TextInput::Impl {
     return n > 0;
   }
 
-  bool read_token(std::string& tok) {
+  bool ReadToken(std::string& tok) {
     tok.clear();
     for (;;) {  // skip leading whitespace
-      if (!fill()) return false;
-      if (!is_space(buf[pos])) break;
+      if (!Fill()) return false;
+      if (!IsSpace(buf[pos])) break;
       ++pos;
     }
-    while (fill() && !is_space(buf[pos])) tok.push_back(buf[pos++]);
+    while (Fill() && !IsSpace(buf[pos])) tok.push_back(buf[pos++]);
     return true;
   }
 };
@@ -114,10 +114,10 @@ const std::filesystem::path& TextInput::path() const noexcept {
   return impl_->path;
 }
 
-bool TextInput::skip_line() {
+bool TextInput::SkipLine() {
   Impl& s = *impl_;
   bool any = false;
-  while (s.fill()) {
+  while (s.Fill()) {
     any = true;
     const char c = s.buf[s.pos++];
     if (c == '\n') break;
@@ -125,14 +125,14 @@ bool TextInput::skip_line() {
   return any;
 }
 
-bool TextInput::next_token(std::string& token) {
-  return impl_->read_token(token);
+bool TextInput::NextToken(std::string& token) {
+  return impl_->ReadToken(token);
 }
 
-bool TextInput::next_float(float& value) {
+bool TextInput::NextFloat(float& value) {
   Impl& s = *impl_;
-  if (!s.read_token(s.scratch)) return false;
-  if (!parse_float(s.scratch, value)) {
+  if (!s.ReadToken(s.scratch)) return false;
+  if (!ParseFloat(s.scratch, value)) {
     throw InputError("'" + s.path.string() + "': malformed numeric token '" +
                      s.scratch + "'");
   }
@@ -163,7 +163,7 @@ GzipWriter::~GzipWriter() = default;
 GzipWriter::GzipWriter(GzipWriter&&) noexcept = default;
 GzipWriter& GzipWriter::operator=(GzipWriter&&) noexcept = default;
 
-void GzipWriter::write(std::string_view text) {
+void GzipWriter::Write(std::string_view text) {
   if (impl_ == nullptr || impl_->file == nullptr)
     throw InputError("write to a closed GzipWriter");
   std::size_t done = 0;
@@ -177,7 +177,7 @@ void GzipWriter::write(std::string_view text) {
   }
 }
 
-void GzipWriter::close() {
+void GzipWriter::Close() {
   if (impl_ == nullptr || impl_->file == nullptr) return;
   const int rc = gzclose(impl_->file);
   impl_->file = nullptr;

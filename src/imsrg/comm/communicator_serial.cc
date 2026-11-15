@@ -12,37 +12,37 @@ namespace imsrg::comm {
 
 struct Communicator::Impl {};
 
-Communicator Communicator::serial() {
-  static const auto impl = std::make_shared<const Impl>();
-  return Communicator(impl);
+Communicator Communicator::Serial() {
+  static const auto kImpl = std::make_shared<const Impl>();
+  return Communicator(kImpl);
 }
 
-Communicator Communicator::world_() { return serial(); }
+Communicator Communicator::World() { return Serial(); }
 
 int Communicator::rank() const noexcept { return 0; }
 int Communicator::size() const noexcept { return 1; }
 bool Communicator::is_serial() const noexcept { return true; }
-void Communicator::barrier() const {}
+void Communicator::Barrier() const {}
 
-#define IMSRG_COMM_SERIAL_REDUCE(T)                       \
-  void Communicator::allreduce_sum(std::span<T>) const {} \
-  void Communicator::allreduce_max(std::span<T>) const {} \
-  void Communicator::allreduce_min(std::span<T>) const {}
+#define IMSRG_COMM_SERIAL_REDUCE(T)                      \
+  void Communicator::AllreduceSum(std::span<T>) const {} \
+  void Communicator::AllreduceMax(std::span<T>) const {} \
+  void Communicator::AllreduceMin(std::span<T>) const {}
 IMSRG_COMM_SERIAL_REDUCE(double)
 IMSRG_COMM_SERIAL_REDUCE(float)
 IMSRG_COMM_SERIAL_REDUCE(std::int32_t)
 IMSRG_COMM_SERIAL_REDUCE(std::int64_t)
 #undef IMSRG_COMM_SERIAL_REDUCE
 
-double Communicator::allreduce_sum(double x) const { return x; }
-std::int64_t Communicator::allreduce_sum(std::int64_t x) const { return x; }
-double Communicator::allreduce_max(double x) const { return x; }
-std::int64_t Communicator::allreduce_max(std::int64_t x) const { return x; }
-double Communicator::allreduce_min(double x) const { return x; }
-std::int64_t Communicator::allreduce_min(std::int64_t x) const { return x; }
+double Communicator::AllreduceSum(double x) const { return x; }
+std::int64_t Communicator::AllreduceSum(std::int64_t x) const { return x; }
+double Communicator::AllreduceMax(double x) const { return x; }
+std::int64_t Communicator::AllreduceMax(std::int64_t x) const { return x; }
+double Communicator::AllreduceMin(double x) const { return x; }
+std::int64_t Communicator::AllreduceMin(std::int64_t x) const { return x; }
 
 #define IMSRG_COMM_SERIAL_BCAST(T)                             \
-  void Communicator::broadcast(std::span<T>, int root) const { \
+  void Communicator::Broadcast(std::span<T>, int root) const { \
     IMSRG_CHECK(root == 0, "broadcast: root out of range");    \
   }
 IMSRG_COMM_SERIAL_BCAST(double)
@@ -52,16 +52,16 @@ IMSRG_COMM_SERIAL_BCAST(std::int64_t)
 IMSRG_COMM_SERIAL_BCAST(std::byte)
 #undef IMSRG_COMM_SERIAL_BCAST
 
-void Communicator::broadcast(std::string&, int root) const {
+void Communicator::Broadcast(std::string&, int root) const {
   IMSRG_CHECK(root == 0, "broadcast: root out of range");
 }
 
-std::vector<double> Communicator::allgather(double x) const { return {x}; }
-std::vector<std::int64_t> Communicator::allgather(std::int64_t x) const {
+std::vector<double> Communicator::Allgather(double x) const { return {x}; }
+std::vector<std::int64_t> Communicator::Allgather(std::int64_t x) const {
   return {x};
 }
 
-void Communicator::alltoallv(std::span<const double> send,
+void Communicator::Alltoallv(std::span<const double> send,
                              std::span<const int> send_counts,
                              std::span<const int> send_displs,
                              std::span<double> recv,
@@ -84,7 +84,7 @@ void Communicator::alltoallv(std::span<const double> send,
   }
 }
 
-Communicator Communicator::split(int, int) const { return *this; }
-Communicator Communicator::duplicate() const { return *this; }
+Communicator Communicator::Split(int, int) const { return *this; }
+Communicator Communicator::Duplicate() const { return *this; }
 
 }  // namespace imsrg::comm

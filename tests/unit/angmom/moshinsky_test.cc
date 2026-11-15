@@ -31,8 +31,8 @@
 
 namespace imsrg::angmom::detail {
 // Defined in moshinsky.cc (test hooks, not in any public header).
-double dd_cg0(int a, int b, int c);
-double dd_ninej(int a, int b, int c, int d, int e, int f, int g, int h, int i);
+double DdCg0(int a, int b, int c);
+double DdNinej(int a, int b, int c, int d, int e, int f, int g, int h, int i);
 }  // namespace imsrg::angmom::detail
 
 namespace {
@@ -41,7 +41,7 @@ using namespace imsrg::angmom;
 using imsrg::TwoJ;
 using imsrg::TwoM;
 
-bool within(double got, double exact) {
+bool Within(double got, double exact) {
   return std::abs(got - exact) <= std::max(1e-12 * std::abs(exact), 1e-14);
 }
 
@@ -50,14 +50,14 @@ struct Dev {
   double max_rel = 0.0;
   long count = 0;
   long failures = 0;
-  void add(double got, double exact) {
+  void Add(double got, double exact) {
     const double d = std::abs(got - exact);
     max_abs = std::max(max_abs, d);
     if (exact != 0.0) {
       max_rel = std::max(max_rel, d / std::abs(exact));
     }
     ++count;
-    if (!within(got, exact)) {
+    if (!Within(got, exact)) {
       ++failures;
     }
   }
@@ -80,9 +80,9 @@ TEST(AngmomMoshinsky, MatchesExactReference) {
       double v;
       ASSERT_TRUE(static_cast<bool>(s >> na >> la >> nb >> lb >> p >> v))
           << line;
-      const double got = talmi_b(HoNL{na, la}, HoNL{nb, lb}, p);
-      talmi.add(got, v);
-      if (!within(got, v) && talmi.failures <= 20) {
+      const double got = TalmiB(HoNL{na, la}, HoNL{nb, lb}, p);
+      talmi.Add(got, v);
+      if (!Within(got, v) && talmi.failures <= 20) {
         ADD_FAILURE() << line << " got " << got;
       }
       continue;
@@ -95,9 +95,9 @@ TEST(AngmomMoshinsky, MatchesExactReference) {
                                   l2 >> lam >> v))
         << line;
     const double got =
-        moshinsky(HoNL{N, L}, HoNL{n, l}, HoNL{n1, l1}, HoNL{n2, l2}, lam);
-    mosh.add(got, v);
-    if (!within(got, v) && mosh.failures <= 20) {
+        Moshinsky(HoNL{N, L}, HoNL{n, l}, HoNL{n1, l1}, HoNL{n2, l2}, lam);
+    mosh.Add(got, v);
+    if (!Within(got, v) && mosh.failures <= 20) {
       ADD_FAILURE() << line << " got " << got;
     }
   }
@@ -131,9 +131,9 @@ TEST(AngmomMoshinsky, MatchesImsrgppSamples) {
                                     l2 >> lam >> v))
           << line;
       const double got =
-          moshinsky(HoNL{N, L}, HoNL{n, l}, HoNL{n1, l1}, HoNL{n2, l2}, lam);
-      mosh.add(got, v);
-      if (!within(got, v)) {
+          Moshinsky(HoNL{N, L}, HoNL{n, l}, HoNL{n1, l1}, HoNL{n2, l2}, lam);
+      mosh.Add(got, v);
+      if (!Within(got, v)) {
         ADD_FAILURE() << line << " got " << got;
       }
     } else if (tag == "talmib") {
@@ -141,9 +141,9 @@ TEST(AngmomMoshinsky, MatchesImsrgppSamples) {
       double v;
       ASSERT_TRUE(static_cast<bool>(s >> na >> la >> nb >> lb >> p >> v))
           << line;
-      const double got = talmi_b(HoNL{na, la}, HoNL{nb, lb}, p);
-      talmi.add(got, v);
-      if (!within(got, v)) {
+      const double got = TalmiB(HoNL{na, la}, HoNL{nb, lb}, p);
+      talmi.Add(got, v);
+      if (!Within(got, v)) {
         ADD_FAILURE() << line << " got " << got;
       }
     }
@@ -244,8 +244,8 @@ TEST(AngmomMoshinsky, TalmiSumRules) {
       for (int np = 0; np <= 6; ++np) {
         double s0 = 0.0, m0 = 0.0, s2 = 0.0, m2 = 0.0;
         for (int p = 0; p <= l + n + np; ++p) {
-          const double B = talmi_b(HoNL{n, l}, HoNL{np, l}, p);
-          const double I2 = talmi_integral(p, 2.0);
+          const double B = TalmiB(HoNL{n, l}, HoNL{np, l}, p);
+          const double I2 = TalmiIntegral(p, 2.0);
           s0 += B;
           m0 += std::abs(B);
           s2 += B * I2;
@@ -284,30 +284,30 @@ TEST(AngmomMoshinsky, TalmiSumRules) {
   EXPECT_EQ(bad, 0);
 
   for (int p = 0; p <= 30; ++p) {
-    EXPECT_NEAR(talmi_integral(p, 0.0), 1.0, 1e-13);
-    EXPECT_NEAR(talmi_integral(p, 2.0), p + 1.5, 1e-12 * (p + 2));
+    EXPECT_NEAR(TalmiIntegral(p, 0.0), 1.0, 1e-13);
+    EXPECT_NEAR(TalmiIntegral(p, 2.0), p + 1.5, 1e-12 * (p + 2));
   }
 }
 
 TEST(AngmomDoubleDouble, Arithmetic) {
   using namespace imsrg::angmom::detail;
   // (1/3)*3 == 1 to dd precision.
-  const DD third = dd(1.0) / dd(3.0);
-  const DD one = third * dd(3.0);
-  EXPECT_LT(std::abs((one - dd(1.0)).hi), 1e-31);
+  const DD third = Dd(1.0) / Dd(3.0);
+  const DD one = third * Dd(3.0);
+  EXPECT_LT(std::abs((one - Dd(1.0)).hi), 1e-31);
   // sqrt(2)^2 - 2.
-  const DD r2 = dd_sqrt(dd(2.0));
-  EXPECT_LT(std::abs((r2 * r2 - dd(2.0)).hi), 1e-31);
+  const DD r2 = DdSqrt(Dd(2.0));
+  EXPECT_LT(std::abs((r2 * r2 - Dd(2.0)).hi), 1e-31);
   // 2^(1/4) to 1e-31: (2^(1/4))^4 == 2.
-  const DD r4 = dd_sqrt(r2);
+  const DD r4 = DdSqrt(r2);
   const DD r4p = r4 * r4;
-  EXPECT_LT(std::abs((r4p * r4p - dd(2.0)).hi), 1e-31);
+  EXPECT_LT(std::abs((r4p * r4p - Dd(2.0)).hi), 1e-31);
   // 30! exactly against an integer product (30! < 2^108, use dd product of
   // exact small factors and compare with a __int128 product).
-  DD f = dd(1.0);
+  DD f = Dd(1.0);
   unsigned __int128 fi = 1;
   for (int i = 1; i <= 30; ++i) {
-    f = f * dd(i);
+    f = f * Dd(i);
     fi *= static_cast<unsigned>(i);
   }
   const double hi = static_cast<double>(fi);
@@ -323,9 +323,9 @@ TEST(AngmomDoubleDouble, ClebschGordanZeroMatchesDouble) {
   for (int l1 = 0; l1 <= 32; ++l1) {
     for (int l2 = 0; l2 <= 32; ++l2) {
       for (int L = std::abs(l1 - l2); L <= l1 + l2; ++L) {
-        const double ref = clebsch_gordan(TwoJ{2 * l1}, TwoM{0}, TwoJ{2 * l2},
-                                          TwoM{0}, TwoJ{2 * L}, TwoM{0});
-        const double got = imsrg::angmom::detail::dd_cg0(l1, l2, L);
+        const double ref = ClebschGordan(TwoJ{2 * l1}, TwoM{0}, TwoJ{2 * l2},
+                                         TwoM{0}, TwoJ{2 * L}, TwoM{0});
+        const double got = imsrg::angmom::detail::DdCg0(l1, l2, L);
         worst = std::max(worst, std::abs(got - ref));
         // The double-precision reference is the limiting side here: its error
         // reaches ~5e-12 at l ~ 30 (exact values below, from Python big
@@ -337,12 +337,12 @@ TEST(AngmomDoubleDouble, ClebschGordanZeroMatchesDouble) {
   std::cout << "[dd] cg0 max abs deviation " << worst << "\n";
   // Exact spot checks (the dd values are accurate to ~1e-17 where the double
   // ones are not).
-  EXPECT_NEAR(imsrg::angmom::detail::dd_cg0(11, 29, 32), 0.24719909357682662719,
+  EXPECT_NEAR(imsrg::angmom::detail::DdCg0(11, 29, 32), 0.24719909357682662719,
               1e-16);
-  EXPECT_NEAR(imsrg::angmom::detail::dd_cg0(27, 32, 37),
-              -0.16559883667476296171, 1e-16);
-  EXPECT_NEAR(imsrg::angmom::detail::dd_cg0(16, 29, 31),
-              -0.20414884248844674639, 1e-16);
+  EXPECT_NEAR(imsrg::angmom::detail::DdCg0(27, 32, 37), -0.16559883667476296171,
+              1e-16);
+  EXPECT_NEAR(imsrg::angmom::detail::DdCg0(16, 29, 31), -0.20414884248844674639,
+              1e-16);
 }
 
 TEST(AngmomDoubleDouble, NineJMatchesDouble) {
@@ -359,11 +359,11 @@ TEST(AngmomDoubleDouble, NineJMatchesDouble) {
     const int c = std::abs(a - b) + rnd(std::min(2 * std::min(a, b) + 1, 9));
     const int f = std::abs(d - e) + rnd(std::min(2 * std::min(d, e) + 1, 9));
     const int i = std::abs(g - h) + rnd(std::min(2 * std::min(g, h) + 1, 9));
-    const double ref = wigner_9j(TwoJ{2 * a}, TwoJ{2 * b}, TwoJ{2 * c},
-                                 TwoJ{2 * d}, TwoJ{2 * e}, TwoJ{2 * f},
-                                 TwoJ{2 * g}, TwoJ{2 * h}, TwoJ{2 * i});
+    const double ref = Wigner9j(TwoJ{2 * a}, TwoJ{2 * b}, TwoJ{2 * c},
+                                TwoJ{2 * d}, TwoJ{2 * e}, TwoJ{2 * f},
+                                TwoJ{2 * g}, TwoJ{2 * h}, TwoJ{2 * i});
     const double got =
-        imsrg::angmom::detail::dd_ninej(a, b, c, d, e, f, g, h, i);
+        imsrg::angmom::detail::DdNinej(a, b, c, d, e, f, g, h, i);
     if (ref == 0.0 && got == 0.0) {
       continue;
     }
@@ -379,10 +379,10 @@ TEST(AngmomDoubleDouble, NineJMatchesDouble) {
 // Beyond the supported energy the bracket fails visibly (NaN) and tables refuse
 // to build.
 TEST(Moshinsky, BeyondMaxEnergyIsNaNAndTableRefuses) {
-  const int e = moshinsky_max_energy + 1;
+  const int e = kMoshinskyMaxEnergy + 1;
   EXPECT_TRUE(
-      std::isnan(moshinsky(HoNL{0, 0}, HoNL{0, e}, HoNL{0, e}, HoNL{0, 0}, e)));
-  EXPECT_EQ(moshinsky(HoNL{0, 0}, HoNL{0, 2}, HoNL{0, 1}, HoNL{0, 0}, 1),
+      std::isnan(Moshinsky(HoNL{0, 0}, HoNL{0, e}, HoNL{0, e}, HoNL{0, 0}, e)));
+  EXPECT_EQ(Moshinsky(HoNL{0, 0}, HoNL{0, 2}, HoNL{0, 1}, HoNL{0, 0}, 1),
             0.0);  // E not conserved
   EXPECT_THROW(MoshinskyTable table(e), imsrg::InvariantError);
 }

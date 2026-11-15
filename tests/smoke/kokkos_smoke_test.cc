@@ -24,7 +24,7 @@ namespace imsrg_smoke {
 using Policy = Kokkos::RangePolicy<Kokkos::IndexType<std::int64_t>>;
 
 /// Sum of 0..n-1 in 64-bit integers on the default execution space.
-std::int64_t sum_indices(std::int64_t n) {
+std::int64_t SumIndices(std::int64_t n) {
   std::int64_t sum = 0;
   Kokkos::parallel_reduce(
       "imsrg::smoke::sum_indices", Policy(0, n),
@@ -37,7 +37,7 @@ std::int64_t sum_indices(std::int64_t n) {
 
 /// Fills a View of length n with values(i) = i/2 on the default execution
 /// space.
-Kokkos::View<double*> half_indices(std::int64_t n) {
+Kokkos::View<double*> HalfIndices(std::int64_t n) {
   Kokkos::View<double*> values("imsrg::smoke::values", n);
   Kokkos::parallel_for(
       "imsrg::smoke::fill", Policy(0, n), KOKKOS_LAMBDA(const std::int64_t i) {
@@ -47,7 +47,7 @@ Kokkos::View<double*> half_indices(std::int64_t n) {
 }
 
 /// Sum of all entries of values on the default execution space.
-double sum_values(const Kokkos::View<double*>& values) {
+double SumValues(const Kokkos::View<double*>& values) {
   double sum = 0.0;
   Kokkos::parallel_reduce(
       "imsrg::smoke::sum_values",
@@ -76,17 +76,17 @@ TEST(KokkosSmoke, DefaultExecutionSpaceIsConfiguredBackend) {
 // Exact in 64-bit integers, so any lost or duplicated iteration shows up.
 TEST(KokkosSmoke, ParallelReduceSumsIndices) {
   constexpr std::int64_t n = 1'000'003;
-  EXPECT_EQ(imsrg_smoke::sum_indices(n), n * (n - 1) / 2);
+  EXPECT_EQ(imsrg_smoke::SumIndices(n), n * (n - 1) / 2);
 }
 
 // Fill a View in the default memory space, reduce it there, and check a host
 // mirror.
 TEST(KokkosSmoke, ParallelForThenReduceOverView) {
   constexpr std::int64_t n = 4096;
-  const auto values = imsrg_smoke::half_indices(n);
+  const auto values = imsrg_smoke::HalfIndices(n);
   // Every partial sum is a multiple of 0.5 below 2^53, so the result is exact
   // in any order.
-  EXPECT_EQ(imsrg_smoke::sum_values(values),
+  EXPECT_EQ(imsrg_smoke::SumValues(values),
             0.25 * static_cast<double>(n) * static_cast<double>(n - 1));
   auto host = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), values);
   EXPECT_EQ(host(n - 1), 0.5 * static_cast<double>(n - 1));

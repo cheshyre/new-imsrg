@@ -16,16 +16,16 @@ namespace imsrg::op::detail {
 /// y[i] += a * x[i] for every element. Precondition: x.size() == y.size()
 /// (IMSRG_CHECK). Asynchronous on async backends. O(n), embarrassingly
 /// parallel.
-void axpy(double a, const exec::DeviceBuffer<double>& x,
+void Axpy(double a, const exec::DeviceBuffer<double>& x,
           exec::DeviceBuffer<double>& y);
 
 /// x[i] *= a for every element. Asynchronous on async backends. O(n).
-void scale(double a, exec::DeviceBuffer<double>& x);
+void Scale(double a, exec::DeviceBuffer<double>& x);
 
 /// Sum of x[i]^2 over i in [offset, offset + count). Precondition: the range
 /// lies inside x (IMSRG_CHECK). Blocking (device reduction). O(count).
-double sum_of_squares(const exec::DeviceBuffer<double>& x, std::int64_t offset,
-                      std::int64_t count);
+double SumOfSquares(const exec::DeviceBuffer<double>& x, std::int64_t offset,
+                    std::int64_t count);
 
 }  // namespace imsrg::op::detail
 

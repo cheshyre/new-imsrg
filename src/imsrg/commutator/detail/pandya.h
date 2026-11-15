@@ -7,7 +7,7 @@
 /// @file
 /// Precomputed data of the particle-hole term comm222_phss (design/12 section
 /// 4.2; imsrg++ `comm222_phss`, reference/02 P-12). Everything is allocated
-/// once per model space by `build_pandya_data`; a call of the term only fills
+/// once per model space by `BuildPandyaData`; a call of the term only fills
 /// the scratch buffers. No Kokkos.
 ///
 /// Conventions. For every cross-coupled (Pandya) channel c of the model space
@@ -109,10 +109,10 @@ struct PandyaData {
 
   /// Trivially copyable view for kernels, cached at build time; valid while
   /// this object lives.
-  PandyaView view_;
+  PandyaView kernel_view;
 
   /// The kernel view. O(1).
-  const PandyaView& view() const noexcept { return view_; }
+  const PandyaView& view() const noexcept { return kernel_view; }
 
   /// Total size of the four scratch buffers in bytes (XK + YK + W + ZB). O(1).
   std::size_t scratch_bytes() const noexcept {
@@ -127,7 +127,7 @@ struct PandyaData {
 /// cc channels of Ncc (2 nk + 4 Ncc)) doubles: XK (Ncc nk) + YK (2 Ncc nk) + W
 /// and ZB (2 Ncc^2 each), i.e. Ncc (3 nk + 4 Ncc); `scratch_bytes()` reports
 /// it.
-PandyaData build_pandya_data(const basis::ModelSpace& ms);
+PandyaData BuildPandyaData(const basis::ModelSpace& ms);
 
 }  // namespace imsrg::commutator::detail
 

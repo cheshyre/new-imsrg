@@ -21,9 +21,9 @@ namespace {
 using namespace imsrg;
 using commutator::Workspace;
 using commutator_test::kTol;
-using imsrg::testing::random_operator;
-using imsrg::testing::read_golden;
-using imsrg::testing::relative_deviation;
+using imsrg::testing::RandomOperator;
+using imsrg::testing::ReadGolden;
+using imsrg::testing::RelativeDeviation;
 using op::Operator;
 
 using FastFn = void (*)(const Operator&, const Operator&, Operator&,
@@ -37,30 +37,30 @@ struct TermCase {
 };
 
 const TermCase kTerms[] = {
-    {"comm110ss", &commutator::terms::comm110ss, &commutator_ref::comm110ss},
-    {"comm220ss", &commutator::terms::comm220ss, &commutator_ref::comm220ss},
-    {"comm111ss", &commutator::terms::comm111ss, &commutator_ref::comm111ss},
-    {"comm121ss", &commutator::terms::comm121ss, &commutator_ref::comm121ss},
-    {"comm122ss", &commutator::terms::comm122ss, &commutator_ref::comm122ss},
+    {"comm110ss", &commutator::terms::Comm110ss, &commutator_ref::Comm110ss},
+    {"comm220ss", &commutator::terms::Comm220ss, &commutator_ref::Comm220ss},
+    {"comm111ss", &commutator::terms::Comm111ss, &commutator_ref::Comm111ss},
+    {"comm121ss", &commutator::terms::Comm121ss, &commutator_ref::Comm121ss},
+    {"comm122ss", &commutator::terms::Comm122ss, &commutator_ref::Comm122ss},
 };
 
 TEST(commutator_simple_terms, golden) {
-  for (const auto& p : commutator_test::golden_pairs()) {
+  for (const auto& p : commutator_test::GoldenPairs()) {
     const auto ms =
-        imsrg::testing::golden_model_space(commutator_test::dump_path(p, p.y));
+        imsrg::testing::GoldenModelSpace(commutator_test::DumpPath(p, p.y));
     Workspace ws(ms);
-    const Operator X = read_golden(commutator_test::dump_path(p, p.x), ms);
-    const Operator Y = read_golden(commutator_test::dump_path(p, p.y), ms);
+    const Operator X = ReadGolden(commutator_test::DumpPath(p, p.x), ms);
+    const Operator Y = ReadGolden(commutator_test::DumpPath(p, p.y), ms);
     for (const auto& t : kTerms) {
-      const std::string file = commutator_test::result_path(p, t.name);
-      if (!std::filesystem::exists(imsrg::testing::golden_path(file))) {
+      const std::string file = commutator_test::ResultPath(p, t.name);
+      if (!std::filesystem::exists(imsrg::testing::GoldenPath(file))) {
         std::printf("[golden] %s %s: %s, %s: no golden file, skipped\n",
                     p.dir.c_str(), t.name, p.x.c_str(), p.y.c_str());
         continue;
       }
-      Operator Z(ms, commutator::commutator_spec(X.spec(), Y.spec()));
+      Operator Z(ms, commutator::CommutatorSpec(X.spec(), Y.spec()));
       t.fast(X, Y, Z, ws);
-      const double dev = relative_deviation(Z, read_golden(file, ms));
+      const double dev = RelativeDeviation(Z, ReadGolden(file, ms));
       std::printf("[golden] %s %s: %s, %s: %.3e\n", p.dir.c_str(), t.name,
                   p.x.c_str(), p.y.c_str(), dev);
       EXPECT_LE(dev, kTol) << p.dir << " " << t.name << " " << p.x << " "
@@ -70,19 +70,19 @@ TEST(commutator_simple_terms, golden) {
 }
 
 TEST(commutator_simple_terms, fast_vs_reference) {
-  for (const auto& sc : commutator_test::space_cases()) {
-    const auto ms = commutator_test::make_space(sc);
+  for (const auto& sc : commutator_test::SpaceCases()) {
+    const auto ms = commutator_test::MakeSpace(sc);
     Workspace ws(ms);
-    for (const auto& hp : commutator_test::herm_pairs()) {
-      const Operator X = random_operator(ms, hp.x, 11, hp.rank_x);
-      const Operator Y = random_operator(ms, hp.y, 29, hp.rank_y);
+    for (const auto& hp : commutator_test::HermPairs()) {
+      const Operator X = RandomOperator(ms, hp.x, 11, hp.rank_x);
+      const Operator Y = RandomOperator(ms, hp.y, 29, hp.rank_y);
       for (const auto& t : kTerms) {
-        const auto spec = commutator::commutator_spec(X.spec(), Y.spec());
+        const auto spec = commutator::CommutatorSpec(X.spec(), Y.spec());
         Operator Z(ms, spec);
         Operator Zref(ms, spec);
         t.fast(X, Y, Z, ws);
         t.ref(X, Y, Zref);
-        const double dev = relative_deviation(Z, Zref);
+        const double dev = RelativeDeviation(Z, Zref);
         std::printf("[fast-vs-ref] %s %s %s: %.3e\n", sc.label.c_str(),
                     hp.label, t.name, dev);
         EXPECT_LE(dev, kTol) << sc.label << " " << hp.label << " " << t.name;
@@ -92,11 +92,11 @@ TEST(commutator_simple_terms, fast_vs_reference) {
 }
 
 TEST(commutator_simple_terms, nonhermitian_input_throws) {
-  const auto ms = imsrg::testing::model_space(1, "He4");
+  const auto ms = imsrg::testing::MakeModelSpace(1, "He4");
   Workspace ws(ms);
-  const Operator X = random_operator(ms, Hermiticity::NonHermitian, 3);
-  const Operator Y = random_operator(ms, Hermiticity::Hermitian, 4);
-  Operator Z(ms, op::OperatorSpec::scalar(2, Hermiticity::AntiHermitian));
+  const Operator X = RandomOperator(ms, Hermiticity::kNonHermitian, 3);
+  const Operator Y = RandomOperator(ms, Hermiticity::kHermitian, 4);
+  Operator Z(ms, op::OperatorSpec::Scalar(2, Hermiticity::kAntiHermitian));
   for (const auto& t : kTerms) {
     EXPECT_THROW(t.fast(X, Y, Z, ws), NotImplementedError) << t.name;
     EXPECT_THROW(t.fast(Y, X, Z, ws), NotImplementedError) << t.name;

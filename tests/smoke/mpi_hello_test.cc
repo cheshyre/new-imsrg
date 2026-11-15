@@ -6,7 +6,7 @@
 /// smoke_mpi_hello --expected-ranks=N`; it checks the size of MPI_COMM_WORLD,
 /// the rank range, and an allreduce. Every rank runs the tests; the exit code
 /// is the maximum over ranks, so a failure on any rank fails the CTest test.
-/// Uses MPI directly because the imsrg::comm facade arrives in M2.
+/// Uses MPI directly because the imsrg::Comm facade arrives in M2.
 
 #include <cstdio>
 #include <cstring>

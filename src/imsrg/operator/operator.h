@@ -28,7 +28,7 @@ namespace imsrg::op {
 /// ordered: the normal-ordering functions say it in their names, and the model
 /// space's reference is the one they use by default. Combining two operators
 /// checks that their model spaces are the same object or structurally equal
-/// (`same_model_space`).
+/// (`SameModelSpace`).
 ///
 /// Memory model at API boundaries (design/12 section 2): between calls the
 /// DEVICE data of the parts are authoritative. Library functions (arithmetic,
@@ -36,8 +36,8 @@ namespace imsrg::op {
 /// device data of their operator arguments and return results whose device data
 /// are current; their host mirrors may be stale. The host element accessors of
 /// the parts (`get`, `set`, `set_normalized`, `host_view`, ...) work on the
-/// host mirror: call `sync_to_host()` before host reads that follow a library
-/// call, and `sync_to_device()` after host writes, before the operator is
+/// host mirror: call `SyncToHost()` before host reads that follow a library
+/// call, and `SyncToDevice()` after host writes, before the operator is
 /// passed on. On Serial/OpenMP the mirror aliases the device data and both
 /// calls are fences only.
 ///
@@ -53,7 +53,7 @@ class Operator {
   /// `empty()` are valid.
   Operator() = default;
   /// The zero operator of kind `spec` on `ms`.
-  /// @throws InputError / NotImplementedError from `validate(spec)`.
+  /// @throws InputError / NotImplementedError from `Validate(spec)`.
   /// @throws InvariantError if `ms` is null.
   Operator(std::shared_ptr<const basis::ModelSpace> ms,
            const OperatorSpec& spec);
@@ -97,9 +97,9 @@ class Operator {
   /// Sets all parts to zero (imsrg++ `Erase`).
   void set_zero();
   /// Syncs the device data of all parts to their host mirrors (see `OneBody`).
-  void sync_to_host();
+  void SyncToHost();
   /// Syncs the host mirrors of all parts to the device data (see `OneBody`).
-  void sync_to_device();
+  void SyncToDevice();
 
  private:
   std::shared_ptr<const basis::ModelSpace> ms_;
@@ -114,7 +114,7 @@ class Operator {
 /// structurally equal (`basis::ModelSpace::operator==`: same basis, occupations
 /// and partition). Empty operators are never on the same model space. O(1) for
 /// the same object, O(norb) otherwise.
-bool same_model_space(const Operator& a, const Operator& b) noexcept;
+bool SameModelSpace(const Operator& a, const Operator& b) noexcept;
 
 }  // namespace imsrg::op
 

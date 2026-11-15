@@ -36,7 +36,7 @@ struct ConfigSources {
   std::string command_line;  ///< recorded in the provenance
 };
 
-/// Options of `load_config`.
+/// Options of `LoadConfig`.
 struct LoadOptions {
   bool check_files =
       true;  ///< V-14 preflight of input files and output directories
@@ -47,8 +47,8 @@ struct LoadOptions {
 /// args, warnings, applied rules) and the warnings are in
 /// `provenance.warnings`. On failure the error holds all issues found (errors
 /// and warnings). Never throws for bad input.
-Expected<RunConfig, ConfigIssues> load_config(const ConfigSources& sources,
-                                              const LoadOptions& options = {});
+Expected<RunConfig, ConfigIssues> LoadConfig(const ConfigSources& sources,
+                                             const LoadOptions& options = {});
 
 }  // namespace imsrg::driver
 

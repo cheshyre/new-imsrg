@@ -37,26 +37,26 @@ struct FamilyStats {
 
 /// Evaluates the symbol of `family` for the doubled arguments `a`; returns
 /// false if the family is unknown.
-bool evaluate(const std::string& family, const std::vector<int>& a,
+bool Evaluate(const std::string& family, const std::vector<int>& a,
               double* out) {
   auto J = [&](int i) { return TwoJ{a[static_cast<std::size_t>(i)]}; };
   auto M = [&](int i) { return TwoM{a[static_cast<std::size_t>(i)]}; };
   namespace am = imsrg::angmom;
   if (family == "cg_sp" || family == "cg_ls" || family == "cg_l0") {
-    *out = am::clebsch_gordan(J(0), M(1), J(2), M(3), J(4), M(5));
+    *out = am::ClebschGordan(J(0), M(1), J(2), M(3), J(4), M(5));
   } else if (family == "3j_sp") {
-    *out = am::wigner_3j(J(0), J(1), J(2), M(3), M(4), M(5));
+    *out = am::Wigner3j(J(0), J(1), J(2), M(3), M(4), M(5));
   } else if (family == "6j_pandya" || family == "6j_3b") {
-    *out = am::wigner_6j(J(0), J(1), J(2), J(3), J(4), J(5));
+    *out = am::Wigner6j(J(0), J(1), J(2), J(3), J(4), J(5));
   } else if (family == "9j_lsjj" || family == "9j_sample") {
-    *out = am::wigner_9j(J(0), J(1), J(2), J(3), J(4), J(5), J(6), J(7), J(8));
+    *out = am::Wigner9j(J(0), J(1), J(2), J(3), J(4), J(5), J(6), J(7), J(8));
   } else {
     return false;
   }
   return true;
 }
 
-std::size_t arg_count(const std::string& family) {
+std::size_t ArgCount(const std::string& family) {
   return family.rfind("9j", 0) == 0 ? 9 : 6;
 }
 
@@ -80,14 +80,14 @@ TEST(WignerReference, AgainstSympyExact) {
     std::istringstream is(line);
     std::string family;
     is >> family;
-    std::vector<int> a(arg_count(family));
+    std::vector<int> a(ArgCount(family));
     for (int& x : a) is >> x;
     std::string value_text;
     is >> value_text;
     ASSERT_TRUE(static_cast<bool>(is)) << "malformed reference line: " << line;
     const double exact = std::strtod(value_text.c_str(), nullptr);
     double got = 0.0;
-    ASSERT_TRUE(evaluate(family, a, &got))
+    ASSERT_TRUE(Evaluate(family, a, &got))
         << "unknown family in line: " << line;
 
     FamilyStats& s = stats[family];

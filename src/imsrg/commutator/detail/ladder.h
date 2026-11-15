@@ -67,7 +67,7 @@ struct LadderData {
 /// `op::TwoBody` (dense column-major N x N blocks back to back in channel
 /// order, the same offsets as `Workspace::Impl:: block_offsets`). Complexity
 /// O(number of kets + buffer sizes).
-LadderData build_ladder_data(const basis::ModelSpace& ms);
+LadderData BuildLadderData(const basis::ModelSpace& ms);
 
 }  // namespace imsrg::commutator::detail
 

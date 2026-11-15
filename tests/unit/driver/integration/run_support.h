@@ -5,7 +5,7 @@
 #define TESTS_UNIT_DRIVER_INTEGRATION_RUN_SUPPORT_H_
 /// @file
 /// Helpers shared by the driver integration tests: temporary output
-/// directories, the flow-CSV reader, and `execute()`, which loads a config,
+/// directories, the flow-CSV reader, and `Execute()`, which loads a config,
 /// runs the pipeline and collects the `results.json` / flow CSV outputs of the
 /// documented output contract.
 
@@ -49,7 +49,7 @@ struct FlowTable {
 
 /// Reads a comma separated flow file with a header line. @throws
 /// std::runtime_error if missing.
-inline FlowTable read_flow(const fs::path& path) {
+inline FlowTable ReadFlow(const fs::path& path) {
   std::ifstream in(path);
   if (!in) throw std::runtime_error("cannot open flow file " + path.string());
   FlowTable t;
@@ -73,7 +73,7 @@ inline FlowTable read_flow(const fs::path& path) {
 }
 
 /// Reads a whole text file. @throws std::runtime_error if missing.
-inline std::string slurp(const fs::path& path) {
+inline std::string Slurp(const fs::path& path) {
   std::ifstream in(path);
   if (!in) throw std::runtime_error("cannot open " + path.string());
   std::ostringstream os;
@@ -83,7 +83,7 @@ inline std::string slurp(const fs::path& path) {
 
 /// A fresh, empty directory `<tmp>/imsrg_it_<tag>_<pid-independent counter>`;
 /// any earlier directory of the same name is removed first.
-inline fs::path fresh_dir(const std::string& tag) {
+inline fs::path FreshDir(const std::string& tag) {
   // CTest runs every test case in its own process, in parallel, and the
   // IT-2/IT-6/IT-12 cases each repeat the shared run: the process id keeps
   // their output directories apart.
@@ -96,21 +96,21 @@ inline fs::path fresh_dir(const std::string& tag) {
 }
 
 /// Absolute path of an input file below `IMSRG_TEST_DATA_DIR`.
-inline fs::path data_file(const std::string& name) {
+inline fs::path DataFile(const std::string& name) {
   return fs::path(IMSRG_TEST_DATA_DIR) / name;
 }
 
 /// Absolute path of a golden file below `IMSRG_GOLDEN_DIR/e2e`.
-inline fs::path golden_file(const std::string& rel) {
+inline fs::path GoldenFile(const std::string& rel) {
   return fs::path(IMSRG_GOLDEN_DIR) / "e2e" / rel;
 }
 
 /// The 2N interaction file used by every integration test.
-inline const char* two_body_name() {
+inline const char* TwoBodyName() {
   return "VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz";
 }
 /// The NO2B 3N file used by IT-4.
-inline const char* three_body_name() {
+inline const char* ThreeBodyName() {
   return "NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin";
 }
 
@@ -120,27 +120,27 @@ struct RunResult {
   fs::path directory;
   Json results;          ///< parsed `results.json`
   FlowTable flow;        ///< parsed flow CSV (empty if the run wrote none)
-  bool planned = false;  ///< `run()` is not implemented yet (E-PLANNED)
+  bool planned = false;  ///< `Run()` is not implemented yet (E-PLANNED)
   std::string note;      ///< diagnostic for `planned`
 };
 
-/// Loads `sources`, runs the pipeline and parses the outputs. `run()` throwing
+/// Loads `sources`, runs the pipeline and parses the outputs. `Run()` throwing
 /// an error whose message contains "E-PLANNED" sets `planned` instead of
 /// throwing. Other failures throw `std::runtime_error` carrying every config
 /// issue or the run's message.
-inline RunResult execute(const driver::ConfigSources& sources,
+inline RunResult Execute(const driver::ConfigSources& sources,
                          const fs::path& directory) {
   RunResult r;
   r.directory = directory;
-  auto loaded = driver::load_config(sources);
+  auto loaded = driver::LoadConfig(sources);
   if (!loaded.has_value()) {
     std::string msg = "config rejected:";
-    for (const auto& issue : loaded.error()) msg += "\n  " + issue.to_string();
+    for (const auto& issue : loaded.error()) msg += "\n  " + issue.ToString();
     throw std::runtime_error(msg);
   }
   r.config = loaded.value();
   try {
-    driver::run(r.config);
+    driver::Run(r.config);
   } catch (const std::exception& e) {
     if (std::string(e.what()).find("E-PLANNED") != std::string::npos) {
       r.planned = true;
@@ -149,11 +149,11 @@ inline RunResult execute(const driver::ConfigSources& sources,
     }
     throw;
   }
-  r.results = parse_json(slurp(directory / "results.json"));
+  r.results = ParseJson(Slurp(directory / "results.json"));
   const fs::path flow_path = r.config.output.flow_file.empty()
                                  ? directory / (r.config.output.stem + ".flow")
                                  : fs::path(r.config.output.flow_file);
-  if (fs::exists(flow_path)) r.flow = read_flow(flow_path);
+  if (fs::exists(flow_path)) r.flow = ReadFlow(flow_path);
   return r;
 }
 
@@ -161,18 +161,18 @@ inline RunResult execute(const driver::ConfigSources& sources,
 /// into `dir`. `extra` is appended verbatim (further tables such as `[valence]`
 /// or `[operators]`); keys of tables already open at the end must not be
 /// repeated there.
-inline std::string toml_text(const fs::path& dir, const std::string& nucleus,
-                             const std::string& extra, bool three_body = false,
-                             const std::string& smax = "") {
+inline std::string TomlText(const fs::path& dir, const std::string& nucleus,
+                            const std::string& extra, bool three_body = false,
+                            const std::string& smax = "") {
   std::ostringstream t;
   t << "[basis]\nemax = 4\nhw = 16.0\n\n"
     << "[reference]\nnucleus = \"" << nucleus << "\"\n\n"
-    << "[interaction.two_body]\nfile = \""
-    << data_file(two_body_name()).string() << "\"\n"
+    << "[interaction.two_body]\nfile = \"" << DataFile(TwoBodyName()).string()
+    << "\"\n"
     << "e1max = 14\ne2max = 28\nlmax = 14\n\n";
   if (three_body)
     t << "[interaction.three_body]\nfile = \""
-      << data_file(three_body_name()).string() << "\"\n"
+      << DataFile(ThreeBodyName()).string() << "\"\n"
       << "type = \"no2b\"\ne1max = 6\ne2max = 12\ne3max = 18\n\n";
   t << "[imsrg]\nmethod = \"magnus\"\n\n";
   if (!smax.empty()) t << "[imsrg.step]\nsmax = " << smax << "\n\n";

@@ -26,17 +26,17 @@ namespace imsrg::detail {
 
 /// Throws `InvariantError` describing a failed check. Not for direct use; see
 /// `IMSRG_CHECK`.
-[[noreturn]] void check_failed(const char* condition, const char* file,
-                               int line, std::string_view message = {});
+[[noreturn]] void CheckFailed(const char* condition, const char* file, int line,
+                              std::string_view message = {});
 
 }  // namespace imsrg::detail
 
-#define IMSRG_CHECK(cond, ...)                                            \
-  do {                                                                    \
-    if (!(cond)) {                                                        \
-      ::imsrg::detail::check_failed(#cond, __FILE__,                      \
-                                    __LINE__ __VA_OPT__(, ) __VA_ARGS__); \
-    }                                                                     \
+#define IMSRG_CHECK(cond, ...)                                           \
+  do {                                                                   \
+    if (!(cond)) {                                                       \
+      ::imsrg::detail::CheckFailed(#cond, __FILE__,                      \
+                                   __LINE__ __VA_OPT__(, ) __VA_ARGS__); \
+    }                                                                    \
   } while (false)
 
 #if !defined(NDEBUG) || defined(IMSRG_ENABLE_ASSERTS)

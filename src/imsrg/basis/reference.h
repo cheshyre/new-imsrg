@@ -39,21 +39,21 @@ namespace imsrg::basis {
 /// sizes agree. Value type: copies are independent.
 class Reference {
  public:
-  /// The naive shell-model filling of `nucleus` (`naive_filling(nucleus,
+  /// The naive shell-model filling of `nucleus` (`NaiveFilling(nucleus,
   /// basis.emax())`), as imsrg++ builds the reference from a nucleus name
   /// (ModelSpace.cc:213-221). `name()` is `nucleus.name()`.
   /// @throws InputError if the nucleus does not fit into shells e <= emax, or
   ///         an occupied orbit is not in the basis (e.g. removed by an lmax
   ///         cut; imsrg++ exits in `SetLmax`).
-  static Reference from_nucleus(const SingleParticleBasis& basis,
-                                const Nucleus& nucleus);
+  static Reference FromNucleus(const SingleParticleBasis& basis,
+                               const Nucleus& nucleus);
 
   /// Explicit occupations, one per orbit of `basis` in index order.
   /// @throws InputError if the size differs from basis.num_orbits() or a value
   ///         is outside [0, 1] (or not finite).
-  static Reference from_occupations(const SingleParticleBasis& basis,
-                                    std::vector<double> occupations,
-                                    std::string name = "custom");
+  static Reference FromOccupations(const SingleParticleBasis& basis,
+                                   std::vector<double> occupations,
+                                   std::string name = "custom");
 
   /// Occupations of listed orbits, all others empty: the semantics of an
   /// imsrg++ occupation file (`Init_occ_from_file`, ModelSpace.cc:319-355;
@@ -61,7 +61,7 @@ class Reference {
   /// in imsrg++; a later entry for the same orbit overrides an earlier one.
   /// @throws InputError if a listed orbit is not in the basis or an occupation
   ///         is outside [0, 1].
-  static Reference from_orbit_occupations(
+  static Reference FromOrbitOccupations(
       const SingleParticleBasis& basis,
       std::span<const OrbitOccupation> entries, std::string name = "custom");
 

@@ -20,19 +20,19 @@ struct Pod {
 };
 
 /// a[i] = 2 i.
-void fill_twice_index(DeviceBuffer<double>& a);
+void FillTwiceIndex(DeviceBuffer<double>& a);
 /// Exact sum of a[i] (integer valued).
-std::int64_t sum(const DeviceBuffer<std::int64_t>& a);
+std::int64_t Sum(const DeviceBuffer<std::int64_t>& a);
 /// Maximum of a[i]; the lowest int64 for an empty buffer.
-std::int64_t max_value(const DeviceBuffer<std::int64_t>& a);
+std::int64_t MaxValue(const DeviceBuffer<std::int64_t>& a);
 /// m(i, j) = 100 i + j for an n0 x n1 row-major matrix stored in `m`.
-void fill_matrix(DeviceBuffer<std::int64_t>& m, std::int64_t n0,
-                 std::int64_t n1);
+void FillMatrix(DeviceBuffer<std::int64_t>& m, std::int64_t n0,
+                std::int64_t n1);
 /// sums[t] = sum_j m(t, j) for each row t, via team_for with team scratch.
-void row_sums_team(const DeviceBuffer<std::int64_t>& m, std::int64_t n0,
-                   std::int64_t n1, DeviceBuffer<std::int64_t>& sums);
+void RowSumsTeam(const DeviceBuffer<std::int64_t>& m, std::int64_t n0,
+                 std::int64_t n1, DeviceBuffer<std::int64_t>& sums);
 /// p[i] = {i, i, -i}.
-void fill_pods(DeviceBuffer<Pod>& p);
+void FillPods(DeviceBuffer<Pod>& p);
 
 }  // namespace imsrg::exec::test
 

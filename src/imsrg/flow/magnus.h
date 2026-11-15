@@ -59,10 +59,10 @@ struct FlowStatus {
 
 /// Why `solve` stopped.
 enum class StopReason : std::uint8_t {
-  Converged,    ///< ||eta|| < eta_criterion.
-  SmaxReached,  ///< s >= smax.
-  Diverged  ///< ||eta|| > 1e12 or |E0| > 1e9 (imsrg++ guard; imsrg++ then fills
-            ///< H with inf).
+  kConverged,    ///< ||eta|| < eta_criterion.
+  kSmaxReached,  ///< s >= smax.
+  kDiverged      ///< ||eta|| > 1e12 or |E0| > 1e9 (imsrg++ guard; imsrg++ then
+                 ///< fills H with inf).
 };
 
 /// Summary of one `solve` call.
@@ -71,7 +71,7 @@ struct SolveResult {
   double s = 0.0;   ///< Final s.
   double e0 = 0.0;  ///< Final zero-body part of H(s).
   double norm_eta = 0.0;
-  StopReason reason = StopReason::SmaxReached;
+  StopReason reason = StopReason::kSmaxReached;
 };
 
 /// Magnus solver state: H_0, H(s), eta(s), the Omega stack and s (imsrg++
@@ -115,16 +115,16 @@ class MagnusSolver {
   ///     ds = min(domega/||eta||, domega/||eta||/(||Omega||+1e-9),
   ///              (omega_norm_max+1e-5)/||eta||, dsmax) (if magnus_adaptive);
   ///     ds = min(ds, smax - s); s += ds;
-  ///     Omega_last = bch_product(eta ds, Omega_last);
-  ///     H = bch_transform(stack size < 2 ? H_0 : H_saved, Omega_last);
+  ///     Omega_last = BchProduct(eta ds, Omega_last);
+  ///     H = BchTransform(stack size < 2 ? H_0 : H_saved, Omega_last);
   ///     eta = generator(H).
   /// `on_status` (optional) receives the istep-0 line and one line per step.
-  SolveResult solve(const StatusCallback& on_status = {});
+  SolveResult Solve(const StatusCallback& on_status = {});
 
   /// e^Omega_n ... e^Omega_1 O e^-Omega_1 ... e^-Omega_n: replays the Omega
-  /// stack in chronological order with `bch_transform` (imsrg++
+  /// stack in chronological order with `BchTransform` (imsrg++
   /// `IMSRGSolver::Transform`). O must live on the solver's model space.
-  op::Operator transform(const op::Operator& O);
+  op::Operator Transform(const op::Operator& O);
 
   /// H(s).
   const op::Operator& hamiltonian() const noexcept { return h_; }
@@ -145,8 +145,8 @@ class MagnusSolver {
   commutator::Workspace& workspace() noexcept { return *ws_; }
 
  private:
-  FlowStatus status(int istep, double ds) const;
-  void push_omega();
+  FlowStatus Status(int istep, double ds) const;
+  void PushOmega();
 
   SolverOptions solver_;
   GeneratorOptions generator_;

@@ -33,19 +33,19 @@ const fs::path kFile =
     "NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin";
 constexpr io::No2bFileTruncation kFileTrunc{6, 12, 18, 6};
 
-void compare_with_dump(const fs::path& dump, const No2bTruncation& tr,
-                       const std::string& tag) {
+void CompareWithDump(const fs::path& dump, const No2bTruncation& tr,
+                     const std::string& tag) {
   if (!fs::exists(kFile)) GTEST_SKIP() << "NO2B file not found: " << kFile;
   if (!fs::exists(dump)) GTEST_SKIP() << "golden dump not found: " << dump;
   No2bThreeBody v3(tr);
   io::No2bReadReport rep;
-  io::read_no2b(kFile, {.file = kFileTrunc}, v3, &rep);
-  const auto ms = model_space_for_dump(read_operator_dump_header(dump));
-  const Operator ref = read_operator_dump(dump, ms);
-  const Operator zero(ms, OperatorSpec::scalar(2, Hermiticity::Hermitian));
-  const Operator got = normal_order(zero, v3);
-  const PartMaxima dev = max_abs_difference(got, ref);
-  const PartMaxima rm = max_abs(ref);
+  io::ReadNo2b(kFile, {.file = kFileTrunc}, v3, &rep);
+  const auto ms = ModelSpaceForDump(ReadOperatorDumpHeader(dump));
+  const Operator ref = ReadOperatorDump(dump, ms);
+  const Operator zero(ms, OperatorSpec::Scalar(2, Hermiticity::kHermitian));
+  const Operator got = NormalOrder(zero, v3);
+  const PartMaxima dev = MaxAbsDifference(got, ref);
+  const PartMaxima rm = MaxAbs(ref);
   const double tol = 1e-10 * std::max(1.0, rm.max());
   std::cout << "[" << tag << "] read " << rep.values_read << " values ("
             << rep.values_stored << " stored) in " << rep.seconds
@@ -60,20 +60,20 @@ void compare_with_dump(const fs::path& dump, const No2bTruncation& tr,
 }
 
 TEST(No2bReaderGolden, Emax2MatchesTheHarnessDump) {
-  compare_with_dump(
+  CompareWithDump(
       fs::path(IMSRG_GOLDEN_DIR) / "hamiltonian/emax2_O16/V3_NO2B.dump",
       No2bTruncation{2, 4, 6, 2}, "emax2");
 }
 
 TEST(No2bReaderGolden, Emax4MatchesTheGeneratedDump) {
-  compare_with_dump(fs::path(IMSRG_GENERATED_GOLDEN_DIR) /
-                        "hamiltonian/emax4_O16/V3_NO2B.dump",
-                    No2bTruncation{4, 8, 12, 4}, "emax4");
+  CompareWithDump(fs::path(IMSRG_GENERATED_GOLDEN_DIR) /
+                      "hamiltonian/emax4_O16/V3_NO2B.dump",
+                  No2bTruncation{4, 8, 12, 4}, "emax4");
 }
 
 /// Independent compact transcription of imsrg++ ReadFile for a binary float
 /// file (whole-file slurp, no skipping tricks), as in the M4 operator test.
-std::int64_t reference_read(const fs::path& path, No2bThreeBody& v3) {
+std::int64_t ReferenceRead(const fs::path& path, No2bThreeBody& v3) {
   struct O {
     int n, l, j, e;
   };
@@ -163,8 +163,8 @@ TEST(No2bReaderGolden, FillsTheSameContainerAsTheTranscription) {
   const No2bTruncation tr{2, 4, 6, 2};
   No2bThreeBody mine(tr), theirs(tr);
   io::No2bReadReport rep;
-  io::read_no2b(kFile, {.file = kFileTrunc}, mine, &rep);
-  const std::int64_t stored = reference_read(kFile, theirs);
+  io::ReadNo2b(kFile, {.file = kFileTrunc}, mine, &rep);
+  const std::int64_t stored = ReferenceRead(kFile, theirs);
   EXPECT_EQ(rep.values_stored, stored);
   EXPECT_EQ(mine.size(), theirs.size());
   EXPECT_EQ(mine.norm(), theirs.norm());
@@ -175,7 +175,7 @@ TEST(No2bReaderGolden, FullEmax6ReadIsFast) {
   if (!fs::exists(kFile)) GTEST_SKIP() << "NO2B file not found: " << kFile;
   No2bThreeBody v3(No2bTruncation{6, 12, 18, 6});
   io::No2bReadReport rep;
-  io::read_no2b(kFile, {.file = kFileTrunc}, v3, &rep);
+  io::ReadNo2b(kFile, {.file = kFileTrunc}, v3, &rep);
   std::cout << "[emax6] read " << rep.values_read << " values ("
             << rep.values_stored << " stored) in " << rep.seconds << " s\n";
   ::testing::Test::RecordProperty("emax6_read_seconds",

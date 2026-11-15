@@ -172,9 +172,9 @@ class ModelSpace {               // immutable bundle, shared via std::shared_ptr
 struct OperatorSpec {
   int particle_rank;          // 1, 2 or 3 (highest stored part)
   int tensor_rank_J = 0;      // 0 for scalars
-  Parity parity = Parity::Even;
+  Parity parity = Parity::kEven;
   int delta_Tz = 0;           // isospin projection change (imsrg++ calls |dTz| "rank_T")
-  Hermiticity hermiticity = Hermiticity::Hermitian;
+  Hermiticity hermiticity = Hermiticity::kHermitian;
   int legs = 4;               // later: dagger (odd-particle-number) operators
 };
 
@@ -220,11 +220,11 @@ Operator transform_basis(const Operator&, const UnitaryTransform& C);    // e.g.
 
 ### 3.4 Algorithms as free functions or small value types
 
-* `commutator::commutator(X, Y, Z, opts, ws)`: `opts` is a `CommutatorOptions` value (truncation
+* `commutator::Commutator(X, Y, Z, opts, ws)`: `opts` is a `CommutatorOptions` value (truncation
   enum, term mask as an enum bitset, 3B cuts, thresholds). `ws` is a `Workspace` of preallocated
   scratch buffers reused across calls (no allocation in the flow loop). Individual terms
   (`terms::comm222_ph(X, Y, Z, ws)`) are public for tests and Python.
-* `hf::solve(H, ms, HFOptions) -> HFResult {energy, C, spe, occupations, converged, iterations}`.
+* `hf::Solve(H, ms, HFOptions) -> HFResult {energy, C, spe, occupations, converged, iterations}`.
 * `flow::MagnusSolver` holds the state (s, Omega stack, H(s)) plus a `SolverOptions` value. The
   generator is `flow::Generator`, an enum `GeneratorKind` plus parameters, evaluated by a free
   function with a `switch`. There is no generator class hierarchy.
@@ -242,7 +242,7 @@ Operator transform_basis(const Operator&, const UnitaryTransform& C);    // e.g.
   first) and `exec::Runtime` (Kokkos, created second, destroyed first). The combined
   `imsrg::Runtime` is a thin composition in `driver` (M8); until then `main()` creates both in
   this order (QUESTIONS M2-Q2).
-* Logging: `imsrg::log::info(...)` and friends, using {fmt}. Only rank 0 prints by default.
+* Logging: `imsrg::log::Info(...)` and friends, using {fmt}. Only rank 0 prints by default.
   Verbosity is set by config.
 * Profiling: `IMSRG_SCOPED_TIMER("name")` feeds a thread-safe registry and also emits
   `Kokkos::Profiling::pushRegion`, so NVTX/rocTX tools see the same regions. It is never called

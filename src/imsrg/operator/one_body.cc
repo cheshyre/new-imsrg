@@ -12,10 +12,10 @@
 namespace imsrg::op {
 
 namespace {
-std::size_t flat(std::int32_t n, OrbitIndex a, OrbitIndex b) {
+std::size_t Flat(std::int32_t n, OrbitIndex a, OrbitIndex b) {
   IMSRG_ASSERT(a.value() >= 0 && a.value() < n && b.value() >= 0 &&
                b.value() < n);
-  return a.to_size() + b.to_size() * static_cast<std::size_t>(n);
+  return a.ToSize() + b.ToSize() * static_cast<std::size_t>(n);
 }
 }  // namespace
 
@@ -28,25 +28,25 @@ OneBody::OneBody(std::int32_t num_orbits, Hermiticity hermiticity)
 }
 
 double OneBody::get(OrbitIndex a, OrbitIndex b) const {
-  return data_.host_span()[flat(n_, a, b)];
+  return data_.host_span()[Flat(n_, a, b)];
 }
 
 void OneBody::set_element(OrbitIndex a, OrbitIndex b, double v) {
-  data_.host_span()[flat(n_, a, b)] = v;
+  data_.host_span()[Flat(n_, a, b)] = v;
 }
 
 void OneBody::set(OrbitIndex a, OrbitIndex b, double v) {
   auto h = data_.host_span();
-  h[flat(n_, a, b)] = v;
-  const std::int32_t s = hermiticity_sign(hermiticity_);
-  if (a != b && s != 0) h[flat(n_, b, a)] = s * v;
+  h[Flat(n_, a, b)] = v;
+  const std::int32_t s = HermiticitySign(hermiticity_);
+  if (a != b && s != 0) h[Flat(n_, b, a)] = s * v;
 }
 
-void OneBody::add(OrbitIndex a, OrbitIndex b, double v) {
+void OneBody::Add(OrbitIndex a, OrbitIndex b, double v) {
   auto h = data_.host_span();
-  h[flat(n_, a, b)] += v;
-  const std::int32_t s = hermiticity_sign(hermiticity_);
-  if (a != b && s != 0) h[flat(n_, b, a)] += s * v;
+  h[Flat(n_, a, b)] += v;
+  const std::int32_t s = HermiticitySign(hermiticity_);
+  if (a != b && s != 0) h[Flat(n_, b, a)] += s * v;
 }
 
 void OneBody::set_zero() { data_.fill(0.0); }

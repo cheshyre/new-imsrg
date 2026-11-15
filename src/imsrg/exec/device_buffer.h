@@ -20,8 +20,8 @@
 ///
 /// Memory model: kernels run asynchronously on backends with asynchronous
 /// launches. Host access to data a kernel wrote (via `host_span`) requires
-/// `sync_to_host()` first, which fences (also when the mirror aliases the
-/// device data). `copy_to_host`, `copy_from_host`, `to_vector` fence
+/// `SyncToHost()` first, which fences (also when the mirror aliases the
+/// device data). `CopyToHost`, `CopyFromHost`, `ToVector` fence
 /// implicitly.
 
 #include <cstddef>
@@ -52,7 +52,7 @@ struct DeviceBufferAccess;
 /// allocation, so they may outlive the Runtime; non-empty buffers must be
 /// destroyed before it. Not thread-safe: the lazily created host mirror is
 /// mutable state (also behind `const`), so create it (`host_span()` or
-/// `sync_to_host()`) before sharing a buffer between host threads.
+/// `SyncToHost()`) before sharing a buffer between host threads.
 template <class T>
 class DeviceBuffer {
   static_assert(std::is_trivially_copyable_v<T>,
@@ -100,30 +100,30 @@ class DeviceBuffer {
 
   /// Copies `src` to the device data. Precondition: `src.size() == size()`
   /// (IMSRG_CHECK). The host mirror, if separate from the device data, becomes
-  /// stale until `sync_to_host()`.
-  void copy_from_host(std::span<const T> src);
+  /// stale until `SyncToHost()`.
+  void CopyFromHost(std::span<const T> src);
 
   /// Copies the device data to `dst`. Precondition: `dst.size() == size()`
   /// (IMSRG_CHECK).
-  void copy_to_host(std::span<T> dst) const;
+  void CopyToHost(std::span<T> dst) const;
 
   /// The device data as a new host vector.
-  std::vector<T> to_vector() const;
+  std::vector<T> ToVector() const;
 
   /// Host mirror, created on first use (initialized from the device data). When
   /// `host_is_device()` it aliases the device data. Writes become visible to
-  /// kernels after `sync_to_device()`; kernel results become visible after
-  /// `sync_to_host()`.
+  /// kernels after `SyncToDevice()`; kernel results become visible after
+  /// `SyncToHost()`.
   std::span<T> host_span();
   /// Read-only host mirror; see the non-const overload.
   std::span<const T> host_span() const;
 
   /// Copies device data to the host mirror (creating it if needed); fences. A
   /// fence only when the mirror aliases the device data.
-  void sync_to_host();
+  void SyncToHost();
   /// Copies the host mirror to the device data (no-op apart from a fence when
   /// aliasing).
-  void sync_to_device();
+  void SyncToDevice();
 
   /// True if device memory is host accessible, so mirror and device data are
   /// the same memory.

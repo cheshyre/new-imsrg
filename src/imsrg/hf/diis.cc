@@ -14,9 +14,9 @@ namespace imsrg::hf::detail {
 
 namespace {
 
-double weighted_dot(const std::vector<double>& w,
-                    const linalg::Matrix<double>& x,
-                    const linalg::Matrix<double>& y) {
+double WeightedDot(const std::vector<double>& w,
+                   const linalg::Matrix<double>& x,
+                   const linalg::Matrix<double>& y) {
   double s = 0.0;
   for (std::int64_t b = 0; b < x.cols(); ++b) {
     for (std::int64_t a = 0; a < x.rows(); ++a) {
@@ -33,7 +33,7 @@ PulayDiis::PulayDiis(std::vector<double> weights, std::size_t max_vectors)
   IMSRG_CHECK(max_vectors_ >= 1, "DIIS subspace must hold at least one vector");
 }
 
-void PulayDiis::push(const linalg::Matrix<double>& F,
+void PulayDiis::Push(const linalg::Matrix<double>& F,
                      const linalg::Matrix<double>& e) {
   IMSRG_CHECK(F.rows() == e.rows() && F.cols() == e.cols() &&
                   F.rows() == static_cast<std::int64_t>(weights_.size()),
@@ -53,10 +53,10 @@ void PulayDiis::clear() noexcept {
 
 double PulayDiis::newest_error_norm() const {
   if (err_.empty()) return 0.0;
-  return std::sqrt(weighted_dot(weights_, err_.back(), err_.back()));
+  return std::sqrt(WeightedDot(weights_, err_.back(), err_.back()));
 }
 
-linalg::Matrix<double> PulayDiis::extrapolate() const {
+linalg::Matrix<double> PulayDiis::Extrapolate() const {
   IMSRG_CHECK(!fock_.empty(), "DIIS extrapolation needs at least one pair");
   const std::size_t m = fock_.size();
 
@@ -65,7 +65,7 @@ linalg::Matrix<double> PulayDiis::extrapolate() const {
   double bmax = 0.0;
   for (std::size_t i = 0; i < m; ++i) {
     for (std::size_t j = i; j < m; ++j) {
-      const double v = weighted_dot(weights_, err_[i], err_[j]);
+      const double v = WeightedDot(weights_, err_[i], err_[j]);
       B(static_cast<std::int64_t>(i), static_cast<std::int64_t>(j)) = v;
       B(static_cast<std::int64_t>(j), static_cast<std::int64_t>(i)) = v;
       bmax = std::max(bmax, std::abs(v));
@@ -95,7 +95,7 @@ linalg::Matrix<double> PulayDiis::extrapolate() const {
       }
       rhs(static_cast<std::int64_t>(k), 0) = 1.0;
       try {
-        linalg::solve(A.const_view(), rhs.view());
+        linalg::Solve(A.const_view(), rhs.view());
       } catch (const NumericalError&) {
         continue;
       }

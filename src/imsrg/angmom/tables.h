@@ -35,7 +35,7 @@ struct SixJView {
   const double* data = nullptr;
   std::int32_t emax = -1;
 
-  /// 6j symbol {ja jb J; jc jd J'} (the same value as `wigner_6j(ja, jb, J, jc,
+  /// 6j symbol {ja jb J; jc jd J'} (the same value as `Wigner6j(ja, jb, J, jc,
   /// jd, Jp)`) for single-particle ja..jd (odd 2j in [1, 2 emax + 1]) and
   /// integer J, J' (`.twice` even, in [0, 2 (2 emax + 1)]); 0.0 outside this
   /// range. O(1).
@@ -78,7 +78,7 @@ class SixJTable {
  public:
   using View = SixJView;
 
-  /// Builds the table; serial, one `wigner_6j` per entry with satisfied
+  /// Builds the table; serial, one `Wigner6j` per entry with satisfied
   /// triangles (cost about O(nj^4 nJ^2) in the worst case; a few ms at emax 6
   /// in Debug). Precondition: emax >= 0.
   explicit SixJTable(int emax);
@@ -108,7 +108,7 @@ struct NineJLSjjView {
   const double* data = nullptr;
   std::int32_t lmax = -1;
 
-  /// LS-jj coefficient `norm_9j(la, 1/2, ja, lb, 1/2, jb, L, S, J)` for 0 <=
+  /// LS-jj coefficient `Norm9j(la, 1/2, ja, lb, 1/2, jb, L, S, J)` for 0 <=
   /// la, lb <= lmax, ja = la +- 1/2 and jb = lb +- 1/2 (each >= 1/2), L in [0,
   /// 2 lmax], S in {0, 1}, J in [0, 2 lmax + 1] (J given doubled and even); 0.0
   /// outside this range. O(1).
@@ -141,7 +141,7 @@ struct NineJLSjjView {
 static_assert(std::is_trivially_copyable_v<NineJLSjjView>);
 
 /// Dense table of LS-jj recoupling coefficients <(la lb) L, (1/2 1/2) S; J |
-/// (la 1/2) ja, (lb 1/2) jb; J> = `norm_9j(la, 1/2, ja, lb, 1/2, jb, L, S, J)`
+/// (la 1/2) ja, (lb 1/2) jb; J> = `Norm9j(la, 1/2, ja, lb, 1/2, jb, L, S, J)`
 /// (imsrg++ `NormNineJ`). Layout: (((((la 2 + sja) (lmax+1) + lb) 2 + sjb) nL +
 /// L) 2 + S) nJ + J, sja = 0 for ja = la - 1/2, 1 for la + 1/2, nL = 2 lmax +
 /// 1, nJ = 2 lmax + 2. Entries for ja = -1/2 (la = 0, sja = 0) and invalid
@@ -150,7 +150,7 @@ class NineJLSjjTable {
  public:
   using View = NineJLSjjView;
 
-  /// Builds the table; serial, one `norm_9j` per entry (about 16 (lmax+1)^2 (2
+  /// Builds the table; serial, one `Norm9j` per entry (about 16 (lmax+1)^2 (2
   /// lmax+1) (2 lmax + 2) evaluations; well under 0.1 s at lmax 6).
   /// Precondition: lmax >= 0.
   explicit NineJLSjjTable(int lmax);
@@ -184,7 +184,7 @@ struct MoshinskyView {
   const std::int32_t* block_size = nullptr;  ///< K(E)
   std::int32_t e2max = -1;
 
-  /// Bracket `moshinsky(cm, rel, a, b, lambda)`; 0.0 if energy is not
+  /// Bracket `Moshinsky(cm, rel, a, b, lambda)`; 0.0 if energy is not
   /// conserved, a quantum number is negative or beyond e2max, or lambda is
   /// outside [0, E]. O(1).
   IMSRG_INLINE_FUNCTION double operator()(HoNL cm, HoNL rel, HoNL a, HoNL b,
@@ -216,13 +216,13 @@ static_assert(std::is_trivially_copyable_v<MoshinskyView>);
 /// ascending, then l2 ascending); K(E) is their number. The cm-rel tuple (N, L,
 /// n, l) uses the same list. For each (E, lambda <= E) a dense K(E) x K(E)
 /// block M[i_cmrel][i_lab] is stored (many entries are 0). An int32 map over
-/// (n1, l1, n2, l2) gives the local index. Memory: `value_count(e2max)` doubles
+/// (n1, l1, n2, l2) gives the local index. Memory: `ValueCount(e2max)` doubles
 /// (see `size_bytes()`).
 class MoshinskyTable {
  public:
   using View = MoshinskyView;
 
-  /// Builds the table, serially, with one `moshinsky()` call per candidate
+  /// Builds the table, serially, with one `Moshinsky()` call per candidate
   /// entry (entries that violate parity or the lambda triangles are skipped).
   /// Cost is dominated by O(e^5) per bracket; measured about 0.1 s at e2max 12
   /// in a Debug build (parity and triangle pruning). Precondition: e2max >= 0.
@@ -234,7 +234,7 @@ class MoshinskyTable {
   int block_size(int E) const noexcept;
   /// Number of doubles stored for `e2max` (computed without building the
   /// table).
-  static std::int64_t value_count(int e2max) noexcept;
+  static std::int64_t ValueCount(int e2max) noexcept;
   /// Total memory of the table's data, in bytes (values, maps and offsets).
   std::size_t size_bytes() const noexcept;
   /// View of the host mirror.

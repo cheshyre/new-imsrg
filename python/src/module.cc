@@ -10,7 +10,7 @@
 
 namespace imsrg::py {
 
-std::atomic<int>& live_operators() noexcept {
+std::atomic<int>& LiveOperators() noexcept {
   static std::atomic<int> n{0};
   return n;
 }
@@ -32,8 +32,8 @@ NB_MODULE(_core, m) {
   nb::exception<imsrg::NotImplementedError>(m, "NotImplementedError",
                                             err.ptr());
 
-  imsrg::py::bind_runtime(m);
-  imsrg::py::bind_basis(m);
-  imsrg::py::bind_operator(m);
-  imsrg::py::bind_config(m);
+  imsrg::py::BindRuntime(m);
+  imsrg::py::BindBasis(m);
+  imsrg::py::BindOperator(m);
+  imsrg::py::BindConfig(m);
 }

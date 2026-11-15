@@ -40,13 +40,13 @@ class TextInput {
   /// @returns false if no byte was available (end of data before the call),
   ///          true otherwise.
   /// @throws InputError on a zlib read error (e.g. a corrupt gzip stream).
-  bool skip_line();
+  bool SkipLine();
 
   /// Reads the next whitespace-delimited token into `token`.
   /// @returns false at the end of data (no further token); `token` is then left
   ///          empty.
   /// @throws InputError on a zlib read error.
-  bool next_token(std::string& token);
+  bool NextToken(std::string& token);
 
   /// Reads the next token as a `float`, correctly rounded directly from the
   /// decimal text (never via double, which could round differently): identical
@@ -56,7 +56,7 @@ class TextInput {
   /// @throws InputError (message names the file and the token) if the token is
   ///         not a number or is not fully consumed by the parse (e.g.
   ///         "1.5abc").
-  bool next_float(float& value);
+  bool NextFloat(float& value);
 
  private:
   struct Impl;
@@ -65,7 +65,7 @@ class TextInput {
 
 /// A minimal gzip text writer (zlib `gzopen(..., "wb")`), used by tests to
 /// produce `.gz` inputs. Move-only; the destructor flushes and closes (errors
-/// at close are ignored; call `close()` to have them reported).
+/// at close are ignored; call `Close()` to have them reported).
 class GzipWriter {
  public:
   /// Creates or truncates `path` for gzip-compressed writing.
@@ -78,11 +78,11 @@ class GzipWriter {
   GzipWriter& operator=(const GzipWriter&) = delete;
 
   /// Appends `text` (compressed). @throws InputError on a write error.
-  void write(std::string_view text);
+  void Write(std::string_view text);
 
   /// Flushes and closes the file; idempotent. @throws InputError if closing
   /// fails.
-  void close();
+  void Close();
 
  private:
   struct Impl;

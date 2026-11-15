@@ -29,7 +29,7 @@ ParticleHoleChannels::ParticleHoleChannels(const TwoBodyChannels& two_body)
     TwoBodyChannel& c = channels_[static_cast<std::size_t>(ch)];
     c.two_j = TwoJ{2 * (ch / kChannelsPerJ)};
     c.two_tz = TwoTz{2 * ((ch % kChannelsPerJ) / 2 - 1)};
-    c.parity = (ch % 2 == 0) ? Parity::Even : Parity::Odd;
+    c.parity = (ch % 2 == 0) ? Parity::kEven : Parity::kOdd;
   }
 
   std::vector<std::vector<KetIndex>> members(static_cast<std::size_t>(nch));
@@ -49,7 +49,7 @@ ParticleHoleChannels::ParticleHoleChannels(const TwoBodyChannels& two_body)
         ket_J_offsets_[static_cast<std::size_t>(k)] + (ki.jmax - ki.jmin + 1);
     for (std::int32_t J = ki.jmin; J <= ki.jmax; ++J) {
       const ChannelIndex ch =
-          imsrgpp_channel_index(TwoJ{2 * J}, ki.parity, TwoTz{2 * ki.tz_diff});
+          ImsrgppChannelIndex(TwoJ{2 * J}, ki.parity, TwoTz{2 * ki.tz_diff});
       IMSRG_CHECK(ch.value() >= 0 && ch.value() < nch,
                   "ph ket channel out of range");
       auto& list = members[static_cast<std::size_t>(ch.value())];
@@ -89,7 +89,7 @@ std::optional<ChannelIndex> ParticleHoleChannels::find_channel(
     return std::nullopt;
   if (two_tz.twice != -2 && two_tz.twice != 0 && two_tz.twice != 2)
     return std::nullopt;
-  return imsrgpp_channel_index(two_j, parity, two_tz);
+  return ImsrgppChannelIndex(two_j, parity, two_tz);
 }
 
 ChannelIndex ParticleHoleChannels::channel_of(OrbitIndex p, OrbitIndex q,
@@ -102,7 +102,7 @@ ChannelIndex ParticleHoleChannels::channel_of(OrbitIndex p, OrbitIndex q,
       "J out of range");
   const auto a = static_cast<std::size_t>(p.value());
   const auto b = static_cast<std::size_t>(q.value());
-  return imsrgpp_channel_index(
+  return ImsrgppChannelIndex(
       two_j, static_cast<Parity>(orbit_parity_[a] ^ orbit_parity_[b]),
       TwoTz{std::abs(orbit_tz2_[a] - orbit_tz2_[b])});
 }
@@ -143,8 +143,8 @@ std::optional<std::int32_t> ParticleHoleChannels::pair_index(
                    q.value() < num_orbits_,
                "orbit index out of range");
   const bool sorted = p <= q;
-  const KetIndex k = sorted ? imsrgpp_ket_index(p, q, num_orbits_)
-                            : imsrgpp_ket_index(q, p, num_orbits_);
+  const KetIndex k = sorted ? ImsrgppKetIndex(p, q, num_orbits_)
+                            : ImsrgppKetIndex(q, p, num_orbits_);
   const auto local = local_index(ch, k);
   if (!local) return std::nullopt;
   return sorted ? local->value() : local->value() + channel(ch).num_kets;

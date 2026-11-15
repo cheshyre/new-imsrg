@@ -18,29 +18,29 @@ namespace {
 
 using namespace imsrg;
 using namespace imsrg::basis;
-using imsrg::basis::testing::golden_basis_dir;
-using imsrg::basis::testing::golden_basis_files;
-using imsrg::basis::testing::read_golden_basis_dump;
+using imsrg::basis::testing::GoldenBasisDir;
+using imsrg::basis::testing::GoldenBasisFiles;
+using imsrg::basis::testing::ReadGoldenBasisDump;
 
-std::shared_ptr<const ModelSpace> o16_emax2() {
-  return ModelSpace::from_names(BasisTruncation{2}, 16.0, "O16", "O16");
+std::shared_ptr<const ModelSpace> O16Emax2() {
+  return ModelSpace::FromNames(BasisTruncation{2}, 16.0, "O16", "O16");
 }
 
 // from_names reproduces the golden orbits (occupation, cvq), counts and 2B
 // channel sizes; the record-by-record comparison of all structures is in
 // test_golden_basis.cc.
 TEST(BasisModelSpace, FromNamesMatchesEveryGoldenFile) {
-  for (const std::string& name : golden_basis_files()) {
+  for (const std::string& name : GoldenBasisFiles()) {
     SCOPED_TRACE(name);
-    const auto g = read_golden_basis_dump(golden_basis_dir() / name);
-    const auto ms = ModelSpace::from_names(BasisTruncation{g.emax, g.lmax},
-                                           g.hw, g.reference, g.valence_space);
+    const auto g = ReadGoldenBasisDump(GoldenBasisDir() / name);
+    const auto ms = ModelSpace::FromNames(BasisTruncation{g.emax, g.lmax}, g.hw,
+                                          g.reference, g.valence_space);
     ASSERT_EQ(ms->num_orbits(), static_cast<int>(g.orbits.size()));
     for (const auto& go : g.orbits) {
       const OrbitIndex a{go.index};
       EXPECT_EQ(ms->reference().occupation(a), go.occupation)
           << "orbit " << go.index;
-      EXPECT_EQ(cvq(ms->partition().orbit_class(a)), go.cvq)
+      EXPECT_EQ(Cvq(ms->partition().orbit_class(a)), go.cvq)
           << "orbit " << go.index;
     }
     EXPECT_EQ(ms->reference().A(), g.Aref);
@@ -56,7 +56,7 @@ TEST(BasisModelSpace, FromNamesMatchesEveryGoldenFile) {
       EXPECT_EQ(ms->two_body().channel(ch).num_kets, gc.nkets)
           << "channel " << gc.ch;
       EXPECT_EQ(static_cast<int>(
-                    ms->two_body_subsets().kets(ch, KetClass::HH).size()),
+                    ms->two_body_subsets().kets(ch, KetClass::kHh).size()),
                 static_cast<int>(gc.subsets.at("hh").size()))
           << "channel " << gc.ch;
     }
@@ -66,11 +66,11 @@ TEST(BasisModelSpace, FromNamesMatchesEveryGoldenFile) {
 // The particle-hole channels are always built and the three-body channels on
 // request; both reproduce the golden counts.
 TEST(BasisModelSpace, ParticleHoleAndThreeBodyMatchGolden) {
-  for (const std::string& name : golden_basis_files()) {
+  for (const std::string& name : GoldenBasisFiles()) {
     SCOPED_TRACE(name);
-    const auto g = read_golden_basis_dump(golden_basis_dir() / name);
-    const auto ms = ModelSpace::from_names(BasisTruncation{g.emax, g.lmax},
-                                           g.hw, g.reference, g.valence_space);
+    const auto g = ReadGoldenBasisDump(GoldenBasisDir() / name);
+    const auto ms = ModelSpace::FromNames(BasisTruncation{g.emax, g.lmax}, g.hw,
+                                          g.reference, g.valence_space);
     EXPECT_EQ(ms->three_body(), nullptr);
     ASSERT_EQ(ms->particle_hole().num_channels(),
               static_cast<int>(g.ph_channels.size()));
@@ -78,10 +78,10 @@ TEST(BasisModelSpace, ParticleHoleAndThreeBodyMatchGolden) {
       EXPECT_EQ(ms->particle_hole().channel(ChannelIndex{gp.ch}).num_kets,
                 gp.nkets);
     }
-    const auto ms3 = ms->with_three_body(ThreeBodyCuts{g.e3max});
+    const auto ms3 = ms->WithThreeBody(ThreeBodyCuts{g.e3max});
     ASSERT_NE(ms3->three_body(), nullptr);
     EXPECT_EQ(ms3->three_body()->num_kets(), g.nkets3);
-    EXPECT_EQ(ms3->three_body()->sum_channel_kets(), g.sum_channel_kets3);
+    EXPECT_EQ(ms3->three_body()->SumChannelKets(), g.sum_channel_kets3);
     EXPECT_EQ(ms3->three_body()->num_channels(),
               static_cast<int>(g.channels3.size()));
     EXPECT_EQ(&ms3->two_body(), &ms->two_body());
@@ -90,20 +90,19 @@ TEST(BasisModelSpace, ParticleHoleAndThreeBodyMatchGolden) {
 }
 
 TEST(BasisModelSpace, DerivedSpacesShareThreeBodyAndParticleHole) {
-  const auto ms = o16_emax2()->with_three_body(ThreeBodyCuts{6});
-  const auto ms2 = ms->with_reference(
-      Reference::from_nucleus(ms->basis(), Nucleus::parse("Ne20")));
+  const auto ms = O16Emax2()->WithThreeBody(ThreeBodyCuts{6});
+  const auto ms2 = ms->WithReference(
+      Reference::FromNucleus(ms->basis(), Nucleus::Parse("Ne20")));
   EXPECT_EQ(ms2->three_body(), ms->three_body());
   EXPECT_EQ(&ms2->particle_hole(), &ms->particle_hole());
-  EXPECT_TRUE(*o16_emax2()->with_three_body(ThreeBodyCuts{6}) == *ms);
-  EXPECT_FALSE(*o16_emax2()->with_three_body(ThreeBodyCuts{5}) == *ms);
+  EXPECT_TRUE(*O16Emax2()->WithThreeBody(ThreeBodyCuts{6}) == *ms);
+  EXPECT_FALSE(*O16Emax2()->WithThreeBody(ThreeBodyCuts{5}) == *ms);
 }
 
 TEST(BasisModelSpace, WithReferenceSharesBasisAndChannels) {
-  const auto ms = o16_emax2();
-  const auto ne20 =
-      Reference::from_nucleus(ms->basis(), Nucleus::parse("Ne20"));
-  const auto ms2 = ms->with_reference(ne20);
+  const auto ms = O16Emax2();
+  const auto ne20 = Reference::FromNucleus(ms->basis(), Nucleus::Parse("Ne20"));
+  const auto ms2 = ms->WithReference(ne20);
   EXPECT_EQ(&ms2->basis(), &ms->basis());
   EXPECT_EQ(&ms2->two_body(), &ms->two_body());
   EXPECT_EQ(ms2->partition(), ms->partition());
@@ -113,20 +112,20 @@ TEST(BasisModelSpace, WithReferenceSharesBasisAndChannels) {
   // holes.
   const ChannelIndex ch0{
       0};  // J=0, even, Tz=-1: kets 0 10 23 42 57 68 75 -> (0,0) ... (6,6)
-  const auto hh = ms2->two_body_subsets().kets(ch0, KetClass::HH);
+  const auto hh = ms2->two_body_subsets().kets(ch0, KetClass::kHh);
   EXPECT_EQ(hh.size(), 4u);  // (0,0), (2,2), (4,4), (6,6)
-  EXPECT_EQ(ms->two_body_subsets().kets(ch0, KetClass::HH).size(), 3u);
+  EXPECT_EQ(ms->two_body_subsets().kets(ch0, KetClass::kHh).size(), 3u);
   // The original is unchanged.
   EXPECT_EQ(ms->reference().name(), "O16");
 }
 
 TEST(BasisModelSpace, WithReferenceAndPartitionAppliesHolesAsCore) {
   const auto ms =
-      ModelSpace::from_names(BasisTruncation{2}, 16.0, "Ne20", "sd-shell");
-  const auto o16 = Reference::from_nucleus(ms->basis(), Nucleus::parse("O16"));
+      ModelSpace::FromNames(BasisTruncation{2}, 16.0, "Ne20", "sd-shell");
+  const auto o16 = Reference::FromNucleus(ms->basis(), Nucleus::Parse("O16"));
   const auto part =
-      Partition::with_holes_as_core(ms->partition(), o16, ms->basis());
-  const auto ms2 = ms->with_reference_and_partition(o16, part);
+      Partition::WithHolesAsCore(ms->partition(), o16, ms->basis());
+  const auto ms2 = ms->WithReferenceAndPartition(o16, part);
   EXPECT_EQ(&ms2->two_body(), &ms->two_body());
   EXPECT_EQ(ms2->partition().core().size(), 6u);
   EXPECT_EQ(ms2->partition().valence().size(), 6u);
@@ -134,36 +133,36 @@ TEST(BasisModelSpace, WithReferenceAndPartitionAppliesHolesAsCore) {
 }
 
 TEST(BasisModelSpace, EqualityIsStructural) {
-  const auto a = o16_emax2();
-  const auto b = o16_emax2();
+  const auto a = O16Emax2();
+  const auto b = O16Emax2();
   EXPECT_NE(a.get(), b.get());
   EXPECT_TRUE(*a == *b);
   const auto c =
-      ModelSpace::from_names(BasisTruncation{2}, 16.0, "O16", "sd-shell");
+      ModelSpace::FromNames(BasisTruncation{2}, 16.0, "O16", "sd-shell");
   EXPECT_FALSE(*a == *c);  // same occupations, different partition
-  const auto d = ModelSpace::from_names(BasisTruncation{2}, 20.0, "O16", "O16");
+  const auto d = ModelSpace::FromNames(BasisTruncation{2}, 20.0, "O16", "O16");
   EXPECT_FALSE(*a == *d);  // different hbar*omega
 }
 
 TEST(BasisModelSpace, SizeMismatchThrows) {
-  const auto ms = o16_emax2();
+  const auto ms = O16Emax2();
   const auto big =
-      SingleParticleBasis::harmonic_oscillator(BasisTruncation{4}, 16.0);
-  const auto ref4 = Reference::from_nucleus(big, Nucleus::parse("O16"));
-  EXPECT_THROW((void)ms->with_reference(ref4), InputError);
-  EXPECT_THROW((void)ModelSpace::create(ms->basis(), ref4, ms->partition()),
+      SingleParticleBasis::HarmonicOscillator(BasisTruncation{4}, 16.0);
+  const auto ref4 = Reference::FromNucleus(big, Nucleus::Parse("O16"));
+  EXPECT_THROW((void)ms->WithReference(ref4), InputError);
+  EXPECT_THROW((void)ModelSpace::Create(ms->basis(), ref4, ms->partition()),
                InputError);
 }
 
 TEST(BasisModelSpace, BadNamesThrow) {
   EXPECT_THROW(
-      (void)ModelSpace::from_names(BasisTruncation{2}, 16.0, "Xx16", "O16"),
+      (void)ModelSpace::FromNames(BasisTruncation{2}, 16.0, "Xx16", "O16"),
       InputError);
-  EXPECT_THROW((void)ModelSpace::from_names(BasisTruncation{2}, 16.0, "default",
-                                            "0hw-shell"),
+  EXPECT_THROW((void)ModelSpace::FromNames(BasisTruncation{2}, 16.0, "default",
+                                           "0hw-shell"),
                InputError);
   EXPECT_THROW(
-      (void)ModelSpace::from_names(BasisTruncation{2}, 16.0, "Ca48", "Ca48"),
+      (void)ModelSpace::FromNames(BasisTruncation{2}, 16.0, "Ca48", "Ca48"),
       InputError);
 }
 

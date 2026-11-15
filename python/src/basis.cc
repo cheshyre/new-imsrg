@@ -32,7 +32,7 @@ struct PyChannel {
 using IntArray2 = nb::ndarray<nb::numpy, std::int32_t, nb::ndim<2>>;
 
 /// Copies (p, q) pairs of `kets` into an (n, 2) int32 numpy array.
-IntArray2 ket_array(std::span<const basis::Ket> kets) {
+IntArray2 KetArray(std::span<const basis::Ket> kets) {
   auto* data = new std::int32_t[kets.size() * 2 + 1];
   for (std::size_t i = 0; i < kets.size(); ++i) {
     data[2 * i] = kets[i].p.value();
@@ -43,7 +43,7 @@ IntArray2 ket_array(std::span<const basis::Ket> kets) {
   return IntArray2(data, {kets.size(), 2}, owner);
 }
 
-PyChannel make_channel(const basis::TwoBodyChannels& tb, ChannelIndex ch) {
+PyChannel MakeChannel(const basis::TwoBodyChannels& tb, ChannelIndex ch) {
   const auto& c = tb.channel(ch);
   return {ch.value(), c.two_j.twice, static_cast<std::int32_t>(c.parity),
           c.two_tz.twice, c.num_kets};
@@ -51,7 +51,7 @@ PyChannel make_channel(const basis::TwoBodyChannels& tb, ChannelIndex ch) {
 
 }  // namespace
 
-void bind_basis(nb::module_& m) {
+void BindBasis(nb::module_& m) {
   nb::class_<basis::Orbit>(
       m, "Orbit", "A single-particle orbit (n, l, 2j, 2tz); tz2 = -1 proton.")
       .def(
@@ -67,7 +67,7 @@ void bind_basis(nb::module_& m) {
       .def_prop_ro("e", &basis::Orbit::e)
       .def_prop_ro("is_proton", &basis::Orbit::is_proton)
       .def_prop_ro("label",
-                   [](const basis::Orbit& o) { return basis::orbit_label(o); })
+                   [](const basis::Orbit& o) { return basis::OrbitLabel(o); })
       .def("__eq__",
            [](const basis::Orbit& a, const basis::Orbit& b) { return a == b; })
       .def("__hash__",
@@ -75,7 +75,7 @@ void bind_basis(nb::module_& m) {
              return (((o.n * 31 + o.l) * 31 + o.j2.twice) * 31) + o.tz2.twice;
            })
       .def("__repr__", [](const basis::Orbit& o) {
-        return "Orbit(" + basis::orbit_label(o) + ")";
+        return "Orbit(" + basis::OrbitLabel(o) + ")";
       });
 
   nb::class_<PyChannel>(m, "Channel", "A two-body channel (2J, parity, 2Tz).")
@@ -100,14 +100,14 @@ void bind_basis(nb::module_& m) {
           [](PyModelSpace* self, int emax, const std::string& reference,
              const std::string& valence_space, double hw, int lmax,
              int emax_unocc, int lmax_unocc) {
-            ensure_runtime();
+            EnsureRuntime();
             basis::BasisTruncation t;
             t.emax = emax;
             t.lmax = lmax;
             t.emax_unocc = emax_unocc;
             t.lmax_unocc = lmax_unocc;
             new (self) PyModelSpace{
-                basis::ModelSpace::from_names(t, hw, reference, valence_space)};
+                basis::ModelSpace::FromNames(t, hw, reference, valence_space)};
           },
           nb::arg("emax"), nb::arg("reference") = "default",
           nb::arg("valence_space") = "default", nb::arg("hw") = 0.0,
@@ -149,7 +149,7 @@ void bind_basis(nb::module_& m) {
       .def(
           "kets",
           [](const PyModelSpace& s) {
-            return ket_array(s.ms->two_body().kets());
+            return KetArray(s.ms->two_body().kets());
           },
           "All two-body kets as an (num_kets, 2) int32 array of orbit indices "
           "(p <= q).")
@@ -159,7 +159,7 @@ void bind_basis(nb::module_& m) {
             const auto& tb = s.ms->two_body();
             std::vector<PyChannel> out;
             for (std::int32_t i = 0; i < tb.num_channels(); ++i)
-              out.push_back(make_channel(tb, ChannelIndex{i}));
+              out.push_back(MakeChannel(tb, ChannelIndex{i}));
             return out;
           },
           "List of Channel in index order.")
@@ -169,7 +169,7 @@ void bind_basis(nb::module_& m) {
             const auto& tb = s.ms->two_body();
             if (index < 0 || index >= tb.num_channels())
               throw imsrg::InputError("channel index out of range");
-            return make_channel(tb, ChannelIndex{index});
+            return MakeChannel(tb, ChannelIndex{index});
           },
           nb::arg("index"))
       .def(
@@ -180,7 +180,7 @@ void bind_basis(nb::module_& m) {
             const auto ch = tb.find_channel(
                 TwoJ{two_j}, static_cast<Parity>(parity), TwoTz{two_tz});
             if (!ch) return std::nullopt;
-            return make_channel(tb, *ch);
+            return MakeChannel(tb, *ch);
           },
           nb::arg("two_j"), nb::arg("parity"), nb::arg("two_tz"))
       .def(
@@ -192,7 +192,7 @@ void bind_basis(nb::module_& m) {
             std::vector<basis::Ket> kets;
             for (const KetIndex k : tb.channel_kets(ChannelIndex{index}))
               kets.push_back(tb.ket(k));
-            return ket_array(kets);
+            return KetArray(kets);
           },
           nb::arg("index"),
           "Kets of a channel in local order, as an (n, 2) int32 array.")

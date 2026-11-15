@@ -12,15 +12,15 @@ namespace imsrg::basis {
 namespace {
 
 template <class T>
-exec::DeviceBuffer<T> upload(std::span<const T> src, const char* label) {
+exec::DeviceBuffer<T> Upload(std::span<const T> src, const char* label) {
   exec::DeviceBuffer<T> buf(src.size(), label);
-  if (!src.empty()) buf.copy_from_host(src);
+  if (!src.empty()) buf.CopyFromHost(src);
   return buf;
 }
 
 template <class T>
-exec::DeviceBuffer<T> upload(const std::vector<T>& src, const char* label) {
-  return upload<T>(std::span<const T>(src), label);
+exec::DeviceBuffer<T> Upload(const std::vector<T>& src, const char* label) {
+  return Upload<T>(std::span<const T>(src), label);
 }
 
 }  // namespace
@@ -40,12 +40,12 @@ DeviceTables::DeviceTables(const SingleParticleBasis& basis,
     tz2[i] = orbs[i].tz2.twice;
     cvq_v[i] = static_cast<std::int32_t>(partition.classes()[i]);
   }
-  orb_n_ = upload(n, "basis::orb_n");
-  orb_l_ = upload(l, "basis::orb_l");
-  orb_j2_ = upload(j2, "basis::orb_j2");
-  orb_tz2_ = upload(tz2, "basis::orb_tz2");
-  orb_cvq_ = upload(cvq_v, "basis::orb_cvq");
-  orb_occ_ = upload<double>(reference.occupations(), "basis::orb_occ");
+  orb_n_ = Upload(n, "basis::orb_n");
+  orb_l_ = Upload(l, "basis::orb_l");
+  orb_j2_ = Upload(j2, "basis::orb_j2");
+  orb_tz2_ = Upload(tz2, "basis::orb_tz2");
+  orb_cvq_ = Upload(cvq_v, "basis::orb_cvq");
+  orb_occ_ = Upload<double>(reference.occupations(), "basis::orb_occ");
 
   const auto kets = channels.kets();
   std::vector<std::int32_t> kp(kets.size()), kq(kets.size());
@@ -53,8 +53,8 @@ DeviceTables::DeviceTables(const SingleParticleBasis& basis,
     kp[i] = kets[i].p.value();
     kq[i] = kets[i].q.value();
   }
-  ket_p_ = upload(kp, "basis::ket_p");
-  ket_q_ = upload(kq, "basis::ket_q");
+  ket_p_ = Upload(kp, "basis::ket_p");
+  ket_q_ = Upload(kq, "basis::ket_q");
 
   const auto chs = channels.channels();
   const std::size_t nc = chs.size();
@@ -66,32 +66,32 @@ DeviceTables::DeviceTables(const SingleParticleBasis& basis,
     cn[i] = chs[i].num_kets;
     co[i] = chs[i].ket_offset;
   }
-  ch_two_j_ = upload(cj, "basis::ch_two_j");
-  ch_parity_ = upload(cp, "basis::ch_parity");
-  ch_two_tz_ = upload(ct, "basis::ch_two_tz");
-  ch_num_kets_ = upload(cn, "basis::ch_num_kets");
-  ch_offset_ = upload(co, "basis::ch_ket_offset");
+  ch_two_j_ = Upload(cj, "basis::ch_two_j");
+  ch_parity_ = Upload(cp, "basis::ch_parity");
+  ch_two_tz_ = Upload(ct, "basis::ch_two_tz");
+  ch_num_kets_ = Upload(cn, "basis::ch_num_kets");
+  ch_offset_ = Upload(co, "basis::ch_ket_offset");
 
   const auto ckt = channels.channel_ket_table();
   std::vector<std::int32_t> ck(ckt.size());
   std::transform(ckt.begin(), ckt.end(), ck.begin(),
                  [](KetIndex k) { return k.value(); });
-  ch_kets_ = upload(ck, "basis::channel_kets");
+  ch_kets_ = Upload(ck, "basis::channel_kets");
   ket_j_offsets_ =
-      upload<std::int32_t>(channels.ket_J_offsets(), "basis::ket_J_offsets");
+      Upload<std::int32_t>(channels.ket_J_offsets(), "basis::ket_J_offsets");
   local_index_ =
-      upload<std::int32_t>(channels.local_index_table(), "basis::local_index");
+      Upload<std::int32_t>(channels.local_index_table(), "basis::local_index");
 
   const auto st = subsets.subset_table();
   std::vector<std::int32_t> sk(st.size());
   std::transform(st.begin(), st.end(), sk.begin(),
                  [](LocalKetIndex k) { return k.value(); });
   sub_offsets_ =
-      upload<std::int32_t>(subsets.subset_offsets(), "basis::subset_offsets");
-  sub_kets_ = upload(sk, "basis::subset_kets");
-  sub_occ_ = upload<double>(subsets.occupation_product_table(),
+      Upload<std::int32_t>(subsets.subset_offsets(), "basis::subset_offsets");
+  sub_kets_ = Upload(sk, "basis::subset_kets");
+  sub_occ_ = Upload<double>(subsets.occupation_product_table(),
                             "basis::subset_occ_products");
-  sub_vac_ = upload<double>(subsets.vacancy_product_table(),
+  sub_vac_ = Upload<double>(subsets.vacancy_product_table(),
                             "basis::subset_vac_products");
 
   const auto ni = static_cast<std::int32_t>(no);

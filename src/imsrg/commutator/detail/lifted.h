@@ -42,7 +42,7 @@ struct LiftedData {
 /// Builds the lifted lists of `ms` on the host and uploads them. Needs an
 /// initialized `exec::Runtime`. Complexity O(number of kets x orbits per
 /// one-body channel).
-LiftedData build_lifted_data(const basis::ModelSpace& ms);
+LiftedData BuildLiftedData(const basis::ModelSpace& ms);
 
 }  // namespace imsrg::commutator::detail
 

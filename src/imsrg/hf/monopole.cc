@@ -15,19 +15,19 @@ namespace {
 
 /// (Tz, parity) block of a pair: (Tz + 1) * 2 + parity, Tz = (tz2_p + tz2_q) /
 /// 2.
-int block_of(const basis::Orbit& p, const basis::Orbit& q) {
+int BlockOf(const basis::Orbit& p, const basis::Orbit& q) {
   const int tz = (p.tz2.twice + q.tz2.twice) / 2;
   return (tz + 1) * 2 + (p.l + q.l) % 2;
 }
 
 }  // namespace
 
-std::vector<std::vector<std::int32_t>> one_body_channels(
+std::vector<std::vector<std::int32_t>> OneBodyChannels(
     const basis::SingleParticleBasis& basis) {
   std::vector<std::vector<std::int32_t>> out;
   for (std::int32_t i = 0; i < basis.num_orbits(); ++i) {
     std::vector<std::int32_t> ch;
-    for (OrbitIndex j : basis.same_ljtz(OrbitIndex{i})) ch.push_back(j.value());
+    for (OrbitIndex j : basis.SameLjtz(OrbitIndex{i})) ch.push_back(j.value());
     std::sort(ch.begin(), ch.end());
     if (ch.front() == i) out.push_back(std::move(ch));
   }
@@ -42,7 +42,7 @@ Monopole2B::Monopole2B(const op::Operator& H) {
   local_.assign(n * n, -1);
   two_j_.resize(n);
   channel_of_.resize(n);
-  for (const auto& ch : one_body_channels(basis)) {
+  for (const auto& ch : OneBodyChannels(basis)) {
     for (std::int32_t i : ch) channel_of_[static_cast<std::size_t>(i)] = ch;
   }
 
@@ -51,7 +51,7 @@ Monopole2B::Monopole2B(const op::Operator& H) {
     two_j_[static_cast<std::size_t>(p)] = basis.orbit(OrbitIndex{p}).j2.twice;
     for (std::int32_t q = p; q < norb_; ++q) {
       const int blk =
-          block_of(basis.orbit(OrbitIndex{p}), basis.orbit(OrbitIndex{q}));
+          BlockOf(basis.orbit(OrbitIndex{p}), basis.orbit(OrbitIndex{q}));
       const auto key =
           static_cast<std::size_t>(p) * n + static_cast<std::size_t>(q);
       blk_[key] = blk;
@@ -91,7 +91,7 @@ Monopole2B::Monopole2B(const op::Operator& H) {
   }
 }
 
-void Monopole2B::apply(const linalg::Matrix<double>& rho,
+void Monopole2B::Apply(const linalg::Matrix<double>& rho,
                        linalg::Matrix<double>& Vij) const {
   IMSRG_CHECK(rho.rows() == norb_ && rho.cols() == norb_, "rho must be N x N");
   Vij = linalg::Matrix<double>(norb_, norb_);
@@ -128,7 +128,7 @@ Monopole3B::Monopole3B(const op::Operator& H, const op::No2bThreeBody& v3,
                        std::int32_t e3max) {
   const auto& basis = H.model_space().basis();
   norb_ = basis.num_orbits();
-  const auto chans = one_body_channels(basis);
+  const auto chans = OneBodyChannels(basis);
   std::vector<const std::vector<std::int32_t>*> channel_of(
       static_cast<std::size_t>(norb_));
   for (const auto& ch : chans) {
@@ -176,7 +176,7 @@ Monopole3B::Monopole3B(const op::Operator& H, const op::No2bThreeBody& v3,
   }
 }
 
-void Monopole3B::apply(const linalg::Matrix<double>& rho,
+void Monopole3B::Apply(const linalg::Matrix<double>& rho,
                        linalg::Matrix<double>& V3ij) const {
   IMSRG_CHECK(rho.rows() == norb_ && rho.cols() == norb_, "rho must be N x N");
   V3ij = linalg::Matrix<double>(norb_, norb_);

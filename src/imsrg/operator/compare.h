@@ -23,14 +23,14 @@ struct PartMaxima {
 
 /// Largest absolute values of the parts of `op` (host computation after syncing
 /// to the host).
-PartMaxima max_abs(const Operator& op);
+PartMaxima MaxAbs(const Operator& op);
 
 /// Largest absolute differences, part by part, between `a` and `b`: |a0 - b0|,
 /// max |a_ab - b_ab|, max |aV - bV| over the stored elements. Requirements
-/// (InvariantError): `same_model_space(a, b)` and
-/// `a.spec().same_symmetry(b.spec())`; a part allocated in only one operator is
+/// (InvariantError): `SameModelSpace(a, b)` and
+/// `a.spec().SameSymmetry(b.spec())`; a part allocated in only one operator is
 /// compared with zero. Hermiticity flags are not compared.
-PartMaxima max_abs_difference(const Operator& a, const Operator& b);
+PartMaxima MaxAbsDifference(const Operator& a, const Operator& b);
 
 }  // namespace imsrg::op
 

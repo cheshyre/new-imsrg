@@ -11,13 +11,13 @@
 
 namespace imsrg::angmom::test {
 
-double sum_sixj_device(const SixJTable& t, double& abs_sum) {
+double SumSixjDevice(const SixJTable& t, double& abs_sum) {
   const SixJView v = t.device_view();
   const std::int64_t nj = v.emax + 1;
   const std::int64_t nJ = 2 * static_cast<std::int64_t>(v.emax) + 2;
   const std::int64_t n = nj * nj * nj * nj * nJ * nJ;
   double result = 0.0;
-  exec::parallel_reduce(
+  exec::ParallelReduce(
       "test::sum_sixj", n,
       IMSRG_LAMBDA(const exec::Index i, double& partial) {
         std::int64_t r = i;
@@ -39,7 +39,7 @@ double sum_sixj_device(const SixJTable& t, double& abs_sum) {
       },
       result);
   double abs_result = 0.0;
-  exec::parallel_reduce(
+  exec::ParallelReduce(
       "test::sum_sixj_abs", n,
       IMSRG_LAMBDA(const exec::Index i, double& partial) {
         std::int64_t r = i;
@@ -65,14 +65,14 @@ double sum_sixj_device(const SixJTable& t, double& abs_sum) {
   return result;
 }
 
-double sum_ninej_device(const NineJLSjjTable& t) {
+double SumNinejDevice(const NineJLSjjTable& t) {
   const NineJLSjjView v = t.device_view();
   const std::int64_t nl = v.lmax + 1;
   const std::int64_t nL = 2 * static_cast<std::int64_t>(v.lmax) + 1;
   const std::int64_t nJ = 2 * static_cast<std::int64_t>(v.lmax) + 2;
   const std::int64_t n = nl * 2 * nl * 2 * nL * 2 * nJ;
   double result = 0.0;
-  exec::parallel_reduce(
+  exec::ParallelReduce(
       "test::sum_ninej", n,
       IMSRG_LAMBDA(const exec::Index i, double& partial) {
         std::int64_t r = i;
@@ -98,20 +98,20 @@ double sum_ninej_device(const NineJLSjjTable& t) {
   return result;
 }
 
-void eval_moshinsky_device(const MoshinskyTable& t,
-                           const exec::DeviceBuffer<std::int32_t>& queries,
-                           exec::DeviceBuffer<double>& out) {
+void EvalMoshinskyDevice(const MoshinskyTable& t,
+                         const exec::DeviceBuffer<std::int32_t>& queries,
+                         exec::DeviceBuffer<double>& out) {
   const MoshinskyView v = t.device_view();
-  const auto q = exec::view(queries);
-  auto o = exec::view(out);
-  exec::parallel_for(
+  const auto q = exec::View(queries);
+  auto o = exec::View(out);
+  exec::ParallelFor(
       "test::eval_moshinsky", static_cast<exec::Index>(o.extent(0)),
       IMSRG_LAMBDA(const exec::Index i) {
         const exec::Index b = 9 * i;
         o(i) = v(HoNL{q(b), q(b + 1)}, HoNL{q(b + 2), q(b + 3)},
                  HoNL{q(b + 4), q(b + 5)}, HoNL{q(b + 6), q(b + 7)}, q(b + 8));
       });
-  exec::fence("test::eval_moshinsky");
+  exec::Fence("test::eval_moshinsky");
 }
 
 }  // namespace imsrg::angmom::test

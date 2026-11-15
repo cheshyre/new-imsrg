@@ -26,7 +26,7 @@ const char* const kDirs[] = {"hamiltonian/emax2_O16", "hf/emax2_O16_2N",
                              "hf/emax2_O16_2N3N", "commutator/emax2_O16",
                              "operator/emax2"};
 
-std::vector<fs::path> golden_dumps() {
+std::vector<fs::path> GoldenDumps() {
   std::vector<fs::path> out;
   for (const char* d : kDirs) {
     const fs::path dir = fs::path(IMSRG_GOLDEN_DIR) / d;
@@ -39,7 +39,7 @@ std::vector<fs::path> golden_dumps() {
   return out;
 }
 
-std::string slurp(const fs::path& p) {
+std::string Slurp(const fs::path& p) {
   std::ifstream f(p, std::ios::binary);
   std::ostringstream ss;
   ss << f.rdbuf();
@@ -47,18 +47,18 @@ std::string slurp(const fs::path& p) {
 }
 
 TEST(GoldenDumps, EveryDumpRoundTripsByteForByte) {
-  const auto files = golden_dumps();
+  const auto files = GoldenDumps();
   ASSERT_GE(files.size(), 37U);
   for (const auto& p : files) {
     SCOPED_TRACE(p.string());
-    const OperatorDumpHeader h = read_operator_dump_header(p);
-    const auto ms = model_space_for_dump(h);
-    const Operator op = read_operator_dump(p, ms);
+    const OperatorDumpHeader h = ReadOperatorDumpHeader(p);
+    const auto ms = ModelSpaceForDump(h);
+    const Operator op = ReadOperatorDump(p, ms);
     std::ostringstream os;
-    write_operator_dump(
+    WriteOperatorDump(
         os, op,
         OperatorDumpWriteOptions{.source = h.source, .reference = h.reference});
-    EXPECT_EQ(os.str(), slurp(p));
+    EXPECT_EQ(os.str(), Slurp(p));
   }
 }
 
@@ -67,16 +67,16 @@ class GoldenH : public ::testing::Test {
   void SetUp() override {
     const fs::path p =
         fs::path(IMSRG_GOLDEN_DIR) / "hamiltonian/emax2_O16/H.dump";
-    ms = model_space_for_dump(read_operator_dump_header(p));
-    op = std::make_unique<Operator>(read_operator_dump(p, ms));
+    ms_ = ModelSpaceForDump(ReadOperatorDumpHeader(p));
+    op_ = std::make_unique<Operator>(ReadOperatorDump(p, ms_));
   }
-  std::shared_ptr<const basis::ModelSpace> ms;
-  std::unique_ptr<Operator> op;
+  std::shared_ptr<const basis::ModelSpace> ms_;
+  std::unique_ptr<Operator> op_;
 };
 
 TEST_F(GoldenH, OneBodySpotValues) {
-  EXPECT_EQ(op->one_body().get(OrbitIndex{0}, OrbitIndex{0}), 11.25);
-  EXPECT_EQ(op->one_body().get(OrbitIndex{0}, OrbitIndex{10}),
+  EXPECT_EQ(op_->one_body().get(OrbitIndex{0}, OrbitIndex{0}), 11.25);
+  EXPECT_EQ(op_->one_body().get(OrbitIndex{0}, OrbitIndex{10}),
             9.1855865354369168);
 }
 
@@ -85,10 +85,10 @@ TEST_F(GoldenH, TwoBodyNormalizedInBothOrbitOrders) {
   const double v = 0.17978553473949432;
   const OrbitIndex a{0};
   const OrbitIndex b{8};
-  const TwoJ J = TwoJ::from_integer(1);
-  const auto& basis = ms->basis();
-  const int ph = basis::exchange_phase(basis.orbit(a).j2, basis.orbit(b).j2, J);
-  const auto& tb = op->two_body();
+  const TwoJ J = TwoJ::FromInteger(1);
+  const auto& basis = ms_->basis();
+  const int ph = basis::ExchangePhase(basis.orbit(a).j2, basis.orbit(b).j2, J);
+  const auto& tb = op_->two_body();
   EXPECT_EQ(tb.get_normalized(a, b, a, b, J), v);
   EXPECT_EQ(tb.get_normalized(b, a, a, b, J), ph * v);
   EXPECT_EQ(tb.get_normalized(a, b, b, a, J), ph * v);

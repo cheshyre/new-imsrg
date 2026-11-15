@@ -30,7 +30,7 @@ struct BfCounts {
 };
 
 // Independent enumeration from the rules (half-integers as doubles, no J2 cap).
-BfCounts brute_force(const No2bTruncation& t) {
+BfCounts BruteForce(const No2bTruncation& t) {
   std::vector<BfOrbit> orbs;
   for (int e = 0; e <= t.emax; ++e) {
     for (int l = 0; l <= e && l <= t.lmax; ++l) {
@@ -81,7 +81,7 @@ BfCounts brute_force(const No2bTruncation& t) {
   return out;
 }
 
-basis::Orbit orb(int n, int l, int tj, int tz) {
+basis::Orbit Orb(int n, int l, int tj, int tz) {
   return basis::Orbit{n, l, TwoJ{tj}, TwoTz{tz}};
 }
 
@@ -114,7 +114,7 @@ TEST(No2b, CountsMatchBruteForce) {
   for (const auto& t :
        {No2bTruncation{2, 4, 6, 2}, No2bTruncation{3, 4, 5, 3}}) {
     const No2bThreeBody w(t);
-    const BfCounts bf = brute_force(t);
+    const BfCounts bf = BruteForce(t);
     EXPECT_GT(bf.channels, 0);
     EXPECT_EQ(w.num_channels(), bf.channels);
     EXPECT_EQ(w.size(), bf.size);
@@ -195,31 +195,31 @@ TEST(No2b, PnDiagonalCases) {
   w.set_isospin(0, 1, 0, 1, 0, 1, 0, 1, 1, 3, 0.75);  // Tab = Tde = 1, T = 3/2
   const double v = 0.75;
   for (int tz : {-1, +1}) {
-    const auto s = orb(0, 0, 1, tz);
-    const auto p = orb(0, 1, 1, tz);
+    const auto s = Orb(0, 0, 1, tz);
+    const auto p = Orb(0, 1, 1, tz);
     EXPECT_NEAR(w.get_pn(s, p, s, s, p, s, 1), v, 1e-15) << tz;
   }
   // Mixed Tz in the isospin-3/2 element only: ppn gets CGs < 1 but T = 3/2
   // only, Tab = 1: <1/2 -1/2 1/2 -1/2|1 -1> = 1, <1 -1, 1/2 +1/2 | 3/2 -1/2> =
   // sqrt(1/3).
-  EXPECT_NEAR(w.get_pn(orb(0, 0, 1, -1), orb(0, 1, 1, -1), orb(0, 0, 1, +1),
-                       orb(0, 0, 1, -1), orb(0, 1, 1, -1), orb(0, 0, 1, +1), 1),
+  EXPECT_NEAR(w.get_pn(Orb(0, 0, 1, -1), Orb(0, 1, 1, -1), Orb(0, 0, 1, +1),
+                       Orb(0, 0, 1, -1), Orb(0, 1, 1, -1), Orb(0, 0, 1, +1), 1),
               v / 3.0, 1e-7);
   // Tz mismatch between bra and ket.
-  EXPECT_EQ(w.get_pn(orb(0, 0, 1, -1), orb(0, 1, 1, -1), orb(0, 0, 1, -1),
-                     orb(0, 0, 1, -1), orb(0, 1, 1, -1), orb(0, 0, 1, +1), 1),
+  EXPECT_EQ(w.get_pn(Orb(0, 0, 1, -1), Orb(0, 1, 1, -1), Orb(0, 0, 1, -1),
+                     Orb(0, 0, 1, -1), Orb(0, 1, 1, -1), Orb(0, 0, 1, +1), 1),
             0.0);
   // Parity mismatch of the pair (a b = s p, d e = s s).
-  EXPECT_EQ(w.get_pn(orb(0, 0, 1, -1), orb(0, 1, 1, -1), orb(0, 0, 1, -1),
-                     orb(0, 0, 1, -1), orb(0, 0, 1, -1), orb(0, 0, 1, -1), 1),
+  EXPECT_EQ(w.get_pn(Orb(0, 0, 1, -1), Orb(0, 1, 1, -1), Orb(0, 0, 1, -1),
+                     Orb(0, 0, 1, -1), Orb(0, 0, 1, -1), Orb(0, 0, 1, -1), 1),
             0.0);
   // j_c != j_f (p1/2 vs p3/2, same parity).
-  EXPECT_EQ(w.get_pn(orb(0, 0, 1, -1), orb(0, 0, 1, +1), orb(0, 1, 1, -1),
-                     orb(0, 0, 1, -1), orb(0, 0, 1, +1), orb(0, 1, 3, -1), 0),
+  EXPECT_EQ(w.get_pn(Orb(0, 0, 1, -1), Orb(0, 0, 1, +1), Orb(0, 1, 1, -1),
+                     Orb(0, 0, 1, -1), Orb(0, 0, 1, +1), Orb(0, 1, 3, -1), 0),
             0.0);
   // Orbit not stored (l = 3 > lmax).
-  EXPECT_EQ(w.get_pn(orb(0, 3, 5, -1), orb(0, 1, 1, -1), orb(0, 0, 1, -1),
-                     orb(0, 0, 1, -1), orb(0, 1, 1, -1), orb(0, 0, 1, -1), 1),
+  EXPECT_EQ(w.get_pn(Orb(0, 3, 5, -1), Orb(0, 1, 1, -1), Orb(0, 0, 1, -1),
+                     Orb(0, 0, 1, -1), Orb(0, 1, 1, -1), Orb(0, 0, 1, -1), 1),
             0.0);
 }
 
@@ -244,8 +244,8 @@ TEST(No2b, PnAgainstHandCgProducts) {
                         w11a * c1 * c1 * t1_half * t1_half +
                         w11b * c1 * c1 * t1_32 * t1_32;
   const auto got =
-      w.get_pn(orb(0, 0, 1, -1), orb(0, 1, 1, +1), orb(0, 0, 1, -1),
-               orb(0, 0, 1, -1), orb(0, 1, 1, +1), orb(0, 0, 1, -1), 1);
+      w.get_pn(Orb(0, 0, 1, -1), Orb(0, 1, 1, +1), Orb(0, 0, 1, -1),
+               Orb(0, 0, 1, -1), Orb(0, 1, 1, +1), Orb(0, 0, 1, -1), 1);
   EXPECT_NEAR(got, expect, 1e-7);
   EXPECT_GT(std::abs(got), 0.1);
 }

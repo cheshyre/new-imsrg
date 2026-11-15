@@ -21,7 +21,7 @@
 ///   J <= j_p + j_q, and J is even when p == q (Pauli); inside a channel the
 ///   kets are in ascending global order (the local index);
 /// * the exchange phase is |qp; J> = (-1)^(j_p + j_q - J + 1) |pq; J>
-///   (`exchange_phase`).
+///   (`ExchangePhase`).
 
 #include <array>
 #include <cstdint>
@@ -57,7 +57,7 @@ static_assert(std::is_trivially_copyable_v<Ket>);
 /// ket |pq> in a basis of `num_orbits` orbits, p (2N - 1 - p) / 2 + q.
 /// Precondition: 0 <= p <= q < num_orbits (not checked; p > q gives a wrong
 /// index). O(1).
-IMSRG_INLINE_FUNCTION constexpr KetIndex imsrgpp_ket_index(
+IMSRG_INLINE_FUNCTION constexpr KetIndex ImsrgppKetIndex(
     OrbitIndex p, OrbitIndex q, std::int32_t num_orbits) noexcept {
   return KetIndex{p.value() * (2 * num_orbits - 1 - p.value()) / 2 + q.value()};
 }
@@ -65,7 +65,7 @@ IMSRG_INLINE_FUNCTION constexpr KetIndex imsrgpp_ket_index(
 /// imsrg++ two-body channel index (`GetTwoBodyChannelIndex`,
 /// ModelSpace.cc:1104-1112): 6 J + 2 (Tz + 1) + parity, for `two_j` = 2J and
 /// `two_tz` = 2Tz = tz2_p + tz2_q. O(1).
-IMSRG_INLINE_FUNCTION constexpr ChannelIndex imsrgpp_channel_index(
+IMSRG_INLINE_FUNCTION constexpr ChannelIndex ImsrgppChannelIndex(
     TwoJ two_j, Parity parity, TwoTz two_tz) noexcept {
   return ChannelIndex{3 * two_j.twice + two_tz.twice + 2 +
                       static_cast<std::int32_t>(parity)};
@@ -74,15 +74,15 @@ IMSRG_INLINE_FUNCTION constexpr ChannelIndex imsrgpp_channel_index(
 /// Exchange phase of imsrg++ (`Ket::Phase`, ModelSpace.hh:77-80): |qp; J> =
 /// phase |pq; J> with phase = (-1)^((2j_p + 2j_q)/2 + 1 + J) = -(-1)^(j_p + j_q
 /// - J). `two_j` is 2J of the pair. O(1).
-IMSRG_INLINE_FUNCTION constexpr std::int32_t exchange_phase(
+IMSRG_INLINE_FUNCTION constexpr std::int32_t ExchangePhase(
     TwoJ jp, TwoJ jq, TwoJ two_j) noexcept {
   return (((jp.twice + jq.twice) / 2 + 1 + two_j.twice / 2) % 2 == 0) ? 1 : -1;
 }
 
 /// Quantum numbers and extent of one two-body channel. Trivially copyable.
 struct TwoBodyChannel {
-  TwoJ two_j{0};                 ///< 2J (J is an integer).
-  Parity parity = Parity::Even;  ///< (-1)^(l_p + l_q).
+  TwoJ two_j{0};                  ///< 2J (J is an integer).
+  Parity parity = Parity::kEven;  ///< (-1)^(l_p + l_q).
   TwoTz two_tz{0};  ///< 2Tz = tz2_p + tz2_q: -2 (pp), 0 (pn), +2 (nn).
   std::int32_t num_kets = 0;    ///< Number of kets (the block dimension).
   std::int32_t ket_offset = 0;  ///< Position of local ket 0 in
@@ -210,19 +210,29 @@ class TwoBodyChannels {
 /// generators: by occupation (pp, hh, ph) and by partition class (cc, vc, qc,
 /// vv, qv, qq). The enumerator order is the order of the golden
 /// `channel_subset` records.
-enum class KetClass : std::uint8_t { PP = 0, HH, PH, CC, VC, QC, VV, QV, QQ };
+enum class KetClass : std::uint8_t {
+  kPp = 0,
+  kHh,
+  kPh,
+  kCc,
+  kVc,
+  kQc,
+  kVv,
+  kQv,
+  kQq
+};
 
 /// Number of KetClass values.
 inline constexpr std::int32_t kNumKetClasses = 9;
 
 /// All KetClass values in enumerator order.
 inline constexpr std::array<KetClass, kNumKetClasses> kAllKetClasses = {
-    KetClass::PP, KetClass::HH, KetClass::PH, KetClass::CC, KetClass::VC,
-    KetClass::QC, KetClass::VV, KetClass::QV, KetClass::QQ};
+    KetClass::kPp, KetClass::kHh, KetClass::kPh, KetClass::kCc, KetClass::kVc,
+    KetClass::kQc, KetClass::kVv, KetClass::kQv, KetClass::kQq};
 
 /// Lower-case name of a class: "pp", "hh", "ph", "cc", "vc", "qc", "vv", "qv",
 /// "qq".
-std::string_view ket_class_name(KetClass c) noexcept;
+std::string_view KetClassName(KetClass c) noexcept;
 
 /// Immutable per-channel ket subsets for given occupations and partition
 /// (imsrg++ `ModelSpace::SetupKets` and `TwoBodyChannel::Initialize`,

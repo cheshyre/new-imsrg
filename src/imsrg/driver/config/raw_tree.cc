@@ -51,7 +51,7 @@ bool RawTree::has_table(std::string_view table) const {
   return it != entries_.end() && it->first.starts_with(prefix);
 }
 
-void RawTree::merge(const RawTree& overlay) {
+void RawTree::Merge(const RawTree& overlay) {
   for (const auto& [path, value] : overlay.entries_)
     entries_.insert_or_assign(path, value);
 }

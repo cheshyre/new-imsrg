@@ -18,13 +18,13 @@ namespace imsrg::io {
 /// `WriteTokyo` and `WriteNuShellX_intfile`).
 enum class ValenceWriteMode {
   /// "" / "int": the matrix elements as stored (a Hamiltonian).
-  Hamiltonian,
+  kHamiltonian,
   /// "op": for proton-neutron orbit pairs, <ab|V|cd> is replaced by the average
   /// of itself and the matrix element with every orbit replaced by its isospin
   /// partner (a - tz2 in imsrg++ indexing, i.e. proton <-> neutron). NuShellX
   /// requires Vpnpn = Vnpnp for operators other than the Hamiltonian, which
   /// only holds approximately for IMSRG-evolved operators.
-  IsospinAveragedOperator
+  kIsospinAveragedOperator
 };
 
 /// Everything the header comments of the files record that the operator itself
@@ -32,7 +32,7 @@ enum class ValenceWriteMode {
 /// space). Only used for the comment lines; they never influence the numbers.
 struct ValenceWriteOptions {
   ValenceWriteMode mode =
-      ValenceWriteMode::Hamiltonian;  ///< Two-body averaging mode.
+      ValenceWriteMode::kHamiltonian;  ///< Two-body averaging mode.
   std::string file_2n;      ///< Path of the 2N input file; only the last path
                             ///< component is written.
   std::string file_3n;      ///< Path of the 3N input file; only the last path
@@ -52,9 +52,9 @@ struct ValenceWriteOptions {
       version;  ///< Code version string written to the first comment line.
 };
 
-/// Options of `write_tokyo` (same struct as the NuShellX writers).
+/// Options of `WriteTokyo` (same struct as the NuShellX writers).
 using TokyoWriteOptions = ValenceWriteOptions;
-/// Options of `write_nushellx_int` and `write_nushellx_sps`.
+/// Options of `WriteNushellxInt` and `WriteNushellxSps`.
 using NushellxWriteOptions = ValenceWriteOptions;
 
 /// Writes the valence-space interaction of `op` in the KSHELL/tokyo `.snt`
@@ -72,7 +72,7 @@ using NushellxWriteOptions = ValenceWriteOptions;
 /// channel, valence-valence bras and kets with ket >= bra. Thresholds are
 /// relative: a one-body element is dropped if |v| < 1e-7 ||V1|| or ||V1|| <
 /// 1e-8, a two-body element if |v| < 1e-7 ||V2|| or ||V2|| < 1e-7 (norms as
-/// `op::one_body_norm`, `op::two_body_norm`). Numbers are fixed with 16
+/// `op::OneBodyNorm`, `op::TwoBodyNorm`). Numbers are fixed with 16
 /// decimals, width 16. The stream state of imsrg++ is reproduced, including its
 /// quirk that hbar_omega is printed with 9 significant digits in the one-body
 /// count line and with 16 decimals in the two-body count line.
@@ -80,18 +80,18 @@ using NushellxWriteOptions = ValenceWriteOptions;
 /// `op` must have the host mirrors of the one- and two-body parts up to date.
 /// Cost: O(number of valence two-body matrix elements).
 /// @throws RuntimeError if the file cannot be written.
-void write_tokyo(const std::filesystem::path& path, const op::Operator& op,
-                 const TokyoWriteOptions& options);
+void WriteTokyo(const std::filesystem::path& path, const op::Operator& op,
+                const TokyoWriteOptions& options);
 
 /// Writes the valence-space interaction of `op` in the NuShellX `.int` format
 /// (imsrg++ `ReadWrite::WriteNuShellX_intfile`, ReadWrite.cc:3610; mode "int"
 /// for `Hamiltonian`, "op" for `IsospinAveragedOperator`).
 ///
-/// Orbit numbering as `write_tokyo`. Layout: comment lines (version, input
+/// Orbit numbering as `WriteTokyo`. Layout: comment lines (version, input
 /// files, truncations, zero-body term, orbit index table), then the single line
 /// `-999`, the diagonal one-body elements, A_core, A_core + 2 and 0.00000 (no
 /// mass dependence), then one row `a b c d J T value` per two-body element with
-/// |v| >= 1e-6 (absolute threshold), in the order of `write_tokyo`. T = |Tz| of
+/// |v| >= 1e-6 (absolute threshold), in the order of `WriteTokyo`. T = |Tz| of
 /// the channel; for Tz = 0 the element is multiplied by sqrt(2) for each pair
 /// of distinct orbits (pn matrix elements are unnormalized in NuShellX), T
 /// becomes (J + 1) mod 2, indices are swapped (with the exchange phase) so that
@@ -102,9 +102,8 @@ void write_tokyo(const std::filesystem::path& path, const op::Operator& op,
 /// `op` must have the host mirrors up to date. Cost: O(number of valence
 /// two-body matrix elements).
 /// @throws RuntimeError if the file cannot be written.
-void write_nushellx_int(const std::filesystem::path& path,
-                        const op::Operator& op,
-                        const NushellxWriteOptions& options);
+void WriteNushellxInt(const std::filesystem::path& path, const op::Operator& op,
+                      const NushellxWriteOptions& options);
 
 /// Writes the valence model space in the NuShellX `.sp` format (imsrg++
 /// `ReadWrite::WriteNuShellX_sps`, ReadWrite.cc:3753): a comment line, "pn",
@@ -114,9 +113,8 @@ void write_nushellx_int(const std::filesystem::path& path,
 /// operator's model space is used (`options` is accepted for symmetry and
 /// ignored).
 /// @throws RuntimeError if the file cannot be written.
-void write_nushellx_sps(const std::filesystem::path& path,
-                        const op::Operator& op,
-                        const NushellxWriteOptions& options = {});
+void WriteNushellxSps(const std::filesystem::path& path, const op::Operator& op,
+                      const NushellxWriteOptions& options = {});
 
 }  // namespace imsrg::io
 

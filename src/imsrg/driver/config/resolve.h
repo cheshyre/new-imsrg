@@ -35,7 +35,7 @@ struct ResolveResult {
 /// Converts `tree` into a resolved `RunConfig`:
 /// 1. typed reading of every schema key present (E-TYPE, V-01 enum spellings
 ///    with suggestion, V-03 required keys, operator specs via
-///    `parse_operator_list`);
+///    `ParseOperatorList`);
 /// 2. derived values: effective basis.e3max = min(e3max, 3*emax); two_body
 ///    e2max = 2*e1max and lmax = e1max if absent; mass_number from
 ///    reference.nucleus or the valence core (V-23); hamiltonian.beta_cm_hw =
@@ -45,12 +45,12 @@ struct ResolveResult {
 ///    its default if steps == 1;
 /// 3. `validate`.
 /// Does not touch `provenance`.
-ResolveResult resolve(const RawTree& tree, const ResolveOptions& options);
+ResolveResult Resolve(const RawTree& tree, const ResolveOptions& options);
 
 /// The validation rules of design/16 section 5 (V-02, V-10 ... V-63, E-PLANNED)
 /// on a resolved config. `tree` tells which keys were given explicitly (V-41,
 /// Q2). Returns errors and warnings.
-ConfigIssues validate(const RunConfig& config, const RawTree& tree,
+ConfigIssues Validate(const RunConfig& config, const RawTree& tree,
                       const ResolveOptions& options);
 
 }  // namespace imsrg::driver

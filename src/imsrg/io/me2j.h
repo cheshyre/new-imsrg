@@ -36,17 +36,17 @@ struct Me2jTruncation {
 /// file's own `e2max`, as in imsrg++. Pure arithmetic on the loop structure of
 /// the format; O(number of records). Reference value: `{14, 28, 14}` gives
 /// 168066656.
-std::int64_t me2j_value_count(const Me2jTruncation& file,
-                              std::int32_t emax_read = -1);
+std::int64_t Me2jValueCount(const Me2jTruncation& file,
+                            std::int32_t emax_read = -1);
 
-/// Options for `read_me2j`.
+/// Options for `ReadMe2j`.
 struct Me2jReadOptions {
   Me2jTruncation file;  ///< Truncation of the file being read.
   bool read_whole_file =
       false;  ///< Consume the entire file and verify its value count.
 };
 
-/// What `read_me2j` did.
+/// What `ReadMe2j` did.
 struct Me2jReadReport {
   std::int64_t values_read =
       0;                 ///< Number of floats consumed (prefix, or whole file).
@@ -78,12 +78,12 @@ struct Me2jReadReport {
 /// @throws InputError if the file cannot be opened; if the data ends before the
 ///         required values are complete; if a token is not a number; or, with
 ///         `read_whole_file`, if the number of values differs from
-///         `me2j_value_count(options.file)` (the message states expected and
+///         `Me2jValueCount(options.file)` (the message states expected and
 ///         found counts and hints at file2e1max, file2e2max and file2lmax).
-op::Operator read_me2j(const std::filesystem::path& path,
-                       const Me2jReadOptions& options,
-                       std::shared_ptr<const basis::ModelSpace> ms,
-                       Me2jReadReport* report = nullptr);
+op::Operator ReadMe2j(const std::filesystem::path& path,
+                      const Me2jReadOptions& options,
+                      std::shared_ptr<const basis::ModelSpace> ms,
+                      Me2jReadReport* report = nullptr);
 
 }  // namespace imsrg::io
 

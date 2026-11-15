@@ -28,12 +28,12 @@ namespace fs = std::filesystem;
 
 /// A half-exact deterministic value: multiples of 1/64 in [-1.6, 1.6], with
 /// about 1% zeros.
-float synthetic_value(std::int64_t k) {
+float SyntheticValue(std::int64_t k) {
   const std::int64_t m = (k * 37 + k / 7) % 201 - 100;
   return static_cast<float>(m) / 64.0F;
 }
 
-fs::path temp_dir() {
+fs::path TempDir() {
   // Per-process directory: ctest runs every test in its own process, in
   // parallel.
   const fs::path d = fs::temp_directory_path() /
@@ -45,24 +45,24 @@ fs::path temp_dir() {
 constexpr No2bFileTruncation kFile{3, 6, 9, -1};
 constexpr op::No2bTruncation kContainer{2, 4, 6, 2};
 
-std::string text_body(std::int64_t count) {
+std::string TextBody(std::int64_t count) {
   std::string s = "header line of the text file\n";
   char buf[64];
   for (std::int64_t k = 0; k < count; ++k) {
     std::snprintf(buf, sizeof buf, "%.9g%c",
-                  static_cast<double>(synthetic_value(k)),
+                  static_cast<double>(SyntheticValue(k)),
                   k % 5 == 4 ? '\n' : ' ');
     s += buf;
   }
   return s;
 }
 
-void write_binary(const fs::path& p, std::int64_t count, bool half) {
+void WriteBinary(const fs::path& p, std::int64_t count, bool half) {
   std::ofstream out(p, std::ios::binary);
   for (std::int64_t k = 0; k < count; ++k) {
-    const float v = synthetic_value(k);
+    const float v = SyntheticValue(k);
     if (half) {
-      const std::uint16_t h = float_to_half(v);
+      const std::uint16_t h = FloatToHalf(v);
       out.write(reinterpret_cast<const char*>(&h), sizeof h);
     } else {
       out.write(reinterpret_cast<const char*>(&v), sizeof v);
@@ -71,52 +71,52 @@ void write_binary(const fs::path& p, std::int64_t count, bool half) {
 }
 
 TEST(No2bCount, ReferenceFile) {
-  EXPECT_EQ(no2b_value_count({6, 12, 18, -1}), 32685840);
-  EXPECT_EQ(no2b_value_count({6, 12, 18, 6}),
+  EXPECT_EQ(No2bValueCount({6, 12, 18, -1}), 32685840);
+  EXPECT_EQ(No2bValueCount({6, 12, 18, 6}),
             32685840);  // lmax = e1max explicitly
 }
 
 TEST(No2bCount, SmallCases) {
   // e1max = 0: one orbit (s1/2); a=b=c=d=e=f, J = 0 and 1, five isospin values
   // each.
-  EXPECT_EQ(no2b_value_count({0, 0, 0, -1}), 10);
+  EXPECT_EQ(No2bValueCount({0, 0, 0, -1}), 10);
   // Monotonic in every truncation.
-  EXPECT_LT(no2b_value_count({2, 4, 6, -1}), no2b_value_count({3, 4, 6, -1}));
-  EXPECT_LT(no2b_value_count({2, 4, 5, -1}), no2b_value_count({2, 4, 6, -1}));
-  EXPECT_LT(no2b_value_count({2, 3, 6, -1}), no2b_value_count({2, 4, 6, -1}));
-  EXPECT_LT(no2b_value_count({3, 6, 9, 1}), no2b_value_count({3, 6, 9, -1}));
+  EXPECT_LT(No2bValueCount({2, 4, 6, -1}), No2bValueCount({3, 4, 6, -1}));
+  EXPECT_LT(No2bValueCount({2, 4, 5, -1}), No2bValueCount({2, 4, 6, -1}));
+  EXPECT_LT(No2bValueCount({2, 3, 6, -1}), No2bValueCount({2, 4, 6, -1}));
+  EXPECT_LT(No2bValueCount({3, 6, 9, 1}), No2bValueCount({3, 6, 9, -1}));
 }
 
 TEST(No2bCount, NegativeTruncationThrows) {
-  EXPECT_THROW(no2b_value_count({-1, 0, 0, -1}), InputError);
+  EXPECT_THROW(No2bValueCount({-1, 0, 0, -1}), InputError);
 }
 
 TEST(No2bRead, TextGzipFloatAndHalfAgree) {
-  const fs::path dir = temp_dir();
-  const std::int64_t count = no2b_value_count(kFile);
+  const fs::path dir = TempDir();
+  const std::int64_t count = No2bValueCount(kFile);
   ASSERT_GT(count, 1000);
 
   const fs::path ptxt = dir / "synthetic.txt";
   {
-    std::ofstream(ptxt) << text_body(count);
+    std::ofstream(ptxt) << TextBody(count);
   }
   const fs::path pgz = dir / "synthetic.txt.gz";
   {
     GzipWriter w(pgz);
-    w.write(text_body(count));
-    w.close();
+    w.Write(TextBody(count));
+    w.Close();
   }
   const fs::path pf = dir / "synthetic_f32_stream.bin";
   const fs::path ph = dir / "synthetic_f16_stream.bin";
-  write_binary(pf, count, false);
-  write_binary(ph, count, true);
+  WriteBinary(pf, count, false);
+  WriteBinary(ph, count, true);
 
   op::No2bThreeBody a(kContainer), b(kContainer), c(kContainer), d(kContainer);
   No2bReadReport ra, rb, rc, rd;
-  read_no2b(ptxt, {.file = kFile}, a, &ra);
-  read_no2b(pgz, {.file = kFile}, b, &rb);
-  read_no2b(pf, {.file = kFile}, c, &rc);
-  read_no2b(ph, {.file = kFile, .precision = No2bPrecision::Half}, d, &rd);
+  ReadNo2b(ptxt, {.file = kFile}, a, &ra);
+  ReadNo2b(pgz, {.file = kFile}, b, &rb);
+  ReadNo2b(pf, {.file = kFile}, c, &rc);
+  ReadNo2b(ph, {.file = kFile, .precision = No2bPrecision::kHalf}, d, &rd);
 
   ASSERT_GT(a.size(), 0U);
   EXPECT_GT(ra.values_stored, 100);
@@ -149,26 +149,26 @@ TEST(No2bRead, TextGzipFloatAndHalfAgree) {
 }
 
 TEST(No2bRead, WholeFileWhenContainerMatchesFile) {
-  const fs::path dir = temp_dir();
+  const fs::path dir = TempDir();
   const No2bFileTruncation f{2, 4, 6, -1};
-  const std::int64_t count = no2b_value_count(f);
+  const std::int64_t count = No2bValueCount(f);
   const fs::path pf = dir / "whole_stream.bin";
-  write_binary(pf, count, false);
+  WriteBinary(pf, count, false);
   op::No2bThreeBody v(op::No2bTruncation{2, 4, 6, 2});
   No2bReadReport r;
-  read_no2b(pf, {.file = f}, v, &r);
+  ReadNo2b(pf, {.file = f}, v, &r);
   EXPECT_EQ(r.values_read, count);
   EXPECT_GT(r.seconds, 0.0);
 }
 
 TEST(No2bRead, WrongBinarySizeThrowsWithDiagnostics) {
-  const fs::path dir = temp_dir();
-  const std::int64_t count = no2b_value_count(kFile);
+  const fs::path dir = TempDir();
+  const std::int64_t count = No2bValueCount(kFile);
   const fs::path pf = dir / "short_stream.bin";
-  write_binary(pf, count - 1, false);
+  WriteBinary(pf, count - 1, false);
   op::No2bThreeBody v(kContainer);
   try {
-    read_no2b(pf, {.file = kFile}, v);
+    ReadNo2b(pf, {.file = kFile}, v);
     FAIL() << "expected InputError";
   } catch (const InputError& e) {
     const std::string msg = e.what();
@@ -181,43 +181,43 @@ TEST(No2bRead, WrongBinarySizeThrowsWithDiagnostics) {
   // A single-precision file read as half (or vice versa) has the wrong size
   // too.
   const fs::path pf2 = dir / "full_stream.bin";
-  write_binary(pf2, count, false);
+  WriteBinary(pf2, count, false);
   EXPECT_THROW(
-      read_no2b(pf2, {.file = kFile, .precision = No2bPrecision::Half}, v),
+      ReadNo2b(pf2, {.file = kFile, .precision = No2bPrecision::kHalf}, v),
       InputError);
   // Wrong truncation.
-  EXPECT_THROW(read_no2b(pf2, {.file = {3, 6, 8, -1}}, v), InputError);
+  EXPECT_THROW(ReadNo2b(pf2, {.file = {3, 6, 8, -1}}, v), InputError);
 }
 
 TEST(No2bRead, TextEndingEarlyThrows) {
-  const fs::path dir = temp_dir();
-  const std::int64_t count = no2b_value_count(kFile);
+  const fs::path dir = TempDir();
+  const std::int64_t count = No2bValueCount(kFile);
   // Needs at least `values_read` values of the prefix; give fewer than the
   // prefix.
   const fs::path p = dir / "early.txt";
   {
-    std::ofstream(p) << text_body(100);
+    std::ofstream(p) << TextBody(100);
   }
   op::No2bThreeBody v(kContainer);
-  EXPECT_THROW(read_no2b(p, {.file = kFile}, v), InputError);
+  EXPECT_THROW(ReadNo2b(p, {.file = kFile}, v), InputError);
   (void)count;
 }
 
 TEST(No2bRead, MalformedTokenThrows) {
-  const fs::path dir = temp_dir();
+  const fs::path dir = TempDir();
   const fs::path p = dir / "bad.txt";
   {
     std::ofstream(p) << "header\n0.5 0.25 oops 1.0\n";
   }
   op::No2bThreeBody v(kContainer);
-  EXPECT_THROW(read_no2b(p, {.file = kFile}, v), InputError);
+  EXPECT_THROW(ReadNo2b(p, {.file = kFile}, v), InputError);
 }
 
 TEST(No2bRead, MissingFileThrows) {
   op::No2bThreeBody v(kContainer);
-  EXPECT_THROW(read_no2b(temp_dir() / "nope.txt", {.file = kFile}, v),
+  EXPECT_THROW(ReadNo2b(TempDir() / "nope.txt", {.file = kFile}, v),
                InputError);
-  EXPECT_THROW(read_no2b(temp_dir() / "nope_stream.bin", {.file = kFile}, v),
+  EXPECT_THROW(ReadNo2b(TempDir() / "nope_stream.bin", {.file = kFile}, v),
                InputError);
 }
 

@@ -20,7 +20,7 @@ TEST(LinalgEigh, RandomSymmetricSizes) {
     Matrix<double> A(n, n);
     for (int j = 0; j < n; ++j)
       for (int i = j; i < n; ++i) A(i, j) = A(j, i) = d(rng);
-    EighResult r = eigh(A.const_view());
+    EighResult r = Eigh(A.const_view());
     ASSERT_EQ(static_cast<int>(r.eigenvalues.size()), n);
     EXPECT_TRUE(std::is_sorted(r.eigenvalues.begin(), r.eigenvalues.end()));
     const Matrix<double>& V = r.eigenvectors;
@@ -50,7 +50,7 @@ TEST(LinalgEigh, TwoByTwoAnalytic) {
   A(0, 0) = 2;
   A(1, 0) = A(0, 1) = 1;
   A(1, 1) = 2;
-  EighResult r = eigh(A.const_view());
+  EighResult r = Eigh(A.const_view());
   EXPECT_NEAR(r.eigenvalues[0], 1.0, 1e-14);
   EXPECT_NEAR(r.eigenvalues[1], 3.0, 1e-14);
   const double s = std::sqrt(0.5);
@@ -64,7 +64,7 @@ TEST(LinalgEigh, DiagonalInput) {
   Matrix<double> A(4, 4);
   const double diag[4] = {3.0, -1.0, 2.0, 0.5};
   for (int i = 0; i < 4; ++i) A(i, i) = diag[i];
-  EighResult r = eigh(A.const_view());
+  EighResult r = Eigh(A.const_view());
   const double expect[4] = {-1.0, 0.5, 2.0, 3.0};
   const int src[4] = {1, 3, 2, 0};
   for (int c = 0; c < 4; ++c) {
@@ -79,13 +79,13 @@ TEST(LinalgEigh, ReadsOnlyLowerTriangleAndEmpty) {
   A(1, 0) = 0.5;
   A(0, 1) = 1e6;  // must be ignored
   A(1, 1) = 3;
-  EighResult r = eigh(A.const_view());
+  EighResult r = Eigh(A.const_view());
   const double mid = 2.0, h = std::sqrt(1.0 + 0.25);
   EXPECT_NEAR(r.eigenvalues[0], mid - h, 1e-13);
   EXPECT_NEAR(r.eigenvalues[1], mid + h, 1e-13);
   Matrix<double> E(0, 0);
-  EXPECT_EQ(eigh(E.const_view()).eigenvalues.size(), 0u);
+  EXPECT_EQ(Eigh(E.const_view()).eigenvalues.size(), 0u);
   Matrix<double> R(2, 3), V(2, 3);
   std::vector<double> w(2);
-  EXPECT_THROW(eigh(R.const_view(), w, V.view()), imsrg::InvariantError);
+  EXPECT_THROW(Eigh(R.const_view(), w, V.view()), imsrg::InvariantError);
 }

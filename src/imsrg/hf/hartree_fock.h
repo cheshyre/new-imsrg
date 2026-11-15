@@ -28,14 +28,14 @@ namespace imsrg::hf {
 
 /// How successive densities are combined.
 enum class Mixing : std::uint8_t {
-  Linear,  ///< imsrg++ scheme: rho <- (1 - w) rho_new + w rho_old with w =
-           ///< `density_mixing`.
-  Diis     ///< Pulay DIIS on the Fock matrix (no density mixing).
+  kLinear,  ///< imsrg++ scheme: rho <- (1 - w) rho_new + w rho_old with w =
+            ///< `density_mixing`.
+  kDiis     ///< Pulay DIIS on the Fock matrix (no density mixing).
 };
 
 /// Options of `solve`.
 struct HFOptions {
-  Mixing mixing = Mixing::Linear;
+  Mixing mixing = Mixing::kLinear;
   /// Convergence threshold on ||eps - eps_prev||_F / num_orbits (eps:
   /// single-particle energies).
   double tolerance = 1e-8;
@@ -87,7 +87,7 @@ struct HFResult {
 /// Runs spherical Hartree-Fock for the Hamiltonian `H`.
 ///
 /// The reference (occupations, Z, N) is the one of H's model space. `H` is
-/// deep-copied and the copy is synced to the host (`Operator::sync_to_host` is
+/// deep-copied and the copy is synced to the host (`Operator::SyncToHost` is
 /// non-const and `H` is device authoritative); `H` itself is not modified. Only
 /// the one-body part and the two-body part of `H` are used (no zero-body term).
 /// `v3` may be null (2N only); otherwise its monopole is used with the
@@ -98,7 +98,7 @@ struct HFResult {
 /// construction of the monopoles.
 /// @throws InputError / InvariantError if H has no two-body part or `v3` does
 ///         not match its model space.
-HFResult solve(const op::Operator& H, const op::No2bThreeBody* v3,
+HFResult Solve(const op::Operator& H, const op::No2bThreeBody* v3,
                const HFOptions& options = {});
 
 /// The Hamiltonian in the Hartree-Fock basis and normal ordered with respect to
@@ -108,24 +108,24 @@ HFResult solve(const op::Operator& H, const op::No2bThreeBody* v3,
 /// rho_ab V3^{J}_{pqa,rsb} (a, b in one (l, 2j, tz) channel, |rho_ab| >= 1e-8,
 /// e_a + e_p + e_q <= options.e3max, normalized kets, built in the oscillator
 /// basis from `r.rho`) and D is the J-coupled basis change of
-/// `op::transform_basis`. `H` supplies the model space, the spec and V2 (its
+/// `op::TransformBasis`. `H` supplies the model space, the spec and V2 (its
 /// zero- and one-body parts are replaced); `v3` may be null (2N only). If the
 /// final occupations differ from the reference of H's model space by more than
 /// 1e-3 in any orbit (imsrg++ `UpdateReference`) the result lives on
-/// `ms.with_reference(...)` with the HF occupations, otherwise on H's model
+/// `ms.WithReference(...)` with the HF occupations, otherwise on H's model
 /// space. `H` is not modified. Complexity: O(sum_ch n_ch^2 (#orbits in
 /// channel)^2) for V3NO, plus the transformation.
 /// @throws InvariantError / InputError if `r` does not match H's model space.
-op::Operator normal_ordered_hamiltonian(const op::Operator& H,
-                                        const op::No2bThreeBody* v3,
-                                        const HFResult& r,
-                                        const HFOptions& options = {});
+op::Operator NormalOrderedHamiltonian(const op::Operator& H,
+                                      const op::No2bThreeBody* v3,
+                                      const HFResult& r,
+                                      const HFOptions& options = {});
 
 /// `O` transformed to the HF basis defined by `r.C` (imsrg++
 /// `TransformToHFBasis`): the one-body part C^T O C and the two-body part D^T V
 /// D per channel; the zero-body part is unchanged and no normal ordering is
 /// performed. `O` is not modified. Complexity: O(norb^3 + sum_ch n_ch^3).
-op::Operator to_hf_basis(const op::Operator& O, const HFResult& r);
+op::Operator ToHfBasis(const op::Operator& O, const HFResult& r);
 
 }  // namespace imsrg::hf
 

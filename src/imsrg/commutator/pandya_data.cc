@@ -15,15 +15,15 @@ namespace {
 
 /// Device buffer holding a copy of `v` (empty buffer for an empty vector).
 template <class T>
-exec::DeviceBuffer<T> upload(const std::vector<T>& v, const char* label) {
+exec::DeviceBuffer<T> Upload(const std::vector<T>& v, const char* label) {
   exec::DeviceBuffer<T> b(v.size(), label);
-  if (!v.empty()) b.copy_from_host(std::span<const T>(v));
+  if (!v.empty()) b.CopyFromHost(std::span<const T>(v));
   return b;
 }
 
 }  // namespace
 
-PandyaData build_pandya_data(const basis::ModelSpace& ms) {
+PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
   const auto& ph = ms.particle_hole();
   const auto& tb = ms.two_body();
   const auto occ = ms.reference().occupations();
@@ -75,23 +75,23 @@ PandyaData build_pandya_data(const basis::ModelSpace& ms) {
     d.w_off_host[cs + 1] = d.w_off_host[cs] + n * 2 * n;
   }
 
-  d.ncc = upload(d.ncc_host, "pandya::ncc");
-  d.nk = upload(d.nk_host, "pandya::nk");
-  d.ket_off = upload(ket_off, "pandya::ket_off");
-  d.k_off = upload(k_off, "pandya::k_off");
-  d.ket_p = upload(ket_p, "pandya::ket_p");
-  d.ket_q = upload(ket_q, "pandya::ket_q");
-  d.k_a = upload(k_a, "pandya::k_a");
-  d.k_b = upload(k_b, "pandya::k_b");
-  d.k_d = upload(k_d, "pandya::k_d");
-  d.xk_off = upload(d.xk_off_host, "pandya::xk_off");
-  d.yk_off = upload(d.yk_off_host, "pandya::yk_off");
-  d.w_off = upload(d.w_off_host, "pandya::w_off");
+  d.ncc = Upload(d.ncc_host, "pandya::ncc");
+  d.nk = Upload(d.nk_host, "pandya::nk");
+  d.ket_off = Upload(ket_off, "pandya::ket_off");
+  d.k_off = Upload(k_off, "pandya::k_off");
+  d.ket_p = Upload(ket_p, "pandya::ket_p");
+  d.ket_q = Upload(ket_q, "pandya::ket_q");
+  d.k_a = Upload(k_a, "pandya::k_a");
+  d.k_b = Upload(k_b, "pandya::k_b");
+  d.k_d = Upload(k_d, "pandya::k_d");
+  d.xk_off = Upload(d.xk_off_host, "pandya::xk_off");
+  d.yk_off = Upload(d.yk_off_host, "pandya::yk_off");
+  d.w_off = Upload(d.w_off_host, "pandya::w_off");
   const auto jo = ph.ket_J_offsets();
   const auto lt = ph.local_index_table();
-  d.ket_J_offsets = upload(std::vector<std::int32_t>(jo.begin(), jo.end()),
+  d.ket_J_offsets = Upload(std::vector<std::int32_t>(jo.begin(), jo.end()),
                            "pandya::ket_J_offsets");
-  d.local_index_table = upload(std::vector<std::int32_t>(lt.begin(), lt.end()),
+  d.local_index_table = Upload(std::vector<std::int32_t>(lt.begin(), lt.end()),
                                "pandya::local_index_table");
 
   const auto sz = [](const std::vector<std::int64_t>& off) {
@@ -102,7 +102,7 @@ PandyaData build_pandya_data(const basis::ModelSpace& ms) {
   d.w = exec::DeviceBuffer<double>(sz(d.w_off_host), "pandya::W");
   d.zb = exec::DeviceBuffer<double>(sz(d.w_off_host), "pandya::ZB");
 
-  PandyaView& v = d.view_;
+  PandyaView& v = d.kernel_view;
   v.num_cc = ncc;
   v.ncc = d.ncc.device_data();
   v.nk = d.nk.device_data();
@@ -134,10 +134,10 @@ PandyaData build_pandya_data(const basis::ModelSpace& ms) {
     linalg::GemmProblem g;
     g.alpha = 1.0;
     g.A = linalg::MatrixView<const double>{v.xk + d.xk_off_host[cs], n, nk, n};
-    g.opA = linalg::Op::NoTrans;
+    g.opA = linalg::Op::kNoTrans;
     g.B = linalg::MatrixView<const double>{v.yk + d.yk_off_host[cs], nk, 2 * n,
                                            nk};
-    g.opB = linalg::Op::NoTrans;
+    g.opB = linalg::Op::kNoTrans;
     g.beta = 0.0;
     g.C = linalg::MatrixView<double>{v.w + d.w_off_host[cs], n, 2 * n, n};
     d.gemms.push_back(g);

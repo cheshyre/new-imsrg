@@ -30,12 +30,12 @@ struct Mp3Energy {
 /// (e_a+e_b-e_i-e_j), with normalized matrix elements, even J only when a==b or
 /// i==j. H must be in the basis where f is diagonal. Syncs H to host.
 /// Complexity: O(N_p^2 N_h^2 J_max).
-double mp2_energy(op::Operator& H);
+double Mp2Energy(op::Operator& H);
 
 /// MBPT(3) energy terms (pp, hh, ph) as in imsrg++ `GetMP3_Energy`. Same
-/// preconditions as `mp2_energy`. Complexity: O(sum_ch n_pp^2 n_hh + n_hh^2
+/// preconditions as `Mp2Energy`. Complexity: O(sum_ch n_pp^2 n_hh + n_hh^2
 /// n_pp) plus the ph term O(sum_Jph n_ph^2 J_max).
-Mp3Energy mp3_energy(op::Operator& H);
+Mp3Energy ComputeMp3Energy(op::Operator& H);
 
 }  // namespace imsrg::mbpt
 

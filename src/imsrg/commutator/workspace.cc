@@ -15,9 +15,9 @@ namespace imsrg::commutator {
 Workspace::Impl::Impl(const std::shared_ptr<const basis::ModelSpace>& ms)
     : tables(*ms),
       sixj(ms->basis().emax()),
-      ladder(detail::build_ladder_data(*ms)),
-      pandya(detail::build_pandya_data(*ms)),
-      lifted(detail::build_lifted_data(*ms)) {
+      ladder(detail::BuildLadderData(*ms)),
+      pandya(detail::BuildPandyaData(*ms)),
+      lifted(detail::BuildLiftedData(*ms)) {
   const std::size_t norb = static_cast<std::size_t>(ms->num_orbits());
 
   // One-body channel CSR: orbits with equal (l, 2j, 2tz).
@@ -26,7 +26,7 @@ Workspace::Impl::Impl(const std::shared_ptr<const basis::ModelSpace>& ms)
   std::vector<std::int32_t> owner;
   for (std::size_t p = 0; p < norb; ++p) {
     for (const OrbitIndex q :
-         ms->basis().same_ljtz(OrbitIndex{static_cast<std::int32_t>(p)})) {
+         ms->basis().SameLjtz(OrbitIndex{static_cast<std::int32_t>(p)})) {
       orbits.push_back(static_cast<std::int32_t>(q.value()));
       owner.push_back(static_cast<std::int32_t>(p));
     }
@@ -34,17 +34,17 @@ Workspace::Impl::Impl(const std::shared_ptr<const basis::ModelSpace>& ms)
   }
   ob_offsets = exec::DeviceBuffer<std::int32_t>(offsets.size(),
                                                 "commutator::ob_offsets");
-  ob_offsets.copy_from_host(offsets);
+  ob_offsets.CopyFromHost(offsets);
   ob_orbits =
       exec::DeviceBuffer<std::int32_t>(orbits.size(), "commutator::ob_orbits");
-  ob_orbits.copy_from_host(orbits);
+  ob_orbits.CopyFromHost(orbits);
   ob_owner =
       exec::DeviceBuffer<std::int32_t>(owner.size(), "commutator::ob_owner");
-  ob_owner.copy_from_host(owner);
+  ob_owner.CopyFromHost(owner);
 
   // Block offsets exactly as `op::TwoBody` stores a scalar rank-2 operator.
   {
-    const op::TwoBody tmp(ms, op::OperatorSpec::scalar(2));
+    const op::TwoBody tmp(ms, op::OperatorSpec::Scalar(2));
     const auto& m = tmp.matrix();
     block_offsets_host.reserve(m.num_blocks() + 1);
     for (std::size_t k = 0; k < m.num_blocks(); ++k)
@@ -53,7 +53,7 @@ Workspace::Impl::Impl(const std::shared_ptr<const basis::ModelSpace>& ms)
     block_offsets_host.push_back(two_body_size);
     block_offsets = exec::DeviceBuffer<std::int64_t>(
         block_offsets_host.size(), "commutator::block_offsets");
-    block_offsets.copy_from_host(block_offsets_host);
+    block_offsets.CopyFromHost(block_offsets_host);
   }
 
   // Channel of each entry of the flat channel-ket table.
@@ -66,7 +66,7 @@ Workspace::Impl::Impl(const std::shared_ptr<const basis::ModelSpace>& ms)
     }
     entry_channel = exec::DeviceBuffer<std::int32_t>(
         ec.size(), "commutator::entry_channel");
-    entry_channel.copy_from_host(ec);
+    entry_channel.CopyFromHost(ec);
   }
 }
 
@@ -91,7 +91,7 @@ Workspace::~Workspace() = default;
 Workspace::Workspace(Workspace&&) noexcept = default;
 Workspace& Workspace::operator=(Workspace&&) noexcept = default;
 
-bool Workspace::compatible(const op::Operator& op) const noexcept {
+bool Workspace::Compatible(const op::Operator& op) const noexcept {
   if (op.empty()) return false;
   return op.model_space_ptr() == ms_ || op.model_space() == *ms_;
 }

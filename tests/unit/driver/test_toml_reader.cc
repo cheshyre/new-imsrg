@@ -142,49 +142,49 @@ struct Read {
   ConfigIssues issues;
 };
 
-Read read(std::string_view text) {
+Read ParseToml(std::string_view text) {
   Read r;
-  r.issues = read_toml_string(text, "<test>", r.tree);
+  r.issues = ReadTomlString(text, "<test>", r.tree);
   return r;
 }
 
 template <class T>
-const T& value_of(const RawTree& tree, std::string_view path) {
+const T& ValueOf(const RawTree& tree, std::string_view path) {
   const RawValue* v = tree.find(path);
   EXPECT_NE(v, nullptr) << path;
-  static const T fallback{};
-  if (v == nullptr) return fallback;
+  static const T kFallback{};
+  if (v == nullptr) return kFallback;
   const T* p = v->get_if<T>();
   EXPECT_NE(p, nullptr) << path << " has type " << v->type_name();
-  return p != nullptr ? *p : fallback;
+  return p != nullptr ? *p : kFallback;
 }
 
 // ---- value types
 // -----------------------------------------------------------------------------
 
 TEST(TomlReader, IntegerValue) {
-  const Read r = read("[basis]\nemax = 4\n");
+  const Read r = ParseToml("[basis]\nemax = 4\n");
   EXPECT_TRUE(r.issues.empty());
-  EXPECT_EQ(value_of<std::int64_t>(r.tree, "basis.emax"), 4);
+  EXPECT_EQ(ValueOf<std::int64_t>(r.tree, "basis.emax"), 4);
 }
 
 TEST(TomlReader, FloatAndIntegerStayDistinct) {
-  const Read a = read("[basis]\nhw = 16.0\n");
+  const Read a = ParseToml("[basis]\nhw = 16.0\n");
   EXPECT_TRUE(a.issues.empty());
-  EXPECT_EQ(value_of<double>(a.tree, "basis.hw"), 16.0);
-  const Read b = read("[basis]\nhw = 16\n");
+  EXPECT_EQ(ValueOf<double>(a.tree, "basis.hw"), 16.0);
+  const Read b = ParseToml("[basis]\nhw = 16\n");
   EXPECT_TRUE(b.issues.empty());
-  EXPECT_EQ(value_of<std::int64_t>(b.tree, "basis.hw"), 16);
+  EXPECT_EQ(ValueOf<std::int64_t>(b.tree, "basis.hw"), 16);
 }
 
 TEST(TomlReader, BoolStringAndArray) {
-  const Read r = read(
+  const Read r = ParseToml(
       "[imsrg3]\nin_flow = true\n[imsrg]\nmethod = \"magnus\"\n[operators]\n"
       "list = [\"Rp2\", \"E2\"]\n");
   EXPECT_TRUE(r.issues.empty());
-  EXPECT_TRUE(value_of<bool>(r.tree, "imsrg3.in_flow"));
-  EXPECT_EQ(value_of<std::string>(r.tree, "imsrg.method"), "magnus");
-  const RawArray& list = value_of<RawArray>(r.tree, "operators.list");
+  EXPECT_TRUE(ValueOf<bool>(r.tree, "imsrg3.in_flow"));
+  EXPECT_EQ(ValueOf<std::string>(r.tree, "imsrg.method"), "magnus");
+  const RawArray& list = ValueOf<RawArray>(r.tree, "operators.list");
   ASSERT_EQ(list.size(), 2u);
   EXPECT_EQ(*list[0].get_if<std::string>(), "Rp2");
   EXPECT_EQ(*list[1].get_if<std::string>(), "E2");
@@ -192,9 +192,9 @@ TEST(TomlReader, BoolStringAndArray) {
 
 TEST(TomlReader, InlineTableInsideArray) {
   const Read r =
-      read("[operators]\nlist = [\"Rp2\", { name = \"X\", rank = 2 }]\n");
+      ParseToml("[operators]\nlist = [\"Rp2\", { name = \"X\", rank = 2 }]\n");
   EXPECT_TRUE(r.issues.empty());
-  const RawArray& list = value_of<RawArray>(r.tree, "operators.list");
+  const RawArray& list = ValueOf<RawArray>(r.tree, "operators.list");
   ASSERT_EQ(list.size(), 2u);
   const RawTable* t = list[1].get_if<RawTable>();
   ASSERT_NE(t, nullptr);
@@ -205,13 +205,13 @@ TEST(TomlReader, InlineTableInsideArray) {
 }
 
 TEST(TomlReader, ArrayOfTablesFromFile) {
-  const Read r = read(
+  const Read r = ParseToml(
       "[[operators.from_file]]\nname = \"a\"\nrank = 0\nfile_2b = \"f1\"\n"
       "[[operators.from_file]]\nname = \"b\"\nfile_2b = \"f2\"\nfile_3b = "
       "\"g2\"\n");
   EXPECT_TRUE(r.issues.empty())
-      << (r.issues.empty() ? "" : r.issues[0].to_string());
-  const RawArray& arr = value_of<RawArray>(r.tree, "operators.from_file");
+      << (r.issues.empty() ? "" : r.issues[0].ToString());
+  const RawArray& arr = ValueOf<RawArray>(r.tree, "operators.from_file");
   ASSERT_EQ(arr.size(), 2u);
   const RawTable* second = arr[1].get_if<RawTable>();
   ASSERT_NE(second, nullptr);
@@ -219,26 +219,27 @@ TEST(TomlReader, ArrayOfTablesFromFile) {
 }
 
 TEST(TomlReader, EmptyArray) {
-  const Read r = read("[operators]\nlist = []\n");
+  const Read r = ParseToml("[operators]\nlist = []\n");
   EXPECT_TRUE(r.issues.empty());
-  EXPECT_TRUE(value_of<RawArray>(r.tree, "operators.list").empty());
+  EXPECT_TRUE(ValueOf<RawArray>(r.tree, "operators.list").empty());
 }
 
 TEST(TomlReader, SourcePositionOfValue) {
-  const Read r = read("[basis]\nemax = 4\n");
+  const Read r = ParseToml("[basis]\nemax = 4\n");
   const RawValue* v = r.tree.find("basis.emax");
   ASSERT_NE(v, nullptr);
-  EXPECT_EQ(v->where.kind, SourceRef::Kind::TomlString);
+  EXPECT_EQ(v->where.kind, SourceRef::Kind::kTomlString);
   EXPECT_EQ(v->where.name, "<test>");
   EXPECT_EQ(v->where.line, 2);
   EXPECT_EQ(v->where.column, 8);
 }
 
 TEST(TomlReader, DottedKeysAndHeaders) {
-  const Read r = read("basis.emax = 4\n[imsrg.generator]\ncore = \"atan\"\n");
+  const Read r =
+      ParseToml("basis.emax = 4\n[imsrg.generator]\ncore = \"atan\"\n");
   EXPECT_TRUE(r.issues.empty());
-  EXPECT_EQ(value_of<std::int64_t>(r.tree, "basis.emax"), 4);
-  EXPECT_EQ(value_of<std::string>(r.tree, "imsrg.generator.core"), "atan");
+  EXPECT_EQ(ValueOf<std::int64_t>(r.tree, "basis.emax"), 4);
+  EXPECT_EQ(ValueOf<std::string>(r.tree, "imsrg.generator.core"), "atan");
 }
 
 // ---- errors
@@ -256,11 +257,11 @@ class TomlReaderUnknown : public ::testing::TestWithParam<UnknownCase> {};
 
 TEST_P(TomlReaderUnknown, ReportsKeyWithSuggestion) {
   const UnknownCase& c = GetParam();
-  const Read r = read(c.text);
+  const Read r = ParseToml(c.text);
   ASSERT_EQ(r.issues.size(), 1u) << r.issues.size();
   const ConfigIssue& issue = r.issues[0];
   EXPECT_EQ(issue.code, "E-KEY-UNKNOWN");
-  EXPECT_EQ(issue.severity, Severity::Error);
+  EXPECT_EQ(issue.severity, Severity::kError);
   EXPECT_EQ(issue.key_path, c.key_path);
   EXPECT_EQ(issue.message, c.message);
   if (c.suggestion != nullptr) {
@@ -269,7 +270,7 @@ TEST_P(TomlReaderUnknown, ReportsKeyWithSuggestion) {
   } else {
     EXPECT_FALSE(issue.suggestion.has_value());
   }
-  EXPECT_EQ(issue.where.kind, SourceRef::Kind::TomlString);
+  EXPECT_EQ(issue.where.kind, SourceRef::Kind::kTomlString);
   EXPECT_GT(issue.where.line, 0);
 }
 
@@ -291,7 +292,7 @@ INSTANTIATE_TEST_SUITE_P(
     });
 
 TEST(TomlReader, SeveralUnknownKeysAreReportedTogether) {
-  const Read r = read(
+  const Read r = ParseToml(
       "[basis]\nemaxx = 4\nemax = 6\n[basiss]\nx = 1\n[imsrg.generator]\ncor = "
       "1\n");
   ASSERT_EQ(r.issues.size(), 3u);
@@ -299,11 +300,11 @@ TEST(TomlReader, SeveralUnknownKeysAreReportedTogether) {
   EXPECT_EQ(r.issues[1].key_path, "basiss");
   EXPECT_EQ(r.issues[2].key_path, "imsrg.generator.cor");
   // The valid key is still stored.
-  EXPECT_EQ(value_of<std::int64_t>(r.tree, "basis.emax"), 6);
+  EXPECT_EQ(ValueOf<std::int64_t>(r.tree, "basis.emax"), 6);
 }
 
 TEST(TomlReader, TableWhereValueExpected) {
-  const Read r = read("[basis.emax]\nx = 1\n");
+  const Read r = ParseToml("[basis.emax]\nx = 1\n");
   ASSERT_EQ(r.issues.size(), 1u);
   EXPECT_EQ(r.issues[0].code, "E-TYPE");
   EXPECT_EQ(r.issues[0].key_path, "basis.emax");
@@ -311,14 +312,14 @@ TEST(TomlReader, TableWhereValueExpected) {
 }
 
 TEST(TomlReader, InlineTableWhereValueExpected) {
-  const Read r = read("[basis]\nemax = { a = 1 }\n");
+  const Read r = ParseToml("[basis]\nemax = { a = 1 }\n");
   ASSERT_EQ(r.issues.size(), 1u);
   EXPECT_EQ(r.issues[0].code, "E-TYPE");
   EXPECT_EQ(r.issues[0].where.line, 2);
 }
 
 TEST(TomlReader, ValueWhereTableExpected) {
-  const Read r = read("basis = 4\n");
+  const Read r = ParseToml("basis = 4\n");
   ASSERT_EQ(r.issues.size(), 1u);
   EXPECT_EQ(r.issues[0].code, "E-TYPE");
   EXPECT_EQ(r.issues[0].key_path, "basis");
@@ -326,7 +327,7 @@ TEST(TomlReader, ValueWhereTableExpected) {
 }
 
 TEST(TomlReader, DateIsTypeError) {
-  const Read r = read("[basis]\nemax = 2020-01-01\n");
+  const Read r = ParseToml("[basis]\nemax = 2020-01-01\n");
   ASSERT_EQ(r.issues.size(), 1u);
   EXPECT_EQ(r.issues[0].code, "E-TYPE");
   EXPECT_EQ(r.issues[0].key_path, "basis.emax");
@@ -334,23 +335,23 @@ TEST(TomlReader, DateIsTypeError) {
 }
 
 TEST(TomlReader, DateInsideArrayIsTypeError) {
-  const Read r = read("[operators]\nlist = [12:30:00]\n");
+  const Read r = ParseToml("[operators]\nlist = [12:30:00]\n");
   ASSERT_EQ(r.issues.size(), 1u);
   EXPECT_EQ(r.issues[0].code, "E-TYPE");
 }
 
 TEST(TomlReader, SyntaxErrorHasLine) {
-  const Read r = read("[basis]\nemax = = 4\n");
+  const Read r = ParseToml("[basis]\nemax = = 4\n");
   ASSERT_EQ(r.issues.size(), 1u);
   EXPECT_EQ(r.issues[0].code, "E-TOML-SYNTAX");
-  EXPECT_EQ(r.issues[0].where.kind, SourceRef::Kind::TomlString);
+  EXPECT_EQ(r.issues[0].where.kind, SourceRef::Kind::kTomlString);
   EXPECT_EQ(r.issues[0].where.line, 2);
   EXPECT_GT(r.issues[0].where.column, 0);
   EXPECT_TRUE(r.tree.empty());
 }
 
 TEST(TomlReader, ProvenanceTableIsSkipped) {
-  const Read r = read(
+  const Read r = ParseToml(
       "[basis]\nemax = 4\n[provenance]\nversion = \"1\"\nwarnings = "
       "[]\nwhatever = 3\n");
   EXPECT_TRUE(r.issues.empty());
@@ -360,7 +361,7 @@ TEST(TomlReader, ProvenanceTableIsSkipped) {
 TEST(TomlReader, MissingFileIsEFile) {
   RawTree tree;
   const ConfigIssues issues =
-      read_toml_file("/nonexistent-dir-imsrg/none.toml", tree);
+      ReadTomlFile("/nonexistent-dir-imsrg/none.toml", tree);
   ASSERT_EQ(issues.size(), 1u);
   EXPECT_EQ(issues[0].code, "E-FILE");
   EXPECT_EQ(issues[0].message,
@@ -376,23 +377,23 @@ TEST(TomlReader, FileUsesPathAsGiven) {
     out << "[basis]\nemax = 4\nemaxx = 1\n";
   }
   RawTree tree;
-  const ConfigIssues issues = read_toml_file(path, tree);
+  const ConfigIssues issues = ReadTomlFile(path, tree);
   std::filesystem::remove(path);
   ASSERT_EQ(issues.size(), 1u);
-  EXPECT_EQ(issues[0].where.kind, SourceRef::Kind::TomlFile);
+  EXPECT_EQ(issues[0].where.kind, SourceRef::Kind::kTomlFile);
   EXPECT_EQ(issues[0].where.name, path.string());
   EXPECT_EQ(issues[0].where.line, 3);
   const RawValue* v = tree.find("basis.emax");
   ASSERT_NE(v, nullptr);
-  EXPECT_EQ(v->where.kind, SourceRef::Kind::TomlFile);
+  EXPECT_EQ(v->where.kind, SourceRef::Kind::kTomlFile);
   EXPECT_EQ(v->where.name, path.string());
 }
 
 TEST(TomlReader, ReadingTwiceReplacesEntries) {
   RawTree tree;
-  EXPECT_TRUE(read_toml_string("[basis]\nemax = 4\n", "a", tree).empty());
-  EXPECT_TRUE(read_toml_string("[basis]\nemax = 6\n", "b", tree).empty());
-  EXPECT_EQ(value_of<std::int64_t>(tree, "basis.emax"), 6);
+  EXPECT_TRUE(ReadTomlString("[basis]\nemax = 4\n", "a", tree).empty());
+  EXPECT_TRUE(ReadTomlString("[basis]\nemax = 6\n", "b", tree).empty());
+  EXPECT_EQ(ValueOf<std::int64_t>(tree, "basis.emax"), 6);
 }
 
 // ---- design examples
@@ -401,9 +402,9 @@ TEST(TomlReader, ReadingTwiceReplacesEntries) {
 class TomlReaderExamples : public ::testing::TestWithParam<std::string_view> {};
 
 TEST_P(TomlReaderExamples, ReadWithoutIssues) {
-  const Read r = read(GetParam());
+  const Read r = ParseToml(GetParam());
   EXPECT_TRUE(r.issues.empty())
-      << (r.issues.empty() ? "" : r.issues[0].to_string());
+      << (r.issues.empty() ? "" : r.issues[0].ToString());
   EXPECT_TRUE(r.tree.contains("basis.emax"));
 }
 
@@ -412,19 +413,19 @@ INSTANTIATE_TEST_SUITE_P(Section211, TomlReaderExamples,
                                            kExampleD));
 
 TEST(TomlReader, ExampleAContent) {
-  const Read r = read(kExampleA);
-  EXPECT_EQ(value_of<std::int64_t>(r.tree, "interaction.two_body.lmax"), 14);
-  EXPECT_EQ(value_of<std::string>(r.tree, "interaction.two_body.format"),
+  const Read r = ParseToml(kExampleA);
+  EXPECT_EQ(ValueOf<std::int64_t>(r.tree, "interaction.two_body.lmax"), 14);
+  EXPECT_EQ(ValueOf<std::string>(r.tree, "interaction.two_body.format"),
             "me2j");
-  EXPECT_EQ(value_of<std::string>(r.tree, "imsrg.generator.core"), "atan");
-  EXPECT_EQ(value_of<RawArray>(r.tree, "operators.list").size(), 1u);
+  EXPECT_EQ(ValueOf<std::string>(r.tree, "imsrg.generator.core"), "atan");
+  EXPECT_EQ(ValueOf<RawArray>(r.tree, "operators.list").size(), 1u);
 }
 
 TEST(TomlReader, ExampleDHasThreeBodyAndImsrg3) {
-  const Read r = read(kExampleD);
+  const Read r = ParseToml(kExampleD);
   EXPECT_TRUE(r.tree.has_table("interaction.three_body"));
-  EXPECT_TRUE(value_of<bool>(r.tree, "imsrg3.in_flow"));
-  EXPECT_EQ(value_of<double>(r.tree, "imsrg3.threebody_threshold"), 0.0);
+  EXPECT_TRUE(ValueOf<bool>(r.tree, "imsrg3.in_flow"));
+  EXPECT_EQ(ValueOf<double>(r.tree, "imsrg3.threebody_threshold"), 0.0);
 }
 
 // ---- --set
@@ -438,78 +439,78 @@ struct SetCase {
 
 TEST(SetOverride, Integer) {
   RawTree tree;
-  EXPECT_TRUE(apply_set_override("basis.emax=4", tree).empty());
-  EXPECT_EQ(value_of<std::int64_t>(tree, "basis.emax"), 4);
+  EXPECT_TRUE(ApplySetOverride("basis.emax=4", tree).empty());
+  EXPECT_EQ(ValueOf<std::int64_t>(tree, "basis.emax"), 4);
 }
 
 TEST(SetOverride, Float) {
   RawTree tree;
-  EXPECT_TRUE(apply_set_override("basis.hw=16.5", tree).empty());
-  EXPECT_EQ(value_of<double>(tree, "basis.hw"), 16.5);
+  EXPECT_TRUE(ApplySetOverride("basis.hw=16.5", tree).empty());
+  EXPECT_EQ(ValueOf<double>(tree, "basis.hw"), 16.5);
 }
 
 TEST(SetOverride, Bool) {
   RawTree tree;
-  EXPECT_TRUE(apply_set_override("imsrg3.in_flow=true", tree).empty());
-  EXPECT_TRUE(value_of<bool>(tree, "imsrg3.in_flow"));
+  EXPECT_TRUE(ApplySetOverride("imsrg3.in_flow=true", tree).empty());
+  EXPECT_TRUE(ValueOf<bool>(tree, "imsrg3.in_flow"));
 }
 
 TEST(SetOverride, QuotedString) {
   RawTree tree;
-  EXPECT_TRUE(apply_set_override("imsrg.method=\"magnus\"", tree).empty());
-  EXPECT_EQ(value_of<std::string>(tree, "imsrg.method"), "magnus");
+  EXPECT_TRUE(ApplySetOverride("imsrg.method=\"magnus\"", tree).empty());
+  EXPECT_EQ(ValueOf<std::string>(tree, "imsrg.method"), "magnus");
 }
 
 TEST(SetOverride, BareStringFallsBack) {
   RawTree tree;
-  EXPECT_TRUE(apply_set_override("imsrg.method=magnus", tree).empty());
-  EXPECT_EQ(value_of<std::string>(tree, "imsrg.method"), "magnus");
+  EXPECT_TRUE(ApplySetOverride("imsrg.method=magnus", tree).empty());
+  EXPECT_EQ(ValueOf<std::string>(tree, "imsrg.method"), "magnus");
 }
 
 TEST(SetOverride, BareStringWithSpacesIsTrimmed) {
   RawTree tree;
-  EXPECT_TRUE(apply_set_override("  reference.nucleus = O16 ", tree).empty());
-  EXPECT_EQ(value_of<std::string>(tree, "reference.nucleus"), "O16");
+  EXPECT_TRUE(ApplySetOverride("  reference.nucleus = O16 ", tree).empty());
+  EXPECT_EQ(ValueOf<std::string>(tree, "reference.nucleus"), "O16");
 }
 
 TEST(SetOverride, Array) {
   RawTree tree;
   EXPECT_TRUE(
-      apply_set_override("operators.list=[\"Rp2\",\"E2\"]", tree).empty());
-  const RawArray& list = value_of<RawArray>(tree, "operators.list");
+      ApplySetOverride("operators.list=[\"Rp2\",\"E2\"]", tree).empty());
+  const RawArray& list = ValueOf<RawArray>(tree, "operators.list");
   ASSERT_EQ(list.size(), 2u);
   EXPECT_EQ(*list[1].get_if<std::string>(), "E2");
 }
 
 TEST(SetOverride, SourceRefIsVerbatimAssignment) {
   RawTree tree;
-  apply_set_override("basis.emax=4", tree);
+  ApplySetOverride("basis.emax=4", tree);
   const RawValue* v = tree.find("basis.emax");
   ASSERT_NE(v, nullptr);
-  EXPECT_EQ(v->where.kind, SourceRef::Kind::SetOption);
+  EXPECT_EQ(v->where.kind, SourceRef::Kind::kSetOption);
   EXPECT_EQ(v->where.name, "basis.emax=4");
 }
 
 TEST(SetOverride, ValueMayContainEquals) {
   RawTree tree;
-  EXPECT_TRUE(apply_set_override("output.directory=a=b", tree).empty());
-  EXPECT_EQ(value_of<std::string>(tree, "output.directory"), "a=b");
+  EXPECT_TRUE(ApplySetOverride("output.directory=a=b", tree).empty());
+  EXPECT_EQ(ValueOf<std::string>(tree, "output.directory"), "a=b");
 }
 
 TEST(SetOverride, UnknownKeyWithSuggestion) {
   RawTree tree;
-  const ConfigIssues issues = apply_set_override("basis.emaxx=4", tree);
+  const ConfigIssues issues = ApplySetOverride("basis.emaxx=4", tree);
   ASSERT_EQ(issues.size(), 1u);
   EXPECT_EQ(issues[0].code, "E-KEY-UNKNOWN");
   ASSERT_TRUE(issues[0].suggestion.has_value());
   EXPECT_EQ(*issues[0].suggestion, "basis.emax");
-  EXPECT_EQ(issues[0].where.kind, SourceRef::Kind::SetOption);
+  EXPECT_EQ(issues[0].where.kind, SourceRef::Kind::kSetOption);
   EXPECT_TRUE(tree.empty());
 }
 
 TEST(SetOverride, MissingEqualsIsSyntaxError) {
   RawTree tree;
-  const ConfigIssues issues = apply_set_override("basis.emax", tree);
+  const ConfigIssues issues = ApplySetOverride("basis.emax", tree);
   ASSERT_EQ(issues.size(), 1u);
   EXPECT_EQ(issues[0].code, "E-SET-SYNTAX");
   EXPECT_TRUE(tree.empty());
@@ -517,26 +518,26 @@ TEST(SetOverride, MissingEqualsIsSyntaxError) {
 
 TEST(SetOverride, EmptyPathIsSyntaxError) {
   RawTree tree;
-  const ConfigIssues issues = apply_set_override("  =4", tree);
+  const ConfigIssues issues = ApplySetOverride("  =4", tree);
   ASSERT_EQ(issues.size(), 1u);
   EXPECT_EQ(issues[0].code, "E-SET-SYNTAX");
 }
 
 TEST(SetOverride, LastWins) {
   RawTree tree;
-  apply_set_override("basis.emax=4", tree);
-  apply_set_override("basis.emax=8", tree);
-  EXPECT_EQ(value_of<std::int64_t>(tree, "basis.emax"), 8);
+  ApplySetOverride("basis.emax=4", tree);
+  ApplySetOverride("basis.emax=8", tree);
+  EXPECT_EQ(ValueOf<std::int64_t>(tree, "basis.emax"), 8);
 }
 
 TEST(SetOverride, OverridesFileValue) {
   RawTree tree;
-  EXPECT_TRUE(read_toml_string("[basis]\nemax = 4\n", "f", tree).empty());
-  apply_set_override("basis.emax=6", tree);
+  EXPECT_TRUE(ReadTomlString("[basis]\nemax = 4\n", "f", tree).empty());
+  ApplySetOverride("basis.emax=6", tree);
   const RawValue* v = tree.find("basis.emax");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(*v->get_if<std::int64_t>(), 6);
-  EXPECT_EQ(v->where.kind, SourceRef::Kind::SetOption);
+  EXPECT_EQ(v->where.kind, SourceRef::Kind::kSetOption);
 }
 
 }  // namespace

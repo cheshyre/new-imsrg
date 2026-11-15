@@ -14,8 +14,8 @@ using namespace imsrg::mbtest;
 
 TEST(MbptNaturalOrbitals, Emax2Invariants) {
   op::Operator H =
-      load_hamiltonian(fs::path(IMSRG_GOLDEN_DIR) / "hamiltonian/emax2_O16");
-  NatResult res = build_nat(H, nullptr);
+      LoadHamiltonian(fs::path(IMSRG_GOLDEN_DIR) / "hamiltonian/emax2_O16");
+  NatResult res = BuildNat(H, nullptr);
   const auto& ms = H.model_space();
   const auto& basis = ms.basis();
   const auto N = ms.num_orbits();
@@ -30,7 +30,7 @@ TEST(MbptNaturalOrbitals, Emax2Invariants) {
   for (std::int32_t a = 0; a < N; ++a) {
     const OrbitIndex oa(a);
     EXPECT_GE(C(a, a), 0.0);
-    const auto ch = basis.same_ljtz(oa);
+    const auto ch = basis.SameLjtz(oa);
     for (std::int32_t b = 0; b < N; ++b) {
       double s = 0.0;
       for (std::int32_t k = 0; k < N; ++k) s += C(k, a) * C(k, b);
@@ -48,7 +48,7 @@ TEST(MbptNaturalOrbitals, Emax2Invariants) {
 
   std::cout << "[nat emax2] E_HF(HF) " << res.e_hf_hf << " E_HF(NAT) "
             << res.e_hf_nat << " E0(NAT H) " << res.h_nat.zero_body()
-            << " MP2(NAT) " << mbpt::mp2_energy(res.h_nat) << "\n";
+            << " MP2(NAT) " << mbpt::Mp2Energy(res.h_nat) << "\n";
   EXPECT_GE(res.e_hf_nat, res.e_hf_hf - 1e-8);  // HF is the variational minimum
   EXPECT_NEAR(res.h_nat.zero_body(), res.e_hf_nat, 1e-9);
 }

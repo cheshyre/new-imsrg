@@ -55,26 +55,26 @@ class Runtime {
 
   /// True while Kokkos is initialized (between construction and destruction of
   /// the `Runtime`).
-  static bool is_initialized() noexcept;
+  static bool IsInitialized() noexcept;
 
   /// Name of the default execution space, e.g. "Serial", "OpenMP", "Cuda",
   /// "HIP".
-  static std::string execution_space_name();
+  static std::string ExecutionSpaceName();
 
   /// Maximum concurrency (threads) of the default execution space; at least 1.
-  static int concurrency();
+  static int Concurrency();
 };
 
 /// True if memory allocated in the default (device) memory space can be read by
 /// host code, so that `DeviceBuffer` host mirrors alias the device data.
-bool default_memory_is_host_accessible() noexcept;
+bool DefaultMemoryIsHostAccessible() noexcept;
 
 /// Opens a named profiling region (Kokkos Tools). Matches the hook type `void
 /// (*)(const char*)` of base's TimerRegistry. Requires an initialized Runtime.
-void push_profiling_region(const char* name);
+void PushProfilingRegion(const char* name);
 
 /// Closes the innermost profiling region. Matches `void (*)()`.
-void pop_profiling_region();
+void PopProfilingRegion();
 
 }  // namespace imsrg::exec
 

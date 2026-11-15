@@ -13,14 +13,14 @@
 namespace imsrg::mbpt {
 
 namespace {
-std::size_t u(std::int64_t i) { return static_cast<std::size_t>(i); }
-double diag(const op::Operator& H, OrbitIndex a) {
+std::size_t U(std::int64_t i) { return static_cast<std::size_t>(i); }
+double Diag(const op::Operator& H, OrbitIndex a) {
   return H.one_body().get(a, a);
 }
 }  // namespace
 
-double mp2_energy(op::Operator& H) {
-  H.sync_to_host();
+double Mp2Energy(op::Operator& H) {
+  H.SyncToHost();
   const auto& ms = H.model_space();
   const auto& basis = ms.basis();
   const auto& ref = ms.reference();
@@ -28,24 +28,24 @@ double mp2_energy(op::Operator& H) {
   double e2 = 0.0;
   for (const OrbitIndex i : ref.particles()) {
     const auto& oi = basis.orbit(i);
-    const double ei = diag(H, i);
+    const double ei = Diag(H, i);
     for (const OrbitIndex a : ref.holes()) {
       const auto& oa = basis.orbit(a);
-      const double ea = diag(H, a);
+      const double ea = Diag(H, a);
       const double fia = H.one_body().get(i, a);
       if (std::abs(fia) > 1e-9)
         e2 += (oa.j2.twice + 1) * ref.occupation(a) * fia * fia / (ea - ei);
       for (const OrbitIndex j : ref.particles()) {
         if (j.value() < i.value()) continue;
         const auto& oj = basis.orbit(j);
-        const double ej = diag(H, j);
+        const double ej = Diag(H, j);
         for (const OrbitIndex b : ref.holes()) {
           if (b.value() < a.value()) continue;
           const auto& ob = basis.orbit(b);
           if ((oi.l + oj.l + oa.l + ob.l) % 2 > 0) continue;
           if (oi.tz2.twice + oj.tz2.twice != oa.tz2.twice + ob.tz2.twice)
             continue;
-          const double denom = ea + diag(H, b) - ei - ej;
+          const double denom = ea + Diag(H, b) - ei - ej;
           int jmin = std::max(std::abs(oi.j2.twice - oj.j2.twice),
                               std::abs(oa.j2.twice - ob.j2.twice)) /
                      2;
@@ -70,8 +70,8 @@ double mp2_energy(op::Operator& H) {
   return e2;
 }
 
-Mp3Energy mp3_energy(op::Operator& H) {
-  H.sync_to_host();
+Mp3Energy ComputeMp3Energy(op::Operator& H) {
+  H.SyncToHost();
   const auto& ms = H.model_space();
   const auto& basis = ms.basis();
   const auto& ref = ms.reference();
@@ -83,8 +83,8 @@ Mp3Energy mp3_energy(op::Operator& H) {
   for (std::int32_t c = 0; c < tb.num_channels(); ++c) {
     const ChannelIndex ch{c};
     const auto& tbc = tb.channel(ch);
-    const auto hh = sub.kets(ch, basis::KetClass::HH);
-    const auto pp = sub.kets(ch, basis::KetClass::PP);
+    const auto hh = sub.kets(ch, basis::KetClass::kHh);
+    const auto pp = sub.kets(ch, basis::KetClass::kPp);
     if (hh.empty() || pp.empty()) continue;
     const auto V = H.two_body().host_block(ch);
     const auto kets = tb.channel_kets(ch);
@@ -92,12 +92,12 @@ Mp3Energy mp3_energy(op::Operator& H) {
                np = static_cast<std::int64_t>(pp.size());
     linalg::Matrix<double> M(nh, np);
     for (std::int64_t I = 0; I < nh; ++I) {
-      const auto& kh = tb.ket(kets[u(hh[u(I)].value())]);
-      const double eh = diag(H, kh.p) + diag(H, kh.q);
+      const auto& kh = tb.ket(kets[U(hh[U(I)].value())]);
+      const double eh = Diag(H, kh.p) + Diag(H, kh.q);
       for (std::int64_t A = 0; A < np; ++A) {
-        const auto& kp = tb.ket(kets[u(pp[u(A)].value())]);
-        const double ep = diag(H, kp.p) + diag(H, kp.q);
-        M(I, A) = V(hh[u(I)].value(), pp[u(A)].value()) / (eh - ep);
+        const auto& kp = tb.ket(kets[U(pp[U(A)].value())]);
+        const double ep = Diag(H, kp.p) + Diag(H, kp.q);
+        M(I, A) = V(hh[U(I)].value(), pp[U(A)].value()) / (eh - ep);
       }
     }
     const double w = 2 * tbc.J() + 1;
@@ -106,13 +106,13 @@ Mp3Energy mp3_energy(op::Operator& H) {
       for (std::int64_t B = 0; B < np; ++B) {
         double s = 0.0;
         for (std::int64_t I = 0; I < nh; ++I) s += M(I, A) * M(I, B);
-        out.pp += w * s * V(pp[u(A)].value(), pp[u(B)].value());
+        out.pp += w * s * V(pp[U(A)].value(), pp[U(B)].value());
       }
     for (std::int64_t I = 0; I < nh; ++I)
       for (std::int64_t K = 0; K < nh; ++K) {
         double s = 0.0;
         for (std::int64_t A = 0; A < np; ++A) s += M(I, A) * M(K, A);
-        out.hh += w * s * V(hh[u(I)].value(), hh[u(K)].value());
+        out.hh += w * s * V(hh[U(I)].value(), hh[U(K)].value());
       }
   }
 
@@ -155,21 +155,21 @@ Mp3Energy mp3_energy(op::Operator& H) {
     const auto& two = H.two_body();
     for (std::int64_t I = 0; I < n; ++I)
       for (std::int64_t II = 0; II < n; ++II) {
-        const auto& x = pk[u(I)];
-        const auto& y = pk[u(II)];  // (b, j)
+        const auto& x = pk[U(I)];
+        const auto& y = pk[U(II)];  // (b, j)
         const double delta =
-            diag(H, x.i) + diag(H, y.i) - diag(H, x.a) - diag(H, y.a);
+            Diag(H, x.i) + Diag(H, y.i) - Diag(H, x.a) - Diag(H, y.a);
         V1(I, II) = 0.0;
         V2(II, I) = 0.0;
         const TwoJ ja{x.ja2}, ji{x.ji2}, jb{y.ja2}, jj{y.ji2};
-        if (!angmom::triangle(jj, jb, tJph) || !angmom::triangle(ji, ja, tJph))
+        if (!angmom::Triangle(jj, jb, tJph) || !angmom::Triangle(ji, ja, tJph))
           continue;
         double t1 = 0.0;
         for (int J1 = std::max(std::abs(ja.twice - jb.twice),
                                std::abs(ji.twice - jj.twice)) /
                       2;
              J1 <= std::min(ja.twice + jb.twice, ji.twice + jj.twice) / 2; ++J1)
-          t1 -= angmom::wigner_6j(ja, ji, tJph, jj, jb, TwoJ{2 * J1}) *
+          t1 -= angmom::Wigner6j(ja, ji, tJph, jj, jb, TwoJ{2 * J1}) *
                 (2 * J1 + 1) *
                 two.get_unnormalized(x.i, y.i, y.a, x.a, TwoJ{2 * J1});
         double t2 = 0.0;
@@ -177,7 +177,7 @@ Mp3Energy mp3_energy(op::Operator& H) {
                                std::abs(ja.twice - jj.twice)) /
                       2;
              J1 <= std::min(ji.twice + jb.twice, ja.twice + jj.twice) / 2; ++J1)
-          t2 -= angmom::wigner_6j(jb, jj, tJph, ja, ji, TwoJ{2 * J1}) *
+          t2 -= angmom::Wigner6j(jb, jj, tJph, ja, ji, TwoJ{2 * J1}) *
                 (2 * J1 + 1) *
                 two.get_unnormalized(y.a, x.i, x.a, y.i, TwoJ{2 * J1});
         V1(I, II) = t1 * x.phase_ia * y.phase_ai / delta;

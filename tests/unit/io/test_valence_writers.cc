@@ -30,21 +30,21 @@ namespace fs = std::filesystem;
 const fs::path kGolden = fs::path(IMSRG_GOLDEN_DIR);
 const char* const kVersion = "feature/m56-io-hf_46c891d+";
 
-std::vector<std::string> read_lines(const fs::path& p) {
+std::vector<std::string> ReadLines(const fs::path& p) {
   std::ifstream in(p);
   std::vector<std::string> lines;
   for (std::string line; std::getline(in, line);) lines.push_back(line);
   return lines;
 }
 
-std::vector<std::string> tokens(const std::string& line) {
+std::vector<std::string> Tokens(const std::string& line) {
   std::istringstream is(line);
   std::vector<std::string> t;
   for (std::string s; is >> s;) t.push_back(s);
   return t;
 }
 
-bool parse_number(const std::string& s, double& v) {
+bool ParseNumber(const std::string& s, double& v) {
   char* end = nullptr;
   v = std::strtod(s.c_str(), &end);
   return end != s.c_str() && *end == '\0';
@@ -53,10 +53,10 @@ bool parse_number(const std::string& s, double& v) {
 /// Compares two files line by line: comment lines (starting with '!') must be
 /// equal except the first (version) line; other lines must have the same
 /// tokens, numeric tokens within 1e-10. Returns the largest numeric deviation.
-double compare_files(const fs::path& got, const fs::path& want,
-                     const std::string& tag) {
-  const auto g = read_lines(got);
-  const auto w = read_lines(want);
+double CompareFiles(const fs::path& got, const fs::path& want,
+                    const std::string& tag) {
+  const auto g = ReadLines(got);
+  const auto w = ReadLines(want);
   EXPECT_EQ(g.size(), w.size()) << tag;
   double max_dev = 0.0;
   const std::size_t n = std::min(g.size(), w.size());
@@ -66,14 +66,14 @@ double compare_files(const fs::path& got, const fs::path& want,
       if (i != 0) EXPECT_EQ(g[i], w[i]) << tag << " line " << i + 1;
       continue;
     }
-    const auto tg = tokens(g[i]);
-    const auto tw = tokens(w[i]);
+    const auto tg = Tokens(g[i]);
+    const auto tw = Tokens(w[i]);
     EXPECT_EQ(tg.size(), tw.size())
         << tag << " line " << i + 1 << ": '" << g[i] << "' vs '" << w[i] << "'";
     if (tg.size() != tw.size()) continue;
     for (std::size_t k = 0; k < tg.size(); ++k) {
       double a = 0.0, b = 0.0;
-      if (parse_number(tg[k], a) && parse_number(tw[k], b)) {
+      if (ParseNumber(tg[k], a) && ParseNumber(tw[k], b)) {
         const double d = std::abs(a - b);
         max_dev = std::max(max_dev, d);
         EXPECT_LE(d, 1e-10) << tag << " line " << i + 1 << " token " << k;
@@ -88,7 +88,7 @@ double compare_files(const fs::path& got, const fs::path& want,
   return max_dev;
 }
 
-void check_mode(io::ValenceWriteMode mode, const std::string& stem) {
+void CheckMode(io::ValenceWriteMode mode, const std::string& stem) {
   const fs::path dump = kGolden / "hf/emax2_O16_2N/HNO.dump";
   if (!fs::exists(dump)) GTEST_SKIP() << "golden dump not found: " << dump;
   if (!fs::exists(kGolden / "io" / (stem + ".snt")))
@@ -97,8 +97,8 @@ void check_mode(io::ValenceWriteMode mode, const std::string& stem) {
   basis::BasisTruncation tr;
   tr.emax = 2;
   tr.lmax = 2;
-  const auto ms = basis::ModelSpace::from_names(tr, 16.0, "O16", "sd-shell");
-  const op::Operator op = op::read_operator_dump(dump, ms);
+  const auto ms = basis::ModelSpace::FromNames(tr, 16.0, "O16", "sd-shell");
+  const op::Operator op = op::ReadOperatorDump(dump, ms);
 
   io::ValenceWriteOptions opt;
   opt.mode = mode;
@@ -120,41 +120,41 @@ void check_mode(io::ValenceWriteMode mode, const std::string& stem) {
   const fs::path nint = dir / (stem + ".int");
   const fs::path sp = dir / (stem + ".sp");
 
-  io::write_tokyo(snt, op, opt);
+  io::WriteTokyo(snt, op, opt);
   io::ValenceWriteOptions int_opt =
       opt;  // imsrg++ leaves Aref and Zref unset in the .int
   int_opt.a_ref = 0;
   int_opt.z_ref = 0;
-  io::write_nushellx_int(nint, op, int_opt);
-  io::write_nushellx_sps(sp, op);
+  io::WriteNushellxInt(nint, op, int_opt);
+  io::WriteNushellxSps(sp, op);
 
   const fs::path g = kGolden / "io";
-  const double d1 = compare_files(snt, g / (stem + ".snt"), stem + ".snt");
-  const double d2 = compare_files(nint, g / (stem + ".int"), stem + ".int");
-  const double d3 = compare_files(sp, g / (stem + ".sp"), stem + ".sp");
+  const double d1 = CompareFiles(snt, g / (stem + ".snt"), stem + ".snt");
+  const double d2 = CompareFiles(nint, g / (stem + ".int"), stem + ".int");
+  const double d3 = CompareFiles(sp, g / (stem + ".sp"), stem + ".sp");
   EXPECT_LE(std::max({d1, d2, d3}), 1e-10);
   std::error_code ec;
   fs::remove_all(dir, ec);
 }
 
 TEST(ValenceWritersGolden, HamiltonianMatchesImsrgpp) {
-  check_mode(io::ValenceWriteMode::Hamiltonian, "O16_sdshell");
+  CheckMode(io::ValenceWriteMode::kHamiltonian, "O16_sdshell");
 }
 
 TEST(ValenceWritersGolden, IsospinAveragedOperatorMatchesImsrgpp) {
-  check_mode(io::ValenceWriteMode::IsospinAveragedOperator, "O16_sdshell_op");
+  CheckMode(io::ValenceWriteMode::kIsospinAveragedOperator, "O16_sdshell_op");
 }
 
 TEST(ValenceWriters, UnwritablePathThrows) {
-  const auto ms = basis::ModelSpace::from_names({.emax = 2, .lmax = 2}, 16.0,
-                                                "O16", "sd-shell");
+  const auto ms = basis::ModelSpace::FromNames({.emax = 2, .lmax = 2}, 16.0,
+                                               "O16", "sd-shell");
   const op::Operator op(ms,
-                        op::OperatorSpec::scalar(2, Hermiticity::Hermitian));
-  EXPECT_THROW(io::write_tokyo("/nonexistent_dir_imsrg/x.snt", op, {}),
+                        op::OperatorSpec::Scalar(2, Hermiticity::kHermitian));
+  EXPECT_THROW(io::WriteTokyo("/nonexistent_dir_imsrg/x.snt", op, {}),
                RuntimeError);
-  EXPECT_THROW(io::write_nushellx_int("/nonexistent_dir_imsrg/x.int", op, {}),
+  EXPECT_THROW(io::WriteNushellxInt("/nonexistent_dir_imsrg/x.int", op, {}),
                RuntimeError);
-  EXPECT_THROW(io::write_nushellx_sps("/nonexistent_dir_imsrg/x.sp", op),
+  EXPECT_THROW(io::WriteNushellxSps("/nonexistent_dir_imsrg/x.sp", op),
                RuntimeError);
 }
 

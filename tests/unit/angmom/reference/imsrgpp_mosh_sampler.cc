@@ -23,13 +23,13 @@
 
 namespace {
 std::uint64_t state = 0x2545F4914F6CDD1DULL;
-int next_int(int n) {  // uniform-ish in [0, n)
+int NextInt(int n) {  // uniform-ish in [0, n)
   state = state * 6364136223846793005ULL + 1442695040888963407ULL;
   return static_cast<int>((state >> 33) % static_cast<std::uint64_t>(n));
 }
-bool tri(int a, int b, int c) { return std::abs(a - b) <= c && c <= a + b; }
-void print_mosh(int N, int L, int n, int l, int n1, int l1, int n2, int l2,
-                int lam) {
+bool Tri(int a, int b, int c) { return std::abs(a - b) <= c && c <= a + b; }
+void PrintMosh(int N, int L, int n, int l, int n1, int l1, int n2, int l2,
+               int lam) {
   std::printf("mosh %d %d %d %d %d %d %d %d %d %.17g\n", N, L, n, l, n1, l1, n2,
               l2, lam, AngMom::Moshinsky(N, L, n, l, n1, l1, n2, l2, lam));
 }
@@ -55,26 +55,26 @@ int main() {
                 const int l2 = E - 2 * n1 - l1 - 2 * n2;
                 if ((L + l - l1 - l2) % 2 != 0) continue;
                 for (int lam = 0; lam <= E; ++lam)
-                  if (tri(L, l, lam) && tri(l1, l2, lam))
-                    print_mosh(N, L, n, l, n1, l1, n2, l2, lam);
+                  if (Tri(L, l, lam) && Tri(l1, l2, lam))
+                    PrintMosh(N, L, n, l, n1, l1, n2, l2, lam);
               }
         }
   // Random allowed brackets with 5 <= E <= 16.
   int count = 0;
   while (count < 3000) {
-    const int E = 5 + next_int(12);
-    const int e_cm = next_int(E + 1);
-    const int N = next_int(e_cm / 2 + 1), L = e_cm - 2 * N;
-    const int n = next_int((E - e_cm) / 2 + 1), l = E - e_cm - 2 * n;
-    const int e1 = next_int(E + 1);
-    const int n1 = next_int(e1 / 2 + 1), l1 = e1 - 2 * n1;
-    const int n2 = next_int((E - e1) / 2 + 1), l2 = E - e1 - 2 * n2;
+    const int E = 5 + NextInt(12);
+    const int e_cm = NextInt(E + 1);
+    const int N = NextInt(e_cm / 2 + 1), L = e_cm - 2 * N;
+    const int n = NextInt((E - e_cm) / 2 + 1), l = E - e_cm - 2 * n;
+    const int e1 = NextInt(E + 1);
+    const int n1 = NextInt(e1 / 2 + 1), l1 = e1 - 2 * n1;
+    const int n2 = NextInt((E - e1) / 2 + 1), l2 = E - e1 - 2 * n2;
     if ((L + l - l1 - l2) % 2 != 0) continue;
     const int lo = std::abs(L - l) > std::abs(l1 - l2) ? std::abs(L - l)
                                                        : std::abs(l1 - l2);
     const int hi = L + l < l1 + l2 ? L + l : l1 + l2;
     if (lo > hi) continue;
-    print_mosh(N, L, n, l, n1, l1, n2, l2, lo + next_int(hi - lo + 1));
+    PrintMosh(N, L, n, l, n1, l1, n2, l2, lo + NextInt(hi - lo + 1));
     ++count;
   }
   // Talmi B.
@@ -86,9 +86,9 @@ int main() {
             std::printf("talmib %d %d %d %d %d %.17g\n", na, la, nb, lb, p,
                         AngMom::TalmiB(na, la, nb, lb, p));
   for (int i = 0; i < 1000; ++i) {
-    const int na = next_int(7), nb = next_int(7), la = next_int(13);
-    const int lb = la % 2 + 2 * next_int(7 - la % 2);
-    const int p = (la + lb) / 2 + next_int(na + nb + 1);
+    const int na = NextInt(7), nb = NextInt(7), la = NextInt(13);
+    const int lb = la % 2 + 2 * NextInt(7 - la % 2);
+    const int p = (la + lb) / 2 + NextInt(na + nb + 1);
     std::printf("talmib %d %d %d %d %d %.17g\n", na, la, nb, lb, p,
                 AngMom::TalmiB(na, la, nb, lb, p));
   }

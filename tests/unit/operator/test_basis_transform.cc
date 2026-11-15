@@ -27,12 +27,12 @@ using namespace imsrg;
 using namespace imsrg::op;
 namespace fs = std::filesystem;
 
-std::shared_ptr<const basis::ModelSpace> make_ms(const char* ref = "O16") {
-  return basis::ModelSpace::from_names(basis::BasisTruncation{.emax = 2}, 16.0,
-                                       ref, ref);
+std::shared_ptr<const basis::ModelSpace> MakeMs(const char* ref = "O16") {
+  return basis::ModelSpace::FromNames(basis::BasisTruncation{.emax = 2}, 16.0,
+                                      ref, ref);
 }
 
-linalg::Matrix<double> identity(std::int64_t n) {
+linalg::Matrix<double> Identity(std::int64_t n) {
   linalg::Matrix<double> C(n, n);
   for (std::int64_t i = 0; i < n; ++i) {
     for (std::int64_t j = 0; j < n; ++j) C(i, j) = (i == j) ? 1.0 : 0.0;
@@ -42,10 +42,10 @@ linalg::Matrix<double> identity(std::int64_t n) {
 
 /// Orthogonal matrix built from Givens rotations between orbits with equal (l,
 /// 2j, tz2), so that the transformed operator keeps its channel structure.
-linalg::Matrix<double> class_rotation(const basis::ModelSpace& ms,
-                                      double angle_scale) {
+linalg::Matrix<double> ClassRotation(const basis::ModelSpace& ms,
+                                     double angle_scale) {
   const std::int64_t n = ms.num_orbits();
-  linalg::Matrix<double> C = identity(n);
+  linalg::Matrix<double> C = Identity(n);
   int k = 0;
   for (std::int64_t a = 0; a < n; ++a) {
     for (std::int64_t b = a + 1; b < n; ++b) {
@@ -75,12 +75,12 @@ linalg::Matrix<double> class_rotation(const basis::ModelSpace& ms,
 TEST(OperatorBasisTransform, GoldenHartreeFockBasis) {
   const fs::path root = IMSRG_GOLDEN_DIR;
   const auto header =
-      read_operator_dump_header(root / "hamiltonian/emax2_O16/H.dump");
-  const auto ms = model_space_for_dump(header);
+      ReadOperatorDumpHeader(root / "hamiltonian/emax2_O16/H.dump");
+  const auto ms = ModelSpaceForDump(header);
   const Operator H =
-      read_operator_dump(root / "hamiltonian/emax2_O16/H.dump", ms);
+      ReadOperatorDump(root / "hamiltonian/emax2_O16/H.dump", ms);
   const Operator ref =
-      read_operator_dump(root / "operator/emax2/H_HFbasis.dump", ms);
+      ReadOperatorDump(root / "operator/emax2/H_HFbasis.dump", ms);
 
   const std::int64_t n = ms->num_orbits();
   std::ifstream in(root / "operator/emax2/C_HF_O16_2N.txt");
@@ -92,8 +92,8 @@ TEST(OperatorBasisTransform, GoldenHartreeFockBasis) {
     }
   }
 
-  const Operator out = transform_basis(H, C.const_view());
-  const PartMaxima dev = max_abs_difference(out, ref);
+  const Operator out = TransformBasis(H, C.const_view());
+  const PartMaxima dev = MaxAbsDifference(out, ref);
   RecordProperty("max_dev_zero", std::to_string(dev.zero_body));
   RecordProperty("max_dev_one", std::to_string(dev.one_body));
   RecordProperty("max_dev_two", std::to_string(dev.two_body));
@@ -103,49 +103,48 @@ TEST(OperatorBasisTransform, GoldenHartreeFockBasis) {
   EXPECT_LT(dev.one_body, 1e-10);
   EXPECT_LT(dev.two_body, 1e-10);
   // The input is untouched and unitary C preserves the norms.
-  EXPECT_NEAR(one_body_norm(out), one_body_norm(H), 1e-10 * one_body_norm(H));
-  EXPECT_NEAR(two_body_norm(out), two_body_norm(H), 1e-10 * two_body_norm(H));
+  EXPECT_NEAR(OneBodyNorm(out), OneBodyNorm(H), 1e-10 * OneBodyNorm(H));
+  EXPECT_NEAR(TwoBodyNorm(out), TwoBodyNorm(H), 1e-10 * TwoBodyNorm(H));
 }
 
 TEST(OperatorBasisTransform, IdentityIsNoOp) {
-  const auto ms = make_ms();
-  const Operator A = random_operator(ms, OperatorSpec::scalar(2),
-                                     {.seed = 3, .zero_body_scale = 2.0});
-  const Operator B =
-      transform_basis(A, identity(ms->num_orbits()).const_view());
-  const PartMaxima d = max_abs_difference(A, B);
+  const auto ms = MakeMs();
+  const Operator A = RandomOperator(ms, OperatorSpec::Scalar(2),
+                                    {.seed = 3, .zero_body_scale = 2.0});
+  const Operator B = TransformBasis(A, Identity(ms->num_orbits()).const_view());
+  const PartMaxima d = MaxAbsDifference(A, B);
   EXPECT_LT(d.max(), 1e-14);
 }
 
 TEST(OperatorBasisTransform, UnitaryPreservesNormsAndRoundTrips) {
-  const auto ms = make_ms();
+  const auto ms = MakeMs();
   for (const Hermiticity h :
-       {Hermiticity::Hermitian, Hermiticity::AntiHermitian,
-        Hermiticity::NonHermitian}) {
+       {Hermiticity::kHermitian, Hermiticity::kAntiHermitian,
+        Hermiticity::kNonHermitian}) {
     const Operator A =
-        random_operator(ms, OperatorSpec::scalar(2, h), {.seed = 11});
-    const linalg::Matrix<double> C = class_rotation(*ms, 1.0);
-    const Operator B = transform_basis(A, C.const_view());
-    EXPECT_GT(max_abs_difference(A, B).two_body,
+        RandomOperator(ms, OperatorSpec::Scalar(2, h), {.seed = 11});
+    const linalg::Matrix<double> C = ClassRotation(*ms, 1.0);
+    const Operator B = TransformBasis(A, C.const_view());
+    EXPECT_GT(MaxAbsDifference(A, B).two_body,
               1e-3);  // the rotation does change things
-    EXPECT_NEAR(one_body_norm(B), one_body_norm(A), 1e-12 * one_body_norm(A));
-    EXPECT_NEAR(two_body_norm(B), two_body_norm(A), 1e-12 * two_body_norm(A));
+    EXPECT_NEAR(OneBodyNorm(B), OneBodyNorm(A), 1e-12 * OneBodyNorm(A));
+    EXPECT_NEAR(TwoBodyNorm(B), TwoBodyNorm(A), 1e-12 * TwoBodyNorm(A));
 
     const std::int64_t n = ms->num_orbits();
     linalg::Matrix<double> Ct(n, n);
     for (std::int64_t i = 0; i < n; ++i) {
       for (std::int64_t j = 0; j < n; ++j) Ct(i, j) = C(j, i);
     }
-    const Operator back = transform_basis(B, Ct.const_view());
-    EXPECT_LT(max_abs_difference(A, back).max(), 1e-13);
+    const Operator back = TransformBasis(B, Ct.const_view());
+    EXPECT_LT(MaxAbsDifference(A, back).max(), 1e-13);
   }
 }
 
 TEST(OperatorBasisTransform, ComposesAsMatrixProduct) {
-  const auto ms = make_ms();
-  const Operator A = random_operator(ms, OperatorSpec::scalar(2), {.seed = 5});
-  const linalg::Matrix<double> C1 = class_rotation(*ms, 1.0);
-  const linalg::Matrix<double> C2 = class_rotation(*ms, -0.7);
+  const auto ms = MakeMs();
+  const Operator A = RandomOperator(ms, OperatorSpec::Scalar(2), {.seed = 5});
+  const linalg::Matrix<double> C1 = ClassRotation(*ms, 1.0);
+  const linalg::Matrix<double> C2 = ClassRotation(*ms, -0.7);
   const std::int64_t n = ms->num_orbits();
   linalg::Matrix<double> C12(n, n);
   for (std::int64_t i = 0; i < n; ++i) {
@@ -156,24 +155,24 @@ TEST(OperatorBasisTransform, ComposesAsMatrixProduct) {
     }
   }
   const Operator two_step =
-      transform_basis(transform_basis(A, C1.const_view()), C2.const_view());
-  const Operator one_step = transform_basis(A, C12.const_view());
-  EXPECT_LT(max_abs_difference(two_step, one_step).max(), 1e-13);
+      TransformBasis(TransformBasis(A, C1.const_view()), C2.const_view());
+  const Operator one_step = TransformBasis(A, C12.const_view());
+  EXPECT_LT(MaxAbsDifference(two_step, one_step).max(), 1e-13);
 }
 
 TEST(OperatorBasisTransform, RejectsWrongShape) {
-  const auto ms = make_ms();
-  const Operator A = random_operator(ms, OperatorSpec::scalar(2));
+  const auto ms = MakeMs();
+  const Operator A = RandomOperator(ms, OperatorSpec::Scalar(2));
   linalg::Matrix<double> C(3, 3);
-  EXPECT_THROW(transform_basis(A, C.const_view()), InvariantError);
+  EXPECT_THROW(TransformBasis(A, C.const_view()), InvariantError);
 }
 
 TEST(OperatorWithModelSpace, CopiesDataOntoSameOrbitList) {
-  const auto ms = make_ms("O16");
-  const auto other = make_ms("He4");
-  const Operator A = random_operator(ms, OperatorSpec::scalar(2),
-                                     {.seed = 9, .zero_body_scale = 1.0});
-  const Operator B = with_model_space(A, other);
+  const auto ms = MakeMs("O16");
+  const auto other = MakeMs("He4");
+  const Operator A = RandomOperator(ms, OperatorSpec::Scalar(2),
+                                    {.seed = 9, .zero_body_scale = 1.0});
+  const Operator B = WithModelSpace(A, other);
   EXPECT_EQ(&B.model_space(), other.get());
   EXPECT_EQ(B.zero_body(), A.zero_body());
   const std::int32_t n = ms->num_orbits();
@@ -198,9 +197,9 @@ TEST(OperatorWithModelSpace, CopiesDataOntoSameOrbitList) {
 }
 
 TEST(OperatorWithModelSpace, RejectsDifferentOrbitList) {
-  const Operator A = random_operator(make_ms(), OperatorSpec::scalar(2));
-  const auto bigger = basis::ModelSpace::from_names(
+  const Operator A = RandomOperator(MakeMs(), OperatorSpec::Scalar(2));
+  const auto bigger = basis::ModelSpace::FromNames(
       basis::BasisTruncation{.emax = 3}, 16.0, "O16", "O16");
-  EXPECT_THROW(with_model_space(A, bigger), InvariantError);
-  EXPECT_THROW(with_model_space(A, nullptr), InvariantError);
+  EXPECT_THROW(WithModelSpace(A, bigger), InvariantError);
+  EXPECT_THROW(WithModelSpace(A, nullptr), InvariantError);
 }

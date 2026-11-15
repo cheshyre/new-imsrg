@@ -28,10 +28,10 @@ class Solver {
   Solver(const op::Operator& H, const op::No2bThreeBody* v3,
          const HFOptions& opt)
       : H_(H), opt_(opt), norb_(H.model_space().num_orbits()) {
-    H_.sync_to_host();
+    H_.SyncToHost();
     const auto& basis = H_.model_space().basis();
     const auto n = static_cast<std::size_t>(norb_);
-    channels_ = detail::one_body_channels(basis);
+    channels_ = detail::OneBodyChannels(basis);
     two_j_.resize(n);
     tz2_.resize(n);
     for (std::int32_t i = 0; i < norb_; ++i) {
@@ -50,7 +50,7 @@ class Solver {
       mono3_ = std::make_unique<detail::Monopole3B>(H_, *v3, opt.e3max);
   }
 
-  HFResult run() {
+  HFResult Run() {
     const auto& ref = H_.model_space().reference();
     z_ref_ = ref.Z();
     n_ref_ = ref.N();
@@ -63,8 +63,8 @@ class Solver {
     for (std::int32_t i = 0; i < norb_; ++i) {
       occ_[static_cast<std::size_t>(i)] = ref.occupation(OrbitIndex{i});
     }
-    rho_ = density();
-    build_fock(rho_, F_);
+    rho_ = Density();
+    BuildFock(rho_, F_);
 
     std::vector<double> energies(n), prev(n, 0.0);
     for (std::int32_t i = 0; i < norb_; ++i)
@@ -75,29 +75,29 @@ class Solver {
     detail::PulayDiis diis(diis_weights,
                            static_cast<std::size_t>(opt_.diis_subspace));
 
-    bool use_diis = opt_.mixing == Mixing::Diis;
+    bool use_diis = opt_.mixing == Mixing::kDiis;
     bool freeze = opt_.freeze_occupations;
     int fill_modulus = 3;
     std::int32_t it = 0;
     for (; it < opt_.max_iterations; ++it) {
       prev = energies;
-      diagonalize(F_, energies);
+      Diagonalize(F_, energies);
 
       if (it > 10 && it % fill_modulus == 0 && !freeze) {
-        if (fill_lowest_orbits()) diis.clear();
+        if (FillLowestOrbits()) diis.clear();
         fill_modulus = (fill_modulus % 5) + 1;
       }
       if (it == 800)
         freeze = true;  // imsrg++: stop re-filling a run that does not settle
 
-      Matrix<double> rho_new = density();
+      Matrix<double> rho_new = Density();
       if (use_diis) {
         rho_ = std::move(rho_new);
         Matrix<double> Fk;
-        build_fock(rho_, Fk);
+        BuildFock(rho_, Fk);
         if (it >= opt_.diis_start) {
-          diis.push(Fk, commutator(Fk, rho_));
-          F_ = diis.extrapolate();
+          diis.Push(Fk, Commutator(Fk, rho_));
+          F_ = diis.Extrapolate();
         } else {
           F_ = std::move(Fk);
         }
@@ -108,9 +108,9 @@ class Solver {
             rho_(i, j) = (1.0 - w) * rho_new(i, j) + w * rho_(i, j);
           }
         }
-        build_fock(rho_, F_);
+        BuildFock(rho_, F_);
       }
-      energy(res);
+      Energy(res);
 
       double diff = 0.0;
       for (std::size_t i = 0; i < n; ++i)
@@ -132,8 +132,8 @@ class Solver {
     res.iterations = it;
 
     // Final state: F consistent with the final rho, final energies.
-    build_fock(rho_, F_);
-    energy(res);
+    BuildFock(rho_, F_);
+    Energy(res);
     res.spe = energies;
     res.C = C_;
     res.rho = rho_;
@@ -144,7 +144,7 @@ class Solver {
 
  private:
   /// rho(a,b) = sum_alpha n_alpha C(a,alpha) C(b,alpha) over the holes alpha.
-  Matrix<double> density() const {
+  Matrix<double> Density() const {
     Matrix<double> rho(norb_, norb_);
     for (std::int32_t alpha = 0; alpha < norb_; ++alpha) {
       const double n = occ_[static_cast<std::size_t>(alpha)];
@@ -159,14 +159,14 @@ class Solver {
   }
 
   /// F = KE + V2[rho] + 1/2 V3[rho]; keeps V2, V3 for the energy.
-  void build_fock(const Matrix<double>& rho, Matrix<double>& F) {
-    mono2_->apply(rho, Vij_);
+  void BuildFock(const Matrix<double>& rho, Matrix<double>& F) {
+    mono2_->Apply(rho, Vij_);
     F = KE_;
     for (std::int32_t j = 0; j < norb_; ++j) {
       for (std::int32_t i = 0; i < norb_; ++i) F(i, j) += Vij_(i, j);
     }
     if (mono3_) {
-      mono3_->apply(rho, V3ij_);
+      mono3_->Apply(rho, V3ij_);
       for (std::int32_t j = 0; j < norb_; ++j) {
         for (std::int32_t i = 0; i < norb_; ++i) F(i, j) += 0.5 * V3ij_(i, j);
       }
@@ -174,8 +174,8 @@ class Solver {
   }
 
   /// e1, e2, e3 from the current rho and the V2, V3 of the last
-  /// `build_fock(rho_, .)`.
-  void energy(HFResult& res) const {
+  /// `BuildFock(rho_, .)`.
+  void Energy(HFResult& res) const {
     double e1 = 0.0, e2 = 0.0, e3 = 0.0;
     for (const auto& ch : channels_) {
       for (std::int32_t i : ch) {
@@ -197,7 +197,7 @@ class Solver {
   /// Channel-wise diagonalization of F: C columns = eigenvectors (ascending
   /// energy), the eigenvalue of rank k in a channel is stored at the orbit
   /// index of rank k.
-  void diagonalize(const Matrix<double>& F, std::vector<double>& energies) {
+  void Diagonalize(const Matrix<double>& F, std::vector<double>& energies) {
     C_ = Matrix<double>(norb_, norb_);
     for (const auto& ch : channels_) {
       const auto m = static_cast<std::int64_t>(ch.size());
@@ -208,7 +208,7 @@ class Solver {
                        ch[static_cast<std::size_t>(q)]);
         }
       }
-      auto eig = linalg::eigh(Fc.const_view());
+      auto eig = linalg::Eigh(Fc.const_view());
       for (std::int64_t q = 0; q < m; ++q) {
         energies[static_cast<std::size_t>(ch[static_cast<std::size_t>(q)])] =
             eig.eigenvalues[static_cast<std::size_t>(q)];
@@ -228,7 +228,7 @@ class Solver {
 
   /// imsrg++ `FillLowestOrbits`: occupy the lowest HF orbits of each species up
   /// to Z and N. Returns true if the occupations changed.
-  bool fill_lowest_orbits() {
+  bool FillLowestOrbits() {
     const auto n = static_cast<std::size_t>(norb_);
     // diag(C^T F C)
     std::vector<double> e(n, 0.0);
@@ -268,14 +268,14 @@ class Solver {
   }
 
   /// e = F rho - rho F.
-  static Matrix<double> commutator(const Matrix<double>& F,
+  static Matrix<double> Commutator(const Matrix<double>& F,
                                    const Matrix<double>& rho) {
     const auto n = F.rows();
     Matrix<double> e(n, n);
-    linalg::gemm(1.0, F.const_view(), linalg::Op::NoTrans, rho.const_view(),
-                 linalg::Op::NoTrans, 0.0, e.view());
-    linalg::gemm(-1.0, rho.const_view(), linalg::Op::NoTrans, F.const_view(),
-                 linalg::Op::NoTrans, 1.0, e.view());
+    linalg::Gemm(1.0, F.const_view(), linalg::Op::kNoTrans, rho.const_view(),
+                 linalg::Op::kNoTrans, 0.0, e.view());
+    linalg::Gemm(-1.0, rho.const_view(), linalg::Op::kNoTrans, F.const_view(),
+                 linalg::Op::kNoTrans, 1.0, e.view());
     return e;
   }
 
@@ -293,24 +293,24 @@ class Solver {
 
 }  // namespace
 
-HFResult solve(const op::Operator& H, const op::No2bThreeBody* v3,
+HFResult Solve(const op::Operator& H, const op::No2bThreeBody* v3,
                const HFOptions& options) {
   IMSRG_CHECK(!H.empty(), "hf::solve needs a non-empty Hamiltonian");
   IMSRG_CHECK(options.max_iterations >= 1 && options.tolerance > 0.0,
               "invalid Hartree-Fock options");
   Solver solver(H, v3, options);
-  return solver.run();
+  return solver.Run();
 }
 
-op::Operator to_hf_basis(const op::Operator& O, const HFResult& r) {
+op::Operator ToHfBasis(const op::Operator& O, const HFResult& r) {
   IMSRG_CHECK(!O.empty(), "to_hf_basis needs a non-empty operator");
-  return op::transform_basis(O, r.C.const_view());
+  return op::TransformBasis(O, r.C.const_view());
 }
 
-op::Operator normal_ordered_hamiltonian(const op::Operator& H,
-                                        const op::No2bThreeBody* v3,
-                                        const HFResult& r,
-                                        const HFOptions& options) {
+op::Operator NormalOrderedHamiltonian(const op::Operator& H,
+                                      const op::No2bThreeBody* v3,
+                                      const HFResult& r,
+                                      const HFOptions& options) {
   IMSRG_CHECK(!H.empty(),
               "normal_ordered_hamiltonian needs a non-empty Hamiltonian");
   const auto ms = H.model_space_ptr();
@@ -322,7 +322,7 @@ op::Operator normal_ordered_hamiltonian(const op::Operator& H,
               "HFResult does not match the model space of H");
 
   op::Operator X = H;  // deep copy, oscillator basis
-  X.sync_to_host();
+  X.SyncToHost();
   X.zero_body() = r.e_hf;
   {
     auto f = X.one_body().host_view();
@@ -331,7 +331,7 @@ op::Operator normal_ordered_hamiltonian(const op::Operator& H,
   }
 
   if (v3 != nullptr) {
-    const auto channels = detail::one_body_channels(basis);
+    const auto channels = detail::OneBodyChannels(basis);
     std::vector<const std::vector<std::int32_t>*> channel_of(
         static_cast<std::size_t>(norb));
     for (const auto& ch : channels)
@@ -345,9 +345,9 @@ op::Operator normal_ordered_hamiltonian(const op::Operator& H,
       const auto npq = static_cast<std::int64_t>(kets.size());
       for (std::int64_t i = 0; i < npq; ++i) {
         const auto& bra = tbc.ket(kets[static_cast<std::size_t>(i)]);
-        const auto& op_ = basis.orbit(bra.p);
+        const auto& orbit_p = basis.orbit(bra.p);
         const auto& oq = basis.orbit(bra.q);
-        const std::int32_t e2bra = op_.e() + oq.e();
+        const std::int32_t e2bra = orbit_p.e() + oq.e();
         for (std::int64_t j = i; j < npq; ++j) {
           const auto& ket = tbc.ket(kets[static_cast<std::size_t>(j)]);
           const auto& orr = basis.orbit(ket.p);
@@ -363,7 +363,7 @@ op::Operator normal_ordered_hamiltonian(const op::Operator& H,
               const double rab = r.rho(a, b);
               if (std::abs(rab) < 1e-8) continue;
               // imsrg++ passes the integer J as the J2 argument.
-              v += rab * v3->get_pn(op_, oq, oa, orr, os, ob, J);
+              v += rab * v3->get_pn(orbit_p, oq, oa, orr, os, ob, J);
             }
           }
           v /= static_cast<double>(2 * J + 1);
@@ -375,9 +375,9 @@ op::Operator normal_ordered_hamiltonian(const op::Operator& H,
       }
     }
   }
-  X.sync_to_device();
+  X.SyncToDevice();
 
-  op::Operator out = op::transform_basis(X, r.C.const_view());
+  op::Operator out = op::TransformBasis(X, r.C.const_view());
   const auto ref_occ = ms->reference().occupations();
   bool changed = false;
   for (std::int32_t a = 0; a < norb; ++a) {
@@ -385,8 +385,8 @@ op::Operator normal_ordered_hamiltonian(const op::Operator& H,
     if (std::abs(ref_occ[k] - r.occupations[k]) > 1e-3) changed = true;
   }
   if (changed) {
-    auto ref = basis::Reference::from_occupations(basis, r.occupations, "hf");
-    out = op::with_model_space(out, ms->with_reference(std::move(ref)));
+    auto ref = basis::Reference::FromOccupations(basis, r.occupations, "hf");
+    out = op::WithModelSpace(out, ms->WithReference(std::move(ref)));
   }
   return out;
 }

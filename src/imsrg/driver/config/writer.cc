@@ -25,7 +25,7 @@ namespace {
 /// A TOML basic string: escapes `"`, `\`, the named control characters, and
 /// other control characters (< 0x20, 0x7F) as \u00XX; all other bytes are
 /// copied verbatim.
-std::string quote(std::string_view s) {
+std::string Quote(std::string_view s) {
   std::string out = "\"";
   for (const char ch : s) {
     const auto c = static_cast<unsigned char>(ch);
@@ -66,7 +66,7 @@ std::string quote(std::string_view s) {
 }
 
 /// A double with 17 significant digits that reads back as a TOML float.
-std::string format_double(double v) {
+std::string FormatDouble(double v) {
   if (std::isnan(v)) return "nan";
   if (std::isinf(v)) return v < 0 ? "-inf" : "inf";
   char buf[64];
@@ -76,62 +76,62 @@ std::string format_double(double v) {
   return text;
 }
 
-std::string string_array(const std::vector<std::string>& items) {
+std::string StringArray(const std::vector<std::string>& items) {
   std::string out = "[";
   for (std::size_t i = 0; i < items.size(); ++i) {
     if (i != 0) out += ", ";
-    out += quote(items[i]);
+    out += Quote(items[i]);
   }
   return out + "]";
 }
 
-std::string from_file_array(const std::vector<OperatorFromFile>& items) {
+std::string FromFileArray(const std::vector<OperatorFromFile>& items) {
   std::string out = "[";
   for (std::size_t i = 0; i < items.size(); ++i) {
     const OperatorFromFile& f = items[i];
     if (i != 0) out += ", ";
-    out += "{ name = " + quote(f.name) + ", rank = " + std::to_string(f.rank) +
+    out += "{ name = " + Quote(f.name) + ", rank = " + std::to_string(f.rank) +
            ", dtz = " + std::to_string(f.dtz) +
            ", parity = " + std::to_string(f.parity) +
            ", particle_rank = " + std::to_string(f.particle_rank) +
-           ", file_2b = " + quote(f.file_2b);
-    if (f.file_3b) out += ", file_3b = " + quote(*f.file_3b);
-    out += ", format = " + quote(to_string(f.format)) + " }";
+           ", file_2b = " + Quote(f.file_2b);
+    if (f.file_3b) out += ", file_3b = " + Quote(*f.file_3b);
+    out += ", format = " + Quote(ToString(f.format)) + " }";
   }
   return out + "]";
 }
 
 template <class T>
-inline constexpr bool dependent_false = false;
+inline constexpr bool kDependentFalse = false;
 
 /// TOML text of one (engaged) field value.
 template <class T>
-std::string format_value(const KeyInfo& key, const T& value) {
+std::string FormatValue(const KeyInfo& key, const T& value) {
   if constexpr (std::is_same_v<T, bool>) {
     return value ? "true" : "false";
   } else if constexpr (std::is_same_v<T, int>) {
     return std::to_string(value);
   } else if constexpr (std::is_same_v<T, double>) {
-    return format_double(value);
+    return FormatDouble(value);
   } else if constexpr (std::is_same_v<T, std::string>) {
-    return quote(value);
+    return Quote(value);
   } else if constexpr (ConfigEnum<T>) {
-    return quote(to_string(value));
+    return Quote(ToString(value));
   } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
-    if (key.string_or_array && value.size() == 1) return quote(value.front());
-    return string_array(value);
+    if (key.string_or_array && value.size() == 1) return Quote(value.front());
+    return StringArray(value);
   } else if constexpr (std::is_same_v<T, std::vector<OperatorRequest>>) {
     std::vector<std::string> names;
     for (const OperatorRequest& r : value) names.push_back(r.canonical_name);
-    return string_array(names);
+    return StringArray(names);
   } else if constexpr (std::is_same_v<T, std::vector<OperatorFromFile>>) {
-    return from_file_array(value);
+    return FromFileArray(value);
   } else {
-    static_assert(dependent_false<T>, "unsupported schema field type");
+    static_assert(kDependentFalse<T>, "unsupported schema field type");
   }
 }
 
-/// `visit_schema` visitor: collects (table, "key = value") lines in canonical
+/// `VisitSchema` visitor: collects (table, "key = value") lines in canonical
 /// order.
 struct LineWriter {
   std::vector<std::pair<std::string, std::string>> lines;
@@ -141,42 +141,42 @@ struct LineWriter {
   bool one_stage = false;
 
   template <class T>
-  void field(const KeyInfo& key, const T& value) {
+  void Field(const KeyInfo& key, const T& value) {
     if (one_stage && key.path == "imsrg.generator.valence") return;
     if constexpr (requires { value.has_value(); }) {
-      if (value.has_value()) emit(key, *value);
+      if (value.has_value()) Emit(key, *value);
     } else {
-      emit(key, value);
+      Emit(key, value);
     }
   }
 
   template <class Section, class Body>
-  void optional_table(std::string_view /*table*/,
-                      const std::optional<Section>& section, Body&& body) {
+  void OptionalTable(std::string_view /*table*/,
+                     const std::optional<Section>& section, Body&& body) {
     if (section) body(*section);
   }
 
  private:
   template <class T>
-  void emit(const KeyInfo& key, const T& value) {
+  void Emit(const KeyInfo& key, const T& value) {
     const std::string_view path = key.path;
     const std::size_t dot = path.rfind('.');
     lines.emplace_back(
         std::string(path.substr(0, dot)),
-        std::string(path.substr(dot + 1)) + " = " + format_value(key, value));
+        std::string(path.substr(dot + 1)) + " = " + FormatValue(key, value));
   }
 };
 
 }  // namespace
 
-std::string to_toml(const RunConfig& config, bool include_provenance) {
+std::string ToToml(const RunConfig& config, bool include_provenance) {
   std::string out =
       "# imsrg resolved configuration (design/16-config-and-cli.md); reproduce "
       "with: imsrg "
       "--config <this file>\n";
   LineWriter writer;
   writer.one_stage = config.imsrg.steps == 1;
-  visit_schema(config, writer);
+  VisitSchema(config, writer);
   std::string current;
   bool first = true;
   for (const auto& [table, line] : writer.lines) {
@@ -190,22 +190,22 @@ std::string to_toml(const RunConfig& config, bool include_provenance) {
   if (include_provenance) {
     const Provenance& p = config.provenance;
     std::vector<std::string> warnings;
-    for (const ConfigIssue& w : p.warnings) warnings.push_back(w.to_string());
+    for (const ConfigIssue& w : p.warnings) warnings.push_back(w.ToString());
     out += "\n[provenance]\n";
-    out += "version = " + quote(p.version) + "\n";
-    out += "git_hash = " + quote(p.git_hash) + "\n";
-    out += "date = " + quote(p.date) + "\n";
-    out += "command_line = " + quote(p.command_line) + "\n";
-    out += "legacy_args = " + string_array(p.legacy_args) + "\n";
-    out += "warnings = " + string_array(warnings) + "\n";
-    out += "applied_rules = " + string_array(p.applied_rules) + "\n";
+    out += "version = " + Quote(p.version) + "\n";
+    out += "git_hash = " + Quote(p.git_hash) + "\n";
+    out += "date = " + Quote(p.date) + "\n";
+    out += "command_line = " + Quote(p.command_line) + "\n";
+    out += "legacy_args = " + StringArray(p.legacy_args) + "\n";
+    out += "warnings = " + StringArray(warnings) + "\n";
+    out += "applied_rules = " + StringArray(p.applied_rules) + "\n";
   }
   return out;
 }
 
-void write_resolved_config(const RunConfig& config,
-                           const std::filesystem::path& file) {
-  const std::string text = to_toml(config);
+void WriteResolvedConfig(const RunConfig& config,
+                         const std::filesystem::path& file) {
+  const std::string text = ToToml(config);
   if (file.has_parent_path()) {
     std::error_code ec;
     std::filesystem::create_directories(file.parent_path(), ec);

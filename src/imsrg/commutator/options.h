@@ -20,25 +20,25 @@ namespace imsrg::commutator {
 /// <-> Y exchange) to the C-body part of Z = [X, Y]. The enumerator order is
 /// the call order of imsrg++ `CommutatorScalarScalar`.
 enum class Term : std::uint8_t {
-  comm110ss = 0,    ///< [X1, Y1] -> Z0.
-  comm220ss,        ///< [X2, Y2] -> Z0.
-  comm111ss,        ///< [X1, Y1] -> Z1.
-  comm121ss,        ///< [X1, Y2] + [X2, Y1] -> Z1.
-  comm221ss,        ///< [X2, Y2] -> Z1.
-  comm122ss,        ///< [X1, Y2] + [X2, Y1] -> Z2.
-  comm222_pp_hhss,  ///< [X2, Y2] -> Z2, particle-particle and hole-hole
-                    ///< ladders.
-  comm222_phss,  ///< [X2, Y2] -> Z2, particle-hole (Pandya-transformed) part.
+  kComm110ss = 0,  ///< [X1, Y1] -> Z0.
+  kComm220ss,      ///< [X2, Y2] -> Z0.
+  kComm111ss,      ///< [X1, Y1] -> Z1.
+  kComm121ss,      ///< [X1, Y2] + [X2, Y1] -> Z1.
+  kComm221ss,      ///< [X2, Y2] -> Z1.
+  kComm122ss,      ///< [X1, Y2] + [X2, Y1] -> Z2.
+  kComm222PpHhss,  ///< [X2, Y2] -> Z2, particle-particle and hole-hole
+                   ///< ladders.
+  kComm222Phss,    ///< [X2, Y2] -> Z2, particle-hole (Pandya-transformed) part.
 };
 
 /// Number of `Term` values.
 inline constexpr int kNumTerms = 8;
 
 /// The imsrg++ name of a term ("comm110ss", ...).
-std::string_view term_name(Term t) noexcept;
+std::string_view TermName(Term t) noexcept;
 
-/// Inverse of `term_name`; nullopt for an unknown name.
-std::optional<Term> term_from_name(std::string_view name) noexcept;
+/// Inverse of `TermName`; nullopt for an unknown name.
+std::optional<Term> TermFromName(std::string_view name) noexcept;
 
 /// A set of `Term`s (bitset over the enumerators). Value type; the IMSRG(3)
 /// terms of M10 will add enumerators (the 64-bit storage leaves room) and
@@ -49,22 +49,22 @@ class TermMask {
   constexpr TermMask() noexcept = default;
 
   /// The empty set.
-  static constexpr TermMask none() noexcept { return TermMask(); }
+  static constexpr TermMask None() noexcept { return TermMask(); }
 
   /// All scalar IMSRG(2) terms (the imsrg++ default with IMSRG(3) off).
-  static constexpr TermMask imsrg2() noexcept {
+  static constexpr TermMask Imsrg2() noexcept {
     return TermMask((std::uint64_t{1} << kNumTerms) - 1);
   }
 
   /// The set holding only `t`.
-  static constexpr TermMask only(Term t) noexcept { return TermMask(bit(t)); }
+  static constexpr TermMask Only(Term t) noexcept { return TermMask(Bit(t)); }
 
   /// True if `t` is in the set.
-  constexpr bool test(Term t) const noexcept { return (bits_ & bit(t)) != 0; }
+  constexpr bool test(Term t) const noexcept { return (bits_ & Bit(t)) != 0; }
 
   /// Adds (`on`) or removes `t`; returns *this.
   constexpr TermMask& set(Term t, bool on = true) noexcept {
-    bits_ = on ? (bits_ | bit(t)) : (bits_ & ~bit(t));
+    bits_ = on ? (bits_ | Bit(t)) : (bits_ & ~Bit(t));
     return *this;
   }
 
@@ -92,17 +92,17 @@ class TermMask {
 
  private:
   constexpr explicit TermMask(std::uint64_t bits) noexcept : bits_(bits) {}
-  static constexpr std::uint64_t bit(Term t) noexcept {
+  static constexpr std::uint64_t Bit(Term t) noexcept {
     return std::uint64_t{1} << static_cast<std::uint8_t>(t);
   }
   std::uint64_t bits_ = 0;
 };
 
-/// Options of `commutator()`. Passed explicitly to every call (no global state,
+/// Options of `Commutator()`. Passed explicitly to every call (no global state,
 /// design/00 D10).
 struct CommutatorOptions {
   /// The terms to evaluate; default: all IMSRG(2) terms.
-  TermMask terms = TermMask::imsrg2();
+  TermMask terms = TermMask::Imsrg2();
 };
 
 }  // namespace imsrg::commutator

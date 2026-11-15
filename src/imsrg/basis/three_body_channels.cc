@@ -19,10 +19,10 @@ namespace {
 // the orbit list, coupled to 2 Jpq = two_jpq, and a channel (two_j, parity,
 // two_tz). All rules are copied exactly, including the ones imsrg++ marks as
 // redundant.
-bool check_channel_ket(const Orbit& oa, const Orbit& ob, const Orbit& oc,
-                       OrbitIndex a, OrbitIndex b, OrbitIndex c,
-                       std::int32_t two_jpq, std::int32_t two_j,
-                       std::int32_t parity, std::int32_t two_tz) {
+bool CheckChannelKet(const Orbit& oa, const Orbit& ob, const Orbit& oc,
+                     OrbitIndex a, OrbitIndex b, OrbitIndex c,
+                     std::int32_t two_jpq, std::int32_t two_j,
+                     std::int32_t parity, std::int32_t two_tz) {
   const std::int32_t ja = oa.j2.twice;
   const std::int32_t jb = ob.j2.twice;
   const std::int32_t jc = oc.j2.twice;
@@ -87,7 +87,7 @@ ThreeBodyChannels::ThreeBodyChannels(const SingleParticleBasis& basis,
   for (std::int32_t ch = 0; ch < nch; ++ch) {
     ThreeBodyChannel& c = channels_[static_cast<std::size_t>(ch)];
     c.two_j = TwoJ{2 * (ch / 8) + 1};
-    c.parity = ((ch % 8) / 4 == 0) ? Parity::Even : Parity::Odd;
+    c.parity = ((ch % 8) / 4 == 0) ? Parity::kEven : Parity::kOdd;
     c.two_tz = TwoTz{2 * (ch % 4) - 3};
   }
 
@@ -115,8 +115,8 @@ ThreeBodyChannels::ThreeBodyChannels(const SingleParticleBasis& basis,
       std::int32_t local = -1;
       const std::int32_t ch = ((two_j - 1) / 2) * 8 + ket_channel_base_[k];
       if (two_j >= 1 && ch < nch &&
-          check_channel_ket(oa, ob, oc, kt.p, kt.q, kt.r, kt.two_jpq.twice,
-                            two_j, parity, two_tz)) {
+          CheckChannelKet(oa, ob, oc, kt.p, kt.q, kt.r, kt.two_jpq.twice, two_j,
+                          parity, two_tz)) {
         auto& list = members[static_cast<std::size_t>(ch)];
         local = static_cast<std::int32_t>(list.size());
         list.push_back(Ket3Index{static_cast<std::int32_t>(k)});
@@ -205,7 +205,7 @@ std::optional<LocalKet3Index> ThreeBodyChannels::local_index(
   return LocalKet3Index{local};
 }
 
-bool ThreeBodyChannels::passes_configuration_cut(
+bool ThreeBodyChannels::PassesConfigurationCut(
     Ket3Index k, const SingleParticleBasis& basis, const Reference& ref,
     double de3max, double occnat3_cut,
     std::span<const double> natural_occupations) const {

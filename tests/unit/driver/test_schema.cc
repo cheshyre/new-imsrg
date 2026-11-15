@@ -17,14 +17,14 @@ namespace imsrg::driver {
 namespace {
 
 template <ConfigEnum E>
-void expect_enum_round_trip() {
+void ExpectEnumRoundTrip() {
   std::set<std::string_view> seen;
   for (const auto& entry : EnumTraits<E>::entries) {
-    EXPECT_EQ(to_string(entry.value), entry.name);
-    const auto parsed = enum_from_string<E>(entry.name);
+    EXPECT_EQ(ToString(entry.value), entry.name);
+    const auto parsed = EnumFromString<E>(entry.name);
     ASSERT_TRUE(parsed.has_value()) << entry.name;
     EXPECT_EQ(*parsed, entry.value);
-    EXPECT_EQ(enum_phase(entry.value), entry.phase);
+    EXPECT_EQ(EnumPhase(entry.value), entry.phase);
     EXPECT_TRUE(seen.insert(entry.name).second)
         << "duplicate spelling " << entry.name;
     // Canonical spellings are lower snake_case.
@@ -32,45 +32,45 @@ void expect_enum_round_trip() {
       return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
     })) << entry.name;
   }
-  EXPECT_FALSE(enum_from_string<E>("no_such_value").has_value());
-  EXPECT_EQ(enum_names<E>().size(), EnumTraits<E>::entries.size());
+  EXPECT_FALSE(EnumFromString<E>("no_such_value").has_value());
+  EXPECT_EQ(EnumNames<E>().size(), EnumTraits<E>::entries.size());
 }
 
 TEST(DriverSchema, EveryEnumValueRoundTripsThroughItsString) {
-  expect_enum_round_trip<Task>();
-  expect_enum_round_trip<LogLevel>();
-  expect_enum_round_trip<BasisKind>();
-  expect_enum_round_trip<KineticEnergy>();
-  expect_enum_round_trip<TwoBodyFormat>();
-  expect_enum_round_trip<ThreeBodyType>();
-  expect_enum_round_trip<ThreeBodyFormat>();
-  expect_enum_round_trip<No2bPrecision>();
-  expect_enum_round_trip<NatOrder>();
-  expect_enum_round_trip<Method>();
-  expect_enum_round_trip<Generator>();
-  expect_enum_round_trip<Partitioning>();
-  expect_enum_round_trip<OmegaStorage>();
-  expect_enum_round_trip<Imsrg3Variant>();
-  expect_enum_round_trip<ValenceFileFormat>();
-  expect_enum_round_trip<OperatorFileFormat>();
+  ExpectEnumRoundTrip<Task>();
+  ExpectEnumRoundTrip<LogLevel>();
+  ExpectEnumRoundTrip<BasisKind>();
+  ExpectEnumRoundTrip<KineticEnergy>();
+  ExpectEnumRoundTrip<TwoBodyFormat>();
+  ExpectEnumRoundTrip<ThreeBodyType>();
+  ExpectEnumRoundTrip<ThreeBodyFormat>();
+  ExpectEnumRoundTrip<No2bPrecision>();
+  ExpectEnumRoundTrip<NatOrder>();
+  ExpectEnumRoundTrip<Method>();
+  ExpectEnumRoundTrip<Generator>();
+  ExpectEnumRoundTrip<Partitioning>();
+  ExpectEnumRoundTrip<OmegaStorage>();
+  ExpectEnumRoundTrip<Imsrg3Variant>();
+  ExpectEnumRoundTrip<ValenceFileFormat>();
+  ExpectEnumRoundTrip<OperatorFileFormat>();
 }
 
 TEST(DriverSchema, PhasesFollowDesign16) {
-  EXPECT_EQ(enum_phase(Method::Magnus), Phase::P1);
-  EXPECT_EQ(enum_phase(Method::Flow), Phase::P1);
-  EXPECT_EQ(enum_phase(Method::FlowRk4), Phase::P1);
-  EXPECT_EQ(enum_phase(Method::MagnusBackoff), Phase::Planned);
-  EXPECT_EQ(enum_phase(Generator::ShellModelImaginaryTime), Phase::P1);
-  EXPECT_EQ(enum_phase(Generator::ShellModelWegner), Phase::Planned);
-  EXPECT_EQ(enum_phase(Generator::OnePa), Phase::Planned);
-  EXPECT_EQ(enum_phase(TwoBodyFormat::Me2j), Phase::P1);
-  EXPECT_EQ(enum_phase(TwoBodyFormat::Navratil), Phase::Planned);
-  EXPECT_EQ(enum_phase(Task::FciExport), Phase::Planned);
-  EXPECT_EQ(enum_phase(ValenceFileFormat::Antoine), Phase::Planned);
+  EXPECT_EQ(EnumPhase(Method::kMagnus), Phase::kP1);
+  EXPECT_EQ(EnumPhase(Method::kFlow), Phase::kP1);
+  EXPECT_EQ(EnumPhase(Method::kFlowRk4), Phase::kP1);
+  EXPECT_EQ(EnumPhase(Method::kMagnusBackoff), Phase::kPlanned);
+  EXPECT_EQ(EnumPhase(Generator::kShellModelImaginaryTime), Phase::kP1);
+  EXPECT_EQ(EnumPhase(Generator::kShellModelWegner), Phase::kPlanned);
+  EXPECT_EQ(EnumPhase(Generator::kOnePa), Phase::kPlanned);
+  EXPECT_EQ(EnumPhase(TwoBodyFormat::kMe2j), Phase::kP1);
+  EXPECT_EQ(EnumPhase(TwoBodyFormat::kNavratil), Phase::kPlanned);
+  EXPECT_EQ(EnumPhase(Task::kFciExport), Phase::kPlanned);
+  EXPECT_EQ(EnumPhase(ValenceFileFormat::kAntoine), Phase::kPlanned);
 }
 
 TEST(DriverSchema, KeysAreUniqueSnakeCaseAndFindable) {
-  const auto keys = schema_keys();
+  const auto keys = SchemaKeys();
   ASSERT_GT(keys.size(), 80u);
   std::set<std::string_view> paths;
   for (const KeyInfo& key : keys) {
@@ -81,21 +81,21 @@ TEST(DriverSchema, KeysAreUniqueSnakeCaseAndFindable) {
     })) << key.path;
     EXPECT_FALSE(key.doc.empty()) << key.path;
     EXPECT_FALSE(key.default_text.empty()) << key.path;
-    const KeyInfo* found = find_schema_key(key.path);
+    const KeyInfo* found = FindSchemaKey(key.path);
     ASSERT_NE(found, nullptr) << key.path;
     EXPECT_EQ(found->path, key.path);
   }
-  EXPECT_EQ(find_schema_key("basis.emaxx"), nullptr);
-  EXPECT_EQ(find_schema_key("basis"), nullptr);
-  ASSERT_NE(find_schema_key("interaction.three_body.e3max"), nullptr);
-  EXPECT_TRUE(find_schema_key("interaction.three_body.e3max")->required);
-  EXPECT_TRUE(find_schema_key("interaction.two_body.file")->string_or_array);
-  EXPECT_EQ(find_schema_key("imsrg.goose_tank")->phase, Phase::Planned);
-  EXPECT_TRUE(find_schema_key("output.stem")->derived);
+  EXPECT_EQ(FindSchemaKey("basis.emaxx"), nullptr);
+  EXPECT_EQ(FindSchemaKey("basis"), nullptr);
+  ASSERT_NE(FindSchemaKey("interaction.three_body.e3max"), nullptr);
+  EXPECT_TRUE(FindSchemaKey("interaction.three_body.e3max")->required);
+  EXPECT_TRUE(FindSchemaKey("interaction.two_body.file")->string_or_array);
+  EXPECT_EQ(FindSchemaKey("imsrg.goose_tank")->phase, Phase::kPlanned);
+  EXPECT_TRUE(FindSchemaKey("output.stem")->derived);
 }
 
 TEST(DriverSchema, TablesAndChildren) {
-  const auto tables = schema_tables();
+  const auto tables = SchemaTables();
   const std::vector<std::string_view> expected = {"run",
                                                   "basis",
                                                   "reference",
@@ -118,13 +118,13 @@ TEST(DriverSchema, TablesAndChildren) {
   EXPECT_EQ(std::vector<std::string_view>(tables.begin(), tables.end()),
             expected);
 
-  const auto imsrg = schema_children("imsrg");
+  const auto imsrg = SchemaChildren("imsrg");
   for (std::string_view child :
        {"method", "steps", "generator", "step", "space"}) {
     EXPECT_NE(std::find(imsrg.begin(), imsrg.end(), child), imsrg.end())
         << child;
   }
-  const auto top = schema_children("");
+  const auto top = SchemaChildren("");
   EXPECT_NE(std::find(top.begin(), top.end(), "interaction"), top.end());
   EXPECT_EQ(std::find(top.begin(), top.end(), "two_body"), top.end());
 }
@@ -140,14 +140,14 @@ TEST(DriverSchema, RunConfigEqualityIgnoresProvenance) {
 
 TEST(DriverSchema, DidYouMean) {
   const std::vector<std::string> keys = {"emax", "e3max", "hw", "lmax"};
-  EXPECT_EQ(did_you_mean("emaxx", keys), "emax");
-  EXPECT_EQ(did_you_mean("hw", keys),
+  EXPECT_EQ(DidYouMean("emaxx", keys), "emax");
+  EXPECT_EQ(DidYouMean("hw", keys),
             std::nullopt);  // exact match is never suggested
-  EXPECT_EQ(did_you_mean("xyzzy", keys), std::nullopt);
+  EXPECT_EQ(DidYouMean("xyzzy", keys), std::nullopt);
   const std::vector<std::string> methods = {"magnus", "magnus_euler", "flow"};
-  EXPECT_EQ(did_you_mean("magnus_eular", methods), "magnus_euler");
-  EXPECT_EQ(edit_distance("ab", "ba"), 1);
-  EXPECT_EQ(edit_distance("", "abc"), 3);
+  EXPECT_EQ(DidYouMean("magnus_eular", methods), "magnus_euler");
+  EXPECT_EQ(EditDistance("ab", "ba"), 1);
+  EXPECT_EQ(EditDistance("", "abc"), 3);
 }
 
 }  // namespace

@@ -24,171 +24,175 @@ namespace imsrg::driver {
 namespace {
 
 using K = LegacyKind;
-constexpr LegacyStatus kS = LegacyStatus::Supported;
-constexpr LegacyStatus kC = LegacyStatus::Changed;
-constexpr LegacyStatus kNS = LegacyStatus::NotSupported;
-constexpr LegacyStatus kPL = LegacyStatus::Planned;
+constexpr LegacyStatus kS = LegacyStatus::kSupported;
+constexpr LegacyStatus kC = LegacyStatus::kChanged;
+constexpr LegacyStatus kNS = LegacyStatus::kNotSupported;
+constexpr LegacyStatus kPL = LegacyStatus::kPlanned;
 
 // The 85 keys of Parameters.hh in declaration order (design/16 sections
 // 3.1-3.4).
 constexpr std::array<LegacyKeyInfo, 85> kKeys = {{
-    {"2bme", K::String, "none", kS, "interaction.two_body.file",
+    {"2bme", K::kString, "none", kS, "interaction.two_body.file",
      "none = no 2N input (error unless fmt2=schematic, 2bme=Minnesota); "
      "oakridge sp,vnn -> 2 "
      "files"},
-    {"3bme", K::String, "none", kS, "interaction.three_body.file",
+    {"3bme", K::kString, "none", kS, "interaction.three_body.file",
      "none = no 3N table"},
-    {"3bme_type", K::String, "full", kS, "interaction.three_body.type",
+    {"3bme_type", K::kString, "full", kS, "interaction.three_body.type",
      "full|no2b|mono; dropped (W-L1) without 3bme"},
-    {"no2b_precision", K::String, "single", kS,
+    {"no2b_precision", K::kString, "single", kS,
      "interaction.three_body.no2b_precision",
      "single|half; dropped (W-L1) without 3bme"},
-    {"core_generator", K::String, "atan", kS, "imsrg.generator.core",
+    {"core_generator", K::kString, "atan", kS, "imsrg.generator.core",
      "hyphenated names mapped; qtransfer-atan_<n> -> qtransfer_atan + "
      "qtransfer_n"},
-    {"valence_generator", K::String, "shell-model-atan", kS,
+    {"valence_generator", K::kString, "shell-model-atan", kS,
      "imsrg.generator.valence", "dropped (W-NSTEPS1) with nsteps=1"},
-    {"flowfile", K::String, "default", kC, "output.flow_file",
+    {"flowfile", K::kString, "default", kC, "output.flow_file",
      "default -> unset"},
-    {"intfile", K::String, "default", kC, "output.directory, output.stem",
+    {"intfile", K::kString, "default", kC, "output.directory, output.stem",
      "default -> unset; dir/stem split at the last '/'"},
-    {"fmt2", K::String, "me2j", kS, "interaction.two_body.format",
+    {"fmt2", K::kString, "me2j", kS, "interaction.two_body.format",
      "nushellx also sets hamiltonian.kinetic=none; schematic only with "
      "2bme=Minnesota"},
-    {"fmt3", K::String, "me3j", kS, "interaction.three_body.format",
+    {"fmt3", K::kString, "me3j", kS, "interaction.three_body.format",
      "me3j|navratil; hdf5 rejected (design/00 D24)"},
-    {"input_op_fmt", K::String, "navratil", kPL, "operators.from_file",
+    {"input_op_fmt", K::kString, "navratil", kPL, "operators.from_file",
      "applied to every OperatorsFromFile entry as its format"},
-    {"reference", K::String, "default", kC, "reference.nucleus",
+    {"reference", K::kString, "default", kC, "reference.nucleus",
      "default -> unset"},
-    {"valence_space", K::String, "", kC, "valence.space, reference.nucleus",
+    {"valence_space", K::kString, "", kC, "valence.space, reference.nucleus",
      "named space/0hw-shell/jj-shell/FCI/comma list -> valence.space; a "
      "nucleus -> reference"},
-    {"custom_valence_space", K::String, "", kS, "valence.custom",
+    {"custom_valence_space", K::kString, "", kS, "valence.custom",
      "wins over valence_space (warning V-30)"},
-    {"basis", K::String, "HF", kS, "basis.kind",
+    {"basis", K::kString, "HF", kS, "basis.kind",
      "HF|oscillator|NAT -> hf|oscillator|nat"},
-    {"method", K::String, "magnus", kC, "imsrg.method, run.task",
+    {"method", K::kString, "magnus", kC, "imsrg.method, run.task",
      "shorthands HF MP3 FCI NSmagnus brueckner brueckner1step (brueckner2 "
      "planned)"},
-    {"denominator_delta_orbit", K::String, "none", kS,
+    {"denominator_delta_orbit", K::kString, "none", kS,
      "imsrg.denominator.delta_orbit", "none -> unset"},
-    {"LECs", K::String, "EM2.0_2.0", kPL, "interaction.two_body.lecs",
+    {"LECs", K::kString, "EM2.0_2.0", kPL, "interaction.two_body.lecs",
      "explicit value ignored with a warning"},
-    {"scratch", K::String, "", kC, "imsrg.omega.storage, run.scratch_dir",
+    {"scratch", K::kString, "", kC, "imsrg.omega.storage, run.scratch_dir",
      "/dev/null -> discard; otherwise scratch + scratch_dir"},
-    {"use_brueckner_bch", K::String, "false", kS, "imsrg.use_brueckner_bch",
+    {"use_brueckner_bch", K::kString, "false", kS, "imsrg.use_brueckner_bch",
      "bool"},
-    {"valence_file_format", K::String, "tokyo", kS,
+    {"valence_file_format", K::kString, "tokyo", kS,
      "output.valence_file_format", "tokyo|nushellx|antoine"},
-    {"occ_file", K::String, "none", kS, "reference.occupations_file",
+    {"occ_file", K::kString, "none", kS, "reference.occupations_file",
      "none -> unset"},
-    {"goose_tank", K::String, "false", kPL, "imsrg.goose_tank", "bool"},
-    {"write_omega", K::String, "false", kC, "output.write_omega",
+    {"goose_tank", K::kString, "false", kPL, "imsrg.goose_tank", "bool"},
+    {"write_omega", K::kString, "false", kC, "output.write_omega",
      "bool; always writes (Q16)"},
-    {"nucleon_mass_correction", K::String, "false", kS,
+    {"nucleon_mass_correction", K::kString, "false", kS,
      "hamiltonian.nucleon_mass_correction", "bool"},
-    {"hunter_gatherer", K::String, "false", kS, "imsrg.omega.hunter_gatherer",
+    {"hunter_gatherer", K::kString, "false", kS, "imsrg.omega.hunter_gatherer",
      "bool"},
-    {"relativistic_correction", K::String, "false", kPL,
+    {"relativistic_correction", K::kString, "false", kPL,
      "hamiltonian.relativistic_correction", "bool"},
-    {"IMSRG3", K::String, "false", kS, "imsrg3.in_flow", "bool"},
-    {"imsrg3_n7", K::String, "false", kS, "imsrg3.variant",
+    {"IMSRG3", K::kString, "false", kS, "imsrg3.in_flow", "bool"},
+    {"imsrg3_n7", K::kString, "false", kS, "imsrg3.variant",
      "true -> variant n7 (rule L2)"},
-    {"imsrg3_mp4", K::String, "false", kPL, "imsrg3.variant",
+    {"imsrg3_mp4", K::kString, "false", kPL, "imsrg3.variant",
      "true -> variant mp4 (rule L2)"},
-    {"imsrg3_at_end", K::String, "false", kS, "imsrg3.at_end",
+    {"imsrg3_at_end", K::kString, "false", kS, "imsrg3.at_end",
      "needs a magnus method (V-52); Q11"},
-    {"imsrg3_no_qqq", K::String, "false", kPL, "imsrg3.no_qqq",
+    {"imsrg3_no_qqq", K::kString, "false", kPL, "imsrg3.no_qqq",
      "bool (rule L2)"},
-    {"physical_system", K::String, "nuclear", kS, "-",
+    {"physical_system", K::kString, "nuclear", kS, "-",
      "nuclear accepted and dropped; atomic rejected"},
-    {"freeze_occupations", K::String, "false", kS,
+    {"freeze_occupations", K::kString, "false", kS,
      "hartree_fock.freeze_occupations", "bool"},
-    {"discard_no2b_from_3n", K::String, "false", kPL,
+    {"discard_no2b_from_3n", K::kString, "false", kPL,
      "interaction.three_body.discard_no2b_after_hf",
      "bool; dropped (W-L1) without 3bme"},
-    {"use_NAT_occupations", K::String, "false", kS,
+    {"use_NAT_occupations", K::kString, "false", kS,
      "natural_orbitals.use_occupations", "dropped (V-21) unless basis=NAT"},
-    {"order_NAT_by_energy", K::String, "false", kC, "natural_orbitals.order",
+    {"order_NAT_by_energy", K::kString, "false", kC, "natural_orbitals.order",
      "true -> order=energy, overriding NAT_order"},
-    {"NAT_order", K::String, "occupation", kS, "natural_orbitals.order",
+    {"NAT_order", K::kString, "occupation", kS, "natural_orbitals.order",
      "occupation|energy; dropped (V-21) unless basis=NAT"},
-    {"store_3bme_pn", K::String, "false", kS, "interaction.three_body.store_pn",
-     "bool; dropped (W-L1) without 3bme"},
-    {"discard_residual_input3N", K::String, "false", kS,
+    {"store_3bme_pn", K::kString, "false", kS,
+     "interaction.three_body.store_pn", "bool; dropped (W-L1) without 3bme"},
+    {"discard_residual_input3N", K::kString, "false", kS,
      "imsrg3.discard_residual_input_3n", "bool"},
-    {"only_2b_eta", K::String, "false", kS, "imsrg3.only_2b_eta",
+    {"only_2b_eta", K::kString, "false", kS, "imsrg3.only_2b_eta",
      "bool (rule L2)"},
-    {"only_2b_omega", K::String, "false", kS, "imsrg3.only_2b_omega",
+    {"only_2b_omega", K::kString, "false", kS, "imsrg3.only_2b_omega",
      "bool (rule L2)"},
-    {"perturbative_triples", K::String, "false", kS,
+    {"perturbative_triples", K::kString, "false", kS,
      "imsrg.perturbative_triples",
      "bool; dropped (W-Q10) unless method=magnus"},
-    {"write_HO_ops", K::String, "false", kPL, "output.write_ho_ops", "bool"},
-    {"write_HF_ops", K::String, "false", kPL, "output.write_hf_ops", "bool"},
-    {"denominator_partitioning", K::String, "Epstein_Nesbet", kS,
+    {"write_HO_ops", K::kString, "false", kPL, "output.write_ho_ops", "bool"},
+    {"write_HF_ops", K::kString, "false", kPL, "output.write_hf_ops", "bool"},
+    {"denominator_partitioning", K::kString, "Epstein_Nesbet", kS,
      "imsrg.denominator.partitioning",
      "Epstein_Nesbet|Moller_Plesset|MP_isospin"},
-    {"hw", K::Double, "20.0", kS, "basis.hw", "supplied default 20.0"},
-    {"smax", K::Double, "200", kS, "imsrg.step.smax", "0 = no flow"},
-    {"dsmax", K::Double, "0.5", kS, "imsrg.step.dsmax", ""},
-    {"ds_0", K::Double, "0.5", kC, "imsrg.step.ds_0",
+    {"hw", K::kDouble, "20.0", kS, "basis.hw", "supplied default 20.0"},
+    {"smax", K::kDouble, "200", kS, "imsrg.step.smax", "0 = no flow"},
+    {"dsmax", K::kDouble, "0.5", kS, "imsrg.step.dsmax", ""},
+    {"ds_0", K::kDouble, "0.5", kC, "imsrg.step.ds_0",
      "unused by magnus (W-Q2)"},
-    {"domega", K::Double, "0.1", kS, "imsrg.step.domega", ""},
-    {"omega_norm_max", K::Double, "0.25", kS, "imsrg.step.omega_norm_max",
+    {"domega", K::kDouble, "0.1", kS, "imsrg.step.domega", ""},
+    {"omega_norm_max", K::kDouble, "0.25", kS, "imsrg.step.omega_norm_max",
      "overridden by NSmagnus/brueckner* (W-Q15)"},
-    {"ode_tolerance", K::Double, "1e-6", kPL, "imsrg.step.ode_tolerance",
+    {"ode_tolerance", K::kDouble, "1e-6", kPL, "imsrg.step.ode_tolerance",
      "flow methods"},
-    {"denominator_delta", K::Double, "0", kC, "imsrg.denominator.delta",
+    {"denominator_delta", K::kDouble, "0", kC, "imsrg.denominator.delta",
      "dropped (W-Q3) without denominator_delta_orbit"},
-    {"BetaCM", K::Double, "0", kS, "hamiltonian.beta_cm", ""},
-    {"hwBetaCM", K::Double, "-1", kS, "hamiltonian.beta_cm_hw", "< 0 -> unset"},
-    {"eta_criterion", K::Double, "1e-6", kS, "imsrg.step.eta_criterion", ""},
-    {"hw_trap", K::Double, "-1", kC, "hamiltonian.trap_hw, hamiltonian.kinetic",
-     "<= 0 -> unset; > 0 -> trap_hw and kinetic=lab"},
-    {"dE3max", K::Double, "99", kS, "imsrg3.de3max",
-     "dropped (W-L2) without IMSRG(3)/triples"},
-    {"OccNat3Cut", K::Double, "-1", kS, "imsrg3.occ_nat3_cut", "<= 0 -> unset"},
-    {"threebody_threshold", K::Double, "0", kS, "imsrg3.threebody_threshold",
-     "nonzero dropped (W-L2) without IMSRG(3)"},
-    {"A", K::Int, "-1", kS, "basis.mass_number", "<= 0 -> unset"},
-    {"e3max", K::Int, "12", kS, "basis.e3max", ""},
-    {"emax", K::Int, "6", kS, "basis.emax", "supplied default 6"},
-    {"lmax", K::Int, "99999", kS, "basis.lmax", "99999 or >= emax -> unset"},
-    {"lmax3", K::Int, "-1", kS, "basis.lmax3", "<= 0 -> unset"},
-    {"nsteps", K::Int, "-1", kC, "imsrg.steps",
-     "-1 -> unset; only 1 or 2 (W-Q9, W-NSTEPS1)"},
-    {"file2e1max", K::Int, "12", kS, "interaction.two_body.e1max",
-     "supplied default 12"},
-    {"file2e2max", K::Int, "-1", kC, "interaction.two_body.e2max",
-     "<= 0 -> unset"},
-    {"file2lmax", K::Int, "-1", kC, "interaction.two_body.lmax",
-     "<= 0 -> unset; explicit 0 warns"},
-    {"file3e1max", K::Int, "12", kS, "interaction.three_body.e1max",
-     "supplied default 12 with 3bme"},
-    {"file3e2max", K::Int, "-1", kS, "interaction.three_body.e2max",
-     "-1 -> unset"},
-    {"file3e3max", K::Int, "12", kS, "interaction.three_body.e3max",
-     "supplied default 12 with 3bme"},
-    {"atomicZ", K::Int, "-1", kNS, "",
-     "atomic systems are not supported by imsrg"},
-    {"emax_unocc", K::Int, "-1", kS, "basis.emax_unocc", "<= 0 -> unset"},
-    {"emax_imsrg", K::Int, "-1", kS, "imsrg.space.emax", "< 0 -> unset"},
-    {"e2max_imsrg", K::Int, "-1", kS, "imsrg.space.e2max", "< 0 -> unset"},
-    {"e3max_imsrg", K::Int, "-1", kS, "imsrg.space.e3max", "< 0 -> unset"},
-    {"emax_3body_imsrg", K::Int, "-1", kS, "imsrg.space.emax_3body",
+    {"BetaCM", K::kDouble, "0", kS, "hamiltonian.beta_cm", ""},
+    {"hwBetaCM", K::kDouble, "-1", kS, "hamiltonian.beta_cm_hw",
      "< 0 -> unset"},
-    {"Operators", K::Vector, "", kS, "operators.list", "strings, parsed later"},
-    {"OperatorsFromFile", K::Vector, "", kPL, "operators.from_file",
-     "Name^J_T_P_R^file2b[^file3b] -> table"},
-    {"OperatorsPT1", K::Vector, "", kPL, "operators.first_order",
+    {"eta_criterion", K::kDouble, "1e-6", kS, "imsrg.step.eta_criterion", ""},
+    {"hw_trap", K::kDouble, "-1", kC,
+     "hamiltonian.trap_hw, hamiltonian.kinetic",
+     "<= 0 -> unset; > 0 -> trap_hw and kinetic=lab"},
+    {"dE3max", K::kDouble, "99", kS, "imsrg3.de3max",
+     "dropped (W-L2) without IMSRG(3)/triples"},
+    {"OccNat3Cut", K::kDouble, "-1", kS, "imsrg3.occ_nat3_cut",
+     "<= 0 -> unset"},
+    {"threebody_threshold", K::kDouble, "0", kS, "imsrg3.threebody_threshold",
+     "nonzero dropped (W-L2) without IMSRG(3)"},
+    {"A", K::kInt, "-1", kS, "basis.mass_number", "<= 0 -> unset"},
+    {"e3max", K::kInt, "12", kS, "basis.e3max", ""},
+    {"emax", K::kInt, "6", kS, "basis.emax", "supplied default 6"},
+    {"lmax", K::kInt, "99999", kS, "basis.lmax", "99999 or >= emax -> unset"},
+    {"lmax3", K::kInt, "-1", kS, "basis.lmax3", "<= 0 -> unset"},
+    {"nsteps", K::kInt, "-1", kC, "imsrg.steps",
+     "-1 -> unset; only 1 or 2 (W-Q9, W-NSTEPS1)"},
+    {"file2e1max", K::kInt, "12", kS, "interaction.two_body.e1max",
+     "supplied default 12"},
+    {"file2e2max", K::kInt, "-1", kC, "interaction.two_body.e2max",
+     "<= 0 -> unset"},
+    {"file2lmax", K::kInt, "-1", kC, "interaction.two_body.lmax",
+     "<= 0 -> unset; explicit 0 warns"},
+    {"file3e1max", K::kInt, "12", kS, "interaction.three_body.e1max",
+     "supplied default 12 with 3bme"},
+    {"file3e2max", K::kInt, "-1", kS, "interaction.three_body.e2max",
+     "-1 -> unset"},
+    {"file3e3max", K::kInt, "12", kS, "interaction.three_body.e3max",
+     "supplied default 12 with 3bme"},
+    {"atomicZ", K::kInt, "-1", kNS, "",
+     "atomic systems are not supported by imsrg"},
+    {"emax_unocc", K::kInt, "-1", kS, "basis.emax_unocc", "<= 0 -> unset"},
+    {"emax_imsrg", K::kInt, "-1", kS, "imsrg.space.emax", "< 0 -> unset"},
+    {"e2max_imsrg", K::kInt, "-1", kS, "imsrg.space.e2max", "< 0 -> unset"},
+    {"e3max_imsrg", K::kInt, "-1", kS, "imsrg.space.e3max", "< 0 -> unset"},
+    {"emax_3body_imsrg", K::kInt, "-1", kS, "imsrg.space.emax_3body",
+     "< 0 -> unset"},
+    {"Operators", K::kVector, "", kS, "operators.list",
      "strings, parsed later"},
-    {"OperatorsRPA", K::Vector, "", kNS, "",
+    {"OperatorsFromFile", K::kVector, "", kPL, "operators.from_file",
+     "Name^J_T_P_R^file2b[^file3b] -> table"},
+    {"OperatorsPT1", K::kVector, "", kPL, "operators.first_order",
+     "strings, parsed later"},
+    {"OperatorsRPA", K::kVector, "", kNS, "",
      "RPA-resummed operator corrections are not supported"},
-    {"OperatorsTDA", K::Vector, "", kNS, "",
+    {"OperatorsTDA", K::kVector, "", kNS, "",
      "TDA-resummed operator corrections are not supported"},
-    {"SPWF", K::Vector, "", kS, "output.spwf", "strings, parsed later"},
+    {"SPWF", K::kVector, "", kS, "output.spwf", "strings, parsed later"},
 }};
 
 // -----------------------------------------------------------------------------
@@ -305,10 +309,10 @@ constexpr std::array kMethodSpellings = std::to_array<std::string_view>({
 // Direct (1:1) key tables.
 
 enum class Absent {
-  Never,  // always emitted
-  LE0,    // absent if <= 0
-  LT0,    // absent if < 0
-  EQM1,   // absent if == -1
+  kNever,  // always emitted
+  kLE0,    // absent if <= 0
+  kLT0,    // absent if < 0
+  kEqM1,   // absent if == -1
 };
 
 struct DirectNumber {
@@ -319,36 +323,37 @@ struct DirectNumber {
 };
 
 constexpr std::array kDirectInts = std::to_array<DirectNumber>({
-    {"emax", "basis.emax", Absent::Never, false},
-    {"e3max", "basis.e3max", Absent::Never, false},
-    {"A", "basis.mass_number", Absent::LE0, false},
-    {"lmax3", "basis.lmax3", Absent::LE0, false},
-    {"emax_unocc", "basis.emax_unocc", Absent::LE0, false},
-    {"file2e1max", "interaction.two_body.e1max", Absent::Never, false},
-    {"file2e2max", "interaction.two_body.e2max", Absent::LE0, false},
-    {"file3e1max", "interaction.three_body.e1max", Absent::Never, true},
-    {"file3e2max", "interaction.three_body.e2max", Absent::EQM1, true},
-    {"file3e3max", "interaction.three_body.e3max", Absent::Never, true},
-    {"emax_imsrg", "imsrg.space.emax", Absent::LT0, false},
-    {"e2max_imsrg", "imsrg.space.e2max", Absent::LT0, false},
-    {"e3max_imsrg", "imsrg.space.e3max", Absent::LT0, false},
-    {"emax_3body_imsrg", "imsrg.space.emax_3body", Absent::LT0, false},
+    {"emax", "basis.emax", Absent::kNever, false},
+    {"e3max", "basis.e3max", Absent::kNever, false},
+    {"A", "basis.mass_number", Absent::kLE0, false},
+    {"lmax3", "basis.lmax3", Absent::kLE0, false},
+    {"emax_unocc", "basis.emax_unocc", Absent::kLE0, false},
+    {"file2e1max", "interaction.two_body.e1max", Absent::kNever, false},
+    {"file2e2max", "interaction.two_body.e2max", Absent::kLE0, false},
+    {"file3e1max", "interaction.three_body.e1max", Absent::kNever, true},
+    {"file3e2max", "interaction.three_body.e2max", Absent::kEqM1, true},
+    {"file3e3max", "interaction.three_body.e3max", Absent::kNever, true},
+    {"emax_imsrg", "imsrg.space.emax", Absent::kLT0, false},
+    {"e2max_imsrg", "imsrg.space.e2max", Absent::kLT0, false},
+    {"e3max_imsrg", "imsrg.space.e3max", Absent::kLT0, false},
+    {"emax_3body_imsrg", "imsrg.space.emax_3body", Absent::kLT0, false},
 });
 
 constexpr std::array kDirectDoubles = std::to_array<DirectNumber>({
-    {"hw", "basis.hw", Absent::Never, false},
-    {"smax", "imsrg.step.smax", Absent::Never, false},
-    {"dsmax", "imsrg.step.dsmax", Absent::Never, false},
-    {"ds_0", "imsrg.step.ds_0", Absent::Never, false},
-    {"domega", "imsrg.step.domega", Absent::Never, false},
-    {"ode_tolerance", "imsrg.step.ode_tolerance", Absent::Never, false},
-    {"denominator_delta", "imsrg.denominator.delta", Absent::Never, false},
-    {"BetaCM", "hamiltonian.beta_cm", Absent::Never, false},
-    {"hwBetaCM", "hamiltonian.beta_cm_hw", Absent::LT0, false},
-    {"eta_criterion", "imsrg.step.eta_criterion", Absent::Never, false},
-    {"dE3max", "imsrg3.de3max", Absent::Never, false},
-    {"OccNat3Cut", "imsrg3.occ_nat3_cut", Absent::LE0, false},
-    {"threebody_threshold", "imsrg3.threebody_threshold", Absent::Never, false},
+    {"hw", "basis.hw", Absent::kNever, false},
+    {"smax", "imsrg.step.smax", Absent::kNever, false},
+    {"dsmax", "imsrg.step.dsmax", Absent::kNever, false},
+    {"ds_0", "imsrg.step.ds_0", Absent::kNever, false},
+    {"domega", "imsrg.step.domega", Absent::kNever, false},
+    {"ode_tolerance", "imsrg.step.ode_tolerance", Absent::kNever, false},
+    {"denominator_delta", "imsrg.denominator.delta", Absent::kNever, false},
+    {"BetaCM", "hamiltonian.beta_cm", Absent::kNever, false},
+    {"hwBetaCM", "hamiltonian.beta_cm_hw", Absent::kLT0, false},
+    {"eta_criterion", "imsrg.step.eta_criterion", Absent::kNever, false},
+    {"dE3max", "imsrg3.de3max", Absent::kNever, false},
+    {"OccNat3Cut", "imsrg3.occ_nat3_cut", Absent::kLE0, false},
+    {"threebody_threshold", "imsrg3.threebody_threshold", Absent::kNever,
+     false},
 });
 
 struct DirectBool {
@@ -379,15 +384,15 @@ constexpr std::array kDirectBools = std::to_array<DirectBool>({
     {"write_HF_ops", "output.write_hf_ops", false},
 });
 
-bool absent_by_sentinel(Absent rule, double v) {
+bool AbsentBySentinel(Absent rule, double v) {
   switch (rule) {
-    case Absent::Never:
+    case Absent::kNever:
       return false;
-    case Absent::LE0:
+    case Absent::kLE0:
       return v <= 0.0;
-    case Absent::LT0:
+    case Absent::kLT0:
       return v < 0.0;
-    case Absent::EQM1:
+    case Absent::kEqM1:
       return v == -1.0;
   }
   return false;
@@ -395,13 +400,13 @@ bool absent_by_sentinel(Absent rule, double v) {
 
 /// Drops one leading '+' (imsrg++ read numbers with istringstream, which
 /// accepts it); "+-1" stays invalid.
-std::string_view strip_plus(std::string_view s) {
+std::string_view StripPlus(std::string_view s) {
   if (s.size() > 1 && s.front() == '+' && s[1] != '-') s.remove_prefix(1);
   return s;
 }
 
-std::optional<std::int64_t> try_int(std::string_view s) {
-  s = strip_plus(s);
+std::optional<std::int64_t> TryInt(std::string_view s) {
+  s = StripPlus(s);
   std::int64_t v = 0;
   const char* b = s.data();
   const char* e = s.data() + s.size();
@@ -411,8 +416,8 @@ std::optional<std::int64_t> try_int(std::string_view s) {
 }
 
 /// Finite doubles only ("inf" and "nan" are not valid parameter values).
-std::optional<double> try_double(std::string_view s) {
-  s = strip_plus(s);
+std::optional<double> TryDouble(std::string_view s) {
+  s = StripPlus(s);
   double v = 0.0;
   const char* b = s.data();
   const char* e = s.data() + s.size();
@@ -422,7 +427,7 @@ std::optional<double> try_double(std::string_view s) {
   return v;
 }
 
-std::vector<std::string> split(std::string_view s, char sep) {
+std::vector<std::string> Split(std::string_view s, char sep) {
   std::vector<std::string> out;
   std::size_t start = 0;
   while (true) {
@@ -449,19 +454,19 @@ struct Gen {
 
 class Translator {
  public:
-  LegacyTranslation run(std::span<const std::string> args) {
-    collect(args);
-    parse_enums();
-    do_method();
-    do_generators();
-    do_basis_and_misc();
-    do_two_body();
-    do_three_body();
-    do_numbers();
-    do_valence_and_reference();
-    do_outputs();
-    do_vectors();
-    do_cross_rules();
+  LegacyTranslation Run(std::span<const std::string> args) {
+    Collect(args);
+    ParseEnums();
+    DoMethod();
+    DoGenerators();
+    DoBasisAndMisc();
+    DoTwoBody();
+    DoThreeBody();
+    DoNumbers();
+    DoValenceAndReference();
+    DoOutputs();
+    DoVectors();
+    DoCrossRules();
     return std::move(out_);
   }
 
@@ -496,53 +501,52 @@ class Translator {
   // V-03.
   bool given_valid_int(std::string_view key) const {
     const Entry* e = get(key);
-    return e != nullptr && try_int(e->value).has_value();
+    return e != nullptr && TryInt(e->value).has_value();
   }
   bool given_valid_double(std::string_view key) const {
     const Entry* e = get(key);
-    return e != nullptr && try_double(e->value).has_value();
+    return e != nullptr && TryDouble(e->value).has_value();
   }
 
-  static SourceRef arg_ref(const Entry& e) {
-    return {SourceRef::Kind::LegacyArg, e.token, 0, 0};
+  static SourceRef ArgRef(const Entry& e) {
+    return {SourceRef::Kind::kLegacyArg, e.token, 0, 0};
   }
-  static SourceRef default_ref(std::string_view key) {
-    return {SourceRef::Kind::LegacyDefault, std::string(key), 0, 0};
+  static SourceRef DefaultRef(std::string_view key) {
+    return {SourceRef::Kind::kLegacyDefault, std::string(key), 0, 0};
   }
   SourceRef ref_of(std::string_view key) const {
     const Entry* e = get(key);
-    return e ? arg_ref(*e) : SourceRef{};
+    return e ? ArgRef(*e) : SourceRef{};
   }
 
-  void error(std::string code, std::string key, std::string msg,
-             SourceRef where = {},
-             std::optional<std::string> sug = std::nullopt) {
-    out_.issues.push_back(make_error(std::move(code), std::move(key),
-                                     std::move(msg), std::move(where),
-                                     std::move(sug)));
+  void AddError(std::string code, std::string key, std::string msg,
+                SourceRef where = {},
+                std::optional<std::string> sug = std::nullopt) {
+    out_.issues.push_back(MakeError(std::move(code), std::move(key),
+                                    std::move(msg), std::move(where),
+                                    std::move(sug)));
   }
-  void warn(std::string code, std::string key, std::string msg,
+  void Warn(std::string code, std::string key, std::string msg,
             SourceRef where = {}) {
-    out_.issues.push_back(make_warning(std::move(code), std::move(key),
-                                       std::move(msg), std::move(where)));
+    out_.issues.push_back(MakeWarning(std::move(code), std::move(key),
+                                      std::move(msg), std::move(where)));
   }
-  void rule(std::string text) { out_.applied_rules.push_back(std::move(text)); }
+  void Rule(std::string text) { out_.applied_rules.push_back(std::move(text)); }
 
-  void put(std::string_view path, RawValue::Data d, SourceRef where) {
+  void Put(std::string_view path, RawValue::Data d, SourceRef where) {
     out_.tree.set(std::string(path), RawValue{std::move(d), std::move(where)});
   }
-  void put_s(std::string_view path, std::string_view v,
-             const SourceRef& where) {
-    put(path, std::string(v), where);
+  void PutS(std::string_view path, std::string_view v, const SourceRef& where) {
+    Put(path, std::string(v), where);
   }
-  void put_i(std::string_view path, std::int64_t v, const SourceRef& where) {
-    put(path, v, where);
+  void PutI(std::string_view path, std::int64_t v, const SourceRef& where) {
+    Put(path, v, where);
   }
-  void put_d(std::string_view path, double v, const SourceRef& where) {
-    put(path, v, where);
+  void PutD(std::string_view path, double v, const SourceRef& where) {
+    Put(path, v, where);
   }
-  void put_b(std::string_view path, bool v, const SourceRef& where) {
-    put(path, v, where);
+  void PutB(std::string_view path, bool v, const SourceRef& where) {
+    Put(path, v, where);
   }
 
   bool in_tree(std::string_view path) const { return out_.tree.contains(path); }
@@ -579,38 +583,38 @@ class Translator {
 
   // ------------------------------------------------------------------ value
   // parsing
-  std::optional<std::int64_t> parse_int(const Entry& e, std::string_view key) {
-    auto v = try_int(e.value);
+  std::optional<std::int64_t> ParseInt(const Entry& e, std::string_view key) {
+    auto v = TryInt(e.value);
     if (!v)
-      error("E-LEGACY-VALUE", std::string(key),
-            "expected an integer for '" + std::string(key) + "', got '" +
-                e.value + "'",
-            arg_ref(e));
+      AddError("E-LEGACY-VALUE", std::string(key),
+               "expected an integer for '" + std::string(key) + "', got '" +
+                   e.value + "'",
+               ArgRef(e));
     return v;
   }
-  std::optional<double> parse_double(const Entry& e, std::string_view key) {
-    auto v = try_double(e.value);
+  std::optional<double> ParseDouble(const Entry& e, std::string_view key) {
+    auto v = TryDouble(e.value);
     if (!v)
-      error("E-LEGACY-VALUE", std::string(key),
-            "expected a number for '" + std::string(key) + "', got '" +
-                e.value + "'",
-            arg_ref(e));
+      AddError("E-LEGACY-VALUE", std::string(key),
+               "expected a number for '" + std::string(key) + "', got '" +
+                   e.value + "'",
+               ArgRef(e));
     return v;
   }
-  std::optional<bool> parse_bool(const Entry& e, std::string_view key) {
+  std::optional<bool> ParseBool(const Entry& e, std::string_view key) {
     if (e.value == "true") return true;
     if (e.value == "false") return false;
-    error("E-LEGACY-VALUE", std::string(key),
-          "expected 'true' or 'false' for '" + std::string(key) + "', got '" +
-              e.value + "'",
-          arg_ref(e));
+    AddError("E-LEGACY-VALUE", std::string(key),
+             "expected 'true' or 'false' for '" + std::string(key) +
+                 "', got '" + e.value + "'",
+             ArgRef(e));
     return std::nullopt;
   }
 
   /// Map a spelling through `table`; the canonical spellings are accepted too.
   /// Unknown -> V-01.
-  std::optional<std::string> map_enum(const Entry& e, std::string_view path,
-                                      std::span<const Spelling> table) {
+  std::optional<std::string> MapEnum(const Entry& e, std::string_view path,
+                                     std::span<const Spelling> table) {
     for (const Spelling& s : table)
       if (e.value == s.spelling) return std::string(s.canonical);
     for (const Spelling& s : table)
@@ -622,28 +626,28 @@ class Translator {
           cands.emplace_back(c);
       }
     }
-    error("V-01", std::string(path),
-          "unknown value '" + e.value + "' for " + std::string(path),
-          arg_ref(e), did_you_mean(e.value, cands));
+    AddError("V-01", std::string(path),
+             "unknown value '" + e.value + "' for " + std::string(path),
+             ArgRef(e), DidYouMean(e.value, cands));
     return std::nullopt;
   }
 
-  std::optional<Gen> parse_generator(const Entry& e, std::string_view path) {
+  std::optional<Gen> ParseGenerator(const Entry& e, std::string_view path) {
     for (std::string_view prefix : {std::string_view("qtransfer-atan_"),
                                     std::string_view("qtransfer_atan_")}) {
       if (e.value.starts_with(prefix)) {
-        const auto n = try_int(std::string_view(e.value).substr(prefix.size()));
+        const auto n = TryInt(std::string_view(e.value).substr(prefix.size()));
         if (!n || *n < 1) {
-          error("E-LEGACY-VALUE", std::string(path),
-                "qtransfer generator needs a positive integer n, got '" +
-                    e.value + "'",
-                arg_ref(e));
+          AddError("E-LEGACY-VALUE", std::string(path),
+                   "qtransfer generator needs a positive integer n, got '" +
+                       e.value + "'",
+                   ArgRef(e));
           return std::nullopt;
         }
         return Gen{"qtransfer_atan", *n};
       }
     }
-    auto canon = map_enum(e, path, kGenerators);
+    auto canon = MapEnum(e, path, kGenerators);
     if (!canon) return std::nullopt;
     Gen g{*canon, std::nullopt};
     if (g.canon == "qtransfer_atan") g.n = 1;
@@ -652,35 +656,36 @@ class Translator {
 
   // ------------------------------------------------------------------ token
   // collection
-  void collect(std::span<const std::string> args) {
+  void Collect(std::span<const std::string> args) {
     std::vector<std::string_view> names;
     for (const auto& k : kKeys) names.push_back(k.key);
     for (const std::string& tok : args) {
       const std::size_t eq = tok.find('=');
-      const SourceRef where{SourceRef::Kind::LegacyArg, tok, 0, 0};
+      const SourceRef where{SourceRef::Kind::kLegacyArg, tok, 0, 0};
       if (eq == std::string::npos) {
-        error("E-LEGACY-SYNTAX", tok, "expected key=value, got '" + tok + "'",
-              where);
+        AddError("E-LEGACY-SYNTAX", tok,
+                 "expected key=value, got '" + tok + "'", where);
         continue;
       }
       const std::string key = tok.substr(0, eq);
       const std::string value = tok.substr(eq + 1);
-      const LegacyKeyInfo* info = find_legacy_key(key);
+      const LegacyKeyInfo* info = FindLegacyKey(key);
       if (info == nullptr) {
-        error("E-KEY-UNKNOWN", key, "unknown legacy key '" + key + "'", where,
-              did_you_mean(key, std::span<const std::string_view>(names)));
+        AddError("E-KEY-UNKNOWN", key, "unknown legacy key '" + key + "'",
+                 where,
+                 DidYouMean(key, std::span<const std::string_view>(names)));
         continue;
       }
       if (value.empty()) {
-        error("E-LEGACY-SYNTAX", key,
-              "empty value for '" + key + "' (key= is not allowed)", where);
+        AddError("E-LEGACY-SYNTAX", key,
+                 "empty value for '" + key + "' (key= is not allowed)", where);
         continue;
       }
-      if (info->kind == LegacyKind::Vector) {
-        for (const std::string& part : split(value, ',')) {
+      if (info->kind == LegacyKind::kVector) {
+        for (const std::string& part : Split(value, ',')) {
           if (part.empty()) {
-            error("E-LEGACY-VALUE", key,
-                  "empty element in the list value of '" + key + "'", where);
+            AddError("E-LEGACY-VALUE", key,
+                     "empty element in the list value of '" + key + "'", where);
             continue;
           }
           vectors_[key].push_back(Entry{part, tok});
@@ -688,7 +693,7 @@ class Translator {
         continue;
       }
       if (scalars_.contains(key))
-        warn("W-DUPLICATE", key,
+        Warn("W-DUPLICATE", key,
              "key '" + key + "' given more than once; the last value wins",
              where);
       scalars_[key] = Entry{value, tok};
@@ -697,88 +702,89 @@ class Translator {
 
   // ------------------------------------------------------------------ enum
   // pre-pass
-  void parse_enums() {
+  void ParseEnums() {
     if (const Entry* e = get("fmt2"))
-      fmt2_ = map_enum(*e, "interaction.two_body.format", kFmt2);
+      fmt2_ = MapEnum(*e, "interaction.two_body.format", kFmt2);
     if (const Entry* e = get("basis"))
-      basis_ = map_enum(*e, "basis.kind", kBasis);
+      basis_ = MapEnum(*e, "basis.kind", kBasis);
     if (const Entry* e = get("input_op_fmt"))
-      op_fmt_ = map_enum(*e, "operators.from_file", kOpFmt);
+      op_fmt_ = MapEnum(*e, "operators.from_file", kOpFmt);
     if (const Entry* e = get("core_generator"))
-      core_gen_ = parse_generator(*e, "imsrg.generator.core");
+      core_gen_ = ParseGenerator(*e, "imsrg.generator.core");
     if (const Entry* e = get("valence_generator"))
-      val_gen_ = parse_generator(*e, "imsrg.generator.valence");
+      val_gen_ = ParseGenerator(*e, "imsrg.generator.valence");
     const Entry* b3 = get("3bme");
     has_3n_ = b3 != nullptr && b3->value != "none";
   }
 
   // ------------------------------------------------------------------ method
   // (design/16 3.5)
-  void do_method() {
+  void DoMethod() {
     const Entry* m = get("method");
     if (m == nullptr) return;
     const std::string& v = m->value;
-    const SourceRef ref = arg_ref(*m);
+    const SourceRef ref = ArgRef(*m);
     const auto verbatim =
         std::find(kVerbatimMethods.begin(), kVerbatimMethods.end(), v);
     if (v == "HF" || v == "MP3" || v == "FCI") {
       const char* task = v == "HF" ? "hf" : (v == "MP3" ? "mp3" : "fci_export");
-      put_s("run.task", task, ref);
-      rule("method=" + v + " -> run.task=" + task);
+      PutS("run.task", task, ref);
+      Rule("method=" + v + " -> run.task=" + task);
     } else if (v == "NSmagnus" || v == "brueckner" || v == "brueckner1step") {
-      put_s("imsrg.method", "magnus", ref);
+      PutS("imsrg.method", "magnus", ref);
       std::string text = "method=" + v + " -> imsrg.method=magnus";
       const double onm = v == "NSmagnus" ? 50000.0 : 500.0;
       forced_omega_ = onm;
       text += ", imsrg.step.omega_norm_max=" +
               std::string(v == "NSmagnus" ? "50000" : "500");
-      put_d("imsrg.step.omega_norm_max", onm, ref);
+      PutD("imsrg.step.omega_norm_max", onm, ref);
       if (const Entry* o = get("omega_norm_max")) {
-        const auto given_v = parse_double(*o, "omega_norm_max");
+        const auto given_v = ParseDouble(*o, "omega_norm_max");
         if (given_v && std::abs(*given_v - onm) > 1e-12)
-          warn("W-Q15", "imsrg.step.omega_norm_max",
+          Warn("W-Q15", "imsrg.step.omega_norm_max",
                "method=" + v + " overrides omega_norm_max=" + o->value,
-               arg_ref(*o));
+               ArgRef(*o));
       }
       if (v != "NSmagnus") {
         forced_brueckner_ = true;
-        put_b("imsrg.use_brueckner_bch", true, ref);
+        PutB("imsrg.use_brueckner_bch", true, ref);
         text += ", imsrg.use_brueckner_bch=true";
       }
       if (v == "brueckner1step") {
         forced_steps_ = 1;
-        put_i("imsrg.steps", 1, ref);
+        PutI("imsrg.steps", 1, ref);
         core_from_valence_ = true;
         text += ", imsrg.steps=1, imsrg.generator.core=<valence_generator>";
       }
-      rule(text);
+      Rule(text);
     } else if (v == "brueckner2") {
-      error("E-PLANNED", "imsrg.method",
-            "method=brueckner2 (HF-basis rotation restart) is not available in "
-            "this build",
-            ref);
+      AddError(
+          "E-PLANNED", "imsrg.method",
+          "method=brueckner2 (HF-basis rotation restart) is not available in "
+          "this build",
+          ref);
     } else if (v == "magnus_euler") {
-      put_s("imsrg.method", "magnus", ref);
-      rule("method=magnus_euler -> imsrg.method=magnus");
+      PutS("imsrg.method", "magnus", ref);
+      Rule("method=magnus_euler -> imsrg.method=magnus");
     } else if (v == "flow_adaptive") {
-      put_s("imsrg.method", "flow", ref);
-      rule("method=flow_adaptive -> imsrg.method=flow");
+      PutS("imsrg.method", "flow", ref);
+      Rule("method=flow_adaptive -> imsrg.method=flow");
     } else if (v == "flow_RK4" || v == "flow_rk4") {
-      put_s("imsrg.method", "flow_rk4", ref);
-      rule("method=" + v + " -> imsrg.method=flow_rk4");
+      PutS("imsrg.method", "flow_rk4", ref);
+      Rule("method=" + v + " -> imsrg.method=flow_rk4");
     } else if (verbatim != kVerbatimMethods.end()) {
-      put_s("imsrg.method", v, ref);
+      PutS("imsrg.method", v, ref);
     } else {
       std::vector<std::string> cands(kMethodSpellings.begin(),
                                      kMethodSpellings.end());
-      error("V-01", "imsrg.method", "unknown method '" + v + "'", ref,
-            did_you_mean(v, cands));
+      AddError("V-01", "imsrg.method", "unknown method '" + v + "'", ref,
+               DidYouMean(v, cands));
     }
   }
 
   // ------------------------------------------------------------------
   // generators
-  void do_generators() {
+  void DoGenerators() {
     std::optional<Gen> core = core_gen_;
     SourceRef core_ref = ref_of("core_generator");
     if (core_from_valence_) {
@@ -787,10 +793,10 @@ class Translator {
                  : std::optional<Gen>(Gen{"shell_model_atan", std::nullopt});
       core_ref = ref_of("method");
     }
-    if (core) put_s("imsrg.generator.core", core->canon, core_ref);
+    if (core) PutS("imsrg.generator.core", core->canon, core_ref);
     if (val_gen_)
-      put_s("imsrg.generator.valence", val_gen_->canon,
-            ref_of("valence_generator"));
+      PutS("imsrg.generator.valence", val_gen_->canon,
+           ref_of("valence_generator"));
     // qtransfer_n: both generators must agree.
     std::optional<std::int64_t> n;
     SourceRef n_ref;
@@ -806,155 +812,157 @@ class Translator {
     consider(core, core_ref);
     consider(val_gen_, ref_of("valence_generator"));
     if (conflict)
-      error("E-LEGACY-VALUE", "imsrg.generator.qtransfer_n",
-            "core_generator and valence_generator name different qtransfer n",
-            n_ref);
+      AddError(
+          "E-LEGACY-VALUE", "imsrg.generator.qtransfer_n",
+          "core_generator and valence_generator name different qtransfer n",
+          n_ref);
     else if (n)
-      put_i("imsrg.generator.qtransfer_n", *n, n_ref);
+      PutI("imsrg.generator.qtransfer_n", *n, n_ref);
   }
 
   // ------------------------------------------------------------------ basis,
   // bools, enums
-  void do_basis_and_misc() {
-    if (basis_) put_s("basis.kind", *basis_, ref_of("basis"));
+  void DoBasisAndMisc() {
+    if (basis_) PutS("basis.kind", *basis_, ref_of("basis"));
 
     // Bools mapped 1:1.
     for (const DirectBool& d : kDirectBools) {
       const Entry* e = get(d.key);
       if (e == nullptr) continue;
       if (d.three_body_only && !has_3n_) {
-        drop_3n_only(d.key, *e);
+        Drop3nOnly(d.key, *e);
         continue;
       }
-      const auto b = parse_bool(*e, d.key);
-      if (b) put_b(d.path, *b, arg_ref(*e));
+      const auto b = ParseBool(*e, d.key);
+      if (b) PutB(d.path, *b, ArgRef(*e));
     }
     if (const Entry* e = get("use_brueckner_bch")) {
-      const auto b = parse_bool(*e, "use_brueckner_bch");
+      const auto b = ParseBool(*e, "use_brueckner_bch");
       if (b && !forced_brueckner_)
-        put_b("imsrg.use_brueckner_bch", *b, arg_ref(*e));
+        PutB("imsrg.use_brueckner_bch", *b, ArgRef(*e));
     }
 
     // imsrg3 variant.
     const Entry* n7 = get("imsrg3_n7");
     const Entry* mp4 = get("imsrg3_mp4");
-    const auto n7v = n7 ? parse_bool(*n7, "imsrg3_n7") : std::nullopt;
-    const auto mp4v = mp4 ? parse_bool(*mp4, "imsrg3_mp4") : std::nullopt;
+    const auto n7v = n7 ? ParseBool(*n7, "imsrg3_n7") : std::nullopt;
+    const auto mp4v = mp4 ? ParseBool(*mp4, "imsrg3_mp4") : std::nullopt;
     if (n7v && mp4v && *n7v && *mp4v)
-      error("E-LEGACY-VALUE", "imsrg3.variant",
-            "imsrg3_n7=true and imsrg3_mp4=true are exclusive", arg_ref(*mp4));
+      AddError("E-LEGACY-VALUE", "imsrg3.variant",
+               "imsrg3_n7=true and imsrg3_mp4=true are exclusive",
+               ArgRef(*mp4));
     else if (n7v && *n7v)
-      put_s("imsrg3.variant", "n7", arg_ref(*n7));
+      PutS("imsrg3.variant", "n7", ArgRef(*n7));
     else if (mp4v && *mp4v)
-      put_s("imsrg3.variant", "mp4", arg_ref(*mp4));
+      PutS("imsrg3.variant", "mp4", ArgRef(*mp4));
 
     // order_NAT_by_energy overrides NAT_order.
     if (const Entry* e = get("NAT_order")) {
-      const auto o = map_enum(*e, "natural_orbitals.order", kNatOrder);
-      if (o) put_s("natural_orbitals.order", *o, arg_ref(*e));
+      const auto o = MapEnum(*e, "natural_orbitals.order", kNatOrder);
+      if (o) PutS("natural_orbitals.order", *o, ArgRef(*e));
     }
     if (const Entry* e = get("order_NAT_by_energy")) {
-      const auto b = parse_bool(*e, "order_NAT_by_energy");
+      const auto b = ParseBool(*e, "order_NAT_by_energy");
       if (b && *b) {
-        put_s("natural_orbitals.order", "energy", arg_ref(*e));
-        rule("order_NAT_by_energy=true -> natural_orbitals.order=energy");
+        PutS("natural_orbitals.order", "energy", ArgRef(*e));
+        Rule("order_NAT_by_energy=true -> natural_orbitals.order=energy");
       }
     }
 
     if (const Entry* e = get("valence_file_format")) {
       const auto o =
-          map_enum(*e, "output.valence_file_format", kValenceFileFormat);
-      if (o) put_s("output.valence_file_format", *o, arg_ref(*e));
+          MapEnum(*e, "output.valence_file_format", kValenceFileFormat);
+      if (o) PutS("output.valence_file_format", *o, ArgRef(*e));
     }
     if (const Entry* e = get("denominator_partitioning")) {
       const auto o =
-          map_enum(*e, "imsrg.denominator.partitioning", kPartitioning);
-      if (o) put_s("imsrg.denominator.partitioning", *o, arg_ref(*e));
+          MapEnum(*e, "imsrg.denominator.partitioning", kPartitioning);
+      if (o) PutS("imsrg.denominator.partitioning", *o, ArgRef(*e));
     }
     if (const Entry* e = get("denominator_delta_orbit");
         e && e->value != "none")
-      put_s("imsrg.denominator.delta_orbit", e->value, arg_ref(*e));
+      PutS("imsrg.denominator.delta_orbit", e->value, ArgRef(*e));
     if (const Entry* e = get("occ_file"); e && e->value != "none")
-      put_s("reference.occupations_file", e->value, arg_ref(*e));
+      PutS("reference.occupations_file", e->value, ArgRef(*e));
 
     if (const Entry* e = get("physical_system")) {
       if (e->value == "atomic")
-        error("E-LEGACY-NS", "physical_system",
-              "atomic systems are not supported by imsrg", arg_ref(*e));
+        AddError("E-LEGACY-NS", "physical_system",
+                 "atomic systems are not supported by imsrg", ArgRef(*e));
       else if (e->value != "nuclear")
-        error("E-LEGACY-VALUE", "physical_system",
-              "physical_system must be 'nuclear' or 'atomic', got '" +
-                  e->value + "'",
-              arg_ref(*e));
+        AddError("E-LEGACY-VALUE", "physical_system",
+                 "physical_system must be 'nuclear' or 'atomic', got '" +
+                     e->value + "'",
+                 ArgRef(*e));
     }
     if (const Entry* e = get("atomicZ"))
-      error("E-LEGACY-NS", "atomicZ",
-            "atomic systems are not supported by imsrg", arg_ref(*e));
+      AddError("E-LEGACY-NS", "atomicZ",
+               "atomic systems are not supported by imsrg", ArgRef(*e));
     if (const Entry* e = get("LECs"))
-      warn("W-L1", "LECs",
+      Warn("W-L1", "LECs",
            "LECs=" + e->value + " is ignored (only used by hdf5 readers)",
-           arg_ref(*e));
+           ArgRef(*e));
   }
 
-  void drop_3n_only(std::string_view key, const Entry& e) {
-    warn("W-L1", std::string(key),
+  void Drop3nOnly(std::string_view key, const Entry& e) {
+    Warn("W-L1", std::string(key),
          "'" + std::string(key) + "' is ignored: no 3N table (3bme) is given",
-         arg_ref(e));
+         ArgRef(e));
   }
 
   // ------------------------------------------------------------------ two-body
   // input
-  void do_two_body() {
+  void DoTwoBody() {
     const Entry* b2 = get("2bme");
     const bool none = b2 == nullptr || b2->value == "none";
     const SourceRef fmt_ref = ref_of("fmt2");
     if (fmt2_ && *fmt2_ == "schematic_minnesota") {
       if (b2 != nullptr && b2->value == "Minnesota") {
-        put_s("interaction.two_body.file", "Minnesota", arg_ref(*b2));
-        put_s("interaction.two_body.format", "schematic_minnesota", fmt_ref);
+        PutS("interaction.two_body.file", "Minnesota", ArgRef(*b2));
+        PutS("interaction.two_body.format", "schematic_minnesota", fmt_ref);
       } else {
-        error("E-LEGACY-VALUE", "fmt2",
-              "fmt2=schematic is only valid with 2bme=Minnesota",
-              b2 ? arg_ref(*b2) : fmt_ref);
+        AddError("E-LEGACY-VALUE", "fmt2",
+                 "fmt2=schematic is only valid with 2bme=Minnesota",
+                 b2 ? ArgRef(*b2) : fmt_ref);
       }
     } else if (none) {
-      error("V-03", "interaction.two_body.file",
-            "no two-body interaction: '2bme' is required (a file path)",
-            b2 ? arg_ref(*b2) : SourceRef{});
+      AddError("V-03", "interaction.two_body.file",
+               "no two-body interaction: '2bme' is required (a file path)",
+               b2 ? ArgRef(*b2) : SourceRef{});
     } else {
       const bool oak =
           fmt2_ && (*fmt2_ == "oakridge" || *fmt2_ == "oakridge_bin");
       if (oak && b2->value.find(',') != std::string::npos) {
-        const auto parts = split(b2->value, ',');
+        const auto parts = Split(b2->value, ',');
         if (parts.size() != 2 || parts[0].empty() || parts[1].empty()) {
-          error("E-LEGACY-VALUE", "2bme",
-                "oakridge formats take 'sp_file,vnn_file'", arg_ref(*b2));
+          AddError("E-LEGACY-VALUE", "2bme",
+                   "oakridge formats take 'sp_file,vnn_file'", ArgRef(*b2));
         } else {
           RawArray arr;
-          for (const auto& p : parts) arr.push_back(RawValue{p, arg_ref(*b2)});
-          put("interaction.two_body.file", std::move(arr), arg_ref(*b2));
+          for (const auto& p : parts) arr.push_back(RawValue{p, ArgRef(*b2)});
+          Put("interaction.two_body.file", std::move(arr), ArgRef(*b2));
         }
       } else {
-        put_s("interaction.two_body.file", b2->value, arg_ref(*b2));
+        PutS("interaction.two_body.file", b2->value, ArgRef(*b2));
       }
-      if (fmt2_) put_s("interaction.two_body.format", *fmt2_, fmt_ref);
+      if (fmt2_) PutS("interaction.two_body.format", *fmt2_, fmt_ref);
     }
     if (fmt2_ && *fmt2_ == "nushellx") {
-      put_s("hamiltonian.kinetic", "none", fmt_ref);
-      rule("fmt2=nushellx -> hamiltonian.kinetic=none");
+      PutS("hamiltonian.kinetic", "none", fmt_ref);
+      Rule("fmt2=nushellx -> hamiltonian.kinetic=none");
     }
   }
 
   // ------------------------------------------------------------------
   // three-body input
-  void do_three_body() {
+  void DoThreeBody() {
     const Entry* b3 = get("3bme");
     if (has_3n_) {
-      put_s("interaction.three_body.file", b3->value, arg_ref(*b3));
+      PutS("interaction.three_body.file", b3->value, ArgRef(*b3));
       if (!given_valid_int("file3e1max"))
-        put_i("interaction.three_body.e1max", 12, default_ref("file3e1max"));
+        PutI("interaction.three_body.e1max", 12, DefaultRef("file3e1max"));
       if (!given_valid_int("file3e3max"))
-        put_i("interaction.three_body.e3max", 12, default_ref("file3e3max"));
+        PutI("interaction.three_body.e3max", 12, DefaultRef("file3e3max"));
     }
     struct EnumKey {
       std::string_view key;
@@ -970,88 +978,88 @@ class Translator {
     for (const EnumKey& k : enums) {
       const Entry* e = get(k.key);
       if (e == nullptr) continue;
-      const auto v = map_enum(*e, k.path, k.table);
+      const auto v = MapEnum(*e, k.path, k.table);
       if (!v) continue;
       if (k.key == "fmt3" && *v == "hdf5") {
-        error("E-LEGACY-NS", "fmt3",
-              "HDF5 3N files are not supported (design/00 D24)", arg_ref(*e));
+        AddError("E-LEGACY-NS", "fmt3",
+                 "HDF5 3N files are not supported (design/00 D24)", ArgRef(*e));
         continue;
       }
       if (!has_3n_) {
-        drop_3n_only(k.key, *e);
+        Drop3nOnly(k.key, *e);
         continue;
       }
-      put_s(k.path, *v, arg_ref(*e));
+      PutS(k.path, *v, ArgRef(*e));
     }
   }
 
   // ------------------------------------------------------------------ numbers
-  std::int64_t final_emax() {
+  std::int64_t FinalEmax() {
     if (const Entry* e = get("emax"))
-      if (const auto v = try_int(e->value)) return *v;
+      if (const auto v = TryInt(e->value)) return *v;
     return 6;
   }
 
-  void do_numbers() {
+  void DoNumbers() {
     // Supplied defaults.
-    if (!given_valid_int("emax")) put_i("basis.emax", 6, default_ref("emax"));
-    if (!given_valid_double("hw")) put_d("basis.hw", 20.0, default_ref("hw"));
+    if (!given_valid_int("emax")) PutI("basis.emax", 6, DefaultRef("emax"));
+    if (!given_valid_double("hw")) PutD("basis.hw", 20.0, DefaultRef("hw"));
     if (!given_valid_int("file2e1max"))
-      put_i("interaction.two_body.e1max", 12, default_ref("file2e1max"));
+      PutI("interaction.two_body.e1max", 12, DefaultRef("file2e1max"));
 
     for (const DirectNumber& d : kDirectInts) {
       const Entry* e = get(d.key);
       if (e == nullptr) continue;
       if (d.three_body_only && !has_3n_) {
-        drop_3n_only(d.key, *e);
+        Drop3nOnly(d.key, *e);
         continue;
       }
-      const auto v = parse_int(*e, d.key);
-      if (!v || absent_by_sentinel(d.absent, static_cast<double>(*v))) continue;
-      put_i(d.path, *v, arg_ref(*e));
+      const auto v = ParseInt(*e, d.key);
+      if (!v || AbsentBySentinel(d.absent, static_cast<double>(*v))) continue;
+      PutI(d.path, *v, ArgRef(*e));
     }
     for (const DirectNumber& d : kDirectDoubles) {
       const Entry* e = get(d.key);
       if (e == nullptr) continue;
-      const auto v = parse_double(*e, d.key);
-      if (!v || absent_by_sentinel(d.absent, *v)) continue;
-      put_d(d.path, *v, arg_ref(*e));
+      const auto v = ParseDouble(*e, d.key);
+      if (!v || AbsentBySentinel(d.absent, *v)) continue;
+      PutD(d.path, *v, ArgRef(*e));
     }
     if (const Entry* e = get("omega_norm_max"); e && !forced_omega_) {
-      if (const auto v = parse_double(*e, "omega_norm_max"))
-        put_d("imsrg.step.omega_norm_max", *v, arg_ref(*e));
+      if (const auto v = ParseDouble(*e, "omega_norm_max"))
+        PutD("imsrg.step.omega_norm_max", *v, ArgRef(*e));
     }
     if (const Entry* e = get("lmax")) {
-      const auto v = parse_int(*e, "lmax");
-      if (v && *v != 99999 && *v < final_emax())
-        put_i("basis.lmax", *v, arg_ref(*e));
+      const auto v = ParseInt(*e, "lmax");
+      if (v && *v != 99999 && *v < FinalEmax())
+        PutI("basis.lmax", *v, ArgRef(*e));
     }
     if (const Entry* e = get("file2lmax")) {
-      if (const auto v = parse_int(*e, "file2lmax")) {
+      if (const auto v = ParseInt(*e, "file2lmax")) {
         if (*v > 0) {
-          put_i("interaction.two_body.lmax", *v, arg_ref(*e));
+          PutI("interaction.two_body.lmax", *v, ArgRef(*e));
         } else if (*v == 0) {
-          warn("W-Q4", "file2lmax",
+          Warn("W-Q4", "file2lmax",
                "file2lmax=0 is treated as the default (= file2e1max) by "
                "imsrg++; ignored",
-               arg_ref(*e));
+               ArgRef(*e));
         }
       }
     }
     if (const Entry* e = get("nsteps"); e && !forced_steps_) {
-      if (const auto v = parse_int(*e, "nsteps")) {
+      if (const auto v = ParseInt(*e, "nsteps")) {
         if (*v == 1 || *v == 2)
-          put_i("imsrg.steps", *v, arg_ref(*e));
+          PutI("imsrg.steps", *v, ArgRef(*e));
         else if (*v != -1)
-          error("E-LEGACY-VALUE", "nsteps",
-                "nsteps must be -1, 1 or 2, got " + e->value, arg_ref(*e));
+          AddError("E-LEGACY-VALUE", "nsteps",
+                   "nsteps must be -1, 1 or 2, got " + e->value, ArgRef(*e));
       }
     }
     if (const Entry* e = get("hw_trap")) {
-      if (const auto v = parse_double(*e, "hw_trap"); v && *v > 0.0) {
-        put_d("hamiltonian.trap_hw", *v, arg_ref(*e));
-        put_s("hamiltonian.kinetic", "lab", arg_ref(*e));
-        rule("hw_trap=" + e->value +
+      if (const auto v = ParseDouble(*e, "hw_trap"); v && *v > 0.0) {
+        PutD("hamiltonian.trap_hw", *v, ArgRef(*e));
+        PutS("hamiltonian.kinetic", "lab", ArgRef(*e));
+        Rule("hw_trap=" + e->value +
              " -> hamiltonian.trap_hw, hamiltonian.kinetic=lab");
       }
     }
@@ -1059,60 +1067,60 @@ class Translator {
 
   // ------------------------------------------------------------------ valence
   // space, reference
-  void do_valence_and_reference() {
+  void DoValenceAndReference() {
     const Entry* ref = get("reference");
     const bool ref_set = ref != nullptr && ref->value != "default";
-    if (ref_set) put_s("reference.nucleus", ref->value, arg_ref(*ref));
+    if (ref_set) PutS("reference.nucleus", ref->value, ArgRef(*ref));
 
     if (const Entry* c = get("custom_valence_space")) {
-      put_s("valence.custom", c->value, arg_ref(*c));
+      PutS("valence.custom", c->value, ArgRef(*c));
       if (const Entry* v = get("valence_space"))
-        warn("V-30", "valence.space",
+        Warn("V-30", "valence.space",
              "custom_valence_space overrides valence_space=" + v->value +
                  " (ignored)",
-             arg_ref(*v));
+             ArgRef(*v));
       return;
     }
     const Entry* v = get("valence_space");
     if (v == nullptr) return;
     const std::string& s = v->value;
-    if (basis::find_named_valence_space(s) != nullptr || s == "0hw-shell" ||
+    if (basis::FindNamedValenceSpace(s) != nullptr || s == "0hw-shell" ||
         s == "jj-shell" || s.find("FCI") != std::string::npos ||
         s.find(',') != std::string::npos) {
-      put_s("valence.space", s, arg_ref(*v));
+      PutS("valence.space", s, ArgRef(*v));
       return;
     }
     bool is_nucleus = true;
     try {
-      (void)basis::Nucleus::parse(s);
+      (void)basis::Nucleus::Parse(s);
     } catch (const Error&) {
       is_nucleus = false;
     }
     if (!is_nucleus) {
       std::vector<std::string> names;
-      for (const auto& n : basis::named_valence_spaces())
+      for (const auto& n : basis::NamedValenceSpaces())
         names.emplace_back(n.name);
-      error(
+      AddError(
           "V-01", "valence.space",
           "valence_space '" + s + "' is neither a valence space nor a nucleus",
-          arg_ref(*v), did_you_mean(s, names));
+          ArgRef(*v), DidYouMean(s, names));
       return;
     }
     if (!ref_set) {
-      put_s("reference.nucleus", s, arg_ref(*v));
-      rule("valence_space=" + s + " -> reference.nucleus=" + s);
+      PutS("reference.nucleus", s, ArgRef(*v));
+      Rule("valence_space=" + s + " -> reference.nucleus=" + s);
     } else if (ref->value != s) {
-      error("E-LEGACY-NS", "valence_space",
-            "valence_space=" + s +
-                " names a nucleus different from reference=" + ref->value +
-                "; not supported",
-            arg_ref(*v));
+      AddError("E-LEGACY-NS", "valence_space",
+               "valence_space=" + s +
+                   " names a nucleus different from reference=" + ref->value +
+                   "; not supported",
+               ArgRef(*v));
     }
   }
 
   // ------------------------------------------------------------------ output /
   // misc paths
-  void do_outputs() {
+  void DoOutputs() {
     if (const Entry* e = get("intfile"); e && e->value != "default") {
       const std::size_t p = e->value.rfind('/');
       std::string dir = ".";
@@ -1122,25 +1130,25 @@ class Translator {
         stem = e->value.substr(p + 1);
       }
       if (stem.empty()) {
-        error("E-LEGACY-VALUE", "intfile", "intfile must end in a file stem",
-              arg_ref(*e));
+        AddError("E-LEGACY-VALUE", "intfile", "intfile must end in a file stem",
+                 ArgRef(*e));
       } else {
-        put_s("output.directory", dir, arg_ref(*e));
-        put_s("output.stem", stem, arg_ref(*e));
-        rule("intfile=" + e->value + " -> output.directory=" + dir +
+        PutS("output.directory", dir, ArgRef(*e));
+        PutS("output.stem", stem, ArgRef(*e));
+        Rule("intfile=" + e->value + " -> output.directory=" + dir +
              ", output.stem=" + stem);
       }
     }
     if (const Entry* e = get("flowfile"); e && e->value != "default")
-      put_s("output.flow_file", e->value, arg_ref(*e));
+      PutS("output.flow_file", e->value, ArgRef(*e));
     if (const Entry* e = get("scratch")) {
       if (e->value == "/dev/null" || e->value == "/dev/null/") {
-        put_s("imsrg.omega.storage", "discard", arg_ref(*e));
-        rule("scratch=" + e->value + " -> imsrg.omega.storage=discard");
+        PutS("imsrg.omega.storage", "discard", ArgRef(*e));
+        Rule("scratch=" + e->value + " -> imsrg.omega.storage=discard");
       } else {
-        put_s("imsrg.omega.storage", "scratch", arg_ref(*e));
-        put_s("run.scratch_dir", e->value, arg_ref(*e));
-        rule("scratch=" + e->value +
+        PutS("imsrg.omega.storage", "scratch", ArgRef(*e));
+        PutS("run.scratch_dir", e->value, ArgRef(*e));
+        Rule("scratch=" + e->value +
              " -> imsrg.omega.storage=scratch, run.scratch_dir");
       }
     }
@@ -1148,13 +1156,13 @@ class Translator {
 
   // ------------------------------------------------------------------ vector
   // keys
-  RawArray string_array(const std::vector<Entry>& v) {
+  RawArray StringArray(const std::vector<Entry>& v) {
     RawArray arr;
-    for (const Entry& e : v) arr.push_back(RawValue{e.value, arg_ref(e)});
+    for (const Entry& e : v) arr.push_back(RawValue{e.value, ArgRef(e)});
     return arr;
   }
 
-  void do_vectors() {
+  void DoVectors() {
     struct V {
       std::string_view key;
       std::string_view path;
@@ -1164,49 +1172,49 @@ class Translator {
                        V{"SPWF", "output.spwf"}}) {
       const auto it = vectors_.find(k.key);
       if (it == vectors_.end()) continue;
-      put(k.path, string_array(it->second), arg_ref(it->second.front()));
+      Put(k.path, StringArray(it->second), ArgRef(it->second.front()));
     }
     for (std::string_view key :
          {std::string_view("OperatorsRPA"), std::string_view("OperatorsTDA")}) {
       const auto it = vectors_.find(key);
       if (it == vectors_.end()) continue;
-      error("E-LEGACY-NS", std::string(key),
-            std::string(key == "OperatorsRPA" ? "RPA" : "TDA") +
-                "-resummed operator corrections are not supported",
-            arg_ref(it->second.front()));
+      AddError("E-LEGACY-NS", std::string(key),
+               std::string(key == "OperatorsRPA" ? "RPA" : "TDA") +
+                   "-resummed operator corrections are not supported",
+               ArgRef(it->second.front()));
     }
     if (const auto it = vectors_.find("OperatorsFromFile");
         it != vectors_.end()) {
       RawArray tables;
       for (const Entry& e : it->second) {
-        if (auto t = parse_from_file_tag(e)) tables.push_back(std::move(*t));
+        if (auto t = ParseFromFileTag(e)) tables.push_back(std::move(*t));
       }
       if (!tables.empty())
-        put("operators.from_file", std::move(tables),
-            arg_ref(it->second.front()));
+        Put("operators.from_file", std::move(tables),
+            ArgRef(it->second.front()));
     }
   }
 
-  std::optional<RawValue> parse_from_file_tag(const Entry& e) {
-    const SourceRef ref = arg_ref(e);
+  std::optional<RawValue> ParseFromFileTag(const Entry& e) {
+    const SourceRef ref = ArgRef(e);
     const auto bad = [&](const std::string& why) {
-      error("E-LEGACY-VALUE", "OperatorsFromFile",
-            "malformed OperatorsFromFile tag '" + e.value +
-                "' (expected Name^J_T_P_R^file2b[^file3b]): " + why,
-            ref);
+      AddError("E-LEGACY-VALUE", "OperatorsFromFile",
+               "malformed OperatorsFromFile tag '" + e.value +
+                   "' (expected Name^J_T_P_R^file2b[^file3b]): " + why,
+               ref);
       return std::optional<RawValue>{};
     };
-    const auto parts = split(e.value, '^');
+    const auto parts = Split(e.value, '^');
     if (parts.size() < 3 || parts.size() > 4)
       return bad("wrong number of '^' fields");
     if (parts[0].empty() || parts[2].empty() ||
         (parts.size() == 4 && parts[3].empty()))
       return bad("empty field");
-    const auto jtpr = split(parts[1], '_');
+    const auto jtpr = Split(parts[1], '_');
     if (jtpr.size() != 4) return bad("J_T_P_R needs four integers");
     std::array<std::int64_t, 4> n{};
     for (std::size_t i = 0; i < 4; ++i) {
-      const auto v = try_int(jtpr[i]);
+      const auto v = TryInt(jtpr[i]);
       if (!v) return bad("'" + jtpr[i] + "' is not an integer");
       n[i] = *v;
     }
@@ -1225,9 +1233,9 @@ class Translator {
 
   // ------------------------------------------------------------------
   // cross-key rules
-  void drop(std::string_view path) { out_.tree.erase(path); }
+  void Drop(std::string_view path) { out_.tree.erase(path); }
 
-  void do_cross_rules() {
+  void DoCrossRules() {
     const bool has_valence =
         in_tree("valence.space") || in_tree("valence.custom");
     const std::string method = tree_str("imsrg.method").value_or("magnus");
@@ -1235,39 +1243,39 @@ class Translator {
 
     // Q1.
     if (steps && *steps == 1 && has_valence && given("valence_generator")) {
-      drop("imsrg.generator.valence");
+      Drop("imsrg.generator.valence");
       if (!core_from_valence_)
-        warn("W-NSTEPS1", "valence_generator",
+        Warn("W-NSTEPS1", "valence_generator",
              "nsteps=1 uses core_generator only; valence_generator is ignored "
              "(design/16 Q1)",
              ref_of("valence_generator"));
     }
     // Q9.
     if (steps && *steps == 2 && !has_valence) {
-      drop("imsrg.steps");
-      warn("W-Q9", "nsteps",
+      Drop("imsrg.steps");
+      Warn("W-Q9", "nsteps",
            "nsteps=2 without a valence space: the second stage is skipped",
            ref_of("nsteps"));
     }
     // Q3.
     if (const auto dv = tree_double("imsrg.denominator.delta");
         dv && *dv != 0.0 && !in_tree("imsrg.denominator.delta_orbit")) {
-      drop("imsrg.denominator.delta");
-      warn("W-Q3", "denominator_delta",
+      Drop("imsrg.denominator.delta");
+      Warn("W-Q3", "denominator_delta",
            "denominator_delta is ignored without denominator_delta_orbit",
            ref_of("denominator_delta"));
     }
     // Q10.
     if (tree_true("imsrg.perturbative_triples") && method != "magnus") {
-      drop("imsrg.perturbative_triples");
-      warn("W-Q10", "perturbative_triples",
+      Drop("imsrg.perturbative_triples");
+      Warn("W-Q10", "perturbative_triples",
            "perturbative_triples runs only with method=magnus; ignored",
            ref_of("perturbative_triples"));
     }
     // V-52.
     if (tree_true("imsrg3.at_end") && method != "magnus") {
-      drop("imsrg3.at_end");
-      warn("V-52", "imsrg3_at_end",
+      Drop("imsrg3.at_end");
+      Warn("V-52", "imsrg3_at_end",
            "imsrg3_at_end requires a magnus method; ignored",
            ref_of("imsrg3_at_end"));
     }
@@ -1285,16 +1293,16 @@ class Translator {
           }};
       for (const auto& [key, path] : keys) {
         if (!given(key) || !in_tree(path)) continue;
-        drop(path);
-        warn("W-L2", std::string(key),
+        Drop(path);
+        Warn("W-L2", std::string(key),
              "'" + std::string(key) +
                  "' has no effect without IMSRG3 or imsrg3_at_end; ignored",
              ref_of(key));
       }
       if (const auto tv = tree_double("imsrg3.threebody_threshold");
           tv && *tv != 0.0) {
-        drop("imsrg3.threebody_threshold");
-        warn("W-L2", "threebody_threshold",
+        Drop("imsrg3.threebody_threshold");
+        Warn("W-L2", "threebody_threshold",
              "threebody_threshold has no effect without IMSRG3 or "
              "imsrg3_at_end; ignored",
              ref_of("threebody_threshold"));
@@ -1306,8 +1314,8 @@ class Translator {
               std::pair{std::string_view("OccNat3Cut"),
                         std::string_view("imsrg3.occ_nat3_cut")}}) {
           if (!given(key) || !in_tree(path)) continue;
-          drop(path);
-          warn("W-L2", std::string(key),
+          Drop(path);
+          Warn("W-L2", std::string(key),
                "'" + std::string(key) +
                    "' has no effect without IMSRG3, imsrg3_at_end or "
                    "perturbative_triples; "
@@ -1323,7 +1331,7 @@ class Translator {
                      g->canon.find("wegner") != std::string::npos);
       };
       if (!fast(core_gen_) && !fast(val_gen_))
-        warn("W-Q2", "ds_0",
+        Warn("W-Q2", "ds_0",
              "ds_0 has no effect with method=magnus (design/16 Q2)",
              ref_of("ds_0"));
     }
@@ -1333,79 +1341,79 @@ class Translator {
                                    std::string_view("NAT_order"),
                                    std::string_view("order_NAT_by_energy")}) {
         if (!given(key)) continue;
-        warn("V-21", std::string(key),
+        Warn("V-21", std::string(key),
              "'" + std::string(key) + "' is ignored unless basis=NAT",
              ref_of(key));
       }
-      drop("natural_orbitals.use_occupations");
-      drop("natural_orbitals.order");
+      Drop("natural_orbitals.use_occupations");
+      Drop("natural_orbitals.order");
     }
   }
 };
 
-std::string kind_text(LegacyKind k) {
+std::string KindText(LegacyKind k) {
   switch (k) {
-    case LegacyKind::String:
+    case LegacyKind::kString:
       return "string";
-    case LegacyKind::Double:
+    case LegacyKind::kDouble:
       return "double";
-    case LegacyKind::Int:
+    case LegacyKind::kInt:
       return "int";
-    case LegacyKind::Vector:
+    case LegacyKind::kVector:
       return "vector";
   }
   return "?";
 }
 
-std::string status_text(LegacyStatus s) {
+std::string StatusText(LegacyStatus s) {
   switch (s) {
-    case LegacyStatus::Supported:
+    case LegacyStatus::kSupported:
       return "S";
-    case LegacyStatus::Changed:
+    case LegacyStatus::kChanged:
       return "C";
-    case LegacyStatus::NotSupported:
+    case LegacyStatus::kNotSupported:
       return "NS";
-    case LegacyStatus::Planned:
+    case LegacyStatus::kPlanned:
       return "PL";
   }
   return "?";
 }
 
-std::string pad(std::string s, std::size_t w) {
+std::string Pad(std::string s, std::size_t w) {
   if (s.size() < w) s.append(w - s.size(), ' ');
   return s;
 }
 
 }  // namespace
 
-std::span<const LegacyKeyInfo> legacy_keys() noexcept { return kKeys; }
+std::span<const LegacyKeyInfo> LegacyKeys() noexcept { return kKeys; }
 
-const LegacyKeyInfo* find_legacy_key(std::string_view key) noexcept {
+const LegacyKeyInfo* FindLegacyKey(std::string_view key) noexcept {
   for (const LegacyKeyInfo& k : kKeys)
     if (k.key == key) return &k;
   return nullptr;
 }
 
-LegacyTranslation translate_legacy(std::span<const std::string> args) {
-  return Translator{}.run(args);
+LegacyTranslation TranslateLegacy(std::span<const std::string> args) {
+  return Translator{}.Run(args);
 }
 
-std::string legacy_keys_text() {
+std::string LegacyKeysText() {
   std::size_t wk = 3, wd = 7, wn = 7;
   for (const LegacyKeyInfo& k : kKeys) {
     wk = std::max(wk, k.key.size());
     wd = std::max(wd, std::max<std::size_t>(k.old_default.size(), 2));
     wn = std::max(wn, k.new_key.empty() ? std::size_t{1} : k.new_key.size());
   }
-  std::string out = pad("key", wk) + "  " + pad("kind", 6) + "  " +
-                    pad("default", wd) + "  " + pad("st", 2) + "  " +
-                    pad("new key", wn) + "  note\n";
+  std::string out = Pad("key", wk) + "  " + Pad("kind", 6) + "  " +
+                    Pad("default", wd) + "  " + Pad("st", 2) + "  " +
+                    Pad("new key", wn) + "  note\n";
   for (const LegacyKeyInfo& k : kKeys) {
     out +=
-        pad(std::string(k.key), wk) + "  " + pad(kind_text(k.kind), 6) + "  " +
-        pad(k.old_default.empty() ? "\"\"" : std::string(k.old_default), wd) +
-        "  " + pad(status_text(k.status), 2) + "  " +
-        pad(k.new_key.empty() ? "-" : std::string(k.new_key), wn) + "  " +
+        Pad(std::string(k.key), wk) + "  " + Pad(KindText(k.kind), 6) + "  " +
+        Pad(k.old_default.empty() ? "\"\"" : std::string(k.old_default), wd) +
+        "  " + Pad(StatusText(k.status), 2) + "  " +
+        Pad(k.new_key.empty() ? "-" : std::string(k.new_key), wn) + "  " +
         std::string(k.note) + "\n";
   }
   return out;

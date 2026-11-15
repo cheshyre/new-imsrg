@@ -43,7 +43,7 @@ struct TwoBodyView {
 
   /// Stored normalized element <pq; J|V|rs; J> for orbits in ANY order
   /// (`op::TwoBody:: get_normalized`): a pair with first orbit > second is
-  /// mapped to the ket (min, max) and multiplied by `basis::exchange_phase`.
+  /// mapped to the ket (min, max) and multiplied by `basis::ExchangePhase`.
   /// Zero if `data` is null, if a ket does not exist for this J (triangle,
   /// Pauli), or if the two kets lie in different channels. `two_J` is 2J. O(1).
   IMSRG_INLINE_FUNCTION double get_normalized(int p, int q, int r, int s,
@@ -72,11 +72,11 @@ struct TwoBodyView {
         tb.channel_of(OrbitIndex{a}, OrbitIndex{b}, TwoJ{two_J}).value();
     int phase = 1;
     if (swap_bra)
-      phase *= basis::exchange_phase(TwoJ{tb.orbit_j2[p]}, TwoJ{tb.orbit_j2[q]},
-                                     TwoJ{two_J});
+      phase *= basis::ExchangePhase(TwoJ{tb.orbit_j2[p]}, TwoJ{tb.orbit_j2[q]},
+                                    TwoJ{two_J});
     if (swap_ket)
-      phase *= basis::exchange_phase(TwoJ{tb.orbit_j2[r]}, TwoJ{tb.orbit_j2[s]},
-                                     TwoJ{two_J});
+      phase *= basis::ExchangePhase(TwoJ{tb.orbit_j2[r]}, TwoJ{tb.orbit_j2[s]},
+                                    TwoJ{two_J});
     const std::int64_t n = tb.channel_num_kets[ch];
     return phase *
            data[block_offset[ch] + ib + static_cast<std::int64_t>(ik) * n];
@@ -88,8 +88,8 @@ struct TwoBodyView {
   IMSRG_INLINE_FUNCTION double get_unnormalized(int p, int q, int r, int s,
                                                 int two_J) const noexcept {
     double v = get_normalized(p, q, r, s, two_J);
-    if (p == q) v *= constants::sqrt2;
-    if (r == s) v *= constants::sqrt2;
+    if (p == q) v *= constants::kSqrt2;
+    if (r == s) v *= constants::kSqrt2;
     return v;
   }
 };
@@ -99,8 +99,8 @@ static_assert(std::is_trivially_copyable_v<TwoBodyView>);
 /// `num_blocks` blocks (`offsets` has num_blocks + 1 entries, non-decreasing;
 /// empty blocks are skipped). Precondition: 0 <= e < offsets[num_blocks].
 /// Binary search, O(log num_blocks).
-IMSRG_INLINE_FUNCTION int find_block(const std::int64_t* offsets,
-                                     int num_blocks, std::int64_t e) noexcept {
+IMSRG_INLINE_FUNCTION int FindBlock(const std::int64_t* offsets, int num_blocks,
+                                    std::int64_t e) noexcept {
   int lo = 0;
   int hi = num_blocks - 1;  // invariant: offsets[lo] <= e, answer in [lo, hi]
   while (lo < hi) {

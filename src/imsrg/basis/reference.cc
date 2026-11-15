@@ -13,9 +13,9 @@
 
 namespace imsrg::basis {
 
-Reference Reference::from_occupations(const SingleParticleBasis& basis,
-                                      std::vector<double> occupations,
-                                      std::string name) {
+Reference Reference::FromOccupations(const SingleParticleBasis& basis,
+                                     std::vector<double> occupations,
+                                     std::string name) {
   if (static_cast<std::int32_t>(occupations.size()) != basis.num_orbits()) {
     throw InputError(
         fmt::format("Reference: {} occupations given for a basis of {} orbits",
@@ -26,7 +26,7 @@ Reference Reference::from_occupations(const SingleParticleBasis& basis,
     if (!std::isfinite(n) || n < 0.0 || n > 1.0) {
       throw InputError(fmt::format(
           "Reference: occupation {} of orbit {} ({}) is outside [0, 1]", n, a,
-          orbit_label(basis.orbits()[a])));
+          OrbitLabel(basis.orbits()[a])));
     }
   }
 
@@ -81,22 +81,22 @@ Reference Reference::from_occupations(const SingleParticleBasis& basis,
   return ref;
 }
 
-Reference Reference::from_nucleus(const SingleParticleBasis& basis,
-                                  const Nucleus& nucleus) {
+Reference Reference::FromNucleus(const SingleParticleBasis& basis,
+                                 const Nucleus& nucleus) {
   std::vector<double> occ(static_cast<std::size_t>(basis.num_orbits()), 0.0);
-  for (const OrbitOccupation& oo : naive_filling(nucleus, basis.emax())) {
+  for (const OrbitOccupation& oo : NaiveFilling(nucleus, basis.emax())) {
     const auto idx = basis.find(oo.orbit);
     if (!idx) {
       throw InputError(
           fmt::format("Reference for {}: occupied orbit {} is not in the basis",
-                      nucleus.name(), orbit_label(oo.orbit)));
+                      nucleus.name(), OrbitLabel(oo.orbit)));
     }
-    occ[idx->to_size()] = oo.occupation;
+    occ[idx->ToSize()] = oo.occupation;
   }
-  return from_occupations(basis, std::move(occ), nucleus.name());
+  return FromOccupations(basis, std::move(occ), nucleus.name());
 }
 
-Reference Reference::from_orbit_occupations(
+Reference Reference::FromOrbitOccupations(
     const SingleParticleBasis& basis, std::span<const OrbitOccupation> entries,
     std::string name) {
   std::vector<double> occ(static_cast<std::size_t>(basis.num_orbits()), 0.0);
@@ -104,24 +104,24 @@ Reference Reference::from_orbit_occupations(
     if (std::abs(oo.occupation) < 1e-8) {
       continue;
     }
-    if (!is_valid(oo.orbit)) {
+    if (!IsValid(oo.orbit)) {
       throw InputError("Reference: invalid orbit in the occupation list");
     }
     const auto idx = basis.find(oo.orbit);
     if (!idx) {
       throw InputError(fmt::format(
           "Reference: orbit {} of the occupation list is not in the basis",
-          orbit_label(oo.orbit)));
+          OrbitLabel(oo.orbit)));
     }
-    occ[idx->to_size()] = oo.occupation;
+    occ[idx->ToSize()] = oo.occupation;
   }
-  return from_occupations(basis, std::move(occ), std::move(name));
+  return FromOccupations(basis, std::move(occ), std::move(name));
 }
 
 double Reference::occupation(OrbitIndex a) const {
   IMSRG_ASSERT(a.value() >= 0 && a.value() < num_orbits(),
                "orbit index out of range");
-  return occ_[a.to_size()];
+  return occ_[a.ToSize()];
 }
 
 double Reference::e_fermi(TwoTz species) const {

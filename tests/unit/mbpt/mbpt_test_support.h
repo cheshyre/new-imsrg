@@ -7,7 +7,7 @@
 /// so the test drives the hf internals (design/13, M9-Q1): the HF result is
 /// modified to describe the NAT orbitals (C = C_ho2hf C_hf2nat, rho = reference
 /// density in the oscillator basis, F = T + V2[rho] + 1/2 V3[rho], E_HF for
-/// rho) and passed to hf::normal_ordered_hamiltonian.
+/// rho) and passed to hf::NormalOrderedHamiltonian.
 #include <memory>
 
 #include "../hf/hf_test_support.h"
@@ -29,26 +29,25 @@ struct NatResult {
 
 /// Runs HF, the MBPT(2) density, natural orbitals and builds the NAT-basis
 /// Hamiltonian.
-inline NatResult build_nat(op::Operator H, const op::No2bThreeBody* v3) {
-  H.sync_to_host();
+inline NatResult BuildNat(op::Operator H, const op::No2bThreeBody* v3) {
+  H.SyncToHost();
   const auto& ms = H.model_space();
   const auto& basis = ms.basis();
   const std::int32_t norb = basis.num_orbits();
-  hf::HFResult r = hf::solve(H, v3);
-  op::Operator hno = hf::normal_ordered_hamiltonian(H, v3, r);
-  linalg::Matrix<double> rho_hf = mbpt::mbpt2_density_matrix(hno);
-  mbpt::NaturalOrbitals nat = mbpt::natural_orbitals(rho_hf, ms);
-  const linalg::Matrix<double> c_ho2nat = mbpt::matmul(r.C, nat.c_hf2nat);
-  const linalg::Matrix<double> rho_ho =
-      mbpt::reference_density_ho(c_ho2nat, ms);
+  hf::HFResult r = hf::Solve(H, v3);
+  op::Operator hno = hf::NormalOrderedHamiltonian(H, v3, r);
+  linalg::Matrix<double> rho_hf = mbpt::Mbpt2DensityMatrix(hno);
+  mbpt::NaturalOrbitals nat = mbpt::ComputeNaturalOrbitals(rho_hf, ms);
+  const linalg::Matrix<double> c_ho2nat = mbpt::Matmul(r.C, nat.c_hf2nat);
+  const linalg::Matrix<double> rho_ho = mbpt::ReferenceDensityHo(c_ho2nat, ms);
 
   hf::detail::Monopole2B mono2(H);
   linalg::Matrix<double> v2ij, v3ij;
-  mono2.apply(rho_ho, v2ij);
+  mono2.Apply(rho_ho, v2ij);
   std::unique_ptr<hf::detail::Monopole3B> mono3;
   if (v3 != nullptr) {
     mono3 = std::make_unique<hf::detail::Monopole3B>(H, *v3, 12);
-    mono3->apply(rho_ho, v3ij);
+    mono3->Apply(rho_ho, v3ij);
   }
   hf::HFResult m = r;
   m.C = c_ho2nat;
@@ -58,7 +57,7 @@ inline NatResult build_nat(op::Operator H, const op::No2bThreeBody* v3) {
   for (std::int32_t a = 0; a < norb; ++a) {
     const OrbitIndex oa(a);
     const double w = basis.orbit(oa).j2.twice + 1.0;
-    for (const OrbitIndex b : basis.same_ljtz(oa)) {
+    for (const OrbitIndex b : basis.SameLjtz(oa)) {
       const double ke = H.one_body().get(oa, b);
       double f = ke + v2ij(a, b.value());
       const double rr = w * rho_ho(a, b.value());
@@ -78,7 +77,7 @@ inline NatResult build_nat(op::Operator H, const op::No2bThreeBody* v3) {
   for (std::int32_t a = 0; a < norb; ++a)
     m.occupations[static_cast<std::size_t>(a)] =
         ms.reference().occupation(OrbitIndex(a));
-  op::Operator hnat = hf::normal_ordered_hamiltonian(H, v3, m);
+  op::Operator hnat = hf::NormalOrderedHamiltonian(H, v3, m);
   return NatResult{std::move(hnat), std::move(nat), std::move(rho_hf), r.e_hf,
                    m.e_hf};
 }

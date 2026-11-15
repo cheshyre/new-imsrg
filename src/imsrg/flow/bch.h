@@ -16,22 +16,22 @@
 
 namespace imsrg::flow {
 
-/// Options of `bch_transform` and `bch_product` (imsrg++ `BCH::` file-scope
+/// Options of `BchTransform` and `BchProduct` (imsrg++ `BCH::` file-scope
 /// defaults).
 struct BchOptions {
-  /// `bch_transform`: X with ||X|| <= this is returned unchanged; also scales
+  /// `BchTransform`: X with ||X|| <= this is returned unchanged; also scales
   /// the termination epsilon (imsrg++ `bch_transform_threshold`).
   double transform_threshold = 1e-9;
-  /// `bch_product` series threshold (imsrg++ `bch_product_threshold`).
+  /// `BchProduct` series threshold (imsrg++ `bch_product_threshold`).
   double product_threshold = 1e-4;
-  /// Maximum number of nested commutators in `bch_transform`.
+  /// Maximum number of nested commutators in `BchTransform`.
   int max_iterations = 40;
-  /// A warning is logged if `bch_transform` reaches this many nested
+  /// A warning is logged if `BchTransform` reaches this many nested
   /// commutators.
   int warn_iterations = 12;
 };
 
-/// Diagnostics of one `bch_transform` call.
+/// Diagnostics of one `BchTransform` call.
 struct BchReport {
   int nested_commutators = 0;  ///< Number of nested commutators evaluated.
   bool converged = true;       ///< False if the series hit `max_iterations`.
@@ -50,11 +50,11 @@ struct BchReport {
 /// hermiticity the commutator accepts works. Preconditions: X and Omega scalar,
 /// number conserving, on `ws`'s model space. Complexity: (number of nested
 /// commutators) x one commutator.
-op::Operator bch_transform(const op::Operator& X, const op::Operator& Omega,
-                           const BchOptions& opts,
-                           const commutator::CommutatorOptions& copts,
-                           commutator::Workspace& ws,
-                           BchReport* report = nullptr);
+op::Operator BchTransform(const op::Operator& X, const op::Operator& Omega,
+                          const BchOptions& opts,
+                          const commutator::CommutatorOptions& copts,
+                          commutator::Workspace& ws,
+                          BchReport* report = nullptr);
 
 /// Z with e^Z = e^X e^Y for small X (imsrg++ `BCH_Product`, BCH.cc:261-352):
 /// with B = {1, -1/2, 1/6, 0, -1/30, 0, 1/42, 0, -1/30}, k! = {1, 1, 2, 6,
@@ -71,15 +71,15 @@ op::Operator bch_transform(const op::Operator& X, const op::Operator& Omega,
 /// section 7). Preconditions: X and Y scalar, number conserving, on `ws`'s
 /// model space; Z gets the larger particle_rank of X and Y. Complexity: up to 9
 /// commutators.
-op::Operator bch_product(const op::Operator& X, const op::Operator& Y,
-                         const BchOptions& opts,
-                         const commutator::CommutatorOptions& copts,
-                         commutator::Workspace& ws);
+op::Operator BchProduct(const op::Operator& X, const op::Operator& Y,
+                        const BchOptions& opts,
+                        const commutator::CommutatorOptions& copts,
+                        commutator::Workspace& ws);
 
 /// Returns `op` with at least the given particle rank (a copy with zero
 /// higher-body parts added if needed; `op` itself if it already has that rank).
-op::Operator with_particle_rank(const op::Operator& op,
-                                std::int32_t particle_rank);
+op::Operator WithParticleRank(const op::Operator& op,
+                              std::int32_t particle_rank);
 
 }  // namespace imsrg::flow
 

@@ -17,10 +17,10 @@ namespace {
 using namespace imsrg;
 using namespace imsrg::op;
 
-std::shared_ptr<const basis::ModelSpace> make_ms(int emax,
-                                                 const char* nucleus = "O16") {
-  return basis::ModelSpace::from_names(basis::BasisTruncation{.emax = emax},
-                                       16.0, nucleus, nucleus);
+std::shared_ptr<const basis::ModelSpace> MakeMs(int emax,
+                                                const char* nucleus = "O16") {
+  return basis::ModelSpace::FromNames(basis::BasisTruncation{.emax = emax},
+                                      16.0, nucleus, nucleus);
 }
 
 TEST(Operator, DefaultIsEmpty) {
@@ -31,8 +31,8 @@ TEST(Operator, DefaultIsEmpty) {
 }
 
 TEST(Operator, SizesFollowTheModelSpace) {
-  const auto ms = make_ms(1);
-  const Operator o(ms, OperatorSpec::scalar(2));
+  const auto ms = MakeMs(1);
+  const Operator o(ms, OperatorSpec::Scalar(2));
   EXPECT_FALSE(o.empty());
   EXPECT_EQ(&o.model_space(), ms.get());
   EXPECT_EQ(o.one_body().num_orbits(), ms->num_orbits());
@@ -41,35 +41,35 @@ TEST(Operator, SizesFollowTheModelSpace) {
             static_cast<std::size_t>(ms->two_body().num_channels()));
   EXPECT_EQ(o.zero_body(), 0.0);
   EXPECT_FALSE(o.three_body().has_value());
-  EXPECT_EQ(o.hermiticity(), Hermiticity::Hermitian);
+  EXPECT_EQ(o.hermiticity(), Hermiticity::kHermitian);
 
-  const Operator o1(ms, OperatorSpec::scalar(1));
+  const Operator o1(ms, OperatorSpec::Scalar(1));
   EXPECT_FALSE(o1.two_body().allocated());
   EXPECT_EQ(o1.one_body().num_orbits(), ms->num_orbits());
 }
 
 TEST(Operator, ConstructorValidates) {
-  const auto ms = make_ms(1);
-  OperatorSpec bad = OperatorSpec::scalar(2);
+  const auto ms = MakeMs(1);
+  OperatorSpec bad = OperatorSpec::Scalar(2);
   bad.particle_rank = 0;
   EXPECT_THROW(Operator(ms, bad), InputError);
-  EXPECT_THROW(Operator(ms, OperatorSpec::scalar(3)), NotImplementedError);
-  EXPECT_THROW(Operator(nullptr, OperatorSpec::scalar(2)), InvariantError);
+  EXPECT_THROW(Operator(ms, OperatorSpec::Scalar(3)), NotImplementedError);
+  EXPECT_THROW(Operator(nullptr, OperatorSpec::Scalar(2)), InvariantError);
 }
 
 TEST(Operator, SetHermiticityUpdatesSpecAndParts) {
-  Operator o(make_ms(1), OperatorSpec::scalar(2));
-  o.set_hermiticity(Hermiticity::AntiHermitian);
-  EXPECT_EQ(o.hermiticity(), Hermiticity::AntiHermitian);
-  EXPECT_EQ(o.spec().hermiticity, Hermiticity::AntiHermitian);
-  EXPECT_EQ(o.one_body().hermiticity(), Hermiticity::AntiHermitian);
-  EXPECT_EQ(o.two_body().hermiticity(), Hermiticity::AntiHermitian);
+  Operator o(MakeMs(1), OperatorSpec::Scalar(2));
+  o.set_hermiticity(Hermiticity::kAntiHermitian);
+  EXPECT_EQ(o.hermiticity(), Hermiticity::kAntiHermitian);
+  EXPECT_EQ(o.spec().hermiticity, Hermiticity::kAntiHermitian);
+  EXPECT_EQ(o.one_body().hermiticity(), Hermiticity::kAntiHermitian);
+  EXPECT_EQ(o.two_body().hermiticity(), Hermiticity::kAntiHermitian);
   o.one_body().set(OrbitIndex{0}, OrbitIndex{1}, 1.0);
   EXPECT_EQ(o.one_body().get(OrbitIndex{1}, OrbitIndex{0}), -1.0);
 }
 
 TEST(Operator, SetZeroClearsAllParts) {
-  Operator o(make_ms(1), OperatorSpec::scalar(2));
+  Operator o(MakeMs(1), OperatorSpec::Scalar(2));
   o.zero_body() = 3.0;
   o.one_body().set(OrbitIndex{0}, OrbitIndex{0}, 1.0);
   o.two_body().set(ChannelIndex{0}, ChannelIndex{0}, LocalKetIndex{0},
@@ -83,33 +83,33 @@ TEST(Operator, SetZeroClearsAllParts) {
 }
 
 TEST(Operator, SyncRoundTripKeepsHostData) {
-  Operator o(make_ms(1), OperatorSpec::scalar(2));
+  Operator o(MakeMs(1), OperatorSpec::Scalar(2));
   o.one_body().set(OrbitIndex{0}, OrbitIndex{1}, 4.0);
-  o.sync_to_device();
-  o.sync_to_host();
+  o.SyncToDevice();
+  o.SyncToHost();
   EXPECT_EQ(o.one_body().get(OrbitIndex{1}, OrbitIndex{0}), 4.0);
 }
 
 TEST(Operator, SameModelSpace) {
-  const auto ms = make_ms(1);
-  const Operator a(ms, OperatorSpec::scalar(2));
-  const Operator b(ms, OperatorSpec::scalar(1));
-  EXPECT_TRUE(same_model_space(a, b));
-  const Operator rebuilt(make_ms(1), OperatorSpec::scalar(2));
+  const auto ms = MakeMs(1);
+  const Operator a(ms, OperatorSpec::Scalar(2));
+  const Operator b(ms, OperatorSpec::Scalar(1));
+  EXPECT_TRUE(SameModelSpace(a, b));
+  const Operator rebuilt(MakeMs(1), OperatorSpec::Scalar(2));
   EXPECT_NE(rebuilt.model_space_ptr(), a.model_space_ptr());
-  EXPECT_TRUE(same_model_space(a, rebuilt));
-  const Operator he4(make_ms(1, "He4"), OperatorSpec::scalar(2));
-  EXPECT_FALSE(same_model_space(a, he4));
-  const Operator bigger(make_ms(2), OperatorSpec::scalar(2));
-  EXPECT_FALSE(same_model_space(a, bigger));
+  EXPECT_TRUE(SameModelSpace(a, rebuilt));
+  const Operator he4(MakeMs(1, "He4"), OperatorSpec::Scalar(2));
+  EXPECT_FALSE(SameModelSpace(a, he4));
+  const Operator bigger(MakeMs(2), OperatorSpec::Scalar(2));
+  EXPECT_FALSE(SameModelSpace(a, bigger));
   const Operator empty;
-  EXPECT_FALSE(same_model_space(a, empty));
-  EXPECT_FALSE(same_model_space(empty, a));
-  EXPECT_FALSE(same_model_space(empty, empty));
+  EXPECT_FALSE(SameModelSpace(a, empty));
+  EXPECT_FALSE(SameModelSpace(empty, a));
+  EXPECT_FALSE(SameModelSpace(empty, empty));
 }
 
 TEST(Operator, CopyIsDeepAndShareslModelSpace) {
-  Operator a(make_ms(1), OperatorSpec::scalar(2));
+  Operator a(MakeMs(1), OperatorSpec::Scalar(2));
   a.zero_body() = 1.0;
   a.one_body().set(OrbitIndex{0}, OrbitIndex{1}, 2.0);
   a.two_body().set(ChannelIndex{0}, ChannelIndex{0}, LocalKetIndex{0},
@@ -128,7 +128,7 @@ TEST(Operator, CopyIsDeepAndShareslModelSpace) {
 }
 
 TEST(Operator, MovedFromIsEmpty) {
-  Operator a(make_ms(1), OperatorSpec::scalar(2));
+  Operator a(MakeMs(1), OperatorSpec::Scalar(2));
   a.zero_body() = 5.0;
   const auto* data = a.one_body().host_view().data;
   Operator b = std::move(a);

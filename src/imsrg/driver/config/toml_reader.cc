@@ -46,7 +46,7 @@ struct ConvertError {
 /// `RawTable`. If `allow_table` is false a table at this level is an error (a
 /// schema leaf never is a table). Dates and times are errors at any depth.
 /// Returns nullopt and fills `error` on failure.
-std::optional<RawValue> convert(const toml::node& node, const Origin& origin,
+std::optional<RawValue> Convert(const toml::node& node, const Origin& origin,
                                 bool allow_table, ConvertError& error) {
   RawValue out;
   out.where = origin.at(node);
@@ -66,7 +66,7 @@ std::optional<RawValue> convert(const toml::node& node, const Origin& origin,
     case toml::node_type::array: {
       RawArray items;
       for (const toml::node& element : *node.as_array()) {
-        auto value = convert(element, origin, true, error);
+        auto value = Convert(element, origin, true, error);
         if (!value) return std::nullopt;
         items.push_back(std::move(*value));
       }
@@ -80,7 +80,7 @@ std::optional<RawValue> convert(const toml::node& node, const Origin& origin,
       }
       RawTable items;
       for (auto&& [key, child] : *node.as_table()) {
-        auto value = convert(child, origin, true, error);
+        auto value = Convert(child, origin, true, error);
         if (!value) return std::nullopt;
         items.emplace_back(std::string(key.str()), std::move(*value));
       }
@@ -93,56 +93,56 @@ std::optional<RawValue> convert(const toml::node& node, const Origin& origin,
   }
 }
 
-std::string join_path(std::string_view table, std::string_view key) {
+std::string JoinPath(std::string_view table, std::string_view key) {
   return table.empty() ? std::string(key)
                        : std::string(table) + "." + std::string(key);
 }
 
-bool is_schema_table(std::string_view path) {
-  const auto tables = schema_tables();
+bool IsSchemaTable(std::string_view path) {
+  const auto tables = SchemaTables();
   return std::find(tables.begin(), tables.end(), path) != tables.end();
 }
 
 /// Walks table `tbl` at dotted path `path`, storing known leaves and reporting
 /// everything else.
-void walk(const toml::table& tbl, const std::string& path, const Origin& origin,
+void Walk(const toml::table& tbl, const std::string& path, const Origin& origin,
           RawTree& tree, ConfigIssues& issues) {
   for (auto&& [key, node] : tbl) {
     const std::string k(key.str());
     if (path.empty() && k == "provenance") continue;
-    const std::string child = join_path(path, k);
-    if (find_schema_key(child) != nullptr) {
+    const std::string child = JoinPath(path, k);
+    if (FindSchemaKey(child) != nullptr) {
       ConvertError error;
-      auto value = convert(node, origin, false, error);
+      auto value = Convert(node, origin, false, error);
       if (!value) {
         issues.push_back(
-            make_error("E-TYPE", child, error.message, error.where));
+            MakeError("E-TYPE", child, error.message, error.where));
         continue;
       }
       tree.set(child, std::move(*value));
-    } else if (is_schema_table(child)) {
+    } else if (IsSchemaTable(child)) {
       if (const toml::table* sub = node.as_table()) {
-        walk(*sub, child, origin, tree, issues);
+        Walk(*sub, child, origin, tree, issues);
       } else {
-        issues.push_back(make_error(
+        issues.push_back(MakeError(
             "E-TYPE", child, "'" + child + "' is a table", origin.at(node)));
       }
     } else {
       std::optional<std::string> suggestion;
-      if (auto best = did_you_mean(k, schema_children(path))) {
-        suggestion = join_path(path, *best);
+      if (auto best = DidYouMean(k, SchemaChildren(path))) {
+        suggestion = JoinPath(path, *best);
       }
       const std::string message = node.is_table()
                                       ? "unknown table '[" + child + "]'"
                                       : "unknown key '" + child + "'";
-      issues.push_back(make_error("E-KEY-UNKNOWN", child, message,
-                                  origin.at(node), std::move(suggestion)));
+      issues.push_back(MakeError("E-KEY-UNKNOWN", child, message,
+                                 origin.at(node), std::move(suggestion)));
     }
   }
 }
 
-ConfigIssues read_text(std::string_view text, const Origin& origin,
-                       RawTree& tree) {
+ConfigIssues ReadText(std::string_view text, const Origin& origin,
+                      RawTree& tree) {
   ConfigIssues issues;
   toml::table root;
   try {
@@ -152,14 +152,14 @@ ConfigIssues read_text(std::string_view text, const Origin& origin,
                     static_cast<int>(e.source().begin.line),
                     static_cast<int>(e.source().begin.column)};
     issues.push_back(
-        make_error("E-TOML-SYNTAX", "", std::string(e.description()), where));
+        MakeError("E-TOML-SYNTAX", "", std::string(e.description()), where));
     return issues;
   }
-  walk(root, "", origin, tree, issues);
+  Walk(root, "", origin, tree, issues);
   return issues;
 }
 
-std::string_view trim(std::string_view s) {
+std::string_view Trim(std::string_view s) {
   const auto is_space = [](char c) {
     return c == ' ' || c == '\t' || c == '\r' || c == '\n';
   };
@@ -170,61 +170,61 @@ std::string_view trim(std::string_view s) {
 
 }  // namespace
 
-ConfigIssues read_toml_file(const std::filesystem::path& file, RawTree& tree) {
+ConfigIssues ReadTomlFile(const std::filesystem::path& file, RawTree& tree) {
   std::ifstream in(file, std::ios::binary);
   std::ostringstream buffer;
   if (in) buffer << in.rdbuf();
   if (!in || in.bad()) {
     ConfigIssues issues;
-    issues.push_back(make_error(
+    issues.push_back(MakeError(
         "E-FILE", "", "cannot read config file '" + file.string() + "'",
-        SourceRef{SourceRef::Kind::TomlFile, file.string(), 0, 0}));
+        SourceRef{SourceRef::Kind::kTomlFile, file.string(), 0, 0}));
     return issues;
   }
-  return read_text(buffer.str(),
-                   Origin{SourceRef::Kind::TomlFile, file.string()}, tree);
+  return ReadText(buffer.str(),
+                  Origin{SourceRef::Kind::kTomlFile, file.string()}, tree);
 }
 
-ConfigIssues read_toml_string(std::string_view text,
-                              std::string_view source_name, RawTree& tree) {
-  return read_text(
-      text, Origin{SourceRef::Kind::TomlString, std::string(source_name)},
+ConfigIssues ReadTomlString(std::string_view text, std::string_view source_name,
+                            RawTree& tree) {
+  return ReadText(
+      text, Origin{SourceRef::Kind::kTomlString, std::string(source_name)},
       tree);
 }
 
-ConfigIssues apply_set_override(std::string_view assignment, RawTree& tree) {
+ConfigIssues ApplySetOverride(std::string_view assignment, RawTree& tree) {
   ConfigIssues issues;
-  const SourceRef where{SourceRef::Kind::SetOption, std::string(assignment), 0,
+  const SourceRef where{SourceRef::Kind::kSetOption, std::string(assignment), 0,
                         0};
   const std::size_t eq = assignment.find('=');
   const std::string path(eq == std::string_view::npos
                              ? std::string_view{}
-                             : trim(assignment.substr(0, eq)));
+                             : Trim(assignment.substr(0, eq)));
   if (eq == std::string_view::npos || path.empty()) {
-    issues.push_back(make_error(
+    issues.push_back(MakeError(
         "E-SET-SYNTAX", path,
         "expected 'section.key=value', got '" + std::string(assignment) + "'",
         where));
     return issues;
   }
-  if (find_schema_key(path) == nullptr) {
+  if (FindSchemaKey(path) == nullptr) {
     std::vector<std::string> all;
-    for (const KeyInfo& key : schema_keys()) all.emplace_back(key.path);
-    issues.push_back(make_error("E-KEY-UNKNOWN", path,
-                                "unknown key '" + path + "'", where,
-                                did_you_mean(path, all)));
+    for (const KeyInfo& key : SchemaKeys()) all.emplace_back(key.path);
+    issues.push_back(MakeError("E-KEY-UNKNOWN", path,
+                               "unknown key '" + path + "'", where,
+                               DidYouMean(path, all)));
     return issues;
   }
-  const std::string_view text = trim(assignment.substr(eq + 1));
+  const std::string_view text = Trim(assignment.substr(eq + 1));
   std::optional<RawValue> value;
   try {
     const toml::table parsed = toml::parse("v = " + std::string(text));
     if (parsed.size() == 1) {
       if (const toml::node* node = parsed.get("v")) {
         ConvertError error;
-        const Origin origin{SourceRef::Kind::SetOption,
+        const Origin origin{SourceRef::Kind::kSetOption,
                             std::string(assignment)};
-        value = convert(*node, origin, true, error);
+        value = Convert(*node, origin, true, error);
         if (value) value->where = where;
       }
     }

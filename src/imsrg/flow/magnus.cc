@@ -19,7 +19,7 @@ namespace imsrg::flow {
 
 namespace {
 
-double now_seconds() {
+double NowSeconds() {
   return std::chrono::duration<double>(
              std::chrono::steady_clock::now().time_since_epoch())
       .count();
@@ -27,9 +27,9 @@ double now_seconds() {
 
 /// A zero Omega: scalar, anti-Hermitian, two-body (imsrg++ copies Eta and
 /// erases it).
-op::Operator zero_omega(const std::shared_ptr<const basis::ModelSpace>& ms) {
+op::Operator ZeroOmega(const std::shared_ptr<const basis::ModelSpace>& ms) {
   return op::Operator(ms,
-                      op::OperatorSpec::scalar(2, Hermiticity::AntiHermitian));
+                      op::OperatorSpec::Scalar(2, Hermiticity::kAntiHermitian));
 }
 
 }  // namespace
@@ -43,7 +43,7 @@ MagnusSolver::MagnusSolver(op::Operator H0, const SolverOptions& solver,
       bch_(bch),
       comm_(comm),
       h0_(std::move(H0)),
-      t_start_(now_seconds()) {
+      t_start_(NowSeconds()) {
   IMSRG_CHECK(!h0_.empty(), "MagnusSolver: empty Hamiltonian");
   IMSRG_CHECK(
       h0_.spec().is_scalar() && h0_.spec().is_number_conserving() &&
@@ -52,59 +52,59 @@ MagnusSolver::MagnusSolver(op::Operator H0, const SolverOptions& solver,
   ws_ = std::make_unique<commutator::Workspace>(h0_.model_space_ptr());
   h_ = h0_;
   eta_ = op::Operator(h0_.model_space_ptr(),
-                      generator_spec(h0_.spec(), generator_.kind));
-  omegas_.push_back(zero_omega(h0_.model_space_ptr()));
+                      GeneratorSpec(h0_.spec(), generator_.kind));
+  omegas_.push_back(ZeroOmega(h0_.model_space_ptr()));
 }
 
 MagnusSolver::~MagnusSolver() = default;
 MagnusSolver::MagnusSolver(MagnusSolver&&) noexcept = default;
 MagnusSolver& MagnusSolver::operator=(MagnusSolver&&) noexcept = default;
 
-void MagnusSolver::push_omega() {
+void MagnusSolver::PushOmega() {
   // imsrg++ NewOmega (IMSRGSolver.cc:43-82), Omega kept in memory: H_saved =
   // H(s), new zero Omega.
   h_saved_ = h_;
-  log::info("pushing back another Omega. Omega.size = {}", omegas_.size());
-  omegas_.push_back(zero_omega(h0_.model_space_ptr()));
+  log::Info("pushing back another Omega. Omega.size = {}", omegas_.size());
+  omegas_.push_back(ZeroOmega(h0_.model_space_ptr()));
 }
 
 void MagnusSolver::set_generator(const GeneratorOptions& generator) {
   // imsrg++ SetGenerator (IMSRGSolver.cc:157-178): a new Omega if the current
   // one is not ~0.
   generator_ = generator;
-  if (op::norm(omegas_.back()) > 1e-6) {
+  if (op::Norm(omegas_.back()) > 1e-6) {
     eta_.set_zero();
-    push_omega();
+    PushOmega();
   }
 }
 
-FlowStatus MagnusSolver::status(int istep, double ds) const {
+FlowStatus MagnusSolver::Status(int istep, double ds) const {
   FlowStatus st;
   st.stage = stage_;
   st.istep = istep;
   st.s = s_;
   st.ds = ds;
   st.e0 = h_.zero_body();
-  st.norm_h = op::norm(h_);
-  st.norm_eta_1b = op::one_body_norm(eta_);
-  st.norm_eta_2b = op::two_body_norm(eta_);
-  st.norm_eta = op::norm(eta_);
-  st.norm_omega_1b = op::one_body_norm(omegas_.back());
-  st.norm_omega_2b = op::two_body_norm(omegas_.back());
-  st.norm_omega = op::norm(omegas_.back());
+  st.norm_h = op::Norm(h_);
+  st.norm_eta_1b = op::OneBodyNorm(eta_);
+  st.norm_eta_2b = op::TwoBodyNorm(eta_);
+  st.norm_eta = op::Norm(eta_);
+  st.norm_omega_1b = op::OneBodyNorm(omegas_.back());
+  st.norm_omega_2b = op::TwoBodyNorm(omegas_.back());
+  st.norm_omega = op::Norm(omegas_.back());
   st.num_omegas = omegas_.size();
-  st.wall_seconds = now_seconds() - t_start_;
+  st.wall_seconds = NowSeconds() - t_start_;
   return st;
 }
 
-SolveResult MagnusSolver::solve(const StatusCallback& on_status) {
+SolveResult MagnusSolver::Solve(const StatusCallback& on_status) {
   ++stage_;
-  compute_generator(h_, eta_, generator_);
+  ComputeGenerator(h_, eta_, generator_);
   // imsrg++ bumps domega to avoid machine-dependent splitting
   // (IMSRGSolver.cc:290); the bump persists, as the member is modified there.
   if (std::abs(solver_.omega_norm_max - solver_.domega) < 1e-6) {
     solver_.domega += 1e-4;
-    log::info(
+    log::Info(
         "adjusting domega to {} to avoid numerical trouble, since "
         "omega_norm_max = {}",
         solver_.domega, solver_.omega_norm_max);
@@ -115,25 +115,25 @@ SolveResult MagnusSolver::solve(const StatusCallback& on_status) {
   double e_last = h0_.zero_body();
   double ds =
       solver_.ds_0;  // used only if magnus_adaptive is off (imsrg++ member ds)
-  if (on_status) on_status(status(0, 0.0));
+  if (on_status) on_status(Status(0, 0.0));
 
   SolveResult result;
-  result.reason = StopReason::SmaxReached;
+  result.reason = StopReason::kSmaxReached;
   for (int istep = 1; s_ < solver_.smax; ++istep) {
-    const double norm_eta = op::norm(eta_);
+    const double norm_eta = op::Norm(eta_);
     if (norm_eta < eta_criterion) {
-      result.reason = StopReason::Converged;
+      result.reason = StopReason::kConverged;
       break;
     }
     if (norm_eta > 1e12 || std::abs(e_last) > 1e9) {
-      log::error("the IMSRG flow diverged: ||eta|| = {}, E0 = {} at s = {}",
+      log::Error("the IMSRG flow diverged: ||eta|| = {}, E0 = {} at s = {}",
                  norm_eta, e_last, s_);
-      result.reason = StopReason::Diverged;
+      result.reason = StopReason::kDiverged;
       break;
     }
-    double norm_omega = op::norm(omegas_.back());
+    double norm_omega = op::Norm(omegas_.back());
     if (norm_omega > solver_.omega_norm_max) {
-      push_omega();
+      PushOmega();
       norm_omega = 0.0;
     }
     if (solver_.magnus_adaptive) {
@@ -144,30 +144,30 @@ SolveResult MagnusSolver::solve(const StatusCallback& on_status) {
     }
     ds = std::min(ds, solver_.smax - s_);
     s_ += ds;
-    op::scale(eta_, ds);
+    op::Scale(eta_, ds);
     // exp(Omega_new) = exp(eta ds) exp(Omega_old).
-    omegas_.back() = bch_product(eta_, omegas_.back(), bch_, comm_, *ws_);
+    omegas_.back() = BchProduct(eta_, omegas_.back(), bch_, comm_, *ws_);
     // The first Omega acts on H_0, later ones on H at the time they were
     // opened.
     const op::Operator& base = omegas_.size() < 2 ? h0_ : h_saved_;
-    h_ = bch_transform(base, omegas_.back(), bch_, comm_, *ws_);
-    compute_generator(h_, eta_, generator_);
-    if (on_status) on_status(status(istep, ds));
+    h_ = BchTransform(base, omegas_.back(), bch_, comm_, *ws_);
+    ComputeGenerator(h_, eta_, generator_);
+    if (on_status) on_status(Status(istep, ds));
     result.steps = istep;
     e_last = h_.zero_body();
   }
   result.s = s_;
   result.e0 = h_.zero_body();
-  result.norm_eta = op::norm(eta_);
+  result.norm_eta = op::Norm(eta_);
   return result;
 }
 
-op::Operator MagnusSolver::transform(const op::Operator& O) {
+op::Operator MagnusSolver::Transform(const op::Operator& O) {
   // imsrg++ Transform (IMSRGSolver.cc:937-1000), in-memory stack, chronological
   // order.
-  op::Operator out = with_particle_rank(O, 2);
+  op::Operator out = WithParticleRank(O, 2);
   for (const op::Operator& omega : omegas_) {
-    out = bch_transform(out, omega, bch_, comm_, *ws_);
+    out = BchTransform(out, omega, bch_, comm_, *ws_);
   }
   return out;
 }

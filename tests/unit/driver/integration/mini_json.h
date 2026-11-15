@@ -21,8 +21,8 @@ namespace imsrg::it {
 
 /// One JSON value. Numbers are `double`; `null` has kind Null.
 struct Json {
-  enum class Kind { Null, Bool, Number, String, Array, Object };
-  Kind kind = Kind::Null;
+  enum class Kind { kNull, kBool, kNumber, kString, kArray, kObject };
+  Kind kind = Kind::kNull;
   bool boolean = false;
   double number = 0.0;
   std::string text;
@@ -53,10 +53,10 @@ namespace detail {
 class JsonParser {
  public:
   explicit JsonParser(const std::string& s) : s_(s) {}
-  Json parse() {
+  Json Parse() {
     Json v = value();
-    skip();
-    if (pos_ != s_.size()) fail("trailing characters");
+    Skip();
+    if (pos_ != s_.size()) Fail("trailing characters");
     return v;
   }
 
@@ -64,25 +64,25 @@ class JsonParser {
   const std::string& s_;
   std::size_t pos_ = 0;
 
-  [[noreturn]] void fail(const std::string& what) const {
+  [[noreturn]] void Fail(const std::string& what) const {
     throw std::runtime_error("JSON parse error at offset " +
                              std::to_string(pos_) + ": " + what);
   }
-  void skip() {
+  void Skip() {
     while (pos_ < s_.size() &&
            std::isspace(static_cast<unsigned char>(s_[pos_])))
       ++pos_;
   }
   char peek() {
-    skip();
-    if (pos_ >= s_.size()) fail("unexpected end");
+    Skip();
+    if (pos_ >= s_.size()) Fail("unexpected end");
     return s_[pos_];
   }
-  void expect(char c) {
-    if (peek() != c) fail(std::string("expected '") + c + "'");
+  void Expect(char c) {
+    if (peek() != c) Fail(std::string("expected '") + c + "'");
     ++pos_;
   }
-  bool literal(const char* word) {
+  bool Literal(const char* word) {
     const std::string w(word);
     if (s_.compare(pos_, w.size(), w) == 0) {
       pos_ += w.size();
@@ -90,8 +90,8 @@ class JsonParser {
     }
     return false;
   }
-  std::string string_literal() {
-    expect('"');
+  std::string StringLiteral() {
+    Expect('"');
     std::string out;
     while (pos_ < s_.size() && s_[pos_] != '"') {
       char c = s_[pos_++];
@@ -114,7 +114,7 @@ class JsonParser {
       }
       out.push_back(c);
     }
-    expect('"');
+    Expect('"');
     return out;
   }
   Json value() {
@@ -122,26 +122,26 @@ class JsonParser {
     const char c = peek();
     if (c == '{') {
       ++pos_;
-      v.kind = Json::Kind::Object;
+      v.kind = Json::Kind::kObject;
       if (peek() == '}') {
         ++pos_;
         return v;
       }
       while (true) {
-        std::string key = string_literal();
-        expect(':');
+        std::string key = StringLiteral();
+        Expect(':');
         v.fields.emplace_back(std::move(key), value());
         if (peek() == ',') {
           ++pos_;
           continue;
         }
-        expect('}');
+        Expect('}');
         return v;
       }
     }
     if (c == '[') {
       ++pos_;
-      v.kind = Json::Kind::Array;
+      v.kind = Json::Kind::kArray;
       if (peek() == ']') {
         ++pos_;
         return v;
@@ -152,30 +152,30 @@ class JsonParser {
           ++pos_;
           continue;
         }
-        expect(']');
+        Expect(']');
         return v;
       }
     }
     if (c == '"') {
-      v.kind = Json::Kind::String;
-      v.text = string_literal();
+      v.kind = Json::Kind::kString;
+      v.text = StringLiteral();
       return v;
     }
-    if (literal("true")) {
-      v.kind = Json::Kind::Bool;
+    if (Literal("true")) {
+      v.kind = Json::Kind::kBool;
       v.boolean = true;
       return v;
     }
-    if (literal("false")) {
-      v.kind = Json::Kind::Bool;
+    if (Literal("false")) {
+      v.kind = Json::Kind::kBool;
       return v;
     }
-    if (literal("null")) return v;
+    if (Literal("null")) return v;
     const char* begin = s_.c_str() + pos_;
     char* end = nullptr;
     v.number = std::strtod(begin, &end);
-    if (end == begin) fail("bad value");
-    v.kind = Json::Kind::Number;
+    if (end == begin) Fail("bad value");
+    v.kind = Json::Kind::kNumber;
     pos_ += static_cast<std::size_t>(end - begin);
     return v;
   }
@@ -184,8 +184,8 @@ class JsonParser {
 }  // namespace detail
 
 /// Parses `text`. @throws std::runtime_error on malformed input.
-inline Json parse_json(const std::string& text) {
-  return detail::JsonParser(text).parse();
+inline Json ParseJson(const std::string& text) {
+  return detail::JsonParser(text).Parse();
 }
 
 }  // namespace imsrg::it

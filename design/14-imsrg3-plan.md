@@ -116,7 +116,7 @@ layout.
   small interface, so the layout choice does not leak into the commutator signatures.
 * `ThreeBodyLayout` provides `imsrgpp_norm()`, which reproduces imsrg++'s n3 for any layout (D12).
 * `ThreeBodyChannels` lives in `basis` and is built lazily on request
-  (`ModelSpace::with_three_body(cuts)`).
+  (`ModelSpace::WithThreeBody(cuts)`).
 * `CommutatorOptions` already carries `Truncation`, `TermMask`, and `ThreeBodyCuts`
   {e3max, de3max, occnat3_cut, threebody_threshold}.
 * `Workspace` owns per-thread and per-team scratch sized from the 3B channel extents. It is

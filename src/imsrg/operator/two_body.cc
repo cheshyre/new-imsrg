@@ -30,12 +30,13 @@ struct Location {
   std::int32_t phase;
 };
 
-std::optional<Side> locate_side(const basis::TwoBodyChannels& tb, OrbitIndex a,
-                                OrbitIndex b, TwoJ two_j) {
+std::optional<Side> LocateSide(const basis::TwoBodyChannels& tb, OrbitIndex a,
+                               OrbitIndex b, TwoJ two_j) {
   const auto orbits = tb.orbits();
-  const basis::Orbit& oa = orbits[a.to_size()];
-  const basis::Orbit& ob = orbits[b.to_size()];
-  const Parity par = (oa.parity() == ob.parity()) ? Parity::Even : Parity::Odd;
+  const basis::Orbit& oa = orbits[a.ToSize()];
+  const basis::Orbit& ob = orbits[b.ToSize()];
+  const Parity par =
+      (oa.parity() == ob.parity()) ? Parity::kEven : Parity::kOdd;
   const auto ch =
       tb.find_channel(two_j, par, TwoTz{oa.tz2.twice + ob.tz2.twice});
   if (!ch) return std::nullopt;
@@ -45,15 +46,15 @@ std::optional<Side> locate_side(const basis::TwoBodyChannels& tb, OrbitIndex a,
   const auto local = tb.local_index(*ch, tb.ket_index(p, q));
   if (!local) return std::nullopt;
   return Side{*ch, *local,
-              swap ? basis::exchange_phase(oa.j2, ob.j2, two_j) : 1};
+              swap ? basis::ExchangePhase(oa.j2, ob.j2, two_j) : 1};
 }
 
-std::optional<Location> locate(const basis::TwoBodyChannels& tb, OrbitIndex a,
+std::optional<Location> Locate(const basis::TwoBodyChannels& tb, OrbitIndex a,
                                OrbitIndex b, OrbitIndex c, OrbitIndex d,
                                TwoJ two_j) {
-  const auto bra = locate_side(tb, a, b, two_j);
+  const auto bra = LocateSide(tb, a, b, two_j);
   if (!bra) return std::nullopt;
-  const auto ket = locate_side(tb, c, d, two_j);
+  const auto ket = LocateSide(tb, c, d, two_j);
   if (!ket || ket->ch != bra->ch) return std::nullopt;
   return Location{bra->ch, bra->idx, ket->idx, bra->phase * ket->phase};
 }
@@ -83,10 +84,10 @@ const basis::TwoBodyChannels& TwoBody::channels() const {
 std::optional<std::size_t> TwoBody::block_index(
     ChannelIndex ch_bra, ChannelIndex ch_ket) const noexcept {
   if (ch_bra != ch_ket || ch_bra.value() < 0 ||
-      ch_bra.to_size() >= matrix_.num_blocks()) {
+      ch_bra.ToSize() >= matrix_.num_blocks()) {
     return std::nullopt;
   }
-  return ch_bra.to_size();
+  return ch_bra.ToSize();
 }
 
 double TwoBody::get(ChannelIndex ch_bra, ChannelIndex ch_ket, LocalKetIndex i,
@@ -112,7 +113,7 @@ void TwoBody::set(ChannelIndex ch_bra, ChannelIndex ch_ket, LocalKetIndex i,
 double TwoBody::get_normalized(OrbitIndex a, OrbitIndex b, OrbitIndex c,
                                OrbitIndex d, TwoJ J) const {
   if (!allocated()) return 0.0;
-  const auto loc = locate(channels(), a, b, c, d, J);
+  const auto loc = Locate(channels(), a, b, c, d, J);
   if (!loc) return 0.0;
   return loc->phase * get(loc->ch, loc->ch, loc->i, loc->j);
 }
@@ -126,26 +127,26 @@ double TwoBody::get_unnormalized(OrbitIndex a, OrbitIndex b, OrbitIndex c,
 void TwoBody::set_normalized(OrbitIndex a, OrbitIndex b, OrbitIndex c,
                              OrbitIndex d, TwoJ J, double v) {
   IMSRG_CHECK(allocated());
-  const auto loc = locate(channels(), a, b, c, d, J);
+  const auto loc = Locate(channels(), a, b, c, d, J);
   IMSRG_CHECK(loc.has_value());
   const double stored = loc->phase * v;
   set(loc->ch, loc->ch, loc->i, loc->j, stored);
-  const std::int32_t h = hermiticity_sign(hermiticity_);
+  const std::int32_t h = HermiticitySign(hermiticity_);
   if (loc->i != loc->j && h != 0)
     set(loc->ch, loc->ch, loc->j, loc->i, h * stored);
 }
 
-void TwoBody::add_normalized(OrbitIndex a, OrbitIndex b, OrbitIndex c,
-                             OrbitIndex d, TwoJ J, double v) {
+void TwoBody::AddNormalized(OrbitIndex a, OrbitIndex b, OrbitIndex c,
+                            OrbitIndex d, TwoJ J, double v) {
   IMSRG_CHECK(allocated());
-  const auto loc = locate(channels(), a, b, c, d, J);
+  const auto loc = Locate(channels(), a, b, c, d, J);
   IMSRG_CHECK(loc.has_value());
   const double stored = loc->phase * v;
   // The partner receives h * stored. imsrg++ AddToTBME omits the sign h for
   // anti-Hermitian parts; this is fixed here (design/30 section 6).
   set(loc->ch, loc->ch, loc->i, loc->j,
       get(loc->ch, loc->ch, loc->i, loc->j) + stored);
-  const std::int32_t h = hermiticity_sign(hermiticity_);
+  const std::int32_t h = HermiticitySign(hermiticity_);
   if (loc->i != loc->j && h != 0) {
     set(loc->ch, loc->ch, loc->j, loc->i,
         get(loc->ch, loc->ch, loc->j, loc->i) + h * stored);

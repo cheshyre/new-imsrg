@@ -148,25 +148,25 @@ constexpr NamedValenceSpace kTable[] = {
 };
 
 // Appends the naive filling of `core` (skipping `skip`) as core orbits.
-void append_core(std::vector<Orbit>& out, const Nucleus& core,
-                 std::int32_t emax, std::span<const Orbit> skip = {}) {
-  for (const OrbitOccupation& oo : naive_filling(core, emax, skip)) {
+void AppendCore(std::vector<Orbit>& out, const Nucleus& core, std::int32_t emax,
+                std::span<const Orbit> skip = {}) {
+  for (const OrbitOccupation& oo : NaiveFilling(core, emax, skip)) {
     out.push_back(oo.orbit);
   }
 }
 
-void add_unique(std::vector<Orbit>& v, const Orbit& o) {
+void AddUnique(std::vector<Orbit>& v, const Orbit& o) {
   if (std::find(v.begin(), v.end(), o) == v.end()) v.push_back(o);
 }
 
-Orbit make_orbit(std::int32_t n, std::int32_t l, std::int32_t j2,
-                 std::int32_t tz2) {
+Orbit MakeOrbit(std::int32_t n, std::int32_t l, std::int32_t j2,
+                std::int32_t tz2) {
   return Orbit{n, l, TwoJ{j2}, TwoTz{tz2}};
 }
 
 // Get0hwSpace (ModelSpace.cc:659-694).
-ValenceSpaceDefinition zero_hw_space(const SingleParticleBasis& basis,
-                                     const Nucleus& reference) {
+ValenceSpaceDefinition ZeroHwSpace(const SingleParticleBasis& basis,
+                                   const Nucleus& reference) {
   const int Aref = static_cast<int>(reference.A);
   const int Zref = static_cast<int>(reference.Z);
   const int Nref = Aref - Zref;
@@ -181,11 +181,11 @@ ValenceSpaceDefinition zero_hw_space(const SingleParticleBasis& basis,
   const Nucleus core{static_cast<double>(Zcore + Ncore),
                      static_cast<double>(Zcore)};
   def.core_name = core.name();
-  append_core(def.core, core, basis.emax());
+  AppendCore(def.core, core, basis.emax());
   auto add_species = [&](int osc, int tz2) {
     for (int L = osc; L >= 0; L -= 2) {
       for (int j2 = 2 * L + 1; j2 > std::max(2 * L - 2, 0); j2 -= 2) {
-        add_unique(def.valence, make_orbit((osc - L) / 2, L, j2, tz2));
+        AddUnique(def.valence, MakeOrbit((osc - L) / 2, L, j2, tz2));
       }
     }
   };
@@ -195,8 +195,8 @@ ValenceSpaceDefinition zero_hw_space(const SingleParticleBasis& basis,
 }
 
 // GetjjSpace (ModelSpace.cc:696-747).
-ValenceSpaceDefinition jj_space(const SingleParticleBasis& basis,
-                                const Nucleus& reference) {
+ValenceSpaceDefinition JjSpace(const SingleParticleBasis& basis,
+                               const Nucleus& reference) {
   constexpr std::array<int, 9> jjmagic = {2, 6, 14, 28, 50, 82, 126, 184, 258};
   const int Aref = static_cast<int>(reference.A);
   const int Zref = static_cast<int>(reference.Z);
@@ -222,15 +222,15 @@ ValenceSpaceDefinition jj_space(const SingleParticleBasis& basis,
   const Nucleus core{static_cast<double>(Zcore + Ncore),
                      static_cast<double>(Zcore)};
   def.core_name = core.name();
-  append_core(def.core, core, basis.emax());
+  AppendCore(def.core, core, basis.emax());
   auto add_species = [&](int idx, int tz2) {
     for (int L = idx; L >= 0; L -= 2) {
       for (int j2 = 2 * L + 1; j2 > std::max(2 * L - 2, 0); j2 -= 2) {
         if (j2 == 2 * idx + 1) {
-          add_unique(def.valence, make_orbit(0, L + 1, j2 + 2,
-                                             tz2));  // largest j of next shell
+          AddUnique(def.valence, MakeOrbit(0, L + 1, j2 + 2,
+                                           tz2));  // largest j of next shell
         } else {
-          add_unique(def.valence, make_orbit((idx - L) / 2, L, j2, tz2));
+          AddUnique(def.valence, MakeOrbit((idx - L) / 2, L, j2, tz2));
         }
       }
     }
@@ -241,7 +241,7 @@ ValenceSpaceDefinition jj_space(const SingleParticleBasis& basis,
 }
 
 // getline(ss, tok, ',') semantics: a trailing empty field is not returned.
-std::vector<std::string_view> split_commas(std::string_view s) {
+std::vector<std::string_view> SplitCommas(std::string_view s) {
   std::vector<std::string_view> out;
   std::size_t pos = 0;
   while (pos < s.size()) {
@@ -258,57 +258,56 @@ std::vector<std::string_view> split_commas(std::string_view s) {
 
 }  // namespace
 
-std::span<const NamedValenceSpace> named_valence_spaces() noexcept {
+std::span<const NamedValenceSpace> NamedValenceSpaces() noexcept {
   return kTable;
 }
 
-const NamedValenceSpace* find_named_valence_space(
-    std::string_view name) noexcept {
+const NamedValenceSpace* FindNamedValenceSpace(std::string_view name) noexcept {
   for (const NamedValenceSpace& s : kTable) {
     if (s.name == name) return &s;
   }
   return nullptr;
 }
 
-ValenceSpaceDefinition define_valence_space(std::string_view spec,
-                                            const SingleParticleBasis& basis,
-                                            const Nucleus& reference) {
-  if (spec == "0hw-shell") return zero_hw_space(basis, reference);
-  if (spec == "jj-shell") return jj_space(basis, reference);
+ValenceSpaceDefinition DefineValenceSpace(std::string_view spec,
+                                          const SingleParticleBasis& basis,
+                                          const Nucleus& reference) {
+  if (spec == "0hw-shell") return ZeroHwSpace(basis, reference);
+  if (spec == "jj-shell") return JjSpace(basis, reference);
 
   ValenceSpaceDefinition def;
   if (spec.find(',') != std::string_view::npos) {
-    const std::vector<std::string_view> tokens = split_commas(spec);
-    const Nucleus core = Nucleus::parse(tokens.front());
+    const std::vector<std::string_view> tokens = SplitCommas(spec);
+    const Nucleus core = Nucleus::Parse(tokens.front());
     for (std::size_t i = 1; i < tokens.size(); ++i) {
-      add_unique(def.valence, parse_orbit_label(tokens[i]));
+      AddUnique(def.valence, ParseOrbitLabel(tokens[i]));
     }
     def.core_name = core.name();
-    append_core(def.core, core, basis.emax(), def.valence);
+    AppendCore(def.core, core, basis.emax(), def.valence);
     return def;
   }
   if (spec.find("FCI") != std::string_view::npos) {
     def.valence.assign(basis.orbits().begin(), basis.orbits().end());
     return def;
   }
-  if (const NamedValenceSpace* named = find_named_valence_space(spec)) {
+  if (const NamedValenceSpace* named = FindNamedValenceSpace(spec)) {
     for (const std::string_view label : named->orbits) {
-      add_unique(def.valence, parse_orbit_label(label));
+      AddUnique(def.valence, ParseOrbitLabel(label));
     }
-    const Nucleus core = Nucleus::parse(named->core);
+    const Nucleus core = Nucleus::Parse(named->core);
     def.core_name = core.name();
-    append_core(def.core, core, basis.emax());
+    AppendCore(def.core, core, basis.emax());
     return def;
   }
-  const Nucleus core = Nucleus::parse(spec);
+  const Nucleus core = Nucleus::Parse(spec);
   def.core_name = core.name();
-  append_core(def.core, core, basis.emax());
+  AppendCore(def.core, core, basis.emax());
   return def;
 }
 
-Nucleus default_reference_nucleus(std::string_view spec) {
+Nucleus DefaultReferenceNucleus(std::string_view spec) {
   if (spec.find(',') != std::string_view::npos) {
-    return Nucleus::parse(split_commas(spec).front());
+    return Nucleus::Parse(SplitCommas(spec).front());
   }
   if (spec == "0hw-shell" || spec == "jj-shell" ||
       spec.find("FCI") != std::string_view::npos) {
@@ -318,10 +317,10 @@ Nucleus default_reference_nucleus(std::string_view spec) {
                     "defined for it)",
                     spec));
   }
-  if (const NamedValenceSpace* named = find_named_valence_space(spec)) {
-    return Nucleus::parse(named->core);
+  if (const NamedValenceSpace* named = FindNamedValenceSpace(spec)) {
+    return Nucleus::Parse(named->core);
   }
-  return Nucleus::parse(spec);
+  return Nucleus::Parse(spec);
 }
 
 }  // namespace imsrg::basis

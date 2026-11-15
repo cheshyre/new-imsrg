@@ -23,14 +23,14 @@
 namespace imsrg::driver {
 namespace {
 
-std::string slurp(const std::string& path) {
+std::string Slurp(const std::string& path) {
   std::ifstream in(path, std::ios::binary);
   std::ostringstream ss;
   ss << in.rdbuf();
   return ss.str();
 }
 
-std::vector<std::string> split_lines(const std::string& text) {
+std::vector<std::string> SplitLines(const std::string& text) {
   std::vector<std::string> lines;
   std::istringstream in(text);
   std::string l;
@@ -38,7 +38,7 @@ std::vector<std::string> split_lines(const std::string& text) {
   return lines;
 }
 
-std::vector<std::string> split_spaces(const std::string& s) {
+std::vector<std::string> SplitSpaces(const std::string& s) {
   std::vector<std::string> out;
   std::istringstream in(s);
   std::string t;
@@ -55,13 +55,13 @@ struct Example {
 
 /// The four examples extracted from design/16 between "### 2.11" and "###
 /// 2.12".
-std::vector<Example> extract_examples() {
+std::vector<Example> ExtractExamples() {
   std::vector<Example> ex = {{'a', "a_o16_imsrg2.toml", {}, {}},
                              {'b', "b_o16_imsrg2_3n.toml", {}, {}},
                              {'c', "c_o16_sd_shell.toml", {}, {}},
                              {'d', "d_o16_imsrg3_n7.toml", {}, {}}};
-  const auto lines = split_lines(
-      slurp(std::string(IMSRG_SOURCE_DIR) + "/design/16-config-and-cli.md"));
+  const auto lines = SplitLines(
+      Slurp(std::string(IMSRG_SOURCE_DIR) + "/design/16-config-and-cli.md"));
   bool inside_section = false;
   bool in_block = false;
   std::size_t block = 0;
@@ -93,7 +93,7 @@ std::vector<Example> extract_examples() {
           std::string("Equivalent legacy command for (") + e.tag + "): `imsrg ";
       if (l.rfind(prefix, 0) == 0) {
         const std::size_t end = l.find('`', prefix.size());
-        e.legacy = split_spaces(l.substr(prefix.size(), end - prefix.size()));
+        e.legacy = SplitSpaces(l.substr(prefix.size(), end - prefix.size()));
       }
     }
   }
@@ -102,73 +102,73 @@ std::vector<Example> extract_examples() {
   return ex;
 }
 
-std::string issues_text(const ConfigIssues& issues) {
+std::string IssuesText(const ConfigIssues& issues) {
   std::string s;
-  for (const auto& i : issues) s += "  " + i.to_string() + "\n";
+  for (const auto& i : issues) s += "  " + i.ToString() + "\n";
   return s;
 }
 
-const std::vector<Example>& examples() {
-  static const std::vector<Example> ex = extract_examples();
-  return ex;
+const std::vector<Example>& Examples() {
+  static const std::vector<Example> kEx = ExtractExamples();
+  return kEx;
 }
 
 /// Loads `sources` and requires success without warnings.
-RunConfig load_ok(const ConfigSources& sources, const std::string& what) {
-  auto r = load_config(sources, LoadOptions{.check_files = false});
+RunConfig LoadOk(const ConfigSources& sources, const std::string& what) {
+  auto r = LoadConfig(sources, LoadOptions{.check_files = false});
   if (!r) {
-    ADD_FAILURE() << what << " failed:\n" << issues_text(r.error());
+    ADD_FAILURE() << what << " failed:\n" << IssuesText(r.error());
     return RunConfig{};
   }
   EXPECT_TRUE(r.value().provenance.warnings.empty())
       << what << " produced warnings:\n"
-      << issues_text(r.value().provenance.warnings);
+      << IssuesText(r.value().provenance.warnings);
   return std::move(r).value();
 }
 
-RunConfig load_toml(const Example& e) {
+RunConfig LoadToml(const Example& e) {
   ConfigSources s;
   s.config_text = e.toml;
   s.config_text_name = e.file;
-  return load_ok(s, std::string("TOML of (") + e.tag + ")");
+  return LoadOk(s, std::string("TOML of (") + e.tag + ")");
 }
 
-RunConfig load_legacy(const Example& e) {
+RunConfig LoadLegacy(const Example& e) {
   ConfigSources s;
   s.legacy_args = e.legacy;
-  return load_ok(s, std::string("legacy command of (") + e.tag + ")");
+  return LoadOk(s, std::string("legacy command of (") + e.tag + ")");
 }
 
 TEST(GoldenEquivalence, ExtractionFindsFourExamples) {
-  ASSERT_EQ(examples().size(), 4u);
-  for (const auto& e : examples()) {
+  ASSERT_EQ(Examples().size(), 4u);
+  for (const auto& e : Examples()) {
     EXPECT_FALSE(e.toml.empty()) << e.tag;
     EXPECT_FALSE(e.legacy.empty()) << e.tag;
   }
 }
 
 TEST(GoldenEquivalence, ExampleFilesAreVerbatimCopiesOfTheDocBlocks) {
-  for (const auto& e : examples()) {
+  for (const auto& e : Examples()) {
     const std::string path =
         std::string(IMSRG_SOURCE_DIR) + "/examples/config/" + e.file;
-    EXPECT_EQ(slurp(path), e.toml) << path;
+    EXPECT_EQ(Slurp(path), e.toml) << path;
   }
 }
 
 TEST(GoldenEquivalence, TomlAndLegacyResolveToTheSameConfig) {
-  for (const auto& e : examples()) {
+  for (const auto& e : Examples()) {
     SCOPED_TRACE(std::string("example (") + e.tag + ")");
-    const RunConfig t = load_toml(e);
-    const RunConfig l = load_legacy(e);
+    const RunConfig t = LoadToml(e);
+    const RunConfig l = LoadLegacy(e);
     EXPECT_TRUE(t == l) << "RunConfig differs; TOML-side:\n"
-                        << to_toml(t, false) << "\nlegacy-side:\n"
-                        << to_toml(l, false);
-    EXPECT_EQ(to_toml(t, false), to_toml(l, false));
+                        << ToToml(t, false) << "\nlegacy-side:\n"
+                        << ToToml(l, false);
+    EXPECT_EQ(ToToml(t, false), ToToml(l, false));
   }
 }
 
 TEST(GoldenEquivalence, ExampleA) {
-  const RunConfig c = load_toml(examples()[0]);
+  const RunConfig c = LoadToml(Examples()[0]);
   EXPECT_EQ(c.basis.mass_number, 16);
   EXPECT_EQ(c.imsrg.steps, 1);
   EXPECT_EQ(c.output.stem, "magnus_O16_O16_hw16_e4_A16");
@@ -182,9 +182,9 @@ TEST(GoldenEquivalence, ExampleA) {
 }
 
 TEST(GoldenEquivalence, ExampleB) {
-  const RunConfig c = load_toml(examples()[1]);
+  const RunConfig c = LoadToml(Examples()[1]);
   ASSERT_TRUE(c.interaction.three_body.has_value());
-  EXPECT_EQ(c.interaction.three_body->type, ThreeBodyType::No2b);
+  EXPECT_EQ(c.interaction.three_body->type, ThreeBodyType::kNo2b);
   EXPECT_EQ(c.interaction.three_body->e1max, 6);
   EXPECT_EQ(c.interaction.three_body->e2max, std::optional<int>(12));
   EXPECT_EQ(c.interaction.three_body->e3max, 18);
@@ -193,21 +193,21 @@ TEST(GoldenEquivalence, ExampleB) {
 }
 
 TEST(GoldenEquivalence, ExampleC) {
-  const RunConfig c = load_toml(examples()[2]);
+  const RunConfig c = LoadToml(Examples()[2]);
   EXPECT_EQ(c.imsrg.steps, 2);
   EXPECT_EQ(c.valence.space, std::optional<std::string>("sd-shell"));
-  EXPECT_EQ(c.imsrg.generator.core, Generator::Atan);
-  EXPECT_EQ(c.imsrg.generator.valence, Generator::ShellModelAtan);
+  EXPECT_EQ(c.imsrg.generator.core, Generator::kAtan);
+  EXPECT_EQ(c.imsrg.generator.valence, Generator::kShellModelAtan);
   EXPECT_EQ(c.output.stem, "magnus_O16_sd-shell_hw20_e6_A16");
 }
 
 TEST(GoldenEquivalence, ExampleD) {
-  const RunConfig c = load_toml(examples()[3]);
+  const RunConfig c = LoadToml(Examples()[3]);
   EXPECT_TRUE(c.imsrg3.in_flow);
-  EXPECT_EQ(c.imsrg3.variant, Imsrg3Variant::N7);
+  EXPECT_EQ(c.imsrg3.variant, Imsrg3Variant::kN7);
   EXPECT_EQ(c.basis.e3max, 6);
   ASSERT_TRUE(c.interaction.three_body.has_value());
-  EXPECT_EQ(c.interaction.three_body->type, ThreeBodyType::No2b);
+  EXPECT_EQ(c.interaction.three_body->type, ThreeBodyType::kNo2b);
 }
 
 }  // namespace

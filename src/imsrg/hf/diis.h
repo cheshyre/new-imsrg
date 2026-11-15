@@ -29,7 +29,7 @@ class PulayDiis {
 
   /// Appends the pair (F, e), both N x N. Drops the oldest pair if the subspace
   /// is full.
-  void push(const linalg::Matrix<double>& F, const linalg::Matrix<double>& e);
+  void Push(const linalg::Matrix<double>& F, const linalg::Matrix<double>& e);
 
   /// Forgets all stored pairs.
   void clear() noexcept;
@@ -46,7 +46,7 @@ class PulayDiis {
   /// singular, ill-conditioned (non-finite coefficients or max |c| > 1e8) the
   /// oldest pairs are dropped one at a time, down to the newest pair alone (c =
   /// 1). Precondition: size() >= 1. Complexity O(m^3 + m N^2).
-  linalg::Matrix<double> extrapolate() const;
+  linalg::Matrix<double> Extrapolate() const;
 
   /// Number of pairs used by the last `extrapolate` call (diagnostics).
   std::size_t last_used() const noexcept { return last_used_; }

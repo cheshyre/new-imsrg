@@ -9,8 +9,8 @@
 
 namespace imsrg::detail {
 
-void check_failed(const char* condition, const char* file, int line,
-                  std::string_view message) {
+void CheckFailed(const char* condition, const char* file, int line,
+                 std::string_view message) {
   std::string what = "check failed: ";
   what += condition;
   what += " at ";

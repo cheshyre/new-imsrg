@@ -39,18 +39,18 @@ class TimerRegistry {
 
   /// Adds `seconds` and `count` calls to region `name` (created on first use).
   /// Thread-safe.
-  void add(std::string_view name, double seconds, std::int64_t count = 1);
+  void Add(std::string_view name, double seconds, std::int64_t count = 1);
   /// Snapshot of all regions, sorted by name.
   std::vector<Entry> entries() const;
   /// Removes all regions.
   void clear();
   /// Aligned text table with columns name, total [s], count, mean [ms]; one row
   /// per region.
-  std::string report() const;
+  std::string Report() const;
 
   /// Installs profiler hooks that every `ScopedTimer` on this registry calls on
-  /// entry and exit (e.g. `exec::push_profiling_region` /
-  /// `exec::pop_profiling_region`, so NVTX/rocTX tools see the same regions).
+  /// entry and exit (e.g. `exec::PushProfilingRegion` /
+  /// `exec::PopProfilingRegion`, so NVTX/rocTX tools see the same regions).
   /// `nullptr` means no hook. Thread-safe; per registry, never global.
   void set_region_hooks(RegionPushHook push, RegionPopHook pop) noexcept;
   /// The installed push hook (or nullptr).
@@ -93,8 +93,8 @@ class ScopedTimer {
 
 }  // namespace imsrg
 
-#define IMSRG_DETAIL_CONCAT_(a, b) a##b
-#define IMSRG_DETAIL_CONCAT(a, b) IMSRG_DETAIL_CONCAT_(a, b)
+#define IMSRG_DETAIL_CONCAT_IMPL(a, b) a##b
+#define IMSRG_DETAIL_CONCAT(a, b) IMSRG_DETAIL_CONCAT_IMPL(a, b)
 /// Declares a uniquely named `ScopedTimer` for the rest of the enclosing scope.
 #define IMSRG_SCOPED_TIMER(registry, name)                                 \
   ::imsrg::ScopedTimer IMSRG_DETAIL_CONCAT(imsrg_scoped_timer_, __LINE__)( \

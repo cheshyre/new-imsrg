@@ -41,8 +41,8 @@ struct FileOrbit {
 
 /// Reads the number after `"key":` in the first object following `"section"` in
 /// `text`.
-double json_number(const std::string& text, const std::string& section,
-                   const std::string& key) {
+double JsonNumber(const std::string& text, const std::string& section,
+                  const std::string& key) {
   const std::size_t sec = text.find("\"" + section + "\"");
   EXPECT_NE(sec, std::string::npos) << section;
   const std::size_t k = text.find("\"" + key + "\"", sec);
@@ -55,9 +55,9 @@ double json_number(const std::string& text, const std::string& section,
 /// little-endian floats, read sequentially), filling `v3` with what its
 /// truncations can hold. Every matrix element of the file consumes one float.
 /// Returns the number of floats consumed.
-std::size_t read_no2b_file(const std::filesystem::path& path, No2bThreeBody& v3,
-                           std::int32_t emax_file, std::int32_t e2max_file,
-                           std::int32_t e3max_file, std::int32_t lmax_file) {
+std::size_t ReadNo2bFile(const std::filesystem::path& path, No2bThreeBody& v3,
+                         std::int32_t emax_file, std::int32_t e2max_file,
+                         std::int32_t e3max_file, std::int32_t lmax_file) {
   const No2bTruncation tr = v3.truncation();
   std::vector<FileOrbit> orbs;
   for (std::int32_t e = 0; e <= emax_file; ++e) {
@@ -161,19 +161,19 @@ TEST(No2bGolden, V3NormalOrderedO16) {
     GTEST_SKIP() << "3N input file not found: " << file;
   }
   No2bThreeBody v3(No2bTruncation{2, 4, 6, 2});
-  const std::size_t nread = read_no2b_file(file, v3, 6, 12, 18, 6);
+  const std::size_t nread = ReadNo2bFile(file, v3, 6, 12, 18, 6);
   std::printf("[ info ] floats read: %zu, stored values: %zu\n", nread,
               v3.size());
 
   const std::filesystem::path dump = std::filesystem::path(IMSRG_GOLDEN_DIR) /
                                      "hamiltonian/emax2_O16/V3_NO2B.dump";
-  const auto ms = model_space_for_dump(read_operator_dump_header(dump));
-  const Operator ref = read_operator_dump(dump, ms);
-  const Operator zero(ms, OperatorSpec::scalar(2, Hermiticity::Hermitian));
-  const Operator got = normal_order(zero, v3);
+  const auto ms = ModelSpaceForDump(ReadOperatorDumpHeader(dump));
+  const Operator ref = ReadOperatorDump(dump, ms);
+  const Operator zero(ms, OperatorSpec::Scalar(2, Hermiticity::kHermitian));
+  const Operator got = NormalOrder(zero, v3);
 
-  const PartMaxima rm = max_abs(ref);
-  const PartMaxima dev = max_abs_difference(got, ref);
+  const PartMaxima rm = MaxAbs(ref);
+  const PartMaxima dev = MaxAbsDifference(got, ref);
   const double tol = 1e-10 * std::max(1.0, rm.max());
   std::printf("[ dev ] V3_NO2B zero %.3e  one %.3e  two %.3e  (tol %.1e)\n",
               dev.zero_body, dev.one_body, dev.two_body, tol);
@@ -186,11 +186,11 @@ TEST(No2bGolden, V3NormalOrderedO16) {
   std::stringstream ss;
   ss << js.rdbuf();
   const std::string text = ss.str();
-  const double z_ref = json_number(text, "V3_NO2B", "zero_body");
-  const double n1_ref = json_number(text, "V3_NO2B", "one_body_norm");
-  const double n2_ref = json_number(text, "V3_NO2B", "two_body_norm");
-  const double n1 = one_body_norm(got);
-  const double n2 = two_body_norm(got);
+  const double z_ref = JsonNumber(text, "V3_NO2B", "zero_body");
+  const double n1_ref = JsonNumber(text, "V3_NO2B", "one_body_norm");
+  const double n2_ref = JsonNumber(text, "V3_NO2B", "two_body_norm");
+  const double n1 = OneBodyNorm(got);
+  const double n2 = TwoBodyNorm(got);
   std::printf("[ dev ] norms (relative): zero %.3e  one %.3e  two %.3e\n",
               std::abs(got.zero_body() - z_ref) / std::abs(z_ref),
               std::abs(n1 - n1_ref) / n1_ref, std::abs(n2 - n2_ref) / n2_ref);

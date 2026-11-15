@@ -17,7 +17,7 @@
 
 namespace imsrg::op {
 
-/// Options of `random_operator`. Values are uniform in [-scale, scale).
+/// Options of `RandomOperator`. Values are uniform in [-scale, scale).
 struct RandomOperatorOptions {
   /// Seed of the generator. The same seed gives the same operator on every
   /// platform.
@@ -45,10 +45,10 @@ struct RandomOperatorOptions {
 /// anti-Hermitian), then the two-body blocks in channel order (row i ascending,
 /// column j ascending, the same triangle rules). The result is therefore
 /// reproducible across platforms and compilers (no std:: distributions).
-/// @throws InputError / NotImplementedError from `validate(spec)`.
-Operator random_operator(std::shared_ptr<const basis::ModelSpace> ms,
-                         const OperatorSpec& spec,
-                         const RandomOperatorOptions& options = {});
+/// @throws InputError / NotImplementedError from `Validate(spec)`.
+Operator RandomOperator(std::shared_ptr<const basis::ModelSpace> ms,
+                        const OperatorSpec& spec,
+                        const RandomOperatorOptions& options = {});
 
 }  // namespace imsrg::op
 

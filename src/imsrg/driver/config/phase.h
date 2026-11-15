@@ -14,16 +14,16 @@ namespace imsrg::driver {
 /// P1 = implemented in the first phase; Planned = parsed, but requesting it
 /// fails validation with `E-PLANNED` ("not available in this build");
 /// NotSupported = rejected with a message.
-enum class Phase { P1, Planned, NotSupported };
+enum class Phase { kP1, kPlanned, kNotSupported };
 
 /// "P1", "PL" or "NS" (the abbreviations of design/16).
-constexpr std::string_view phase_name(Phase phase) noexcept {
+constexpr std::string_view PhaseName(Phase phase) noexcept {
   switch (phase) {
-    case Phase::P1:
+    case Phase::kP1:
       return "P1";
-    case Phase::Planned:
+    case Phase::kPlanned:
       return "PL";
-    case Phase::NotSupported:
+    case Phase::kNotSupported:
       return "NS";
   }
   return "?";

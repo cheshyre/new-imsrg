@@ -29,7 +29,7 @@ namespace imsrg::driver {
 ///         (checked before any work: methods other than magnus, IMSRG(3), NAT
 ///         basis, ...); InputError for unreadable inputs or unwritable outputs;
 ///         NumericalError if the flow diverged (after writing results.json).
-void run(const RunConfig& config);
+void Run(const RunConfig& config);
 
 }  // namespace imsrg::driver
 

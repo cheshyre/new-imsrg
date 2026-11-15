@@ -26,26 +26,27 @@ namespace {
 // -----------------------------------------------------------------------------
 
 constexpr OpParamSpec kHw[] = {
-    {"hw", OpParamType::Number, true, "oscillator frequency in MeV"}};
+    {"hw", OpParamType::kNumber, true, "oscillator frequency in MeV"}};
 constexpr OpParamSpec kZ[] = {
-    {"z", OpParamType::Integer, false, "proton number"}};
+    {"z", OpParamType::kInteger, false, "proton number"}};
 constexpr OpParamSpec kAZ[] = {
-    {"a", OpParamType::Integer, false, "mass number"},
-    {"z", OpParamType::Integer, false, "proton number"}};
+    {"a", OpParamType::kInteger, false, "mass number"},
+    {"z", OpParamType::kInteger, false, "proton number"}};
 constexpr OpParamSpec kOrbit[] = {
-    {"orbit", OpParamType::Orbit, false, "orbit label, e.g. p0d5"}};
+    {"orbit", OpParamType::kOrbit, false, "orbit label, e.g. p0d5"}};
 constexpr OpParamSpec kOrbit2[] = {
-    {"orbit1", OpParamType::Orbit, false, "bra orbit, e.g. p0s1"},
-    {"orbit2", OpParamType::Orbit, false, "ket orbit, e.g. p0s1"}};
-constexpr OpParamSpec kR[] = {{"r", OpParamType::Number, true, "radius in fm"}};
+    {"orbit1", OpParamType::kOrbit, false, "bra orbit, e.g. p0s1"},
+    {"orbit2", OpParamType::kOrbit, false, "ket orbit, e.g. p0s1"}};
+constexpr OpParamSpec kR[] = {
+    {"r", OpParamType::kNumber, true, "radius in fm"}};
 constexpr OpParamSpec kRmax[] = {
-    {"rmax", OpParamType::Number, true, "sphere radius in fm"}};
+    {"rmax", OpParamType::kNumber, true, "sphere radius in fm"}};
 
 using Params = std::span<const OpParamSpec>;
 
 /// A P1 row (scalar: J = 0, dTz = 0, even parity). Particle ranks are a best
 /// guess, to be confirmed by the operator-library milestone.
-OperatorCatalogEntry p1(std::string_view name, Params params, OperatorKind kind,
+OperatorCatalogEntry P1(std::string_view name, Params params, OperatorKind kind,
                         int rank, std::string_view doc, int min_params = -1,
                         bool macro = false) {
   OperatorCatalogEntry e;
@@ -54,14 +55,14 @@ OperatorCatalogEntry p1(std::string_view name, Params params, OperatorKind kind,
   e.min_params = min_params < 0 ? static_cast<int>(params.size()) : min_params;
   e.macro = macro;
   e.shape = OperatorShape{0, 0, 0, rank};
-  e.phase = Phase::P1;
+  e.phase = Phase::kP1;
   e.kind = kind;
   e.doc = doc;
   return e;
 }
 
 /// A planned or not-supported row: variadic, no kind.
-OperatorCatalogEntry later(std::string_view name, Phase phase,
+OperatorCatalogEntry Later(std::string_view name, Phase phase,
                            OperatorShape shape, std::string_view doc,
                            bool macro = false) {
   OperatorCatalogEntry e;
@@ -74,78 +75,79 @@ OperatorCatalogEntry later(std::string_view name, Phase phase,
   return e;
 }
 
-void add_p1_rows(std::vector<OperatorCatalogEntry>& v) {
+void AddP1Rows(std::vector<OperatorCatalogEntry>& v) {
   const Params none;
   using K = OperatorKind;
   v.push_back(
-      p1("Trel", none, K::Trel, 2, "intrinsic kinetic energy T - T_cm"));
-  v.push_back(p1("TCM", none, K::Tcm, 2, "center-of-mass kinetic energy"));
+      P1("Trel", none, K::kTrel, 2, "intrinsic kinetic energy T - T_cm"));
+  v.push_back(P1("TCM", none, K::kTcm, 2, "center-of-mass kinetic energy"));
   v.push_back(
-      p1("Tlab", none, K::Tlab, 1, "lab-frame kinetic energy (one-body)"));
-  v.push_back(p1("TrelMassCorrection", none, K::TrelMassCorrection, 2,
+      P1("Tlab", none, K::kTlab, 1, "lab-frame kinetic energy (one-body)"));
+  v.push_back(P1("TrelMassCorrection", none, K::kTrelMassCorrection, 2,
                  "proton-neutron mass-difference correction to Trel"));
-  v.push_back(p1(
-      "HCM", Params(kHw), K::Hcm, 2,
+  v.push_back(P1(
+      "HCM", Params(kHw), K::kHcm, 2,
       "Lawson center-of-mass Hamiltonian; without <hw> uses the basis hw", 0));
-  v.push_back(p1("VCM", Params(kHw), K::Vcm, 2,
+  v.push_back(P1("VCM", Params(kHw), K::kVcm, 2,
                  "oscillator term of HCM at frequency <hw>"));
-  v.push_back(p1("R2CM", none, K::R2cm, 2, "center-of-mass R^2"));
+  v.push_back(P1("R2CM", none, K::kR2cm, 2, "center-of-mass R^2"));
   v.push_back(
-      p1("Rp2", none, K::Rp2, 2, "intrinsic point-proton radius squared"));
+      P1("Rp2", none, K::kRp2, 2, "intrinsic point-proton radius squared"));
   v.push_back(
-      p1("Rn2", none, K::Rn2, 2, "intrinsic point-neutron radius squared"));
+      P1("Rn2", none, K::kRn2, 2, "intrinsic point-neutron radius squared"));
   v.push_back(
-      p1("Rm2", none, K::Rm2, 2, "intrinsic point-matter radius squared"));
-  v.push_back(p1("Rm2lab", none, K::Rm2lab, 1,
+      P1("Rm2", none, K::kRm2, 2, "intrinsic point-matter radius squared"));
+  v.push_back(P1("Rm2lab", none, K::kRm2lab, 1,
                  "lab-frame matter radius squared (one-body)"));
-  v.push_back(p1("Rp2Z", Params(kZ), K::Rp2Z, 2,
+  v.push_back(P1("Rp2Z", Params(kZ), K::kRp2Z, 2,
                  "Rp2 with the proton number overridden"));
-  v.push_back(p1("Rp2AZ", Params(kAZ), K::Rp2AZ, 2,
+  v.push_back(P1("Rp2AZ", Params(kAZ), K::kRp2Az, 2,
                  "Rp2 with mass and proton number overridden"));
-  v.push_back(p1("Rn2Z", Params(kZ), K::Rn2Z, 2,
+  v.push_back(P1("Rn2Z", Params(kZ), K::kRn2Z, 2,
                  "Rn2 with the proton number overridden"));
-  v.push_back(p1("R2_p1", none, K::R2p1, 1, "one-body part of the proton r^2"));
   v.push_back(
-      p1("R2_n1", none, K::R2n1, 1, "one-body part of the neutron r^2"));
-  v.push_back(p1("R2_p2", none, K::R2p2, 2,
+      P1("R2_p1", none, K::kR2p1, 1, "one-body part of the proton r^2"));
+  v.push_back(
+      P1("R2_n1", none, K::kR2n1, 1, "one-body part of the neutron r^2"));
+  v.push_back(P1("R2_p2", none, K::kR2p2, 2,
                  "two-body part (r_i.r_j) of the proton r^2"));
-  v.push_back(p1("R2_n2", none, K::R2n2, 2,
+  v.push_back(P1("R2_n2", none, K::kR2n2, 2,
                  "two-body part (r_i.r_j) of the neutron r^2"));
-  v.push_back(
-      p1("Rso", none, K::Rso, 1, "spin-orbit correction to the proton radius"));
-  v.push_back(p1("E0", none, K::E0, 1, "isoscalar monopole operator"));
-  v.push_back(p1("OccRef", none, K::OccRef, 1,
+  v.push_back(P1("Rso", none, K::kRso, 1,
+                 "spin-orbit correction to the proton radius"));
+  v.push_back(P1("E0", none, K::kE0, 1, "isoscalar monopole operator"));
+  v.push_back(P1("OccRef", none, K::kOccRef, 1,
                  "number operator on the reference orbits"));
-  v.push_back(p1("OneOcc", Params(kOrbit), K::OneOcc, 1,
+  v.push_back(P1("OneOcc", Params(kOrbit), K::kOneOcc, 1,
                  "occupation number of one orbit"));
-  v.push_back(p1("AllOcc", Params(kOrbit), K::AllOcc, 1,
+  v.push_back(P1("AllOcc", Params(kOrbit), K::kAllOcc, 1,
                  "occupation summed over n for the (l, j, tz) of the orbit"));
-  v.push_back(p1("OBD", Params(kOrbit2), K::Obd, 1,
+  v.push_back(P1("OBD", Params(kOrbit2), K::kObd, 1,
                  "one-body density matrix element <orbit1|.|orbit2>"));
   v.push_back(
-      p1("rhop", Params(kR), K::RhoP, 1, "point-proton density at radius r"));
+      P1("rhop", Params(kR), K::kRhoP, 1, "point-proton density at radius r"));
   v.push_back(
-      p1("rhon", Params(kR), K::RhoN, 1, "point-neutron density at radius r"));
-  v.push_back(p1("rhop_all", none, K::RhoP, 1,
+      P1("rhon", Params(kR), K::kRhoN, 1, "point-neutron density at radius r"));
+  v.push_back(P1("rhop_all", none, K::kRhoP, 1,
                  "macro: rhop_<r> for r = 0, 0.2, ..., 10 (51 operators)", -1,
                  true));
-  v.push_back(p1("rhon_all", none, K::RhoN, 1,
+  v.push_back(P1("rhon_all", none, K::kRhoN, 1,
                  "macro: rhon_<r> for r = 0, 0.2, ..., 10 (51 operators)", -1,
                  true));
-  v.push_back(p1("rhocentralp", Params(kRmax), K::RhoCentralP, 1,
+  v.push_back(P1("rhocentralp", Params(kRmax), K::kRhoCentralP, 1,
                  "central proton density averaged on a sphere of radius rmax"));
   v.push_back(
-      p1("rhocentraln", Params(kRmax), K::RhoCentralN, 1,
+      P1("rhocentraln", Params(kRmax), K::kRhoCentralN, 1,
          "central neutron density averaged on a sphere of radius rmax"));
-  v.push_back(p1("Iso2", none, K::Iso2, 2, "total isospin squared T^2"));
-  v.push_back(p1("Tz2", none, K::Tz2, 2, "isospin projection squared Tz^2"));
-  v.push_back(p1("LdotS", none, K::LdotS, 1, "one-body l.s"));
+  v.push_back(P1("Iso2", none, K::kIso2, 2, "total isospin squared T^2"));
+  v.push_back(P1("Tz2", none, K::kTz2, 2, "isospin projection squared Tz^2"));
+  v.push_back(P1("LdotS", none, K::kLdotS, 1, "one-body l.s"));
 }
 
-void add_planned_rows(std::vector<OperatorCatalogEntry>& v) {
+void AddPlannedRows(std::vector<OperatorCatalogEntry>& v) {
   const auto pl = [&v](std::string_view name, OperatorShape shape,
                        std::string_view doc, bool macro = false) {
-    v.push_back(later(name, Phase::Planned, shape, doc, macro));
+    v.push_back(Later(name, Phase::kPlanned, shape, doc, macro));
   };
   // Shape order: rank_j, dtz, parity, particle_rank. dTz is in imsrg++ units
   // (Operator(ms, J, dTz, parity, rank)): 1 for beta decay, 2 for 0vbb. Scalar
@@ -237,30 +239,30 @@ void add_planned_rows(std::vector<OperatorCatalogEntry>& v) {
      "dark-matter NR-EFT operator, DMNREFT_<Op><IsoSV>_<q>_<J>");
 }
 
-void add_not_supported_rows(std::vector<OperatorCatalogEntry>& v) {
-  v.push_back(later("hfsNMS", Phase::NotSupported, {0, 0, 0, 1},
+void AddNotSupportedRows(std::vector<OperatorCatalogEntry>& v) {
+  v.push_back(Later("hfsNMS", Phase::kNotSupported, {0, 0, 0, 1},
                     "atomic normal mass shift"));
-  v.push_back(later("hfsSMS", Phase::NotSupported, {0, 0, 0, 2},
+  v.push_back(Later("hfsSMS", Phase::kNotSupported, {0, 0, 0, 2},
                     "atomic specific mass shift"));
 }
 
-const std::vector<OperatorCatalogEntry>& catalog_rows() {
-  static const std::vector<OperatorCatalogEntry> rows = [] {
+const std::vector<OperatorCatalogEntry>& CatalogRows() {
+  static const std::vector<OperatorCatalogEntry> kRows = [] {
     std::vector<OperatorCatalogEntry> v;
     v.reserve(160);
-    add_p1_rows(v);
-    add_planned_rows(v);
-    add_not_supported_rows(v);
+    AddP1Rows(v);
+    AddPlannedRows(v);
+    AddNotSupportedRows(v);
     return v;
   }();
-  return rows;
+  return kRows;
 }
 
 // -----------------------------------------------------------------------------
 // Helpers
 // -----------------------------------------------------------------------------
 
-std::vector<std::string_view> split_underscore(std::string_view s) {
+std::vector<std::string_view> SplitUnderscore(std::string_view s) {
   std::vector<std::string_view> out;
   std::size_t start = 0;
   for (;;) {
@@ -276,66 +278,65 @@ std::vector<std::string_view> split_underscore(std::string_view s) {
 
 /// Shortest round-trip decimal form of `d` (3.0 -> "3", 0.2 -> "0.2"); negative
 /// zero prints "0".
-std::string format_number(double d) {
+std::string FormatNumber(double d) {
   if (d == 0.0) d = 0.0;
   char buf[64];
   const auto res = std::to_chars(buf, buf + sizeof(buf), d);
   return std::string(buf, res.ptr);
 }
 
-std::string format_param(const OpParam& p) {
+std::string FormatParam(const OpParam& p) {
   if (const auto* i = std::get_if<std::int64_t>(&p)) return std::to_string(*i);
-  if (const auto* d = std::get_if<double>(&p)) return format_number(*d);
+  if (const auto* d = std::get_if<double>(&p)) return FormatNumber(*d);
   return std::get<std::string>(p);
 }
 
-std::string canonical_of(std::string_view name,
-                         const std::vector<OpParam>& params) {
+std::string CanonicalOf(std::string_view name,
+                        const std::vector<OpParam>& params) {
   std::string s(name);
   for (const auto& p : params) {
     s += '_';
-    s += format_param(p);
+    s += FormatParam(p);
   }
   return s;
 }
 
-std::string type_text(const OpParamSpec& p) {
+std::string TypeText(const OpParamSpec& p) {
   switch (p.type) {
-    case OpParamType::Integer:
+    case OpParamType::kInteger:
       return "integer";
-    case OpParamType::Number:
+    case OpParamType::kNumber:
       return p.non_negative ? "number >= 0" : "number";
-    case OpParamType::Orbit:
+    case OpParamType::kOrbit:
       return "orbit";
-    case OpParamType::Word:
+    case OpParamType::kWord:
       return "word";
   }
   return "?";
 }
 
-std::string schema_text(const OperatorCatalogEntry& row) {
+std::string SchemaText(const OperatorCatalogEntry& row) {
   std::string s;
   for (const auto& p : row.params) {
     if (!s.empty()) s += ", ";
-    s += std::string(p.name) + ": " + type_text(p);
+    s += std::string(p.name) + ": " + TypeText(p);
   }
   return s;
 }
 
-std::string plural_params(std::size_t n) {
+std::string PluralParams(std::size_t n) {
   return n == 1 ? "1 parameter" : std::to_string(n) + " parameters";
 }
 
 /// "expects 1 parameter (r: number >= 0)", "expects 0 or 1 parameters (...)",
 /// "expects no parameters".
-std::string expects_text(const OperatorCatalogEntry& row) {
+std::string ExpectsText(const OperatorCatalogEntry& row) {
   const auto n = row.params.size();
   const auto m = static_cast<std::size_t>(row.min_params);
   if (n == 0) return "expects no parameters";
   std::string s = "expects ";
-  s +=
-      m == n ? plural_params(n) : std::to_string(m) + " to " + plural_params(n);
-  s += " (" + schema_text(row) + ")";
+  s += m == n ? PluralParams(n) : std::to_string(m) + " to " + PluralParams(n);
+  s += " (" + SchemaText(row) + ")";
   return s;
 }
 
@@ -344,7 +345,7 @@ struct ParamError {
   std::string detail;
 };
 
-bool is_word(std::string_view s) {
+bool IsWord(std::string_view s) {
   if (s.empty()) return false;
   return std::all_of(s.begin(), s.end(), [](char c) {
     return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
@@ -352,26 +353,26 @@ bool is_word(std::string_view s) {
   });
 }
 
-std::optional<ParamError> check_number(double d, const OpParamSpec& spec) {
+std::optional<ParamError> CheckNumber(double d, const OpParamSpec& spec) {
   if (!std::isfinite(d)) {
     return ParamError{"E-OP-PARAMS",
                       "'" + std::string(spec.name) + "' must be finite"};
   }
   if (spec.non_negative && d < 0.0) {
-    return ParamError{"E-OP-PARAMS",
-                      "'" + format_number(d) + "' is negative (" +
-                          std::string(spec.name) + " must be >= 0)"};
+    return ParamError{"E-OP-PARAMS", "'" + FormatNumber(d) + "' is negative (" +
+                                         std::string(spec.name) +
+                                         " must be >= 0)"};
   }
   return std::nullopt;
 }
 
 /// Parses an orbit label and checks e <= emax. Malformed labels are
 /// E-OP-PARAMS, labels outside the model space E-OP-ORBIT.
-std::optional<ParamError> make_orbit(std::string_view label, int emax,
-                                     OpParam& out) {
+std::optional<ParamError> MakeOrbit(std::string_view label, int emax,
+                                    OpParam& out) {
   basis::Orbit o;
   try {
-    o = basis::parse_orbit_label(label);
+    o = basis::ParseOrbitLabel(label);
   } catch (const InputError&) {
     return ParamError{"E-OP-PARAMS",
                       "'" + std::string(label) +
@@ -384,17 +385,17 @@ std::optional<ParamError> make_orbit(std::string_view label, int emax,
             ") is outside the model space (emax = " + std::to_string(emax) +
             ")"};
   }
-  out = basis::orbit_label(o);
+  out = basis::OrbitLabel(o);
   return std::nullopt;
 }
 
 /// Converts one string token per the schema.
-std::optional<ParamError> convert_token(const OpParamSpec& spec,
-                                        std::string_view tok, int emax,
-                                        OpParam& out) {
+std::optional<ParamError> ConvertToken(const OpParamSpec& spec,
+                                       std::string_view tok, int emax,
+                                       OpParam& out) {
   const auto quoted = "'" + std::string(tok) + "'";
   switch (spec.type) {
-    case OpParamType::Integer: {
+    case OpParamType::kInteger: {
       std::int64_t v = 0;
       const auto res = std::from_chars(tok.data(), tok.data() + tok.size(), v);
       if (tok.empty() || res.ec != std::errc{} ||
@@ -404,21 +405,21 @@ std::optional<ParamError> convert_token(const OpParamSpec& spec,
       out = v;
       return std::nullopt;
     }
-    case OpParamType::Number: {
+    case OpParamType::kNumber: {
       double v = 0.0;
       const auto res = std::from_chars(tok.data(), tok.data() + tok.size(), v);
       if (tok.empty() || res.ec != std::errc{} ||
           res.ptr != tok.data() + tok.size() || !std::isfinite(v)) {
         return ParamError{"E-OP-PARAMS", quoted + " is not a number"};
       }
-      if (auto err = check_number(v, spec)) return err;
+      if (auto err = CheckNumber(v, spec)) return err;
       out = v == 0.0 ? 0.0 : v;
       return std::nullopt;
     }
-    case OpParamType::Orbit:
-      return make_orbit(tok, emax, out);
-    case OpParamType::Word:
-      if (!is_word(tok)) {
+    case OpParamType::kOrbit:
+      return MakeOrbit(tok, emax, out);
+    case OpParamType::kWord:
+      if (!IsWord(tok)) {
         return ParamError{"E-OP-PARAMS",
                           quoted + " is not a word ([A-Za-z0-9+-]+)"};
       }
@@ -429,9 +430,9 @@ std::optional<ParamError> convert_token(const OpParamSpec& spec,
 }
 
 /// Converts one inline-table value per the schema.
-std::optional<ParamError> convert_value(const OpParamSpec& spec,
-                                        const RawValue& val, int emax,
-                                        OpParam& out) {
+std::optional<ParamError> ConvertValue(const OpParamSpec& spec,
+                                       const RawValue& val, int emax,
+                                       OpParam& out) {
   const auto key = "'" + std::string(spec.name) + "'";
   const auto wrong_type = [&](std::string_view expected) {
     return ParamError{"E-OP-PARAMS", "parameter " + key + " must be " +
@@ -439,13 +440,13 @@ std::optional<ParamError> convert_value(const OpParamSpec& spec,
                                          std::string(val.type_name())};
   };
   switch (spec.type) {
-    case OpParamType::Integer: {
+    case OpParamType::kInteger: {
       const auto* i = val.get_if<std::int64_t>();
       if (!i) return wrong_type("an integer");
       out = *i;
       return std::nullopt;
     }
-    case OpParamType::Number: {
+    case OpParamType::kNumber: {
       double d = 0.0;
       if (const auto* i = val.get_if<std::int64_t>()) {
         d = static_cast<double>(*i);
@@ -454,19 +455,19 @@ std::optional<ParamError> convert_value(const OpParamSpec& spec,
       } else {
         return wrong_type("a number");
       }
-      if (auto err = check_number(d, spec)) return err;
+      if (auto err = CheckNumber(d, spec)) return err;
       out = d == 0.0 ? 0.0 : d;
       return std::nullopt;
     }
-    case OpParamType::Orbit: {
+    case OpParamType::kOrbit: {
       const auto* s = val.get_if<std::string>();
       if (!s) return wrong_type("an orbit label string");
-      return make_orbit(*s, emax, out);
+      return MakeOrbit(*s, emax, out);
     }
-    case OpParamType::Word: {
+    case OpParamType::kWord: {
       const auto* s = val.get_if<std::string>();
       if (!s) return wrong_type("a string");
-      if (!is_word(*s)) {
+      if (!IsWord(*s)) {
         return ParamError{"E-OP-PARAMS",
                           "parameter " + key + ": '" + *s + "' is not a word"};
       }
@@ -477,30 +478,30 @@ std::optional<ParamError> convert_value(const OpParamSpec& spec,
   return std::nullopt;
 }
 
-OperatorRequest make_request(const OperatorCatalogEntry& row,
-                             std::vector<OpParam> params) {
+OperatorRequest MakeRequest(const OperatorCatalogEntry& row,
+                            std::vector<OpParam> params) {
   OperatorRequest r;
   r.kind = *row.kind;
-  r.canonical_name = canonical_of(row.name, params);
+  r.canonical_name = CanonicalOf(row.name, params);
   r.params = std::move(params);
   r.shape = row.shape;
-  r.phase = Phase::P1;
+  r.phase = Phase::kP1;
   return r;
 }
 
 /// The 51 requests of rhop_all / rhon_all: r = i / 5.0, i = 0..50 (exact
 /// decimals).
-void expand_macro(const OperatorCatalogEntry& row,
-                  std::vector<OperatorRequest>& out) {
+void ExpandMacro(const OperatorCatalogEntry& row,
+                 std::vector<OperatorRequest>& out) {
   const std::string_view base = row.name.substr(0, row.name.find('_'));
   const OperatorCatalogEntry* target = nullptr;
-  for (const auto& e : catalog_rows()) {
+  for (const auto& e : CatalogRows()) {
     if (e.name == base) target = &e;
   }
   if (target == nullptr)
     throw InvariantError("operator macro without a target row");
   for (int i = 0; i <= 50; ++i) {
-    out.push_back(make_request(*target, {OpParam{i / 5.0}}));
+    out.push_back(MakeRequest(*target, {OpParam{i / 5.0}}));
   }
 }
 
@@ -509,87 +510,88 @@ class ListParser {
   ListParser(const ModelSpaceInfo& info, std::string_view key_path)
       : emax_(info.emax), key_path_(key_path) {}
 
-  void parse_element(const RawValue& spec) {
+  void ParseElement(const RawValue& spec) {
     if (const auto* s = spec.get_if<std::string>()) {
-      parse_string(*s, spec.where);
+      ParseString(*s, spec.where);
     } else if (const auto* t = spec.get_if<RawTable>()) {
-      parse_table(*t, spec.where);
+      ParseTable(*t, spec.where);
     } else {
-      error("E-OP-PARAMS",
-            "an operator spec must be a string or an inline table, got " +
-                std::string(spec.type_name()),
-            spec.where);
+      AddError("E-OP-PARAMS",
+               "an operator spec must be a string or an inline table, got " +
+                   std::string(spec.type_name()),
+               spec.where);
     }
   }
 
-  Expected<std::vector<OperatorRequest>, ConfigIssues> finish() {
-    if (has_errors(issues_))
-      return Unexpected<ConfigIssues>{std::move(issues_)};
+  Expected<std::vector<OperatorRequest>, ConfigIssues> Finish() {
+    if (HasErrors(issues_)) return Unexpected<ConfigIssues>{std::move(issues_)};
     return std::move(requests_);
   }
 
  private:
-  void error(std::string code, std::string message, const SourceRef& where,
-             std::optional<std::string> suggestion = std::nullopt) {
-    issues_.push_back(make_error(std::move(code), key_path_, std::move(message),
-                                 where, std::move(suggestion)));
+  void AddError(std::string code, std::string message, const SourceRef& where,
+                std::optional<std::string> suggestion = std::nullopt) {
+    issues_.push_back(MakeError(std::move(code), key_path_, std::move(message),
+                                where, std::move(suggestion)));
   }
 
   /// Adds the requests of one spec; reports duplicates against everything added
   /// before.
-  void add(std::vector<OperatorRequest> reqs, const SourceRef& where) {
+  void Add(std::vector<OperatorRequest> reqs, const SourceRef& where) {
     for (auto& r : reqs) {
       if (!seen_.insert(r.canonical_name).second) {
-        error("E-OP-DUPLICATE",
-              "operator '" + r.canonical_name + "' is requested more than once",
-              where);
+        AddError(
+            "E-OP-DUPLICATE",
+            "operator '" + r.canonical_name + "' is requested more than once",
+            where);
         continue;
       }
       requests_.push_back(std::move(r));
     }
   }
 
-  std::optional<std::string> suggest(
+  std::optional<std::string> Suggest(
       const std::vector<std::string_view>& tokens) {
     std::vector<std::string_view> names;
-    for (const auto& e : catalog_rows()) names.push_back(e.name);
+    for (const auto& e : CatalogRows()) names.push_back(e.name);
     if (tokens.size() >= 2) {
       const std::string joined =
           std::string(tokens[0]) + "_" + std::string(tokens[1]);
-      if (auto s = did_you_mean(joined, names)) return s;
+      if (auto s = DidYouMean(joined, names)) return s;
     }
-    return did_you_mean(tokens[0], names);
+    return DidYouMean(tokens[0], names);
   }
 
   /// Handles the phase of a matched row; returns true if parsing must stop
   /// (planned / NS).
-  bool reject_phase(const OperatorCatalogEntry& row, const std::string& shown,
-                    const SourceRef& where) {
-    if (row.phase == Phase::Planned) {
-      error("E-PLANNED",
-            "operator '" + shown + "' is not available in this build", where);
+  bool RejectPhase(const OperatorCatalogEntry& row, const std::string& shown,
+                   const SourceRef& where) {
+    if (row.phase == Phase::kPlanned) {
+      AddError("E-PLANNED",
+               "operator '" + shown + "' is not available in this build",
+               where);
       return true;
     }
-    if (row.phase == Phase::NotSupported) {
-      error("E-OP-NS",
-            "operator '" + shown + "' is not supported (" +
-                std::string(row.doc) + ")",
-            where);
+    if (row.phase == Phase::kNotSupported) {
+      AddError("E-OP-NS",
+               "operator '" + shown + "' is not supported (" +
+                   std::string(row.doc) + ")",
+               where);
       return true;
     }
     return false;
   }
 
-  void parse_string(const std::string& spec, const SourceRef& where) {
+  void ParseString(const std::string& spec, const SourceRef& where) {
     if (spec.empty()) {
-      error("E-OP-PARAMS", "empty operator spec", where);
+      AddError("E-OP-PARAMS", "empty operator spec", where);
       return;
     }
-    const auto tokens = split_underscore(spec);
+    const auto tokens = SplitUnderscore(spec);
     const OperatorCatalogEntry* row = nullptr;
     std::size_t name_tokens = 0;
-    for (const auto& e : catalog_rows()) {
-      const auto nt = split_underscore(e.name);
+    for (const auto& e : CatalogRows()) {
+      const auto nt = SplitUnderscore(e.name);
       if (nt.size() <= name_tokens || nt.size() > tokens.size()) continue;
       if (std::equal(nt.begin(), nt.end(), tokens.begin())) {
         row = &e;
@@ -597,76 +599,76 @@ class ListParser {
       }
     }
     if (row == nullptr && tokens[0].starts_with("QdotQ")) {
-      for (const auto& e : catalog_rows()) {
+      for (const auto& e : CatalogRows()) {
         if (e.name == "QdotQ") row = &e;
       }
       name_tokens = 1;
     }
     if (row == nullptr) {
       const std::string name(tokens[0]);
-      error("E-OP-UNKNOWN", "operator '" + name + "' is not known", where,
-            suggest(tokens));
+      AddError("E-OP-UNKNOWN", "operator '" + name + "' is not known", where,
+               Suggest(tokens));
       return;
     }
-    if (reject_phase(*row, spec, where)) return;
+    if (RejectPhase(*row, spec, where)) return;
 
     const std::size_t given = tokens.size() - name_tokens;
     const auto n = row->params.size();
     if (given < static_cast<std::size_t>(row->min_params) || given > n) {
-      error("E-OP-PARAMS",
-            "'" + std::string(row->name) + "' " + expects_text(*row) +
-                ", got " + std::to_string(given),
-            where);
+      AddError("E-OP-PARAMS",
+               "'" + std::string(row->name) + "' " + ExpectsText(*row) +
+                   ", got " + std::to_string(given),
+               where);
       return;
     }
     std::vector<OpParam> params;
     bool ok = true;
     for (std::size_t i = 0; i < given; ++i) {
       OpParam value;
-      if (auto err = convert_token(row->params[i], tokens[name_tokens + i],
-                                   emax_, value)) {
-        error(err->code, "'" + spec + "': " + err->detail, where);
+      if (auto err = ConvertToken(row->params[i], tokens[name_tokens + i],
+                                  emax_, value)) {
+        AddError(err->code, "'" + spec + "': " + err->detail, where);
         ok = false;
       } else {
         params.push_back(std::move(value));
       }
     }
     if (!ok) return;
-    finish_row(*row, std::move(params), where);
+    FinishRow(*row, std::move(params), where);
   }
 
-  void finish_row(const OperatorCatalogEntry& row, std::vector<OpParam> params,
-                  const SourceRef& where) {
+  void FinishRow(const OperatorCatalogEntry& row, std::vector<OpParam> params,
+                 const SourceRef& where) {
     std::vector<OperatorRequest> reqs;
     if (row.macro) {
-      expand_macro(row, reqs);
+      ExpandMacro(row, reqs);
     } else {
-      reqs.push_back(make_request(row, std::move(params)));
+      reqs.push_back(MakeRequest(row, std::move(params)));
     }
-    add(std::move(reqs), where);
+    Add(std::move(reqs), where);
   }
 
-  void parse_table(const RawTable& table, const SourceRef& where) {
+  void ParseTable(const RawTable& table, const SourceRef& where) {
     const RawValue* name_val = nullptr;
     for (const auto& [k, v] : table) {
       if (k == "name") name_val = &v;
     }
     const auto* name = name_val ? name_val->get_if<std::string>() : nullptr;
     if (name == nullptr) {
-      error("E-OP-PARAMS", "an inline operator table needs a string key 'name'",
-            where);
+      AddError("E-OP-PARAMS",
+               "an inline operator table needs a string key 'name'", where);
       return;
     }
     const OperatorCatalogEntry* row = nullptr;
-    for (const auto& e : catalog_rows()) {
+    for (const auto& e : CatalogRows()) {
       if (e.name == *name) row = &e;
     }
     if (row == nullptr) {
-      error("E-OP-UNKNOWN", "operator '" + *name + "' is not known", where,
-            suggest(split_underscore(*name)));
+      AddError("E-OP-UNKNOWN", "operator '" + *name + "' is not known", where,
+               Suggest(SplitUnderscore(*name)));
       return;
     }
-    if (reject_phase(*row, *name, where)) return;
+    if (RejectPhase(*row, *name, where)) return;
 
     bool ok = true;
     std::set<std::string_view> keys;
@@ -676,15 +678,16 @@ class ListParser {
           std::any_of(row->params.begin(), row->params.end(),
                       [&](const OpParamSpec& p) { return p.name == k; });
       if (!known) {
-        const auto sch = schema_text(*row);
-        error("E-OP-PARAMS",
-              "'" + *name + "': unexpected key '" + k +
-                  "' (parameters: " + (sch.empty() ? "none" : sch) + ")",
-              where);
+        const auto sch = SchemaText(*row);
+        AddError("E-OP-PARAMS",
+                 "'" + *name + "': unexpected key '" + k +
+                     "' (parameters: " + (sch.empty() ? "none" : sch) + ")",
+                 where);
         ok = false;
       } else if (!keys.insert(k).second) {
-        error("E-OP-PARAMS",
-              "'" + *name + "': key '" + k + "' given more than once", where);
+        AddError("E-OP-PARAMS",
+                 "'" + *name + "': key '" + k + "' given more than once",
+                 where);
         ok = false;
       }
     }
@@ -698,33 +701,33 @@ class ListParser {
       }
       if (val == nullptr) {
         if (static_cast<int>(i) < row->min_params) {
-          error("E-OP-PARAMS",
-                "'" + *name + "' " + expects_text(*row) +
-                    ": missing parameter '" + std::string(spec.name) + "'",
-                where);
+          AddError("E-OP-PARAMS",
+                   "'" + *name + "' " + ExpectsText(*row) +
+                       ": missing parameter '" + std::string(spec.name) + "'",
+                   where);
           ok = false;
         }
         gap = true;
         continue;
       }
       if (gap) {
-        error("E-OP-PARAMS",
-              "'" + *name + "': parameter '" + std::string(spec.name) +
-                  "' given after a missing optional parameter",
-              where);
+        AddError("E-OP-PARAMS",
+                 "'" + *name + "': parameter '" + std::string(spec.name) +
+                     "' given after a missing optional parameter",
+                 where);
         ok = false;
         continue;
       }
       OpParam value;
-      if (auto err = convert_value(spec, *val, emax_, value)) {
-        error(err->code, "'" + *name + "': " + err->detail, where);
+      if (auto err = ConvertValue(spec, *val, emax_, value)) {
+        AddError(err->code, "'" + *name + "': " + err->detail, where);
         ok = false;
       } else {
         params.push_back(std::move(value));
       }
     }
     if (!ok) return;
-    finish_row(*row, std::move(params), where);
+    FinishRow(*row, std::move(params), where);
   }
 
   int emax_;
@@ -734,14 +737,14 @@ class ListParser {
   std::set<std::string> seen_;
 };
 
-std::string shape_text(const OperatorShape& s) {
+std::string ShapeText(const OperatorShape& s) {
   std::ostringstream os;
   os << "J=" << s.rank_j << " dTz=" << s.dtz
      << " P=" << (s.parity == 0 ? '+' : '-') << " rank=" << s.particle_rank;
   return os.str();
 }
 
-std::string display_name(const OperatorCatalogEntry& e) {
+std::string DisplayName(const OperatorCatalogEntry& e) {
   if (e.name == "QdotQ") return "QdotQ*";
   std::string s(e.name);
   if (e.variadic) {
@@ -761,53 +764,53 @@ std::string display_name(const OperatorCatalogEntry& e) {
 
 }  // namespace
 
-std::span<const OperatorCatalogEntry> operator_catalog() noexcept {
+std::span<const OperatorCatalogEntry> OperatorCatalog() noexcept {
   try {
-    return catalog_rows();
+    return CatalogRows();
   } catch (...) {
     return {};
   }
 }
 
-Expected<std::vector<OperatorRequest>, ConfigIssues> parse_operator_list(
+Expected<std::vector<OperatorRequest>, ConfigIssues> ParseOperatorList(
     std::span<const RawValue> specs, const ModelSpaceInfo& info,
     std::string_view key_path) {
   ListParser parser(info, key_path);
-  for (const auto& spec : specs) parser.parse_element(spec);
-  return parser.finish();
+  for (const auto& spec : specs) parser.ParseElement(spec);
+  return parser.Finish();
 }
 
-Expected<std::vector<OperatorRequest>, ConfigIssues> parse_operator_spec(
+Expected<std::vector<OperatorRequest>, ConfigIssues> ParseOperatorSpec(
     std::string_view spec, const ModelSpaceInfo& info) {
   const RawValue value{RawValue::Data{std::string(spec)}, SourceRef{}};
-  return parse_operator_list(std::span<const RawValue>(&value, 1), info,
-                             "operators.list");
+  return ParseOperatorList(std::span<const RawValue>(&value, 1), info,
+                           "operators.list");
 }
 
-std::string operator_catalog_text() {
+std::string OperatorCatalogText() {
   std::ostringstream os;
   const struct {
     Phase phase;
     const char* heading;
   } groups[] = {
-      {Phase::P1, "P1 (implemented)"},
-      {Phase::Planned, "planned (recognised, not available in this build)"},
-      {Phase::NotSupported, "not supported"}};
+      {Phase::kP1, "P1 (implemented)"},
+      {Phase::kPlanned, "planned (recognised, not available in this build)"},
+      {Phase::kNotSupported, "not supported"}};
   for (const auto& g : groups) {
     os << g.heading << ":\n";
-    for (const auto& e : catalog_rows()) {
+    for (const auto& e : CatalogRows()) {
       if (e.phase != g.phase) continue;
-      os << "  " << display_name(e);
+      os << "  " << DisplayName(e);
       if (!e.params.empty()) {
         os << "  [";
         for (std::size_t i = 0; i < e.params.size(); ++i) {
           if (i > 0) os << "; ";
-          os << e.params[i].name << ": " << type_text(e.params[i]) << ", "
+          os << e.params[i].name << ": " << TypeText(e.params[i]) << ", "
              << e.params[i].doc;
         }
         os << "]";
       }
-      os << "  " << shape_text(e.shape) << "  " << e.doc << "\n";
+      os << "  " << ShapeText(e.shape) << "  " << e.doc << "\n";
     }
     os << "\n";
   }

@@ -37,11 +37,11 @@ static_assert(std::is_trivially_copyable_v<OneBodyArgs>);
 
 }  // namespace
 
-void comm110ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+void Comm110ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                Workspace& ws) {
-  detail::check_term_inputs(X, Y, Z, ws);
+  detail::CheckTermInputs(X, Y, Z, ws);
   // [X,Y] is anti-Hermitian (hZ = -hX hY = -1) -> the scalar part vanishes.
-  if (detail::commutator_hermiticity_sign(X, Y) < 0) return;
+  if (detail::CommutatorHermiticitySign(X, Y) < 0) return;
   const auto& impl = ws.impl();
   OneBodyArgs a;
   a.x = std::as_const(X).one_body().device_view();
@@ -51,7 +51,7 @@ void comm110ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   a.ch1 = impl.one_body_channels();
   const exec::Index norb = impl.tables.orbits().num_orbits;
   double sum = 0.0;
-  exec::parallel_reduce(
+  exec::ParallelReduce(
       "commutator::comm110ss", norb,
       IMSRG_LAMBDA(const exec::Index ia, double& partial) {
         const int p = static_cast<int>(ia);
@@ -69,11 +69,11 @@ void comm110ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   Z.zero_body() += sum;
 }
 
-void comm220ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+void Comm220ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                Workspace& ws) {
-  detail::check_term_inputs(X, Y, Z, ws);
+  detail::CheckTermInputs(X, Y, Z, ws);
   // [X,Y] is anti-Hermitian (hZ = -hX hY = -1) -> the scalar part vanishes.
-  if (detail::commutator_hermiticity_sign(X, Y) < 0) return;
+  if (detail::CommutatorHermiticitySign(X, Y) < 0) return;
   if (!X.two_body().allocated() || !Y.two_body().allocated()) return;
   const auto& impl = ws.impl();
   const TwoBodyView xv = impl.two_body_view(X);
@@ -83,7 +83,7 @@ void comm220ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   const exec::Index nentries =
       static_cast<exec::Index>(impl.entry_channel.size());
   double sum = 0.0;
-  exec::parallel_reduce(
+  exec::ParallelReduce(
       "commutator::comm220ss", nentries,
       IMSRG_LAMBDA(const exec::Index e, double& partial) {
         const int ch = entry_channel[e];
@@ -114,13 +114,13 @@ void comm220ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   Z.zero_body() += sum;
 }
 
-void comm111ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+void Comm111ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                Workspace& ws) {
-  detail::check_term_inputs(X, Y, Z, ws);
+  detail::CheckTermInputs(X, Y, Z, ws);
   // Host BLAS on the one-body matrices (tiny: norb^3). GPU backends will route
   // gemm to device BLAS; until then wait for pending device work before
   // touching the data.
-  exec::fence("commutator::comm111ss");
+  exec::Fence("commutator::comm111ss");
   const auto x1 = std::as_const(X).one_body().device_view();
   const auto y1 = std::as_const(Y).one_body().device_view();
   const auto z1 = Z.one_body().device_view();
@@ -129,13 +129,15 @@ void comm111ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   IMSRG_CHECK(Z.one_body().buffer().host_is_device(),
               "comm111ss: host BLAS on device memory; needs a device gemm (GPU "
               "backends)");
-  linalg::gemm(1.0, x1, linalg::Op::NoTrans, y1, linalg::Op::NoTrans, 1.0, z1);
-  linalg::gemm(-1.0, y1, linalg::Op::NoTrans, x1, linalg::Op::NoTrans, 1.0, z1);
+  linalg::Gemm(1.0, x1, linalg::Op::kNoTrans, y1, linalg::Op::kNoTrans, 1.0,
+               z1);
+  linalg::Gemm(-1.0, y1, linalg::Op::kNoTrans, x1, linalg::Op::kNoTrans, 1.0,
+               z1);
 }
 
-void comm121ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+void Comm121ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                Workspace& ws) {
-  detail::check_term_inputs(X, Y, Z, ws);
+  detail::CheckTermInputs(X, Y, Z, ws);
   // [X1,Y2] and [X2,Y1] each need only one two-body operand (a missing part
   // reads as zero).
   if (!X.two_body().allocated() && !Y.two_body().allocated()) return;
@@ -153,7 +155,7 @@ void comm121ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   const std::int32_t* orbits = impl.ob_orbits.device_data();
   const int norb = impl.tables.orbits().num_orbits;
   const exec::Index nentries = static_cast<exec::Index>(impl.ob_orbits.size());
-  exec::parallel_for(
+  exec::ParallelFor(
       "commutator::comm121ss", nentries, IMSRG_LAMBDA(const exec::Index e) {
         const int i = owner[e];
         const int j = orbits[e];
@@ -187,12 +189,12 @@ void comm121ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
         }
         z1(i, j) += z / (ji + 1);
       });
-  exec::fence("commutator::comm121ss");
+  exec::Fence("commutator::comm121ss");
 }
 
-void comm122ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+void Comm122ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                Workspace& ws) {
-  detail::check_term_inputs(X, Y, Z, ws);
+  detail::CheckTermInputs(X, Y, Z, ws);
   if (!Z.two_body().allocated()) return;
   if (!X.two_body().allocated() && !Y.two_body().allocated()) return;
   const auto& impl = ws.impl();
@@ -212,16 +214,16 @@ void comm122ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   const std::int32_t* lto = impl.lifted.to.device_data();
   const double* lcoef = impl.lifted.coef.device_data();
   const double hz =
-      static_cast<double>(detail::commutator_hermiticity_sign(X, Y));
+      static_cast<double>(detail::CommutatorHermiticitySign(X, Y));
   const int nch = xv.tb.num_channels;
   const exec::Index total = static_cast<exec::Index>(impl.two_body_size);
   // One thread per element (r, c) with r <= c. B(r, c) is the bra part (lifted
   // one-body list of row r acting on column c of X, Y); the ket part of Z(r, c)
   // is hZ B(c, r) by hermiticity of X, Y (checked by check_term_inputs), and
   // Z(c, r) = hZ Z(r, c). No division or sqrt.
-  exec::parallel_for(
+  exec::ParallelFor(
       "commutator::comm122ss", total, IMSRG_LAMBDA(const exec::Index e) {
-        const int ch = detail::find_block(block_offset, nch, e);
+        const int ch = detail::FindBlock(block_offset, nch, e);
         const std::int64_t off = block_offset[ch];
         const std::int64_t local = e - off;
         const int n = num_kets[ch];
@@ -252,7 +254,7 @@ void comm122ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
         z2[off + r + static_cast<std::int64_t>(c) * n] += z;
         if (r < c) z2[off + c + static_cast<std::int64_t>(r) * n] += hz * z;
       });
-  exec::fence("commutator::comm122ss");
+  exec::Fence("commutator::comm122ss");
 }
 
 }  // namespace imsrg::commutator::terms

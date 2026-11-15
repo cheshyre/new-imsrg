@@ -38,25 +38,25 @@ using op::OperatorSpec;
 
 constexpr double kPi = 3.14159265358979323846;
 
-std::shared_ptr<const basis::ModelSpace> emax3_space() {
-  return basis::ModelSpace::from_names(basis::BasisTruncation{.emax = 3}, 16.0,
-                                       "O16", "sd-shell");
+std::shared_ptr<const basis::ModelSpace> Emax3Space() {
+  return basis::ModelSpace::FromNames(basis::BasisTruncation{.emax = 3}, 16.0,
+                                      "O16", "sd-shell");
 }
 
-Operator random_hamiltonian(const std::shared_ptr<const basis::ModelSpace>& ms,
-                            std::uint64_t seed) {
+Operator RandomHamiltonian(const std::shared_ptr<const basis::ModelSpace>& ms,
+                           std::uint64_t seed) {
   op::RandomOperatorOptions ro;
   ro.seed = seed;
-  return op::random_operator(
-      ms, OperatorSpec::scalar(2, Hermiticity::Hermitian), ro);
+  return op::RandomOperator(
+      ms, OperatorSpec::Scalar(2, Hermiticity::kHermitian), ro);
 }
 
-bool same_ljtz(const basis::Orbit& a, const basis::Orbit& b) {
+bool SameLjtz(const basis::Orbit& a, const basis::Orbit& b) {
   return a.l == b.l && a.j2.twice == b.j2.twice && a.tz2.twice == b.tz2.twice;
 }
 
-int cls(const basis::ModelSpace& ms, OrbitIndex a) {
-  return basis::cvq(ms.partition().orbit_class(a));
+int Cls(const basis::ModelSpace& ms, OrbitIndex a) {
+  return basis::Cvq(ms.partition().orbit_class(a));
 }
 
 // Independent class tests of a two-body ket (cvq values 0 core, 1 valence, 2
@@ -64,51 +64,52 @@ int cls(const basis::ModelSpace& ms, OrbitIndex a) {
 struct KetCvq {
   int cp, cq;
 };
-KetCvq ket_cvq(const basis::ModelSpace& ms, ChannelIndex ch,
-               std::int32_t local) {
+KetCvq KetCvqOf(const basis::ModelSpace& ms, ChannelIndex ch,
+                std::int32_t local) {
   const auto& tb = ms.two_body();
   const basis::Ket& k = tb.ket(tb.global_ket(ch, LocalKetIndex{local}));
-  return {cls(ms, k.p), cls(ms, k.q)};
+  return {Cls(ms, k.p), Cls(ms, k.q)};
 }
-bool is_cc(KetCvq k) { return k.cp == 0 && k.cq == 0; }
-bool is_vc(KetCvq k) { return k.cp + k.cq == 1; }
-bool is_vv(KetCvq k) { return k.cp == 1 && k.cq == 1; }
-bool is_qv(KetCvq k) { return k.cp + k.cq == 3; }
-bool is_qq(KetCvq k) { return k.cp == 2 && k.cq == 2; }
+bool IsCc(KetCvq k) { return k.cp == 0 && k.cq == 0; }
+bool IsVc(KetCvq k) { return k.cp + k.cq == 1; }
+bool IsVv(KetCvq k) { return k.cp == 1 && k.cq == 1; }
+bool IsQv(KetCvq k) { return k.cp + k.cq == 3; }
+bool IsQq(KetCvq k) { return k.cp == 2 && k.cq == 2; }
 
-bool is_shell_model(GeneratorKind k) {
-  return k == GeneratorKind::ShellModel || k == GeneratorKind::ShellModelAtan ||
-         k == GeneratorKind::ShellModelWegner ||
-         k == GeneratorKind::ShellModelImaginaryTime;
+bool IsShellModel(GeneratorKind k) {
+  return k == GeneratorKind::kShellModel ||
+         k == GeneratorKind::kShellModelAtan ||
+         k == GeneratorKind::kShellModelWegner ||
+         k == GeneratorKind::kShellModelImaginaryTime;
 }
 
 // True if eta(x, y) is a "downward" element: x = i in valence u q, y = a in
 // core (u valence for the shell-model kinds, x != y).
-bool one_body_down(const basis::ModelSpace& ms, bool shell, OrbitIndex x,
-                   OrbitIndex y) {
+bool OneBodyDown(const basis::ModelSpace& ms, bool shell, OrbitIndex x,
+                 OrbitIndex y) {
   if (x == y) return false;
-  if (!same_ljtz(ms.basis().orbit(x), ms.basis().orbit(y))) return false;
-  const int cx = cls(ms, x), cy = cls(ms, y);
+  if (!SameLjtz(ms.basis().orbit(x), ms.basis().orbit(y))) return false;
+  const int cx = Cls(ms, x), cy = Cls(ms, y);
   if (cx < 1) return false;
   return shell ? cy <= 1 : cy == 0;
 }
 
 // Checks eta (built from H with `opts`) against the documented block structure
 // and f(H, Delta).
-void check_generator_structure(const Operator& H_in, const Operator& eta_in,
-                               const GeneratorOptions& opts) {
+void CheckGeneratorStructure(const Operator& H_in, const Operator& eta_in,
+                             const GeneratorOptions& opts) {
   Operator H(H_in), eta(eta_in);
-  H.sync_to_host();
-  eta.sync_to_host();
+  H.SyncToHost();
+  eta.SyncToHost();
   const basis::ModelSpace& ms = H.model_space();
   const Denominators den(H, opts);
-  const bool shell = is_shell_model(opts.kind);
+  const bool shell = IsShellModel(opts.kind);
   const int nq = opts.qtransfer_n;
   const std::int32_t norb = ms.num_orbits();
   const std::string label =
       "kind " + std::to_string(static_cast<int>(opts.kind));
 
-  EXPECT_EQ(eta.hermiticity(), Hermiticity::AntiHermitian) << label;
+  EXPECT_EQ(eta.hermiticity(), Hermiticity::kAntiHermitian) << label;
   double tol_scale = 1.0;
   for (std::int32_t p = 0; p < norb; ++p)
     for (std::int32_t q = 0; q < norb; ++q)
@@ -121,12 +122,12 @@ void check_generator_structure(const Operator& H_in, const Operator& eta_in,
     for (std::int32_t q = 0; q < norb; ++q) {
       const OrbitIndex x{p}, y{q};
       double expected = 0.0;
-      if (one_body_down(ms, shell, x, y)) {
-        expected = flow::generator_function(opts.kind, H.one_body().get(x, y),
-                                            den.one_body(x, y), nq);
-      } else if (one_body_down(ms, shell, y, x)) {
-        expected = flow::generator_function(opts.kind, H.one_body().get(x, y),
-                                            -den.one_body(y, x), nq);
+      if (OneBodyDown(ms, shell, x, y)) {
+        expected = flow::GeneratorFunction(opts.kind, H.one_body().get(x, y),
+                                           den.one_body(x, y), nq);
+      } else if (OneBodyDown(ms, shell, y, x)) {
+        expected = flow::GeneratorFunction(opts.kind, H.one_body().get(x, y),
+                                           -den.one_body(y, x), nq);
       }
       const double got = eta.one_body().get(x, y);
       EXPECT_NEAR(got, expected, 1e-12 * std::max(1.0, std::abs(expected)))
@@ -141,7 +142,7 @@ void check_generator_structure(const Operator& H_in, const Operator& eta_in,
 
   if (opts.only_1b_eta) {
     // All of the two-body part must be zero.
-    EXPECT_EQ(op::max_abs(eta).two_body, 0.0) << label;
+    EXPECT_EQ(op::MaxAbs(eta).two_body, 0.0) << label;
     return;
   }
   int nonzero_2b = 0;
@@ -150,26 +151,25 @@ void check_generator_structure(const Operator& H_in, const Operator& eta_in,
     const ChannelIndex ch{c};
     const auto n =
         static_cast<std::int32_t>(ms.two_body().channel_kets(ch).size());
-    auto bra_ok = [&](KetCvq k) { return is_vv(k) || is_qv(k) || is_qq(k); };
+    auto bra_ok = [&](KetCvq k) { return IsVv(k) || IsQv(k) || IsQq(k); };
     for (std::int32_t r = 0; r < n; ++r) {
       for (std::int32_t s = 0; s < n; ++s) {
-        const KetCvq kr = ket_cvq(ms, ch, r), ks = ket_cvq(ms, ch, s);
+        const KetCvq kr = KetCvqOf(ms, ch, r), ks = KetCvqOf(ms, ch, s);
         // (bra, ket) allowed for an element (bra = x, ket = y).
         auto allowed = [&](KetCvq bra, KetCvq ket) {
-          if (!shell)
-            return is_cc(ket) && (is_qq(bra) || is_vv(bra) || is_qv(bra));
-          if (is_cc(ket) || is_vc(ket)) return bra_ok(bra);
-          if (is_vv(ket)) return is_qv(bra) || is_qq(bra);
+          if (!shell) return IsCc(ket) && (IsQq(bra) || IsVv(bra) || IsQv(bra));
+          if (IsCc(ket) || IsVc(ket)) return bra_ok(bra);
+          if (IsVv(ket)) return IsQv(bra) || IsQq(bra);
           return false;
         };
         double expected = 0.0;
         if (allowed(kr, ks)) {
-          expected = flow::generator_function(
+          expected = flow::GeneratorFunction(
               opts.kind,
               H.two_body().get(ch, ch, LocalKetIndex{r}, LocalKetIndex{s}),
               den.two_body(ch, LocalKetIndex{r}, LocalKetIndex{s}), nq);
         } else if (allowed(ks, kr)) {
-          expected = -flow::generator_function(
+          expected = -flow::GeneratorFunction(
               opts.kind,
               H.two_body().get(ch, ch, LocalKetIndex{s}, LocalKetIndex{r}),
               den.two_body(ch, LocalKetIndex{s}, LocalKetIndex{r}), nq);
@@ -188,19 +188,19 @@ void check_generator_structure(const Operator& H_in, const Operator& eta_in,
 // ---- 1. golden
 // -----------------------------------------------------------------------------
 
-double golden_deviation(const char* eta_file, GeneratorKind kind,
-                        const char* name) {
+double GoldenDeviation(const char* eta_file, GeneratorKind kind,
+                       const char* name) {
   const std::string dir =
       std::string(IMSRG_GOLDEN_DIR) + "/commutator/emax2_O16/";
-  const auto header = op::read_operator_dump_header(dir + "H.dump");
-  const auto ms = op::model_space_for_dump(header);
-  const Operator H = op::read_operator_dump(dir + "H.dump", ms);
-  const Operator eta_ref = op::read_operator_dump(dir + eta_file, ms);
+  const auto header = op::ReadOperatorDumpHeader(dir + "H.dump");
+  const auto ms = op::ModelSpaceForDump(header);
+  const Operator H = op::ReadOperatorDump(dir + "H.dump", ms);
+  const Operator eta_ref = op::ReadOperatorDump(dir + eta_file, ms);
   GeneratorOptions opts;
   opts.kind = kind;
-  const Operator eta = flow::compute_generator(H, opts);
-  const op::PartMaxima ref = op::max_abs(eta_ref);
-  const op::PartMaxima dev = op::max_abs_difference(eta, eta_ref);
+  const Operator eta = flow::ComputeGenerator(H, opts);
+  const op::PartMaxima ref = op::MaxAbs(eta_ref);
+  const op::PartMaxima dev = op::MaxAbsDifference(eta, eta_ref);
   const double tol = 1e-10 * std::max(1.0, ref.max());
   std::printf(
       "[golden %s] max|d eta|: 0B %.3e  1B %.3e  2B %.3e (tol %.3e, max|eta| "
@@ -215,83 +215,83 @@ double golden_deviation(const char* eta_file, GeneratorKind kind,
 }
 
 TEST(GeneratorGolden, White) {
-  golden_deviation("eta_white.dump", GeneratorKind::White, "white");
+  GoldenDeviation("eta_white.dump", GeneratorKind::kWhite, "white");
 }
 
 TEST(GeneratorGolden, Atan) {
-  golden_deviation("eta_atan.dump", GeneratorKind::Atan, "atan");
+  GoldenDeviation("eta_atan.dump", GeneratorKind::kAtan, "atan");
 }
 
 // ---- 2. structure and values
 // ---------------------------------------------------------------
 
 TEST(GeneratorStructure, AllKindsEpsteinNesbet) {
-  const auto ms = emax3_space();
-  const Operator H = random_hamiltonian(ms, 11);
-  const GeneratorKind kinds[] = {GeneratorKind::White,
-                                 GeneratorKind::Atan,
-                                 GeneratorKind::ImaginaryTime,
-                                 GeneratorKind::Wegner,
-                                 GeneratorKind::QtransferAtan,
-                                 GeneratorKind::ShellModel,
-                                 GeneratorKind::ShellModelAtan,
-                                 GeneratorKind::ShellModelWegner,
-                                 GeneratorKind::ShellModelImaginaryTime};
+  const auto ms = Emax3Space();
+  const Operator H = RandomHamiltonian(ms, 11);
+  const GeneratorKind kinds[] = {GeneratorKind::kWhite,
+                                 GeneratorKind::kAtan,
+                                 GeneratorKind::kImaginaryTime,
+                                 GeneratorKind::kWegner,
+                                 GeneratorKind::kQtransferAtan,
+                                 GeneratorKind::kShellModel,
+                                 GeneratorKind::kShellModelAtan,
+                                 GeneratorKind::kShellModelWegner,
+                                 GeneratorKind::kShellModelImaginaryTime};
   for (GeneratorKind k : kinds) {
     GeneratorOptions opts;
     opts.kind = k;
-    const Operator eta = flow::compute_generator(H, opts);
-    check_generator_structure(H, eta, opts);
+    const Operator eta = flow::ComputeGenerator(H, opts);
+    CheckGeneratorStructure(H, eta, opts);
   }
 }
 
 TEST(GeneratorStructure, QtransferSecondExponent) {
-  const auto ms = emax3_space();
-  const Operator H = random_hamiltonian(ms, 12);
+  const auto ms = Emax3Space();
+  const Operator H = RandomHamiltonian(ms, 12);
   GeneratorOptions opts;
-  opts.kind = GeneratorKind::QtransferAtan;
+  opts.kind = GeneratorKind::kQtransferAtan;
   opts.qtransfer_n = 2;
-  const Operator eta = flow::compute_generator(H, opts);
-  check_generator_structure(H, eta, opts);
+  const Operator eta = flow::ComputeGenerator(H, opts);
+  CheckGeneratorStructure(H, eta, opts);
 }
 
 TEST(GeneratorStructure, PartitioningsAndDelta) {
-  const auto ms = emax3_space();
-  const Operator H = random_hamiltonian(ms, 13);
+  const auto ms = Emax3Space();
+  const Operator H = RandomHamiltonian(ms, 13);
   for (Partitioning p :
-       {Partitioning::MollerPlesset, Partitioning::MpIsospin}) {
+       {Partitioning::kMollerPlesset, Partitioning::kMpIsospin}) {
     GeneratorOptions opts;
-    opts.kind = GeneratorKind::Atan;
+    opts.kind = GeneratorKind::kAtan;
     opts.partitioning = p;
-    check_generator_structure(H, flow::compute_generator(H, opts), opts);
-    opts.kind = GeneratorKind::ShellModelAtan;
+    CheckGeneratorStructure(H, flow::ComputeGenerator(H, opts), opts);
+    opts.kind = GeneratorKind::kShellModelAtan;
     opts.denominator_delta = 0.7;
     opts.denominator_delta_all = true;
-    check_generator_structure(H, flow::compute_generator(H, opts), opts);
+    CheckGeneratorStructure(H, flow::ComputeGenerator(H, opts), opts);
   }
 }
 
 TEST(GeneratorStructure, OnlyOneBodyEta) {
-  const auto ms = emax3_space();
-  const Operator H = random_hamiltonian(ms, 14);
+  const auto ms = Emax3Space();
+  const Operator H = RandomHamiltonian(ms, 14);
   GeneratorOptions opts;
-  opts.kind = GeneratorKind::White;
+  opts.kind = GeneratorKind::kWhite;
   opts.only_1b_eta = true;
-  check_generator_structure(H, flow::compute_generator(H, opts), opts);
+  CheckGeneratorStructure(H, flow::ComputeGenerator(H, opts), opts);
 }
 
 TEST(GeneratorStructure, HartreeFock) {
-  const auto ms = emax3_space();
-  const Operator H = random_hamiltonian(ms, 15);
+  const auto ms = Emax3Space();
+  const Operator H = RandomHamiltonian(ms, 15);
   GeneratorOptions opts;
-  opts.kind = GeneratorKind::HartreeFock;
-  Operator eta = flow::compute_generator(H, opts);
+  opts.kind = GeneratorKind::kHartreeFock;
+  Operator eta = flow::ComputeGenerator(H, opts);
   EXPECT_EQ(eta.spec().particle_rank, 1);
   EXPECT_FALSE(eta.two_body().allocated());
-  EXPECT_EQ(eta.hermiticity(), Hermiticity::AntiHermitian);
+  EXPECT_EQ(eta.hermiticity(), Hermiticity::kAntiHermitian);
   Operator Hh(H);
-  Hh.sync_to_host();
-  eta.sync_to_host();
+  Hh.SyncToHost();
+  eta.SyncToHost();
   const Denominators den(H, opts);
   const std::int32_t norb = ms->num_orbits();
   int nonzero = 0;
@@ -299,10 +299,10 @@ TEST(GeneratorStructure, HartreeFock) {
     for (std::int32_t j = 0; j < norb; ++j) {
       const OrbitIndex oi{i}, oj{j};
       double expected = 0.0;
-      if (j < i && same_ljtz(ms->basis().orbit(oi), ms->basis().orbit(oj))) {
+      if (j < i && SameLjtz(ms->basis().orbit(oi), ms->basis().orbit(oj))) {
         expected = Hh.one_body().get(oi, oj) / den.one_body(oi, oj);
       } else if (i < j &&
-                 same_ljtz(ms->basis().orbit(oi), ms->basis().orbit(oj))) {
+                 SameLjtz(ms->basis().orbit(oi), ms->basis().orbit(oj))) {
         expected = -Hh.one_body().get(oj, oi) / den.one_body(oj, oi);
       }
       EXPECT_NEAR(eta.one_body().get(oi, oj), expected,
@@ -319,36 +319,36 @@ TEST(GeneratorStructure, HartreeFock) {
 // -----------------------------------------------------------------------------
 
 TEST(GeneratorFloor, FloorDenominator) {
-  EXPECT_EQ(flow::floor_denominator(-1e-8, 1e-6), -1e-6);
-  EXPECT_EQ(flow::floor_denominator(1e-8, 1e-6), 1e-6);
-  EXPECT_EQ(flow::floor_denominator(0.0, 1e-6), 1e-6);
-  EXPECT_EQ(flow::floor_denominator(-0.0, 1e-6), 1e-6);
-  EXPECT_EQ(flow::floor_denominator(-0.5, 1e-6), -0.5);
-  EXPECT_EQ(flow::floor_denominator(0.5, 1e-6), 0.5);
-  EXPECT_EQ(flow::floor_denominator(-1e-6, 1e-6), -1e-6);
+  EXPECT_EQ(flow::FloorDenominator(-1e-8, 1e-6), -1e-6);
+  EXPECT_EQ(flow::FloorDenominator(1e-8, 1e-6), 1e-6);
+  EXPECT_EQ(flow::FloorDenominator(0.0, 1e-6), 1e-6);
+  EXPECT_EQ(flow::FloorDenominator(-0.0, 1e-6), 1e-6);
+  EXPECT_EQ(flow::FloorDenominator(-0.5, 1e-6), -0.5);
+  EXPECT_EQ(flow::FloorDenominator(0.5, 1e-6), 0.5);
+  EXPECT_EQ(flow::FloorDenominator(-1e-6, 1e-6), -1e-6);
 }
 
 TEST(GeneratorFloor, SmallNegativeOneBodyDenominatorKeepsItsSign) {
-  const auto ms = emax3_space();
+  const auto ms = Emax3Space();
   const basis::SingleParticleBasis& sp = ms->basis();
   const auto a =
       sp.find(basis::Orbit{.n = 0, .l = 0, .j2 = TwoJ{1}, .tz2 = TwoTz{-1}});
   const auto i =
       sp.find(basis::Orbit{.n = 1, .l = 0, .j2 = TwoJ{1}, .tz2 = TwoTz{-1}});
   ASSERT_TRUE(a.has_value() && i.has_value());
-  ASSERT_EQ(cls(*ms, *a), 0);  // proton 0s1/2: core
-  ASSERT_GE(cls(*ms, *i), 1);  // proton 1s1/2: valence
-  Operator H(ms, OperatorSpec::scalar(2, Hermiticity::Hermitian));
+  ASSERT_EQ(Cls(*ms, *a), 0);  // proton 0s1/2: core
+  ASSERT_GE(Cls(*ms, *i), 1);  // proton 1s1/2: valence
+  Operator H(ms, OperatorSpec::Scalar(2, Hermiticity::kHermitian));
   H.one_body().set(*a, *a, 0.0);
   H.one_body().set(*i, *i, -1e-8);  // f_ii - f_aa = -1e-8
   H.one_body().set(*i, *a, 0.3);
-  H.sync_to_device();
+  H.SyncToDevice();
 
   GeneratorOptions opts;
-  opts.kind = GeneratorKind::White;
-  opts.partitioning = Partitioning::MollerPlesset;
-  Operator eta = flow::compute_generator(H, opts);
-  eta.sync_to_host();
+  opts.kind = GeneratorKind::kWhite;
+  opts.partitioning = Partitioning::kMollerPlesset;
+  Operator eta = flow::ComputeGenerator(H, opts);
+  eta.SyncToHost();
   EXPECT_DOUBLE_EQ(eta.one_body().get(*i, *a), 0.3 / -1e-6);
   EXPECT_DOUBLE_EQ(eta.one_body().get(*a, *i), 0.3 / 1e-6);
   EXPECT_LT(eta.one_body().get(*i, *a), 0.0);
@@ -359,10 +359,10 @@ TEST(GeneratorFloor, SmallNegativeOneBodyDenominatorKeepsItsSign) {
 // -----------------------------------------------------------------------
 
 TEST(GeneratorDenominators, MonopoleEqualsDirectJSum) {
-  const auto ms = emax3_space();
-  const Operator H0 = random_hamiltonian(ms, 21);
+  const auto ms = Emax3Space();
+  const Operator H0 = RandomHamiltonian(ms, 21);
   Operator H(H0);
-  H.sync_to_host();
+  H.SyncToHost();
   GeneratorOptions opts;  // Epstein-Nesbet
   const Denominators den(H, opts);
   const std::int32_t norb = ms->num_orbits();
@@ -386,14 +386,14 @@ TEST(GeneratorDenominators, MonopoleEqualsDirectJSum) {
   EXPECT_NE(den.monopole(OrbitIndex{0}, OrbitIndex{3}), 0.0);
   // Not built for the other partitionings.
   GeneratorOptions mp;
-  mp.partitioning = Partitioning::MollerPlesset;
+  mp.partitioning = Partitioning::kMollerPlesset;
   EXPECT_EQ(Denominators(H, mp).monopole(OrbitIndex{0}, OrbitIndex{3}), 0.0);
 }
 
 TEST(GeneratorDenominators, EpsteinNesbetOneAndTwoBody) {
-  const auto ms = emax3_space();
-  Operator H = random_hamiltonian(ms, 22);
-  H.sync_to_host();
+  const auto ms = Emax3Space();
+  Operator H = RandomHamiltonian(ms, 22);
+  H.SyncToHost();
   GeneratorOptions opts;
   const Denominators den(H, opts);
   const auto occ = ms->reference().occupations();
@@ -402,10 +402,9 @@ TEST(GeneratorDenominators, EpsteinNesbetOneAndTwoBody) {
   for (std::int32_t p = 0; p < norb; p += 3) {
     for (std::int32_t q = 1; q < norb; q += 4) {
       const OrbitIndex i{p}, j{q};
-      const double d =
-          fdiag(i) - fdiag(j) +
-          (occ[i.to_size()] - occ[j.to_size()]) * den.monopole(i, j);
-      EXPECT_DOUBLE_EQ(den.one_body(i, j), flow::floor_denominator(d, 1e-6));
+      const double d = fdiag(i) - fdiag(j) +
+                       (occ[i.ToSize()] - occ[j.ToSize()]) * den.monopole(i, j);
+      EXPECT_DOUBLE_EQ(den.one_body(i, j), flow::FloorDenominator(d, 1e-6));
     }
   }
   const auto& tb = ms->two_body();
@@ -418,7 +417,7 @@ TEST(GeneratorDenominators, EpsteinNesbetOneAndTwoBody) {
         const basis::Ket& bra = tb.ket(tb.global_ket(ch, LocalKetIndex{r}));
         const basis::Ket& ket = tb.ket(tb.global_ket(ch, LocalKetIndex{s}));
         const OrbitIndex i = bra.p, j = bra.q, k = ket.p, l = ket.q;
-        auto n_of = [&](OrbitIndex x) { return occ[x.to_size()]; };
+        auto n_of = [&](OrbitIndex x) { return occ[x.ToSize()]; };
         const double d = fdiag(i) + fdiag(j) - fdiag(k) - fdiag(l) +
                          (1 - n_of(i) - n_of(j)) * den.monopole(i, j) -
                          (1 - n_of(k) - n_of(l)) * den.monopole(k, l) +
@@ -427,7 +426,7 @@ TEST(GeneratorDenominators, EpsteinNesbetOneAndTwoBody) {
                          (n_of(j) - n_of(k)) * den.monopole(j, k) +
                          (n_of(j) - n_of(l)) * den.monopole(j, l);
         EXPECT_NEAR(den.two_body(ch, LocalKetIndex{r}, LocalKetIndex{s}),
-                    flow::floor_denominator(d, 1e-6),
+                    flow::FloorDenominator(d, 1e-6),
                     1e-12 * std::max(1.0, std::abs(d)));
         ++checked;
       }
@@ -437,18 +436,18 @@ TEST(GeneratorDenominators, EpsteinNesbetOneAndTwoBody) {
 }
 
 TEST(GeneratorDenominators, MollerPlessetIsSpeDifference) {
-  const auto ms = emax3_space();
-  Operator H = random_hamiltonian(ms, 23);
-  H.sync_to_host();
+  const auto ms = Emax3Space();
+  Operator H = RandomHamiltonian(ms, 23);
+  H.SyncToHost();
   GeneratorOptions opts;
-  opts.partitioning = Partitioning::MollerPlesset;
+  opts.partitioning = Partitioning::kMollerPlesset;
   const Denominators den(H, opts);
   const auto fdiag = [&](OrbitIndex x) { return H.one_body().get(x, x); };
   const std::int32_t norb = ms->num_orbits();
   for (std::int32_t p = 0; p < norb; ++p) {
     for (std::int32_t q = 0; q < norb; ++q) {
       EXPECT_DOUBLE_EQ(den.one_body(OrbitIndex{p}, OrbitIndex{q}),
-                       flow::floor_denominator(
+                       flow::FloorDenominator(
                            fdiag(OrbitIndex{p}) - fdiag(OrbitIndex{q}), 1e-6));
     }
   }
@@ -463,18 +462,18 @@ TEST(GeneratorDenominators, MollerPlessetIsSpeDifference) {
         const double d =
             fdiag(bra.p) + fdiag(bra.q) - fdiag(ket.p) - fdiag(ket.q);
         EXPECT_DOUBLE_EQ(den.two_body(ch, LocalKetIndex{r}, LocalKetIndex{s}),
-                         flow::floor_denominator(d, 1e-6));
+                         flow::FloorDenominator(d, 1e-6));
       }
     }
   }
 }
 
 TEST(GeneratorDenominators, MpIsospinAveragesPartners) {
-  const auto ms = emax3_space();
-  Operator H = random_hamiltonian(ms, 24);
-  H.sync_to_host();
+  const auto ms = Emax3Space();
+  Operator H = RandomHamiltonian(ms, 24);
+  H.SyncToHost();
   GeneratorOptions opts;
-  opts.partitioning = Partitioning::MpIsospin;
+  opts.partitioning = Partitioning::kMpIsospin;
   const Denominators den(H, opts);
   const basis::SingleParticleBasis& sp = ms->basis();
   const auto fdiag = [&](OrbitIndex x) { return H.one_body().get(x, x); };
@@ -490,7 +489,7 @@ TEST(GeneratorDenominators, MpIsospinAveragesPartners) {
       const OrbitIndex i{p}, j{q};
       const double d = 0.5 * ((fdiag(i) - fdiag(j)) +
                               (fdiag(partner(i)) - fdiag(partner(j))));
-      EXPECT_NEAR(den.one_body(i, j), flow::floor_denominator(d, 1e-6), 1e-14);
+      EXPECT_NEAR(den.one_body(i, j), flow::FloorDenominator(d, 1e-6), 1e-14);
     }
   }
   const auto& tb = ms->two_body();
@@ -506,18 +505,18 @@ TEST(GeneratorDenominators, MpIsospinAveragesPartners) {
         const double d1 = fdiag(partner(bra.p)) + fdiag(partner(bra.q)) -
                           fdiag(partner(ket.p)) - fdiag(partner(ket.q));
         EXPECT_NEAR(den.two_body(ch, LocalKetIndex{r}, LocalKetIndex{s}),
-                    flow::floor_denominator(0.5 * (d0 + d1), 1e-6), 1e-14);
+                    flow::FloorDenominator(0.5 * (d0 + d1), 1e-6), 1e-14);
       }
     }
   }
 }
 
 TEST(GeneratorDenominators, DeltaAllAndOrbit) {
-  const auto ms = emax3_space();
-  Operator H = random_hamiltonian(ms, 25);
-  H.sync_to_host();
+  const auto ms = Emax3Space();
+  Operator H = RandomHamiltonian(ms, 25);
+  H.SyncToHost();
   GeneratorOptions base;
-  base.partitioning = Partitioning::MollerPlesset;
+  base.partitioning = Partitioning::kMollerPlesset;
   const Denominators d0(H, base);
   GeneratorOptions all = base;
   all.denominator_delta = 0.25;
@@ -530,13 +529,13 @@ TEST(GeneratorDenominators, DeltaAllAndOrbit) {
   const auto fdiag = [&](OrbitIndex x) { return H.one_body().get(x, x); };
   const OrbitIndex i{5}, j{8}, k{3};
   EXPECT_DOUBLE_EQ(dall.one_body(i, j),
-                   flow::floor_denominator(fdiag(i) - fdiag(j) + 0.25, 1e-6));
+                   flow::FloorDenominator(fdiag(i) - fdiag(j) + 0.25, 1e-6));
   EXPECT_DOUBLE_EQ(dorb.one_body(i, j),
                    d0.one_body(i, j));  // orbit 3 not involved
   EXPECT_DOUBLE_EQ(dorb.one_body(k, j),
-                   flow::floor_denominator(fdiag(k) - fdiag(j) + 0.25, 1e-6));
+                   flow::FloorDenominator(fdiag(k) - fdiag(j) + 0.25, 1e-6));
   EXPECT_DOUBLE_EQ(dorb.one_body(j, k),
-                   flow::floor_denominator(fdiag(j) - fdiag(k) + 0.25, 1e-6));
+                   flow::FloorDenominator(fdiag(j) - fdiag(k) + 0.25, 1e-6));
   // Two-body: only with the "all" flag (imsrg++ quirk P5).
   const auto& tb = ms->two_body();
   const ChannelIndex ch{0};
@@ -549,108 +548,106 @@ TEST(GeneratorDenominators, DeltaAllAndOrbit) {
   const double s =
       fdiag(bra.p) + fdiag(bra.q) - fdiag(ket.p) - fdiag(ket.q) + 0.25;
   EXPECT_DOUBLE_EQ(dall.two_body(ch, LocalKetIndex{0}, LocalKetIndex{1}),
-                   flow::floor_denominator(s, 1e-6));
+                   flow::FloorDenominator(s, 1e-6));
 }
 
 // ---- 5. generator_function
 // -----------------------------------------------------------------
 
 TEST(GeneratorFunction, SpotValues) {
-  using flow::generator_function;
-  const double w1 = std::sqrt(2.0 * constants::m_nucleon /
-                              (constants::hbarc * constants::hbarc));
+  using flow::GeneratorFunction;
+  const double w1 = std::sqrt(2.0 * constants::kMNucleon /
+                              (constants::kHbarc * constants::kHbarc));
   const double w2 =
-      2.0 * constants::m_nucleon / (constants::hbarc * constants::hbarc);
-  EXPECT_DOUBLE_EQ(generator_function(GeneratorKind::White, 2.0, 4.0), 0.5);
-  EXPECT_DOUBLE_EQ(generator_function(GeneratorKind::White, 2.0, -4.0), -0.5);
-  EXPECT_DOUBLE_EQ(generator_function(GeneratorKind::Atan, 1.0, 2.0),
+      2.0 * constants::kMNucleon / (constants::kHbarc * constants::kHbarc);
+  EXPECT_DOUBLE_EQ(GeneratorFunction(GeneratorKind::kWhite, 2.0, 4.0), 0.5);
+  EXPECT_DOUBLE_EQ(GeneratorFunction(GeneratorKind::kWhite, 2.0, -4.0), -0.5);
+  EXPECT_DOUBLE_EQ(GeneratorFunction(GeneratorKind::kAtan, 1.0, 2.0),
                    0.5 * std::atan(1.0));
-  EXPECT_NEAR(generator_function(GeneratorKind::Atan, 1.0, 2.0), kPi / 8.0,
+  EXPECT_NEAR(GeneratorFunction(GeneratorKind::kAtan, 1.0, 2.0), kPi / 8.0,
               1e-15);
-  EXPECT_DOUBLE_EQ(generator_function(GeneratorKind::Atan, 1.0, -2.0),
+  EXPECT_DOUBLE_EQ(GeneratorFunction(GeneratorKind::kAtan, 1.0, -2.0),
                    -kPi / 8.0);
-  EXPECT_DOUBLE_EQ(generator_function(GeneratorKind::ImaginaryTime, 3.0, -2.0),
+  EXPECT_DOUBLE_EQ(GeneratorFunction(GeneratorKind::kImaginaryTime, 3.0, -2.0),
                    -3.0);
-  EXPECT_DOUBLE_EQ(generator_function(GeneratorKind::ImaginaryTime, 3.0, 2.0),
+  EXPECT_DOUBLE_EQ(GeneratorFunction(GeneratorKind::kImaginaryTime, 3.0, 2.0),
                    3.0);
-  EXPECT_DOUBLE_EQ(generator_function(GeneratorKind::Wegner, 3.0, -2.0), -6.0);
-  EXPECT_DOUBLE_EQ(generator_function(GeneratorKind::Wegner, 3.0, 2.0), 6.0);
-  EXPECT_NEAR(generator_function(GeneratorKind::QtransferAtan, 1.0, 2.0, 1),
+  EXPECT_DOUBLE_EQ(GeneratorFunction(GeneratorKind::kWegner, 3.0, -2.0), -6.0);
+  EXPECT_DOUBLE_EQ(GeneratorFunction(GeneratorKind::kWegner, 3.0, 2.0), 6.0);
+  EXPECT_NEAR(GeneratorFunction(GeneratorKind::kQtransferAtan, 1.0, 2.0, 1),
               w1 * 0.5 * std::atan(1.0), 1e-15);
-  EXPECT_NEAR(generator_function(GeneratorKind::QtransferAtan, 1.0, -2.0, 1),
+  EXPECT_NEAR(GeneratorFunction(GeneratorKind::kQtransferAtan, 1.0, -2.0, 1),
               -w1 * 0.5 * std::atan(1.0), 1e-15);
-  EXPECT_NEAR(generator_function(GeneratorKind::QtransferAtan, 1.0, 2.0, 2),
+  EXPECT_NEAR(GeneratorFunction(GeneratorKind::kQtransferAtan, 1.0, 2.0, 2),
               w2 * 0.5 * std::atan(1.0), 1e-15);
   // Shell-model kinds use the corresponding single-reference function.
-  EXPECT_DOUBLE_EQ(generator_function(GeneratorKind::ShellModel, 2.0, 4.0),
+  EXPECT_DOUBLE_EQ(GeneratorFunction(GeneratorKind::kShellModel, 2.0, 4.0),
                    0.5);
-  EXPECT_DOUBLE_EQ(generator_function(GeneratorKind::ShellModelAtan, 1.0, 2.0),
-                   generator_function(GeneratorKind::Atan, 1.0, 2.0));
+  EXPECT_DOUBLE_EQ(GeneratorFunction(GeneratorKind::kShellModelAtan, 1.0, 2.0),
+                   GeneratorFunction(GeneratorKind::kAtan, 1.0, 2.0));
   EXPECT_DOUBLE_EQ(
-      generator_function(GeneratorKind::ShellModelWegner, 3.0, -2.0), -6.0);
+      GeneratorFunction(GeneratorKind::kShellModelWegner, 3.0, -2.0), -6.0);
   EXPECT_DOUBLE_EQ(
-      generator_function(GeneratorKind::ShellModelImaginaryTime, 3.0, -2.0),
+      GeneratorFunction(GeneratorKind::kShellModelImaginaryTime, 3.0, -2.0),
       -3.0);
 }
 
 TEST(GeneratorFunction, NotImplemented) {
   EXPECT_THROW(
-      flow::generator_function(GeneratorKind::ShellModelAtanNpnh, 1.0, 2.0),
+      flow::GeneratorFunction(GeneratorKind::kShellModelAtanNpnh, 1.0, 2.0),
       NotImplementedError);
-  EXPECT_THROW(flow::generator_function(GeneratorKind::OnePa, 1.0, 2.0),
+  EXPECT_THROW(flow::GeneratorFunction(GeneratorKind::kOnePa, 1.0, 2.0),
                NotImplementedError);
-  const auto ms = emax3_space();
-  const Operator H = random_hamiltonian(ms, 31);
+  const auto ms = Emax3Space();
+  const Operator H = RandomHamiltonian(ms, 31);
   GeneratorOptions opts;
-  opts.kind = GeneratorKind::ShellModelAtanNpnh;
-  EXPECT_THROW(flow::compute_generator(H, opts), NotImplementedError);
-  opts.kind = GeneratorKind::OnePa;
-  EXPECT_THROW(flow::compute_generator(H, opts), NotImplementedError);
+  opts.kind = GeneratorKind::kShellModelAtanNpnh;
+  EXPECT_THROW(flow::ComputeGenerator(H, opts), NotImplementedError);
+  opts.kind = GeneratorKind::kOnePa;
+  EXPECT_THROW(flow::ComputeGenerator(H, opts), NotImplementedError);
 }
 
 // ---- 6. reuse
 // -----------------------------------------------------------------------------
 
 TEST(GeneratorReuse, SecondCallDoesNotReallocate) {
-  const auto ms = emax3_space();
-  const Operator H1 = random_hamiltonian(ms, 41);
-  const Operator H2 = random_hamiltonian(ms, 42);
+  const auto ms = Emax3Space();
+  const Operator H1 = RandomHamiltonian(ms, 41);
+  const Operator H2 = RandomHamiltonian(ms, 42);
   GeneratorOptions opts;
-  opts.kind = GeneratorKind::ShellModelAtan;
+  opts.kind = GeneratorKind::kShellModelAtan;
   Operator eta;
-  flow::compute_generator(H1, eta, opts);
+  flow::ComputeGenerator(H1, eta, opts);
   const double* p1 = eta.one_body().buffer().device_data();
   const double* p2 = eta.two_body().matrix().buffer().device_data();
 
-  flow::compute_generator(H1, eta, opts);
+  flow::ComputeGenerator(H1, eta, opts);
   EXPECT_EQ(eta.one_body().buffer().device_data(), p1);
   EXPECT_EQ(eta.two_body().matrix().buffer().device_data(), p2);
-  const Operator fresh1 = flow::compute_generator(H1, opts);
-  const op::PartMaxima d1 = op::max_abs_difference(eta, fresh1);
+  const Operator fresh1 = flow::ComputeGenerator(H1, opts);
+  const op::PartMaxima d1 = op::MaxAbsDifference(eta, fresh1);
   EXPECT_EQ(d1.max(), 0.0);
 
   // A different H on the same eta, then a kind with fewer blocks: stale
   // elements must vanish.
-  flow::compute_generator(H2, eta, opts);
+  flow::ComputeGenerator(H2, eta, opts);
   EXPECT_EQ(eta.one_body().buffer().device_data(), p1);
-  EXPECT_EQ(
-      op::max_abs_difference(eta, flow::compute_generator(H2, opts)).max(),
-      0.0);
+  EXPECT_EQ(op::MaxAbsDifference(eta, flow::ComputeGenerator(H2, opts)).max(),
+            0.0);
   GeneratorOptions white;
-  white.kind = GeneratorKind::White;
-  flow::compute_generator(H2, eta, white);
+  white.kind = GeneratorKind::kWhite;
+  flow::ComputeGenerator(H2, eta, white);
   EXPECT_EQ(eta.two_body().matrix().buffer().device_data(), p2);
-  EXPECT_EQ(
-      op::max_abs_difference(eta, flow::compute_generator(H2, white)).max(),
-      0.0);
+  EXPECT_EQ(op::MaxAbsDifference(eta, flow::ComputeGenerator(H2, white)).max(),
+            0.0);
 
   // A different spec (Hartree-Fock: particle_rank 1) replaces eta.
   GeneratorOptions hf;
-  hf.kind = GeneratorKind::HartreeFock;
-  flow::compute_generator(H2, eta, hf);
+  hf.kind = GeneratorKind::kHartreeFock;
+  flow::ComputeGenerator(H2, eta, hf);
   EXPECT_EQ(eta.spec().particle_rank, 1);
   EXPECT_FALSE(eta.two_body().allocated());
-  EXPECT_EQ(op::max_abs_difference(eta, flow::compute_generator(H2, hf)).max(),
+  EXPECT_EQ(op::MaxAbsDifference(eta, flow::ComputeGenerator(H2, hf)).max(),
             0.0);
 }
 

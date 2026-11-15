@@ -15,7 +15,7 @@ void TimerRegistry::set_region_hooks(RegionPushHook push,
   pop_.store(pop, std::memory_order_release);
 }
 
-void TimerRegistry::add(std::string_view name, double seconds,
+void TimerRegistry::Add(std::string_view name, double seconds,
                         std::int64_t count) {
   const std::lock_guard<std::mutex> lock(mutex_);
   Acc& a = map_[std::string(name)];
@@ -41,7 +41,7 @@ void TimerRegistry::clear() {
   map_.clear();
 }
 
-std::string TimerRegistry::report() const {
+std::string TimerRegistry::Report() const {
   const auto es = entries();
   std::size_t w = 4;
   for (const auto& e : es) w = std::max(w, e.name.size());
@@ -65,7 +65,7 @@ ScopedTimer::ScopedTimer(TimerRegistry& registry, std::string_view name)
 ScopedTimer::~ScopedTimer() {
   const auto stop = std::chrono::steady_clock::now();
   if (RegionPopHook pop = registry_.pop_hook()) pop();
-  registry_.add(name_, std::chrono::duration<double>(stop - start_).count());
+  registry_.Add(name_, std::chrono::duration<double>(stop - start_).count());
 }
 
 }  // namespace imsrg

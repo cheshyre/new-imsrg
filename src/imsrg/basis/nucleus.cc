@@ -32,19 +32,19 @@ constexpr std::array<std::string_view, 119> kElements = {
     "Cm", "Bk", "Cf", "Es", "Fm", "Md", "No", "Lr", "Rf", "Db", "Sg", "Bh",
     "Hs", "Mt", "Ds", "Rg", "Cn", "Nh", "Fl", "Mc", "Lv", "Ts", "Og"};
 
-bool is_digit(char c) { return c >= '0' && c <= '9'; }
+bool IsDigit(char c) { return c >= '0' && c <= '9'; }
 
 // Parses a complete decimal number (strtod syntax, no leading or trailing
 // junk).
-bool parse_decimal(std::string_view s, double& value) {
-  if (s.empty() || !(is_digit(s.front()) || s.front() == '.')) return false;
+bool ParseDecimal(std::string_view s, double& value) {
+  if (s.empty() || !(IsDigit(s.front()) || s.front() == '.')) return false;
   const std::string copy(s);
   char* end = nullptr;
   value = std::strtod(copy.c_str(), &end);
   return end == copy.c_str() + copy.size() && std::isfinite(value);
 }
 
-Nucleus checked(Nucleus nuc, std::string_view input) {
+Nucleus Checked(Nucleus nuc, std::string_view input) {
   if (!(nuc.Z >= 0.0) || !(nuc.A >= nuc.Z) || !std::isfinite(nuc.A)) {
     throw InputError("invalid nucleus '" + std::string(input) +
                      "': need A >= Z >= 0");
@@ -54,7 +54,7 @@ Nucleus checked(Nucleus nuc, std::string_view input) {
 
 }  // namespace
 
-std::string_view element_symbol(std::int32_t Z) {
+std::string_view ElementSymbol(std::int32_t Z) {
   if (Z < 0 || Z >= static_cast<std::int32_t>(kElements.size())) {
     throw InputError("element_symbol: no element with Z = " +
                      std::to_string(Z));
@@ -62,7 +62,7 @@ std::string_view element_symbol(std::int32_t Z) {
   return kElements[static_cast<std::size_t>(Z)];
 }
 
-std::int32_t element_proton_number(std::string_view symbol) {
+std::int32_t ElementProtonNumber(std::string_view symbol) {
   const auto it = std::find(kElements.begin(), kElements.end(), symbol);
   if (it == kElements.end()) {
     throw InputError("unknown element symbol '" + std::string(symbol) + "'");
@@ -70,7 +70,7 @@ std::int32_t element_proton_number(std::string_view symbol) {
   return static_cast<std::int32_t>(it - kElements.begin());
 }
 
-Nucleus Nucleus::parse(std::string_view name) {
+Nucleus Nucleus::Parse(std::string_view name) {
   if (name == "vacuum") return Nucleus{0.0, 0.0};
   constexpr std::string_view kMix = "mix_A";
   if (name.substr(0, kMix.size()) == kMix) {
@@ -78,20 +78,20 @@ Nucleus Nucleus::parse(std::string_view name) {
     double A = 0.0;
     double Z = 0.0;
     if (zpos == std::string_view::npos ||
-        !parse_decimal(name.substr(kMix.size(), zpos - kMix.size()), A) ||
-        !parse_decimal(name.substr(zpos + 2), Z)) {
+        !ParseDecimal(name.substr(kMix.size(), zpos - kMix.size()), A) ||
+        !ParseDecimal(name.substr(zpos + 2), Z)) {
       throw InputError("invalid nucleus mixture '" + std::string(name) +
                        "': expected mix_A<A>_Z<Z>, e.g. mix_A4.5_Z2.5");
     }
-    return checked(Nucleus{A, Z}, name);
+    return Checked(Nucleus{A, Z}, name);
   }
   std::size_t i = 0;
-  while (i < name.size() && !is_digit(name[i])) ++i;
+  while (i < name.size() && !IsDigit(name[i])) ++i;
   const std::string_view symbol = name.substr(0, i);
   const std::string_view digits = name.substr(i);
   if (symbol.empty() || digits.empty() ||
       !std::all_of(digits.begin(), digits.end(),
-                   [](char c) { return is_digit(c); })) {
+                   [](char c) { return IsDigit(c); })) {
     throw InputError(
         "invalid nucleus name '" + std::string(name) +
         "': expected an element symbol and a mass number, e.g. O16");
@@ -102,11 +102,11 @@ Nucleus Nucleus::parse(std::string_view name) {
                      "': unknown element '" + std::string(symbol) + "'");
   }
   double A = 0.0;
-  if (!parse_decimal(digits, A)) {
+  if (!ParseDecimal(digits, A)) {
     throw InputError("invalid nucleus name '" + std::string(name) +
                      "': bad mass number");
   }
-  return checked(Nucleus{A, static_cast<double>(it - kElements.begin())}, name);
+  return Checked(Nucleus{A, static_cast<double>(it - kElements.begin())}, name);
 }
 
 std::string Nucleus::name() const {
@@ -120,9 +120,9 @@ std::string Nucleus::name() const {
   return fmt::format("mix_A{}_Z{}", A, Z);
 }
 
-std::vector<OrbitOccupation> naive_filling(const Nucleus& nucleus,
-                                           std::int32_t emax,
-                                           std::span<const Orbit> skip) {
+std::vector<OrbitOccupation> NaiveFilling(const Nucleus& nucleus,
+                                          std::int32_t emax,
+                                          std::span<const Orbit> skip) {
   if (emax < 0) throw InputError("naive_filling: emax must be >= 0");
   const double A = nucleus.A;
   const double Z = nucleus.Z;
@@ -142,8 +142,8 @@ std::vector<OrbitOccupation> naive_filling(const Nucleus& nucleus,
       const std::int32_t j2 = std::abs(g);
       const std::int32_t l = g < 0 ? (j2 + 1) / 2 : (j2 - 1) / 2;
       const std::int32_t n = (N - l) / 2;
-      const Orbit proton{n, l, TwoJ{j2}, TwoTz::proton()};
-      const Orbit neutron{n, l, TwoJ{j2}, TwoTz::neutron()};
+      const Orbit proton{n, l, TwoJ{j2}, TwoTz::Proton()};
+      const Orbit neutron{n, l, TwoJ{j2}, TwoTz::Neutron()};
       if (zz < Z && !skipped(proton)) {
         const double dz = std::min(Z - zz, j2 + 1.);
         filled.push_back({proton, dz / (j2 + 1.0)});

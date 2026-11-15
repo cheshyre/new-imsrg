@@ -31,10 +31,10 @@ RawValue::Data S(const char* v) { return std::string(v); }
 RawValue::Data B(bool v) { return v; }
 
 /// `operators.from_file` with one entry whose dTz is `dtz` (V-62 rows).
-RawValue::Data from_file_entry(std::int64_t dtz) {
+RawValue::Data FromFileEntry(std::int64_t dtz) {
   auto val = [](RawValue::Data d) {
     return RawValue{std::move(d),
-                    SourceRef{SourceRef::Kind::TomlString, "test", 3, 1}};
+                    SourceRef{SourceRef::Kind::kTomlString, "test", 3, 1}};
   };
   RawTable entry{{"name", val(std::string("op"))},
                  {"dtz", val(dtz)},
@@ -42,11 +42,11 @@ RawValue::Data from_file_entry(std::int64_t dtz) {
   return RawArray{val(std::move(entry))};
 }
 
-RawTree minimal() {
+RawTree Minimal() {
   RawTree t;
   auto set = [&](const char* p, RawValue::Data d) {
     t.set(p, RawValue{std::move(d),
-                      SourceRef{SourceRef::Kind::TomlString, "test", 1, 1}});
+                      SourceRef{SourceRef::Kind::kTomlString, "test", 1, 1}});
   };
   set("basis.emax", I(4));
   set("basis.hw", I(16));
@@ -56,17 +56,17 @@ RawTree minimal() {
   return t;
 }
 
-RawTree with(RawTree t, std::initializer_list<Entry> extra) {
+RawTree With(RawTree t, std::initializer_list<Entry> extra) {
   for (const auto& [path, data] : extra) {
-    t.set(path,
-          RawValue{data, SourceRef{SourceRef::Kind::TomlString, "test", 2, 1}});
+    t.set(path, RawValue{data, SourceRef{SourceRef::Kind::kTomlString, "test",
+                                         2, 1}});
   }
   return t;
 }
 
-const ConfigIssue* find_issue(const ConfigIssues& issues,
-                              const std::string& code,
-                              const std::string& key = "") {
+const ConfigIssue* FindIssue(const ConfigIssues& issues,
+                             const std::string& code,
+                             const std::string& key = "") {
   for (const auto& i : issues) {
     if (i.code == code && (key.empty() || i.key_path == key)) return &i;
   }
@@ -82,7 +82,7 @@ struct Row {
   bool legacy_downgrades;  // true: a warning (same code) under legacy parsing
 };
 
-std::vector<Row> rows() {
+std::vector<Row> Rows() {
   return {
       {"V02_hw_positive",
        {{"basis.hw", D(-1.0)}},
@@ -234,7 +234,7 @@ std::vector<Row> rows() {
        "requires imsrg.method = \"magnus\"",
        false},  // V-46 also fires (every P1 non-magnus method is a flow method)
       {"V62_from_file_dtz",
-       {{"operators.from_file", from_file_entry(3)}},
+       {{"operators.from_file", FromFileEntry(3)}},
        "V-62",
        "operators.from_file[0].dtz",
        "must be in -2..2",
@@ -309,43 +309,43 @@ std::vector<Row> rows() {
 }
 
 TEST(Validate, table_of_rules) {
-  for (const auto& row : rows()) {
+  for (const auto& row : Rows()) {
     SCOPED_TRACE(row.name);
-    RawTree t = minimal();
+    RawTree t = Minimal();
     // Rows that set no reference.nucleus rely on `extra` to override the
     // minimal tree.
     for (const auto& [path, data] : row.extra) {
-      t.set(path, RawValue{data, SourceRef{SourceRef::Kind::TomlString, "test",
+      t.set(path, RawValue{data, SourceRef{SourceRef::Kind::kTomlString, "test",
                                            2, 1}});
     }
-    const auto r = resolve(t, ResolveOptions{false, false});
-    const auto* i = find_issue(r.issues, row.code, row.key);
+    const auto r = Resolve(t, ResolveOptions{false, false});
+    const auto* i = FindIssue(r.issues, row.code, row.key);
     ASSERT_NE(i, nullptr) << "missing " << row.code << " at " << row.key;
     EXPECT_NE(i->message.find(row.fragment), std::string::npos) << i->message;
     const bool is_warning_rule =
         std::string(row.code) == "W-Q11" ||
         std::string(row.name) == "V22_freeze_oscillator";
     if (!is_warning_rule && std::string(row.name) != "V52_at_end_without_3n") {
-      EXPECT_EQ(i->severity, Severity::Error);
+      EXPECT_EQ(i->severity, Severity::kError);
     }
   }
 }
 
 TEST(Validate, legacy_downgrades_selected_rules_to_warnings) {
   int checked = 0;
-  for (const auto& row : rows()) {
+  for (const auto& row : Rows()) {
     if (!row.legacy_downgrades) continue;
     SCOPED_TRACE(row.name);
-    RawTree t = minimal();
+    RawTree t = Minimal();
     for (const auto& [path, data] : row.extra) {
-      t.set(path, RawValue{data, SourceRef{SourceRef::Kind::TomlString, "test",
+      t.set(path, RawValue{data, SourceRef{SourceRef::Kind::kTomlString, "test",
                                            2, 1}});
     }
-    const auto r = resolve(t, ResolveOptions{true, false});
-    const auto* i = find_issue(r.issues, row.code, row.key);
+    const auto r = Resolve(t, ResolveOptions{true, false});
+    const auto* i = FindIssue(r.issues, row.code, row.key);
     ASSERT_NE(i, nullptr);
-    EXPECT_EQ(i->severity, Severity::Warning);
-    EXPECT_FALSE(has_errors(r.issues)) << "unexpected errors under legacy";
+    EXPECT_EQ(i->severity, Severity::kWarning);
+    EXPECT_FALSE(HasErrors(r.issues)) << "unexpected errors under legacy";
     ++checked;
   }
   EXPECT_GE(checked, 8);
@@ -353,55 +353,55 @@ TEST(Validate, legacy_downgrades_selected_rules_to_warnings) {
 
 TEST(Validate, warning_rules_stay_warnings_without_legacy) {
   const auto r =
-      resolve(with(minimal(), {{"imsrg3.at_end", B(true)}}), {false, false});
-  const auto* i = find_issue(r.issues, "W-Q11");
+      Resolve(With(Minimal(), {{"imsrg3.at_end", B(true)}}), {false, false});
+  const auto* i = FindIssue(r.issues, "W-Q11");
   ASSERT_NE(i, nullptr);
-  EXPECT_EQ(i->severity, Severity::Warning);
-  const auto* j = find_issue(r.issues, "V-52", "imsrg3.at_end");
+  EXPECT_EQ(i->severity, Severity::kWarning);
+  const auto* j = FindIssue(r.issues, "V-52", "imsrg3.at_end");
   ASSERT_NE(j, nullptr);
-  EXPECT_EQ(j->severity, Severity::Warning);
-  EXPECT_FALSE(has_errors(r.issues));
+  EXPECT_EQ(j->severity, Severity::kWarning);
+  EXPECT_FALSE(HasErrors(r.issues));
 }
 
 TEST(Validate, v32_occupations_file_without_reference_or_valence) {
-  RawTree t = minimal();
+  RawTree t = Minimal();
   t.erase("reference.nucleus");
   t.set("basis.mass_number", RawValue{I(16), {}});
   t.set("reference.occupations_file", RawValue{S("occ.txt"), {}});
-  const auto r = resolve(t, {false, false});
-  const auto* i = find_issue(r.issues, "V-32", "reference.occupations_file");
+  const auto r = Resolve(t, {false, false});
+  const auto* i = FindIssue(r.issues, "V-32", "reference.occupations_file");
   ASSERT_NE(i, nullptr);
   EXPECT_NE(i->message.find("requires reference.nucleus"), std::string::npos);
 }
 
 TEST(Validate, v22_only_when_explicitly_set) {
-  const auto quiet = resolve(with(minimal(), {{"basis.kind", S("oscillator")}}),
+  const auto quiet = Resolve(With(Minimal(), {{"basis.kind", S("oscillator")}}),
                              {false, false});
-  EXPECT_EQ(find_issue(quiet.issues, "V-22"), nullptr);
+  EXPECT_EQ(FindIssue(quiet.issues, "V-22"), nullptr);
 }
 
 TEST(Validate, independent_errors_accumulate) {
-  const auto t = with(minimal(), {{"basis.hw", D(-1.0)},
+  const auto t = With(Minimal(), {{"basis.hw", D(-1.0)},
                                   {"basis.emax", I(6)},
                                   {"interaction.two_body.e1max", I(4)},
                                   {"valence.space", S("sd-shel")},
                                   {"output.stem", S("a/b")}});
-  const auto r = resolve(t, {false, false});
-  EXPECT_NE(find_issue(r.issues, "V-02", "basis.hw"), nullptr);
-  EXPECT_NE(find_issue(r.issues, "V-10", "basis.emax"), nullptr);
-  EXPECT_NE(find_issue(r.issues, "V-01", "valence.space"), nullptr);
-  EXPECT_NE(find_issue(r.issues, "V-63", "output.stem"), nullptr);
+  const auto r = Resolve(t, {false, false});
+  EXPECT_NE(FindIssue(r.issues, "V-02", "basis.hw"), nullptr);
+  EXPECT_NE(FindIssue(r.issues, "V-10", "basis.emax"), nullptr);
+  EXPECT_NE(FindIssue(r.issues, "V-01", "valence.space"), nullptr);
+  EXPECT_NE(FindIssue(r.issues, "V-63", "output.stem"), nullptr);
   int errors = 0;
   for (const auto& i : r.issues)
-    errors += i.severity == Severity::Error ? 1 : 0;
+    errors += i.severity == Severity::kError ? 1 : 0;
   EXPECT_GE(errors, 4);
 }
 
 TEST(Validate,
      unknown_valence_space_suggests_nearest_and_single_reference_hint) {
-  const auto r = resolve(with(minimal(), {{"valence.space", S("sd-shel")}}),
+  const auto r = Resolve(With(Minimal(), {{"valence.space", S("sd-shel")}}),
                          {false, false});
-  const auto* i = find_issue(r.issues, "V-01", "valence.space");
+  const auto* i = FindIssue(r.issues, "V-01", "valence.space");
   ASSERT_NE(i, nullptr);
   ASSERT_TRUE(i->suggestion.has_value());
   EXPECT_NE(i->suggestion->find("sd-shell"), std::string::npos);
@@ -409,19 +409,19 @@ TEST(Validate,
 }
 
 TEST(Validate, valid_tree_has_no_errors) {
-  const auto r = resolve(minimal(), {false, false});
-  EXPECT_FALSE(has_errors(r.issues));
+  const auto r = Resolve(Minimal(), {false, false});
+  EXPECT_FALSE(HasErrors(r.issues));
   EXPECT_TRUE(r.issues.empty());
-  const auto again = validate(r.config, minimal(), {false, false});
+  const auto again = Validate(r.config, Minimal(), {false, false});
   EXPECT_TRUE(again.empty());
 }
 
 TEST(Validate, valid_single_stage_and_two_stage_trees_have_no_errors) {
   const auto two =
-      resolve(with(minimal(), {{"valence.space", S("sd-shell")},
+      Resolve(With(Minimal(), {{"valence.space", S("sd-shell")},
                                {"imsrg.generator.core", S("atan")}}),
               {false, false});
-  EXPECT_FALSE(has_errors(two.issues));
+  EXPECT_FALSE(HasErrors(two.issues));
   EXPECT_EQ(two.config.imsrg.steps, 2);
 }
 
@@ -439,9 +439,9 @@ class FileChecks : public ::testing::Test {
     std::error_code ec;
     fs::remove_all(dir_, ec);
   }
-  RawTree tree(const fs::path& file, const fs::path& out) {
-    return with(
-        minimal(),
+  RawTree Tree(const fs::path& file, const fs::path& out) {
+    return With(
+        Minimal(),
         {{"interaction.two_body.file", RawValue::Data(file.generic_string())},
          {"output.directory", RawValue::Data(out.generic_string())}});
   }
@@ -449,27 +449,27 @@ class FileChecks : public ::testing::Test {
 };
 
 TEST_F(FileChecks, existing_file_and_writable_dir_pass) {
-  const auto r = resolve(tree(dir_ / "x.me2j", dir_ / "out"), {false, true});
-  EXPECT_EQ(find_issue(r.issues, "V-14"), nullptr);
-  EXPECT_FALSE(has_errors(r.issues));
+  const auto r = Resolve(Tree(dir_ / "x.me2j", dir_ / "out"), {false, true});
+  EXPECT_EQ(FindIssue(r.issues, "V-14"), nullptr);
+  EXPECT_FALSE(HasErrors(r.issues));
 }
 
 TEST_F(FileChecks, missing_file_is_v14) {
-  const auto r = resolve(tree(dir_ / "nope.me2j", dir_ / "out"), {false, true});
-  const auto* i = find_issue(r.issues, "V-14", "interaction.two_body.file");
+  const auto r = Resolve(Tree(dir_ / "nope.me2j", dir_ / "out"), {false, true});
+  const auto* i = FindIssue(r.issues, "V-14", "interaction.two_body.file");
   ASSERT_NE(i, nullptr);
   EXPECT_NE(i->message.find("does not exist"), std::string::npos);
 }
 
 TEST_F(FileChecks, directory_as_input_file_is_v14) {
-  const auto r = resolve(tree(dir_, dir_ / "out"), {false, true});
-  EXPECT_NE(find_issue(r.issues, "V-14", "interaction.two_body.file"), nullptr);
+  const auto r = Resolve(Tree(dir_, dir_ / "out"), {false, true});
+  EXPECT_NE(FindIssue(r.issues, "V-14", "interaction.two_body.file"), nullptr);
 }
 
 TEST_F(FileChecks, output_directory_under_a_regular_file_is_v14) {
   const auto r =
-      resolve(tree(dir_ / "x.me2j", dir_ / "x.me2j" / "sub"), {false, true});
-  EXPECT_NE(find_issue(r.issues, "V-14", "output.directory"), nullptr);
+      Resolve(Tree(dir_ / "x.me2j", dir_ / "x.me2j" / "sub"), {false, true});
+  EXPECT_NE(FindIssue(r.issues, "V-14", "output.directory"), nullptr);
 }
 
 TEST_F(FileChecks, missing_operator_and_occupation_files_are_v14) {
@@ -478,28 +478,27 @@ TEST_F(FileChecks, missing_operator_and_occupation_files_are_v14) {
   e.emplace_back(
       "file_2b",
       RawValue{RawValue::Data((dir_ / "r2.me2j").generic_string()), {}});
-  auto t = tree(dir_ / "x.me2j", dir_ / "out");
+  auto t = Tree(dir_ / "x.me2j", dir_ / "out");
   t.set("operators.from_file", RawValue{RawArray{RawValue{e, {}}}, {}});
   t.set("reference.occupations_file",
         RawValue{RawValue::Data((dir_ / "occ.txt").generic_string()), {}});
-  const auto r = resolve(t, {false, true});
-  EXPECT_NE(find_issue(r.issues, "V-14", "operators.from_file[0].file_2b"),
+  const auto r = Resolve(t, {false, true});
+  EXPECT_NE(FindIssue(r.issues, "V-14", "operators.from_file[0].file_2b"),
             nullptr);
-  EXPECT_NE(find_issue(r.issues, "V-14", "reference.occupations_file"),
-            nullptr);
+  EXPECT_NE(FindIssue(r.issues, "V-14", "reference.occupations_file"), nullptr);
 }
 
 TEST_F(FileChecks, files_are_not_touched_when_check_files_is_off) {
   const auto r =
-      resolve(tree(dir_ / "nope.me2j", dir_ / "out"), {false, false});
-  EXPECT_EQ(find_issue(r.issues, "V-14"), nullptr);
+      Resolve(Tree(dir_ / "nope.me2j", dir_ / "out"), {false, false});
+  EXPECT_EQ(FindIssue(r.issues, "V-14"), nullptr);
 }
 
 TEST_F(FileChecks, legacy_keeps_v14_as_error) {
-  const auto r = resolve(tree(dir_ / "nope.me2j", dir_ / "out"), {true, true});
-  const auto* i = find_issue(r.issues, "V-14");
+  const auto r = Resolve(Tree(dir_ / "nope.me2j", dir_ / "out"), {true, true});
+  const auto* i = FindIssue(r.issues, "V-14");
   ASSERT_NE(i, nullptr);
-  EXPECT_EQ(i->severity, Severity::Error);
+  EXPECT_EQ(i->severity, Severity::kError);
 }
 
 }  // namespace

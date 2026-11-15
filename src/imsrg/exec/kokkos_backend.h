@@ -15,7 +15,7 @@
 /// kernels live in free functions, never in a `TEST` body or a
 /// private/protected member function.
 ///
-/// `parallel_for` and `team_for` launch asynchronously on async backends;
+/// `ParallelFor` and `TeamFor` launch asynchronously on async backends;
 /// `parallel_reduce*` return the result in a host variable and therefore block.
 
 #include <cstddef>
@@ -44,27 +44,27 @@ using RangePolicy =
 /// The device view of `buf` (empty view for an empty buffer). Valid until `buf`
 /// is resized, moved from or destroyed.
 template <class T>
-DeviceView<T> view(DeviceBuffer<T>& buf) {
+DeviceView<T> View(DeviceBuffer<T>& buf) {
   return detail::DeviceBufferAccess<T>::view(buf);
 }
 
 /// Read-only device view of `buf`.
 template <class T>
-DeviceView<const T> view(const DeviceBuffer<T>& buf) {
+DeviceView<const T> View(const DeviceBuffer<T>& buf) {
   return detail::DeviceBufferAccess<T>::view(buf);
 }
 
 /// Runs `f(i)` for i in [0, n) on the default execution space. `f` is an
 /// `IMSRG_LAMBDA` with value captures. Asynchronous on async backends.
 template <class F>
-void parallel_for(const char* name, Index n, const F& f) {
+void ParallelFor(const char* name, Index n, const F& f) {
   IMSRG_CHECK(n >= 0, name);
   Kokkos::parallel_for(name, RangePolicy(0, n), f);
 }
 
 /// Runs `f(i, j)` for i in [0, n0), j in [0, n1) (MDRangePolicy, rank 2).
 template <class F>
-void parallel_for_md(const char* name, Index n0, Index n1, const F& f) {
+void ParallelForMd(const char* name, Index n0, Index n1, const F& f) {
   using Policy = Kokkos::MDRangePolicy<DefaultExecSpace, Kokkos::Rank<2>,
                                        Kokkos::IndexType<Index>>;
   IMSRG_CHECK(n0 >= 0 && n1 >= 0, name);
@@ -75,7 +75,7 @@ void parallel_for_md(const char* name, Index n0, Index n1, const F& f) {
 /// `partial` (`partial += ...`). `result` is overwritten. Blocking.
 /// Floating-point sums depend on the reduction order.
 template <class F, class T>
-void parallel_reduce(const char* name, Index n, const F& f, T& result) {
+void ParallelReduce(const char* name, Index n, const F& f, T& result) {
   IMSRG_CHECK(n >= 0, name);
   Kokkos::parallel_reduce(name, RangePolicy(0, n), f, result);
 }
@@ -83,7 +83,7 @@ void parallel_reduce(const char* name, Index n, const F& f, T& result) {
 /// `result = max over i in [0, n) of the values `f(i, m)` fold into `m` (`if (x
 /// > m) m = x`). Blocking. For `n == 0` the result is the lowest value of `T`.
 template <class F, class T>
-void parallel_reduce_max(const char* name, Index n, const F& f, T& result) {
+void ParallelReduceMax(const char* name, Index n, const F& f, T& result) {
   IMSRG_CHECK(n >= 0, name);
   Kokkos::parallel_reduce(name, RangePolicy(0, n), f, Kokkos::Max<T>(result));
 }
@@ -96,8 +96,8 @@ void parallel_reduce_max(const char* name, Index n, const F& f, T& result) {
 /// `Kokkos::single(PerTeam)` and `member.team_barrier()`; CPU tests with team
 /// size 1 do not exercise this, so review it. Asynchronous on async backends.
 template <class F>
-void team_for(const char* name, int league_size, int team_size,
-              std::size_t scratch_bytes_per_team, const F& f) {
+void TeamFor(const char* name, int league_size, int team_size,
+             std::size_t scratch_bytes_per_team, const F& f) {
   IMSRG_CHECK(league_size >= 0, name);
   Kokkos::TeamPolicy<DefaultExecSpace> policy =
       team_size > 0
@@ -110,7 +110,7 @@ void team_for(const char* name, int league_size, int team_size,
 }
 
 /// Waits for all work on the default execution space.
-inline void fence(const char* name) { DefaultExecSpace().fence(name); }
+inline void Fence(const char* name) { DefaultExecSpace().fence(name); }
 
 }  // namespace imsrg::exec
 

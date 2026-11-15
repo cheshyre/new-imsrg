@@ -70,14 +70,14 @@ struct GoldenBasisDump {
 /// last (nothing after it).
 /// @throws std::runtime_error naming the file, the line number and the reason
 ///         on any deviation (including an unreadable file).
-GoldenBasisDump read_golden_basis_dump(const std::filesystem::path& file);
+GoldenBasisDump ReadGoldenBasisDump(const std::filesystem::path& file);
 
 /// The directory of the golden basis files, `IMSRG_GOLDEN_DIR "/basis"`
 /// (compile definition).
-std::filesystem::path golden_basis_dir();
+std::filesystem::path GoldenBasisDir();
 
 /// File names (not paths) of the 14 golden basis files, sorted.
-std::vector<std::string> golden_basis_files();
+std::vector<std::string> GoldenBasisFiles();
 
 }  // namespace imsrg::basis::testing
 

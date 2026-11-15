@@ -13,127 +13,127 @@ namespace imsrg::opslib {
 
 namespace {
 
-double b_squared(const basis::ModelSpace& ms) {
-  return constants::hbarc * constants::hbarc / constants::m_nucleon /
+double BSquared(const basis::ModelSpace& ms) {
+  return constants::kHbarc * constants::kHbarc / constants::kMNucleon /
          ms.basis().hbar_omega();
 }
 
-bool in_species(const basis::Orbit& o, Species s) {
+bool InSpecies(const basis::Orbit& o, Species s) {
   switch (s) {
-    case Species::Proton:
+    case Species::kProton:
       return o.tz2.twice < 0;
-    case Species::Neutron:
+    case Species::kNeutron:
       return o.tz2.twice > 0;
-    case Species::Matter:
+    case Species::kMatter:
       return true;
   }
   return false;
 }
 
-op::Operator zero_operator(const std::shared_ptr<const basis::ModelSpace>& ms) {
-  op::Operator z(ms, op::OperatorSpec::scalar(2, Hermiticity::Hermitian));
-  z.sync_to_device();
+op::Operator ZeroOperator(const std::shared_ptr<const basis::ModelSpace>& ms) {
+  op::Operator z(ms, op::OperatorSpec::Scalar(2, Hermiticity::kHermitian));
+  z.SyncToDevice();
   return z;
 }
 
 }  // namespace
 
-Species species_from_string(const std::string& option) {
+Species SpeciesFromString(const std::string& option) {
   if (option == "proton") {
-    return Species::Proton;
+    return Species::kProton;
   }
   if (option == "neutron") {
-    return Species::Neutron;
+    return Species::kNeutron;
   }
   if (option == "matter") {
-    return Species::Matter;
+    return Species::kMatter;
   }
   throw InputError("species_from_string: unknown option '" + option + "'");
 }
 
-op::Operator r2_one_body(const std::shared_ptr<const basis::ModelSpace>& ms,
-                         Species species) {
-  op::Operator r(ms, op::OperatorSpec::scalar(2, Hermiticity::Hermitian));
-  detail::add_oscillator_one_body(
-      r, b_squared(*ms), -1.0,
-      [species](const basis::Orbit& o) { return in_species(o, species); });
-  r.sync_to_device();
+op::Operator R2OneBody(const std::shared_ptr<const basis::ModelSpace>& ms,
+                       Species species) {
+  op::Operator r(ms, op::OperatorSpec::Scalar(2, Hermiticity::kHermitian));
+  detail::AddOscillatorOneBody(
+      r, BSquared(*ms), -1.0,
+      [species](const basis::Orbit& o) { return InSpecies(o, species); });
+  r.SyncToDevice();
   return r;
 }
 
-op::Operator r2_two_body(const std::shared_ptr<const basis::ModelSpace>& ms,
-                         Species species) {
-  op::Operator r(ms, op::OperatorSpec::scalar(2, Hermiticity::Hermitian));
-  const detail::PairEngine engine(detail::max_orbit_shell(*ms),
+op::Operator R2TwoBody(const std::shared_ptr<const basis::ModelSpace>& ms,
+                       Species species) {
+  op::Operator r(ms, op::OperatorSpec::Scalar(2, Hermiticity::kHermitian));
+  const detail::PairEngine engine(detail::MaxOrbitShell(*ms),
                                   ms->basis().lmax(), ms->basis().hbar_omega());
   // Channel filter and pn prefactor are applied inside the value callback (zero
   // skips the entry).
-  detail::add_two_body(
+  detail::AddTwoBody(
       r, 0.0,
       [&](const basis::TwoBodyChannel& ch, const basis::Orbit& a,
           const basis::Orbit& b, const basis::Orbit& c, const basis::Orbit& d) {
-        if ((species == Species::Proton && ch.Tz() > 0) ||
-            (species == Species::Neutron && ch.Tz() < 0)) {
+        if ((species == Species::kProton && ch.Tz() > 0) ||
+            (species == Species::kNeutron && ch.Tz() < 0)) {
           return 0.0;
         }
         const double prefactor =
-            (ch.Tz() == 0 && species != Species::Matter) ? 0.5 : 1.0;
-        return prefactor *
-               engine.element(detail::PairKind::Position, a, b, c, d, ch.two_j);
+            (ch.Tz() == 0 && species != Species::kMatter) ? 0.5 : 1.0;
+        return prefactor * engine.Element(detail::PairKind::kPosition, a, b, c,
+                                          d, ch.two_j);
       });
-  r.sync_to_device();
+  r.SyncToDevice();
   return r;
 }
 
-op::Operator rp_spin_orbit_correction(
+op::Operator RpSpinOrbitCorrection(
     const std::shared_ptr<const basis::ModelSpace>& ms) {
-  op::Operator r(ms, op::OperatorSpec::scalar(2, Hermiticity::Hermitian));
-  const double m2 = constants::m_nucleon * constants::m_nucleon /
-                    (constants::hbarc * constants::hbarc);
+  op::Operator r(ms, op::OperatorSpec::Scalar(2, Hermiticity::kHermitian));
+  const double m2 = constants::kMNucleon * constants::kMNucleon /
+                    (constants::kHbarc * constants::kHbarc);
   const auto& basis = ms->basis();
   for (std::int32_t i = 0; i < basis.num_orbits(); ++i) {
     const basis::Orbit& o = basis.orbit(OrbitIndex{i});
     const double mu = (o.tz2.twice < 0) ? 2.793 - 0.5 : -1.913;
     const double kappa = (o.j2.twice < 2 * o.l) ? o.l : -(o.l + 1);
-    r.one_body().add(OrbitIndex{i}, OrbitIndex{i}, -mu / m2 * (kappa + 1.0));
+    r.one_body().Add(OrbitIndex{i}, OrbitIndex{i}, -mu / m2 * (kappa + 1.0));
   }
-  r.sync_to_device();
+  r.SyncToDevice();
   return r;
 }
 
-op::Operator rp2(const std::shared_ptr<const basis::ModelSpace>& ms, int A,
+op::Operator Rp2(const std::shared_ptr<const basis::ModelSpace>& ms, int A,
                  int Z, bool include_spin_orbit) {
   if (Z == 0) {
-    return zero_operator(ms);
+    return ZeroOperator(ms);
   }
   const double dA = A;
   const double dZ = Z;
-  op::Operator r = r2_cm(ms, A);
-  op::axpy((dA - 2.0) / (dA * dZ), r2_one_body(ms, Species::Proton), r);
-  op::axpy(-4.0 / (dA * dZ), r2_two_body(ms, Species::Proton), r);
+  op::Operator r = R2Cm(ms, A);
+  op::Axpy((dA - 2.0) / (dA * dZ), R2OneBody(ms, Species::kProton), r);
+  op::Axpy(-4.0 / (dA * dZ), R2TwoBody(ms, Species::kProton), r);
   if (include_spin_orbit) {
-    op::axpy(1.0 / dZ, rp_spin_orbit_correction(ms), r);
+    op::Axpy(1.0 / dZ, RpSpinOrbitCorrection(ms), r);
   }
   return r;
 }
 
-op::Operator rn2(const std::shared_ptr<const basis::ModelSpace>& ms, int A,
+op::Operator Rn2(const std::shared_ptr<const basis::ModelSpace>& ms, int A,
                  int Z) {
   if (Z == A) {
-    return zero_operator(ms);
+    return ZeroOperator(ms);
   }
   const double dA = A;
   const double dN = A - Z;
-  op::Operator r = r2_cm(ms, A);
-  op::axpy((dA - 2.0) / (dA * dN), r2_one_body(ms, Species::Neutron), r);
-  op::axpy(-4.0 / (dA * dN), r2_two_body(ms, Species::Neutron), r);
+  op::Operator r = R2Cm(ms, A);
+  op::Axpy((dA - 2.0) / (dA * dN), R2OneBody(ms, Species::kNeutron), r);
+  op::Axpy(-4.0 / (dA * dN), R2TwoBody(ms, Species::kNeutron), r);
   return r;
 }
 
-op::Operator rm2(const std::shared_ptr<const basis::ModelSpace>& ms, int A) {
-  op::Operator r = r2_one_body(ms, Species::Matter);
+op::Operator Rm2(const std::shared_ptr<const basis::ModelSpace>& ms, int A) {
+  op::Operator r = R2OneBody(ms, Species::kMatter);
   r *= 1.0 / A;
-  r -= r2_cm(ms, A);
+  r -= R2Cm(ms, A);
   return r;
 }
 

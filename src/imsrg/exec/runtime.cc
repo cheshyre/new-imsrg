@@ -16,7 +16,7 @@ namespace imsrg::exec {
 
 namespace {
 
-void validate(const RuntimeOptions& o) {
+void Validate(const RuntimeOptions& o) {
   if (o.num_threads == 0 || o.num_threads < -1) {
     throw ConfigError(
         "exec::Runtime: num_threads must be -1 (default) or >= 1, got " +
@@ -29,7 +29,7 @@ void validate(const RuntimeOptions& o) {
   }
 }
 
-void require_fresh_kokkos() {
+void RequireFreshKokkos() {
   if (Kokkos::is_initialized()) {
     throw RuntimeError("exec::Runtime: Kokkos is already initialized");
   }
@@ -39,7 +39,7 @@ void require_fresh_kokkos() {
   }
 }
 
-Kokkos::InitializationSettings make_settings(const RuntimeOptions& o) {
+Kokkos::InitializationSettings MakeSettings(const RuntimeOptions& o) {
   Kokkos::InitializationSettings s;
   if (o.num_threads >= 0) {
     s.set_num_threads(o.num_threads);
@@ -53,7 +53,7 @@ Kokkos::InitializationSettings make_settings(const RuntimeOptions& o) {
   return s;
 }
 
-bool has_flag(const std::vector<char*>& args, const std::string& prefix) {
+bool HasFlag(const std::vector<char*>& args, const std::string& prefix) {
   for (const char* a : args) {
     if (a != nullptr && std::string(a).rfind(prefix, 0) == 0) {
       return true;
@@ -65,28 +65,28 @@ bool has_flag(const std::vector<char*>& args, const std::string& prefix) {
 }  // namespace
 
 Runtime::Runtime(const RuntimeOptions& options) {
-  validate(options);
-  require_fresh_kokkos();
-  Kokkos::initialize(make_settings(options));
+  Validate(options);
+  RequireFreshKokkos();
+  Kokkos::initialize(MakeSettings(options));
 }
 
 Runtime::Runtime(int& argc, char** argv, const RuntimeOptions& options) {
-  validate(options);
-  require_fresh_kokkos();
+  Validate(options);
+  RequireFreshKokkos();
   // Kokkos::initialize(argc, argv) cannot be combined with settings, so options
   // are turned into arguments (unless the command line already sets them)
   // appended to a working copy.
   std::vector<char*> args(argv, argv + argc);
   std::vector<std::string> extra;
-  if (options.num_threads >= 0 && !has_flag(args, "--kokkos-num-threads")) {
+  if (options.num_threads >= 0 && !HasFlag(args, "--kokkos-num-threads")) {
     extra.push_back("--kokkos-num-threads=" +
                     std::to_string(options.num_threads));
   }
-  if (options.device_id >= 0 && !has_flag(args, "--kokkos-device-id")) {
+  if (options.device_id >= 0 && !HasFlag(args, "--kokkos-device-id")) {
     extra.push_back("--kokkos-device-id=" + std::to_string(options.device_id));
   }
   if (options.print_configuration &&
-      !has_flag(args, "--kokkos-print-configuration")) {
+      !HasFlag(args, "--kokkos-print-configuration")) {
     extra.push_back("--kokkos-print-configuration");
   }
   for (std::string& e : extra) {
@@ -125,26 +125,26 @@ Runtime::~Runtime() {
   }
 }
 
-bool Runtime::is_initialized() noexcept { return Kokkos::is_initialized(); }
+bool Runtime::IsInitialized() noexcept { return Kokkos::is_initialized(); }
 
-std::string Runtime::execution_space_name() {
+std::string Runtime::ExecutionSpaceName() {
   return Kokkos::DefaultExecutionSpace::name();
 }
 
-int Runtime::concurrency() {
+int Runtime::Concurrency() {
   return Kokkos::DefaultExecutionSpace().concurrency();
 }
 
-bool default_memory_is_host_accessible() noexcept {
+bool DefaultMemoryIsHostAccessible() noexcept {
   return Kokkos::SpaceAccessibility<
       Kokkos::HostSpace,
       Kokkos::DefaultExecutionSpace::memory_space>::accessible;
 }
 
-void push_profiling_region(const char* name) {
+void PushProfilingRegion(const char* name) {
   Kokkos::Tools::pushRegion(std::string(name));
 }
 
-void pop_profiling_region() { Kokkos::Tools::popRegion(); }
+void PopProfilingRegion() { Kokkos::Tools::popRegion(); }
 
 }  // namespace imsrg::exec

@@ -47,27 +47,27 @@ class [[nodiscard]] Expected {
 
   /// The value. @throws InvariantError if an error is held.
   T& value() & {
-    require_value();
+    RequireValue();
     return std::get<0>(data_);
   }
   /// The value. @throws InvariantError if an error is held.
   const T& value() const& {
-    require_value();
+    RequireValue();
     return std::get<0>(data_);
   }
   /// The value (moved out). @throws InvariantError if an error is held.
   T&& value() && {
-    require_value();
+    RequireValue();
     return std::get<0>(std::move(data_));
   }
   /// The error. @throws InvariantError if a value is held.
   E& error() & {
-    require_error();
+    RequireError();
     return std::get<1>(data_);
   }
   /// The error. @throws InvariantError if a value is held.
   const E& error() const& {
-    require_error();
+    RequireError();
     return std::get<1>(data_);
   }
 
@@ -81,11 +81,11 @@ class [[nodiscard]] Expected {
   const T& operator*() const& { return value(); }
 
  private:
-  void require_value() const {
+  void RequireValue() const {
     if (!has_value())
       throw InvariantError("Expected: value() called on an error");
   }
-  void require_error() const {
+  void RequireError() const {
     if (has_value())
       throw InvariantError("Expected: error() called on a value");
   }

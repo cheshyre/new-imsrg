@@ -29,8 +29,8 @@ namespace {
 /// Wraps a column-major host matrix as a zero-copy numpy view kept alive by
 /// `owner`. Element strides are {1, ld}, i.e. the array is Fortran-ordered.
 template <class T>
-nb::object matrix_view(T* data, std::int64_t rows, std::int64_t cols,
-                       std::int64_t ld, nb::handle owner) {
+nb::object NumpyMatrixView(T* data, std::int64_t rows, std::int64_t cols,
+                           std::int64_t ld, nb::handle owner) {
   using Arr = nb::ndarray<nb::numpy, T, nb::ndim<2>>;
   const std::size_t shape[2] = {static_cast<std::size_t>(rows),
                                 static_cast<std::size_t>(cols)};
@@ -38,18 +38,18 @@ nb::object matrix_view(T* data, std::int64_t rows, std::int64_t cols,
   return nb::cast(Arr(data, 2, shape, owner, strides));
 }
 
-PyOperator& as_op(nb::handle h) { return nb::cast<PyOperator&>(h); }
+PyOperator& AsOp(nb::handle h) { return nb::cast<PyOperator&>(h); }
 
 }  // namespace
 
-void bind_operator(nb::module_& m) {
+void BindOperator(nb::module_& m) {
   nb::enum_<Parity>(m, "Parity")
-      .value("Even", Parity::Even)
-      .value("Odd", Parity::Odd);
+      .value("Even", Parity::kEven)
+      .value("Odd", Parity::kOdd);
   nb::enum_<Hermiticity>(m, "Hermiticity")
-      .value("Hermitian", Hermiticity::Hermitian)
-      .value("AntiHermitian", Hermiticity::AntiHermitian)
-      .value("NonHermitian", Hermiticity::NonHermitian);
+      .value("Hermitian", Hermiticity::kHermitian)
+      .value("AntiHermitian", Hermiticity::kAntiHermitian)
+      .value("NonHermitian", Hermiticity::kNonHermitian);
 
   nb::class_<op::OperatorSpec>(m, "OperatorSpec",
                                "Symmetry and rank labels of an operator.")
@@ -68,12 +68,12 @@ void bind_operator(nb::module_& m) {
             new (self) op::OperatorSpec(s);
           },
           nb::arg("particle_rank") = 2, nb::arg("rank_J") = 0,
-          nb::arg("parity") = Parity::Even, nb::arg("delta_Tz") = 0,
-          nb::arg("hermiticity") = Hermiticity::Hermitian,
+          nb::arg("parity") = Parity::kEven, nb::arg("delta_Tz") = 0,
+          nb::arg("hermiticity") = Hermiticity::kHermitian,
           nb::arg("delta_particle_number") = 0)
-      .def_static("scalar", &op::OperatorSpec::scalar,
+      .def_static("scalar", &op::OperatorSpec::Scalar,
                   nb::arg("particle_rank") = 2,
-                  nb::arg("hermiticity") = Hermiticity::Hermitian)
+                  nb::arg("hermiticity") = Hermiticity::kHermitian)
       .def_rw("particle_rank", &op::OperatorSpec::particle_rank)
       .def_rw("rank_J", &op::OperatorSpec::rank_J)
       .def_rw("parity", &op::OperatorSpec::parity)
@@ -84,7 +84,7 @@ void bind_operator(nb::module_& m) {
       .def("__repr__", [](const op::OperatorSpec& s) {
         return "OperatorSpec(particle_rank=" + std::to_string(s.particle_rank) +
                ", rank_J=" + std::to_string(s.rank_J) +
-               ", parity=" + (s.parity == Parity::Even ? "Even" : "Odd") +
+               ", parity=" + (s.parity == Parity::kEven ? "Even" : "Odd") +
                ", delta_Tz=" + std::to_string(s.delta_Tz) + ")";
       });
 
@@ -95,7 +95,7 @@ void bind_operator(nb::module_& m) {
           "__init__",
           [](PyOperator* self, const PyModelSpace& ms,
              const op::OperatorSpec& spec) {
-            ensure_runtime();
+            EnsureRuntime();
             new (self) PyOperator(op::Operator(ms.ms, spec));
           },
           nb::arg("model_space"), nb::arg("spec") = op::OperatorSpec{})
@@ -110,26 +110,26 @@ void bind_operator(nb::module_& m) {
       .def_prop_ro(
           "one_body",
           [](nb::object self) {
-            auto& o = as_op(self);
-            o.sync_to_host();
+            auto& o = AsOp(self);
+            o.SyncToHost();
             auto v = std::as_const(o).one_body().host_view();
-            return matrix_view<const double>(v.data, v.rows, v.cols, v.ld,
-                                             self);
+            return NumpyMatrixView<const double>(v.data, v.rows, v.cols, v.ld,
+                                                 self);
           },
           "Read-only zero-copy numpy view (column-major) of the one-body "
           "matrix (host mirror).")
       .def(
           "one_body_view",
           [](nb::object self, bool writable) {
-            auto& o = as_op(self);
-            o.sync_to_host();
+            auto& o = AsOp(self);
+            o.SyncToHost();
             if (!writable) {
               auto v = std::as_const(o).one_body().host_view();
-              return matrix_view<const double>(v.data, v.rows, v.cols, v.ld,
-                                               self);
+              return NumpyMatrixView<const double>(v.data, v.rows, v.cols, v.ld,
+                                                   self);
             }
             auto v = o.one_body().host_view();
-            return matrix_view<double>(v.data, v.rows, v.cols, v.ld, self);
+            return NumpyMatrixView<double>(v.data, v.rows, v.cols, v.ld, self);
           },
           nb::arg("writable") = false,
           "Zero-copy view of the one-body matrix. After writing through a "
@@ -138,26 +138,26 @@ void bind_operator(nb::module_& m) {
       .def(
           "two_body_block",
           [](nb::object self, int channel, bool writable) {
-            auto& o = as_op(self);
+            auto& o = AsOp(self);
             const auto& tb = o.model_space_ptr()->two_body();
             if (channel < 0 || channel >= tb.num_channels())
               throw imsrg::InputError("channel index out of range");
-            o.sync_to_host();
+            o.SyncToHost();
             const ChannelIndex ch{channel};
             if (!writable) {
               auto v = std::as_const(o).two_body().host_block(ch);
-              return matrix_view<const double>(v.data, v.rows, v.cols, v.ld,
-                                               self);
+              return NumpyMatrixView<const double>(v.data, v.rows, v.cols, v.ld,
+                                                   self);
             }
             auto v = o.two_body().host_block(ch);
-            return matrix_view<double>(v.data, v.rows, v.cols, v.ld, self);
+            return NumpyMatrixView<double>(v.data, v.rows, v.cols, v.ld, self);
           },
           nb::arg("channel"), nb::arg("writable") = false,
           "Zero-copy numpy view of the two-body block of a channel "
           "(column-major).")
-      .def("sync_to_host", [](PyOperator& o) { o.sync_to_host(); })
+      .def("sync_to_host", [](PyOperator& o) { o.SyncToHost(); })
       .def(
-          "sync_to_device", [](PyOperator& o) { o.sync_to_device(); },
+          "sync_to_device", [](PyOperator& o) { o.SyncToDevice(); },
           "Copies host edits (writable views) to the device data.")
       .def("set_zero", [](PyOperator& o) { o.set_zero(); })
       .def("copy",
@@ -192,7 +192,7 @@ void bind_operator(nb::module_& m) {
            [](nb::object self, const PyOperator& b) {
              {
                nb::gil_scoped_release r;
-               op::operator+=(as_op(self), b);
+               op::operator+=(AsOp(self), b);
              }
              return self;
            })
@@ -200,41 +200,41 @@ void bind_operator(nb::module_& m) {
            [](nb::object self, const PyOperator& b) {
              {
                nb::gil_scoped_release r;
-               op::operator-=(as_op(self), b);
+               op::operator-=(AsOp(self), b);
              }
              return self;
            })
       .def("__imul__",
            [](nb::object self, double c) {
-             op::operator*=(as_op(self), c);
+             op::operator*=(AsOp(self), c);
              return self;
            })
       .def("__itruediv__",
            [](nb::object self, double c) {
-             op::operator/=(as_op(self), c);
+             op::operator/=(AsOp(self), c);
              return self;
            })
       .def(
-          "norm", [](const PyOperator& o) { return op::norm(o); },
+          "norm", [](const PyOperator& o) { return op::Norm(o); },
           "Frobenius-type total norm.")
       .def("one_body_norm",
-           [](const PyOperator& o) { return op::one_body_norm(o); })
+           [](const PyOperator& o) { return op::OneBodyNorm(o); })
       .def("two_body_norm",
-           [](const PyOperator& o) { return op::two_body_norm(o); })
+           [](const PyOperator& o) { return op::TwoBodyNorm(o); })
       .def("three_body_norm",
-           [](const PyOperator& o) { return op::three_body_norm(o); })
+           [](const PyOperator& o) { return op::ThreeBodyNorm(o); })
       .def(
           "normal_ordered",
           [](const PyOperator& o) {
             nb::gil_scoped_release r;
-            return PyOperator(op::normal_order(o));
+            return PyOperator(op::NormalOrder(o));
           },
           "Normal ordering w.r.t. the model-space reference (two-body "
           "approximation).")
       .def("undo_normal_order",
            [](const PyOperator& o) {
              nb::gil_scoped_release r;
-             return PyOperator(op::undo_normal_order(o));
+             return PyOperator(op::UndoNormalOrder(o));
            })
       .def("__repr__", [](const PyOperator& o) {
         return "Operator(zero_body=" + std::to_string(o.zero_body()) +
@@ -247,13 +247,13 @@ void bind_operator(nb::module_& m) {
       [](const PyModelSpace& ms, const op::OperatorSpec& spec,
          std::uint64_t seed, double zero_body_scale, double one_body_scale,
          double two_body_scale) {
-        ensure_runtime();
+        EnsureRuntime();
         op::RandomOperatorOptions opt;
         opt.seed = seed;
         opt.zero_body_scale = zero_body_scale;
         opt.one_body_scale = one_body_scale;
         opt.two_body_scale = two_body_scale;
-        return PyOperator(op::random_operator(ms.ms, spec, opt));
+        return PyOperator(op::RandomOperator(ms.ms, spec, opt));
       },
       nb::arg("model_space"), nb::arg("spec") = op::OperatorSpec{},
       nb::arg("seed") = 1, nb::arg("zero_body_scale") = 0.0,
@@ -263,7 +263,7 @@ void bind_operator(nb::module_& m) {
   m.def(
       "read_operator_dump_header",
       [](const std::filesystem::path& path) {
-        const auto h = op::read_operator_dump_header(path);
+        const auto h = op::ReadOperatorDumpHeader(path);
         nb::dict d;
         d["source"] = h.source;
         d["emax"] = h.emax;
@@ -287,17 +287,17 @@ void bind_operator(nb::module_& m) {
       "read_operator_dump",
       [](const std::filesystem::path& path, std::optional<PyModelSpace> ms,
          bool check_occupations) {
-        ensure_runtime();
+        EnsureRuntime();
         nb::gil_scoped_release r;
         std::shared_ptr<const basis::ModelSpace> space;
         if (ms) {
           space = ms->ms;
         } else {
-          space = op::model_space_for_dump(op::read_operator_dump_header(path));
+          space = op::ModelSpaceForDump(op::ReadOperatorDumpHeader(path));
         }
         op::OperatorDumpReadOptions opt;
         opt.check_occupations = check_occupations;
-        return PyOperator(op::read_operator_dump(path, space, opt));
+        return PyOperator(op::ReadOperatorDump(path, space, opt));
       },
       nb::arg("path"), nb::arg("model_space") = nb::none(),
       nb::arg("check_occupations") = true,
@@ -312,7 +312,7 @@ void bind_operator(nb::module_& m) {
         op::OperatorDumpWriteOptions opt;
         opt.source = source;
         opt.reference = reference;
-        op::write_operator_dump(path, o, opt);
+        op::WriteOperatorDump(path, o, opt);
       },
       nb::arg("path"), nb::arg("operator"), nb::arg("source") = "imsrg",
       nb::arg("reference") = "");

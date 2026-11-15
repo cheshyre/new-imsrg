@@ -18,13 +18,13 @@ struct KeyCollector {
   std::vector<KeyInfo> keys;
 
   template <class T>
-  void field(const KeyInfo& key, const T& /*value*/) {
+  void Field(const KeyInfo& key, const T& /*value*/) {
     keys.push_back(key);
   }
 
   template <class Section, class Body>
-  void optional_table(std::string_view /*table*/,
-                      const std::optional<Section>& /*section*/, Body&& body) {
+  void OptionalTable(std::string_view /*table*/,
+                     const std::optional<Section>& /*section*/, Body&& body) {
     const Section tmp{};
     body(tmp);
   }
@@ -38,7 +38,7 @@ struct SchemaLists {
   SchemaLists() {
     KeyCollector collector;
     const RunConfig defaults{};
-    visit_schema(defaults, collector);
+    VisitSchema(defaults, collector);
     keys = std::move(collector.keys);
     for (const KeyInfo& key : keys) {
       // Every proper prefix of the path is a table ("imsrg",
@@ -57,25 +57,25 @@ struct SchemaLists {
   }
 };
 
-const SchemaLists& lists() {
-  static const SchemaLists instance;
-  return instance;
+const SchemaLists& Lists() {
+  static const SchemaLists kInstance;
+  return kInstance;
 }
 
 }  // namespace
 
-std::span<const KeyInfo> schema_keys() { return lists().keys; }
+std::span<const KeyInfo> SchemaKeys() { return Lists().keys; }
 
-const KeyInfo* find_schema_key(std::string_view path) {
-  for (const KeyInfo& key : lists().keys) {
+const KeyInfo* FindSchemaKey(std::string_view path) {
+  for (const KeyInfo& key : Lists().keys) {
     if (key.path == path) return &key;
   }
   return nullptr;
 }
 
-std::span<const std::string_view> schema_tables() { return lists().tables; }
+std::span<const std::string_view> SchemaTables() { return Lists().tables; }
 
-std::vector<std::string_view> schema_children(std::string_view table) {
+std::vector<std::string_view> SchemaChildren(std::string_view table) {
   std::vector<std::string_view> children;
   const std::string prefix =
       table.empty() ? std::string() : std::string(table) + ".";
@@ -88,7 +88,7 @@ std::vector<std::string_view> schema_children(std::string_view table) {
       children.push_back(rest);
     }
   };
-  for (const KeyInfo& key : lists().keys) add_child(key.path);
+  for (const KeyInfo& key : Lists().keys) add_child(key.path);
   return children;
 }
 

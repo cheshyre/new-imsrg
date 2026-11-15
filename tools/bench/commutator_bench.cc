@@ -6,10 +6,10 @@
 //
 //   commutator_bench --emax N --reps R [--reference O16] [--seed S]
 //
-// Times every `commutator::terms::` function and the full `commutator()` on
+// Times every `commutator::terms::` function and the full `Commutator()` on
 // random scalar two-body operators (X anti-Hermitian, Y Hermitian), after one
 // warm-up call per term. The term functions add into Z (as in imsrg++), so Z
-// accumulates over the repetitions; the full `commutator()` resets Z itself.
+// accumulates over the repetitions; the full `Commutator()` resets Z itself.
 // The Workspace construction is timed separately. The counterpart for imsrg++
 // is `refharness bench-commutator` (tools/reference/rh_bench.cpp), which prints
 // the same table.
@@ -52,19 +52,18 @@ struct Row {
 
 /// One warm-up call, then `reps` fenced timed calls of `fn`; returns mean and
 /// min in ms.
-Row time_it(const std::string& name, int reps,
-            const std::function<void()>& fn) {
+Row TimeIt(const std::string& name, int reps, const std::function<void()>& fn) {
   fn();
-  imsrg::exec::fence("bench warm-up");
+  imsrg::exec::Fence("bench warm-up");
   Row r;
   r.name = name;
   r.min_ms = std::numeric_limits<double>::max();
   double total = 0.0;
   for (int i = 0; i < reps; ++i) {
-    imsrg::exec::fence("bench pre");
+    imsrg::exec::Fence("bench pre");
     const auto t0 = Clock::now();
     fn();
-    imsrg::exec::fence("bench post");
+    imsrg::exec::Fence("bench post");
     const double ms =
         std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
     total += ms;
@@ -110,23 +109,23 @@ int main(int argc, char** argv) {
   }
   if (reps < 1) return 2;
 
-  const auto ms = imsrg::basis::ModelSpace::from_names(
+  const auto ms = imsrg::basis::ModelSpace::FromNames(
       imsrg::basis::BasisTruncation{emax}, 16.0, reference, reference);
 
   const auto tw0 = Clock::now();
   cm::Workspace ws(ms);
-  imsrg::exec::fence("workspace");
+  imsrg::exec::Fence("workspace");
   const double ws_ms =
       std::chrono::duration<double, std::milli>(Clock::now() - tw0).count();
 
   op::RandomOperatorOptions ro;
   ro.seed = seed;
-  const op::Operator X = op::random_operator(
-      ms, op::OperatorSpec::scalar(2, imsrg::Hermiticity::AntiHermitian), ro);
+  const op::Operator X = op::RandomOperator(
+      ms, op::OperatorSpec::Scalar(2, imsrg::Hermiticity::kAntiHermitian), ro);
   ro.seed = seed + 1;
-  const op::Operator Y = op::random_operator(
-      ms, op::OperatorSpec::scalar(2, imsrg::Hermiticity::Hermitian), ro);
-  op::Operator Z(ms, cm::commutator_spec(X.spec(), Y.spec()));
+  const op::Operator Y = op::RandomOperator(
+      ms, op::OperatorSpec::Scalar(2, imsrg::Hermiticity::kHermitian), ro);
+  op::Operator Z(ms, cm::CommutatorSpec(X.spec(), Y.spec()));
 
   const char* omp = std::getenv("OMP_NUM_THREADS");
   std::printf("# commutator_bench (this code)\n");
@@ -139,24 +138,24 @@ int main(int argc, char** argv) {
   std::printf("reps %d\nworkspace construction: %.3f ms\n", reps, ws_ms);
 
   const Named named[] = {
-      {"comm110ss", cm::terms::comm110ss},
-      {"comm220ss", cm::terms::comm220ss},
-      {"comm111ss", cm::terms::comm111ss},
-      {"comm121ss", cm::terms::comm121ss},
-      {"comm221ss", cm::terms::comm221ss},
-      {"comm122ss", cm::terms::comm122ss},
-      {"comm222_pp_hhss", cm::terms::comm222_pp_hhss},
-      {"comm222_phss", cm::terms::comm222_phss},
-      {"comm222_pp_hh_221ss", cm::terms::comm222_pp_hh_221ss},
+      {"comm110ss", cm::terms::Comm110ss},
+      {"comm220ss", cm::terms::Comm220ss},
+      {"comm111ss", cm::terms::Comm111ss},
+      {"comm121ss", cm::terms::Comm121ss},
+      {"comm221ss", cm::terms::Comm221ss},
+      {"comm122ss", cm::terms::Comm122ss},
+      {"comm222_pp_hhss", cm::terms::Comm222PpHhss},
+      {"comm222_phss", cm::terms::Comm222Phss},
+      {"comm222_pp_hh_221ss", cm::terms::Comm222PpHh221ss},
   };
   std::vector<Row> rows;
   for (const Named& n : named) {
     Z.set_zero();
-    rows.push_back(time_it(n.name, reps, [&] { n.fn(X, Y, Z, ws); }));
+    rows.push_back(TimeIt(n.name, reps, [&] { n.fn(X, Y, Z, ws); }));
   }
   const cm::CommutatorOptions opts;
-  rows.push_back(time_it("commutator (full)", reps,
-                         [&] { cm::commutator(X, Y, Z, opts, ws); }));
+  rows.push_back(TimeIt("commutator (full)", reps,
+                        [&] { cm::Commutator(X, Y, Z, opts, ws); }));
 
   std::printf("%-22s %12s %12s\n", "term", "mean ms", "min ms");
   for (const Row& r : rows)

@@ -33,7 +33,7 @@ struct HoNL {
 /// Largest HO energy E = 2n1 + l1 + 2n2 + l2 for which `moshinsky` is
 /// implemented (size of its double-double factorial tables; emax 20). Beyond it
 /// `moshinsky` returns NaN.
-inline constexpr int moshinsky_max_energy = 40;
+inline constexpr int kMoshinskyMaxEnergy = 40;
 
 /// Moshinsky bracket <cm, rel; lambda | a, b; lambda> = <N L, n l; lambda | n1
 /// l1, n2 l2; lambda>: overlap of the state with center-of-mass motion `cm` =
@@ -46,23 +46,23 @@ inline constexpr int moshinsky_max_energy = 40;
 /// double nearest to the exact bracket in practice (validated for all 405,537
 /// brackets with E <= 16); the plain double algorithm of imsrg++ loses up to
 /// ~1e-10 relative on some high-l brackets. Returns NaN for E >
-/// `moshinsky_max_energy`. Cost grows like O(E^5); use `MoshinskyTable` in
+/// `kMoshinskyMaxEnergy`. Cost grows like O(E^5); use `MoshinskyTable` in
 /// loops.
-double moshinsky(HoNL cm, HoNL rel, HoNL a, HoNL b, int lambda) noexcept;
+double Moshinsky(HoNL cm, HoNL rel, HoNL a, HoNL b, int lambda) noexcept;
 
 /// Talmi coefficient B(n_a l_a, n_b l_b; p) of Brody and Moshinsky ("Tables of
 /// Transformation Brackets", 1967), with which <a| V(r) |b> = sum_p B(a, b; p)
 /// I_p for a central potential; identical to imsrg++ `AngMom::TalmiB`
 /// (`AngMom.cc:246-261`). Zero unless l_a + l_b is even and (l_a + l_b)/2 <= p
 /// <= (l_a + l_b)/2 + n_a + n_b.
-double talmi_b(HoNL a, HoNL b, int p) noexcept;
+double TalmiB(HoNL a, HoNL b, int p) noexcept;
 
 /// Talmi integral of the power potential r^k in oscillator units (b = 1): I_p =
 /// (2 / Gamma(p + 3/2)) * integral dr r^(2p+2) r^k exp(-r^2) = Gamma(p + 3/2 +
 /// k/2) / Gamma(p + 3/2), evaluated as exp(lgamma - lgamma) like imsrg++
 /// `imsrg_util::TalmiI` (`imsrg_util.cc:2340-2346`). Precondition: 2p + 3 + k >
 /// 0. For another oscillator length b, multiply by b^k.
-double talmi_integral(int p, double k) noexcept;
+double TalmiIntegral(int p, double k) noexcept;
 
 }  // namespace imsrg::angmom
 

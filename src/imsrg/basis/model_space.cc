@@ -15,8 +15,8 @@ namespace imsrg::basis {
 
 namespace {
 
-void check_sizes(const SingleParticleBasis& basis, const Reference& reference,
-                 const Partition& partition) {
+void CheckSizes(const SingleParticleBasis& basis, const Reference& reference,
+                const Partition& partition) {
   if (reference.num_orbits() != basis.num_orbits() ||
       partition.num_orbits() != basis.num_orbits()) {
     throw InputError("ModelSpace: the reference (" +
@@ -30,10 +30,10 @@ void check_sizes(const SingleParticleBasis& basis, const Reference& reference,
 
 }  // namespace
 
-std::shared_ptr<const ModelSpace> ModelSpace::create(SingleParticleBasis basis,
+std::shared_ptr<const ModelSpace> ModelSpace::Create(SingleParticleBasis basis,
                                                      Reference reference,
                                                      Partition partition) {
-  check_sizes(basis, reference, partition);
+  CheckSizes(basis, reference, partition);
   auto basis_ptr =
       std::make_shared<const SingleParticleBasis>(std::move(basis));
   auto two_body = std::make_shared<const TwoBodyChannels>(*basis_ptr);
@@ -49,28 +49,28 @@ std::shared_ptr<const ModelSpace> ModelSpace::create(SingleParticleBasis basis,
   return ms;
 }
 
-std::shared_ptr<const ModelSpace> ModelSpace::from_names(
+std::shared_ptr<const ModelSpace> ModelSpace::FromNames(
     const BasisTruncation& truncation, double hw_MeV,
     std::string_view reference, std::string_view valence_space) {
   SingleParticleBasis basis =
-      SingleParticleBasis::harmonic_oscillator(truncation, hw_MeV);
+      SingleParticleBasis::HarmonicOscillator(truncation, hw_MeV);
   const Nucleus nucleus = reference == "default"
-                              ? default_reference_nucleus(valence_space)
-                              : Nucleus::parse(reference);
-  Reference ref = Reference::from_nucleus(basis, nucleus);
-  Partition partition = Partition::from_definition(
-      basis, define_valence_space(valence_space, basis, nucleus));
-  return create(std::move(basis), std::move(ref), std::move(partition));
+                              ? DefaultReferenceNucleus(valence_space)
+                              : Nucleus::Parse(reference);
+  Reference ref = Reference::FromNucleus(basis, nucleus);
+  Partition partition = Partition::FromDefinition(
+      basis, DefineValenceSpace(valence_space, basis, nucleus));
+  return Create(std::move(basis), std::move(ref), std::move(partition));
 }
 
-std::shared_ptr<const ModelSpace> ModelSpace::with_reference(
+std::shared_ptr<const ModelSpace> ModelSpace::WithReference(
     Reference reference) const {
-  return with_reference_and_partition(std::move(reference), *partition_);
+  return WithReferenceAndPartition(std::move(reference), *partition_);
 }
 
-std::shared_ptr<const ModelSpace> ModelSpace::with_reference_and_partition(
+std::shared_ptr<const ModelSpace> ModelSpace::WithReferenceAndPartition(
     Reference reference, Partition partition) const {
-  check_sizes(*basis_, reference, partition);
+  CheckSizes(*basis_, reference, partition);
   std::shared_ptr<ModelSpace> ms(new ModelSpace());
   ms->basis_ = basis_;
   ms->two_body_ = two_body_;
@@ -83,7 +83,7 @@ std::shared_ptr<const ModelSpace> ModelSpace::with_reference_and_partition(
   return ms;
 }
 
-std::shared_ptr<const ModelSpace> ModelSpace::with_three_body(
+std::shared_ptr<const ModelSpace> ModelSpace::WithThreeBody(
     const ThreeBodyCuts& cuts) const {
   std::shared_ptr<ModelSpace> ms(new ModelSpace(*this));
   ms->three_body_ = std::make_shared<const ThreeBodyChannels>(*basis_, cuts);

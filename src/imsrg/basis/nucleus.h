@@ -33,7 +33,7 @@ struct Nucleus {
   /// "mix_A<A>_Z<Z>" with decimal A and Z ("mix_A4.5_Z2.5").
   /// @throws InputError (naming the input) for an unknown element, a missing or
   ///         malformed A, trailing characters, or A < Z.
-  static Nucleus parse(std::string_view name);
+  static Nucleus Parse(std::string_view name);
 
   /// A canonical name: "vacuum" for A = Z = 0, element symbol + A for integer A
   /// and Z (e.g. "O16"), otherwise "mix_A<A>_Z<Z>" (shortest round-trip decimal
@@ -48,11 +48,11 @@ struct Nucleus {
 /// = 118), with the spelling of the imsrg++ periodic table
 /// (ModelSpace.cc:570-576).
 /// @throws InputError if Z is outside [0, 118].
-std::string_view element_symbol(std::int32_t Z);
+std::string_view ElementSymbol(std::int32_t Z);
 
 /// Proton number of an element symbol ("He" -> 2; case sensitive, "n" -> 0).
 /// @throws InputError if the symbol is unknown.
-std::int32_t element_proton_number(std::string_view symbol);
+std::int32_t ElementProtonNumber(std::string_view symbol);
 
 /// An orbit and its occupation, e.g. one entry of a filling or of an occupation
 /// file.
@@ -83,9 +83,9 @@ struct OrbitOccupation {
 /// @throws InputError if the nucleons do not fit into the shells 0..emax
 ///         (imsrg++ prints "Trouble!" and continues with a partial filling; we
 ///         refuse).
-std::vector<OrbitOccupation> naive_filling(const Nucleus& nucleus,
-                                           std::int32_t emax,
-                                           std::span<const Orbit> skip = {});
+std::vector<OrbitOccupation> NaiveFilling(const Nucleus& nucleus,
+                                          std::int32_t emax,
+                                          std::span<const Orbit> skip = {});
 
 }  // namespace imsrg::basis
 

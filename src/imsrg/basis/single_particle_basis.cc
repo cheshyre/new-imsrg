@@ -12,7 +12,7 @@
 
 namespace imsrg::basis {
 
-SingleParticleBasis SingleParticleBasis::harmonic_oscillator(
+SingleParticleBasis SingleParticleBasis::HarmonicOscillator(
     const BasisTruncation& trunc, double hw_MeV) {
   if (trunc.emax < 0) {
     throw InputError("SingleParticleBasis: emax must be >= 0 (got " +
@@ -34,7 +34,7 @@ SingleParticleBasis SingleParticleBasis::harmonic_oscillator(
   b.truncation_ = trunc;
   b.hbar_omega_ = hw_MeV;
   b.index_by_hash_.assign(
-      static_cast<std::size_t>(num_orbits_untruncated(trunc.emax)), -1);
+      static_cast<std::size_t>(NumOrbitsUntruncated(trunc.emax)), -1);
 
   // ModelSpace::Init, ModelSpace.cc:381-408.
   for (std::int32_t N = 0; N <= trunc.emax; ++N) {
@@ -42,11 +42,11 @@ SingleParticleBasis SingleParticleBasis::harmonic_oscillator(
       if (trunc.lmax >= 0 && l > trunc.lmax) continue;
       const std::int32_t n = (N - l) / 2;
       for (std::int32_t j2 = 2 * l + 1; j2 >= 2 * l - 1 && j2 > 0; j2 -= 2) {
-        for (const TwoTz tz2 : {TwoTz::proton(), TwoTz::neutron()}) {
+        for (const TwoTz tz2 : {TwoTz::Proton(), TwoTz::Neutron()}) {
           if (unocc_cut && N > trunc.emax_unocc && l > trunc.lmax_unocc)
             continue;
           const Orbit o{n, l, TwoJ{j2}, tz2};
-          b.index_by_hash_[static_cast<std::size_t>(imsrgpp_orbit_hash(o))] =
+          b.index_by_hash_[static_cast<std::size_t>(ImsrgppOrbitHash(o))] =
               static_cast<std::int32_t>(b.orbits_.size());
           b.orbits_.push_back(o);
           b.max_j2_ = std::max(b.max_j2_, o.j2);
@@ -60,14 +60,14 @@ SingleParticleBasis SingleParticleBasis::harmonic_oscillator(
 const Orbit& SingleParticleBasis::orbit(OrbitIndex i) const {
   IMSRG_ASSERT(i.value() >= 0 && i.value() < num_orbits(),
                "orbit index out of range");
-  return orbits_[i.to_size()];
+  return orbits_[i.ToSize()];
 }
 
 std::optional<OrbitIndex> SingleParticleBasis::find(
     const Orbit& o) const noexcept {
-  if (!is_valid(o) || o.e() > truncation_.emax) return std::nullopt;
+  if (!IsValid(o) || o.e() > truncation_.emax) return std::nullopt;
   const std::int32_t idx =
-      index_by_hash_[static_cast<std::size_t>(imsrgpp_orbit_hash(o))];
+      index_by_hash_[static_cast<std::size_t>(ImsrgppOrbitHash(o))];
   if (idx < 0) return std::nullopt;
   return OrbitIndex{idx};
 }
@@ -76,7 +76,7 @@ OrbitIndex SingleParticleBasis::index_of(const Orbit& o) const {
   if (const auto i = find(o)) return *i;
   std::string label;
   try {
-    label = orbit_label(o);
+    label = OrbitLabel(o);
   } catch (const InputError&) {
     label = "(invalid orbit)";
   }
@@ -90,7 +90,7 @@ std::int32_t SingleParticleBasis::lmax() const noexcept {
                               : std::min(truncation_.lmax, truncation_.emax);
 }
 
-std::vector<OrbitIndex> SingleParticleBasis::same_ljtz(OrbitIndex i) const {
+std::vector<OrbitIndex> SingleParticleBasis::SameLjtz(OrbitIndex i) const {
   const Orbit& oi = orbit(i);
   std::vector<OrbitIndex> result;
   for (std::int32_t k = 0; k < num_orbits(); ++k) {

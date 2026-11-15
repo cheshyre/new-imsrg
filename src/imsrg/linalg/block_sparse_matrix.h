@@ -88,7 +88,7 @@ class BlockSparseMatrix {
 
   /// View of block `k` in the HOST MIRROR (creating it on first use). On
   /// backends with separate device memory the caller must
-  /// `buffer().sync_to_host()` before reading and `sync_to_device()` after
+  /// `buffer().SyncToHost()` before reading and `SyncToDevice()` after
   /// writing. Precondition: `k < num_blocks()`.
   MatrixView<T> host_block(std::size_t k);
   /// Read-only host view, see the non-const overload.

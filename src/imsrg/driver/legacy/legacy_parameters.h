@@ -27,18 +27,18 @@
 namespace imsrg::driver {
 
 /// Value kind of an old key (the four maps of `Parameters.hh`).
-enum class LegacyKind { String, Double, Int, Vector };
+enum class LegacyKind { kString, kDouble, kInt, kVector };
 
 /// Status of an old key (design/16 section 3): S, C, NS, PL.
-enum class LegacyStatus { Supported, Changed, NotSupported, Planned };
+enum class LegacyStatus { kSupported, kChanged, kNotSupported, kPlanned };
 
 /// One row of the legacy table.
 struct LegacyKeyInfo {
   std::string_view key;  ///< old key, e.g. "2bme"
-  LegacyKind kind = LegacyKind::String;
+  LegacyKind kind = LegacyKind::kString;
   std::string_view old_default;  ///< as in Parameters.hh, e.g. "none", "20",
                                  ///< "-1", "" (vectors)
-  LegacyStatus status = LegacyStatus::Supported;
+  LegacyStatus status = LegacyStatus::kSupported;
   std::string_view
       new_key;  ///< new path(s), e.g. "interaction.two_body.file"; "" for NS
   std::string_view note;  ///< one line (sentinels, shorthands, messages)
@@ -46,10 +46,10 @@ struct LegacyKeyInfo {
 
 /// All 85 keys of `Parameters.hh`, in its order (strings, doubles, ints,
 /// vectors).
-std::span<const LegacyKeyInfo> legacy_keys() noexcept;
+std::span<const LegacyKeyInfo> LegacyKeys() noexcept;
 
 /// The row of `key` (exact, case sensitive), or nullptr.
-const LegacyKeyInfo* find_legacy_key(std::string_view key) noexcept;
+const LegacyKeyInfo* FindLegacyKey(std::string_view key) noexcept;
 
 /// Result of translating a legacy command line.
 struct LegacyTranslation {
@@ -66,11 +66,11 @@ struct LegacyTranslation {
 /// suggestion), not supported (`E-LEGACY-NS`). Scalars given twice: last wins
 /// plus `W-DUPLICATE`; vector keys append. Every value keeps its token as
 /// `SourceRef::LegacyArg`.
-LegacyTranslation translate_legacy(std::span<const std::string> args);
+LegacyTranslation TranslateLegacy(std::span<const std::string> args);
 
 /// The legacy table as text for `imsrg --legacy-keys`: old key, kind, old
 /// default, status, new key and note, one row per key.
-std::string legacy_keys_text();
+std::string LegacyKeysText();
 
 }  // namespace imsrg::driver
 

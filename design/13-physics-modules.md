@@ -107,9 +107,9 @@ sd shell): every number identical to imsrg++, comment lines identical except the
   the SCF uses `std::rand()`. Fix both and document.
 * **As implemented (M6).** `imsrg/hf/hartree_fock.h`: `hf::solve(H, const op::No2bThreeBody*
   v3, HFOptions) -> HFResult {e_hf, e1, e2, e3, iterations, converged, spe, C, rho, F,
-  occupations, ediff_history}`; `Mixing::Linear` reproduces imsrg++ (weight 0.2 on the old
+  occupations, ediff_history}`; `Mixing::kLinear` reproduces imsrg++ (weight 0.2 on the old
   density, `FillLowestOrbits` schedule, convergence `‖Δε‖_F / norb < 1e-8`, unfrozen occupations
-  by default) and `Mixing::Diis` is Pulay DIIS on the Fock matrix (error F ρ − ρ F, metric
+  by default) and `Mixing::kDiis` is Pulay DIIS on the Fock matrix (error F ρ − ρ F, metric
   weighted by 2j+1, `diis_start` = 2, subspace 8, history reset when occupations change). The
   NO2B monopole uses `No2bThreeBody::get_pn` with the `e3max` cut (imsrg++ `ModelSpace` E3max,
   default 12). Deviations M6-1/M6-2 in `30` §6 (rescue path beyond iteration 100 only).
@@ -127,7 +127,7 @@ sd shell): every number identical to imsrg++, comment lines identical except the
   does; verify the exact pipeline in `imsrg++.cc`.
 * MP4 and Van Vleck are out of the near-term scope.
 
-**As implemented (M9).** `mbpt::mp2_energy`, `mbpt::mp3_energy` (pp, hh, ph, total),
+**As implemented (M9).** `mbpt::Mp2Energy`, `mbpt::ComputeMp3Energy` (pp, hh, ph, total),
 `mbpt2_density_matrix` (HFMBPT.cc:421-777 with the regulated denominators),
 `natural_orbitals` (per-channel `eigh`, descending occupation, columns signed so C(i,i) >= 0,
 trace check against A), `reference_density_ho`, `matmul`, `to_nat_basis`. mbpt does not depend on
@@ -150,7 +150,7 @@ to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9.
   intermediates off; `factorized = true` sets these as defaults (`16` §2.8).
 * **As implemented (M7, tag `m7-api-ready`):** headers `imsrg/commutator/{options,workspace,
   commutator}.hpp`. `commutator(X, Y, Z, opts, ws)` overwrites Z (reusing its storage when the
-  spec matches) and an allocating overload returns Z; `terms::comm*ss` add one term each;
+  spec matches) and an allocating overload returns Z; `terms::Comm*ss` add one term each;
   `commutator_spec` gives Z's spec (rank max of the inputs, hermiticity rule of imsrg++). The
   `Workspace` (one per model space, eagerly built, one call at a time) holds the device tables,
   the dense 6j table, the ladder ket lists and the Pandya data, and all scratch. Every fast term

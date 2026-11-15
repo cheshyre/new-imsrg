@@ -17,7 +17,7 @@ using imsrg::log::Logger;
 
 struct Capture {
   std::vector<std::pair<Level, std::string>> lines;
-  Logger::Sink sink() {
+  Logger::Sink MakeSink() {
     return [this](Level l, std::string_view s) {
       lines.emplace_back(l, std::string(s));
     };
@@ -26,66 +26,67 @@ struct Capture {
 
 TEST(Log, LevelFiltering) {
   Capture cap;
-  Logger log(Level::Warn, cap.sink());
-  log.trace("t");
-  log.debug("d");
-  log.info("i");
-  log.warn("w {}", 1);
-  log.error("e");
+  Logger log(Level::kWarn, cap.MakeSink());
+  log.Trace("t");
+  log.Debug("d");
+  log.Info("i");
+  log.Warn("w {}", 1);
+  log.Error("e");
   ASSERT_EQ(cap.lines.size(), std::size_t{2});
-  EXPECT_EQ(cap.lines[0].first, Level::Warn);
+  EXPECT_EQ(cap.lines[0].first, Level::kWarn);
   EXPECT_EQ(cap.lines[0].second, "w 1");
-  EXPECT_EQ(cap.lines[1].first, Level::Error);
-  log.set_level(Level::Trace);
-  EXPECT_EQ(log.level(), Level::Trace);
-  log.trace("now");
+  EXPECT_EQ(cap.lines[1].first, Level::kError);
+  log.set_level(Level::kTrace);
+  EXPECT_EQ(log.level(), Level::kTrace);
+  log.Trace("now");
   EXPECT_EQ(cap.lines.size(), std::size_t{3});
-  log.set_level(Level::Off);
-  log.error("silent");
+  log.set_level(Level::kOff);
+  log.Error("silent");
   EXPECT_EQ(cap.lines.size(), std::size_t{3});
-  EXPECT_FALSE(log.enabled(Level::Error));
+  EXPECT_FALSE(log.enabled(Level::kError));
 }
 
 TEST(Log, FormattingOnlyWhenEnabled) {
   Capture cap;
-  Logger log(Level::Error, cap.sink());
-  log.info("{:>6.2f}|{}", 3.14159, "x");
+  Logger log(Level::kError, cap.MakeSink());
+  log.Info("{:>6.2f}|{}", 3.14159, "x");
   EXPECT_TRUE(cap.lines.empty());
-  log.error("{:>6.2f}|{}", 3.14159, "x");
+  log.Error("{:>6.2f}|{}", 3.14159, "x");
   ASSERT_EQ(cap.lines.size(), std::size_t{1});
   EXPECT_EQ(cap.lines[0].second, "  3.14|x");
 }
 
 TEST(Log, RankFiltering) {
   Capture cap;
-  Logger log(Level::Info, cap.sink());
+  Logger log(Level::kInfo, cap.MakeSink());
   log.set_rank(2);
-  log.info("hidden");
+  log.Info("hidden");
   EXPECT_TRUE(cap.lines.empty());
-  EXPECT_FALSE(log.enabled(Level::Info));
+  EXPECT_FALSE(log.enabled(Level::kInfo));
   log.set_rank(0);
-  log.info("shown");
+  log.Info("shown");
   EXPECT_EQ(cap.lines.size(), std::size_t{1});
   log.set_rank(3, true);
-  log.info("shown too");
+  log.Info("shown too");
   EXPECT_EQ(cap.lines.size(), std::size_t{2});
 }
 
 TEST(Log, ToStringAndDefaultLogger) {
-  EXPECT_EQ(imsrg::log::to_string(Level::Warn), "warn");
-  EXPECT_EQ(&imsrg::log::default_logger(), &imsrg::log::default_logger());
-  imsrg::log::default_logger().set_level(Level::Off);
-  imsrg::log::info("not printed {}", 1);
-  imsrg::log::default_logger().set_level(Level::Info);
+  EXPECT_EQ(imsrg::log::ToString(Level::kWarn), "warn");
+  EXPECT_EQ(&imsrg::log::DefaultLogger(), &imsrg::log::DefaultLogger());
+  imsrg::log::DefaultLogger().set_level(Level::kOff);
+  imsrg::log::Info("not printed {}", 1);
+  imsrg::log::DefaultLogger().set_level(Level::kInfo);
 }
 
 TEST(Log, ThreadSafeCapture) {
   Capture cap;
-  Logger log(Level::Info, cap.sink());  // sink is called under the logger mutex
+  Logger log(Level::kInfo,
+             cap.MakeSink());  // sink is called under the logger mutex
   std::vector<std::thread> ts;
   for (int t = 0; t < 4; ++t) {
     ts.emplace_back([&log, t] {
-      for (int i = 0; i < 500; ++i) log.info("{} {}", t, i);
+      for (int i = 0; i < 500; ++i) log.Info("{} {}", t, i);
     });
   }
   for (auto& th : ts) th.join();

@@ -13,20 +13,20 @@
 
 namespace imsrg::basis {
 
-std::string_view orbit_class_name(OrbitClass c) noexcept {
+std::string_view OrbitClassName(OrbitClass c) noexcept {
   switch (c) {
-    case OrbitClass::Core:
+    case OrbitClass::kCore:
       return "core";
-    case OrbitClass::Valence:
+    case OrbitClass::kValence:
       return "valence";
-    case OrbitClass::QSpace:
+    case OrbitClass::kQSpace:
       return "qspace";
   }
   return "unknown";
 }
 
-Partition Partition::from_classes(const SingleParticleBasis& basis,
-                                  std::vector<OrbitClass> classes) {
+Partition Partition::FromClasses(const SingleParticleBasis& basis,
+                                 std::vector<OrbitClass> classes) {
   if (static_cast<std::int32_t>(classes.size()) != basis.num_orbits()) {
     throw InputError(
         fmt::format("Partition: {} classes given for a basis of {} orbits",
@@ -37,17 +37,17 @@ Partition Partition::from_classes(const SingleParticleBasis& basis,
   for (std::int32_t a = 0; a < basis.num_orbits(); ++a) {
     const OrbitIndex ia{a};
     switch (p.classes_[static_cast<std::size_t>(a)]) {
-      case OrbitClass::Core: {
+      case OrbitClass::kCore: {
         p.core_.push_back(ia);
         const Orbit& o = basis.orbit(ia);
         p.A_core_ += o.j2.twice + 1;
         if (o.is_proton()) p.Z_core_ += o.j2.twice + 1;
         break;
       }
-      case OrbitClass::Valence:
+      case OrbitClass::kValence:
         p.valence_.push_back(ia);
         break;
-      case OrbitClass::QSpace:
+      case OrbitClass::kQSpace:
         p.qspace_.push_back(ia);
         break;
     }
@@ -55,37 +55,37 @@ Partition Partition::from_classes(const SingleParticleBasis& basis,
   return p;
 }
 
-Partition Partition::from_definition(const SingleParticleBasis& basis,
-                                     const ValenceSpaceDefinition& def) {
+Partition Partition::FromDefinition(const SingleParticleBasis& basis,
+                                    const ValenceSpaceDefinition& def) {
   std::vector<OrbitClass> classes(static_cast<std::size_t>(basis.num_orbits()),
-                                  OrbitClass::QSpace);
+                                  OrbitClass::kQSpace);
   for (const Orbit& o : def.valence) {
     if (const auto idx = basis.find(o)) {
-      classes[idx->to_size()] = OrbitClass::Valence;
+      classes[idx->ToSize()] = OrbitClass::kValence;
     } else {
-      log::warn("valence orbit {} is not in the basis and is dropped",
-                orbit_label(o));
+      log::Warn("valence orbit {} is not in the basis and is dropped",
+                OrbitLabel(o));
     }
   }
   for (const Orbit& o : def.core) {
     const auto idx = basis.find(o);
     if (!idx) {
       throw InputError(fmt::format(
-          "Partition: core orbit {} is not in the basis", orbit_label(o)));
+          "Partition: core orbit {} is not in the basis", OrbitLabel(o)));
     }
-    if (classes[idx->to_size()] == OrbitClass::Valence) {
-      log::warn(
+    if (classes[idx->ToSize()] == OrbitClass::kValence) {
+      log::Warn(
           "orbit {} is in both the core and the valence space; it is core",
-          orbit_label(o));
+          OrbitLabel(o));
     }
-    classes[idx->to_size()] = OrbitClass::Core;
+    classes[idx->ToSize()] = OrbitClass::kCore;
   }
-  return from_classes(basis, std::move(classes));
+  return FromClasses(basis, std::move(classes));
 }
 
-Partition Partition::with_holes_as_core(const Partition& previous,
-                                        const Reference& ref,
-                                        const SingleParticleBasis& basis) {
+Partition Partition::WithHolesAsCore(const Partition& previous,
+                                     const Reference& ref,
+                                     const SingleParticleBasis& basis) {
   if (previous.num_orbits() != ref.num_orbits() ||
       ref.num_orbits() != basis.num_orbits()) {
     throw InputError(fmt::format(
@@ -94,20 +94,20 @@ Partition Partition::with_holes_as_core(const Partition& previous,
         previous.num_orbits(), ref.num_orbits(), basis.num_orbits()));
   }
   std::vector<OrbitClass> classes(static_cast<std::size_t>(basis.num_orbits()),
-                                  OrbitClass::QSpace);
+                                  OrbitClass::kQSpace);
   for (const OrbitIndex h : ref.holes()) {
-    classes[h.to_size()] = OrbitClass::Core;
+    classes[h.ToSize()] = OrbitClass::kCore;
   }
   for (const OrbitIndex v : previous.valence()) {
-    classes[v.to_size()] = OrbitClass::Valence;  // valence is never core
+    classes[v.ToSize()] = OrbitClass::kValence;  // valence is never core
   }
-  return from_classes(basis, std::move(classes));
+  return FromClasses(basis, std::move(classes));
 }
 
 OrbitClass Partition::orbit_class(OrbitIndex a) const {
   IMSRG_ASSERT(a.value() >= 0 && a.value() < num_orbits(),
                "orbit index out of range");
-  return classes_[a.to_size()];
+  return classes_[a.ToSize()];
 }
 
 }  // namespace imsrg::basis

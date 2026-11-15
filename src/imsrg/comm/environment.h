@@ -39,14 +39,14 @@ class Environment {
   Communicator world() const;
 
   /// True if the library was built with MPI.
-  static bool mpi_enabled() noexcept;
+  static bool MpiEnabled() noexcept;
   /// True if MPI is initialized and not finalized (always false without MPI).
-  static bool is_initialized() noexcept;
+  static bool IsInitialized() noexcept;
   /// The provided thread level (MPI_THREAD_* value); 0 without MPI.
   int thread_level() const noexcept { return thread_level_; }
 
  private:
-  void init(int* argc, char*** argv);
+  void Init(int* argc, char*** argv);
   [[maybe_unused]] bool owns_ = false;  // unused in builds without MPI
   int thread_level_ = 0;
 };

@@ -66,7 +66,7 @@ struct OperatorDumpWriteOptions {
 /// @throws InputError ("<path>:<line>: <message>") if the file cannot be read,
 ///         the version line is not `# imsrg-operator-dump v1`, or a record is
 ///         missing or malformed.
-OperatorDumpHeader read_operator_dump_header(const std::filesystem::path& path);
+OperatorDumpHeader ReadOperatorDumpHeader(const std::filesystem::path& path);
 
 /// A model space matching a dump header: the harmonic-oscillator basis with the
 /// header's emax, lmax and hw; the reference occupations of the orbit records
@@ -74,7 +74,7 @@ OperatorDumpHeader read_operator_dump_header(const std::filesystem::path& path);
 /// kOccupationCut) as core and all other orbits as q-space (a dump does not
 /// record a valence space).
 /// @throws InputError if an orbit of the header is not in that basis.
-std::shared_ptr<const basis::ModelSpace> model_space_for_dump(
+std::shared_ptr<const basis::ModelSpace> ModelSpaceForDump(
     const OperatorDumpHeader& header);
 
 /// Reads the dump at `path` into an operator on `ms`. Orbits are mapped to `ms`
@@ -87,14 +87,14 @@ std::shared_ptr<const basis::ModelSpace> model_space_for_dump(
 /// @throws InputError ("<path>:<line>: <message>") on any violation.
 /// @throws NotImplementedError for specs `validate` rejects and for a non-empty
 ///         `three_body` section (reserved for M10).
-Operator read_operator_dump(const std::filesystem::path& path,
-                            std::shared_ptr<const basis::ModelSpace> ms,
-                            const OperatorDumpReadOptions& options = {});
+Operator ReadOperatorDump(const std::filesystem::path& path,
+                          std::shared_ptr<const basis::ModelSpace> ms,
+                          const OperatorDumpReadOptions& options = {});
 
-/// Stream version of `read_operator_dump`; `name` labels error messages.
-Operator read_operator_dump(std::istream& in, std::string_view name,
-                            std::shared_ptr<const basis::ModelSpace> ms,
-                            const OperatorDumpReadOptions& options = {});
+/// Stream version of `ReadOperatorDump`; `name` labels error messages.
+Operator ReadOperatorDump(std::istream& in, std::string_view name,
+                          std::shared_ptr<const basis::ModelSpace> ms,
+                          const OperatorDumpReadOptions& options = {});
 
 /// Writes `op` as an OperatorDump v1, in the record order and number format of
 /// the imsrg-devel harness writer, so that harness dumps round-trip
@@ -105,12 +105,12 @@ Operator read_operator_dump(std::istream& in, std::string_view name,
 /// effective lmax and hw; the orbit records its orbits and reference
 /// occupations.
 /// @throws InputError if the file cannot be written.
-void write_operator_dump(const std::filesystem::path& path, const Operator& op,
-                         const OperatorDumpWriteOptions& options = {});
+void WriteOperatorDump(const std::filesystem::path& path, const Operator& op,
+                       const OperatorDumpWriteOptions& options = {});
 
-/// Stream version of `write_operator_dump`.
-void write_operator_dump(std::ostream& out, const Operator& op,
-                         const OperatorDumpWriteOptions& options = {});
+/// Stream version of `WriteOperatorDump`.
+void WriteOperatorDump(std::ostream& out, const Operator& op,
+                       const OperatorDumpWriteOptions& options = {});
 
 }  // namespace imsrg::op
 

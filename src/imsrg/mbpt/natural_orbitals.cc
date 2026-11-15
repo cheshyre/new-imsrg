@@ -39,15 +39,15 @@ struct Ctx {
 };
 
 /// imsrg++ regularization: 0.5 (sqrt(t + eps^2) - eps)/sqrt(t + eps^2).
-double regulated(double tbme, double eps) {
+double Regulated(double tbme, double eps) {
   const double s = std::sqrt(tbme + eps * eps);
   return 0.5 * (s - eps) / s;
 }
 
 }  // namespace
 
-linalg::Matrix<double> mbpt2_density_matrix(op::Operator& H) {
-  H.sync_to_host();
+linalg::Matrix<double> Mbpt2DensityMatrix(op::Operator& H) {
+  H.SyncToHost();
   const auto& ms = H.model_space();
   const auto& ref = ms.reference();
   const Ctx x{H, ms, ref};
@@ -62,7 +62,7 @@ linalg::Matrix<double> mbpt2_density_matrix(op::Operator& H) {
 
   // PP block: a, b particles in the same channel, b <= a.
   for (const OrbitIndex a : particles) {
-    for (const OrbitIndex b : ms.basis().same_ljtz(a)) {
+    for (const OrbitIndex b : ms.basis().SameLjtz(a)) {
       if (b.value() > a.value() || ref.occupation(b) >= basis::kOccupationCut)
         continue;
       double r = 0.0;
@@ -85,7 +85,7 @@ linalg::Matrix<double> mbpt2_density_matrix(op::Operator& H) {
             const double nc = 1.0 - x.n(c);
             t *= (1 - x.n(a)) * (1 - x.n(b)) * nc * nc * x.n(i) * x.n(i) *
                  x.n(j) * x.n(j);
-            r += regulated(t, 0.5 * std::sqrt(std::abs(eac * ebc)));
+            r += Regulated(t, 0.5 * std::sqrt(std::abs(eac * ebc)));
           }
       const double v = r * 0.5 / (x.j2(a) + 1);
       rho_pp(a.value(), b.value()) = v;
@@ -95,7 +95,7 @@ linalg::Matrix<double> mbpt2_density_matrix(op::Operator& H) {
 
   // HH block: i, j holes in the same channel, j <= i.
   for (const OrbitIndex i : holes) {
-    for (const OrbitIndex j : ms.basis().same_ljtz(i)) {
+    for (const OrbitIndex j : ms.basis().SameLjtz(i)) {
       if (j.value() > i.value() || ref.occupation(j) < basis::kOccupationCut)
         continue;
       double r = 0.0;
@@ -117,7 +117,7 @@ linalg::Matrix<double> mbpt2_density_matrix(op::Operator& H) {
               t += (2 * J + 1) * x.V(a, b, i, k, J) * x.V(j, k, a, b, J);
             const double na = 1.0 - x.n(a), nb = 1.0 - x.n(b);
             t *= na * na * nb * nb * x.n(k) * x.n(k) * x.n(i) * x.n(j);
-            r += regulated(t, 0.5 * std::sqrt(std::abs(eik * ejk)));
+            r += Regulated(t, 0.5 * std::sqrt(std::abs(eik * ejk)));
           }
       const double v = -r * 0.5 / (x.j2(i) + 1);
       rho_hh(i.value(), j.value()) = v;
@@ -127,7 +127,7 @@ linalg::Matrix<double> mbpt2_density_matrix(op::Operator& H) {
 
   // PH block, two terms.
   for (const OrbitIndex i : holes) {
-    for (const OrbitIndex a : ms.basis().same_ljtz(i)) {
+    for (const OrbitIndex a : ms.basis().SameLjtz(i)) {
       if (ref.occupation(a) >= basis::kOccupationCut) continue;  // a particle
       const double eai = x.e(a) - x.e(i);
       double r1 = 0.0;
@@ -180,8 +180,8 @@ linalg::Matrix<double> mbpt2_density_matrix(op::Operator& H) {
   return rho;
 }
 
-NaturalOrbitals natural_orbitals(const linalg::Matrix<double>& rho_hf,
-                                 const basis::ModelSpace& ms) {
+NaturalOrbitals ComputeNaturalOrbitals(const linalg::Matrix<double>& rho_hf,
+                                       const basis::ModelSpace& ms) {
   const auto& basis = ms.basis();
   const std::int64_t N = ms.num_orbits();
   NaturalOrbitals out{linalg::Matrix<double>(N, N),
@@ -189,7 +189,7 @@ NaturalOrbitals natural_orbitals(const linalg::Matrix<double>& rho_hf,
   double trace = 0.0;
   for (std::int64_t a = 0; a < N; ++a) {
     const OrbitIndex oa(static_cast<std::int32_t>(a));
-    const auto idx = basis.same_ljtz(oa);
+    const auto idx = basis.SameLjtz(oa);
     if (idx.empty() || idx.front() != oa)
       continue;  // process each channel once
     const std::int64_t n = static_cast<std::int64_t>(idx.size());
@@ -198,7 +198,7 @@ NaturalOrbitals natural_orbitals(const linalg::Matrix<double>& rho_hf,
       for (std::int64_t c = 0; c < n; ++c)
         blk(r, c) = rho_hf(idx[static_cast<std::size_t>(r)].value(),
                            idx[static_cast<std::size_t>(c)].value());
-    const auto eig = linalg::eigh(blk.const_view());
+    const auto eig = linalg::Eigh(blk.const_view());
     const int j2 = basis.orbit(oa).j2.twice;
     for (std::int64_t c = 0; c < n; ++c) {
       const std::int64_t src = n - 1 - c;  // descending occupations
@@ -220,7 +220,7 @@ NaturalOrbitals natural_orbitals(const linalg::Matrix<double>& rho_hf,
   return out;
 }
 
-linalg::Matrix<double> matmul(const linalg::Matrix<double>& a,
+linalg::Matrix<double> Matmul(const linalg::Matrix<double>& a,
                               const linalg::Matrix<double>& b) {
   linalg::Matrix<double> c(a.rows(), b.cols());
   for (std::int64_t i = 0; i < a.rows(); ++i)
@@ -232,7 +232,7 @@ linalg::Matrix<double> matmul(const linalg::Matrix<double>& a,
   return c;
 }
 
-linalg::Matrix<double> reference_density_ho(
+linalg::Matrix<double> ReferenceDensityHo(
     const linalg::Matrix<double>& c_ho2nat, const basis::ModelSpace& ms) {
   const auto& ref = ms.reference();
   const std::int64_t N = ms.num_orbits();
@@ -249,10 +249,10 @@ linalg::Matrix<double> reference_density_ho(
   return rho;
 }
 
-op::Operator to_nat_basis(op::Operator& H,
-                          const linalg::Matrix<double>& c_hf2nat) {
-  H.sync_to_host();
-  return op::transform_basis(H, c_hf2nat.const_view());
+op::Operator ToNatBasis(op::Operator& H,
+                        const linalg::Matrix<double>& c_hf2nat) {
+  H.SyncToHost();
+  return op::TransformBasis(H, c_hf2nat.const_view());
 }
 
 }  // namespace imsrg::mbpt

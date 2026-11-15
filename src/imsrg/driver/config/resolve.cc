@@ -30,11 +30,11 @@ namespace imsrg::driver {
 namespace {
 
 template <class T>
-struct is_optional : std::false_type {};
+struct IsOptional : std::false_type {};
 template <class T>
-struct is_optional<std::optional<T>> : std::true_type {};
+struct IsOptional<std::optional<T>> : std::true_type {};
 
-/// Typed reader: the visitor of `visit_schema` that fills a RunConfig from a
+/// Typed reader: the visitor of `VisitSchema` that fills a RunConfig from a
 /// raw tree.
 class Reader {
  public:
@@ -44,21 +44,21 @@ class Reader {
   /// Reads one schema field. Absent keys keep their default (or raise V-03 when
   /// required).
   template <class F>
-  void field(const KeyInfo& key, F& f) {
+  void Field(const KeyInfo& key, F& f) {
     const std::string path(key.path);
     const RawValue* v = tree_.find(path);
     if (v == nullptr) {
       if (key.required) {
         issues_.push_back(
-            make_error("V-03", path, "required key '" + path + "' is missing"));
+            MakeError("V-03", path, "required key '" + path + "' is missing"));
       }
       return;
     }
-    const bool ok = read(path, *v, f, key.string_or_array);
+    const bool ok = Read(path, *v, f, key.string_or_array);
     if constexpr (std::is_same_v<F, std::vector<std::string>>) {
       if (ok && path == "interaction.two_body.file" &&
           (f.empty() || f.size() > 2)) {
-        issues_.push_back(make_error(
+        issues_.push_back(MakeError(
             "V-02", path,
             path + " must have 1 or 2 entries, got " + std::to_string(f.size()),
             v->where));
@@ -69,37 +69,37 @@ class Reader {
   /// Reads an optional table: the section exists iff the table is present in
   /// the tree.
   template <class S, class Body>
-  void optional_table(std::string_view table, std::optional<S>& section,
-                      Body&& body) {
+  void OptionalTable(std::string_view table, std::optional<S>& section,
+                     Body&& body) {
     if (!tree_.has_table(table)) return;
     section.emplace();
     body(*section);
   }
 
  private:
-  void type_error(const std::string& path, const RawValue& v,
-                  std::string_view expected) {
-    issues_.push_back(make_error("E-TYPE", path,
-                                 "expected " + std::string(expected) +
-                                     ", got " + std::string(v.type_name()),
-                                 v.where));
+  void TypeError(const std::string& path, const RawValue& v,
+                 std::string_view expected) {
+    issues_.push_back(MakeError("E-TYPE", path,
+                                "expected " + std::string(expected) + ", got " +
+                                    std::string(v.type_name()),
+                                v.where));
   }
 
   template <class F>
-  bool read(const std::string& path, const RawValue& v, F& f,
+  bool Read(const std::string& path, const RawValue& v, F& f,
             bool string_or_array = false) {
     if constexpr (std::is_same_v<F, bool>) {
       if (const bool* b = v.get_if<bool>()) {
         f = *b;
         return true;
       }
-      type_error(path, v, "a boolean");
+      TypeError(path, v, "a boolean");
       return false;
     } else if constexpr (std::is_same_v<F, int>) {
       if (const auto* i = v.get_if<std::int64_t>()) {
         if (*i < std::numeric_limits<int>::min() ||
             *i > std::numeric_limits<int>::max()) {
-          issues_.push_back(make_error(
+          issues_.push_back(MakeError(
               "V-02", path,
               path + " = " + std::to_string(*i) + " does not fit into an int",
               v.where));
@@ -108,13 +108,13 @@ class Reader {
         f = static_cast<int>(*i);
         return true;
       }
-      type_error(path, v, "an integer");
+      TypeError(path, v, "an integer");
       return false;
     } else if constexpr (std::is_same_v<F, double>) {
       if (const double* d = v.get_if<double>()) {
         if (!std::isfinite(
                 *d)) {  // TOML allows inf and nan; no parameter means them
-          issues_.push_back(make_error(
+          issues_.push_back(MakeError(
               "V-02", path, path + " must be a finite number", v.where));
           return false;
         }
@@ -125,18 +125,18 @@ class Reader {
         f = static_cast<double>(*i);
         return true;
       }
-      type_error(path, v, "a number");
+      TypeError(path, v, "a number");
       return false;
     } else if constexpr (std::is_same_v<F, std::string>) {
       if (const auto* s = v.get_if<std::string>()) {
         f = *s;
         return true;
       }
-      type_error(path, v, "a string");
+      TypeError(path, v, "a string");
       return false;
-    } else if constexpr (is_optional<F>::value) {
+    } else if constexpr (IsOptional<F>::value) {
       typename F::value_type tmp{};
-      if (read(path, v, tmp, string_or_array)) {
+      if (Read(path, v, tmp, string_or_array)) {
         f = std::move(tmp);
         return true;
       }
@@ -144,24 +144,24 @@ class Reader {
     } else if constexpr (ConfigEnum<F>) {
       const auto* s = v.get_if<std::string>();
       if (s == nullptr) {
-        type_error(path, v, "a string");
+        TypeError(path, v, "a string");
         return false;
       }
-      if (auto e = enum_from_string<F>(*s)) {
+      if (auto e = EnumFromString<F>(*s)) {
         f = *e;
         return true;
       }
-      const auto names = enum_names<F>();
+      const auto names = EnumNames<F>();
       std::string allowed;
       for (const auto n : names) {
         if (!allowed.empty()) allowed += ", ";
         allowed += n;
       }
-      issues_.push_back(make_error(
+      issues_.push_back(MakeError(
           "V-01", path,
           "unknown " + std::string(EnumTraits<F>::type_name) + " '" + *s +
               "'; allowed: " + allowed,
-          v.where, did_you_mean(*s, std::span<const std::string_view>(names))));
+          v.where, DidYouMean(*s, std::span<const std::string_view>(names))));
       return false;
     } else if constexpr (std::is_same_v<F, std::vector<std::string>>) {
       if (const auto* s = v.get_if<std::string>();
@@ -171,9 +171,9 @@ class Reader {
       }
       const auto* a = v.get_if<RawArray>();
       if (a == nullptr) {
-        type_error(path, v,
-                   string_or_array ? "a string or an array of strings"
-                                   : "an array of strings");
+        TypeError(path, v,
+                  string_or_array ? "a string or an array of strings"
+                                  : "an array of strings");
         return false;
       }
       std::vector<std::string> out;
@@ -181,7 +181,7 @@ class Reader {
       for (std::size_t i = 0; i < a->size(); ++i) {
         const auto* s = (*a)[i].get_if<std::string>();
         if (s == nullptr) {
-          type_error(path + "[" + std::to_string(i) + "]", (*a)[i], "a string");
+          TypeError(path + "[" + std::to_string(i) + "]", (*a)[i], "a string");
           ok = false;
         } else {
           out.push_back(*s);
@@ -192,11 +192,11 @@ class Reader {
     } else if constexpr (std::is_same_v<F, std::vector<OperatorRequest>>) {
       const auto* a = v.get_if<RawArray>();
       if (a == nullptr) {
-        type_error(path, v, "an array");
+        TypeError(path, v, "an array");
         return false;
       }
-      auto parsed = parse_operator_list(std::span<const RawValue>(*a),
-                                        ModelSpaceInfo{cfg_.basis.emax}, path);
+      auto parsed = ParseOperatorList(std::span<const RawValue>(*a),
+                                      ModelSpaceInfo{cfg_.basis.emax}, path);
       if (parsed.has_value()) {
         f = std::move(parsed.value());
         return true;
@@ -204,20 +204,20 @@ class Reader {
       for (auto& issue : parsed.error()) issues_.push_back(std::move(issue));
       return false;
     } else if constexpr (std::is_same_v<F, std::vector<OperatorFromFile>>) {
-      return read_from_file(path, v, f);
+      return ReadFromFile(path, v, f);
     } else {
       static_assert(!sizeof(F), "unsupported schema field type");
     }
   }
 
-  bool read_from_file(const std::string& path, const RawValue& v,
-                      std::vector<OperatorFromFile>& out) {
+  bool ReadFromFile(const std::string& path, const RawValue& v,
+                    std::vector<OperatorFromFile>& out) {
     const auto* a = v.get_if<RawArray>();
     if (a == nullptr) {
-      type_error(path, v, "an array of tables");
+      TypeError(path, v, "an array of tables");
       return false;
     }
-    static const std::vector<std::string> keys = {
+    static const std::vector<std::string> kKeys = {
         "name",          "rank",    "dtz",     "parity",
         "particle_rank", "file_2b", "file_3b", "format"};
     std::vector<OperatorFromFile> result;
@@ -226,7 +226,7 @@ class Reader {
       const std::string base = path + "[" + std::to_string(i) + "]";
       const auto* tbl = (*a)[i].get_if<RawTable>();
       if (tbl == nullptr) {
-        type_error(base, (*a)[i], "a table");
+        TypeError(base, (*a)[i], "a table");
         ok = false;
         continue;
       }
@@ -237,39 +237,39 @@ class Reader {
         const std::string ep = base + "." + key;
         bool r = true;
         if (key == "name") {
-          r = read(ep, val, e.name);
+          r = Read(ep, val, e.name);
           have_name = true;
         } else if (key == "rank") {
-          r = read(ep, val, e.rank);
+          r = Read(ep, val, e.rank);
         } else if (key == "dtz") {
-          r = read(ep, val, e.dtz);
+          r = Read(ep, val, e.dtz);
         } else if (key == "parity") {
-          r = read(ep, val, e.parity);
+          r = Read(ep, val, e.parity);
         } else if (key == "particle_rank") {
-          r = read(ep, val, e.particle_rank);
+          r = Read(ep, val, e.particle_rank);
         } else if (key == "file_2b") {
-          r = read(ep, val, e.file_2b);
+          r = Read(ep, val, e.file_2b);
           have_file = true;
         } else if (key == "file_3b") {
-          r = read(ep, val, e.file_3b);
+          r = Read(ep, val, e.file_3b);
         } else if (key == "format") {
-          r = read(ep, val, e.format);
+          r = Read(ep, val, e.format);
         } else {
-          issues_.push_back(make_error("E-KEY-UNKNOWN", ep,
-                                       "unknown key '" + key + "' in " + base,
-                                       val.where, did_you_mean(key, keys)));
+          issues_.push_back(MakeError("E-KEY-UNKNOWN", ep,
+                                      "unknown key '" + key + "' in " + base,
+                                      val.where, DidYouMean(key, kKeys)));
           r = false;
         }
         ok = ok && r;
       }
       if (!have_name) {
-        issues_.push_back(make_error(
+        issues_.push_back(MakeError(
             "V-03", base + ".name",
             "required key '" + base + ".name' is missing", (*a)[i].where));
         ok = false;
       }
       if (!have_file) {
-        issues_.push_back(make_error(
+        issues_.push_back(MakeError(
             "V-03", base + ".file_2b",
             "required key '" + base + ".file_2b' is missing", (*a)[i].where));
         ok = false;
@@ -285,14 +285,14 @@ class Reader {
   ConfigIssues& issues_;
 };
 
-std::string format_g(double x) {
+std::string FormatG(double x) {
   char buf[64];
   std::snprintf(buf, sizeof buf, "%g", x);
   return buf;
 }
 
 /// Replaces characters that do not belong into a file name.
-std::string sanitize(const std::string& s) {
+std::string Sanitize(const std::string& s) {
   std::string out = s;
   for (char& c : out) {
     const bool ok = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') ||
@@ -305,7 +305,7 @@ std::string sanitize(const std::string& s) {
 
 /// Derived values (design/16 section 2). Never throws and never assumes reading
 /// succeeded.
-void derive(const RawTree& tree, RunConfig& cfg, ConfigIssues& issues) {
+void Derive(const RawTree& tree, RunConfig& cfg, ConfigIssues& issues) {
   // Effective e3max.
   if (cfg.basis.emax >= 0)
     cfg.basis.e3max = std::min(cfg.basis.e3max, 3 * cfg.basis.emax);
@@ -320,7 +320,7 @@ void derive(const RawTree& tree, RunConfig& cfg, ConfigIssues& issues) {
   bool reference_bad = false;
   if (cfg.reference.nucleus) {
     try {
-      reference = basis::Nucleus::parse(*cfg.reference.nucleus);
+      reference = basis::Nucleus::Parse(*cfg.reference.nucleus);
     } catch (const std::exception&) {
       reference_bad = true;  // V-31 reports it
     }
@@ -328,7 +328,7 @@ void derive(const RawTree& tree, RunConfig& cfg, ConfigIssues& issues) {
   std::optional<basis::Nucleus> core;
   if (cfg.valence.space) {
     try {
-      core = basis::default_reference_nucleus(*cfg.valence.space);
+      core = basis::DefaultReferenceNucleus(*cfg.valence.space);
     } catch (const std::exception&) {
     }
   }
@@ -339,11 +339,11 @@ void derive(const RawTree& tree, RunConfig& cfg, ConfigIssues& issues) {
     if (src && src->A == std::floor(src->A) && src->A >= 1.0) {
       cfg.basis.mass_number = static_cast<int>(src->A);
     } else if (!reference_bad) {
-      issues.push_back(make_error(
+      issues.push_back(MakeError(
           "V-23", "basis.mass_number",
           "cannot determine the mass number; set basis.mass_number or "
           "reference.nucleus",
-          SourceRef{SourceRef::Kind::Derived, "basis.mass_number", 0, 0}));
+          SourceRef{SourceRef::Kind::kDerived, "basis.mass_number", 0, 0}));
     }
   }
 
@@ -351,12 +351,12 @@ void derive(const RawTree& tree, RunConfig& cfg, ConfigIssues& issues) {
     cfg.hamiltonian.beta_cm_hw = cfg.basis.hw;
 
   if (!tree.contains("hamiltonian.kinetic")) {
-    if (tb.format == TwoBodyFormat::Nushellx) {
-      cfg.hamiltonian.kinetic = KineticEnergy::None;
+    if (tb.format == TwoBodyFormat::kNushellx) {
+      cfg.hamiltonian.kinetic = KineticEnergy::kNone;
     } else if (cfg.hamiltonian.trap_hw) {
-      cfg.hamiltonian.kinetic = KineticEnergy::Lab;
+      cfg.hamiltonian.kinetic = KineticEnergy::kLab;
     } else {
-      cfg.hamiltonian.kinetic = KineticEnergy::Intrinsic;
+      cfg.hamiltonian.kinetic = KineticEnergy::kIntrinsic;
     }
   }
 
@@ -373,9 +373,9 @@ void derive(const RawTree& tree, RunConfig& cfg, ConfigIssues& issues) {
 
   // Output stem and flow file.
   if (!tree.contains("output.stem")) {
-    const std::string method = cfg.run.task == Task::Imsrg
-                                   ? std::string(to_string(cfg.imsrg.method))
-                                   : std::string(to_string(cfg.run.task));
+    const std::string method = cfg.run.task == Task::kImsrg
+                                   ? std::string(ToString(cfg.imsrg.method))
+                                   : std::string(ToString(cfg.run.task));
     std::string ref = "none";
     if (cfg.reference.nucleus) {
       ref = *cfg.reference.nucleus;
@@ -388,10 +388,10 @@ void derive(const RawTree& tree, RunConfig& cfg, ConfigIssues& issues) {
     } else if (cfg.valence.custom) {
       val = *cfg.valence.custom;
     }
-    cfg.output.stem = sanitize(method + "_" + ref + "_" + val + "_hw" +
-                               format_g(cfg.basis.hw) + "_e" +
-                               std::to_string(cfg.basis.emax) + "_A" +
-                               std::to_string(cfg.basis.mass_number));
+    cfg.output.stem =
+        Sanitize(method + "_" + ref + "_" + val + "_hw" +
+                 FormatG(cfg.basis.hw) + "_e" + std::to_string(cfg.basis.emax) +
+                 "_A" + std::to_string(cfg.basis.mass_number));
   }
   if (!tree.contains("output.flow_file")) {
     cfg.output.flow_file = (std::filesystem::path(cfg.output.directory) /
@@ -406,12 +406,12 @@ void derive(const RawTree& tree, RunConfig& cfg, ConfigIssues& issues) {
 
 }  // namespace
 
-ResolveResult resolve(const RawTree& tree, const ResolveOptions& options) {
+ResolveResult Resolve(const RawTree& tree, const ResolveOptions& options) {
   ResolveResult result;
   Reader reader(tree, result.config, result.issues);
-  visit_schema(result.config, reader);
-  derive(tree, result.config, result.issues);
-  auto found = validate(result.config, tree, options);
+  VisitSchema(result.config, reader);
+  Derive(tree, result.config, result.issues);
+  auto found = Validate(result.config, tree, options);
   for (auto& issue : found) result.issues.push_back(std::move(issue));
   return result;
 }

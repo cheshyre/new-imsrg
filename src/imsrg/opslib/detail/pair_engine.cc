@@ -13,7 +13,7 @@ namespace imsrg::opslib::detail {
 PairEngine::PairEngine(int emax, int lmax, double hbar_omega)
     : hbar_omega_(hbar_omega), mosh_(2 * emax), nj_(lmax) {}
 
-double PairEngine::element(PairKind kind, const basis::Orbit& oa,
+double PairEngine::Element(PairKind kind, const basis::Orbit& oa,
                            const basis::Orbit& ob, const basis::Orbit& oc,
                            const basis::Orbit& od, TwoJ two_j) const {
   const int fab = oa.e() + ob.e();
@@ -25,7 +25,7 @@ double PairEngine::element(PairKind kind, const basis::Orbit& oa,
   }
   const int J = two_j.twice / 2;
   const double off =
-      (kind == PairKind::Momentum) ? 1.0 : -1.0;  // sign of the sqrt terms
+      (kind == PairKind::kMomentum) ? 1.0 : -1.0;  // sign of the sqrt terms
   const auto mosh = mosh_.host_view();
   const auto nj = nj_.host_view();
 
@@ -108,14 +108,14 @@ double PairEngine::element(PairKind kind, const basis::Orbit& oa,
 
   const double dab = (oa == ob) ? 2.0 : 1.0;
   const double dcd = (oc == od) ? 2.0 : 1.0;
-  const double unit = (kind == PairKind::Momentum)
+  const double unit = (kind == PairKind::kMomentum)
                           ? hbar_omega_
-                          : constants::hbarc * constants::hbarc /
-                                constants::m_nucleon / hbar_omega_;
+                          : constants::kHbarc * constants::kHbarc /
+                                constants::kMNucleon / hbar_omega_;
   return sum * 0.5 * unit / std::sqrt(dab * dcd);
 }
 
-int max_orbit_shell(const basis::ModelSpace& ms) {
+int MaxOrbitShell(const basis::ModelSpace& ms) {
   int e = 0;
   for (const basis::Orbit& o : ms.basis().orbits()) {
     e = std::max(e, static_cast<int>(o.e()));

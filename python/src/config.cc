@@ -25,25 +25,25 @@ namespace {
 using driver::RunConfig;
 
 /// Joins the issues one per line.
-std::string join_issues(const driver::ConfigIssues& issues) {
+std::string JoinIssues(const driver::ConfigIssues& issues) {
   std::string out;
   for (const auto& i : issues) {
     if (!out.empty()) out += '\n';
-    out += i.to_string();
+    out += i.ToString();
   }
   return out;
 }
 
 }  // namespace
 
-void bind_config(nb::module_& m) {
+void BindConfig(nb::module_& m) {
   nb::class_<RunConfig>(
       m, "RunConfig",
       "A resolved, validated run configuration (immutable from Python).")
       .def(
           "to_toml",
           [](const RunConfig& c, bool include_provenance) {
-            return driver::to_toml(c, include_provenance);
+            return driver::ToToml(c, include_provenance);
           },
           nb::arg("include_provenance") = true,
           "Canonical TOML text of the resolved config.")
@@ -51,13 +51,13 @@ void bind_config(nb::module_& m) {
           "to_dict",
           [](const RunConfig& c) {
             nb::object tomllib = nb::module_::import_("tomllib");
-            return tomllib.attr("loads")(driver::to_toml(c, false));
+            return tomllib.attr("loads")(driver::ToToml(c, false));
           },
           "The resolved config as nested dicts (parsed from its canonical "
           "TOML).")
       .def_prop_ro("warnings", [](const RunConfig& c) {
         std::vector<std::string> w;
-        for (const auto& i : c.provenance.warnings) w.push_back(i.to_string());
+        for (const auto& i : c.provenance.warnings) w.push_back(i.ToString());
         return w;
       });
 
@@ -72,8 +72,8 @@ void bind_config(nb::module_& m) {
         src.command_line = "python imsrg.load_config";
         driver::LoadOptions opt;
         opt.check_files = check_files;
-        auto r = driver::load_config(src, opt);
-        if (!r) throw imsrg::ConfigError(join_issues(r.error()));
+        auto r = driver::LoadConfig(src, opt);
+        if (!r) throw imsrg::ConfigError(JoinIssues(r.error()));
         return std::move(r).value();
       },
       nb::arg("text") = nb::none(), nb::arg("file") = nb::none(),

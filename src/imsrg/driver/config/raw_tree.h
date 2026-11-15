@@ -78,7 +78,7 @@ class RawTree {
   bool empty() const noexcept { return entries_.empty(); }
   /// Copies every entry of `overlay` into this tree; `overlay` wins on
   /// conflicts.
-  void merge(const RawTree& overlay);
+  void Merge(const RawTree& overlay);
 
  private:
   Map entries_;

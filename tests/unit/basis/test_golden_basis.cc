@@ -32,7 +32,7 @@ namespace imsrg::basis {
 namespace {
 
 using testing::GoldenBasisDump;
-using testing::read_golden_basis_dump;
+using testing::ReadGoldenBasisDump;
 
 // Golden subset names in the order of KetClass (PP HH PH CC VC QC VV QV QQ).
 constexpr const char* kSubsetNames[kNumKetClasses] = {
@@ -47,16 +47,16 @@ struct Built {
   TwoBodyKetSubsets sub;
 };
 
-Built build(const GoldenBasisDump& g) {
-  SingleParticleBasis basis = SingleParticleBasis::harmonic_oscillator(
+Built Build(const GoldenBasisDump& g) {
+  SingleParticleBasis basis = SingleParticleBasis::HarmonicOscillator(
       BasisTruncation{g.emax, g.lmax}, g.hw);
   const Nucleus nucleus = g.reference == "default"
-                              ? default_reference_nucleus(g.valence_space)
-                              : Nucleus::parse(g.reference);
-  Reference ref = Reference::from_nucleus(basis, nucleus);
+                              ? DefaultReferenceNucleus(g.valence_space)
+                              : Nucleus::Parse(g.reference);
+  Reference ref = Reference::FromNucleus(basis, nucleus);
   const ValenceSpaceDefinition def =
-      define_valence_space(g.valence_space, basis, nucleus);
-  Partition part = Partition::from_definition(basis, def);
+      DefineValenceSpace(g.valence_space, basis, nucleus);
+  Partition part = Partition::FromDefinition(basis, def);
   TwoBodyChannels ch(basis);
   TwoBodyKetSubsets sub(ch, ref, part);
   return Built{std::move(basis), std::move(ref), std::move(part), std::move(ch),
@@ -65,7 +65,7 @@ Built build(const GoldenBasisDump& g) {
 
 // Index lists of a span of strong indices.
 template <class Span>
-std::vector<int> values_of(const Span& s) {
+std::vector<int> ValuesOf(const Span& s) {
   std::vector<int> v;
   for (const auto& x : s) v.push_back(static_cast<int>(x.value()));
   return v;
@@ -74,9 +74,9 @@ std::vector<int> values_of(const Span& s) {
 class GoldenBasis : public ::testing::TestWithParam<std::string> {
  protected:
   void SetUp() override {
-    path_ = testing::golden_basis_dir() / GetParam();
-    ASSERT_NO_THROW(g_ = read_golden_basis_dump(path_)) << path_;
-    ASSERT_NO_THROW(b_ = std::make_unique<Built>(build(g_))) << GetParam();
+    path_ = testing::GoldenBasisDir() / GetParam();
+    ASSERT_NO_THROW(g_ = ReadGoldenBasisDump(path_)) << path_;
+    ASSERT_NO_THROW(b_ = std::make_unique<Built>(Build(g_))) << GetParam();
   }
   std::filesystem::path path_;
   GoldenBasisDump g_;
@@ -109,17 +109,17 @@ TEST_P(GoldenBasis, Orbits) {
     ASSERT_EQ(go.j2, o.j2.twice) << where << " 2j";
     ASSERT_EQ(go.tz2, o.tz2.twice) << where << " 2tz";
     ASSERT_EQ(go.occupation, b_->ref.occupation(a)) << where << " occupation";
-    ASSERT_EQ(go.cvq, cvq(b_->part.orbit_class(a))) << where << " cvq";
+    ASSERT_EQ(go.cvq, Cvq(b_->part.orbit_class(a))) << where << " cvq";
   }
 }
 
 TEST_P(GoldenBasis, OrbitLists) {
-  EXPECT_EQ(g_.holes, values_of(b_->ref.holes())) << "record 'holes'";
-  EXPECT_EQ(g_.particles, values_of(b_->ref.particles()))
+  EXPECT_EQ(g_.holes, ValuesOf(b_->ref.holes())) << "record 'holes'";
+  EXPECT_EQ(g_.particles, ValuesOf(b_->ref.particles()))
       << "record 'particles'";
-  EXPECT_EQ(g_.core, values_of(b_->part.core())) << "record 'core'";
-  EXPECT_EQ(g_.valence, values_of(b_->part.valence())) << "record 'valence'";
-  EXPECT_EQ(g_.qspace, values_of(b_->part.qspace())) << "record 'qspace'";
+  EXPECT_EQ(g_.core, ValuesOf(b_->part.core())) << "record 'core'";
+  EXPECT_EQ(g_.valence, ValuesOf(b_->part.valence())) << "record 'valence'";
+  EXPECT_EQ(g_.qspace, ValuesOf(b_->part.qspace())) << "record 'qspace'";
 }
 
 TEST_P(GoldenBasis, Kets) {
@@ -144,7 +144,7 @@ TEST_P(GoldenBasis, TwoBodyChannels) {
     ASSERT_EQ(gc.Tz, ours.Tz()) << where << " Tz";
     ASSERT_EQ(gc.nkets, ours.num_kets) << where << " nkets";
     // The global ket list in local order.
-    ASSERT_EQ(gc.kets, values_of(b_->ch.channel_kets(c)))
+    ASSERT_EQ(gc.kets, ValuesOf(b_->ch.channel_kets(c)))
         << where << " channel_kets";
   }
 }
@@ -158,7 +158,7 @@ TEST_P(GoldenBasis, KetSubsets) {
       const auto it = gc.subsets.find(name);
       ASSERT_NE(it, gc.subsets.end())
           << "channel " << gc.ch << " has no subset " << name;
-      ASSERT_EQ(it->second, values_of(b_->sub.kets(c, k)))
+      ASSERT_EQ(it->second, ValuesOf(b_->sub.kets(c, k)))
           << "channel " << gc.ch << " (J=" << gc.J << " parity=" << gc.parity
           << " Tz=" << gc.Tz << ") record 'channel_subset' " << name;
     }
@@ -177,7 +177,7 @@ TEST_P(GoldenBasis, PhChannels) {
     ASSERT_EQ(gc.parity, static_cast<int>(ours.parity)) << where << " parity";
     ASSERT_EQ(gc.Tz, ours.Tz()) << where << " Tz";
     ASSERT_EQ(gc.nkets, ours.num_kets) << where << " nkets";
-    ASSERT_EQ(gc.kets, values_of(ph.channel_kets(c)))
+    ASSERT_EQ(gc.kets, ValuesOf(ph.channel_kets(c)))
         << where << " ph_channel_kets";
   }
 }
@@ -198,11 +198,11 @@ TEST_P(GoldenBasis, ThreeBodyChannels) {
         << where << " nkets";
   }
   EXPECT_EQ(g_.nkets3, tb.num_kets()) << "record 'nkets3'";
-  EXPECT_EQ(g_.sum_channel_kets3, tb.sum_channel_kets())
+  EXPECT_EQ(g_.sum_channel_kets3, tb.SumChannelKets())
       << "record 'sum_channel_kets3'";
 }
 
-std::string case_name(const ::testing::TestParamInfo<std::string>& info) {
+std::string CaseName(const ::testing::TestParamInfo<std::string>& info) {
   std::string s = info.param.substr(0, info.param.size() - 4);  // strip ".txt"
   for (char& c : s) {
     if (c == '-') c = '_';
@@ -211,8 +211,8 @@ std::string case_name(const ::testing::TestParamInfo<std::string>& info) {
 }
 
 INSTANTIATE_TEST_SUITE_P(Files, GoldenBasis,
-                         ::testing::ValuesIn(testing::golden_basis_files()),
-                         case_name);
+                         ::testing::ValuesIn(testing::GoldenBasisFiles()),
+                         CaseName);
 
 }  // namespace
 }  // namespace imsrg::basis

@@ -14,14 +14,14 @@ namespace {
 
 using namespace imsrg;
 
-std::vector<std::string>& events() {
+std::vector<std::string>& Events() {
   static std::vector<std::string> e;
   return e;
 }
-void push_hook(const char* name) {
-  events().push_back(std::string("push:") + name);
+void PushHook(const char* name) {
+  Events().push_back(std::string("push:") + name);
 }
-void pop_hook() { events().push_back("pop"); }
+void PopHook() { Events().push_back("pop"); }
 
 TEST(Timer, AccumulatesCountsAndTimes) {
   TimerRegistry reg;
@@ -48,15 +48,15 @@ TEST(Timer, AccumulatesCountsAndTimes) {
 
 TEST(Timer, AddAndReport) {
   TimerRegistry reg;
-  reg.add("alpha", 1.5);
-  reg.add("alpha", 0.5, 3);
-  reg.add("a_much_longer_name", 2.0, 2);
+  reg.Add("alpha", 1.5);
+  reg.Add("alpha", 0.5, 3);
+  reg.Add("a_much_longer_name", 2.0, 2);
   const auto es = reg.entries();
   ASSERT_EQ(es.size(), std::size_t{2});
   EXPECT_EQ(es[1].name, "alpha");
   EXPECT_DOUBLE_EQ(es[1].seconds, 2.0);
   EXPECT_EQ(es[1].count, 4);
-  const std::string r = reg.report();
+  const std::string r = reg.Report();
   EXPECT_NE(r.find("alpha"), std::string::npos);
   EXPECT_NE(r.find("a_much_longer_name"), std::string::npos);
   EXPECT_NE(r.find("mean [ms]"), std::string::npos);
@@ -67,7 +67,7 @@ TEST(Timer, ThreadSafe) {
   std::vector<std::thread> ts;
   for (int t = 0; t < 8; ++t) {
     ts.emplace_back([&reg] {
-      for (int i = 0; i < 1000; ++i) reg.add("shared", 1e-6);
+      for (int i = 0; i < 1000; ++i) reg.Add("shared", 1e-6);
     });
   }
   for (auto& th : ts) th.join();
@@ -78,9 +78,9 @@ TEST(Timer, ThreadSafe) {
 }
 
 TEST(Timer, HooksCalledInOrder) {
-  events().clear();
+  Events().clear();
   TimerRegistry reg;
-  reg.set_region_hooks(&push_hook, &pop_hook);
+  reg.set_region_hooks(&PushHook, &PopHook);
   TimerRegistry
       other;  // hooks are per registry: timers on `other` must not call them
   {
@@ -98,7 +98,7 @@ TEST(Timer, HooksCalledInOrder) {
   }
   const std::vector<std::string> expected = {"push:outer", "push:inner", "pop",
                                              "pop"};
-  EXPECT_EQ(events(), expected);
+  EXPECT_EQ(Events(), expected);
   EXPECT_EQ(reg.entries().size(), std::size_t{3});
 }
 

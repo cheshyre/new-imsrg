@@ -35,22 +35,22 @@ namespace imsrg::driver {
 
 /// Severity of a configuration issue. Errors stop the run before any
 /// computation; warnings are printed and recorded in the provenance.
-enum class Severity { Warning, Error };
+enum class Severity { kWarning, kError };
 
 /// Where a configuration value (or an issue) comes from.
 struct SourceRef {
   /// Kind of source.
   enum class Kind {
-    None,        ///< unknown / not applicable
-    TomlFile,    ///< `name` = file path; `line`, `column` 1-based (0 = unknown)
-    TomlString,  ///< `name` = a label of the TOML text (e.g. "<string>")
-    LegacyArg,   ///< `name` = the verbatim legacy token, e.g. "emax=abc"
-    LegacyDefault,  ///< `name` = the legacy key whose old default was supplied
-    SetOption,      ///< `name` = the verbatim `--set` assignment, e.g.
-                    ///< "basis.emax=4"
-    Derived,        ///< computed by the resolver; `name` says from what
+    kNone,      ///< unknown / not applicable
+    kTomlFile,  ///< `name` = file path; `line`, `column` 1-based (0 = unknown)
+    kTomlString,     ///< `name` = a label of the TOML text (e.g. "<string>")
+    kLegacyArg,      ///< `name` = the verbatim legacy token, e.g. "emax=abc"
+    kLegacyDefault,  ///< `name` = the legacy key whose old default was supplied
+    kSetOption,      ///< `name` = the verbatim `--set` assignment, e.g.
+                     ///< "basis.emax=4"
+    kDerived,        ///< computed by the resolver; `name` says from what
   };
-  Kind kind = Kind::None;
+  Kind kind = Kind::kNone;
   std::string name;
   int line = 0;
   int column = 0;
@@ -58,14 +58,14 @@ struct SourceRef {
   /// Human-readable form: "run.toml:12:3", "legacy arg 'emax=abc'", "--set
   /// basis.emax=4", "legacy default of 'emax'", "derived (...)", or "" for
   /// `Kind::None`.
-  std::string to_string() const;
+  std::string ToString() const;
 
   friend bool operator==(const SourceRef&, const SourceRef&) = default;
 };
 
 /// One configuration error or warning.
 struct ConfigIssue {
-  Severity severity = Severity::Error;
+  Severity severity = Severity::kError;
   std::string code;      ///< stable id, see the file comment
   std::string key_path;  ///< new-schema path ("basis.emax"); legacy issues may
                          ///< name the old key
@@ -76,7 +76,7 @@ struct ConfigIssue {
 
   /// One line: "error V-10 [basis.emax] (run.toml:3:1): <message> (did you mean
   /// 'x'?)". Empty parts are left out.
-  std::string to_string() const;
+  std::string ToString() const;
 
   friend bool operator==(const ConfigIssue&, const ConfigIssue&) = default;
 };
@@ -85,32 +85,32 @@ struct ConfigIssue {
 using ConfigIssues = std::vector<ConfigIssue>;
 
 /// True if any issue in `issues` is an error.
-bool has_errors(const ConfigIssues& issues) noexcept;
+bool HasErrors(const ConfigIssues& issues) noexcept;
 
 /// An error issue.
-ConfigIssue make_error(std::string code, std::string key_path,
-                       std::string message, SourceRef where = {},
-                       std::optional<std::string> suggestion = std::nullopt);
+ConfigIssue MakeError(std::string code, std::string key_path,
+                      std::string message, SourceRef where = {},
+                      std::optional<std::string> suggestion = std::nullopt);
 
 /// A warning issue.
-ConfigIssue make_warning(std::string code, std::string key_path,
-                         std::string message, SourceRef where = {},
-                         std::optional<std::string> suggestion = std::nullopt);
+ConfigIssue MakeWarning(std::string code, std::string key_path,
+                        std::string message, SourceRef where = {},
+                        std::optional<std::string> suggestion = std::nullopt);
 
 /// Damerau-Levenshtein (optimal string alignment) distance between `a` and `b`,
 /// case sensitive.
-int edit_distance(std::string_view a, std::string_view b);
+int EditDistance(std::string_view a, std::string_view b);
 
 /// The best did-you-mean candidate for `word` (design/16 V-01): the candidate
 /// with the smallest edit distance if that distance is <= 2 (ties: the first in
 /// `candidates`); otherwise the candidate with the longest common prefix with
 /// `word` if that prefix has >= 4 characters; otherwise nullopt. A candidate
 /// equal to `word` is never suggested.
-std::optional<std::string> did_you_mean(
+std::optional<std::string> DidYouMean(
     std::string_view word, std::span<const std::string_view> candidates);
 
 /// Overload for owned candidate strings.
-std::optional<std::string> did_you_mean(
+std::optional<std::string> DidYouMean(
     std::string_view word, const std::vector<std::string>& candidates);
 
 }  // namespace imsrg::driver

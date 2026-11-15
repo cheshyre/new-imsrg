@@ -5,7 +5,7 @@
 // IT-2, IT-3, IT-4, IT-6, IT-7 and IT-12, compared against the imsrg++ goldens
 // under tests/golden/e2e.
 //
-// Output contract assumed of `driver::run` (all files in
+// Output contract assumed of `driver::Run` (all files in
 // `config.output.directory`):
 //   results.json  {"e_reference",
 //                  "imsrg":{"e0","num_omegas",
@@ -18,7 +18,7 @@
 //                 norm_omega,num_omegas,wall_s; istep 0 included
 //   <stem>.snt    valence-space Hamiltonian (tokyo); operators in
 //                 <stem>_<name>.snt
-// While `run()` still throws E-PLANNED the tests skip with a message.
+// While `Run()` still throws E-PLANNED the tests skip with a message.
 
 #include <algorithm>
 #include <cmath>
@@ -40,18 +40,18 @@ using namespace imsrg::it;
 namespace driver = imsrg::driver;
 
 /// Skips the current test when `path` does not exist.
-#define IT_REQUIRE_FILE(path)                                                 \
+#define IMSRG_IT_REQUIRE_FILE(path)                                           \
   do {                                                                        \
     if (!std::filesystem::exists(path)) GTEST_SKIP() << "missing " << (path); \
   } while (0)
 
-#define IT_REQUIRE_RUN(r)                                                   \
+#define IMSRG_IT_REQUIRE_RUN(r)                                             \
   do {                                                                      \
     if ((r).planned) GTEST_SKIP() << "driver::run not ready: " << (r).note; \
   } while (0)
 
 /// Total number of steps over all stages of a run, from results.json.
-long total_steps(const Json& results) {
+long TotalSteps(const Json& results) {
   long n = 0;
   for (const auto& st : results["imsrg"]["stages"].items)
     n += static_cast<long>(st["steps"].number);
@@ -61,13 +61,13 @@ long total_steps(const Json& results) {
 /// Shared IT-2 / IT-6 / IT-12 pipeline run: O16, Magnus, atan, 2N only, with
 /// Rp2 requested. Run once; the result is cached (nullopt if inputs are
 /// missing).
-const RunResult* shared_it2_run() {
+const RunResult* SharedIt2Run() {
   static const RunResult* cached = [&]() -> const RunResult* {
-    if (!std::filesystem::exists(data_file(two_body_name()))) return nullptr;
-    const auto dir = fresh_dir("it2_toml");
+    if (!std::filesystem::exists(DataFile(TwoBodyName()))) return nullptr;
+    const auto dir = FreshDir("it2_toml");
     driver::ConfigSources src;
-    src.config_text = toml_text(dir, "O16", "[operators]\nlist = [\"Rp2\"]\n");
-    static RunResult result = execute(src, dir);
+    src.config_text = TomlText(dir, "O16", "[operators]\nlist = [\"Rp2\"]\n");
+    static RunResult result = Execute(src, dir);
     return &result;
   }();
   return cached;
@@ -78,22 +78,22 @@ const RunResult* shared_it2_run() {
 // -----------------------------------------------------------------------------
 
 TEST(DriverIntegration, IT2_O16_Magnus_Atan) {
-  const RunResult* r = shared_it2_run();
+  const RunResult* r = SharedIt2Run();
   if (r == nullptr) GTEST_SKIP() << "missing 2N input file";
-  IT_REQUIRE_RUN(*r);
+  IMSRG_IT_REQUIRE_RUN(*r);
 
   const double golden_e0 = -164.648772308;
   const double e0 = r->results["imsrg"]["e0"].number;
   std::printf("[IT-2] E0 = %.9f  golden %.9f  dE0 = %.3e\n", e0, golden_e0,
               e0 - golden_e0);
   std::printf("[IT-2] steps = %ld  golden 256  (stages %zu)\n",
-              total_steps(r->results), r->results["imsrg"]["stages"].size());
+              TotalSteps(r->results), r->results["imsrg"]["stages"].size());
   EXPECT_NEAR(e0, golden_e0, 1e-3);
 
   // First ten trajectory steps against the golden trajectory.
-  const auto traj_path = golden_file("IT-2/trajectory.csv");
-  IT_REQUIRE_FILE(traj_path);
-  const FlowTable traj = read_flow(traj_path);
+  const auto traj_path = GoldenFile("IT-2/trajectory.csv");
+  IMSRG_IT_REQUIRE_FILE(traj_path);
+  const FlowTable traj = ReadFlow(traj_path);
   ASSERT_FALSE(r->flow.rows.empty()) << "no flow CSV written";
   double dev_s = 0, dev_e = 0, dev_eta = 0, dev_om = 0;
   const std::size_t n = std::min<std::size_t>(
@@ -124,13 +124,13 @@ TEST(DriverIntegration, IT2_O16_Magnus_Atan) {
 // -----------------------------------------------------------------------------
 
 TEST(DriverIntegration, IT6_Rp2_Operator) {
-  const RunResult* r = shared_it2_run();
+  const RunResult* r = SharedIt2Run();
   if (r == nullptr) GTEST_SKIP() << "missing 2N input file";
-  IT_REQUIRE_RUN(*r);
-  const auto golden_path = golden_file("IT-6/intRp2.snt");
-  IT_REQUIRE_FILE(golden_path);
+  IMSRG_IT_REQUIRE_RUN(*r);
+  const auto golden_path = GoldenFile("IT-6/intRp2.snt");
+  IMSRG_IT_REQUIRE_FILE(golden_path);
 
-  const SntData golden = read_snt(golden_path);
+  const SntData golden = ReadSnt(golden_path);
   ASSERT_TRUE(r->results["operators"].has("Rp2"));
   const double ref = r->results["operators"]["Rp2"]["reference"].number;
   const double imsrg = r->results["operators"]["Rp2"]["imsrg"].number;
@@ -148,12 +148,12 @@ TEST(DriverIntegration, IT6_Rp2_Operator) {
 // -----------------------------------------------------------------------------
 
 TEST(DriverIntegration, IT12_Legacy_Matches_Toml) {
-  const RunResult* toml = shared_it2_run();
+  const RunResult* toml = SharedIt2Run();
   if (toml == nullptr) GTEST_SKIP() << "missing 2N input file";
 
-  const auto dir = fresh_dir("it2_legacy");
+  const auto dir = FreshDir("it2_legacy");
   driver::ConfigSources src;
-  src.legacy_args = {"2bme=" + data_file(two_body_name()).string(),
+  src.legacy_args = {"2bme=" + DataFile(TwoBodyName()).string(),
                      "file2e1max=14",
                      "file2e2max=28",
                      "file2lmax=14",
@@ -164,7 +164,7 @@ TEST(DriverIntegration, IT12_Legacy_Matches_Toml) {
                      "method=magnus",
                      "Operators=Rp2",
                      "intfile=" + (dir / "legacy").string()};
-  const RunResult legacy = execute(src, dir);
+  const RunResult legacy = Execute(src, dir);
 
   // Configs agree in every section except output (provenance is excluded from
   // == already).
@@ -183,16 +183,16 @@ TEST(DriverIntegration, IT12_Legacy_Matches_Toml) {
   EXPECT_TRUE(a.operators == b.operators) << "operators";
   EXPECT_NE(a.output.directory, b.output.directory);
 
-  IT_REQUIRE_RUN(*toml);
-  IT_REQUIRE_RUN(legacy);
+  IMSRG_IT_REQUIRE_RUN(*toml);
+  IMSRG_IT_REQUIRE_RUN(legacy);
   const double e0a = toml->results["imsrg"]["e0"].number;
   const double e0b = legacy.results["imsrg"]["e0"].number;
   std::printf("[IT-12] E0 toml %.17g legacy %.17g  diff %.3e\n", e0a, e0b,
               e0a - e0b);
-  std::printf("[IT-12] steps toml %ld legacy %ld\n", total_steps(toml->results),
-              total_steps(legacy.results));
+  std::printf("[IT-12] steps toml %ld legacy %ld\n", TotalSteps(toml->results),
+              TotalSteps(legacy.results));
   EXPECT_EQ(e0a, e0b);
-  EXPECT_EQ(total_steps(toml->results), total_steps(legacy.results));
+  EXPECT_EQ(TotalSteps(toml->results), TotalSteps(legacy.results));
 
   // Flow CSVs identical in every column except wall_s.
   ASSERT_EQ(toml->flow.columns, legacy.flow.columns);
@@ -216,13 +216,13 @@ TEST(DriverIntegration, IT12_Legacy_Matches_Toml) {
 // -----------------------------------------------------------------------------
 
 TEST(DriverIntegration, IT4_ThreeBody_NO2B_Smax10) {
-  IT_REQUIRE_FILE(data_file(two_body_name()));
-  IT_REQUIRE_FILE(data_file(three_body_name()));
-  const auto dir = fresh_dir("it4");
+  IMSRG_IT_REQUIRE_FILE(DataFile(TwoBodyName()));
+  IMSRG_IT_REQUIRE_FILE(DataFile(ThreeBodyName()));
+  const auto dir = FreshDir("it4");
   driver::ConfigSources src;
-  src.config_text = toml_text(dir, "O16", "", /*three_body=*/true, "10.0");
-  const RunResult r = execute(src, dir);
-  IT_REQUIRE_RUN(r);
+  src.config_text = TomlText(dir, "O16", "", /*three_body=*/true, "10.0");
+  const RunResult r = Execute(src, dir);
+  IMSRG_IT_REQUIRE_RUN(r);
 
   const double e_hf = r.results["e_reference"].number;
   const double e0 = r.results["imsrg"]["e0"].number;
@@ -230,7 +230,7 @@ TEST(DriverIntegration, IT4_ThreeBody_NO2B_Smax10) {
               e_hf + 313.1684814);
   std::printf("[IT-4] E0(s=10) = %.9f  golden -343.761780688  dev %.3e\n", e0,
               e0 + 343.761780688);
-  std::printf("[IT-4] steps = %ld  golden 29\n", total_steps(r.results));
+  std::printf("[IT-4] steps = %ld  golden 29\n", TotalSteps(r.results));
   EXPECT_NEAR(e_hf, -313.1684814, 1e-4);
   EXPECT_NEAR(e0, -343.761780688, 1e-3);
 }
@@ -240,34 +240,33 @@ TEST(DriverIntegration, IT4_ThreeBody_NO2B_Smax10) {
 // int.snt.
 // -----------------------------------------------------------------------------
 
-void run_valence_case(const char* tag, const char* nucleus,
-                      const char* golden_rel, long golden_steps) {
-  IT_REQUIRE_FILE(data_file(two_body_name()));
-  const auto golden_path = golden_file(golden_rel);
-  IT_REQUIRE_FILE(golden_path);
-  const auto dir = fresh_dir(tag);
+void RunValenceCase(const char* tag, const char* nucleus,
+                    const char* golden_rel, long golden_steps) {
+  IMSRG_IT_REQUIRE_FILE(DataFile(TwoBodyName()));
+  const auto golden_path = GoldenFile(golden_rel);
+  IMSRG_IT_REQUIRE_FILE(golden_path);
+  const auto dir = FreshDir(tag);
   driver::ConfigSources src;
-  src.config_text =
-      toml_text(dir, nucleus, "[valence]\nspace = \"sd-shell\"\n");
-  const RunResult r = execute(src, dir);
-  IT_REQUIRE_RUN(r);
+  src.config_text = TomlText(dir, nucleus, "[valence]\nspace = \"sd-shell\"\n");
+  const RunResult r = Execute(src, dir);
+  IMSRG_IT_REQUIRE_RUN(r);
 
   const auto& stages = r.results["imsrg"]["stages"];
   std::string per_stage;
   for (const auto& st : stages.items)
     per_stage += " " + std::to_string(static_cast<long>(st["steps"].number));
   std::printf("[%s] stages %zu, steps per stage:%s  total %ld  golden %ld\n",
-              tag, stages.size(), per_stage.c_str(), total_steps(r.results),
+              tag, stages.size(), per_stage.c_str(), TotalSteps(r.results),
               golden_steps);
 
   ASSERT_TRUE(r.results.has("valence_interaction"));
-  ASSERT_EQ(r.results["valence_interaction"].kind, Json::Kind::String);
+  ASSERT_EQ(r.results["valence_interaction"].kind, Json::Kind::kString);
   const std::filesystem::path snt = r.results["valence_interaction"].text;
   ASSERT_TRUE(std::filesystem::exists(snt)) << snt;
 
-  const SntData got = read_snt(snt);
-  const SntData want = read_snt(golden_path);
-  const SntComparison c = compare_snt(got, want, 1e-3);
+  const SntData got = ReadSnt(snt);
+  const SntData want = ReadSnt(golden_path);
+  const SntComparison c = CompareSnt(got, want, 1e-3);
   std::printf("[%s] zero body %.6f vs %.6f (dev %.3e)\n", tag, got.zero_body,
               want.zero_body, c.zero_dev);
   std::printf("[%s] one-body elements %zu vs %zu, max dev %.3e\n", tag, c.n1b_a,
@@ -287,10 +286,10 @@ void run_valence_case(const char* tag, const char* nucleus,
 }
 
 TEST(DriverIntegration, SntReaderSelfComparison) {
-  const auto path = golden_file("IT-3/int.snt");
-  IT_REQUIRE_FILE(path);
-  const SntData d = read_snt(path);
-  const SntComparison c = compare_snt(d, d, 1e-3);
+  const auto path = GoldenFile("IT-3/int.snt");
+  IMSRG_IT_REQUIRE_FILE(path);
+  const SntData d = ReadSnt(path);
+  const SntComparison c = CompareSnt(d, d, 1e-3);
   std::printf(
       "[snt] IT-3 golden: zero %.6f, %zu 1B, %zu 2B (%zu lines, %zu "
       "duplicates)\n",
@@ -302,11 +301,11 @@ TEST(DriverIntegration, SntReaderSelfComparison) {
 }
 
 TEST(DriverIntegration, IT3_O16_SdShell_Valence) {
-  run_valence_case("IT-3", "O16", "IT-3/int.snt", 421);
+  RunValenceCase("IT-3", "O16", "IT-3/int.snt", 421);
 }
 
 TEST(DriverIntegration, IT7_Ne20_SdShell_Valence) {
-  run_valence_case("IT-7", "Ne20", "IT-7/int.snt", 431);
+  RunValenceCase("IT-7", "Ne20", "IT-7/int.snt", 431);
 }
 
 }  // namespace

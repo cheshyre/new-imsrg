@@ -15,15 +15,15 @@
 namespace imsrg::basis {
 namespace {
 
-SingleParticleBasis make_basis(int emax, int lmax = -1, int emax_unocc = -1,
-                               int lmax_unocc = -1, double hw = 16.0) {
-  return SingleParticleBasis::harmonic_oscillator(
+SingleParticleBasis MakeBasis(int emax, int lmax = -1, int emax_unocc = -1,
+                              int lmax_unocc = -1, double hw = 16.0) {
+  return SingleParticleBasis::HarmonicOscillator(
       BasisTruncation{emax, lmax, emax_unocc, lmax_unocc}, hw);
 }
 
 // The untruncated orbit list generated independently of the class, in imsrg++
 // order.
-std::vector<Orbit> reference_orbits(int emax) {
+std::vector<Orbit> ReferenceOrbits(int emax) {
   std::vector<Orbit> v;
   for (int N = 0; N <= emax; ++N) {
     for (int l = N; l >= 0; l -= 2) {
@@ -39,14 +39,14 @@ std::vector<Orbit> reference_orbits(int emax) {
 
 TEST(SingleParticleBasis, UntruncatedMatchesGenerationOrderAndHash) {
   for (int emax = 0; emax <= 8; ++emax) {
-    const auto b = make_basis(emax);
-    const auto ref = reference_orbits(emax);
-    ASSERT_EQ(b.num_orbits(), num_orbits_untruncated(emax));
+    const auto b = MakeBasis(emax);
+    const auto ref = ReferenceOrbits(emax);
+    ASSERT_EQ(b.num_orbits(), NumOrbitsUntruncated(emax));
     ASSERT_EQ(static_cast<std::size_t>(b.num_orbits()), ref.size());
     for (std::size_t i = 0; i < ref.size(); ++i) {
       EXPECT_EQ(b.orbits()[i], ref[i]) << emax << " " << i;
       EXPECT_EQ(b.orbit(OrbitIndex{static_cast<int>(i)}), ref[i]);
-      EXPECT_EQ(imsrgpp_orbit_hash(ref[i]), static_cast<int>(i));
+      EXPECT_EQ(ImsrgppOrbitHash(ref[i]), static_cast<int>(i));
     }
     EXPECT_EQ(b.emax(), emax);
     EXPECT_EQ(b.lmax(), emax);
@@ -54,16 +54,16 @@ TEST(SingleParticleBasis, UntruncatedMatchesGenerationOrderAndHash) {
 }
 
 TEST(SingleParticleBasis, HbarOmegaAndTruncationAreStored) {
-  const auto b = make_basis(4, 2, -1, -1, 20.0);
+  const auto b = MakeBasis(4, 2, -1, -1, 20.0);
   EXPECT_EQ(b.hbar_omega(), 20.0);
   EXPECT_EQ(b.truncation(), (BasisTruncation{4, 2, -1, -1}));
   // hw does not change the orbit list.
-  EXPECT_EQ(b.orbits().size(), make_basis(4, 2, -1, -1, 8.0).orbits().size());
+  EXPECT_EQ(b.orbits().size(), MakeBasis(4, 2, -1, -1, 8.0).orbits().size());
 }
 
 TEST(SingleParticleBasis, LmaxTruncation) {
-  const auto full = make_basis(4);
-  const auto b = make_basis(4, 1);
+  const auto full = MakeBasis(4);
+  const auto b = MakeBasis(4, 1);
   EXPECT_EQ(b.lmax(), 1);
   // Orbits with l <= 1 up to e = 4: s (n=0,1,2), p (n=0,1): 2 j-values each for
   // p, 1 for s, x2 tz. s: 3 orbits x 1 j x 2 = 6; p: 2 x 2 j x 2 = 8.
@@ -84,16 +84,16 @@ TEST(SingleParticleBasis, LmaxTruncation) {
 }
 
 TEST(SingleParticleBasis, LmaxLargerThanEmaxIsNoCut) {
-  EXPECT_EQ(make_basis(3, 50), make_basis(3));
-  EXPECT_EQ(make_basis(3, 50).lmax(), 3);
-  EXPECT_EQ(make_basis(3, 3).lmax(), 3);
-  EXPECT_EQ(make_basis(3, 0).num_orbits(), 2 * 2);  // 0s and 1s, both tz
+  EXPECT_EQ(MakeBasis(3, 50), MakeBasis(3));
+  EXPECT_EQ(MakeBasis(3, 50).lmax(), 3);
+  EXPECT_EQ(MakeBasis(3, 3).lmax(), 3);
+  EXPECT_EQ(MakeBasis(3, 0).num_orbits(), 2 * 2);  // 0s and 1s, both tz
 }
 
 TEST(SingleParticleBasis, EmaxUnoccTruncation) {
   const int emax = 6, emax_unocc = 3, lmax_unocc = 2;
-  const auto full = make_basis(emax);
-  const auto b = make_basis(emax, -1, emax_unocc, lmax_unocc);
+  const auto full = MakeBasis(emax);
+  const auto b = MakeBasis(emax, -1, emax_unocc, lmax_unocc);
   std::vector<Orbit> expected;
   for (const Orbit& o : full.orbits()) {
     if (o.e() > emax_unocc && o.l > lmax_unocc) continue;
@@ -124,18 +124,18 @@ TEST(SingleParticleBasis, EmaxUnoccTruncation) {
   }
   // Orbit order is preserved (hash is strictly increasing).
   for (int i = 1; i < b.num_orbits(); ++i) {
-    EXPECT_LT(imsrgpp_orbit_hash(b.orbit(OrbitIndex{i - 1})),
-              imsrgpp_orbit_hash(b.orbit(OrbitIndex{i})));
+    EXPECT_LT(ImsrgppOrbitHash(b.orbit(OrbitIndex{i - 1})),
+              ImsrgppOrbitHash(b.orbit(OrbitIndex{i})));
   }
 }
 
 TEST(SingleParticleBasis, EmaxUnoccAtOrAboveEmaxIsNoCut) {
-  EXPECT_EQ(make_basis(4, -1, 4, 1), make_basis(4));
-  EXPECT_EQ(make_basis(4, -1, 7, 1), make_basis(4));
+  EXPECT_EQ(MakeBasis(4, -1, 4, 1), MakeBasis(4));
+  EXPECT_EQ(MakeBasis(4, -1, 7, 1), MakeBasis(4));
 }
 
 TEST(SingleParticleBasis, EmaxUnoccCombinedWithLmax) {
-  const auto b = make_basis(6, 4, 2, 1);
+  const auto b = MakeBasis(6, 4, 2, 1);
   for (const Orbit& o : b.orbits()) {
     EXPECT_LE(o.l, 4);
     EXPECT_TRUE(o.e() <= 2 || o.l <= 1) << o.e() << " " << o.l;
@@ -145,19 +145,19 @@ TEST(SingleParticleBasis, EmaxUnoccCombinedWithLmax) {
 TEST(SingleParticleBasis, InvalidArguments) {
   const double nan = std::numeric_limits<double>::quiet_NaN();
   const double inf = std::numeric_limits<double>::infinity();
-  EXPECT_THROW((void)make_basis(-1), InputError);
-  EXPECT_THROW((void)make_basis(2, -1, -1, -1, 0.0), InputError);
-  EXPECT_THROW((void)make_basis(2, -1, -1, -1, -5.0), InputError);
-  EXPECT_THROW((void)make_basis(2, -1, -1, -1, nan), InputError);
-  EXPECT_THROW((void)make_basis(2, -1, -1, -1, inf), InputError);
+  EXPECT_THROW((void)MakeBasis(-1), InputError);
+  EXPECT_THROW((void)MakeBasis(2, -1, -1, -1, 0.0), InputError);
+  EXPECT_THROW((void)MakeBasis(2, -1, -1, -1, -5.0), InputError);
+  EXPECT_THROW((void)MakeBasis(2, -1, -1, -1, nan), InputError);
+  EXPECT_THROW((void)MakeBasis(2, -1, -1, -1, inf), InputError);
   // emax_unocc cut active (0 <= emax_unocc < emax) without lmax_unocc.
-  EXPECT_THROW((void)make_basis(4, -1, 2, -1), InputError);
-  EXPECT_NO_THROW((void)make_basis(4, -1, 2, 0));
-  EXPECT_NO_THROW((void)make_basis(0));
+  EXPECT_THROW((void)MakeBasis(4, -1, 2, -1), InputError);
+  EXPECT_NO_THROW((void)MakeBasis(4, -1, 2, 0));
+  EXPECT_NO_THROW((void)MakeBasis(0));
 }
 
 TEST(SingleParticleBasis, FindIndexOfContains) {
-  const auto b = make_basis(4);
+  const auto b = MakeBasis(4);
   const Orbit d5{0, 2, TwoJ{5}, TwoTz{-1}};
   const Orbit d5n{0, 2, TwoJ{5}, TwoTz{1}};
   ASSERT_TRUE(b.find(d5).has_value());
@@ -186,10 +186,10 @@ TEST(SingleParticleBasis, FindIndexOfContains) {
 }
 
 TEST(SingleParticleBasis, SameLjtz) {
-  const auto b = make_basis(4);
+  const auto b = MakeBasis(4);
   // p0d5 (index 6): same l, 2j, tz = p1d5? e = 2+2 = 4: 1d5/2 proton is in the
   // basis.
-  const auto same = b.same_ljtz(OrbitIndex{6});
+  const auto same = b.SameLjtz(OrbitIndex{6});
   std::vector<OrbitIndex> expected;
   for (int i = 0; i < b.num_orbits(); ++i) {
     const Orbit& o = b.orbit(OrbitIndex{i});
@@ -201,7 +201,7 @@ TEST(SingleParticleBasis, SameLjtz) {
   EXPECT_TRUE(std::is_sorted(same.begin(), same.end()));
   EXPECT_EQ(same.front(), OrbitIndex{6});
   // 0s1/2 neutron: 0s, 1s, 2s.
-  const auto s = b.same_ljtz(OrbitIndex{1});
+  const auto s = b.SameLjtz(OrbitIndex{1});
   ASSERT_EQ(s.size(), 3u);
   for (const auto i : s) {
     EXPECT_EQ(b.orbit(i).l, 0);
@@ -209,53 +209,53 @@ TEST(SingleParticleBasis, SameLjtz) {
   }
   // Every orbit is in its own class, classes are ascending.
   for (int i = 0; i < b.num_orbits(); ++i) {
-    const auto c = b.same_ljtz(OrbitIndex{i});
+    const auto c = b.SameLjtz(OrbitIndex{i});
     EXPECT_TRUE(std::find(c.begin(), c.end(), OrbitIndex{i}) != c.end());
     EXPECT_TRUE(std::is_sorted(c.begin(), c.end()));
   }
   // With an l truncation the class shrinks.
-  EXPECT_EQ(make_basis(4, 1).same_ljtz(OrbitIndex{0}).size(), 3u);
+  EXPECT_EQ(MakeBasis(4, 1).SameLjtz(OrbitIndex{0}).size(), 3u);
 }
 
 TEST(SingleParticleBasis, MaxJ2AndMaxTwoBodyJ) {
   // Largest 2j of shell e: l = e, 2j = 2e + 1.
   for (int emax = 0; emax <= 10; ++emax) {
-    const auto b = make_basis(emax);
+    const auto b = MakeBasis(emax);
     EXPECT_EQ(b.max_j2().twice, 2 * emax + 1);
     EXPECT_EQ(b.max_two_body_J(), 2 * emax + 1);
   }
   // With an l cut the maximum follows lmax.
-  EXPECT_EQ(make_basis(6, 2).max_j2().twice, 5);
-  EXPECT_EQ(make_basis(6, 2).max_two_body_J(), 5);
-  EXPECT_EQ(make_basis(6, 0).max_j2().twice, 1);
+  EXPECT_EQ(MakeBasis(6, 2).max_j2().twice, 5);
+  EXPECT_EQ(MakeBasis(6, 2).max_two_body_J(), 5);
+  EXPECT_EQ(MakeBasis(6, 0).max_j2().twice, 1);
   // unoccupied-shell cut: 6 -> highest kept is max(l <= lmax_unocc at high e,
   // any l at e <= emax_unocc)
-  const auto b = make_basis(6, -1, 3, 1);
+  const auto b = MakeBasis(6, -1, 3, 1);
   EXPECT_EQ(b.max_j2().twice, 7);  // 0f7/2 at e = 3
 }
 
 TEST(SingleParticleBasis, ChannelCountFormula) {
   // The number of two-body channels is 6 (Jmax + 1).
-  EXPECT_EQ(6 * (make_basis(2).max_two_body_J() + 1), 36);
-  EXPECT_EQ(6 * (make_basis(4).max_two_body_J() + 1), 60);
+  EXPECT_EQ(6 * (MakeBasis(2).max_two_body_J() + 1), 36);
+  EXPECT_EQ(6 * (MakeBasis(4).max_two_body_J() + 1), 60);
 }
 
 TEST(SingleParticleBasis, Equality) {
-  EXPECT_EQ(make_basis(4), make_basis(4));
-  EXPECT_NE(make_basis(4), make_basis(3));
-  EXPECT_NE(make_basis(4), make_basis(4, 2));
-  EXPECT_NE(make_basis(4, -1, -1, -1, 16.0), make_basis(4, -1, -1, -1, 20.0));
+  EXPECT_EQ(MakeBasis(4), MakeBasis(4));
+  EXPECT_NE(MakeBasis(4), MakeBasis(3));
+  EXPECT_NE(MakeBasis(4), MakeBasis(4, 2));
+  EXPECT_NE(MakeBasis(4, -1, -1, -1, 16.0), MakeBasis(4, -1, -1, -1, 20.0));
   // Same orbits from different truncation parameters compare equal.
-  EXPECT_EQ(make_basis(4, 4), make_basis(4));
-  EXPECT_EQ(make_basis(4, -1, 4, 0), make_basis(4));
+  EXPECT_EQ(MakeBasis(4, 4), MakeBasis(4));
+  EXPECT_EQ(MakeBasis(4, -1, 4, 0), MakeBasis(4));
   // Copies are independent values.
-  const auto a = make_basis(3);
+  const auto a = MakeBasis(3);
   const auto c = a;
   EXPECT_EQ(a, c);
 }
 
 TEST(SingleParticleBasis, EmaxZero) {
-  const auto b = make_basis(0);
+  const auto b = MakeBasis(0);
   ASSERT_EQ(b.num_orbits(), 2);
   EXPECT_EQ(b.orbit(OrbitIndex{0}), (Orbit{0, 0, TwoJ{1}, TwoTz{-1}}));
   EXPECT_EQ(b.orbit(OrbitIndex{1}), (Orbit{0, 0, TwoJ{1}, TwoTz{1}}));

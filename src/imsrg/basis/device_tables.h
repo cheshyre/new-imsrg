@@ -74,7 +74,7 @@ struct TwoBodyTableView {
   /// num_orbits.
   IMSRG_INLINE_FUNCTION KetIndex ket_index(OrbitIndex p,
                                            OrbitIndex q) const noexcept {
-    return imsrgpp_ket_index(p, q, num_orbits);
+    return ImsrgppKetIndex(p, q, num_orbits);
   }
 
   /// Local index of global ket `k` at 2J = `two_j` in the channel its orbits
@@ -150,7 +150,7 @@ static_assert(std::is_trivially_copyable_v<KetSubsetTableView>);
 class DeviceTables {
  public:
   /// Copies the tables of the given host objects to the device
-  /// (`copy_from_host`). Cost O(orbits + kets * J range + subset sizes).
+  /// (`CopyFromHost`). Cost O(orbits + kets * J range + subset sizes).
   /// `channels` and `subsets` must have been built from `basis` and
   /// `reference`/`partition` (same orbit count).
   DeviceTables(const SingleParticleBasis& basis, const Reference& reference,

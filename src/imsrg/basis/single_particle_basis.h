@@ -49,7 +49,7 @@ struct BasisTruncation {
 /// shell N = 0..emax; l = N, N-2, ..., 0; 2j = 2l+1, then 2l-1; tz2 = -1
 /// (proton), then +1 (neutron); truncated orbits are skipped, and the orbit
 /// index is the position in this sequence. Without truncations other than emax
-/// the index equals `imsrgpp_orbit_hash(orbit)`. Protons and neutrons are
+/// the index equals `ImsrgppOrbitHash(orbit)`. Protons and neutrons are
 /// always truncated alike, so proton indices are even and the neutron partner
 /// of proton `a` is `a + 1` in every basis. Single-species ("atomic") bases are
 /// not supported.
@@ -62,8 +62,8 @@ class SingleParticleBasis {
   /// O(number of orbits).
   /// @throws InputError if emax < 0, hw_MeV <= 0 (or not finite), or the
   ///         emax_unocc cut is active without lmax_unocc >= 0.
-  static SingleParticleBasis harmonic_oscillator(const BasisTruncation& trunc,
-                                                 double hw_MeV);
+  static SingleParticleBasis HarmonicOscillator(const BasisTruncation& trunc,
+                                                double hw_MeV);
 
   /// All orbits, index order.
   std::span<const Orbit> orbits() const noexcept { return orbits_; }
@@ -104,7 +104,7 @@ class SingleParticleBasis {
   /// Indices of the orbits with the same (l, 2j, tz2) as orbit `i`, ascending
   /// (imsrg++ `OneBodyChannels`): the orbits a scalar, isospin-conserving
   /// one-body operator connects to `i`. O(num_orbits()).
-  std::vector<OrbitIndex> same_ljtz(OrbitIndex i) const;
+  std::vector<OrbitIndex> SameLjtz(OrbitIndex i) const;
 
   /// Equality of emax, hbar*omega and the orbit list (the truncation parameters
   /// may differ when they produce the same orbits).
