@@ -49,7 +49,9 @@ op::OperatorSpec CommutatorSpec(const op::OperatorSpec& x,
 /// 222 ladder and the 221 term share their intermediates when both are selected
 /// (imsrg++ `comm222_pp_hh_221ss`). Preconditions (InvariantError): X, Y on the
 /// workspace's model space (`ws.compatible`); Z is neither X nor Y.
-/// @throws NotImplementedError for NonHermitian X or Y and for specs
+/// @throws NotImplementedError for NonHermitian X or Y, for X, Y or Z with a
+///         three-body part (the IMSRG(3) terms are not implemented; the
+///         [2,2]->3 term alone is `Comm223` of three_body.h) and for specs
 ///         `CommutatorSpec` rejects.
 /// Complexity: dominated by the 2B terms, O(sum over channels of N^3) GEMMs.
 void Commutator(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
