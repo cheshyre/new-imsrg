@@ -8,7 +8,11 @@
 #   Env: IMSRG_REFERENCE_ROOT (default /Users/cheshyre/Downloads/new-imsrg-reference),
 #        IMSRG_TEST_DATA_DIR (default /Users/cheshyre/Downloads/new-imsrg),
 #        IT_TIMEOUT_S (default 3600: wall-time cap per run; killed runs are recorded as timed out),
-#        OMP_NUM_THREADS (default 8).
+#        OMP_NUM_THREADS (default 8),
+#        IMSRG_REFERENCE_EXE (default $ROOT/build/imsrg++), IMSRG_REFERENCE_RUNS (default
+#        $ROOT/runs/e2e), IMSRG_GOLDEN_E2E_OUT (default tests/golden/e2e of this checkout) and
+#        IMSRG_REFERENCE_SHA_FILE (version file read by parse_imsrg_log.py): the D35 patched
+#        build sets all four, see tools/reference/regen_golden_d35.sh.
 # Run directories (outside the repo): ${IMSRG_REFERENCE_ROOT}/runs/e2e/<job>/
 # Results (committed, small): tests/golden/e2e/<job>/{result.json,flow.dat,int*.snt,stdout.log}
 set -uo pipefail
@@ -16,13 +20,13 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "${HERE}/../.." && pwd)"
 ROOT="${IMSRG_REFERENCE_ROOT:-/Users/cheshyre/Downloads/new-imsrg-reference}"
 DATA="${IMSRG_TEST_DATA_DIR:-/Users/cheshyre/Downloads/new-imsrg}"
-EXE="${ROOT}/build/imsrg++"
+EXE="${IMSRG_REFERENCE_EXE:-${ROOT}/build/imsrg++}"   # D35: the patched build is build-d35/imsrg++
 F2="${DATA}/VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz"
 F3="${DATA}/NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin"
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-8}"
 CAP="${IT_TIMEOUT_S:-3600}"
-RUNS="${ROOT}/runs/e2e"
-OUT="${REPO}/tests/golden/e2e"
+RUNS="${IMSRG_REFERENCE_RUNS:-${ROOT}/runs/e2e}"   # D35: use runs-d35/e2e (keeps the pristine runs)
+OUT="${IMSRG_GOLDEN_E2E_OUT:-${REPO}/tests/golden/e2e}"
 
 # common 2N arguments (C) and 3N arguments (N) of the brief
 C=(2bme="${F2}" file2e1max=14 file2e2max=28 file2lmax=14 hw=16)

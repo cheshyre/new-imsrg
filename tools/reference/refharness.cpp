@@ -95,8 +95,12 @@ std::string fmt17(double x) {
 
 std::string reference_version() {
   const char* root = std::getenv("IMSRG_REFERENCE_ROOT");
-  std::string path = std::string(root ? root : "/Users/cheshyre/Downloads/new-imsrg-reference") +
-                     "/REFERENCE_SRC_SHA256";
+  // IMSRG_REFERENCE_SHA_FILE: version file of another build (the D35 patched build writes
+  // REFERENCE_SRC_SHA256_D35); the default is the pristine build's file.
+  const char* sha_file = std::getenv("IMSRG_REFERENCE_SHA_FILE");
+  std::string path = sha_file ? std::string(sha_file)
+                              : std::string(root ? root : "/Users/cheshyre/Downloads/new-imsrg-reference") +
+                                    "/REFERENCE_SRC_SHA256";
   std::ifstream f(path);
   std::string h;
   if (f >> h) return "imsrg-devel src-sha256:" + h;

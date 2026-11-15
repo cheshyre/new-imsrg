@@ -1,0 +1,40 @@
+# imsrg-devel-d35.patch -- patch against imsrg-devel src/ (apply with `patch -p1` from the directory
+# that contains src/; tools/reference/build_imsrg_devel.sh `patched` does this on a private copy).
+#
+# What: two quirks of imsrg++ are removed in imsrg_util.cc.
+#   1. TCM_Op: the two-body part no longer drops entries with |p1p2/A| <= 1e-7, so
+#      Trel = T - Tcm (and thus the bare H) keeps every entry (changes of <= 1e-7 MeV per element).
+#   2. Rp2_corrected_Op (operator "Rp2"): no longer adds 1/Z * RpSpinOrbitCorrection; that term is the
+#      separate operator "Rso" (already in OperatorFromString). Old Rp2 = new Rp2 + (1/Z) * Rso.
+# Why: owner decision D35 (M6-Q1, M6-Q2): the rewrite fixes both quirks instead of carrying
+#   compatibility switches; the e2e/hamiltonian/HF goldens are regenerated from this patched build
+#   so that the integration tests keep ~1e-10 MeV agreement and identical step counts (D42: only via
+#   the scripted tools/reference commands).
+# Everything else in imsrg-devel is untouched.
+--- a/src/imsrg_util/imsrg_util.cc
++++ b/src/imsrg_util/imsrg_util.cc
+@@ -869,10 +869,8 @@
+ //            double p1p2 = Calculate_p1p2(modelspace,bra,ket,tbc.J) * hw/A;
+             double p1p2 = Calculate_p1p2(modelspace,bra,ket,tbc.J) / A;
+ //            std::cout << "ijkl " << bra.p << " " << bra.q << " " << ket.p << " " << ket.q << "   p1p2 = " << p1p2 << "  E2max is " << E2max << std::endl;
+-            if (std::abs(p1p2)>1e-7)
+-            {
+-              TcmOp.TwoBody.SetTBME(ch,ibra,iket,p1p2);
+-            }
++            // D35: no 1e-7 threshold; keep every two-body entry (imsrg++ drops |p1p2| <= 1e-7).
++            TcmOp.TwoBody.SetTBME(ch,ibra,iket,p1p2);
+          }
+       }
+    }
+@@ -1261,8 +1259,9 @@
+  {
+    if (Z==0) return 0.0*KineticEnergy_Op(modelspace);
+    return R2CM_Op(modelspace) + (A-2.0)/(A*Z)*R2_1body_Op(modelspace,"proton")
+-                                   - 4./(A*Z)*R2_2body_Op(modelspace,"proton")
+-                                   + 1./Z * RpSpinOrbitCorrection(modelspace);
++                                   - 4./(A*Z)*R2_2body_Op(modelspace,"proton");
++   // D35: no spin-orbit correction here (imsrg++ adds + 1./Z * RpSpinOrbitCorrection(modelspace));
++   // it is the separate operator "Rso".
+  }
+ 
+  Operator Rn2_corrected_Op(ModelSpace& modelspace, int A, int Z)

@@ -7,7 +7,8 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "${HERE}/../.." && pwd)"
 ROOT="${IMSRG_REFERENCE_ROOT:-/Users/cheshyre/Downloads/new-imsrg-reference}"
 RH="${1:-${ROOT}/harness-build/refharness}"
-OUT="${REPO}/tests/golden/e2e"
+OUT="${IMSRG_GOLDEN_E2E_OUT:-${REPO}/tests/golden/e2e}"
+FLOW_JOBS="${FLOW_JOBS:-IT-2 IT-10}"   # D35 regeneration runs IT-2 only (IT-10 follows in M10)
 export OMP_NUM_THREADS=8
 CAP="${IT_TIMEOUT_S:-2700}"   # perl alarm = portable wall-time cap
 
@@ -19,13 +20,17 @@ run() {  # run <outdir> <args...>
   rm -f "${d}/stderr.log"
 }
 
+if [[ " ${FLOW_JOBS} " == *" IT-2 "* ]]; then
 # IT-2: full %.17g trajectory in a scratch dir; commit only steps 0-9 and the last step.
 tmp="$(mktemp -d)"
 run "${tmp}" emax=4 reference=O16 valence_space=O16 hw=16
 { sed -n 1,11p "${tmp}/trajectory.csv"; tail -n 1 "${tmp}/trajectory.csv"; } > "${OUT}/IT-2/trajectory.csv"
 cp "${tmp}/result.json" "${OUT}/IT-2/refharness_result.json"
+fi
 
+if [[ " ${FLOW_JOBS} " == *" IT-10 "* ]]; then
 # IT-10: IMSRG(3f2) (IMSRG(2) + factorized triples correction), full trajectories.
 run "${OUT}/IT-10/O16_emax2" emax=2 reference=O16 valence_space=O16 hw=16 --factorized
 run "${OUT}/IT-10/He4_emax2" emax=2 reference=He4 valence_space=He4 hw=16 --factorized
 run "${OUT}/IT-10/O16_emax3" emax=3 reference=O16 valence_space=O16 hw=16 --factorized
+fi
