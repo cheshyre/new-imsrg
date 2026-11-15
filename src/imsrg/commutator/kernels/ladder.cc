@@ -25,7 +25,7 @@
 #include "imsrg/linalg/blas.h"
 #include "imsrg/operator/operator_spec.h"
 
-namespace imsrg::commutator::terms {
+namespace imsrg::commutator {
 
 namespace {
 
@@ -104,12 +104,12 @@ struct SymArgs {
 };
 static_assert(std::is_trivially_copyable_v<SymArgs>);
 
-/// Computes Mpp and Mhh for X and Y into `impl.ladder.{pp,hh}.product`. X and Y
-/// must have an allocated two-body part; `h_z` is the hermiticity sign of the
-/// commutator. Leaves the device idle (fenced). Complexity: two grouped gemms
-/// of sum_c N_c^2 (|Kp| + |Kh|) flops.
-void ComputeIntermediates(const op::Operator& X, const op::Operator& Y, int h_z,
-                          Workspace::Impl& impl) {
+}  // namespace
+
+namespace detail {
+
+void LadderProducts(const op::Operator& X, const op::Operator& Y,
+                    Workspace::Impl& impl) {
   auto& lad = impl.ladder;
   const TwoBodyView xv = impl.two_body_view(X);
   const TwoBodyView yv = impl.two_body_view(Y);
@@ -153,7 +153,25 @@ void ComputeIntermediates(const op::Operator& X, const op::Operator& Y, int h_z,
       lad.pp.product.host_is_device(),
       "ladder: host BLAS on device memory; needs a device gemm (GPU backends)");
   linalg::GroupedGemm(lad.problems);
+}
 
+}  // namespace detail
+
+namespace terms {
+
+namespace {
+
+/// Computes Mpp and Mhh for X and Y into `impl.ladder.{pp,hh}.product`. X and Y
+/// must have an allocated two-body part; `h_z` is the hermiticity sign of the
+/// commutator. Leaves the device idle (fenced). Complexity: two grouped gemms
+/// of sum_c N_c^2 (|Kp| + |Kh|) flops.
+void ComputeIntermediates(const op::Operator& X, const op::Operator& Y, int h_z,
+                          Workspace::Impl& impl) {
+  detail::LadderProducts(X, Y, impl);  // W = X P Y for P = P_pp, P_hh
+
+  auto& lad = impl.ladder;
+  const TwoBodyView xv = impl.two_body_view(X);
+  const int nch = xv.tb.num_channels;
   SymArgs s;
   s.block_offset = impl.block_offsets.device_data();
   s.num_kets = xv.tb.channel_num_kets;
@@ -297,4 +315,6 @@ void Comm222PpHh221ss(const op::Operator& X, const op::Operator& Y,
   Add221(Z, impl, X);
 }
 
-}  // namespace imsrg::commutator::terms
+}  // namespace terms
+
+}  // namespace imsrg::commutator

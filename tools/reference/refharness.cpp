@@ -21,6 +21,8 @@
 //   bench-commutator emax=N reps=R  time the imsrg++ commutator terms        (rh_bench.cpp)
 //   generator TYPE H ETA   imsrg++ generator eta(H) of a given type    (rh_commutator.cpp)
 //   flow [--factorized]     full IMSRG pipeline with %.17g trajectory  (rh_flow.cpp)
+//   factorized PART ETA GAMMA Z   factorized double commutator parts   (rh_factorized.cpp)
+//   bch transform|product A B OUT [scale_a= scale_b= --factorized ...]  (rh_factorized.cpp)
 //
 // Common keys (imsrg++ names): emax e3max lmax hw reference valence_space A
 //   2bme file2e1max file2e2max file2lmax 3bme 3bme_type file3e1max file3e2max file3e3max
@@ -269,6 +271,8 @@ int main(int argc, char** argv) {
     if (c == "bench-commutator") return rh::cmd_bench_commutator(a);
     if (c == "generator") return rh::cmd_generator(a);
     if (c == "flow") return rh::cmd_flow(a);
+    if (c == "factorized") return rh::cmd_factorized(a);
+    if (c == "bch") return rh::cmd_bch(a);
     std::cerr << "refharness: unknown subcommand '" << c << "'\n";
     return 2;
   } catch (const std::exception& e) {

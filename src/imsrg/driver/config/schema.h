@@ -471,7 +471,13 @@ struct Imsrg3Config {
   bool at_end = false;
   Imsrg3Variant variant = Imsrg3Variant::kFull;
   bool factorized = false;  ///< IMSRG(3f2): BchOptions::factorized
-  bool no_qqq = false;      ///< planned
+  /// 3f2: one-body intermediates of the factorized double commutator
+  /// (`BchOptions::factorized_terms.one_body_intermediates`).
+  bool factorized_1b_intermediates = true;
+  /// 3f2: two-body intermediates (`...two_body_intermediates`; not
+  /// implemented, E-PLANNED together with `factorized`).
+  bool factorized_2b_intermediates = false;
+  bool no_qqq = false;  ///< planned
   bool only_2b_eta = false;
   bool only_2b_omega = false;
   bool discard_residual_input_3n = false;

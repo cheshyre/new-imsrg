@@ -18,8 +18,10 @@
 #include <vector>
 
 #include "imsrg/basis/model_space.h"
+#include "imsrg/commutator/workspace.h"
 #include "imsrg/exec/device_buffer.h"
 #include "imsrg/linalg/blas.h"
+#include "imsrg/operator/operator.h"
 
 namespace imsrg::commutator::detail {
 
@@ -41,7 +43,8 @@ struct LadderProjector {
   exec::DeviceBuffer<double> xg;  ///< Gathered X operands, all channels.
   exec::DeviceBuffer<double> yg;  ///< Gathered Y operands, all channels.
   exec::DeviceBuffer<double>
-      product;  ///< Mpp or Mhh, laid out like a two-body operator.
+      product;  ///< W = X P Y (`LadderProducts`), antisymmetrized in place
+                ///< to Mpp or Mhh by the ladder terms; two-body layout.
 };
 
 /// Device-resident data of the ladder terms.
@@ -68,6 +71,16 @@ struct LadderData {
 /// order, the same offsets as `Workspace::Impl:: block_offsets`). Complexity
 /// O(number of kets + buffer sizes).
 LadderData BuildLadderData(const basis::ModelSpace& ms);
+
+/// The raw ladder products W_pp = X P_pp Y and W_hh = X P_hh Y (no
+/// antisymmetrization) of every channel, written into
+/// `impl.ladder.{pp,hh}.product` (layout of `op::TwoBody`). X and Y must have
+/// an allocated two-body part and live on the workspace's model space. Shared
+/// by the ladder terms (which then antisymmetrize, kernels/ladder.cc) and the
+/// factorized double commutator. The products are complete when it returns
+/// (host BLAS). Complexity: grouped gemms of sum_c N_c^2 (|Kp| + |Kh|) flops.
+void LadderProducts(const op::Operator& X, const op::Operator& Y,
+                    Workspace::Impl& impl);
 
 }  // namespace imsrg::commutator::detail
 

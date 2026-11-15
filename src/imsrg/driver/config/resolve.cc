@@ -366,6 +366,15 @@ void Derive(const RawTree& tree, const ResolveOptions& options, RunConfig& cfg,
     }
   }
 
+  // IMSRG(3f2) recipe (owner decision D32): factorized = true implies
+  // hunter-gatherer and omega_norm_max = 0.1 unless given explicitly.
+  if (cfg.imsrg3.factorized) {
+    if (!tree.contains("imsrg.omega.hunter_gatherer"))
+      cfg.imsrg.omega.hunter_gatherer = true;
+    if (!tree.contains("imsrg.step.omega_norm_max"))
+      cfg.imsrg.step.omega_norm_max = 0.1;
+  }
+
   if (!tree.contains("imsrg.steps"))
     cfg.imsrg.steps = cfg.valence.has_valence_space() ? 2 : 1;
 

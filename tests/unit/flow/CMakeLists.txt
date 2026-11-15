@@ -10,3 +10,14 @@ foreach(_t generator bch magnus ode)
   target_compile_definitions(flow_${_t} PRIVATE
     IMSRG_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/tests/golden")
 endforeach()
+
+# The IMSRG(3f2) correction of BCH, with the golden and random-operator helpers
+# of the commutator tests.
+imsrg_add_test(NAME flow_bch_factorized
+  SOURCES test_bch_factorized.cc ${_imsrg_exec_main}
+          "${PROJECT_SOURCE_DIR}/tests/support/commutator_test_support.cc"
+  DEPS flow commutator operator
+  LABELS unit
+  NO_GTEST_MAIN)
+target_compile_definitions(flow_bch_factorized PRIVATE
+  IMSRG_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/tests/golden")

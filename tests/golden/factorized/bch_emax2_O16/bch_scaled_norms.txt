@@ -1,0 +1,43 @@
+== transform_H__eta_white_x0.0929__d32: bch transform H eta_white scale_a=1 scale_b=0.0929 --factorized --factorized-1b-intermediates=1 --factorized-2b-intermediates=0
+Precalculating SixJ's
+done calculating sixJs (8815 of them)  now there are 8815 entries 
+Hash table has 12853 buckets and a load factor 0.685832  estimated storage ~ 0.000322878 GB
+norm_a 330.92557935438197
+norm_b 0.099999084647924549
+norm_out 330.10035929911277
+== transform_H__eta_white_x1.86__d32: bch transform H eta_white scale_a=1 scale_b=1.86 --factorized --factorized-1b-intermediates=1 --factorized-2b-intermediates=0
+Precalculating SixJ's
+done calculating sixJs (8815 of them)  now there are 8815 entries 
+Hash table has 12853 buckets and a load factor 0.685832  estimated storage ~ 0.000322878 GB
+Warning: BCH_Transform not converged after 12 nested commutators
+norm_a 330.92557935438197
+norm_b 2.0021345257819125
+norm_out 302.65662414007676
+== transform_H__eta_white_x1.86__none: bch transform H eta_white scale_a=1 scale_b=1.86 
+Precalculating SixJ's
+done calculating sixJs (8815 of them)  now there are 8815 entries 
+Hash table has 12853 buckets and a load factor 0.685832  estimated storage ~ 0.000322878 GB
+norm_a 330.92557935438197
+norm_b 2.0021345257819125
+norm_out 330.22816622476006
+== product_eta_white_x0.0464__random_A_x0.000415__d32: bch product eta_white random_A scale_a=0.0464 scale_b=0.000415 --factorized --factorized-1b-intermediates=1 --factorized-2b-intermediates=0
+Precalculating SixJ's
+done calculating sixJs (8815 of them)  now there are 8815 entries 
+Hash table has 12853 buckets and a load factor 0.685832  estimated storage ~ 0.000322878 GB
+norm_a 0.049945721503376735
+norm_b 0.10006921084717176
+norm_out 0.10817173088561462
+== product_eta_white_x0.0929__random_A_x0.00829__d32: bch product eta_white random_A scale_a=0.0929 scale_b=0.00829 --factorized --factorized-1b-intermediates=1 --factorized-2b-intermediates=0
+Precalculating SixJ's
+done calculating sixJs (8815 of them)  now there are 8815 entries 
+Hash table has 12853 buckets and a load factor 0.685832  estimated storage ~ 0.000322878 GB
+norm_a 0.099999084647924549
+norm_b 1.9989729106579615
+norm_out 1.9930748930079991
+== product_eta_white_x0.0929__random_A_x0.00829__none: bch product eta_white random_A scale_a=0.0929 scale_b=0.00829 
+Precalculating SixJ's
+done calculating sixJs (8815 of them)  now there are 8815 entries 
+Hash table has 12853 buckets and a load factor 0.685832  estimated storage ~ 0.000322878 GB
+norm_a 0.099999084647924549
+norm_b 1.9989729106579615
+norm_out 1.9932541892150695

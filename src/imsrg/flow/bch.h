@@ -12,6 +12,7 @@
 /// truncation are numerics-defining (design/00 D12): they reproduce imsrg++
 /// exactly.
 #include "imsrg/commutator/commutator.h"
+#include "imsrg/commutator/factorized.h"
 #include "imsrg/operator/operator.h"
 
 namespace imsrg::flow {
@@ -29,12 +30,24 @@ struct BchOptions {
   /// A warning is logged if `BchTransform` reaches this many nested
   /// commutators.
   int warn_iterations = 12;
+  /// IMSRG(3f2) (design/14 section 4 item 3, owner decision D32; imsrg++
+  /// `BCH::SetUseFactorizedCorrection`, which switches on the transform and
+  /// the product correction together): every nested commutator from the
+  /// second on gets the factorized double commutator F of the nested
+  /// commutator two steps back, in `BchTransform` and in `BchProduct` (see
+  /// there). Needs an anti-Hermitian Omega (resp. X and Y of the product).
+  bool factorized = false;
+  /// Topologies of F (`commutator::FactorizedDoubleCommutator`); the defaults
+  /// are the D32 recipe (one-body intermediates on, two-body off).
+  commutator::FactorizedOptions factorized_terms;
 };
 
 /// Diagnostics of one `BchTransform` call.
 struct BchReport {
   int nested_commutators = 0;  ///< Number of nested commutators evaluated.
   bool converged = true;       ///< False if the series hit `max_iterations`.
+  int factorized_corrections = 0;  ///< Non-vanishing factorized corrections
+                                   ///< added.
 };
 
 /// Z = e^Omega X e^-Omega = X + [Omega, X] + 1/2! [Omega, [Omega, X]] + ...
@@ -44,12 +57,20 @@ struct BchReport {
 ///   ||Omega||), for i = 1, 2, ..., max_iterations: nested_i = [Omega,
 ///   nested_{i-1}] (nested_0 = X), Z += nested_i / i!, eps *= (i + 1), stop
 ///   when ||nested_i|| < eps.
+/// With `opts.factorized` (IMSRG(3f2), imsrg++ BCH.cc:153-157 and 179-191),
+/// nested_i = [Omega, nested_{i-1}] + F(Omega, nested_{i-2}) for i >= 2, with
+/// the corrected nested_{i-2}; the correction is added before the series
+/// update and the epsilon test (Omega's intermediates are computed once per
+/// call, `commutator::FactorizedEta`).
 /// Norms are `op::norm` (zero-body part excluded). X is promoted to
 /// particle_rank 2 (imsrg++ `SetParticleRank(2)`) so Z has a two-body part.
-/// Omega must be anti-Hermitian for a unitary transformation, but any
-/// hermiticity the commutator accepts works. Preconditions: X and Omega scalar,
-/// number conserving, on `ws`'s model space. Complexity: (number of nested
-/// commutators) x one commutator.
+/// Omega must be anti-Hermitian for a unitary transformation; without
+/// `factorized` any hermiticity the commutator accepts works, with it Omega
+/// must be anti-Hermitian (NotImplementedError otherwise). Preconditions: X and
+/// Omega scalar, number conserving, on `ws`'s model space. Complexity: (number
+/// of nested commutators) x one commutator, plus one factorized double
+/// commutator per nested term from the second on with `factorized` (about half
+/// a commutator each).
 op::Operator BchTransform(const op::Operator& X, const op::Operator& Omega,
                           const BchOptions& opts,
                           const commutator::CommutatorOptions& copts,
@@ -68,9 +89,14 @@ op::Operator BchTransform(const op::Operator& X, const op::Operator& Omega,
 /// This is the series in powers of ad_Y to 8th order plus the single 1/12
 /// [[Y,X],X] term; the -1/24 [Y,[X,[X,Y]]] term of the exact series is NOT
 /// included (a truncation choice of imsrg++, reproduced on purpose; design/13
-/// section 7). Preconditions: X and Y scalar, number conserving, on `ws`'s
+/// section 7). With `opts.factorized` (imsrg++ BCH.cc:312-359): the 1/12 term
+/// adds F(X, Y) / 12, and N_k = [Y, N_{k-1}] + F(Y, N_{k-2}) for k >= 2 with
+/// N_0 = X, N_1 = [Y, X] (F of `commutator::FactorizedDoubleCommutator`; a
+/// term whose operands lack a two-body part vanishes and is skipped; with
+/// `factorized`, X and Y must be anti-Hermitian).
+/// Preconditions: X and Y scalar, number conserving, on `ws`'s
 /// model space; Z gets the larger particle_rank of X and Y. Complexity: up to 9
-/// commutators.
+/// commutators, plus up to 8 factorized double commutators with `factorized`.
 op::Operator BchProduct(const op::Operator& X, const op::Operator& Y,
                         const BchOptions& opts,
                         const commutator::CommutatorOptions& copts,

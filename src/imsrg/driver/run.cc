@@ -57,7 +57,10 @@ void RejectPlanned(const RunConfig& c) {
   if (c.imsrg.goose_tank) Planned("imsrg.goose_tank");
   if (c.imsrg.perturbative_triples) Planned("imsrg.perturbative_triples");
   if (c.imsrg.space) Planned("[imsrg.space] (IMSRG model-space truncation)");
-  if (c.imsrg3.active() || c.imsrg3.factorized) Planned("IMSRG(3) ([imsrg3])");
+  if (c.imsrg3.active()) Planned("IMSRG(3) ([imsrg3])");
+  if (c.imsrg3.factorized && c.imsrg3.factorized_2b_intermediates) {
+    Planned("imsrg3.factorized_2b_intermediates");
+  }
   if (c.output.valence_file_format == ValenceFileFormat::kAntoine) {
     Planned("output.valence_file_format = \"antoine\"");
   }
@@ -445,10 +448,16 @@ void Run(const RunConfig& config) {
       ops.push_back(rec);
     }
   }
+  flow::BchOptions bch;
+  bch.factorized = config.imsrg3.factorized;
+  bch.factorized_terms.one_body_intermediates =
+      config.imsrg3.factorized_1b_intermediates;
+  bch.factorized_terms.two_body_intermediates =
+      config.imsrg3.factorized_2b_intermediates;
   const flow::GeneratorOptions core_opts =
       MakeGeneratorOptions(config, core_gen, ms);
   Engine solver =
-      magnus ? Engine(flow::MagnusSolver(ph.hno, so, core_opts))
+      magnus ? Engine(flow::MagnusSolver(ph.hno, so, core_opts, bch))
              : Engine(flow::OdeSolver(config.imsrg.method == Method::kFlowRk4
                                           ? flow::OdeMethod::kRk4
                                           : flow::OdeMethod::kDopri5,

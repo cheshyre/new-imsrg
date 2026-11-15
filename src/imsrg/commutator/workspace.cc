@@ -43,6 +43,12 @@ Workspace::Impl::Impl(const std::shared_ptr<const basis::ModelSpace>& ms)
       exec::DeviceBuffer<std::int32_t>(owner.size(), "commutator::ob_owner");
   ob_owner.CopyFromHost(owner);
 
+  // One-body intermediates of the factorized double commutator (zeroed).
+  factorized.chi2 =
+      exec::DeviceBuffer<double>(norb * norb, "commutator::factorized_chi2");
+  factorized.chib =
+      exec::DeviceBuffer<double>(norb * norb, "commutator::factorized_chib");
+
   // Block offsets exactly as `op::TwoBody` stores a scalar rank-2 operator.
   {
     const op::TwoBody tmp(ms, op::OperatorSpec::Scalar(2));

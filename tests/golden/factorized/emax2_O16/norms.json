@@ -1,0 +1,23 @@
+{
+  "Z_d32__eta_white__H": {
+    "zero_body": 0,
+    "one_body_norm": 3.083962987468452,
+    "two_body_norm": 20.116409095184224,
+    "three_body_norm": 0,
+    "norm": 20.351430971626687
+  },
+  "Z_d32__eta_white__random_A": {
+    "zero_body": 0,
+    "one_body_norm": 1.1669591025793418,
+    "two_body_norm": 14.538693176808463,
+    "three_body_norm": 0,
+    "norm": 14.585451410102799
+  },
+  "Z_d32__random_A__random_H": {
+    "zero_body": 0,
+    "one_body_norm": 16518.816578766764,
+    "two_body_norm": 163372.43884648135,
+    "three_body_norm": 0,
+    "norm": 164205.4355854587
+  }
+}

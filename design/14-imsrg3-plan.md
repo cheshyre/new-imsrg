@@ -105,6 +105,11 @@ layout.
    1b/2b-intermediate switches. **Prerequisites:** hunter-gatherer Magnus (an M8 follow-up) and
    refharness flags for hunter-gatherer, `omega_norm_max` and the 2b-intermediate switch; the
    IT-10 goldens are regenerated with the owner's settings (D32) before they are used.
+   **Done (M10 3f2, run 2):** 1b intermediates only (`13` §6-7); the 2b intermediates are
+   E-PLANNED (QUESTIONS M10-Q20). The explicit-IMSRG(3) cross-check is the harness's `direct`
+   route (imsrg++ comm223ss + comm231ss + comm232ss), which agrees with imsrg++'s full factorized
+   result to 1.3e-15 (`tests/golden/factorized/README.md`); our own explicit 3B check waits for the
+   N7 track's 3B storage.
 4. Later: the full IMSRG(3) term set; MPI distribution of 3B blocks (D14 phase 2, in M12b: evaluate
    the row-wise, cost-balanced block distribution of Hagen and Nam, Prog. Theor. Phys. Suppl. 196,
    102 (2012), arXiv:1203.3765, against distribution by channel, which is likely unbalanced; D40);

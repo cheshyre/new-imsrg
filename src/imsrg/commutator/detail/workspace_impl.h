@@ -26,6 +26,20 @@
 
 namespace imsrg::commutator {
 
+namespace detail {
+
+/// The gamma-dependent one-body intermediates of the factorized double
+/// commutator (factorized.h; the eta-only ones live in `FactorizedEta`):
+/// dense column-major num_orbits x num_orbits device matrices. Only the
+/// entries (d, e) of equal (l, 2j, 2tz) are written (each call overwrites all
+/// of them); the others stay zero.
+struct FactorizedScratch {
+  exec::DeviceBuffer<double> chi2;  ///< chi2 = B_pp + B_hh (from gamma P eta).
+  exec::DeviceBuffer<double> chib;  ///< chib (from gamma P eta).
+};
+
+}  // namespace detail
+
 /// Internal data of a `Workspace`; built once per model space by the
 /// `Workspace` constructor.
 struct Workspace::Impl {
@@ -59,6 +73,8 @@ struct Workspace::Impl {
   detail::LadderData ladder;  ///< Data of the pp/hh ladder terms (T3b).
   detail::PandyaData pandya;  ///< Data of the particle-hole term (T4).
   detail::LiftedData lifted;  ///< Lifted one-body lists of comm122ss.
+  detail::FactorizedScratch
+      factorized;  ///< One-body scratch of the factorized double commutator.
 
   /// View of the one-body channel CSR. O(1).
   detail::OneBodyChannelView one_body_channels() const noexcept {

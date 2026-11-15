@@ -524,3 +524,21 @@ The tolerance is rounded to float (`static_cast<double>(static_cast<float>(tol))
 `SetODETolerance(float)`, so 1e-6 is 9.99999997e-7; the goldens' step counts depend on it only at
 round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as for `eta_criterion`
 (quirk P7). One line to change if the owner prefers double.
+* **M10-Q20** (2026-11-15, M10 3f2) - Only the topologies with one-body intermediates of the
+  factorized double commutator are implemented (the D32 recipe). `FactorizedOptions::
+  two_body_intermediates` / `[imsrg3] factorized_2b_intermediates = true` throw NotImplementedError /
+  E-PLANNED. **Assumed meanwhile:** the 2b topologies (imsrg++ `comm223_231_chi2b`,
+  `comm223_232_chi2b`, Pandya-transformed intermediates, about 25 two-body operators of memory) are
+  needed only if the owner wants the imsrg++ default (both on). Say if they should be scheduled.
+* **M10-Q21** (2026-11-15, M10 3f2) - `[imsrg3] factorized` together with `in_flow`/`at_end` is an
+  error (V-57: the correction would double count the explicit 3-body terms); imsrg++ does not forbid
+  it. Also V-56 (sub-switches without `factorized`). **Assumed meanwhile:** errors; reversible.
+* **M10-Q22** (2026-11-15, M10 3f2) - The factorized correction requires an anti-Hermitian eta
+  (NotImplementedError otherwise): imsrg++'s `Eta_matrix_nnnn` sign is commented "SRS this is a guess
+  to fix bug for herm,herm case", so a Hermitian eta is not validated there either. Every BCH use
+  has an anti-Hermitian Omega. **Assumed meanwhile:** fine.
+* **M10-Q23** (2026-11-15, M10 3f2) - imsrg++ applies the 3f2 correction to every BCH call once
+  `SetUseFactorizedCorrection` is on, including the transformation of other operators (`Rp2` etc.)
+  and the hunter-gatherer `H_saved` rebuild; `BchOptions::factorized` does the same (the solver passes
+  one `BchOptions` to all its BCH calls). **Assumed meanwhile:** intended (it is what the IT-10
+  goldens contain for H); say if operators should be transformed without the correction.

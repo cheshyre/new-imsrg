@@ -3,4 +3,5 @@
 imsrg_add_module(NAME commutator_ref
   SOURCES
     commutator_ref.cc
+    factorized_ref.cc
   DEPS operator angmom)
