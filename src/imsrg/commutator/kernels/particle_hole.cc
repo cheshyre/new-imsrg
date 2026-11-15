@@ -10,13 +10,20 @@
 //   XK(alpha, kappa) = D_kappa xbar(i, l, a, b; J')
 //   YK(kappa, beta)  = ybar(a, b, k, j; J')
 // (alpha = ket (i, l), kappa = (a, b), beta = ordered pair (k, j)),
-// GEMM W = XK YK, combine W into the Pandya-transformed result ZB, and
-// transform back to the coupled two-body matrix element by element. Only rows
-// alpha (kets, first orbit <= second) are computed: the remaining rows follow
-// from hermiticity of X, Y (ZB(beta, alpha) block) and from the flip symmetry
-// of the ordered-pair basis; the inverse transform reads only the stored half
-// (with an explicit sign for flipped bra pairs), so it needs no lexicographic
-// ket order.
+// GEMM W = XK YK, combine W in place into the Pandya-transformed result (ZB
+// in imsrg++), and transform back to the coupled two-body matrix element.
+// Only rows alpha (kets, first orbit <= second) are computed: the remaining
+// rows follow from hermiticity of X, Y and from the flip symmetry of the
+// ordered-pair basis; the inverse transform reads only the stored half (with
+// an explicit sign for flipped bra pairs), so it needs no lexicographic ket
+// order.
+//
+// Performance (M12a): every kernel works on whole rows or columns (one item
+// per cc ket or per two-body column, dynamic scheduling) instead of one item
+// per element, so the block search and index divisions run once per item;
+// the 6j symbols of a J' (or J'') sum come from one contiguous table row; the
+// fill evaluates the X and Y transforms in one pass over the shared indices.
+// The arithmetic on every value is unchanged (bitwise identical results).
 
 #include <cmath>
 #include <cstdint>
@@ -102,30 +109,200 @@ IMSRG_INLINE_FUNCTION int CcChannel(const PhArgs& a, int p, int q,
          ((tb.orbit_l[p] + tb.orbit_l[q]) & 1);
 }
 
-/// Element of the Pandya-transformed result, zbar(p, q, r, s; J'), from the
-/// stored half of ZB.
-IMSRG_INLINE_FUNCTION double Zbar(const PhArgs& a, int p, int q, int r, int s,
-                                  int Jp) noexcept {
+/// Both Pandya transforms of `PandyaBar` for the same orbits at once, xbar for
+/// X and ybar for Y: X and Y share every index computation. The 6j symbols
+/// come from one contiguous table row (`SixJView::row`), the kets of the pairs
+/// (p, s) and (r, q) and their channel class (parity, Tz) are resolved once,
+/// and only the local indices (table reads), the channel and the exchange
+/// phase remain per J''. The operations on each value are those of
+/// `PandyaBar` and `TwoBodyView::get_unnormalized` in the same order, so the
+/// results are bitwise identical. O(J'' range).
+IMSRG_INLINE_FUNCTION void PandyaBarXY(const PhArgs& a, int p, int q, int r,
+                                       int s, int two_Jp, double& xbar,
+                                       double& ybar) noexcept {
+  const auto& tb = a.xv.tb;
+  const int* j2 = tb.orbit_j2;
+  const int jp = j2[p], jq = j2[q], jr = j2[r], js = j2[s];
+  int lo = jp > js ? jp - js : js - jp;
+  const int lo2 = jr > jq ? jr - jq : jq - jr;
+  if (lo2 > lo) lo = lo2;
+  const int hi1 = jp + js;
+  const int hi2 = jr + jq;
+  const int hi = hi1 < hi2 ? hi1 : hi2;
+  double sx = 0.0;
+  double sy = 0.0;
+  // X~^{J''}_{psrq}: bra pair (p, s), ket pair (r, q), each stored as the ket
+  // (min, max) with an exchange phase if swapped. Both kets must lie in the
+  // same channel class, else every term vanishes (TwoBodyView returns 0).
+  const bool swap_bra = p > s;
+  const bool swap_ket = r > q;
+  const int a1 = swap_bra ? s : p;
+  const int b1 = swap_bra ? p : s;
+  const int a2 = swap_ket ? q : r;
+  const int b2 = swap_ket ? r : q;
+  const int par1 = (tb.orbit_l[a1] + tb.orbit_l[b1]) % 2;
+  const int par2 = (tb.orbit_l[a2] + tb.orbit_l[b2]) % 2;
+  const int tz1 = tb.orbit_tz2[a1] + tb.orbit_tz2[b1];
+  if (lo <= hi && par1 == par2 && tz1 == tb.orbit_tz2[a2] + tb.orbit_tz2[b2]) {
+    const int k1 = tb.ket_index(OrbitIndex{a1}, OrbitIndex{b1}).value();
+    const int k2 = tb.ket_index(OrbitIndex{a2}, OrbitIndex{b2}).value();
+    const int ja1 = j2[a1], jb1 = j2[b1], ja2 = j2[a2], jb2 = j2[b2];
+    // Local index tables of the two kets, indexed by J'' (valid on the
+    // J'' range, which lies inside both triangles).
+    const std::int32_t* lit1 = tb.local_index_table + tb.ket_J_offsets[k1] -
+                               (ja1 > jb1 ? ja1 - jb1 : jb1 - ja1) / 2;
+    const std::int32_t* lit2 = tb.local_index_table + tb.ket_J_offsets[k2] -
+                               (ja2 > jb2 ? ja2 - jb2 : jb2 - ja2) / 2;
+    const int cls = tz1 + 2 + par1;  // channel = 3 (2J'') + cls
+    const double* row =
+        a.sj.row(TwoJ{jp}, TwoJ{jq}, TwoJ{two_Jp}, TwoJ{jr}, TwoJ{js});
+    const double* xd = a.xv.data;
+    const double* yd = a.yv.data;
+    const std::int64_t* block_offset = a.xv.block_offset;
+    for (int two_Jpp = lo; two_Jpp <= hi; two_Jpp += 2) {
+      const int Jpp = two_Jpp / 2;
+      const double sixj = row[Jpp];
+      if (sixj == 0.0) continue;
+      const std::int32_t ib = lit1[Jpp];
+      if (ib < 0) continue;
+      const std::int32_t ik = lit2[Jpp];
+      if (ik < 0) continue;
+      const int ch = 3 * two_Jpp + cls;
+      const std::int64_t idx =
+          block_offset[ch] + ib +
+          static_cast<std::int64_t>(ik) * tb.channel_num_kets[ch];
+      int phase = 1;
+      if (swap_bra)
+        phase *= basis::ExchangePhase(TwoJ{jp}, TwoJ{js}, TwoJ{two_Jpp});
+      if (swap_ket)
+        phase *= basis::ExchangePhase(TwoJ{jr}, TwoJ{jq}, TwoJ{two_Jpp});
+      double vx = phase * xd[idx];
+      double vy = phase * yd[idx];
+      if (p == s) {
+        vx *= constants::kSqrt2;
+        vy *= constants::kSqrt2;
+      }
+      if (r == q) {
+        vx *= constants::kSqrt2;
+        vy *= constants::kSqrt2;
+      }
+      const double w = (two_Jpp + 1) * sixj;
+      sx += w * vx;
+      sy += w * vy;
+    }
+  }
+  xbar = -sx;
+  ybar = -sy;
+}
+
+/// One of the two Pandya-transformed elements zbar(p, q, r, s; J') that an
+/// element of Z needs, with everything that does not depend on J' resolved
+/// once (see `MakeCcTerm`; read by `CcValue`). Trivially copyable.
+struct CcTerm {
+  const std::int32_t* lit_bra = nullptr;  ///< cc local index of the bra pair
+                                          ///< (min, max), indexed by J'.
+  const std::int32_t* lit_ket = nullptr;  ///< Same for the ket pair.
+  int lo = 1;             ///< First J' at which both cc kets exist.
+  int hi = 0;             ///< Last such J' (lo > hi: the term vanishes).
+  int cls = 0;            ///< cc channel = 6 J' + cls.
+  bool ket_flip = false;  ///< Column = ket local index + Ncc (flipped pair).
+  double sign = 1.0;      ///< 1, or -hX hY phi for a flipped bra pair.
+};
+static_assert(std::is_trivially_copyable_v<CcTerm>);
+
+/// Resolves zbar(p, q, r, s; J') of the stored half of the Pandya-transformed
+/// result (rows = cc kets, columns = ordered pairs, see detail/pandya.h): for
+/// p <= q the element sits at row local(p, q), column local(min(r, s), max(r,
+/// s)) (+ Ncc if r > s); for p > q, Hermiticity and the flip symmetry give
+/// -hX hY phi times the element of row local(q, p), column local(min, max) (+
+/// Ncc if s > r), phi = (-1)^((jp + jq)/2 + (jr + js)/2). Pairs of different
+/// cc channel classes give an empty J' range. O(1).
+IMSRG_INLINE_FUNCTION CcTerm MakeCcTerm(const PhArgs& a, int p, int q, int r,
+                                        int s) noexcept {
   const auto& tb = a.zv.tb;
-  const int c = CcChannel(a, p, q, Jp);
-  if (c < 0 || c >= a.pv.num_cc || c != CcChannel(a, r, s, Jp)) return 0.0;
+  const int* j2 = tb.orbit_j2;
+  CcTerm t;
+  const int dpq = tb.orbit_tz2[p] - tb.orbit_tz2[q];
+  const int drs = tb.orbit_tz2[r] - tb.orbit_tz2[s];
+  const int cls =
+      (dpq < 0 ? -dpq : dpq) + 2 + ((tb.orbit_l[p] + tb.orbit_l[q]) & 1);
+  if (cls != (drs < 0 ? -drs : drs) + 2 + ((tb.orbit_l[r] + tb.orbit_l[s]) & 1))
+    return t;
+  t.cls = cls;
+  const int ba = p <= q ? p : q;
+  const int bb = p <= q ? q : p;
+  const int ka = r <= s ? r : s;
+  const int kb = r <= s ? s : r;
+  if (p <= q) {
+    t.ket_flip = r > s;
+  } else {
+    t.ket_flip = s > r;
+    const double phi = ParitySign((j2[p] + j2[q]) / 2 + (j2[r] + j2[s]) / 2);
+    t.sign = -a.hxhy * phi;
+  }
+  const int jba = j2[ba], jbb = j2[bb], jka = j2[ka], jkb = j2[kb];
+  const int bmin = (jba > jbb ? jba - jbb : jbb - jba) / 2;
+  const int kmin = (jka > jkb ? jka - jkb : jkb - jka) / 2;
+  const int kbra = tb.ket_index(OrbitIndex{ba}, OrbitIndex{bb}).value();
+  const int kket = tb.ket_index(OrbitIndex{ka}, OrbitIndex{kb}).value();
+  t.lit_bra = a.pv.local_index_table + a.pv.ket_J_offsets[kbra] - bmin;
+  t.lit_ket = a.pv.local_index_table + a.pv.ket_J_offsets[kket] - kmin;
+  const int bmax = (jba + jbb) / 2;
+  const int kmax = (jka + jkb) / 2;
+  t.lo = bmin > kmin ? bmin : kmin;
+  t.hi = bmax < kmax ? bmax : kmax;
+  return t;
+}
+
+/// zbar(p, q, r, s; J') for the term `t` made by `MakeCcTerm`, read from the
+/// combined W (0 if a cc ket does not exist at J'). O(1).
+IMSRG_INLINE_FUNCTION double CcValue(const PhArgs& a, const CcTerm& t,
+                                     int Jp) noexcept {
+  if (Jp < t.lo || Jp > t.hi) return 0.0;
+  const int c = 6 * Jp + t.cls;
+  if (c >= a.pv.num_cc) return 0.0;
   const int n = a.pv.ncc[c];
   if (n == 0) return 0.0;
-  const double* zb = a.pv.zb + a.pv.w_off[c];
-  if (p <= q) {
-    const int alpha = CcLocal(a, p, q, Jp);
-    const int lb = r <= s ? CcLocal(a, r, s, Jp) : CcLocal(a, s, r, Jp);
-    if (alpha < 0 || lb < 0) return 0.0;
-    const int beta = lb + (r > s ? n : 0);
-    return zb[alpha + static_cast<std::int64_t>(beta) * n];
-  }
-  const int alpha = CcLocal(a, q, p, Jp);
-  const int lb = s <= r ? CcLocal(a, s, r, Jp) : CcLocal(a, r, s, Jp);
+  const std::int32_t alpha = t.lit_bra[Jp];
+  const std::int32_t lb = t.lit_ket[Jp];
   if (alpha < 0 || lb < 0) return 0.0;
-  const int beta = lb + (s > r ? n : 0);
-  const double phi = ParitySign((tb.orbit_j2[p] + tb.orbit_j2[q]) / 2 +
-                                (tb.orbit_j2[r] + tb.orbit_j2[s]) / 2);
-  return -a.hxhy * phi * zb[alpha + static_cast<std::int64_t>(beta) * n];
+  const int beta = lb + (t.ket_flip ? n : 0);
+  return t.sign *
+         a.pv.w[a.pv.w_off[c] + alpha + static_cast<std::int64_t>(beta) * n];
+}
+
+/// Inverse Pandya transform of one element Z(ij, kl; J) before the
+/// normalization of equal-orbit pairs: sum over J' of (2J' + 1) [{ji jj J; jk
+/// jl J'} zbar(i, l, k, j; J') - (-1)^((ji + jj)/2 - J) {jj ji J; jk jl J'}
+/// zbar(j, l, k, i; J')], with the operation order of the per-element kernel
+/// it replaced (bitwise identical). O(J' range).
+IMSRG_INLINE_FUNCTION double InverseElement(const PhArgs& a, int i, int j,
+                                            int k, int l, int two_J) noexcept {
+  const int* j2 = a.zv.tb.orbit_j2;
+  const int ji = j2[i], jj = j2[j], jk = j2[k], jl = j2[l];
+  const auto iabs = [](int v) { return v < 0 ? -v : v; };
+  const auto imax = [](int u, int v) { return u > v ? u : v; };
+  const auto imin = [](int u, int v) { return u < v ? u : v; };
+  const int lo2 = imin(imax(iabs(ji - jl), iabs(jj - jk)),
+                       imax(iabs(jj - jl), iabs(ji - jk)));
+  const int hi2 = imax(imin(ji + jl, jj + jk), imin(jj + jl, ji + jk));
+  const double ph_ij = ParitySign((ji + jj) / 2 - two_J / 2);
+  const CcTerm t1 = MakeCcTerm(a, i, l, k, j);
+  const CcTerm t2 = MakeCcTerm(a, j, l, k, i);
+  const double* row1 =
+      a.sj.row(TwoJ{ji}, TwoJ{jj}, TwoJ{two_J}, TwoJ{jk}, TwoJ{jl});
+  const double* row2 =
+      a.sj.row(TwoJ{jj}, TwoJ{ji}, TwoJ{two_J}, TwoJ{jk}, TwoJ{jl});
+  double z = 0.0;
+  for (int Jp = lo2 / 2; Jp <= hi2 / 2; ++Jp) {
+    const double s1 = row1[Jp];
+    const double s2 = row2[Jp];
+    double t = 0.0;
+    if (s1 != 0.0) t += s1 * CcValue(a, t1, Jp);
+    if (s2 != 0.0) t -= ph_ij * s2 * CcValue(a, t2, Jp);
+    z += (2 * Jp + 1) * t;
+  }
+  return z;
 }
 
 /// POD bundle of the general-path kernels (PhArgs plus the general scratch).
@@ -307,44 +484,54 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   a.hxhy = hx * hy;
 
   const int num_cc = pd.num_cc;
-  const auto xk_total = static_cast<exec::Index>(pd.xk_off_host.back());
-  const auto w_total = static_cast<exec::Index>(pd.w_off_host.back());
+  // One work item per cc ket of every channel (rows of XK, columns of W).
+  exec::Index cc_kets = 0;
+  for (const std::int32_t v : pd.ncc_host) cc_kets += v;
+  const std::int32_t* ket_off = pd.ket_off.device_data();
 
-  if (xk_total > 0) {
-    // One evaluation per (kappa, beta < Ncc) fills XK and YK (kappa = (a, b),
-    // beta = ket (k, j)):
-    //   xbar = Xbar(kappa, beta), ybar = Ybar(kappa, beta);
+  if (pd.xk_off_host.back() > 0) {
+    // Item (c, beta), beta = ket (k, j) of cc channel c: for every pair kappa
+    // = (a, b) of K one fused evaluation xbar = Xbar(kappa, beta), ybar =
+    // Ybar(kappa, beta) (`PandyaBarXY`) fills
     //   XK(beta, kappa)            = D_kappa hX xbar  (Xbar^T = hX Xbar),
     //   YK(kappa, beta)            = ybar,
     //   YK(flip kappa, beta + Ncc) = hY phi_kappa phi_beta ybar
     //                                (F Ybar F = hY Phi Ybar Phi).
     // The flipped pair (b, a) of K index kappa is kappa ^ 1 (K is built in
     // flipped pairs), and the flip is a bijection, so every target element is
-    // written exactly once.
-    exec::ParallelFor(
-        "commutator::comm222_phss::fill", xk_total,
+    // written exactly once. Columns of YK are contiguous; the row of XK is
+    // strided by Ncc but reused by the neighbouring items.
+    exec::ParallelForDynamic(
+        "commutator::comm222_phss::fill", cc_kets,
         IMSRG_LAMBDA(const exec::Index e) {
-          const int c = detail::FindBlock(a.pv.xk_off, num_cc, e);
-          const std::int64_t local = e - a.pv.xk_off[c];
-          const int n = a.pv.ncc[c];
+          const int c = detail::FindBlock(ket_off, num_cc, e);
           const int nk = a.pv.nk[c];
-          const int beta = static_cast<int>(local % n);
-          const int kappa = static_cast<int>(local / n);
-          const int ka = a.pv.k_off[c] + kappa;
-          const int ia = a.pv.k_a[ka], ib = a.pv.k_b[ka];
-          const int k = a.pv.ket_p[a.pv.ket_off[c] + beta];
-          const int j = a.pv.ket_q[a.pv.ket_off[c] + beta];
+          if (nk == 0) return;
+          const int n = a.pv.ncc[c];
+          const int beta = static_cast<int>(e - ket_off[c]);
+          const int k = a.pv.ket_p[e];
+          const int j = a.pv.ket_q[e];
           const int two_Jp = 2 * (c / 6);
-          const double xbar = PandyaBar(a.xv, a.sj, ia, ib, k, j, two_Jp);
-          const double ybar = PandyaBar(a.yv, a.sj, ia, ib, k, j, two_Jp);
           const int* j2 = a.zv.tb.orbit_j2;
-          const double phi =
-              ParitySign((j2[ia] + j2[ib]) / 2 + (j2[k] + j2[j]) / 2);
+          const int phase_beta = (j2[k] + j2[j]) / 2;
+          double* xk = a.pv.xk + a.pv.xk_off[c] + beta;
           double* yk = a.pv.yk + a.pv.yk_off[c];
-          a.pv.xk[e] = a.pv.k_d[ka] * a.hx * xbar;
-          yk[kappa + static_cast<std::int64_t>(beta) * nk] = ybar;
-          yk[(kappa ^ 1) + static_cast<std::int64_t>(beta + n) * nk] =
-              a.hy * phi * ybar;
+          double* yk_l = yk + static_cast<std::int64_t>(beta) * nk;
+          double* yk_r = yk + static_cast<std::int64_t>(beta + n) * nk;
+          const int koff = a.pv.k_off[c];
+          for (int kappa = 0; kappa < nk; ++kappa) {
+            const int ka = koff + kappa;
+            const int ia = a.pv.k_a[ka];
+            const int ib = a.pv.k_b[ka];
+            double xbar = 0.0;
+            double ybar = 0.0;
+            PandyaBarXY(a, ia, ib, k, j, two_Jp, xbar, ybar);
+            const double phi = ParitySign((j2[ia] + j2[ib]) / 2 + phase_beta);
+            xk[static_cast<std::int64_t>(kappa) * n] =
+                a.pv.k_d[ka] * a.hx * xbar;
+            yk_l[kappa] = ybar;
+            yk_r[kappa ^ 1] = a.hy * phi * ybar;
+          }
         });
   }
   exec::Fence("commutator::comm222_phss::fill");
@@ -354,82 +541,76 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
               "(GPU backends)");
   linalg::GroupedGemm(pd.gemms);
 
-  exec::ParallelFor(
-      "commutator::comm222_phss::ZB", w_total,
+  // Combine W in place into the stored half of the Pandya-transformed result:
+  //   left block  (beta < Ncc):  W(alpha, beta) - hX hY W(beta, alpha),
+  //   right block (Ncc + bb):    W(alpha, Ncc + bb)
+  //                              + phi_alpha phi_bb W(bb, Ncc + alpha).
+  // Item (c, beta) owns the pairs {(alpha, beta), (beta, alpha)} and
+  // {(alpha, Ncc + beta), (beta, Ncc + alpha)} for alpha <= beta, so every
+  // element is read and written by exactly one item (no separate ZB buffer).
+  exec::ParallelForDynamic(
+      "commutator::comm222_phss::combine", cc_kets,
       IMSRG_LAMBDA(const exec::Index e) {
-        const int c = detail::FindBlock(a.pv.w_off, num_cc, e);
-        const std::int64_t local = e - a.pv.w_off[c];
-        const int n = a.pv.ncc[c];
-        const int alpha = static_cast<int>(local % n);
-        const int beta = static_cast<int>(local / n);
-        const double* w = a.pv.w + a.pv.w_off[c];
-        const int* kp = a.pv.ket_p + a.pv.ket_off[c];
-        const int* kq = a.pv.ket_q + a.pv.ket_off[c];
+        const int c = detail::FindBlock(ket_off, num_cc, e);
+        if (a.pv.nk[c] == 0) return;  // W stays zero
+        const std::int64_t n = a.pv.ncc[c];
+        const std::int64_t beta = e - ket_off[c];
+        double* w = a.pv.w + a.pv.w_off[c];
+        const int* kp = a.pv.ket_p + ket_off[c];
+        const int* kq = a.pv.ket_q + ket_off[c];
         const int* j2 = a.zv.tb.orbit_j2;
-        double v = w[alpha + static_cast<std::int64_t>(beta) * n];
-        if (beta < n) {
-          v -= a.hxhy * w[beta + static_cast<std::int64_t>(alpha) * n];
-        } else {
-          const int bb = beta - n;
+        const double phi_b = ParitySign((j2[kp[beta]] + j2[kq[beta]]) / 2);
+        for (std::int64_t alpha = 0; alpha <= beta; ++alpha) {
+          const std::int64_t ab = alpha + beta * n;
+          const std::int64_t ba = beta + alpha * n;
+          const double x = w[ab];
+          const double y = w[ba];
+          w[ab] = x - a.hxhy * y;
+          if (alpha != beta) w[ba] = y - a.hxhy * x;
           const double phi_a = ParitySign((j2[kp[alpha]] + j2[kq[alpha]]) / 2);
-          const double phi_b = ParitySign((j2[kp[bb]] + j2[kq[bb]]) / 2);
-          v += phi_a * phi_b * w[bb + static_cast<std::int64_t>(alpha + n) * n];
+          const std::int64_t ar = alpha + (n + beta) * n;
+          const std::int64_t br = beta + (n + alpha) * n;
+          const double u = w[ar];
+          const double v = w[br];
+          w[ar] = u + phi_a * phi_b * v;
+          if (alpha != beta) w[br] = v + phi_b * phi_a * u;
         }
-        a.pv.zb[e] = v;
       });
-  exec::Fence("commutator::comm222_phss::ZB");
+  exec::Fence("commutator::comm222_phss::combine");
 
+  // Inverse transform: one item per column (ket kl) of every two-body block,
+  // computing the upper triangle (rows ij <= kl) and mirroring with hZ.
   double* z2 = Z.two_body().matrix().buffer().device_data();
   const std::int64_t* block_offset = impl.block_offsets.device_data();
-  const int nch = a.zv.tb.num_channels;
-  const auto total = static_cast<exec::Index>(impl.two_body_size);
-  exec::ParallelFor(
-      "commutator::comm222_phss::inverse", total,
+  const std::int32_t* entry_channel = impl.entry_channel.device_data();
+  const auto columns = static_cast<exec::Index>(impl.entry_channel.size());
+  exec::ParallelForDynamic(
+      "commutator::comm222_phss::inverse", columns,
       IMSRG_LAMBDA(const exec::Index e) {
         const auto& tb = a.zv.tb;
-        const int ch = detail::FindBlock(block_offset, nch, e);
-        const std::int64_t local = e - block_offset[ch];
-        const int n = tb.channel_num_kets[ch];
-        const int ib = static_cast<int>(local % n);
-        const int ik = static_cast<int>(local / n);
-        if (ib > ik)
-          return;  // lower triangle: mirrored from the upper one below
-        const int* kets = tb.channel_kets + tb.channel_ket_offset[ch];
-        const int i = tb.ket_p[kets[ib]];
-        const int j = tb.ket_q[kets[ib]];
+        const int ch = entry_channel[e];
+        const std::int64_t off = tb.channel_ket_offset[ch];
+        const int ik = static_cast<int>(e - off);
+        const std::int64_t n = tb.channel_num_kets[ch];
+        const int* kets = tb.channel_kets + off;
         const int k = tb.ket_p[kets[ik]];
         const int l = tb.ket_q[kets[ik]];
         const int two_J = tb.channel_two_j[ch];
-        const int* j2 = tb.orbit_j2;
-        const int ji = j2[i], jj = j2[j], jk = j2[k], jl = j2[l];
-        const auto iabs = [](int v) { return v < 0 ? -v : v; };
-        const auto imax = [](int u, int v) { return u > v ? u : v; };
-        const auto imin = [](int u, int v) { return u < v ? u : v; };
-        const int lo2 = imin(imax(iabs(ji - jl), iabs(jj - jk)),
-                             imax(iabs(jj - jl), iabs(ji - jk)));
-        const int hi2 = imax(imin(ji + jl, jj + jk), imin(jj + jl, ji + jk));
-        const double ph_ij = ParitySign((ji + jj) / 2 - two_J / 2);
-        double z = 0.0;
-        for (int Jp = lo2 / 2; Jp <= hi2 / 2; ++Jp) {
-          const double s1 = a.sj(TwoJ{ji}, TwoJ{jj}, TwoJ{two_J}, TwoJ{jk},
-                                 TwoJ{jl}, TwoJ{2 * Jp});
-          const double s2 = a.sj(TwoJ{jj}, TwoJ{ji}, TwoJ{two_J}, TwoJ{jk},
-                                 TwoJ{jl}, TwoJ{2 * Jp});
-          double t = 0.0;
-          if (s1 != 0.0) t += s1 * Zbar(a, i, l, k, j, Jp);
-          if (s2 != 0.0) t -= ph_ij * s2 * Zbar(a, j, l, k, i, Jp);
-          z += (2 * Jp + 1) * t;
+        double* zb = z2 + block_offset[ch];
+        for (int ib = 0; ib <= ik; ++ib) {
+          const int i = tb.ket_p[kets[ib]];
+          const int j = tb.ket_q[kets[ib]];
+          double z = InverseElement(a, i, j, k, l, two_J);
+          // imsrg++ normalization: divide by sqrt(2) per equal-orbit pair
+          // (exact constants::kSqrt2).
+          if (i == j) z /= constants::kSqrt2;
+          if (k == l) z /= constants::kSqrt2;
+          zb[ib + ik * n] += z;
+          // Z is (anti-)Hermitian with sign hZ = -hX hY: the mirrored
+          // element (ik, ib) lies in column ib, row ik > ib, which no other
+          // item writes.
+          if (ib != ik) zb[ik + ib * n] -= a.hxhy * z;
         }
-        // imsrg++ normalization: divide by sqrt(2) per equal-orbit pair (exact
-        // constants::kSqrt2).
-        if (i == j) z /= constants::kSqrt2;
-        if (k == l) z /= constants::kSqrt2;
-        z2[e] += z;
-        // Z is (anti-)Hermitian with sign hZ = -hX hY: fill the mirrored
-        // element (ik, ib).
-        if (ib != ik)
-          z2[ik + static_cast<std::int64_t>(ib) * n + block_offset[ch]] -=
-              a.hxhy * z;
       });
   exec::Fence("commutator::comm222_phss");
 }

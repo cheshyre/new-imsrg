@@ -24,7 +24,10 @@
 ///
 /// Scratch layout (all column-major; element (r, s) of an R-row block at offset
 /// + r + s R):
-///   XK : Ncc x nk,   YK : nk x 2 Ncc,   W : Ncc x 2 Ncc,   ZB : Ncc x 2 Ncc.
+///   XK : Ncc x nk,   YK : nk x 2 Ncc,   W : Ncc x 2 Ncc.
+/// The GEMM writes W = XK YK; a pairwise in-place pass then turns W into the
+/// stored half of the Pandya-transformed result (ZB in imsrg++ terms), which
+/// the inverse transform reads (no separate ZB buffer, M7-Q4).
 
 #include <cstddef>
 #include <cstdint>
@@ -58,15 +61,15 @@ struct PandyaView {
       nullptr;  ///< num_cc + 1 offsets of the XK blocks.
   const std::int64_t* yk_off =
       nullptr;  ///< num_cc + 1 offsets of the YK blocks.
-  const std::int64_t* w_off =
-      nullptr;  ///< num_cc + 1 offsets of the W and ZB blocks.
+  const std::int64_t* w_off = nullptr;  ///< num_cc + 1 offsets of the W blocks.
   const std::int32_t* ket_J_offsets =
       nullptr;  ///< cc `ket_J_offsets` (global kets).
   const std::int32_t* local_index_table = nullptr;  ///< cc `local_index_table`.
   double* xk = nullptr;                             ///< Scratch XK.
   double* yk = nullptr;                             ///< Scratch YK.
-  double* w = nullptr;                              ///< Scratch W = XK YK.
-  double* zb = nullptr;  ///< Scratch ZB, the Pandya-transformed result.
+  /// Scratch W = XK YK, combined in place into the stored half of the
+  /// Pandya-transformed result.
+  double* w = nullptr;
 };
 static_assert(std::is_trivially_copyable_v<PandyaView>);
 
@@ -111,8 +114,7 @@ struct PandyaData {
       xk_off_host;  ///< Host XK block offsets (num_cc + 1).
   std::vector<std::int64_t>
       yk_off_host;  ///< Host YK block offsets (num_cc + 1).
-  std::vector<std::int64_t>
-      w_off_host;  ///< Host W/ZB block offsets (num_cc + 1).
+  std::vector<std::int64_t> w_off_host;  ///< Host W block offsets (num_cc + 1).
 
   exec::DeviceBuffer<std::int32_t> ncc, nk, ket_off,
       k_off;  ///< Per-channel sizes and offsets.
@@ -122,8 +124,8 @@ struct PandyaData {
   exec::DeviceBuffer<std::int64_t> xk_off, yk_off,
       w_off;  ///< Block offsets (num_cc + 1).
   exec::DeviceBuffer<std::int32_t> ket_J_offsets,
-      local_index_table;                     ///< Device cc tables.
-  exec::DeviceBuffer<double> xk, yk, w, zb;  ///< Scratch buffers.
+      local_index_table;                 ///< Device cc tables.
+  exec::DeviceBuffer<double> xk, yk, w;  ///< Scratch buffers.
 
   /// One GEMM W = XK YK per channel with Ncc > 0 and |K| > 0 (pointers into the
   /// scratch).
@@ -138,10 +140,10 @@ struct PandyaData {
   /// The kernel view. O(1).
   const PandyaView& view() const noexcept { return kernel_view; }
 
-  /// Total size of the scratch buffers in bytes (XK + YK + W + ZB, plus the
+  /// Total size of the scratch buffers in bytes (XK + YK + W, plus the
   /// general-path scratch once allocated). O(1).
   std::size_t scratch_bytes() const noexcept {
-    return (xk.size() + yk.size() + w.size() + zb.size()) * sizeof(double) +
+    return (xk.size() + yk.size() + w.size()) * sizeof(double) +
            general.scratch_bytes();
   }
 };
@@ -150,9 +152,8 @@ struct PandyaData {
 /// reference occupations of `ms`), device copies of the cc index tables and the
 /// scratch buffers with their block offsets. Needs an initialized
 /// `exec::Runtime`. All allocation of the (anti-)Hermitian path happens here.
-/// Memory O(sum over cc channels of Ncc (2 nk + 4 Ncc)) doubles: XK (Ncc nk) +
-/// YK (2 Ncc nk) + W and ZB (2 Ncc^2 each), i.e. Ncc (3 nk + 4 Ncc);
-/// `scratch_bytes()` reports it.
+/// Memory: sum over cc channels of Ncc (3 nk + 2 Ncc) doubles, XK (Ncc nk) +
+/// YK (2 Ncc nk) + W (2 Ncc^2); `scratch_bytes()` reports it.
 PandyaData BuildPandyaData(const basis::ModelSpace& ms);
 
 /// Allocates (once) the scratch of the general particle-hole path for the
@@ -164,8 +165,8 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms);
 /// that share the operand buffers: Z (2Ncc x 2Ncc) = A0 B0 + A1 B1, A (2Ncc x
 /// nk) and B (nk x 2Ncc), all column-major (A, B at the offset `g_off`, each 2
 /// Ncc nk doubles; Z at `gz_off`, 4 Ncc^2). Memory sum over cc channels of Ncc
-/// (4 nk + 4 Ncc) doubles, at most 4/3 of the
-/// Hermitian scratch of Ncc (3 nk + 4 Ncc); 4x the flops. Paid only by
+/// (4 nk + 4 Ncc) doubles, at most twice the Hermitian scratch of
+/// Ncc (3 nk + 2 Ncc); 4x the flops. Paid only by
 /// programs that use general operators; included in `scratch_bytes()` once
 /// allocated. Idempotent; strongly exception safe (a throwing allocation
 /// leaves the scratch unallocated). Needs an initialized `exec::Runtime`.

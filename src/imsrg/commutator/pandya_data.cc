@@ -101,7 +101,6 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
   d.xk = exec::DeviceBuffer<double>(sz(d.xk_off_host), "pandya::XK");
   d.yk = exec::DeviceBuffer<double>(sz(d.yk_off_host), "pandya::YK");
   d.w = exec::DeviceBuffer<double>(sz(d.w_off_host), "pandya::W");
-  d.zb = exec::DeviceBuffer<double>(sz(d.w_off_host), "pandya::ZB");
 
   PandyaView& v = d.kernel_view;
   v.num_cc = ncc;
@@ -122,7 +121,6 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
   v.xk = d.xk.device_data();
   v.yk = d.yk.device_data();
   v.w = d.w.device_data();
-  v.zb = d.zb.device_data();
 
   for (std::int32_t c = 0; c < ncc; ++c) {
     const auto cs = static_cast<std::size_t>(c);
