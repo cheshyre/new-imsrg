@@ -20,9 +20,10 @@
 namespace imsrg::op {
 
 /// A many-body operator O = O0 + sum O_ab {a+ b} + (1/4) sum V_abcd {a+ b+ d c}
-/// (+ 3B for particle_rank 3) on a model space: a zero-body constant, a `OneBody`, a
-/// `TwoBody` (allocated iff particle_rank >= 2) and an optional `ThreeBody`
-/// (iff particle_rank 3; needs a model space with a three-body space), described by an `OperatorSpec`.
+/// (+ 3B for particle_rank 3) on a model space: a zero-body constant, a
+/// `OneBody`, a `TwoBody` (allocated iff particle_rank >= 2) and an optional
+/// `ThreeBody` (iff particle_rank 3; needs a model space with a three-body
+/// space), described by an `OperatorSpec`.
 ///
 /// The operator does not record with respect to which reference it is normal
 /// ordered: the normal-ordering functions say it in their names, and the model

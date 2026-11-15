@@ -47,7 +47,8 @@ PartMaxima MaxAbs(const Operator& op) {
   m.zero_body = std::abs(op.zero_body());
   m.one_body = MaxAbsOf(op.one_body().buffer().ToVector());
   m.two_body = MaxAbsOf(TwoBodyValues(op.two_body()));
-  if (op.three_body()) m.three_body = MaxAbsOf(op.three_body()->buffer().ToVector());
+  if (op.three_body())
+    m.three_body = MaxAbsOf(op.three_body()->buffer().ToVector());
   return m;
 }
 
@@ -67,8 +68,9 @@ PartMaxima MaxAbsDifference(const Operator& a, const Operator& b) {
       a3.set_hermiticity(Hermiticity::kNonHermitian);
       b3.set_hermiticity(Hermiticity::kNonHermitian);
     }
-    m.three_body = MaxAbsDiffOf(a3.empty() ? std::vector<double>() : a3.buffer().ToVector(),
-                                b3.empty() ? std::vector<double>() : b3.buffer().ToVector());
+    m.three_body = MaxAbsDiffOf(
+        a3.empty() ? std::vector<double>() : a3.buffer().ToVector(),
+        b3.empty() ? std::vector<double>() : b3.buffer().ToVector());
   }
   return m;
 }

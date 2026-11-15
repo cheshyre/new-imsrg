@@ -15,7 +15,8 @@ void ElementwiseAbs(Operator& x) {
   IMSRG_CHECK(!x.empty(), "ElementwiseAbs: empty operator");
   if (x.three_body()) {
     throw NotImplementedError(
-        "ElementwiseAbs: operators with a three-body part (particle_rank 3) are not "
+        "ElementwiseAbs: operators with a three-body part (particle_rank 3) "
+        "are not "
         "supported");
   }
 
@@ -30,7 +31,8 @@ void ElementwiseDivide(Operator& num, const Operator& denom) {
               "ElementwiseDivide: empty operator");
   if (num.three_body()) {
     throw NotImplementedError(
-        "ElementwiseDivide: operators with a three-body part (particle_rank 3) are not "
+        "ElementwiseDivide: operators with a three-body part (particle_rank 3) "
+        "are not "
         "supported");
   }
 
@@ -54,7 +56,8 @@ void AddToEveryElement(Operator& x, double c) {
   IMSRG_CHECK(!x.empty(), "AddToEveryElement: empty operator");
   if (x.three_body()) {
     throw NotImplementedError(
-        "AddToEveryElement: operators with a three-body part (particle_rank 3) are not "
+        "AddToEveryElement: operators with a three-body part (particle_rank 3) "
+        "are not "
         "supported");
   }
 

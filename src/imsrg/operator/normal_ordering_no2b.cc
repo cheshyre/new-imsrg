@@ -20,7 +20,8 @@ Operator NormalOrder(const Operator& op, const No2bThreeBody& v3,
   IMSRG_CHECK(!op.empty(), "normal_order(NO2B): empty operator");
   if (op.three_body()) {
     throw NotImplementedError(
-        "normal_order(NO2B): operators with a three-body part (particle_rank 3) are not "
+        "normal_order(NO2B): operators with a three-body part (particle_rank "
+        "3) are not "
         "supported");
   }
   IMSRG_CHECK(op.hermiticity() == Hermiticity::kHermitian,

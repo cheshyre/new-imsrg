@@ -57,7 +57,8 @@ Operator TransformBasis(const Operator& op,
   IMSRG_CHECK(!op.empty());
   if (op.three_body()) {
     throw NotImplementedError(
-        "transform_basis: operators with a three-body part (particle_rank 3) are not "
+        "transform_basis: operators with a three-body part (particle_rank 3) "
+        "are not "
         "supported");
   }
   const std::int64_t norb = op.model_space().num_orbits();
@@ -105,7 +106,8 @@ Operator WithModelSpace(const Operator& op,
   if (!ms) throw InvariantError("with_model_space: null model space");
   if (op.three_body()) {
     throw NotImplementedError(
-        "with_model_space: operators with a three-body part (particle_rank 3) are not "
+        "with_model_space: operators with a three-body part (particle_rank 3) "
+        "are not "
         "supported");
   }
 

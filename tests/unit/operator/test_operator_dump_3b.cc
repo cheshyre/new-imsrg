@@ -50,9 +50,8 @@ Operator RandomThreeBody(const std::shared_ptr<const basis::ModelSpace>& ms,
     const std::int64_t n = t.dim(Channel3Index{c});
     for (std::int64_t j = 0; j < n; ++j) {
       for (std::int64_t i = t.packed() ? j : 0; i < n; ++i) {
-        const double v = (i == j && h == Hermiticity::kAntiHermitian)
-                             ? 0.0
-                             : Val(c, i, j);
+        const double v =
+            (i == j && h == Hermiticity::kAntiHermitian) ? 0.0 : Val(c, i, j);
         t.set(Channel3Index{c}, KeptRow3Index{static_cast<std::int32_t>(i)},
               KeptRow3Index{static_cast<std::int32_t>(j)}, v);
       }
@@ -104,9 +103,8 @@ void ExpectErrorAt(const std::string& text, std::size_t line,
     (void)ReadText(text, ms);
     ADD_FAILURE() << "expected InputError at line " << line;
   } catch (const InputError& e) {
-    EXPECT_EQ(std::string(e.what()).rfind("mem:" + std::to_string(line) + ":",
-                                          0),
-              0u)
+    EXPECT_EQ(
+        std::string(e.what()).rfind("mem:" + std::to_string(line) + ":", 0), 0u)
         << e.what();
   }
 }
@@ -177,7 +175,8 @@ class ThreeBodyDumpErrors : public ::testing::Test {
  protected:
   void SetUp() override {
     ms_ = He4Space();
-    lines_ = SplitLines(WriteText(RandomThreeBody(ms_, Hermiticity::kHermitian)));
+    lines_ =
+        SplitLines(WriteText(RandomThreeBody(ms_, Hermiticity::kHermitian)));
     k_ = FindLine(lines_, "three_body ");
   }
   std::shared_ptr<const basis::ModelSpace> ms_;

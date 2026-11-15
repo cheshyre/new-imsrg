@@ -18,8 +18,8 @@
 #include "imsrg/operator/basis_transform.h"
 #include "imsrg/operator/compare.h"
 #include "imsrg/operator/elementwise.h"
-#include "imsrg/operator/norms.h"
 #include "imsrg/operator/normal_ordering.h"
+#include "imsrg/operator/norms.h"
 #include "imsrg/operator/operator.h"
 #include "imsrg/operator/random_operator.h"
 #include "imsrg/operator/three_body.h"
@@ -81,8 +81,8 @@ std::vector<double> FullMatrices(const ThreeBody& t) {
     const std::int32_t n = t.dim(Channel3Index{c});
     for (std::int32_t j = 0; j < n; ++j) {
       for (std::int32_t i = 0; i < n; ++i) {
-        out.push_back(t.get(Channel3Index{c}, KeptRow3Index{i},
-                            KeptRow3Index{j}));
+        out.push_back(
+            t.get(Channel3Index{c}, KeptRow3Index{i}, KeptRow3Index{j}));
       }
     }
   }
@@ -439,8 +439,8 @@ TEST(ThreeBodyOperator, UnsupportedFunctionsThrowNotImplemented) {
     c[static_cast<std::size_t>(i + i * norb)] = 1.0;
   }
   EXPECT_THROW(
-      (void)TransformBasis(x, linalg::MatrixView<const double>{
-                                  c.data(), norb, norb, norb}),
+      (void)TransformBasis(
+          x, linalg::MatrixView<const double>{c.data(), norb, norb, norb}),
       NotImplementedError);
 }
 

@@ -14,12 +14,12 @@
 
 namespace imsrg::op {
 
-/// y += a x, partwise (0B, 1B, 2B, 3B). Requirements, checked with InvariantError:
-/// `SameModelSpace(x, y)`, `x.spec().SameSymmetry(y.spec())`, and
-/// x.spec().particle_rank <= y.spec().particle_rank (y must hold every part of
-/// x). Hermiticity of y afterwards: `CombinedHermiticity(y, x)` (unchanged if
-/// a == 0). A three-body part of x is added to that of y (a part missing in x
-/// counts as zero); if the hermiticities differ, the three-body storage of
+/// y += a x, partwise (0B, 1B, 2B, 3B). Requirements, checked with
+/// InvariantError: `SameModelSpace(x, y)`, `x.spec().SameSymmetry(y.spec())`,
+/// and x.spec().particle_rank <= y.spec().particle_rank (y must hold every part
+/// of x). Hermiticity of y afterwards: `CombinedHermiticity(y, x)` (unchanged
+/// if a == 0). A three-body part of x is added to that of y (a part missing in
+/// x counts as zero); if the hermiticities differ, the three-body storage of
 /// both goes to the dense non-Hermitian layout first (a copy of x's part).
 /// Complexity O(size of y), one flat kernel per part. Returns y.
 Operator& Axpy(double a, const Operator& x, Operator& y);

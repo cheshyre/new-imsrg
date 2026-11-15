@@ -61,7 +61,8 @@ Operator RandomOperator(std::shared_ptr<const basis::ModelSpace> ms,
   Operator op(std::move(ms), spec);
   if (op.three_body()) {
     throw NotImplementedError(
-        "random_operator: operators with a three-body part (particle_rank 3) are not "
+        "random_operator: operators with a three-body part (particle_rank 3) "
+        "are not "
         "supported");
   }
   SplitMix64 rng(options.seed);

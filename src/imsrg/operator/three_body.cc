@@ -5,6 +5,7 @@
 
 #include <cmath>
 #include <utility>
+#include <vector>
 
 #include "imsrg/base/assert.h"
 #include "imsrg/base/error.h"
@@ -24,8 +25,8 @@ ThreeBody::ThreeBody(std::shared_ptr<const basis::ModelSpace> ms, Hermiticity h)
         "ModelSpace::WithThreeBody)");
   }
   offsets_ = OffsetsFor(packed());
-  data_ = exec::DeviceBuffer<double>(
-      static_cast<std::size_t>(offsets_.back()), "imsrg::op::ThreeBody");
+  data_ = exec::DeviceBuffer<double>(static_cast<std::size_t>(offsets_.back()),
+                                     "imsrg::op::ThreeBody");
 }
 
 const basis::ThreeBodySpace& ThreeBody::space() const {
@@ -42,12 +43,9 @@ std::vector<std::int64_t> ThreeBody::OffsetsFor(bool packed_mode) const {
   return off;
 }
 
-std::int32_t ThreeBody::dim(Channel3Index ch) const {
-  return space().dim(ch);
-}
+std::int32_t ThreeBody::dim(Channel3Index ch) const { return space().dim(ch); }
 
-ThreeBody::Location ThreeBody::Locate(Channel3Index ch,
-                                      basis::KeptRow3Index i,
+ThreeBody::Location ThreeBody::Locate(Channel3Index ch, basis::KeptRow3Index i,
                                       basis::KeptRow3Index j) const {
   const std::int64_t n = dim(ch);
   IMSRG_ASSERT(i.value() >= 0 && i.value() < n && j.value() >= 0 &&
@@ -141,10 +139,10 @@ void ThreeBody::set_hermiticity(Hermiticity h) {
       for (std::int64_t i = 0; i < n; ++i) {
         if (!to_packed) {
           // Packed -> dense: the old symmetry fills the upper triangle.
-          const double v = i >= j ? src[static_cast<std::size_t>(
-                                        so + PackedIndex(n, i, j))]
-                                  : old_h * src[static_cast<std::size_t>(
-                                                so + PackedIndex(n, j, i))];
+          const double v =
+              i >= j ? src[static_cast<std::size_t>(so + PackedIndex(n, i, j))]
+                     : old_h * src[static_cast<std::size_t>(
+                                   so + PackedIndex(n, j, i))];
           dst[static_cast<std::size_t>(d0 + i + j * n)] = v;
         } else if (i >= j) {
           const bool zero_diag = i == j && h == Hermiticity::kAntiHermitian;
@@ -163,8 +161,8 @@ void ThreeBody::set_hermiticity(Hermiticity h) {
 double ImsrgppNorm(const ThreeBody& t) {
   if (t.empty() || t.size() == 0) return 0.0;
   if (t.packed()) {
-    return std::sqrt(detail::SumOfSquares(
-        t.buffer(), 0, static_cast<std::int64_t>(t.size())));
+    return std::sqrt(detail::SumOfSquares(t.buffer(), 0,
+                                          static_cast<std::int64_t>(t.size())));
   }
   const std::vector<double> data = t.buffer().ToVector();
   const auto offsets = t.block_offsets();
@@ -173,7 +171,8 @@ double ImsrgppNorm(const ThreeBody& t) {
     const std::int64_t n = t.dim(Channel3Index{static_cast<std::int32_t>(ch)});
     for (std::int64_t j = 0; j < n; ++j) {
       for (std::int64_t i = j; i < n; ++i) {
-        const double v = data[static_cast<std::size_t>(offsets[ch] + i + j * n)];
+        const double v =
+            data[static_cast<std::size_t>(offsets[ch] + i + j * n)];
         sum += v * v;
       }
     }

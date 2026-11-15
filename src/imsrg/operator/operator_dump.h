@@ -111,8 +111,8 @@ Operator ReadOperatorDump(std::istream& in, std::string_view name,
 /// appear); the three-body section (`three_body <count>`, channel by channel,
 /// bra local row, then ket local row, every nonzero element of the full matrix,
 /// i.e. both triangles; Jab and Jde are integers) or `three_body none` if the
-/// operator has no three-body part. The `basis` record holds the model space's emax,
-/// effective lmax and hw; the orbit records its orbits and reference
+/// operator has no three-body part. The `basis` record holds the model space's
+/// emax, effective lmax and hw; the orbit records its orbits and reference
 /// occupations.
 /// @throws InputError if the file cannot be written.
 void WriteOperatorDump(const std::filesystem::path& path, const Operator& op,

@@ -287,7 +287,6 @@ void AccumulateSymmetry(const double* data, std::int64_t n, double sgn,
   }
 }
 
-
 /// The records of the three-body section that lie above the diagonal of a
 /// Hermitian or anti-Hermitian part (the packed storage keeps the lower
 /// triangle only): their values per stored element, to check the declared
@@ -314,7 +313,8 @@ class ThreeBodyRecords {
     const double h = HermiticitySign(t.hermiticity());
     const auto offsets = t.block_offsets();
     for (std::size_t ch = 0; ch + 1 < offsets.size(); ++ch) {
-      const std::int64_t n = t.dim(Channel3Index{static_cast<std::int32_t>(ch)});
+      const std::int64_t n =
+          t.dim(Channel3Index{static_cast<std::int32_t>(ch)});
       for (std::int64_t j = 0; j < n; ++j) {
         for (std::int64_t i = j; i < n; ++i) {
           const std::size_t k = static_cast<std::size_t>(
@@ -438,10 +438,9 @@ void WriteThreeBody(std::ostream& out, const ThreeBody& t) {
         if (!t.packed()) {
           v = data[static_cast<std::size_t>(off + i + j * n)];
         } else if (i >= j) {
-          v = i == j && h < 0
-                  ? 0.0
-                  : data[static_cast<std::size_t>(
-                        off + ThreeBody::PackedIndex(n, i, j))];
+          v = i == j && h < 0 ? 0.0
+                              : data[static_cast<std::size_t>(
+                                    off + ThreeBody::PackedIndex(n, i, j))];
         } else {
           v = h * data[static_cast<std::size_t>(
                       off + ThreeBody::PackedIndex(n, j, i))];
