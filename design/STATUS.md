@@ -2,25 +2,37 @@
 
 ## Current state (keep this section up to date)
 
-* **Phase:** run 1 of the unsupervised implementation ended 2026-11-12 ~08:45 JST at the owner's
-  request (started 2026-11-11 23:41). Report: `design/reports/2026-11-12-overnight.md`. The owner
-  interviews of 2026-11-13 (D25–D29) and 2026-11-15 (D30–D42, report
-  `design/reports/2026-11-15-owner-interview.md`) answered every open question. Next: run 2
-  (`design/NEXT_SESSION_PROMPT.md`), which starts with the Google-style conversion (MS, D38).
-* **Integration branch:** `develop` (local). Run 1 and the interview sessions advanced it from
-  worktree branches with `git update-ref` after `tools/ci.sh dev-openmp` passed (QUESTIONS O1).
-  **The main checkout's files match 68c8927 (synced 2026-11-12) and need another sync before run 2**
-  (command in the 2026-11-15 report); from run 2 on, runs start in the main checkout (D31).
+* **Phase:** **run 2 in progress** (started 2026-11-15 13:50 JST; plan `design/NEXT_SESSION_PROMPT.md`;
+  draft report `design/reports/2026-11-15-run2.md`). MS (Google style) is merged; next: the M8
+  follow-ups and interview tasks, and the two M10 tracks. Run 1 ended 2026-11-12 ~08:45 JST (report
+  `design/reports/2026-11-12-overnight.md`); the owner interviews of 2026-11-13 (D25–D29) and
+  2026-11-15 (D30–D42, `design/reports/2026-11-15-owner-interview.md`) answered every run-1 question.
+* **Integration branch:** `develop` (local). Run 2 again runs in an app worktree, so `develop` is
+  advanced from the staging branch `claude/imsrg-rewrite-run-2-36094d` with `tools/ci.sh dev-openmp
+  && git update-ref refs/heads/develop <new> <old>` (QUESTIONS O1, O3). **The main checkout's files
+  do not follow; sync it before committing there (O3).**
+* **Code style:** Google C++ Style Guide since the MS merge (D38, `17-code-style.md`): `.h`/`.cc`,
+  PascalCase functions, `kName` constants and enumerators, 80 columns, blocking cpplint step in
+  `tools/ci.sh`, clang-tidy naming check `tools/lint.sh`; exceptions and allowlists in `17` §3.
 * **Merged:** M0 bootstrap; M1 reference build, refharness, golden data (IT-1..IT-10); M2
   base/exec/comm/linalg/angmom; M3 basis; M4 operator (`imsrg::op`); M5+M6 io/opslib/hf (mixing +
   DIIS); M7 IMSRG(2) commutators (Kokkos kernels + `commutator_ref`); M8a config/legacy CLI/`apps/imsrg`;
-  M8 flow (generators, BCH, Magnus) + driver pipeline; M9 mbpt; M11 phase 1 Python bindings.
+  M8 flow (generators, BCH, Magnus) + driver pipeline; M9 mbpt; M11 phase 1 Python bindings;
+  MS Google-style conversion.
 * **End to end:** `imsrg` reproduces imsrg-devel for IT-2, IT-3, IT-4, IT-6, IT-7, IT-12 (same step
   counts, |ΔE0| ≤ 3e-10 MeV, `.snt` ≤ 1.2e-14). CI on `develop`: 851 unit, 34 integration, 3 MPI,
   23 Python tests, dev-openmp PASS (dev-serial passed in every lead's final run).
-* **Not started:** MS (Google-style conversion, D38; brief in `NEXT_SESSION_PROMPT.md`), M10
-  IMSRG(3) (two tracks, 3f2 and layout, D39; briefs ready; `feature/m10-layout-benchmark` exists but
-  has no commits), M11 phase 2, M12a/M12b (D40), M13, M14 (GPU, after M12). Open M8 follow-ups and
+* **Prepared outside the repository during MS (to be committed by the M8 branches):** the patched
+  imsrg-devel build for D35 (`new-imsrg-reference/build-d35`, `harness-build-d35`; staged patch,
+  build-script mode and regenerated goldens in `new-imsrg-reference/staging/`, `REGEN_D35.md`); the
+  refharness flags for hunter-gatherer, `omega_norm_max` and the factorized intermediates, with
+  hunter-gatherer goldens and IT-10 regenerated with the D32 recipe (`staging-hg3f2/`,
+  `REGEN_HG_3F2.md`); an Opus review of the flow numerics (2 bugs, design notes for hunter-gatherer,
+  3f2 and RK4/DP45); implementation plans for the M10 layout benchmark and for 3f2
+  (`new-imsrg-reference/plans/`).
+* **Not started:** M10 IMSRG(3) (two tracks, 3f2 and layout, D39; briefs ready; the empty
+  `feature/m10-layout-benchmark` is checked out in a stale run-1 worktree, so the layout track uses
+  `feature/m10-layout`), M11 phase 2, M12a/M12b (D40), M13, M14 (GPU, after M12). Open M8 follow-ups and
   the tasks of the 2026-11-15 interview are listed under M8 in `40-roadmap.md` (hunter-gatherer,
   Tcm/Rp2 fixes with a patched reference build, `hartree_fock.mixing`, config-relative paths,
   `results.json` schema version, MP2 column, NAT/IT-5, non-Hermitian commutator paths, 1/√2, ...).
@@ -31,13 +43,14 @@
   clang-format 23.1.5, gsl, boost, openblas; Apple clang 21; Python 3.15.2; Kokkos 5.3.0 per backend
   in `~/.cache/imsrg-deps` (`tools/bootstrap_deps.sh`); shared venv `~/.cache/imsrg-deps/venv`. The
   default MacOSX27.0.sdk does not link; `cmake/ImsrgAppleSdk.cmake` picks a working SDK (Q24).
-  cpplint 2.0.2 is in the shared venv (2026-11-15); clang-tidy is not installed yet.
+  cpplint 2.0.2 is in the shared venv (2026-11-15); clang-tidy 23.1.5 from Homebrew LLVM
+  (`/opt/homebrew/opt/llvm/bin/clang-tidy`, installed by MS).
   Reference build and harness: `/Users/cheshyre/Downloads/new-imsrg-reference/`.
 * **Inputs:** me2j test file = 168,066,656 values (e1max 14, e2max 28, lmax 14); NO2B test file =
   32,685,840 floats (6, 12, 18; single precision) holding only the cE contact term (M1-Q1); it stays
   the 3N test input until the owner provides a full N2LO file (D33).
-* **Blocking questions:** none. Open: none; all 73 entries in `QUESTIONS.md` were answered on
-  2026-11-15 (run 2 appends new ones under "Added during run 2").
+* **Blocking questions:** none. Open (run 2, under "Added during run 2" in `QUESTIONS.md`):
+  MS-Q1..MS-Q5, O3.
 
 ## Log (append one entry per merged branch)
 
@@ -64,3 +77,4 @@
 | 2026-11-13 | feature/python-312-stable-abi → develop | D29 applied: Python ≥ 3.12 (`requires-python`, both CMake lookups), `_core` built with nanobind `STABLE_ABI` (`_core.abi3.so`; `Development.SABIModule` on CMake ≥ 3.26), `wheel.py-api = "cp312"`; configure removes stale `_core.*` files with another suffix | ci.sh dev-openmp PASS (23 Python tests on the abi3 module); `pip wheel` → `imsrg-0.1.0-cp312-abi3-macosx_26_0_arm64.whl` (not installed) | `StaleHostError` for device-resident data remains for M11 phase 2 |
 | 2026-11-15 | feature/owner-answers-2026-11-15 → develop | Owner interview: all 73 `QUESTIONS.md` entries answered; decisions D30–D42; new `design/17-code-style.md` (Google style: measured change list, exceptions, tool configuration, conversion plan); updates to `00`, `10`, `13`, `14`, `16`, `18`, `20`, `30`, `40`, `41`, `AGENTS.md`, the proposed settings and `NEXT_SESSION_PROMPT.md` (run-2 plan, briefs for MS and both M10 tracks); report `design/reports/2026-11-15-owner-interview.md`; cpplint 2.0.2 added to the shared venv | ci.sh dev-openmp PASS on the merge (documentation only; 851 unit, 34 integration, 3 MPI, 23 Python tests) | Owner: sync the main checkout (68c8927 → develop) and launch run 2 in it; run 2 starts with MS |
 | 2026-11-15 | feature/settings-install-steps → develop | Pre-flight of `NEXT_SESSION_PROMPT.md`, the interview report and the proposed settings say how to install the settings: `.claude/settings.local.json` without `_comment`, the run-1 `.claude/settings.json` (still setting `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=80`) renamed to `.claude/settings.json.bak`; the preflight check ignores untracked files | ci.sh dev-openmp PASS on the merge (documentation only) | Owner: follow the pre-flight before launching run 2 |
+| 2026-11-15 16:20 | feature/style-google → develop | **MS, Google C++ style conversion** (D38, `17` §5), 17 commits: tooling (`.clang-format` at 80 columns with the guide's include order, `CPPLINT.cfg`, `.clang-tidy` naming with a 199-name accessor allowlist, blocking cpplint step in `ci.sh`, `tools/lint.sh`, `AUTHORS`, `.git-blame-ignore-revs`); 299 files renamed `.hpp/.cpp` → `.h/.cc`; `#define` guards; SPDX GPL-3.0-or-later lines; 80-column reformat; clang-tidy renames (612 functions, 182 methods, 164 enumerators, 38 constants, ~35 by hand incl. the MPI-off branch); floating-point literals; cpplint fixes (6,139 findings → 0; 3 NOLINTs with reasons); structural items (explicit copy/move, trivially destructible statics, no namespace aliases in headers, ...); `AGENTS.md`, `10` §1, `20`, `17` §6 updated. Run 2 also staged (outside the repo) the D35 patched reference build and goldens, the hunter-gatherer/3f2 refharness flags and goldens, and the M10 plans; the orchestrator added O3 and the draft run-2 report | Outputs (IT results, printed numbers, test lists, Python exports) identical to the pre-MS baseline after every step; ci.sh dev-openmp + dev-serial PASS (lead); dev-openmp PASS on the merge (851 unit, 34 integration, 3 MPI, 23 Python) | MS-Q1..Q5 (physics capitals kept, accessor allowlist, guards outside `src/`, AUTHORS holder, structural leftovers). Owner: `git config blame.ignoreRevsFile .git-blame-ignore-revs` |

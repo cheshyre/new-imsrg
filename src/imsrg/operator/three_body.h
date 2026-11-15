@@ -1,0 +1,32 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
+#ifndef IMSRG_OPERATOR_THREE_BODY_H_
+#define IMSRG_OPERATOR_THREE_BODY_H_
+/// @file
+/// `ThreeBody`: placeholder for the three-body part of an operator (design/00
+/// D15).
+
+namespace imsrg::op {
+
+/// Placeholder for the three-body part of an `Operator`. Its storage layout is
+/// chosen by the IMSRG(3) benchmark of milestone M10 (design/14); until then it
+/// holds nothing, and operators with particle_rank 3 are rejected by `validate`
+/// (NotImplementedError). Whatever the layout, its norm must reproduce
+/// imsrg++'s Frobenius norm over the canonical pn storage (design/00 D12).
+/// Three-nucleon INPUT interactions do not use this type: they live in separate
+/// input containers (NO2B, me3j) that are converted by explicit functions
+/// (D15).
+class ThreeBody {
+ public:
+  ThreeBody() = default;
+
+  ThreeBody(const ThreeBody&) = default;
+  ThreeBody& operator=(const ThreeBody&) = default;
+  ThreeBody(ThreeBody&&) = default;
+  ThreeBody& operator=(ThreeBody&&) = default;
+};
+
+}  // namespace imsrg::op
+
+#endif  // IMSRG_OPERATOR_THREE_BODY_H_

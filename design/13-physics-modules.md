@@ -77,16 +77,16 @@ Phase-1 formats, in this order:
    has none).
 6. **Dropped** *(owner)*: HDF5 3N, Oslo, OakRidge, "Jason", "Takayuki" and the other older readers.
 
-**As implemented (M5).** `imsrg/io/input_stream.hpp` (`TextInput`: zlib `gzread` for plain and
-gzip text alike, tokens parsed straight to `float`; `GzipWriter`), `imsrg/io/me2j.hpp`
+**As implemented (M5).** `imsrg/io/input_stream.h` (`TextInput`: zlib `gzread` for plain and
+gzip text alike, tokens parsed straight to `float`; `GzipWriter`), `imsrg/io/me2j.h`
 (`me2j_value_count`, `read_me2j(path, {Me2jTruncation{e1max, e2max, lmax}, read_whole_file}, ms)`
-returning a new Hermitian rank-2 operator), `imsrg/io/no2b.hpp` (`no2b_value_count`,
+returning a new Hermitian rank-2 operator), `imsrg/io/no2b.h` (`no2b_value_count`,
 `read_no2b(path, {No2bFileTruncation, No2bPrecision}, op::No2bThreeBody&)`; binary when the
 file name contains `stream.bin`, size checked against the count; the container is M4's
 `op::No2bThreeBody`). Only the prefix needed for the model space is decoded: emax 4 reads 27,336
 me2j values in 4 ms and 2.7 M NO2B values in 0.05 s; the whole me2j file (168,066,656 values,
 count check) takes 9 s (test label `slow`). No caching is needed.
-Writers: `imsrg/io/valence_writers.hpp` (`write_tokyo`, `write_nushellx_int`,
+Writers: `imsrg/io/valence_writers.h` (`write_tokyo`, `write_nushellx_int`,
 `write_nushellx_sps`; `ValenceWriteOptions` carries the provenance of the header lines and the
 mode `Hamiltonian` or `IsospinAveragedOperator` = imsrg++ `"op"`). Golden files from the new
 harness subcommand `refharness write-valence` (`tests/golden/io/`, HF HNO at emax 2 in the
@@ -105,11 +105,11 @@ sd shell): every number identical to imsrg++, comment lines identical except the
   normal-ordered H in the HF basis (`D^T (V2 + V3NO) D` for the 2B part; 3B → NO2B).
 * Known reference bugs: the dE3max cut uses `op->l` for all three orbits (HartreeFock.cc:1368);
   the SCF uses `std::rand()`. Fix both and document.
-* **As implemented (M6).** `imsrg/hf/hartree_fock.hpp`: `hf::solve(H, const op::No2bThreeBody*
+* **As implemented (M6).** `imsrg/hf/hartree_fock.h`: `hf::solve(H, const op::No2bThreeBody*
   v3, HFOptions) -> HFResult {e_hf, e1, e2, e3, iterations, converged, spe, C, rho, F,
-  occupations, ediff_history}`; `Mixing::Linear` reproduces imsrg++ (weight 0.2 on the old
+  occupations, ediff_history}`; `Mixing::kLinear` reproduces imsrg++ (weight 0.2 on the old
   density, `FillLowestOrbits` schedule, convergence `‖Δε‖_F / norb < 1e-8`, unfrozen occupations
-  by default) and `Mixing::Diis` is Pulay DIIS on the Fock matrix (error F ρ − ρ F, metric
+  by default) and `Mixing::kDiis` is Pulay DIIS on the Fock matrix (error F ρ − ρ F, metric
   weighted by 2j+1, `diis_start` = 2, subspace 8, history reset when occupations change). The
   NO2B monopole uses `No2bThreeBody::get_pn` with the `e3max` cut (imsrg++ `ModelSpace` E3max,
   default 12). Deviations M6-1/M6-2 in `30` §6 (rescue path beyond iteration 100 only).
@@ -127,12 +127,12 @@ sd shell): every number identical to imsrg++, comment lines identical except the
   does; verify the exact pipeline in `imsrg++.cc`.
 * MP4 and Van Vleck are out of the near-term scope.
 
-**As implemented (M9).** `mbpt::mp2_energy`, `mbpt::mp3_energy` (pp, hh, ph, total),
+**As implemented (M9).** `mbpt::Mp2Energy`, `mbpt::ComputeMp3Energy` (pp, hh, ph, total),
 `mbpt2_density_matrix` (HFMBPT.cc:421-777 with the regulated denominators),
 `natural_orbitals` (per-channel `eigh`, descending occupation, columns signed so C(i,i) >= 0,
 trace check against A), `reference_density_ho`, `matmul`, `to_nat_basis`. mbpt does not depend on
 hf: the NAT-basis Hamiltonian is assembled by the caller from a modified `HFResult` (see
-M9-Q1 and `tests/unit/mbpt/mbpt_test_support.hpp`). Not implemented: `use_NAT_occupations`,
+M9-Q1 and `tests/unit/mbpt/mbpt_test_support.h`). Not implemented: `use_NAT_occupations`,
 `NAT_order` energy/mp2 (M9-Q3; owner: not now, added when a job needs them, D36). Verified: MP2/MP3 at emax 2 (2N and 2N+3N) to 1e-15; IT-1 EMP2
 to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9.
 
@@ -149,8 +149,8 @@ to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9.
   3f2 recipe (D32): hunter-gatherer Magnus, `omega_norm_max` 0.1, 1b intermediates on, 2b
   intermediates off; `factorized = true` sets these as defaults (`16` §2.8).
 * **As implemented (M7, tag `m7-api-ready`):** headers `imsrg/commutator/{options,workspace,
-  commutator}.hpp`. `commutator(X, Y, Z, opts, ws)` overwrites Z (reusing its storage when the
-  spec matches) and an allocating overload returns Z; `terms::comm*ss` add one term each;
+  commutator}.h`. `Commutator(X, Y, Z, opts, ws)` overwrites Z (reusing its storage when the
+  spec matches) and an allocating overload returns Z; `terms::Comm*ss` add one term each;
   `commutator_spec` gives Z's spec (rank max of the inputs, hermiticity rule of imsrg++). The
   `Workspace` (one per model space, eagerly built, one call at a time) holds the device tables,
   the dense 6j table, the ladder ket lists and the Pandya data, and all scratch. Every fast term

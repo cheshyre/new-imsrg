@@ -5,12 +5,16 @@
 ```
 CMakeLists.txt            top level: options, deps, add_subdirectory(src apps python tests)
 CMakePresets.json         dev-serial, dev-openmp (default on macOS), release-openmp, asan, cuda, hip
+.clang-format             Google style, 80 columns, the guide's include order (design/17 section 4)
+CPPLINT.cfg, .clang-tidy  cpplint settings (blocking in tools/ci.sh) and the clang-tidy naming check
+AUTHORS                   copyright holders named by the license line of every source file
+.git-blame-ignore-revs    pure reformat commits that git blame skips
 cmake/                    helper modules (warnings, sanitizers, deps lookup, layering check)
 extern/                   git submodules (pinned release tags): kokkos, googletest, fmt, CLI11,
                           tomlplusplus, nanobind   [kokkos-kernels: optional, later]
-src/imsrg/<module>/       library code; headers included as "imsrg/<module>/x.hpp"
-                          ("x.h" after the run-2 Google-style conversion: .h/.cc files, D38)
-src/imsrg/<module>/kernels/   .cpp files that contain Kokkos kernels (only these include Kokkos)
+src/imsrg/<module>/       library code (Google style, D38: snake_case.h / snake_case.cc); headers
+                          included as "imsrg/<module>/x.h"
+src/imsrg/<module>/kernels/   .cc files that contain Kokkos kernels (only these include Kokkos)
 apps/imsrg/               the `imsrg` executable (CLI11, thin wrapper around imsrg::driver)
 python/src/               nanobind bindings (module imsrg._core)
 python/imsrg/             pure-Python package layered on _core
@@ -21,8 +25,9 @@ tests/data/               small committed input files (synthetic, < 1 MB each)
 tests/golden/             small committed reference outputs produced by imsrg-devel
 tests/smoke/              toolchain smoke tests (Kokkos backend, MPI launcher)
 tests/layering/           fixtures for the layering check's self-test
-tools/                    scripts: bootstrap_deps.sh, ci.sh, check_layering.py, lib/ (shared
-                          shell settings), reference/ (build old code, generate golden data)
+tools/                    scripts: bootstrap_deps.sh, ci.sh, lint.sh (naming check),
+                          check_layering.py, lib/ (shared shell settings), bench/ (micro-benchmarks),
+                          reference/ (build old code, generate golden data; keeps imsrg++ style)
 docs/                     user documentation (later: Doxygen + Sphinx)
 design/                   these design documents, STATUS.md, QUESTIONS.md
 ```
@@ -88,7 +93,7 @@ Rules:
 All names are tentative; implementers may refine them and record the change in the module's
 docstring and here.
 
-### 3.1 Quantum numbers and indices (module `base`, header `imsrg/base/types.hpp`)
+### 3.1 Quantum numbers and indices (module `base`, header `imsrg/base/types.h`)
 
 ```cpp
 template <class Tag, class Rep = std::int32_t>
@@ -172,9 +177,9 @@ class ModelSpace {               // immutable bundle, shared via std::shared_ptr
 struct OperatorSpec {
   int particle_rank;          // 1, 2 or 3 (highest stored part)
   int tensor_rank_J = 0;      // 0 for scalars
-  Parity parity = Parity::Even;
+  Parity parity = Parity::kEven;
   int delta_Tz = 0;           // isospin projection change (imsrg++ calls |dTz| "rank_T")
-  Hermiticity hermiticity = Hermiticity::Hermitian;
+  Hermiticity hermiticity = Hermiticity::kHermitian;
   int legs = 4;               // later: dagger (odd-particle-number) operators
 };
 
@@ -213,18 +218,18 @@ Operator transform_basis(const Operator&, const UnitaryTransform& C);    // e.g.
   `TwoBody` holds one block per channel, all channels in order (empty ones 0 x 0), so block k is
   channel k. Element accessors use host mirrors (`sync_to_host/device` on GPU backends).
   Headers: `imsrg/operator/{operator_spec,one_body,two_body,three_body,operator,arithmetic,norms,
-  compare,operator_dump,normal_ordering,basis_transform,random_operator,no2b}.hpp`. The NO2B
+  compare,operator_dump,normal_ordering,basis_transform,random_operator,no2b}.h`. The NO2B
   input container `No2bThreeBody` mirrors imsrg++ `ThreeBodyStorage_no2b<float>` (isospin
   orbits, channels (J2, P2, J1, P1, T3), packed triangles), so `io` can follow imsrg++'s
-  `ReadFile` loop; `normal_order(op, v3)` reproduces `DoNormalOrdering3`.
+  `ReadFile` loop; `NormalOrder(op, v3)` reproduces `DoNormalOrdering3`.
 
 ### 3.4 Algorithms as free functions or small value types
 
-* `commutator::commutator(X, Y, Z, opts, ws)`: `opts` is a `CommutatorOptions` value (truncation
+* `commutator::Commutator(X, Y, Z, opts, ws)`: `opts` is a `CommutatorOptions` value (truncation
   enum, term mask as an enum bitset, 3B cuts, thresholds). `ws` is a `Workspace` of preallocated
   scratch buffers reused across calls (no allocation in the flow loop). Individual terms
   (`terms::comm222_ph(X, Y, Z, ws)`) are public for tests and Python.
-* `hf::solve(H, ms, HFOptions) -> HFResult {energy, C, spe, occupations, converged, iterations}`.
+* `hf::Solve(H, ms, HFOptions) -> HFResult {energy, C, spe, occupations, converged, iterations}`.
 * `flow::MagnusSolver` holds the state (s, Omega stack, H(s)) plus a `SolverOptions` value. The
   generator is `flow::Generator`, an enum `GeneratorKind` plus parameters, evaluated by a free
   function with a `switch`. There is no generator class hierarchy.
@@ -242,7 +247,7 @@ Operator transform_basis(const Operator&, const UnitaryTransform& C);    // e.g.
   first) and `exec::Runtime` (Kokkos, created second, destroyed first). The combined
   `imsrg::Runtime` is a thin composition in `driver` (M8); until then `main()` creates both in
   this order (QUESTIONS M2-Q2).
-* Logging: `imsrg::log::info(...)` and friends, using {fmt}. Only rank 0 prints by default.
+* Logging: `imsrg::log::Info(...)` and friends, using {fmt}. Only rank 0 prints by default.
   Verbosity is set by config.
 * Profiling: `IMSRG_SCOPED_TIMER("name")` feeds a thread-safe registry and also emits
   `Kokkos::Profiling::pushRegion`, so NVTX/rocTX tools see the same regions. It is never called
@@ -253,12 +258,12 @@ Operator transform_basis(const Operator&, const UnitaryTransform& C);    // e.g.
 
 ## 5. Header and compile-time policy
 
-* Public headers stay light: no Kokkos, no MPI, no toml/CLI headers. `exec/device_buffer.hpp`
+* Public headers stay light: no Kokkos, no MPI, no toml/CLI headers. `exec/device_buffer.h`
   exposes `DeviceBuffer<T>` (pimpl) with explicit instantiations for `double`, `float`,
-  `std::int32_t`, `std::uint16_t`. Only `src/imsrg/*/kernels/*.cpp` and `exec/*.cpp` include
-  `<Kokkos_Core.hpp>` through `imsrg/exec/kokkos_backend.hpp`.
-* One commutator term family per `.cpp` file, so editing one kernel recompiles one file.
-* Templates are explicitly instantiated in `.cpp` files where possible.
+  `std::int32_t`, `std::uint16_t`. Only `src/imsrg/*/kernels/*.cc` and `exec/*.cc` include
+  `<Kokkos_Core.hpp>` through `imsrg/exec/kokkos_backend.h`.
+* One commutator term family per `.cc` file, so editing one kernel recompiles one file.
+* Templates are explicitly instantiated in `.cc` files where possible.
 * `ccache` is picked up automatically if present. Unity builds are optional
   (`IMSRG_UNITY_BUILD`).
 * Warnings: `-Wall -Wextra -Wpedantic -Wshadow -Wconversion` (the last one can be relaxed in

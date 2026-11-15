@@ -11,7 +11,7 @@ if(GIT_FOUND)
   endif()
 endif()
 
-add_executable(commutator_bench commutator_bench.cpp)
+add_executable(commutator_bench commutator_bench.cc)
 target_compile_definitions(commutator_bench PRIVATE IMSRG_BENCH_GIT_HASH="${_bench_git_hash}")
 target_link_libraries(commutator_bench PRIVATE imsrg::commutator imsrg::operator imsrg::exec
                                                imsrg::basis imsrg::warnings)

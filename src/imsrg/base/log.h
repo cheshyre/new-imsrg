@@ -1,0 +1,140 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
+#ifndef IMSRG_BASE_LOG_H_
+#define IMSRG_BASE_LOG_H_
+/// @file
+/// Minimal thread-safe logging (design/10 section 3.1). A `Logger` is an
+/// explicit object; the one process-wide instance `DefaultLogger()` only
+/// configures output and never affects results. Line format: `[imsrg] <level>:
+/// <message>` (`[imsrg r<k>] ...` when all ranks print).
+
+#include <atomic>
+#include <functional>
+#include <mutex>
+#include <string_view>
+#include <utility>
+
+#include <fmt/format.h>
+
+namespace imsrg::log {
+
+/// Severity, ordered; `Off` disables all output.
+enum class Level { kTrace, kDebug, kInfo, kWarn, kError, kOff };
+
+/// Lower-case name of a level ("trace", ..., "error", "off").
+std::string_view ToString(Level level) noexcept;
+
+/// Thread-safe logger. The level is atomic; writes are serialized by a mutex.
+/// By default only rank 0 prints (see `set_rank`). Not copyable.
+class Logger {
+ public:
+  /// Receives (level, message) where message has no prefix and no trailing
+  /// newline.
+  using Sink = std::function<void(Level, std::string_view)>;
+
+  /// Logger writing formatted lines to stdout.
+  explicit Logger(Level level = Level::kInfo);
+  /// Logger delivering each enabled message to `sink` instead of stdout (for
+  /// capture in tests).
+  Logger(Level level, Sink sink);
+
+  Logger(const Logger&) = delete;
+  Logger& operator=(const Logger&) = delete;
+  Logger(Logger&&) = delete;
+  Logger& operator=(Logger&&) = delete;
+
+  /// Sets the minimum level that is written.
+  void set_level(Level level) noexcept {
+    level_.store(level, std::memory_order_relaxed);
+  }
+  /// The current minimum level.
+  Level level() const noexcept {
+    return level_.load(std::memory_order_relaxed);
+  }
+
+  /// Declares this process's MPI rank. Only rank 0 writes unless `all_ranks`;
+  /// with `all_ranks` and rank > 0 the line prefix carries the rank (`[imsrg
+  /// r3]`).
+  void set_rank(int rank, bool all_ranks = false) noexcept;
+
+  /// True if a message of `lvl` would be written (level passes and this rank
+  /// may print).
+  bool enabled(Level lvl) const noexcept;
+
+  /// Writes `message` at `lvl` if enabled. Thread-safe.
+  void Write(Level lvl, std::string_view message);
+
+  /// Formats and writes at Trace; formatting happens only if enabled.
+  template <class... Args>
+  void Trace(fmt::format_string<Args...> f, Args&&... args) {
+    LogAt(Level::kTrace, f, std::forward<Args>(args)...);
+  }
+  /// As `trace`, at Debug.
+  template <class... Args>
+  void Debug(fmt::format_string<Args...> f, Args&&... args) {
+    LogAt(Level::kDebug, f, std::forward<Args>(args)...);
+  }
+  /// As `trace`, at Info.
+  template <class... Args>
+  void Info(fmt::format_string<Args...> f, Args&&... args) {
+    LogAt(Level::kInfo, f, std::forward<Args>(args)...);
+  }
+  /// As `trace`, at Warn.
+  template <class... Args>
+  void Warn(fmt::format_string<Args...> f, Args&&... args) {
+    LogAt(Level::kWarn, f, std::forward<Args>(args)...);
+  }
+  /// As `trace`, at Error.
+  template <class... Args>
+  void Error(fmt::format_string<Args...> f, Args&&... args) {
+    LogAt(Level::kError, f, std::forward<Args>(args)...);
+  }
+
+ private:
+  template <class... Args>
+  void LogAt(Level lvl, fmt::format_string<Args...> f, Args&&... args) {
+    if (enabled(lvl)) Write(lvl, fmt::format(f, std::forward<Args>(args)...));
+  }
+
+  std::atomic<Level> level_;
+  std::atomic<int> rank_{0};
+  std::atomic<bool> all_ranks_{false};
+  Sink sink_;
+  std::mutex mutex_;
+};
+
+/// The process-wide logger: the single sanctioned global. It only configures
+/// output (level, rank filtering, destination) and never affects numerical
+/// results.
+Logger& DefaultLogger();
+
+/// Formats and writes to `DefaultLogger()` at Trace.
+template <class... Args>
+void Trace(fmt::format_string<Args...> f, Args&&... args) {
+  DefaultLogger().Trace(f, std::forward<Args>(args)...);
+}
+/// As `log::Trace`, at Debug.
+template <class... Args>
+void Debug(fmt::format_string<Args...> f, Args&&... args) {
+  DefaultLogger().Debug(f, std::forward<Args>(args)...);
+}
+/// As `log::Trace`, at Info.
+template <class... Args>
+void Info(fmt::format_string<Args...> f, Args&&... args) {
+  DefaultLogger().Info(f, std::forward<Args>(args)...);
+}
+/// As `log::Trace`, at Warn.
+template <class... Args>
+void Warn(fmt::format_string<Args...> f, Args&&... args) {
+  DefaultLogger().Warn(f, std::forward<Args>(args)...);
+}
+/// As `log::Trace`, at Error.
+template <class... Args>
+void Error(fmt::format_string<Args...> f, Args&&... args) {
+  DefaultLogger().Error(f, std::forward<Args>(args)...);
+}
+
+}  // namespace imsrg::log
+
+#endif  // IMSRG_BASE_LOG_H_

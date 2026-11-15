@@ -1,14 +1,14 @@
 # ImsrgModule.cmake -- the one way to define an imsrg library module (design/20 section 2).
 #
 #   imsrg_add_module(NAME <module>
-#                    [SOURCES <file>...]       # .cpp files, kernels/ included; none = header-only
+#                    [SOURCES <file>...]       # .cc files, kernels/ included; none = header-only
 #                    [HEADERS <file>...]       # optional, for IDEs
 #                    [DEPS <module>...]        # imsrg modules (short names), linked PUBLIC
 #                    [LIBS <target>...]        # external targets, PUBLIC (e.g. fmt::fmt)
 #                    [PRIVATE_LIBS <target>...]) # external targets, PRIVATE (e.g. MPI::MPI_CXX)
 #
 # Defines the static library imsrg_<module> with alias imsrg::<module>, include root src/ (and the
-# generated-header root <build>/src) so headers are included as "imsrg/<module>/x.hpp", the warning
+# generated-header root <build>/src) so headers are included as "imsrg/<module>/x.h", the warning
 # set of imsrg::warnings (with -Werror under IMSRG_WERROR), and records the module's DEPS for
 # tools/check_layering.py (imsrg_write_module_deps). A module may only list modules that the DAG in
 # design/10-architecture.md section 2 allows; the layering test fails otherwise.

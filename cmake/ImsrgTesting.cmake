@@ -49,6 +49,9 @@ function(imsrg_add_test)
   endif()
 
   add_executable(${ARG_NAME} ${ARG_SOURCES})
+  # Test-local headers are included by their path from the repository root
+  # ("tests/support/commutator_test_support.h"), as the Google style guide asks.
+  target_include_directories(${ARG_NAME} PRIVATE "${PROJECT_SOURCE_DIR}")
   target_link_libraries(${ARG_NAME} PRIVATE imsrg::warnings GTest::gtest GTest::gmock)
   if(NOT ARG_NO_GTEST_MAIN)
     target_link_libraries(${ARG_NAME} PRIVATE GTest::gtest_main)

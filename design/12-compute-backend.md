@@ -17,14 +17,14 @@ Kernels use a restricted vocabulary, so a future port has to replace only the fa
 
 | Facade | Kokkos implementation | Notes |
 |--------|----------------------|-------|
-| `exec::DefaultExecSpace`, `exec::HostExecSpace`, `exec::DeviceMemorySpace`, `exec::DeviceView<T>` | `Kokkos::DefaultExecutionSpace`, `DefaultHostExecutionSpace`, its memory space, `View<T*, ...>` | Names as implemented in M2 (`exec/kokkos_backend.hpp`). |
+| `exec::DefaultExecSpace`, `exec::HostExecSpace`, `exec::DeviceMemorySpace`, `exec::DeviceView<T>` | `Kokkos::DefaultExecutionSpace`, `DefaultHostExecutionSpace`, its memory space, `View<T*, ...>` | Names as implemented in M2 (`exec/kokkos_backend.h`). |
 | `DeviceBuffer<T>` | pimpl around `Kokkos::View<T*>` | Lives in public headers without Kokkos. `host_span()` gives a `std::span<T>` on host; `sync_to_host()` / `sync_to_device()` are explicit (fence-only when the mirror aliases the device data). Copy = deep copy (replaces a free `deep_copy`). |
 | `exec::view(buf)` | returns the raw `Kokkos::View` | Only in kernel TUs. |
-| `exec::parallel_for(name, n, f)` | `Kokkos::parallel_for(RangePolicy)` | `f` must be an `IMSRG_LAMBDA` (= `KOKKOS_LAMBDA`). |
-| `exec::parallel_for_md(name, n0, n1, f)` | `MDRangePolicy<Rank<2>>` | |
-| `exec::parallel_reduce(name, n, f, result)`, `exec::parallel_reduce_max(...)` | `Kokkos::parallel_reduce` | Sum and max reducers. |
-| `exec::team_for(name, league, team, scratch_bytes, f)` | `TeamPolicy` with scratch | For ragged channel loops; `f` runs on every team thread. |
-| `exec::fence` | Kokkos equivalent | |
+| `exec::ParallelFor(name, n, f)` | `Kokkos::parallel_for(RangePolicy)` | `f` must be an `IMSRG_LAMBDA` (= `KOKKOS_LAMBDA`). |
+| `exec::ParallelForMd(name, n0, n1, f)` | `MDRangePolicy<Rank<2>>` | |
+| `exec::ParallelReduce(name, n, f, result)`, `exec::ParallelReduceMax(...)` | `Kokkos::parallel_reduce` | Sum and max reducers. |
+| `exec::TeamFor(name, league, team, scratch_bytes, f)` | `TeamPolicy` with scratch | For ragged channel loops; `f` runs on every team thread. |
+| `exec::Fence` | Kokkos equivalent | |
 
 The **mandatory backends** are Serial and OpenMP, both tested on the dev machine. CUDA and HIP
 must compile and run on clusters later. Threads is optional.
@@ -100,7 +100,7 @@ none computes a symbol inside a hot loop, and no table is a lazy cache.
 8. Device lambdas are never defined directly in a GoogleTest `TEST`/`TEST_F` body: its
    `TestBody()` is a private member function, and nvcc/hipcc reject extended lambdas whose
    enclosing function is private or protected. Tests call a free (namespace-scope) function that
-   launches the kernel (see `tests/smoke/kokkos_smoke_test.cpp`). The same holds for private or
+   launches the kernel (see `tests/smoke/kokkos_smoke_test.cc`). The same holds for private or
    protected member functions of our own classes.
 
 ## 6. MPI design (`imsrg::comm`)

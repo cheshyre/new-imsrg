@@ -1,0 +1,426 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
+// The pipeline of the `imsrg` driver (design/13 section 9, design/16 section
+// 6.1, imsrg++.cc): stage 1 (pipeline/hamiltonian.cc) -> IMSRG flow (1 or 2
+// Magnus stages) -> re-normal ordering for ensemble references -> transformed
+// operators -> outputs (results.json, flow CSV, .snt).
+#include "imsrg/driver/run.h"
+
+#include <cmath>
+#include <cstdio>
+#include <filesystem>
+#include <fstream>
+#include <functional>
+#include <string>
+#include <vector>
+
+#include "imsrg/base/error.h"
+#include "imsrg/base/log.h"
+#include "imsrg/basis/orbit.h"
+#include "imsrg/driver/config/writer.h"
+#include "imsrg/driver/pipeline/hamiltonian.h"
+#include "imsrg/flow/magnus.h"
+#include "imsrg/io/valence_writers.h"
+#include "imsrg/operator/normal_ordering.h"
+
+namespace imsrg::driver {
+
+namespace {
+
+namespace fs = std::filesystem;
+
+[[noreturn]] void Planned(const std::string& what) {
+  throw ConfigError("E-PLANNED: " + what +
+                    " is not implemented yet in this build");
+}
+
+/// Options of the pipeline that are not implemented yet (design/16 phases):
+/// fail before any work.
+void RejectPlanned(const RunConfig& c) {
+  if (c.run.task == Task::kMp3) Planned("run.task = \"mp3\"");
+  if (c.run.task == Task::kFciExport) Planned("run.task = \"fci_export\"");
+  if (c.imsrg.method != Method::kMagnus)
+    Planned("imsrg.method other than \"magnus\"");
+  if (c.imsrg.omega.hunter_gatherer) Planned("imsrg.omega.hunter_gatherer");
+  if (c.imsrg.use_brueckner_bch) Planned("imsrg.use_brueckner_bch");
+  if (c.imsrg.goose_tank) Planned("imsrg.goose_tank");
+  if (c.imsrg.perturbative_triples) Planned("imsrg.perturbative_triples");
+  if (c.imsrg.space) Planned("[imsrg.space] (IMSRG model-space truncation)");
+  if (c.imsrg3.active() || c.imsrg3.factorized) Planned("IMSRG(3) ([imsrg3])");
+  if (c.output.valence_file_format == ValenceFileFormat::kAntoine) {
+    Planned("output.valence_file_format = \"antoine\"");
+  }
+  if (c.output.write_omega) Planned("output.write_omega");
+  if (!c.operators.first_order.empty()) Planned("operators.first_order");
+  if (!c.operators.from_file.empty()) Planned("operators.from_file");
+}
+
+/// driver::Generator -> flow::GeneratorKind (the enums list the same
+/// generators, M8a-Q1).
+flow::GeneratorKind ToGeneratorKind(Generator g) {
+  switch (g) {
+    case Generator::kWhite:
+      return flow::GeneratorKind::kWhite;
+    case Generator::kAtan:
+      return flow::GeneratorKind::kAtan;
+    case Generator::kImaginaryTime:
+      return flow::GeneratorKind::kImaginaryTime;
+    case Generator::kWegner:
+      return flow::GeneratorKind::kWegner;
+    case Generator::kQtransferAtan:
+      return flow::GeneratorKind::kQtransferAtan;
+    case Generator::kShellModel:
+      return flow::GeneratorKind::kShellModel;
+    case Generator::kShellModelAtan:
+      return flow::GeneratorKind::kShellModelAtan;
+    case Generator::kShellModelWegner:
+      return flow::GeneratorKind::kShellModelWegner;
+    case Generator::kShellModelImaginaryTime:
+      return flow::GeneratorKind::kShellModelImaginaryTime;
+    case Generator::kShellModelAtanNpnh:
+      return flow::GeneratorKind::kShellModelAtanNpnh;
+    case Generator::kHartreeFock:
+      return flow::GeneratorKind::kHartreeFock;
+    case Generator::kOnePa:
+      return flow::GeneratorKind::kOnePa;
+  }
+  throw InvariantError("unknown driver::Generator");
+}
+
+flow::GeneratorOptions MakeGeneratorOptions(const RunConfig& c, Generator g,
+                                            const basis::ModelSpace& ms) {
+  flow::GeneratorOptions o;
+  o.kind = ToGeneratorKind(g);
+  if (o.kind == flow::GeneratorKind::kShellModelAtanNpnh ||
+      o.kind == flow::GeneratorKind::kOnePa) {
+    Planned("generator \"" + std::string(ToString(g)) + "\"");
+  }
+  switch (c.imsrg.denominator.partitioning) {
+    case Partitioning::kEpsteinNesbet:
+      o.partitioning = flow::Partitioning::kEpsteinNesbet;
+      break;
+    case Partitioning::kMollerPlesset:
+      o.partitioning = flow::Partitioning::kMollerPlesset;
+      break;
+    case Partitioning::kMpIsospin:
+      o.partitioning = flow::Partitioning::kMpIsospin;
+      break;
+  }
+  o.qtransfer_n = c.imsrg.generator.qtransfer_n;
+  o.denominator_delta = c.imsrg.denominator.delta;
+  if (const auto& orb = c.imsrg.denominator.delta_orbit) {
+    if (*orb == "all") {
+      o.denominator_delta_all = true;
+    } else {
+      o.denominator_delta_orbit =
+          ms.basis().index_of(basis::ParseOrbitLabel(*orb));
+    }
+  }
+  return o;
+}
+
+/// imsrg++.cc:1080-1090 and 1135-1140: imaginary-time and Wegner generators use
+/// small steps.
+void SmallStepsForStiffGenerators(Generator g, flow::SolverOptions& so) {
+  const std::string_view name = ToString(g);
+  const bool stiff = name.find("imaginary") != std::string_view::npos ||
+                     name.find("wegner") != std::string_view::npos;
+  if (stiff && so.ds_0 > 1.0e-2) {
+    so.ds_0 = 1.0e-4;
+    so.dsmax = 1.0e-2;
+  }
+}
+
+std::string Fmt17(double x) {
+  char buf[40];
+  std::snprintf(buf, sizeof buf, "%.17g", x);
+  return buf;
+}
+
+std::string JsonString(const std::string& s) {
+  std::string out = "\"";
+  for (const char ch : s) {
+    if (ch == '"' || ch == '\\') out += '\\';
+    out += ch;
+  }
+  return out + "\"";
+}
+
+const char* StopName(flow::StopReason r) {
+  switch (r) {
+    case flow::StopReason::kConverged:
+      return "converged";
+    case flow::StopReason::kSmaxReached:
+      return "smax";
+    case flow::StopReason::kDiverged:
+      return "diverged";
+  }
+  return "unknown";
+}
+
+/// The flow log: a CSV file (design/13 section 7) plus one stdout line per
+/// step.
+class FlowLog {
+ public:
+  explicit FlowLog(const fs::path& path) {
+    if (path.has_parent_path()) fs::create_directories(path.parent_path());
+    out_.open(path);
+    if (!out_)
+      throw InputError("cannot write the flow file '" + path.string() + "'");
+    out_ << "stage,istep,s,ds,E0,norm_H,norm_eta_1b,norm_eta_2b,norm_eta,norm_"
+            "omega_1b,"
+            "norm_omega_2b,norm_omega,num_omegas,wall_s\n";
+    log::Info(
+        "{:>5} {:>5} {:>12} {:>18} {:>14} {:>14} {:>14} {:>14} {:>4} {:>10}",
+        "stage", "step", "s", "E0", "|eta_1b|", "|eta_2b|", "|Omega_1b|",
+        "|Omega_2b|", "nOm", "wall(s)");
+  }
+  void operator()(const flow::FlowStatus& st) {
+    out_ << st.stage << ',' << st.istep << ',' << Fmt17(st.s) << ','
+         << Fmt17(st.ds) << ',' << Fmt17(st.e0) << ',' << Fmt17(st.norm_h)
+         << ',' << Fmt17(st.norm_eta_1b) << ',' << Fmt17(st.norm_eta_2b) << ','
+         << Fmt17(st.norm_eta) << ',' << Fmt17(st.norm_omega_1b) << ','
+         << Fmt17(st.norm_omega_2b) << ',' << Fmt17(st.norm_omega) << ','
+         << st.num_omegas << ',' << Fmt17(st.wall_seconds) << '\n';
+    out_.flush();
+    log::Info(
+        "{:>5} {:>5} {:>12.5f} {:>18.9f} {:>14.9f} {:>14.9f} {:>14.9f} "
+        "{:>14.9f} {:>4} "
+        "{:>10.3f}",
+        st.stage, st.istep, st.s, st.e0, st.norm_eta_1b, st.norm_eta_2b,
+        st.norm_omega_1b, st.norm_omega_2b, st.num_omegas, st.wall_seconds);
+  }
+
+ private:
+  std::ofstream out_;
+};
+
+struct StageRecord {
+  int stage = 0;
+  std::string generator;
+  flow::SolveResult result;
+};
+
+struct OperatorRecord {
+  std::string name;
+  double reference = 0.0;
+  double imsrg = 0.0;
+  std::string file;
+};
+
+/// Occupations of the core (1 for core orbits, 0 otherwise).
+std::vector<double> CoreOccupations(const basis::ModelSpace& ms) {
+  std::vector<double> occ(static_cast<std::size_t>(ms.num_orbits()), 0.0);
+  for (const OrbitIndex a : ms.partition().core()) occ[a.ToSize()] = 1.0;
+  return occ;
+}
+
+/// imsrg++.cc:1221-1277: with a valence space, re-normal order w.r.t. the core
+/// if the reference used for normal ordering is not the core (ensemble /
+/// targeted normal ordering).
+bool NeedsRenormalOrdering(const basis::ModelSpace& ms) {
+  if (ms.partition().is_single_reference()) return false;
+  const std::vector<double> core = CoreOccupations(ms);
+  const auto occ = ms.reference().occupations();
+  for (std::size_t a = 0; a < core.size(); ++a) {
+    if (std::abs(occ[a] - core[a]) > 1.0e-12) return true;
+  }
+  return false;
+}
+
+/// Undo the normal ordering w.r.t. the reference, then normal order w.r.t. the
+/// core.
+op::Operator RenormalOrderToCore(const op::Operator& O) {
+  const op::Operator vacuum = op::UndoNormalOrder(O);
+  const std::vector<double> core = CoreOccupations(O.model_space());
+  return op::NormalOrder(vacuum, core, op::NormalOrderDirection::kToReference);
+}
+
+io::TokyoWriteOptions TokyoOptions(const RunConfig& c,
+                                   const pipeline::PreparedHamiltonian& ph,
+                                   io::ValenceWriteMode mode) {
+  io::TokyoWriteOptions o;
+  o.mode = mode;
+  o.file_2n = c.interaction.two_body.file.empty()
+                  ? ""
+                  : c.interaction.two_body.file.front();
+  o.file_3n =
+      c.interaction.three_body ? c.interaction.three_body->file : "none";
+  o.e1max = c.basis.emax;
+  o.e2max = 2 * c.basis.emax;
+  o.e3max = c.basis.e3max;
+  o.hbar_omega = c.basis.hw;
+  o.a_ref = static_cast<std::int32_t>(ph.ms_bare->reference().target_mass());
+  o.z_ref = static_cast<std::int32_t>(ph.ms_bare->reference().target_Z());
+  o.a_target = static_cast<double>(ph.mass_number);
+  o.version =
+      c.provenance.version.empty() ? "imsrg" : "imsrg " + c.provenance.version;
+  return o;
+}
+
+void WriteValenceFile(const fs::path& path, op::Operator O, const RunConfig& c,
+                      const pipeline::PreparedHamiltonian& ph,
+                      io::ValenceWriteMode mode) {
+  O.SyncToHost();
+  const io::ValenceWriteOptions o = TokyoOptions(c, ph, mode);
+  if (c.output.valence_file_format == ValenceFileFormat::kNushellx) {
+    fs::path base = path;
+    io::WriteNushellxInt(base.replace_extension(".int"), O, o);
+    io::WriteNushellxSps(base.replace_extension(".sp"), O, o);
+  } else {
+    io::WriteTokyo(path, O, o);
+  }
+}
+
+void WriteResults(const fs::path& path, const pipeline::PreparedHamiltonian& ph,
+                  const std::vector<StageRecord>& stages, double e0,
+                  std::size_t num_omegas,
+                  const std::vector<OperatorRecord>& ops,
+                  const std::string& valence_file) {
+  std::ofstream out(path);
+  if (!out) throw InputError("cannot write '" + path.string() + "'");
+  out << "{\n  \"e_reference\": " << Fmt17(ph.e_reference) << ",\n";
+  if (ph.hf) {
+    out << "  \"hf\": {\"e_hf\": " << Fmt17(ph.hf->e_hf)
+        << ", \"e1\": " << Fmt17(ph.hf->e1) << ", \"e2\": " << Fmt17(ph.hf->e2)
+        << ", \"e3\": " << Fmt17(ph.hf->e3)
+        << ", \"iterations\": " << ph.hf->iterations
+        << ", \"converged\": " << (ph.hf->converged ? "true" : "false")
+        << "},\n";
+  }
+  out << "  \"imsrg\": {\"e0\": " << Fmt17(e0)
+      << ", \"num_omegas\": " << num_omegas << ", \"stages\": [";
+  for (std::size_t i = 0; i < stages.size(); ++i) {
+    const StageRecord& st = stages[i];
+    out << (i ? ", " : "") << "{\"stage\": " << st.stage
+        << ", \"generator\": " << JsonString(st.generator)
+        << ", \"steps\": " << st.result.steps
+        << ", \"s\": " << Fmt17(st.result.s)
+        << ", \"e0\": " << Fmt17(st.result.e0)
+        << ", \"norm_eta\": " << Fmt17(st.result.norm_eta)
+        << ", \"stop\": " << JsonString(StopName(st.result.reason)) << "}";
+  }
+  out << "]},\n  \"operators\": {";
+  for (std::size_t i = 0; i < ops.size(); ++i) {
+    out << (i ? ", " : "") << JsonString(ops[i].name)
+        << ": {\"reference\": " << Fmt17(ops[i].reference)
+        << ", \"imsrg\": " << Fmt17(ops[i].imsrg)
+        << ", \"file\": " << JsonString(ops[i].file) << "}";
+  }
+  out << "},\n  \"valence_interaction\": "
+      << (valence_file.empty() ? std::string("null") : JsonString(valence_file))
+      << "\n}\n";
+}
+
+}  // namespace
+
+void Run(const RunConfig& config) {
+  const fs::path dir(config.output.directory);
+  WriteResolvedConfig(config, dir / "resolved_config.toml");
+  RejectPlanned(config);
+
+  const pipeline::PreparedHamiltonian ph = pipeline::PrepareHamiltonian(config);
+  if (config.run.task == Task::kHf) {
+    WriteResults(dir / "results.json", ph, {}, ph.e_reference, 0, {}, "");
+    return;
+  }
+  const basis::ModelSpace& ms = ph.hno.model_space();
+
+  // ---- IMSRG flow: stage 1 with the core generator, stage 2 (valence) with a
+  // new Omega.
+  const StepConfig& step = config.imsrg.step;
+  flow::SolverOptions so;
+  so.smax = step.smax;
+  so.dsmax = step.dsmax;
+  so.ds_0 = step.ds_0;
+  so.domega = step.domega;
+  so.omega_norm_max = step.omega_norm_max;
+  so.eta_criterion = step.eta_criterion;
+  const Generator core_gen = config.imsrg.generator.core;
+  SmallStepsForStiffGenerators(core_gen, so);
+
+  FlowLog flow_log(config.output.flow_file.empty()
+                       ? dir / "flow.csv"
+                       : fs::path(config.output.flow_file));
+  flow::MagnusSolver solver(ph.hno, so,
+                            MakeGeneratorOptions(config, core_gen, ms));
+  std::vector<StageRecord> stages;
+  log::Info("Setting generator to {}", ToString(core_gen));
+  stages.push_back(
+      {1, std::string(ToString(core_gen)), solver.Solve(std::ref(flow_log))});
+
+  const bool second_stage =
+      config.imsrg.steps > 1 && config.valence.has_valence_space();
+  if (second_stage &&
+      stages.back().result.reason != flow::StopReason::kDiverged) {
+    // imsrg++.cc:1122-1143: smax doubled for the second Magnus stage, new
+    // Omega.
+    const Generator val_gen = config.imsrg.generator.valence;
+    flow::SolverOptions so2 = so;
+    so2.smax = 2.0 * step.smax;
+    SmallStepsForStiffGenerators(val_gen, so2);
+    log::Info("Setting generator to {}", ToString(val_gen));
+    solver.set_generator(MakeGeneratorOptions(config, val_gen, ms));
+    solver.set_smax(so2.smax);
+    stages.push_back(
+        {2, std::string(ToString(val_gen)), solver.Solve(std::ref(flow_log))});
+  }
+  for (const StageRecord& st : stages) {
+    log::Info("stage {} ({}): {} steps, s = {}, E0 = {:.9f}, stop: {}",
+              st.stage, st.generator, st.result.steps, st.result.s,
+              st.result.e0, StopName(st.result.reason));
+  }
+  const bool diverged =
+      stages.back().result.reason == flow::StopReason::kDiverged;
+
+  // ---- Final Hamiltonian, re-normal ordered w.r.t. the core for ensemble
+  // references.
+  const bool renormal = NeedsRenormalOrdering(ms);
+  op::Operator h_final = renormal ? RenormalOrderToCore(solver.hamiltonian())
+                                  : solver.hamiltonian();
+  const double e0 = solver.hamiltonian().zero_body();
+  if (config.valence.has_valence_space()) {
+    log::Info("Core Energy = {:.6f} (valence-space zero body {:.6f})", e0,
+              h_final.zero_body());
+  } else {
+    log::Info("Core Energy = {:.6f}", e0);
+  }
+
+  std::string valence_file;
+  const std::string stem =
+      config.output.stem.empty() ? "imsrg" : config.output.stem;
+  if (config.valence.has_valence_space()) {
+    valence_file = (dir / (stem + ".snt")).string();
+    WriteValenceFile(valence_file, h_final, config, ph,
+                     io::ValenceWriteMode::kHamiltonian);
+  }
+
+  // ---- Operators: HF-basis, normal-ordered operators transformed with the
+  // Omega stack.
+  std::vector<OperatorRecord> ops;
+  for (const OperatorRequest& req : config.operators.list) {
+    op::Operator O = pipeline::PrepareOperator(req, ph, config);
+    OperatorRecord rec;
+    rec.name = req.canonical_name;
+    rec.reference = O.zero_body();
+    log::Info("{}   HF: {:.6f}", rec.name, rec.reference);
+    O = solver.Transform(O);
+    if (renormal) O = RenormalOrderToCore(O);
+    rec.imsrg = O.zero_body();
+    log::Info("{}   IMSRG: {:.8f}", rec.name, rec.imsrg);
+    rec.file = (dir / (stem + "_" + rec.name + ".snt")).string();
+    WriteValenceFile(rec.file, O, config, ph,
+                     io::ValenceWriteMode::kIsospinAveragedOperator);
+    ops.push_back(rec);
+  }
+
+  WriteResults(dir / "results.json", ph, stages, e0, solver.omegas().size(),
+               ops, valence_file);
+  if (diverged) {
+    throw NumericalError(
+        "the IMSRG flow diverged (see the flow log); results.json was written");
+  }
+}
+
+}  // namespace imsrg::driver

@@ -2,7 +2,7 @@
 
 > **Precedence:** where this document disagrees with `10-architecture.md`, `16-config-and-cli.md` or
 > `20-build-and-tooling.md`, those documents win (module/target names, test locations, build options,
-> dependencies via submodules). Source files use `.hpp`/`.cpp`.
+> dependencies via submodules). Source files use `.h`/`.cc` (Google style, D38).
 
 Status: proposal. Scope: `imsrg._core` (nanobind extension) and the pure-Python package `imsrg`.
 Old reference: `imsrg-devel/src/pyIMSRG.cc` (pybind11, 961 lines, ~150 individually exposed commutator terms, `arma::mat` as an opaque class, no numpy, no GIL release).

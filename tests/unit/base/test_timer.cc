@@ -1,0 +1,105 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
+#include <chrono>
+#include <string>
+#include <thread>
+#include <vector>
+
+#include <gtest/gtest.h>
+
+#include "imsrg/base/timer.h"
+
+namespace imsrg {
+namespace {
+
+std::vector<std::string>& Events() {
+  static auto* const kEvents = new std::vector<std::string>();
+  return *kEvents;
+}
+void PushHook(const char* name) {
+  Events().push_back(std::string("push:") + name);
+}
+void PopHook() { Events().push_back("pop"); }
+
+TEST(Timer, AccumulatesCountsAndTimes) {
+  TimerRegistry reg;
+  for (int i = 0; i < 3; ++i) {
+    IMSRG_SCOPED_TIMER(reg, "b_region");
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+  }
+  {
+    IMSRG_SCOPED_TIMER(reg, "a_region");
+  }
+  const auto es = reg.entries();
+  ASSERT_EQ(es.size(), std::size_t{2});
+  EXPECT_EQ(es[0].name, "a_region");
+  EXPECT_EQ(es[1].name, "b_region");
+  EXPECT_EQ(es[1].count, 3);
+  EXPECT_GE(es[1].seconds, 0.005);
+  // An empty region may take less than one steady_clock tick, so only
+  // non-negativity holds.
+  EXPECT_GE(es[0].seconds, 0.0);
+  EXPECT_EQ(es[0].count, 1);
+  reg.clear();
+  EXPECT_TRUE(reg.entries().empty());
+}
+
+TEST(Timer, AddAndReport) {
+  TimerRegistry reg;
+  reg.Add("alpha", 1.5);
+  reg.Add("alpha", 0.5, 3);
+  reg.Add("a_much_longer_name", 2.0, 2);
+  const auto es = reg.entries();
+  ASSERT_EQ(es.size(), std::size_t{2});
+  EXPECT_EQ(es[1].name, "alpha");
+  EXPECT_DOUBLE_EQ(es[1].seconds, 2.0);
+  EXPECT_EQ(es[1].count, 4);
+  const std::string r = reg.Report();
+  EXPECT_NE(r.find("alpha"), std::string::npos);
+  EXPECT_NE(r.find("a_much_longer_name"), std::string::npos);
+  EXPECT_NE(r.find("mean [ms]"), std::string::npos);
+}
+
+TEST(Timer, ThreadSafe) {
+  TimerRegistry reg;
+  std::vector<std::thread> ts;
+  for (int t = 0; t < 8; ++t) {
+    ts.emplace_back([&reg] {
+      for (int i = 0; i < 1000; ++i) reg.Add("shared", 1.0e-6);
+    });
+  }
+  for (auto& th : ts) th.join();
+  const auto es = reg.entries();
+  ASSERT_EQ(es.size(), std::size_t{1});
+  EXPECT_EQ(es[0].count, 8000);
+  EXPECT_NEAR(es[0].seconds, 8.0e-3, 1.0e-9);
+}
+
+TEST(Timer, HooksCalledInOrder) {
+  Events().clear();
+  TimerRegistry reg;
+  reg.set_region_hooks(&PushHook, &PopHook);
+  TimerRegistry
+      other;  // hooks are per registry: timers on `other` must not call them
+  {
+    IMSRG_SCOPED_TIMER(other, "elsewhere");
+  }
+  {
+    IMSRG_SCOPED_TIMER(reg, "outer");
+    {
+      IMSRG_SCOPED_TIMER(reg, "inner");
+    }
+  }
+  reg.set_region_hooks(nullptr, nullptr);
+  {
+    IMSRG_SCOPED_TIMER(reg, "unhooked");
+  }
+  const std::vector<std::string> expected = {"push:outer", "push:inner", "pop",
+                                             "pop"};
+  EXPECT_EQ(Events(), expected);
+  EXPECT_EQ(reg.entries().size(), std::size_t{3});
+}
+
+}  // namespace
+}  // namespace imsrg

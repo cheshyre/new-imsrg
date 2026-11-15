@@ -1,0 +1,39 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
+#ifndef IMSRG_DRIVER_CONFIG_WRITER_H_
+#define IMSRG_DRIVER_CONFIG_WRITER_H_
+/// @file
+/// `RunConfig` -> TOML (`resolved_config.toml`, design/16 sections 1.3, 1.7 and
+/// 6.1).
+///
+/// Deterministic: keys in `VisitSchema` order, one `[table]` header per table
+/// that has at least one written key, absent optionals omitted, doubles with 17
+/// significant digits ("%.17g", a ".0" appended if the text would otherwise
+/// read as a TOML integer), strings as TOML basic strings with escapes, arrays
+/// on one line, operator requests as their canonical names, from-file entries
+/// as inline tables. `imsrg.generator.valence` is left out when `imsrg.steps ==
+/// 1` (it is inert then, and an explicit value with a valence space is V-41).
+/// Reading the output back with `LoadConfig` gives an equal config.
+
+#include <filesystem>
+#include <string>
+
+#include "imsrg/driver/config/schema.h"
+
+namespace imsrg::driver {
+
+/// The resolved configuration as TOML text; with `include_provenance`, a
+/// `[provenance]` table (version, git_hash, date, command_line, legacy_args,
+/// warnings, applied_rules) is appended last.
+std::string ToToml(const RunConfig& config, bool include_provenance = true);
+
+/// Writes `ToToml(config)` to `file`, creating missing parent directories.
+/// @throws InputError if the directory cannot be created or the file cannot be
+///         written.
+void WriteResolvedConfig(const RunConfig& config,
+                         const std::filesystem::path& file);
+
+}  // namespace imsrg::driver
+
+#endif  // IMSRG_DRIVER_CONFIG_WRITER_H_

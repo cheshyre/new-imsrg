@@ -4,15 +4,15 @@
 # Orderings follow imsrg++ exactly (design/00 D11); tests compare against tests/golden/basis/.
 imsrg_add_module(NAME basis
   SOURCES
-    orbit.cpp
-    single_particle_basis.cpp
-    nucleus.cpp
-    reference.cpp
-    valence_space.cpp
-    partition.cpp
-    two_body_channels.cpp
-    particle_hole_channels.cpp
-    three_body_channels.cpp
-    model_space.cpp
-    device_tables.cpp
+    orbit.cc
+    single_particle_basis.cc
+    nucleus.cc
+    reference.cc
+    valence_space.cc
+    partition.cc
+    two_body_channels.cc
+    particle_hole_channels.cc
+    three_body_channels.cc
+    model_space.cc
+    device_tables.cc
   DEPS base exec)

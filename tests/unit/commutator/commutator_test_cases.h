@@ -1,0 +1,73 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
+#ifndef TESTS_UNIT_COMMUTATOR_COMMUTATOR_TEST_CASES_H_
+#define TESTS_UNIT_COMMUTATOR_COMMUTATOR_TEST_CASES_H_
+
+/// @file
+/// Test data shared by the commutator unit tests: the golden pairs, the
+/// random-operator model spaces and hermiticity pairs, and the comparison
+/// helpers.
+
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "imsrg/base/types.h"
+#include "imsrg/basis/model_space.h"
+#include "imsrg/operator/operator.h"
+
+namespace imsrg::commutator_test {
+
+/// Tolerance of design/30 section 2 on `testing::RelativeDeviation`.
+inline constexpr double kTol = 1.0e-10;
+
+/// One golden pair: directory below tests/golden/commutator and the names of
+/// the X and Y dumps.
+struct GoldenPair {
+  std::string dir;
+  std::string x;
+  std::string y;
+};
+
+/// All golden pairs of the three golden directories (emax2_O16, emax1_He4,
+/// emax1_He6).
+const std::vector<GoldenPair>& GoldenPairs();
+
+/// Relative path ("commutator/<dir>/<name>.dump") of a dump of `p.dir`.
+std::string DumpPath(const GoldenPair& p, const std::string& name);
+
+/// Relative path of the golden result of `term` (an imsrg++ term name or "all")
+/// for `p`.
+std::string ResultPath(const GoldenPair& p, const std::string& term);
+
+/// A model space of the random-operator tests.
+struct SpaceCase {
+  std::string label;
+  int emax;
+  std::string reference;
+  bool fractional;
+};
+
+/// The five model spaces of the fast-vs-reference tests.
+const std::vector<SpaceCase>& SpaceCases();
+
+/// Builds the model space of `c` (integer or fractional occupations).
+std::shared_ptr<const basis::ModelSpace> MakeSpace(const SpaceCase& c);
+
+/// A pair of hermiticities and the particle ranks of X and Y of a
+/// random-operator case.
+struct HermPair {
+  const char* label;
+  Hermiticity x;
+  Hermiticity y;
+  int rank_x;
+  int rank_y;
+};
+
+/// (A,H), (H,A), (H,H), (A,A) and a rank-1 X with a rank-2 Y.
+const std::vector<HermPair>& HermPairs();
+
+}  // namespace imsrg::commutator_test
+
+#endif  // TESTS_UNIT_COMMUTATOR_COMMUTATOR_TEST_CASES_H_

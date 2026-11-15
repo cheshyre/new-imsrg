@@ -13,7 +13,9 @@ add_subdirectory("${PROJECT_SOURCE_DIR}/extern/nanobind" "${CMAKE_BINARY_DIR}/ex
 
 nanobind_add_module(_core NB_STATIC STABLE_ABI
   src/module.cc src/runtime.cc src/basis.cc src/operator.cc src/config.cc)
-target_include_directories(_core PRIVATE src)
+# Binding-local headers are included by their path from the repository root
+# ("python/src/bindings.h").
+target_include_directories(_core PRIVATE "${PROJECT_SOURCE_DIR}")
 target_link_libraries(_core PRIVATE imsrg::operator imsrg::driver imsrg::exec imsrg::comm)
 target_compile_features(_core PRIVATE cxx_std_20)
 

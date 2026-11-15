@@ -28,10 +28,13 @@ submodule.
 1.13.2, ccache 4.14.3, Open MPI 5.0.11, libomp 23.1.5, clang-format 23.1.5, Python 3.15.2
 (numpy 2.5.4, sympy 1.14.0, pytest 9.2.0 and scikit-build-core 1.1.2 all have 3.15 wheels, so no
 older Python was needed). Also installed for imsrg-devel: gsl, boost, openblas. Workarounds: §8.
+Added in run 2 (Google style, D38): cpplint 2.0.2 in the shared venv (tools/requirements-dev.txt)
+and Homebrew LLVM 23.1.5 for clang-tidy (`tools/lint.sh`).
 
 macOS bootstrap (allowed by the user):
 ```bash
 brew install cmake ninja ccache open-mpi libomp clang-format   # for the new code
+brew install llvm                                   # clang-tidy for tools/lint.sh (optional)
 brew install gsl boost openblas                     # additionally needed to build imsrg-devel
 tools/bootstrap_deps.sh       # once per machine: Kokkos (openmp, serial) + the shared venv
 ```
@@ -59,7 +62,7 @@ tools/bootstrap_deps.sh       # once per machine: Kokkos (openmp, serial) + the 
   `<build>/src` (generated headers), links the `imsrg::warnings` set privately, and records the
   DEPS; `imsrg_write_module_deps()` writes them to `<build>/imsrg_module_deps.json` for the layering
   check. No SOURCES = header-only (INTERFACE) module. Project headers are included as
-  `"imsrg/<module>/x.hpp"` (the layering check also accepts `<imsrg/...>`; QUESTIONS Q21).
+  `"imsrg/<module>/x.h"` (the layering check also accepts `<imsrg/...>`; QUESTIONS Q21).
 * `src/` and `tests/unit/` **discover** module directories (`file(GLOB ... CONFIGURE_DEPENDS)` over
   `*/CMakeLists.txt`): a milestone adds `src/imsrg/<m>/` and `tests/unit/<m>/` without editing a
   shared CMake file, so parallel milestones do not conflict. The layering check rejects directories
@@ -139,10 +142,11 @@ As implemented in M0:
   one is missing (no network needed otherwise), configures with `-DIMSRG_WERROR=ON`, builds, runs
   `ctest -L '^unit$'`, the integration tests if both big input files exist in
   `IMSRG_TEST_DATA_DIR` (ctest label `integration`, plus `pytest tests/integration` once it
-  exists), `ctest -L '^mpi$'` if `IMSRG_ENABLE_MPI`, `check_layering.py` with its self-test, and
-  `clang-format --dry-run --Werror` on git-tracked C++ files under `src/ apps/ tests/ python/
-  tools/bench/` (never `extern/`, `tools/reference/`, `tests/golden/`). Tests labeled `slow` never
-  run in CI. Each step is timed; the last line is exactly `CI PASS <preset>` or
+  exists), `ctest -L '^mpi$'` if `IMSRG_ENABLE_MPI`, the Python binding tests if the module was
+  built, `check_layering.py` with its self-test, `clang-format --dry-run --Werror` and cpplint
+  (since run 2, D38; it prints every finding and fails on any) on git-tracked C++ files under
+  `src/ apps/ tests/ python/ tools/bench/` (never `extern/`, `tools/reference/`,
+  `tests/golden/`). Tests labeled `slow` never run in CI. Each step is timed; the last line is exactly `CI PASS <preset>` or
   `CI FAIL <preset>: <step>` (nonzero exit). `IMSRG_BUILD_DIR` overrides the build tree (default
   `build/<preset>`) so two runs in one checkout do not collide; `IMSRG_CI_JOBS` sets the build
   jobs. Tests get `OMP_NUM_THREADS=4`, `OMP_PROC_BIND=false` unless set, and ctest runs
@@ -162,7 +166,7 @@ As implemented in M0:
   `IMSRG_INLINE_FUNCTION`; `base` types must be usable in kernels) cannot come from Kokkos
   headers, which `base` cannot see anyway. Define them without Kokkos (keyed on
   `__CUDACC__`/`__HIPCC__`, i.e. `__host__ __device__` there and empty otherwise); `IMSRG_LAMBDA`
-  is needed only in kernel files and can come from `exec/kokkos_backend.hpp`.
+  is needed only in kernel files and can come from `exec/kokkos_backend.h`.
 * `tools/ci.sh` and `tools/check_layering.py` operate on `git ls-files` only: the main checkout
   root also holds untracked `imsrg-devel/` and `.claude/worktrees/`. pytest uses
   `testpaths = ["tests/python", "tests/integration"]`.
@@ -171,12 +175,21 @@ As implemented in M0:
   lock (`mkdir`-based) on the deps prefix.
 * `tools/reference/build_imsrg_devel.sh`: builds the old code outside the repo (§5).
 * `tools/reference/gen_golden_*.py|.cpp`: produces golden data (see `30-testing-and-validation.md`).
-* `.clang-format` (based on Google style, 100 columns) and `.clang-tidy` (bugprone, performance,
-  modernize subsets; not enforced at first). **Owner, 2026-11-15 (D38):** the code follows the Google
-  C++ Style Guide; the run-2 conversion moves `.clang-format` to 80 columns and the guide's include
-  order, adds `CPPLINT.cfg` and a cpplint step to `ci.sh`, and adds clang-tidy
-  `readability-identifier-naming` (details and the measured scale in `17-code-style.md`). `ci.sh`
-  stays under 5 minutes (D42).
+* Style tooling (Google C++ Style Guide, owner D38; converted in run 2, details in
+  `17-code-style.md`): `.clang-format` (Google base, 80 columns, the guide's include order),
+  `CPPLINT.cfg` (cpplint 2.0, blocking in `ci.sh`; each filter has its reason in the file),
+  `.clang-tidy` (`readability-identifier-naming` with the Google naming and the accessor
+  allowlist; the bugprone, performance and modernize subsets stay advisory).
+* `tools/lint.sh [file...]`: the naming check. Runs clang-tidy (Homebrew LLVM if none is on the
+  PATH) with only `readability-identifier-naming` on the given units or on every unit of the
+  compile database of `IMSRG_BUILD_DIR` (default `build/dev-openmp`) under `src/ apps/ tests/
+  python/ tools/bench/`, prints each finding once and exits nonzero on any (about 25 s for all
+  units). Not part of `ci.sh`, which stays under 5 minutes (D42); run it after adding or renaming
+  names. Code the build does not compile (`communicator_serial.cc` without MPI, `tools/bench`
+  without `IMSRG_BUILD_BENCH`, CUDA/HIP branches) needs a second build tree, e.g.
+  `cmake --preset dev-openmp -B build/style-cov -DIMSRG_ENABLE_MPI=OFF -DIMSRG_BUILD_BENCH=ON`.
+* `.git-blame-ignore-revs` lists pure reformat commits (`git config blame.ignoreRevsFile
+  .git-blame-ignore-revs`).
 
 ## 5. Building the reference imsrg-devel (outside the repo)
 
@@ -229,7 +242,7 @@ As implemented in M0:
 A single `Makefile` at the root for users without CMake. It assumes a pre-installed Kokkos
 (`KOKKOS_PATH`, using Kokkos' `Makefile.kokkos` support), OpenMP backend, system BLAS/LAPACK
 and zlib, no MPI by default (`USE_MPI=1` switches to `mpicxx`), and no Python. It lists sources
-by globbing `src/imsrg/*/*.cpp src/imsrg/*/kernels/*.cpp`. A test checks that it builds the
+by globbing `src/imsrg/*/*.cc src/imsrg/*/kernels/*.cc`. A test checks that it builds the
 executable. Note: the inherited `.gitignore` ignores `Makefile` everywhere; M13 must add
 `!/Makefile`.
 

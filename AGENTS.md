@@ -52,7 +52,7 @@ tools/ci.sh dev-openmp             # the full pre-merge check; last line: CI PAS
 ```
 * **Shared per-machine state (one rule):** `IMSRG_DEPS_PREFIX` (default `~/.cache/imsrg-deps`)
   holds the Kokkos installs `kokkos-<backend>/`; `IMSRG_VENV` (default `$IMSRG_DEPS_PREFIX/venv`)
-  is the one Python venv (numpy, pytest, sympy, scikit-build-core) for all worktrees.
+  is the one Python venv (numpy, pytest, sympy, scikit-build-core, cpplint) for all worktrees.
   `tools/bootstrap_deps.sh` and `tools/ci.sh` link it as `.venv` in each worktree (gitignored).
   Never create a venv per worktree.
 * **Several tasks in one checkout:** give each its own build tree:
@@ -62,7 +62,7 @@ tools/ci.sh dev-openmp             # the full pre-merge check; last line: CI PAS
   DEPS ...)` and `tests/unit/<m>/CMakeLists.txt` with `imsrg_add_test(NAME <m>_<topic> SOURCES ...
   DEPS <m> LABELS unit)` (test names are global, hence the module prefix). Both directories are
   discovered automatically; no shared CMake file changes. Include project headers as
-  `"imsrg/<module>/x.hpp"`. Kernels in tests go into free functions, never into a `TEST` body
+  `"imsrg/<module>/x.h"`. Kernels in tests go into free functions, never into a `TEST` body
   (`design/12-compute-backend.md` §5).
 * macOS: the default SDK of this machine does not link; CMake works around it by itself
   (`cmake/ImsrgAppleSdk.cmake`). For compiles outside CMake, export
@@ -75,13 +75,31 @@ then `.venv/bin/pytest tests/python`.
 
 * **Style: the Google C++ Style Guide** (owner, D38), with the exceptions and tooling in
   `design/17-code-style.md` (exceptions D16, `<filesystem>` outside kernels, Kokkos `[=]` device
-  lambdas). The conversion of the existing code is the **first task of run 2**; until it lands, the
-  bullets below describe the code as it is (snake_case functions, `.hpp`/`.cpp`, 100 columns,
-  `#pragma once`), and the conversion replaces them with `design/17` §1.
-* C++20, no compiler extensions. Formatting: `.clang-format` (100 columns).
-* Naming: types `PascalCase`; functions and variables `snake_case`; private members
-  `snake_case_`; macros `IMSRG_UPPER_CASE`; files `snake_case.hpp/.cpp`; namespaces
-  `imsrg::<module>`.
+  lambdas, physics notation in variable names). `tools/ci.sh` fails on clang-format or cpplint
+  findings; run `tools/lint.sh` (clang-tidy naming check, needs `brew install llvm`) after adding
+  or renaming names. cpplint is not followed blindly: a justified exception is a
+  `// NOLINT(<category>): <reason>` on the line.
+* C++20, no compiler extensions. Formatting: `.clang-format` (Google base, **80 columns**,
+  include order: related header, C system, C++ standard, other libraries, project headers).
+* Files `snake_case.h` / `snake_case.cc`, each starting with
+  `// SPDX-License-Identifier: GPL-3.0-or-later` and `// Copyright 2026 The imsrg authors`;
+  headers use `#define` guards `IMSRG_<PATH>_H_` (path below `src/`; outside `src/` the path
+  from the repository root, e.g. `TESTS_UNIT_HF_HF_TEST_SUPPORT_H_`). Include project headers as
+  `"imsrg/<module>/x.h"`, test- and binding-local headers by their path from the repository root
+  (`"tests/support/commutator_test_support.h"`).
+* Naming: types, concepts and **functions/methods `PascalCase`** (`hf::Solve`, `Mp2Energy`);
+  accessors (const, return a property or part of the object, possibly selected by an index or
+  key: `num_orbits()`, `orbit(i)`, `spec()`), mutators `set_x()` and STL analogs (`begin`,
+  `size`, `find`, `value`) stay `snake_case` (the allowlist is in `.clang-tidy`); variables
+  `snake_case`, but physics symbols keep their capitals (`X`, `Y`, `Z`, `J`, `Tz`, `hw_MeV`);
+  class data members `snake_case_`, struct members without the `_`; constants with static
+  storage and enumerators `kName` (`kInvSqrt2`, `Mixing::kLinear`); macros `IMSRG_UPPER_CASE`;
+  namespaces `imsrg::<module>`, internals in `detail`.
+* No using-directives (put tests inside the namespace they test; aliases and using-declarations
+  in `.cc` files); `std::int64_t` etc. instead of `long`; C++ casts; every class declares its
+  copy and move operations; objects with static storage are trivially destructible (use
+  `static const auto* const kX = new T(...);`); floating-point literals with digits on both
+  sides of the point (`1.0e-10`).
 * **Strong types** for indices and quantum numbers (`OrbitIndex`, `ChannelIndex`, `TwoJ`,
   `TwoTz`, `Parity`, ...). No raw `int` for these in public APIs. Store twice-j as `TwoJ`.
 * **Value semantics**, composition, `std::variant` or enums for closed sets. No inheritance
@@ -91,7 +109,7 @@ then `.venv/bin/pytest tests/python`.
 * Library code never calls `exit()`/`abort()`. Input errors throw typed exceptions; invariants
   use `IMSRG_ASSERT` (debug) or `IMSRG_CHECK` (always).
 * Public headers must not include Kokkos, MPI, toml++ or CLI11. Kernels live in
-  `src/imsrg/<module>/kernels/*.cpp`.
+  `src/imsrg/<module>/kernels/*.cc`.
 * Device-code rules (`design/12-compute-backend.md` §5): `IMSRG_LAMBDA` with value captures only;
   no containers, exceptions, virtual calls or allocation in kernels; trivially copyable kernel
   types.

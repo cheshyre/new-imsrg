@@ -3,6 +3,6 @@
 # orbitals. C++ namespace: imsrg::mbpt. Host-only. Must not depend on hf (layering).
 imsrg_add_module(NAME mbpt
   SOURCES
-    energies.cpp
-    natural_orbitals.cpp
+    energies.cc
+    natural_orbitals.cc
   DEPS operator linalg basis)

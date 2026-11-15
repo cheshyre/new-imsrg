@@ -1,18 +1,29 @@
-# imsrg rewrite: clang-format style.
+# imsrg rewrite: clang-format style (Google C++ Style Guide, design/17-code-style.md section 4).
 # Checked by tools/ci.sh with clang-format 23 (clang-format --dry-run).
 # Applies to src/ apps/ tests/ python/ tools/bench/ only.
 # Never applies to extern/, tools/reference/ or tests/golden/.
 BasedOnStyle: Google
 Language: Cpp
 Standard: c++20
-ColumnLimit: 100
+ColumnLimit: 80
 DerivePointerAlignment: false
 PointerAlignment: Left
+# The guide's include order: related header (detected by clang-format), C system, C++ standard
+# library, other libraries, project headers; one block each.
 IncludeBlocks: Regroup
 IncludeCategories:
-  - Regex: '^[<"]imsrg/'       # project headers, last
-    Priority: 4
-  - Regex: '^<[a-z_0-9]+>$'    # C++ standard library
+  # Other libraries; before the C-system rule, which would catch <mpi.h>.
+  - Regex: '^<(mpi|omp|zlib|Kokkos_[A-Za-z_]+|nanobind/.*|gtest/.*|gmock/.*|fmt/.*|CLI/.*|toml\+\+/.*)(\.h|\.hpp)?>$'
+    Priority: 3
+  # C system headers.
+  - Regex: '^<[a-z_0-9/]+\.h>$'
+    Priority: 1
+  # C++ standard library.
+  - Regex: '^<[a-z_0-9]+>$'
     Priority: 2
-  - Regex: '.*'                # third-party and C system headers
+  # Project headers: "imsrg/...", test- and binding-local headers in quotes, <imsrg/...>.
+  - Regex: '^("|<imsrg/)'
+    Priority: 4
+  # Any other library (e.g. <Accelerate/Accelerate.h>).
+  - Regex: '.*'
     Priority: 3

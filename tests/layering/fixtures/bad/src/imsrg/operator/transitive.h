@@ -1,0 +1,9 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright 2026 The imsrg authors
+
+#ifndef TESTS_LAYERING_FIXTURES_BAD_SRC_IMSRG_OPERATOR_TRANSITIVE_H_
+#define TESTS_LAYERING_FIXTURES_BAD_SRC_IMSRG_OPERATOR_TRANSITIVE_H_
+
+#include "imsrg/exec/kokkos_backend.h"
+
+#endif  // TESTS_LAYERING_FIXTURES_BAD_SRC_IMSRG_OPERATOR_TRANSITIVE_H_
