@@ -14,9 +14,6 @@ namespace imsrg::opslib {
 
 namespace {
 
-constexpr double kTcmThreshold =
-    1.0e-7;  // imsrg++ TCM_Op drops |p1p2/A| <= 1e-7
-
 detail::PairEngine MakeEngine(const basis::ModelSpace& ms) {
   return detail::PairEngine(detail::MaxOrbitShell(ms), ms.basis().lmax(),
                             ms.basis().hbar_omega());
@@ -30,7 +27,7 @@ op::Operator TCm(const std::shared_ptr<const basis::ModelSpace>& ms, int A) {
                                [](const basis::Orbit&) { return true; });
   const detail::PairEngine engine = MakeEngine(*ms);
   detail::AddTwoBody(
-      t, kTcmThreshold,
+      t, 0.0,
       [&](const basis::TwoBodyChannel& ch, const basis::Orbit& a,
           const basis::Orbit& b, const basis::Orbit& c, const basis::Orbit& d) {
         return engine.Element(detail::PairKind::kMomentum, a, b, c, d,
