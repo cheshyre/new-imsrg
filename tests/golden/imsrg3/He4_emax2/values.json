@@ -1,0 +1,26 @@
+{
+  "case": "He4_emax2",
+  "reference": "He4",
+  "emax": 2,
+  "reference_version": "imsrg-devel src-sha256:ddcbf1aff166414e746113d5f3de2ddc1e72783fb7c201829cd58e317717f40f+d35-patch:5fdd2b73265417f2",
+  "operators": "X = RandomOperator(Scalar(2, kAntiHermitian), {seed 1, one_body_scale 1, two_body_scale 1}); Y = the same with kHermitian and seed 2; epsilon.txt as tools/bench/imsrg3_layout/bench_main.cc --write-dumps",
+  "command": "refharness comm223 emax=2 e3max=<e3max> reference=He4 x=X.dump y=Y.dump epsilon=epsilon.txt out=Z3.dump reps=1",
+  "cases": [
+    {
+      "e3max": 3,
+      "three_body_norm": 97.12139189630095,
+      "three_body_norm_str": "97.121391896300949",
+      "triples_energy": 0.0,
+      "triples_energy_str": "0",
+      "dump": "Z3.dump"
+    },
+    {
+      "e3max": 6,
+      "three_body_norm": 340.71339955428823,
+      "three_body_norm_str": "340.71339955428823",
+      "triples_energy": -3.186471546223424,
+      "triples_energy_str": "-3.1864715462234239",
+      "dump": null
+    }
+  ]
+}

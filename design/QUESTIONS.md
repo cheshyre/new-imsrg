@@ -601,3 +601,49 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   which the existing phase-1 names (`ModelSpace(emax, reference, ...)`) already departed from. Names stay
   snake_case, enum members CamelCase as in phase 1. **Assumed meanwhile:** fine; also bound `opslib`
   (`t_rel`, `rp2`, `h_cm`, ...) because a scripted pipeline needs them.
+* **M10-Q40** (2026-11-15, M10 triples driver) - imsrg++ `CalculatePerturbativeTriples`
+  (IMSRGSolver.cc:1186) combines a split Omega stack as `omega = BCH_Product(omega, Omega[n])`, i.e.
+  e^omega = e^{Omega_0} e^{Omega_n}, while the transformation of H is e^{Omega_n} ... e^{Omega_0} H
+  e^{-Omega_0} ... e^{-Omega_n} (the oldest piece acts first). For a single Omega (no split, as in
+  IT-8 He4 emax 2, O16 emax 3) the order is irrelevant; for a split stack the combined omega differs
+  from the one that generated H at the commutator level. **Assumed meanwhile:** reproduce imsrg++
+  (`flow::PerturbativeTriples` uses `BchProduct(omega, Omega_n)`). Alternative: `BchProduct(Omega_n,
+  omega)`, consistent with the transform order; say if wanted (a fix would be an old-code bug entry
+  in design/30 section 6).
+* **M10-Q41** (2026-11-15, M10 T5 production comm223) - The production `commutator::Comm223`
+  gathers the two-body legs per tile (no global gather tables, as the layout review asked) and is
+  1.7x slower than the prototype K1 at O16 emax 3 E3max 9 (15.3 vs 9.0 ms, 18 threads): W sums 6.8 ms
+  (about K1's), ket-leg gathers 3.3, bra-leg gathers 1.6, epilogue 1.7, set-up 1.5 ms. The tiles at
+  emax 3 are tiny (m <= 12 states, groups <= 6 orbits), so per-leg overhead dominates; at emax 12
+  (m ~ 40-80) the gathers should cost about (thirds + cache misses) / m' ~ 10-20 % of W, not
+  measured (IMSRG(3) only at emax 2-3). If it matters: one team per block of bra triples sharing
+  thirds (ket legs reused; deviates from "one team per bra triple"), or a ket cache keyed by
+  (pair, J). **Assumed meanwhile:** one team per bra triple, as briefed.
+* **M10-Q42** (2026-11-15, M10 T5) - Locality at emax 12, not measurable today: (1) the dense
+  `angmom::SixJ3Table` holds nj^3 nJ^2 nJ3 doubles, 451 MB at emax 12 (360 KB at emax 3), and W
+  reads one 6j per j block at stride c2 (2.7 MB at emax 12), a cache line per value; a per-tile
+  transposed 6j slice in scratch (or a symmetry-reduced table) would fix both. (2) Bra legs are rows
+  of column-major two-body blocks (stride n per element; cached per third w, 4 slots). **Assumed
+  meanwhile:** as is; worth a timing-only run at emax 4-6 if the owner allows one.
+* **M10-Q43** (2026-11-15, M10 T5) - imsrg++ `comm223ss` returns early (Z3 unchanged) when
+  ||X2|| ||Y2|| < 1e-6 outside the first `scalar3b_transform` pass (IMSRG3Commutators.cc:5020);
+  `Comm223` always computes (documented in three_body.h). Results differ only when that product is
+  tiny but nonzero. **Assumed meanwhile:** not reproduced; one line to add if wanted.
+* **M10-Q44** (2026-11-15, M10 T5) - kernels/comm223.cc uses Kokkos directly (TeamPolicy with
+  dynamic schedule, chunk 1, AUTO team size and vector length, level-0 or level-1 scratch, nested
+  TeamThreadRange/ThreadVectorRange reductions, a Sum reducer): `exec::TeamFor` has no schedule,
+  scratch level, or reducer (design/12 section 2). **Assumed meanwhile:** direct Kokkos inside the
+  kernel TU (public headers stay Kokkos-free); add `exec::TeamFor`/`TeamReduce` options when the
+  next team kernels ([2,3]->3, [3,3]->2) arrive.
+* **M10-Q45** (2026-11-15, M10 T5) - Additive API beyond the brief: `ThreeBodyContext::
+  ScratchBytesPerTeam()` (reported by the benchmark) and `impl()` (the internal tables, a
+  `detail::` type for tests and the benchmark). **Assumed meanwhile:** kept; both removable. The
+  context also holds `op::PairThirdSpace`'s E map (1.1 MB of its 4.2 MB at O16 emax 3 E3max 9),
+  which these kernels never read; PairThirdSpace has no option to skip it.
+* **M10-Q46** (2026-11-15, M10 triples lead) - The perturbative triples use E3max = 3 emax, as
+  imsrg++ (`IMSRGSolver.cc:1201-1209`), so without a dE3max cut the triples' kept space, its R map
+  and the (unused) E map grow like the full canonical space: harmless at emax <= 3 (He4 emax 2:
+  6.5 s for the whole IT-8 run in Debug), but at the owner's emax 10-12 target the tables alone
+  would need tens of GB. **Assumed meanwhile:** as imsrg++ (the triples are a post-processing step
+  and `imsrg3.de3max` bounds the space). Follow-up if triples at emax >= 8 are wanted: build R per
+  tile inside the kernel (it is a few 6j products per entry) and skip E for the triples context.

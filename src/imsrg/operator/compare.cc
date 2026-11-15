@@ -39,7 +39,7 @@ std::vector<double> TwoBodyValues(const TwoBody& t) {
 }  // namespace
 
 double PartMaxima::max() const noexcept {
-  return std::max({zero_body, one_body, two_body});
+  return std::max({zero_body, one_body, two_body, three_body});
 }
 
 PartMaxima MaxAbs(const Operator& op) {
@@ -47,6 +47,8 @@ PartMaxima MaxAbs(const Operator& op) {
   m.zero_body = std::abs(op.zero_body());
   m.one_body = MaxAbsOf(op.one_body().buffer().ToVector());
   m.two_body = MaxAbsOf(TwoBodyValues(op.two_body()));
+  if (op.three_body())
+    m.three_body = MaxAbsOf(op.three_body()->buffer().ToVector());
   return m;
 }
 
@@ -59,6 +61,17 @@ PartMaxima MaxAbsDifference(const Operator& a, const Operator& b) {
                             b.one_body().buffer().ToVector());
   m.two_body =
       MaxAbsDiffOf(TwoBodyValues(a.two_body()), TwoBodyValues(b.two_body()));
+  if (a.three_body() || b.three_body()) {
+    ThreeBody a3 = a.three_body() ? *a.three_body() : ThreeBody();
+    ThreeBody b3 = b.three_body() ? *b.three_body() : ThreeBody();
+    if (!a3.empty() && !b3.empty() && a3.hermiticity() != b3.hermiticity()) {
+      a3.set_hermiticity(Hermiticity::kNonHermitian);
+      b3.set_hermiticity(Hermiticity::kNonHermitian);
+    }
+    m.three_body = MaxAbsDiffOf(
+        a3.empty() ? std::vector<double>() : a3.buffer().ToVector(),
+        b3.empty() ? std::vector<double>() : b3.buffer().ToVector());
+  }
   return m;
 }
 

@@ -4,7 +4,7 @@ set(_imsrg_golden_dir "${PROJECT_SOURCE_DIR}/tests/golden")
 set(_imsrg_exec_main "${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc")
 
 imsrg_add_test(NAME operator_core
-  SOURCES test_operator_spec.cc test_one_body.cc test_two_body.cc test_operator.cc
+  SOURCES test_operator_spec.cc test_one_body.cc test_two_body.cc test_three_body.cc test_operator.cc
           test_compare.cc ${_imsrg_exec_main}
   DEPS operator
   LABELS unit
@@ -17,7 +17,8 @@ imsrg_add_test(NAME operator_arithmetic
   NO_GTEST_MAIN)
 
 imsrg_add_test(NAME operator_dump
-  SOURCES test_operator_dump.cc test_golden_dumps.cc ${_imsrg_exec_main}
+  SOURCES test_operator_dump.cc test_operator_dump_3b.cc test_golden_dumps.cc
+          test_golden_imsrg3_dump.cc ${_imsrg_exec_main}
   DEPS operator
   LABELS unit
   NO_GTEST_MAIN)
@@ -47,3 +48,10 @@ imsrg_add_test(NAME operator_no2b_golden
   NO_GTEST_MAIN)
 target_compile_definitions(operator_no2b_golden PRIVATE
   IMSRG_GOLDEN_DIR="${_imsrg_golden_dir}" IMSRG_TEST_DATA_DIR="${IMSRG_TEST_DATA_DIR}")
+
+# Pair-third states and the R / E maps (IMSRG(3), design/14 section 4 item 0).
+imsrg_add_test(NAME operator_pair_third
+  SOURCES test_pair_third.cc pair_third_kernels.cc ${_imsrg_exec_main}
+  DEPS operator exec
+  LABELS unit
+  NO_GTEST_MAIN)

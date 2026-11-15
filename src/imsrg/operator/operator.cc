@@ -17,12 +17,16 @@ Operator::Operator(std::shared_ptr<const basis::ModelSpace> ms,
   IMSRG_CHECK(ms_ != nullptr);
   one_body_ = OneBody(ms_->num_orbits(), spec_.hermiticity);
   two_body_ = TwoBody(ms_, spec_);
+  if (spec_.particle_rank == 3) {
+    three_body_.emplace(ms_, spec_.hermiticity);
+  }
 }
 
-void Operator::set_hermiticity(Hermiticity h) noexcept {
+void Operator::set_hermiticity(Hermiticity h) {
   spec_.hermiticity = h;
   one_body_.set_hermiticity(h);
   two_body_.set_hermiticity(h);
+  if (three_body_) three_body_->set_hermiticity(h);
 }
 
 const basis::ModelSpace& Operator::model_space() const {
@@ -34,16 +38,19 @@ void Operator::set_zero() {
   zero_body_ = 0.0;
   one_body_.set_zero();
   two_body_.set_zero();
+  if (three_body_) three_body_->set_zero();
 }
 
 void Operator::SyncToHost() const {
   one_body_.SyncToHost();
   two_body_.SyncToHost();
+  if (three_body_) three_body_->SyncToHost();
 }
 
 void Operator::SyncToDevice() {
   one_body_.SyncToDevice();
   two_body_.SyncToDevice();
+  if (three_body_) three_body_->SyncToDevice();
 }
 
 bool SameModelSpace(const Operator& a, const Operator& b) noexcept {

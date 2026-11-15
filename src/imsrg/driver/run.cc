@@ -12,6 +12,8 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <limits>
+#include <optional>
 #include <string>
 #include <utility>
 #include <variant>
@@ -24,6 +26,7 @@
 #include "imsrg/driver/pipeline/hamiltonian.h"
 #include "imsrg/flow/magnus.h"
 #include "imsrg/flow/ode.h"
+#include "imsrg/flow/triples.h"
 #include "imsrg/io/valence_writers.h"
 #include "imsrg/mbpt/energies.h"
 #include "imsrg/operator/normal_ordering.h"
@@ -55,7 +58,10 @@ void RejectPlanned(const RunConfig& c) {
   }
   if (c.imsrg.use_brueckner_bch) Planned("imsrg.use_brueckner_bch");
   if (c.imsrg.goose_tank) Planned("imsrg.goose_tank");
-  if (c.imsrg.perturbative_triples) Planned("imsrg.perturbative_triples");
+  if (c.imsrg.perturbative_triples && c.imsrg3.occ_nat3_cut) {
+    // imsrg++.cc:570 switches to natural orbitals for the cut.
+    Planned("imsrg3.occ_nat3_cut with imsrg.perturbative_triples");
+  }
   if (c.imsrg.space) Planned("[imsrg.space] (IMSRG model-space truncation)");
   if (c.imsrg3.active()) Planned("IMSRG(3) ([imsrg3])");
   if (c.imsrg3.factorized && c.imsrg3.factorized_2b_intermediates) {
@@ -253,6 +259,10 @@ class Engine {
         [](const auto& s) -> const op::Operator& { return s.hamiltonian(); },
         v_);
   }
+  /// The Magnus solver (precondition: `is_magnus()`).
+  flow::MagnusSolver& magnus_solver() {
+    return std::get<flow::MagnusSolver>(v_);
+  }
   /// Size of the Omega stack (1 for the ODE methods, which keep none).
   std::size_t num_omegas() const {
     if (const auto* m = std::get_if<flow::MagnusSolver>(&v_))
@@ -281,6 +291,12 @@ struct StageRecord {
   int stage = 0;
   std::string generator;
   flow::SolveResult result;
+};
+
+/// The perturbative-triples correction of stage 1 (imsrg++.cc:1100-1108).
+struct TriplesRecord {
+  double de = 0.0;
+  double e0_plus_de = 0.0;  ///< E0 of the stage-1 H(s) plus de.
 };
 
 struct OperatorRecord {
@@ -356,13 +372,14 @@ void WriteValenceFile(const fs::path& path, op::Operator O, const RunConfig& c,
 
 /// Version of the `results.json` layout (design/16 section 2.10: the schema
 /// table and its changelog). Bump it with every change of the written keys.
-constexpr int kResultsSchemaVersion = 1;
+constexpr int kResultsSchemaVersion = 2;
 
 void WriteResults(const fs::path& path, const pipeline::PreparedHamiltonian& ph,
                   const std::vector<StageRecord>& stages, double e0,
                   std::size_t num_omegas, int num_gathers,
                   const std::vector<OperatorRecord>& ops,
-                  const std::string& valence_file) {
+                  const std::string& valence_file,
+                  const std::optional<TriplesRecord>& triples = {}) {
   std::ofstream out(path);
   if (!out) throw InputError("cannot write '" + path.string() + "'");
   out << "{\n  \"schema_version\": " << kResultsSchemaVersion
@@ -390,7 +407,12 @@ void WriteResults(const fs::path& path, const pipeline::PreparedHamiltonian& ph,
         << ", \"norm_eta\": " << Fmt17(st.result.norm_eta)
         << ", \"stop\": " << JsonString(StopName(st.result.reason)) << "}";
   }
-  out << "]},\n  \"operators\": {";
+  out << "]";
+  if (triples) {
+    out << ", \"perturbative_triples\": {\"de\": " << Fmt17(triples->de)
+        << ", \"e0_plus_de\": " << Fmt17(triples->e0_plus_de) << "}";
+  }
+  out << "},\n  \"operators\": {";
   for (std::size_t i = 0; i < ops.size(); ++i) {
     out << (i ? ", " : "") << JsonString(ops[i].name)
         << ": {\"reference\": " << Fmt17(ops[i].reference)
@@ -470,6 +492,24 @@ void Run(const RunConfig& config) {
   stages.push_back(
       {1, std::string(ToString(core_gen)), solver.Solve(std::ref(flow_log))});
 
+  // ---- Perturbative triples after stage 1 (imsrg++.cc:1100-1108, before the
+  // second stage; H(s) and the Omega stack are those of stage 1).
+  std::optional<TriplesRecord> triples;
+  if (config.imsrg.perturbative_triples && magnus &&
+      stages.back().result.reason != flow::StopReason::kDiverged) {
+    flow::TriplesOptions to;
+    if (config.imsrg3.de3max) to.de3max = *config.imsrg3.de3max;
+    const flow::TriplesResult tr =
+        flow::PerturbativeTriples(solver.magnus_solver(), to);
+    const double e0_stage1 = solver.hamiltonian().zero_body();
+    log::Info(
+        "Perturbative triples: dE3max = {}, 3-body states kept: {} out of {}",
+        to.de3max, tr.kept_rows, tr.total_kets);
+    log::Info("Perturbative triples:  {:16.8f} -> {:.8f}", tr.de,
+              e0_stage1 + tr.de);
+    triples = TriplesRecord{tr.de, e0_stage1 + tr.de};
+  }
+
   const bool second_stage =
       config.imsrg.steps > 1 && config.valence.has_valence_space();
   if (second_stage &&
@@ -543,7 +583,7 @@ void Run(const RunConfig& config) {
   }
 
   WriteResults(dir / "results.json", ph, stages, e0, solver.num_omegas(),
-               solver.num_gathers(), ops, valence_file);
+               solver.num_gathers(), ops, valence_file, triples);
   if (diverged) {
     throw NumericalError(
         "the IMSRG flow diverged (see the flow log); results.json was written");

@@ -62,6 +62,14 @@ target_compile_definitions(angmom_moshinsky PRIVATE
   IMSRG_MOSHINSKY_EXACT_FILE="${_mref}"
   IMSRG_MOSHINSKY_SAMPLES_FILE="${_msamples}")
 
+# --- Three-body 6j family, recoupling and the 6j-trap guards -------------------------------------
+imsrg_add_test(NAME angmom_sixj3
+  SOURCES sixj3_test.cc sixj3_kernels.cc
+          ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
+  DEPS angmom exec
+  LABELS unit
+  NO_GTEST_MAIN)
+
 # --- Angular-momentum tables (device views; own main initializes the exec runtime) --------------
 imsrg_add_test(NAME angmom_tables
   SOURCES tables_test.cc tables_kernels.cc

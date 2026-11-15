@@ -14,8 +14,14 @@
 // every layout, then times the kernels `ref` (K0), `tiled` / `wonly` (K1 and
 // its W part per layout), `triples-ref`, `triples` (per layout) and `pack`
 // (dense <-> packed triangle of layout A), and compares every layout with the
-// reference results. Count-only mode (any emax): sizes of the three layouts
-// and the operation-count cost models from the metadata alone.
+// reference results. The production mode (kernels `prod`, `prod-alloc`,
+// `prod-triples`) builds a `commutator::ThreeBodyContext` for the same kept
+// space and times `commutator::Comm223` (packed layout A, a new part per
+// call; `prod-alloc` times the allocation of that part alone) and
+// `commutator::PerturbativeTriplesEnergy`, reports their table and
+// team-scratch bytes, and checks them against the same references.
+// Count-only mode (any emax): sizes of the three layouts and the
+// operation-count cost models from the metadata alone.
 //
 // Every measurement is also printed as one `JSON {...}` line for scripts.
 // Exit codes: 0 success, 1 a `--check` comparison failed, 2 usage error, 3
@@ -41,17 +47,20 @@
 
 #include "imsrg/base/types.h"
 #include "imsrg/basis/model_space.h"
+#include "imsrg/commutator/three_body.h"
 #include "imsrg/exec/kokkos_backend.h"
 #include "imsrg/exec/runtime.h"
 #include "imsrg/operator/operator.h"
 #include "imsrg/operator/operator_dump.h"
 #include "imsrg/operator/operator_spec.h"
 #include "imsrg/operator/random_operator.h"
+#include "imsrg/operator/three_body.h"
 #include "tools/bench/imsrg3_layout/canonical_space.h"
 #include "tools/bench/imsrg3_layout/cost_model.h"
 #include "tools/bench/imsrg3_layout/kernel_context.h"
 #include "tools/bench/imsrg3_layout/layouts.h"
 #include "tools/bench/imsrg3_layout/pair_third.h"
+#include "tools/bench/imsrg3_layout/production.h"
 #include "tools/bench/imsrg3_layout/sixj3.h"
 
 #ifndef IMSRG_BENCH_GIT_HASH
@@ -78,7 +87,8 @@ struct Options {
   std::string reference = "O16";
   std::vector<std::string> layouts = {"A", "B", "C"};
   std::vector<std::string> kernels = {"ref",     "tiled",       "wonly",
-                                      "triples", "triples-ref", "pack"};
+                                      "triples", "triples-ref", "pack",
+                                      "prod",    "prod-alloc",  "prod-triples"};
   int reps = 10;
   int ref_reps = 3;
   std::uint64_t seed = 1;
@@ -114,7 +124,8 @@ const char* kUsage =
     "[--reps R]\n"
     "         [--ref-reps R] [--seed S] [--check] [--count-only]\n"
     "         [--write-dumps DIR] [--x-dump F --y-dump F]\n"
-    "kernels: ref,tiled,wonly,triples,triples-ref,pack (default: all)\n";
+    "kernels: ref,tiled,wonly,triples,triples-ref,pack,prod,prod-alloc,\n"
+    "         prod-triples (default: all)\n";
 
 /// Parses the command line; throws std::invalid_argument on any error.
 Options ParseOptions(int argc, char** argv) {
@@ -174,7 +185,8 @@ Options ParseOptions(int argc, char** argv) {
   }
   for (const std::string& k : o.kernels) {
     if (k != "ref" && k != "tiled" && k != "wonly" && k != "triples" &&
-        k != "triples-ref" && k != "pack") {
+        k != "triples-ref" && k != "pack" && k != "prod" && k != "prod-alloc" &&
+        k != "prod-triples") {
       throw std::invalid_argument("unknown kernel " + k);
     }
   }
@@ -635,6 +647,61 @@ void PrintAgreements(const Run& r) {
   }
 }
 
+/// Times and checks the production kernels (`commutator::Comm223`,
+/// `commutator::PerturbativeTriplesEnergy`) on the context `pctx`, whose kept
+/// space has the rows of `space`.
+void RunProduction(Run* r, const imsrg::commutator::ThreeBodyContext& pctx,
+                   const l3::CanonicalSpace& space) {
+  const Options& o = r->opt;
+  const std::string lname = "P";
+  const double nan = std::nan("");
+  const auto add = [&](const char* quantity, double value, double reference,
+                       double dev) {
+    const bool pass = dev <= kCheckTol;
+    r->agreements.push_back({lname, quantity, value, reference, dev, pass});
+    Json("agreement")
+        .Params(o)
+        .Str("layout", lname)
+        .Str("quantity", quantity)
+        .Num("value", value)
+        .Num("reference_value", reference)
+        .Num("deviation", dev)
+        .Num("tolerance", kCheckTol)
+        .Bool("pass", pass)
+        .Print();
+  };
+  if (o.WantsKernel("prod")) {
+    op::ThreeBody z;
+    const Stats s = TimeCalls(
+        o.reps, [&] { z = imsrg::commutator::Comm223(r->x, r->y, pctx); });
+    r->AddRow(lname, "prod", o.reps, s);
+    if (r->have_ref) {
+      add("prod_vs_K0_maxdiff", nan, nan,
+          RelDiff(l3::ToCanonicalDense(z, space), r->z0));
+      const double n = op::ImsrgppNorm(z);
+      add("imsrgpp_norm", n, r->norm0, RelScalar(n, r->norm0));
+    }
+  }
+  if (o.WantsKernel("prod-alloc")) {
+    const imsrg::Hermiticity h = r->x.hermiticity() == r->y.hermiticity()
+                                     ? imsrg::Hermiticity::kAntiHermitian
+                                     : imsrg::Hermiticity::kHermitian;
+    op::ThreeBody z;
+    const Stats s = TimeCalls(
+        o.reps, [&] { z = op::ThreeBody(pctx.model_space_ptr(), h); });
+    r->AddRow(lname, "prod-alloc", o.reps, s);
+  }
+  if (o.WantsKernel("prod-triples")) {
+    double e = 0.0;
+    const Stats s = TimeCalls(o.reps, [&] {
+      e = imsrg::commutator::PerturbativeTriplesEnergy(r->x, r->y, r->eps,
+                                                       pctx);
+    });
+    r->AddRow(lname, "prod-triples", o.reps, s);
+    if (r->have_e0) add("triples_energy", e, r->e0, RelScalar(e, r->e0));
+  }
+}
+
 int RunFull(const Options& o) {
   PrintHeader(o);
 
@@ -665,6 +732,17 @@ int RunFull(const Options& o) {
   if (o.WantsLayout("C")) note("layout_C", TimedEmplace(lc, *space, *pt));
   std::optional<l3::KernelContext> ctx;
   note("kernel_context", TimedEmplace(ctx, *space, *pt, *sixj));
+  std::optional<imsrg::commutator::ThreeBodyContext> pctx;
+  if (o.WantsKernel("prod") || o.WantsKernel("prod-alloc") ||
+      o.WantsKernel("prod-triples")) {
+    // The production model space (cuts applied at enumeration) is part of
+    // the build: ThreeBodySpace with the dE3max / OccNat3 cuts, then the
+    // context tables.
+    auto t_prod = Clock::now();
+    const auto ms_prod = l3::ProductionModelSpace(ms, o.de3max, o.occnat3);
+    note("production_model_space", MsSince(t_prod));
+    note("production_context", TimedEmplace(pctx, ms_prod));
+  }
 
   std::printf("\nbuild times\n");
   for (const auto& b : builds) {
@@ -714,6 +792,19 @@ int RunFull(const Options& o) {
       .Int("e_map_bytes", e_bytes)
       .Int("sixj_bytes", sixj_bytes)
       .Print();
+  if (pctx) {
+    const std::int64_t tables = pctx->TableBytes();
+    const std::int64_t scratch = pctx->ScratchBytesPerTeam();
+    std::printf("production context: device tables %" PRId64
+                " bytes, team scratch %" PRId64 " bytes per team\n",
+                static_cast<std::int64_t>(tables),
+                static_cast<std::int64_t>(scratch));
+    Json("memory_production")
+        .Params(o)
+        .Int("table_bytes", tables)
+        .Int("scratch_bytes_per_team", scratch)
+        .Print();
+  }
 
   // ---- operators ----
   op::Operator x =
@@ -770,6 +861,7 @@ int RunFull(const Options& o) {
   if (la) RunLayout(&run, "A", *la);
   if (lb) RunLayout(&run, "B", *lb);
   if (lc) RunLayout(&run, "C", *lc);
+  if (pctx) RunProduction(&run, *pctx, *space);
 
   std::printf("\nkernel timings (ms; warm-up excluded)\n");
   std::printf("%-6s %-12s %5s %12s %12s %12s\n", "layout", "kernel", "reps",

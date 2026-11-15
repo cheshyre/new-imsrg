@@ -51,7 +51,8 @@ TEST(Operator, ConstructorValidates) {
   OperatorSpec bad = OperatorSpec::Scalar(2);
   bad.particle_rank = 0;
   EXPECT_THROW(Operator(ms, bad), InputError);
-  EXPECT_THROW(Operator(ms, OperatorSpec::Scalar(3)), NotImplementedError);
+  // rank 3 needs a model space with a three-body space.
+  EXPECT_THROW(Operator(ms, OperatorSpec::Scalar(3)), InputError);
   EXPECT_THROW(Operator(nullptr, OperatorSpec::Scalar(2)), InvariantError);
 }
 

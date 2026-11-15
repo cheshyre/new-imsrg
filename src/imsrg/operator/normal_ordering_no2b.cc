@@ -18,6 +18,12 @@ Operator NormalOrder(const Operator& op, const No2bThreeBody& v3,
                      std::span<const double> occupations,
                      NormalOrderDirection direction) {
   IMSRG_CHECK(!op.empty(), "normal_order(NO2B): empty operator");
+  if (op.three_body()) {
+    throw NotImplementedError(
+        "normal_order(NO2B): operators with a three-body part (particle_rank "
+        "3) are not "
+        "supported");
+  }
   IMSRG_CHECK(op.hermiticity() == Hermiticity::kHermitian,
               "normal_order(NO2B): the operator must be Hermitian");
   const basis::ModelSpace& ms = op.model_space();

@@ -233,11 +233,16 @@ SolveResult MagnusSolver::Solve(const StatusCallback& on_status) {
 }
 
 op::Operator MagnusSolver::Transform(const op::Operator& O) {
+  return Transform(O, bch_);
+}
+
+op::Operator MagnusSolver::Transform(const op::Operator& O,
+                                     const BchOptions& bch) {
   // imsrg++ Transform (IMSRGSolver.cc:937-1000), in-memory stack, chronological
   // order.
   op::Operator out = WithParticleRank(O, 2);
   for (const op::Operator& omega : omegas_) {
-    out = BchTransform(out, omega, bch_, comm_, *ws_);
+    out = BchTransform(out, omega, bch, comm_, *ws_);
   }
   return out;
 }

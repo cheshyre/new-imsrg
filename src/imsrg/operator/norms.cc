@@ -54,7 +54,11 @@ double TwoBodyNorm(const Operator& op) {
   return std::sqrt(sum);
 }
 
-double ThreeBodyNorm(const Operator&) { return 0.0; }
+double ThreeBodyNorm(const Operator& op) {
+  IMSRG_CHECK(!op.empty(), "three_body_norm: empty operator");
+  if (!op.three_body()) return 0.0;
+  return ImsrgppNorm(*op.three_body());
+}
 
 double Norm(const Operator& op) {
   const double n1 = OneBodyNorm(op);

@@ -342,6 +342,58 @@ TEST(flow_bch, non_finite_omega_stops_the_series) {
   EXPECT_FALSE(rep.converged);
 }
 
+// skip_first_commutator (imsrg++ SetBCHSkipiEq1, perturbative triples):
+// Z = X + sum_{k>=1} ad_Omega^k(X) / (k+1)!, with the imsrg++ termination
+// rule (epsilon starts at ||X|| exp(-2||Omega||) thr / (2||Omega||) and is
+// multiplied by j + 2 after the term j, not by 2 at the skipped step).
+TEST(flow_bch, skip_first_commutator_series) {
+  const auto ms = MakeSpace(1, "He4");
+  Workspace ws(ms);
+  const CommutatorOptions copts;
+  const Operator X = RandOp(ms, Hermiticity::kHermitian, 71, 2, 2.0);
+  const Operator Om = RandOp(ms, Hermiticity::kAntiHermitian, 72, 2, 0.4);
+  BchOptions opts;
+  opts.skip_first_commutator = true;
+  BchReport rep;
+  const Operator Z = flow::BchTransform(X, Om, opts, copts, ws, &rep);
+
+  // Explicit series with the imsrg++ termination rule.
+  const double nx = op::Norm(X);
+  const double ny = op::Norm(Om);
+  Operator expected = flow::WithParticleRank(X, 2);
+  Operator nested = expected;
+  double eps = nx * std::exp(-2 * ny) * opts.transform_threshold / (2 * ny);
+  double fact = 1.0;  // 1 / (j + 1)!
+  int count = 0;
+  for (int j = 1; j <= opts.max_iterations - 1; ++j) {
+    nested = commutator::Commutator(Om, nested, copts, ws);
+    ++count;
+    fact /= j + 1;
+    op::Axpy(fact, nested, expected);
+    eps *= j + 2;
+    if (op::Norm(nested) < eps) break;
+  }
+  EXPECT_EQ(rep.nested_commutators, count);
+  EXPECT_TRUE(rep.converged);
+  EXPECT_GT(count, 3);
+  EXPECT_LT(MaxDev(Z, expected), 1.0e-13);
+
+  // Relation to the full transform: [Omega, Z_skip] = Z_full - X (up to the
+  // series truncation, about 1e-9).
+  const Operator full =
+      flow::BchTransform(X, Om, BchOptions{}, copts, ws, nullptr);
+  Operator lhs = commutator::Commutator(Om, Z, copts, ws);
+  Operator rhs = full;
+  op::Axpy(-1.0, flow::WithParticleRank(X, 2), rhs);
+  EXPECT_LT(MaxDev(lhs, rhs), 1.0e-8);
+
+  // The skipped step also costs one iteration of the cap.
+  opts.max_iterations = 4;
+  flow::BchTransform(X, Om, opts, copts, ws, &rep);
+  EXPECT_EQ(rep.nested_commutators, 3);
+  EXPECT_FALSE(rep.converged);
+}
+
 TEST(flow_bch, hermiticity) {
   const auto ms = MakeSpace(2, "O16");
   Workspace ws(ms);

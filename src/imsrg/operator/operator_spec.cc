@@ -64,10 +64,6 @@ void Validate(const OperatorSpec& s) {
     throw NotImplementedError(
         "non-number-conserving operators are not implemented");
   }
-  if (s.particle_rank == 3) {
-    throw NotImplementedError(
-        "three-body operators (particle_rank 3) are not implemented yet");
-  }
 }
 
 }  // namespace imsrg::op

@@ -21,7 +21,7 @@ for how the tests use them and §2 for the tolerances.
   `new-imsrg-reference/harness-build/refharness` (`tools/reference/refharness.cpp` + `rh_*.cpp`).
 * **Patched build (owner decision D35, 2026-11-15).** The goldens that contain T_int = T - Tcm or Rp2
   (`hamiltonian/emax2_O16/{T,H,Rp2,Rso}.dump`, `hf/*`, `operator/emax2/H_*`, `io/*`, `e2e/IT-1..IT-7`,
-  `IT-8/emax2`, `IT-2/trajectory.csv`) come from a patched imsrg-devel build
+  `IT-8/emax2`, `IT-8/He4_emax2`, `IT-8/emax3`, `IT-2/trajectory.csv`) come from a patched imsrg-devel build
   (`tools/reference/patches/imsrg-devel-d35.patch`: `TCM_Op` without the 1e-7 two-body threshold,
   `Rp2_corrected_Op` without `RpSpinOrbitCorrection`, which is the operator `Rso`). Version string of
   those files: `imsrg-devel src-sha256:ddcbf1aff166414e746113d5f3de2ddc1e72783fb7c201829cd58e317717f40f+d35-patch:cb9d11ba30f579d4`.
@@ -35,7 +35,7 @@ for how the tests use them and §2 for the tolerances.
   `source` lines then carry the `+d35-patch` version string). Why: with dumps from the pristine build the
   test `OpslibGolden.Emax4TrelAndRp2` fails (Rp2 differs by 0.063), and the emax-4 tests skip when the
   directory is absent (a fresh checkout has none).
-  Goldens not listed here (V2, V3_NO2B, random_H, commutator, basis, IT-8/9/10 other jobs) still come from
+  Goldens not listed here (V2, V3_NO2B, random_H, commutator, basis, IT-9/10 other jobs) still come from
   the pristine build.
 * **Default build of the generation scripts (D35).** Every `tools/reference/gen_golden_*.sh` that runs
   `refharness` or `imsrg++` now defaults to the patched build (`harness-build-d35/refharness`,
@@ -193,3 +193,10 @@ commutators for the (A,H), (H,A), (H,H) and (A,A) pairs at emax 1, plus per-dire
 and the regeneration command (`REFHARNESS` must point at `harness-build-comm`) are in
 `commutator/README.md`, section "emax 1, other hermiticity pairs and an open-shell reference".
 Script: `tools/reference/gen_golden_commutator_extra.sh`.
+
+## IMSRG(3) reference data (M10)
+
+`imsrg3/` (random-operator `comm223ss` result of imsrg++ as a 3B OperatorDump, with the 3B norm and
+triples energies) and `e2e/IT-8/*/harness_triples.json` (`refharness flow --perturbative-triples`,
+%.17g) come from `tools/reference/gen_golden_imsrg3.sh`; see `imsrg3/README.md`. `IT-8/He4_emax2` and
+`IT-8/emax3` were regenerated from the patched build (identical to 8 decimals).

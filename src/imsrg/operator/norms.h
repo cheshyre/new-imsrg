@@ -24,8 +24,9 @@ double OneBodyNorm(const Operator& op);
 /// device reduction per channel block.
 double TwoBodyNorm(const Operator& op);
 
-/// Three-body norm (imsrg++ Frobenius norm over its canonical pn storage); 0
-/// while operators have no three-body part (until M10).
+/// Three-body norm: `ImsrgppNorm` of the three-body part (imsrg++
+/// `ThreeBodyStorage_pn::Norm`, the sum of squares over the stored packed
+/// lower triangle of the canonical pn blocks); 0 without a three-body part.
 double ThreeBodyNorm(const Operator& op);
 
 /// imsrg++ `Operator::Norm` for number-conserving operators: sqrt(n1^2 + n2^2 +

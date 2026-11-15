@@ -8,6 +8,7 @@ imsrg_add_module(NAME operator
     operator_spec.cc
     one_body.cc
     two_body.cc
+    three_body.cc
     operator.cc
     compare.cc
     arithmetic.cc
@@ -19,5 +20,6 @@ imsrg_add_module(NAME operator
     no2b.cc
     basis_transform.cc
     random_operator.cc
+    pair_third.cc
     kernels/part_kernels.cc
   DEPS basis linalg angmom exec base)

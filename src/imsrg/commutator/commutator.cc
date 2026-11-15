@@ -74,6 +74,15 @@ void Commutator(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   IMSRG_CHECK(ws.Compatible(Y),
               "commutator: Y is not on the workspace's model space");
   IMSRG_CHECK(&Z != &X && &Z != &Y, "commutator: Z must not alias X or Y");
+  // The IMSRG(3) terms (N7) are not implemented yet: refuse three-body parts
+  // instead of silently dropping them (the [2,2]->3 term alone is
+  // commutator::Comm223, three_body.h).
+  if (X.three_body().has_value() || Y.three_body().has_value() ||
+      (!Z.empty() && Z.three_body().has_value()))
+    throw NotImplementedError(
+        "commutator: operands or outputs with a three-body part need the "
+        "IMSRG(3) terms, which are not implemented yet (use "
+        "commutator::Comm223 for the [2,2]->3 part)");
 
   const op::OperatorSpec spec = CommutatorSpec(X.spec(), Y.spec());
   if (!Z.empty() && Z.spec() == spec && ws.Compatible(Z)) {

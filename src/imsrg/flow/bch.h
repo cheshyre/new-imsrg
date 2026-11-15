@@ -40,6 +40,14 @@ struct BchOptions {
   /// Topologies of F (`commutator::FactorizedDoubleCommutator`); the defaults
   /// are the D32 recipe (one-body intermediates on, two-body off).
   commutator::FactorizedOptions factorized_terms;
+  /// `BchTransform` only (imsrg++ `BCH::SetBCHSkipiEq1`, used by the
+  /// perturbative triples): the series starts at the second nested
+  /// commutator with the weights of the next order, Z = X + sum_{k>=1}
+  /// ad_Omega^k(X) / (k+1)!, so that [Omega, Z] is the full transform of the
+  /// triples' Wbar. Exactly the imsrg++ loop: the i = 1 pass is skipped before
+  /// any bookkeeping, hence epsilon is not multiplied by 2 and the counter of
+  /// the factorial runs one ahead of the nested commutators.
+  bool skip_first_commutator = false;
 };
 
 /// Diagnostics of one `BchTransform` call.
@@ -62,6 +70,12 @@ struct BchReport {
 /// the corrected nested_{i-2}; the correction is added before the series
 /// update and the epsilon test (Omega's intermediates are computed once per
 /// call, `commutator::FactorizedEta`).
+/// With `opts.skip_first_commutator` (imsrg++ `BCH::SetBCHSkipiEq1`) the term
+/// i = 1 is skipped as a whole: the pass i = 1 is empty (no division by i,
+/// no epsilon update), the passes i >= 2 add nested_{i-1} / i! and multiply
+/// epsilon by (i + 1); the factorized correction F(Omega, nested_{j-2}) then
+/// applies from nested_2 on, as without the skip (imsrg++ `i_min_factorized =
+/// 2`).
 /// Norms are `op::norm` (zero-body part excluded). X is promoted to
 /// particle_rank 2 (imsrg++ `SetParticleRank(2)`) so Z has a two-body part.
 /// Omega must be anti-Hermitian for a unitary transformation; without
