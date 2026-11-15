@@ -220,7 +220,8 @@ TEST(WeightedBlockSumOfSquares, EmptyBlocksBigBlocksAndChunkBoundaries) {
   const std::vector<std::int64_t> off = {
       0, 0, 5, 5, 4000, 12000, 12288, 12288, 12290, 20000, 20000};
   std::vector<double> w(off.size() - 1);
-  for (std::size_t b = 0; b < w.size(); ++b) w[b] = 1.0 + 0.5 * b;
+  for (std::size_t b = 0; b < w.size(); ++b)
+    w[b] = 1.0 + 0.5 * static_cast<double>(b);
   ExpectWeightedSum(off, w, 20500);
 }
 
