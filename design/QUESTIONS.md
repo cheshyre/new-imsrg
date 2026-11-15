@@ -557,3 +557,33 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   (upper triangle, as imsrg++), which halves the memory; unpacking a channel for GEMM-type terms cost
   4 % of a [2,2]->3 evaluation at emax 3 (0.40 of 9 ms). **Assumed meanwhile:** packed storage, dense
   scratch per channel inside kernels. Alternative: dense blocks (simpler kernels, twice the memory).
+* **M11-Q10** (2026-11-15, M11 python phase 2) - The brief asks for a commutator that accepts general
+  (non-Hermitian) operators, but `commutator::Commutator` of this core still throws
+  `NotImplementedError` for a `NonHermitian` X or Y (the symmetry tricks of the kernels need Hermitian
+  or anti-Hermitian input; `commutator_ref` handles any hermiticity). **Assumed meanwhile:** the binding
+  passes everything through and surfaces the core's `NotImplementedError` (tested); it will accept
+  general operators as soon as the core does, no binding change needed.
+* **M11-Q11** (2026-11-15, M11 python phase 2) - D29 says a stale host view raises `StaleHostError`.
+  On Serial/OpenMP builds the host mirror aliases the device data, and 23 existing tests (names fixed)
+  read views of library results directly. **Assumed meanwhile:** the state machine is always tracked,
+  but the default policy `Auto` raises only where the memory is not host accessible (GPU); `Strict`
+  (`with imsrg.strict_residency():` or `IMSRG_RESIDENCY=strict`) raises everywhere, so scripts can be
+  tested for portability to GPU nodes; `Implicit` never raises. Say if the default should be `Strict`.
+* **M11-Q12** (2026-11-15, M11 python phase 2) - Force-finalize (answer to M11-Q1): `Runtime.finalize(force=True)`
+  and the exit hook now free the device data of every live operator and solver (later use raises
+  `StaleHostError`), but refuse (all or nothing) while numpy views of an operator are alive, because
+  freeing under a view would leave it dangling. **Assumed meanwhile:** at exit a global view then blocks
+  finalization as before (Kokkos is left to process exit).
+* **M11-Q13** (2026-11-15, M11 python phase 2) - Solver observers: the C++ solvers have no stop request
+  from a status callback, so `solve(on_status)` cannot stop on a returned `True` (design/18 2.7); an
+  exception raised by the callback aborts the solve at a step boundary and is re-raised. Python
+  generator callbacks (`GeneratorFn`) are not bound (needs a C++ hook in `flow`). **Assumed meanwhile:**
+  exception-based early exit is enough for the owner's group; a stop flag/generator hook would be a
+  `flow` API addition.
+* **M11-Q14** (2026-11-15, M11 python phase 2) - API shape: the bound surface follows the C++ modules
+  (`imsrg.io.read_me2j`, `hf.solve(h, v3, mixing=...)`, `HFResult`, `flow.MagnusSolver`/`OdeSolver`,
+  `commutators.commutator(terms=...)`, `pipeline.run(config) -> RunResult` over `results.json`) rather
+  than the proposal's dataclass tree (`Solver`, `SolverOptions(method=...)`, `ModelSpace.from_reference`),
+  which the existing phase-1 names (`ModelSpace(emax, reference, ...)`) already departed from. Names stay
+  snake_case, enum members CamelCase as in phase 1. **Assumed meanwhile:** fine; also bound `opslib`
+  (`t_rel`, `rp2`, `h_cm`, ...) because a scripted pipeline needs them.

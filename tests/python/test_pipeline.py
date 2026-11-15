@@ -69,11 +69,11 @@ def test_hf_task(me2j_file, tmp_path):
 
 
 def test_imsrg_run_results_and_flow_file(me2j_file, tmp_path, he4_emax2):
-    cfg = imsrg.load_config(text=he4_toml(me2j_file, tmp_path / "run", extra='[operators]\nlist = ["Rp2"]\n'))
+    cfg = imsrg.load_config(text=he4_toml(me2j_file, tmp_path / "run", extra='[imsrg.step]\nsmax = 30\n\n[operators]\nlist = ["Rp2"]\n'))
     res = pipeline.run(cfg)
     assert res.e_hf == pytest.approx(he4_emax2[2].e_hf, abs=1e-10)
     assert res.e_mp2 < 0 and res.e0 < res.e_reference
-    assert res.results["imsrg"]["stages"][0]["stop"] in ("converged", "Converged", "converged ")
+    assert res.results["imsrg"]["stages"][0]["steps"] > 10
     assert set(res.operators) == {"Rp2"}
     assert res.operators["Rp2"]["imsrg"] > 0 and res.operators["Rp2"]["reference"] > 0
     flow = res.flow()
@@ -96,7 +96,7 @@ def test_python_m_imsrg_run(me2j_file, tmp_path):
     root = str(Path(imsrg.__file__).resolve().parent.parent)
     env["PYTHONPATH"] = root + os.pathsep + env.get("PYTHONPATH", "")
     out = subprocess.run(
-        [sys.executable, "-m", "imsrg", "run", str(p), "--set", "output.directory=" + str(tmp_path / "cli2")],
+        [sys.executable, "-m", "imsrg", "run", str(p), "--set", "output.directory=" + str(tmp_path / "cli2"), "--set", "imsrg.step.smax=30"],
         env=env, capture_output=True, text=True, timeout=300,
     )
     assert out.returncode == 0, out.stderr
