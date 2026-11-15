@@ -32,6 +32,7 @@ add_executable(refharness
   rh_commutator.cpp
   rh_bench.cpp
   rh_flow.cpp
+  rh_factorized.cpp
 )
 target_compile_features(refharness PRIVATE cxx_std_17)
 target_include_directories(refharness PRIVATE
