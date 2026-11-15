@@ -47,3 +47,10 @@ imsrg_add_test(NAME operator_no2b_golden
   NO_GTEST_MAIN)
 target_compile_definitions(operator_no2b_golden PRIVATE
   IMSRG_GOLDEN_DIR="${_imsrg_golden_dir}" IMSRG_TEST_DATA_DIR="${IMSRG_TEST_DATA_DIR}")
+
+# Pair-third states and the R / E maps (IMSRG(3), design/14 section 4 item 0).
+imsrg_add_test(NAME operator_pair_third
+  SOURCES test_pair_third.cc pair_third_kernels.cc ${_imsrg_exec_main}
+  DEPS operator exec
+  LABELS unit
+  NO_GTEST_MAIN)
