@@ -3,7 +3,7 @@
 #
 # What: two quirks of imsrg++ are removed in imsrg_util.cc.
 #   1. TCM_Op: the two-body part no longer drops entries with |p1p2/A| <= 1e-7, so
-#      Trel = T - Tcm (and thus the bare H) keeps every entry (changes of <= 1e-7 MeV per element).
+#      Trel = T - Tcm (and thus the bare H) keeps every entry (measured effect <= 2.4e-15 MeV).
 #   2. Rp2_corrected_Op (operator "Rp2"): no longer adds 1/Z * RpSpinOrbitCorrection; that term is the
 #      separate operator "Rso" (already in OperatorFromString). Old Rp2 = new Rp2 + (1/Z) * Rso.
 # Why: owner decision D35 (M6-Q1, M6-Q2): the rewrite fixes both quirks instead of carrying

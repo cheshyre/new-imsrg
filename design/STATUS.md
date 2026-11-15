@@ -3,8 +3,11 @@
 ## Current state (keep this section up to date)
 
 * **Phase:** **run 2 in progress** (started 2026-11-15 13:50 JST; plan `design/NEXT_SESSION_PROMPT.md`;
-  draft report `design/reports/2026-11-15-run2.md`). MS (Google style) is merged; next: the M8
-  follow-ups and interview tasks, and the two M10 tracks. Run 1 ended 2026-11-12 ~08:45 JST (report
+  draft report `design/reports/2026-11-15-run2.md`). Merged in run 2 so far: MS (Google style),
+  hunter-gatherer, D35 (Tcm/Rp2/Rso with a patched reference), the flow-review fixes, the D37
+  config/driver tasks, the reference-tooling clean-up. In progress: M10 layout benchmark
+  (`feature/m10-layout`), M10 3f2 (`feature/m10-3f2`), flow-RK4/DP45 (`feature/m8-flow-rk4`).
+  Run 1 ended 2026-11-12 ~08:45 JST (report
   `design/reports/2026-11-12-overnight.md`); the owner interviews of 2026-11-13 (D25–D29) and
   2026-11-15 (D30–D42, `design/reports/2026-11-15-owner-interview.md`) answered every run-1 question.
 * **Integration branch:** `develop` (local). Run 2 again runs in an app worktree, so `develop` is
@@ -18,27 +21,21 @@
   base/exec/comm/linalg/angmom; M3 basis; M4 operator (`imsrg::op`); M5+M6 io/opslib/hf (mixing +
   DIIS); M7 IMSRG(2) commutators (Kokkos kernels + `commutator_ref`); M8a config/legacy CLI/`apps/imsrg`;
   M8 flow (generators, BCH, Magnus) + driver pipeline; M9 mbpt; M11 phase 1 Python bindings;
-  MS Google-style conversion.
-* **End to end:** `imsrg` reproduces imsrg-devel for IT-2, IT-3, IT-4, IT-6, IT-7, IT-12 (same step
-  counts, |ΔE0| ≤ 3e-10 MeV, `.snt` ≤ 1.2e-14). CI on `develop`: 851 unit, 34 integration, 3 MPI,
-  23 Python tests, dev-openmp PASS (dev-serial passed in every lead's final run).
-* **Prepared outside the repository during MS (to be committed by the M8 branches):** the patched
-  imsrg-devel build for D35 (`new-imsrg-reference/build-d35`, `harness-build-d35`; staged patch,
-  build-script mode and regenerated goldens in `new-imsrg-reference/staging/`, `REGEN_D35.md`); the
-  refharness flags for hunter-gatherer, `omega_norm_max` and the factorized intermediates, with
-  hunter-gatherer goldens and IT-10 regenerated with the D32 recipe (`staging-hg3f2/`,
-  `REGEN_HG_3F2.md`); an Opus review of the flow numerics (2 bugs, design notes for hunter-gatherer,
-  3f2 and RK4/DP45); implementation plans for the M10 layout benchmark and for 3f2
-  (`new-imsrg-reference/plans/`).
-* **Not started:** M10 IMSRG(3) (two tracks, 3f2 and layout, D39; briefs ready; the empty
-  `feature/m10-layout-benchmark` is checked out in a stale run-1 worktree, so the layout track uses
-  `feature/m10-layout`), M11 phase 2, M12a/M12b (D40), M13, M14 (GPU, after M12). Open M8 follow-ups and
-  the tasks of the 2026-11-15 interview are listed under M8 in `40-roadmap.md` (hunter-gatherer,
-  Tcm/Rp2 fixes with a patched reference build, `hartree_fock.mixing`, config-relative paths,
-  `results.json` schema version, MP2 column, NAT/IT-5, non-Hermitian commutator paths, 1/√2, ...).
-  The IT-10 goldens must be regenerated with the owner's 3f2 recipe before use (D32).
-* **Interruptions:** all agents stopped on the 5-hour usage limit 01:30–02:30 and 04:15–07:30 JST.
-  Usage budget, not wall time, was the binding constraint.
+  MS Google-style conversion; hunter-gatherer Magnus; D35 fixes; flow-review fixes; D37 config/driver
+  tasks (DIIS default, config-relative paths, `schema_version`, EMP2, NAT basis).
+* **End to end:** `imsrg` reproduces imsrg-devel (the D35-patched build since run 2) for IT-1 (EMP2),
+  IT-2, IT-3, IT-4, IT-5 (NAT, smax 10), IT-6, IT-7, IT-12 and the hunter-gatherer cases (same step
+  and gather counts, |ΔE0| ≤ 3e-10 MeV, `.snt` ≤ 2e-14, IT-6 Rp2 1.8e-9 fm²). IT-8, IT-9, IT-10 wait
+  for M10. CI on `develop`: 877 unit, 44 integration, 3 MPI, 23 Python tests, dev-openmp PASS in
+  ~75 s. The reference: patched imsrg-devel `new-imsrg-reference/build-d35`, `harness-build-d35`
+  (default of every `tools/reference/gen_golden_*.sh`).
+* **Not started:** non-Hermitian fast-commutator paths and full-precision 1/√2 (wait for the 3f2
+  merge: same kernels), M11 phase 2, M12a/M12b (D40), M13, M14 (GPU, after M12). The
+  `feature/m10-layout-benchmark` branch of run 1 is empty and checked out in a stale worktree; the
+  layout track uses `feature/m10-layout`. Implementation plans made during MS:
+  `new-imsrg-reference/plans/m10-layout-plan.md`, `m10-3f2-plan.md`.
+* **Interruptions:** run 1: 5-hour usage limit 01:30–02:30 and 04:15–07:30 JST. Run 2: limit reached
+  ~16:35, reset 18:00 JST; agents resumed with `SendMessage`. Usage budget, not wall time, binds.
 * **Toolchain:** Homebrew cmake 4.4.5, ninja 1.13.2, ccache 4.14.3, Open MPI 5.0.11, libomp 23.1.5,
   clang-format 23.1.5, gsl, boost, openblas; Apple clang 21; Python 3.15.2; Kokkos 5.3.0 per backend
   in `~/.cache/imsrg-deps` (`tools/bootstrap_deps.sh`); shared venv `~/.cache/imsrg-deps/venv`. The
@@ -82,3 +79,4 @@
 | 2026-11-15 16:05 | feature/m8-tcm-rp2-rso → develop | **D35 fixes with a patched reference**: `tools/reference/patches/imsrg-devel-d35.patch` (imsrg++ `TCM_Op` without the 1e-7 threshold, `Rp2_corrected_Op` without `RpSpinOrbitCorrection`), `build_imsrg_devel.sh patched` (separate `build-d35`/`harness-build-d35`, stamp file), `regen_golden_d35.sh`; goldens regenerated from the patched build (`hamiltonian/emax2_O16` + new `Rso.dump`, `hf/*`, `operator/emax2/H_*`, `io/*`, `e2e/IT-1..IT-7`, `IT-4/smax10`, `IT-5/smax10`, `IT-8/emax2`, `IT-2/trajectory.csv`); `opslib`: Tcm keeps all entries, Rp2 without spin-orbit (no option), new catalog operator `Rso`; `30` §6, `13`, `16` updated | The threshold dropped only ≤ 2.4e-15 MeV; IT-2 ΔE0 −2.97e-10 MeV (256 steps); IT-4/smax10 1.5e-10 (29); IT-3/IT-7 421/431 steps, `.snt` ≤ 2e-14; IT-6 Rp2 4.45025883 (was 4.45016791), dev 1.8e-9 fm² (tolerance tightened 1e-4 → 1e-6); Rso vs golden 0; Rp2 dump 3e-16; Trel 5e-15/1e-14. Reviewer pass (D42): acceptable, 7 low findings. ci.sh dev-openmp PASS (worker; 855 unit, 36 integration) and on the merge | M8-Q20 (no charge radius in the code yet: output stage must add Rso/Z), M8-Q21 (**regenerate the gitignored `build/golden-generated` with the patched harness in every checkout**, else `Emax4TrelAndRp2` fails), M8-Q22 (merge conflict, resolved). Review follow-ups (low): baseline of `d35_restore_unchanged.py` from git, scratch paths in e2e `result.json` command fields, `.snt` version header churn, IT-8/9/10 goldens still from the pristine build (≤ 1e-14), exact Tcm entry count test, patch header wording; rebuild `harness-build-d35` from the merged `tools/reference` and default the gen scripts to it |
 | 2026-11-15 16:20 | feature/m8-flow-fixes → develop | **Flow-review fixes (F2a)** from the Opus review of 2026-11-15: the stage-2 solver options reach the solver (`MagnusSolver::set_solver_options`; small steps for stiff valence generators as imsrg++.cc:1130-1140); NaN/inf norms or energies end as Diverged (driver throws `NumericalError`) and `BchTransform` stops on non-finite nested commutators; library-side validation (`InputError` for non-positive/non-finite dsmax, domega, ds_0, omega_norm_max, non-finite smax, NaN eta criterion, `denominator_cutoff <= 0`); non-adaptive ds starts at min(ds_0, dsmax) like imsrg++ `SetDsmax`; `imsrg.omega.storage = scratch/discard` rejected with E-PLANNED | New tests for each item (driver-level stage-2 max ds 0.0024 ≤ 1e-2; injected NaN in E0 and a 1B element; BCH stops after one commutator); existing golden comparisons unchanged; ci.sh dev-openmp PASS (worker, 62 s) and on the merge | M8-Q12. Still open from the review: `flow`/`flow_rk4` driver wiring (item 4), DP45 error control (item 6), RK4/DP45, `Denominators` copy (F2b) |
 | 2026-11-15 16:25 | feature/m8-config-driver → develop | **Config and driver tasks of the 2026-11-15 interview (D37, M8 follow-ups)**: `hartree_fock.mixing` (`diis` default in TOML, linear in the legacy layer); relative paths in TOML resolve against the config file's directory, legacy/CLI against the working directory, `resolved_config.toml` records absolute paths (examples and the equivalence test adapted); `results.json` `schema_version` 1 with the schema table and changelog in `16` §2.10 and a test that the written keys match it; EMP2 in `results.json` (`e_mp2`) and an `E_MP2` flow-CSV column; `basis.kind = nat` in the driver through the new public `hf::SolutionInBasis` (replaces the test-only `hf::detail` coupling) and IT-5 as an integration test; `tests/support/scratch_dir.h` | IT-1 EMP2 −3.4e-9 MeV; IT-2 first 10 flow rows E_MP2 5e-10; IT-5/smax10 28 steps (28), E0(s=10) 3.6e-10, NAT E_HF 1.9e-10, NAT EMP2 −3.5e-10, HF-basis E_HF −1.1e-8 MeV; IT-12 bitwise identical; ci.sh dev-openmp PASS (worker, ~50 s, Python step skipped there) and on the merge (Python tests run) | M8-Q30..Q33 (default `output.directory` against the working directory; NAT `use_occupations`/`order=energy` E-PLANNED; integration tests that reproduce imsrg++ step counts set `mixing = "linear"`) |
+| 2026-11-15 18:20 | feature/ref-tooling-d35 → develop | **Reference-tooling clean-up (D35 review follow-ups)**: every `tools/reference/gen_golden_*.sh` defaults to the patched build (`harness-build-d35`, `build-d35`, `REFERENCE_SRC_SHA256_D35`), `harness-build-d35` rebuilt from the merged `tools/reference` (has the hunter-gatherer flags); `d35_restore_unchanged.py` takes its baseline from git (e291b07); patch header wording (2.4e-15 MeV, body byte-identical); how to regenerate the gitignored `build/golden-generated` (README, M8-Q21) | Rebuilt harness reproduces the committed IT-2 and IT-10 trajectories byte-identically (result.json differs only in wall time; IT-2/hunter_gatherer omax 0.10 differs at 2.8e-14 MeV from thread-count summation order, not committed); with regenerated `build/golden-generated` the emax-4 tests run and pass (`Emax4TrelAndRp2` included); ci.sh dev-openmp PASS (worker) and on the merge | Owner: run `tools/reference/gen_golden_generated.sh` once in the main checkout (stale pristine dumps make `Emax4TrelAndRp2` fail) |

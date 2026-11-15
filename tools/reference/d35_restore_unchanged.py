@@ -9,35 +9,50 @@ string and a zero diff. Only files under hamiltonian/, hf/, operator/ and io/ ar
 (the e2e goldens carry wall times and are always rewritten).
 
 Usage: d35_restore_unchanged.py [--baseline DIR] [--staging DIR]
-  baseline default: $IMSRG_REFERENCE_ROOT/golden-baseline (a copy of tests/golden at develop
-                    c01d766, made before the regeneration)
+  baseline default: tests/golden at git revision e291b07 (the goldens before the D35
+                    regeneration), extracted with `git archive` into a temporary directory that
+                    is removed afterwards. Nothing outside the repository is read.
   staging  default: tests/golden of the checkout that holds this script
 """
 import argparse
+import io
 import os
 import re
 import shutil
+import subprocess
 import sys
+import tarfile
+import tempfile
 
-ROOT = os.environ.get("IMSRG_REFERENCE_ROOT", "/Users/cheshyre/Downloads/new-imsrg-reference")
 HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
+BASELINE_REV = "e291b07"
 VER = re.compile(rb"[0-9a-f]{64}(\+d35-patch:[0-9a-f]+)?")
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--baseline", default=os.path.join(ROOT, "golden-baseline"))
-    ap.add_argument("--staging", default=os.path.join(HERE, "..", "..", "tests", "golden"))
-    a = ap.parse_args()
+def extract_baseline(dest):
+    """Extracts tests/golden of BASELINE_REV into dest and returns the path of dest/tests/golden."""
+    archive = subprocess.run(
+        ["git", "-C", REPO, "archive", "--format=tar", BASELINE_REV, "tests/golden"],
+        check=True, stdout=subprocess.PIPE).stdout
+    with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
+        if hasattr(tarfile, "data_filter"):
+            tar.extractall(dest, filter="data")
+        else:
+            tar.extractall(dest)
+    return os.path.join(dest, "tests", "golden")
+
+
+def restore(baseline, staging):
     kept, changed, new = [], [], []
     for sub in ("hamiltonian", "hf", "operator", "io"):
-        for d, _, files in os.walk(os.path.join(a.staging, sub)):
+        for d, _, files in os.walk(os.path.join(staging, sub)):
             for f in sorted(files):
                 p = os.path.join(d, f)
-                rel = os.path.relpath(p, a.staging)
+                rel = os.path.relpath(p, staging)
                 if f == "README.md":
                     continue
-                b = os.path.join(a.baseline, rel)
+                b = os.path.join(baseline, rel)
                 if not os.path.exists(b):
                     new.append(rel)
                     continue
@@ -56,6 +71,24 @@ def main():
         print("   *", r)
     for r in new:
         print("   + (no baseline)", r)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--baseline", default=None,
+                    help="a tests/golden directory to compare with (default: git e291b07)")
+    ap.add_argument("--staging", default=os.path.join(HERE, "..", "..", "tests", "golden"))
+    a = ap.parse_args()
+    tmp = None
+    try:
+        if a.baseline is None:
+            tmp = tempfile.mkdtemp(prefix="d35-baseline-")
+            a.baseline = extract_baseline(tmp)
+        restore(a.baseline, a.staging)
+    finally:
+        if tmp is not None:
+            shutil.rmtree(tmp, ignore_errors=True)
+    return 0
 
 
 if __name__ == "__main__":

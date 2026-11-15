@@ -9,7 +9,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "${HERE}/../.." && pwd)"
 ROOT="${IMSRG_REFERENCE_ROOT:-/Users/cheshyre/Downloads/new-imsrg-reference}"
-RH="${1:-${ROOT}/harness-build-hg3f2/refharness}"
+RH="${1:-${ROOT}/harness-build-d35/refharness}"
 export IMSRG_REFERENCE_SHA_FILE="${IMSRG_REFERENCE_SHA_FILE:-${ROOT}/REFERENCE_SRC_SHA256_D35}"
 OUT="${IMSRG_GOLDEN_E2E_OUT:-${REPO}/tests/golden/e2e}"
 FLOW_JOBS="${FLOW_JOBS:-IT-2 IT-2-HG IT-10}"
