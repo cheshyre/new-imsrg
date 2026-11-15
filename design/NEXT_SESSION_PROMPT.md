@@ -131,14 +131,14 @@ rows of the interview after run 2) and in the answers in `design/QUESTIONS.md`. 
   (149 tests).
 * **End to end:** `imsrg` reproduces imsrg-devel (D35-patched) for IT-1..IT-8, IT-10, IT-12, IT-14 and
   the hunter-gatherer cases (identical step and gather counts, |ΔE0| ≤ 3e-10 MeV); numbers in the
-  run-2 report §3. CI on `develop`: 1055 unit, 61 integration, 3 MPI, 149 Python tests (1 skipped), `ci.sh dev-openmp` 101 s (`develop` bd2fda4 at the time of writing; use the hash in STATUS); the `slow` suite has 6 tests (IT-9 emax 3 takes ~46 min on a loaded machine), run it before numerics merges.
+  run-2 report §3. CI on `develop`: 1069 unit, 61 integration, 3 MPI, 149 Python tests (1 skipped), `ci.sh dev-openmp` 129 s (`develop` 9bef685 at the time of writing; use the hash in STATUS); the `slow` suite has 6 tests (IT-9 emax 3 took 39 min on the merge), run it before numerics merges.
 * **IMSRG(3)-N7 (IT-9): merged.** Every N7 term vs the m-scheme brute force <= 6.1e-15 and vs imsrg-devel
   <= 6.1e-16 (full commutator 5.7e-16); IT-9 He4/O16 at emax 2 and 3 with identical step counts
   (250/147/248/173), |dE0| <= 3.8e-10 MeV; ours 12.5 s vs 24 s (O16 emax 2), 644 s vs 21 min (O16 emax 3),
   720 s vs 30 min (He4 emax 3). imsrg++ bug fixed: the `comm232` hermX*hermY shortcut is wrong for
   non-Hermitian operands (`30` section 6 M10-N7-1..3). Open: N7 is correct but not yet scalable (comm232
   tiling, tiled 133/132/231/331, `14` section 1.1; M10-Q60..Q67).
-* **M12a single-node performance: merged (9bef685; check `STATUS.md` that its CI passed).** Full
+* **M12a single-node performance: merged (9bef685; CI and the slow suite passed).** Full
   IMSRG(2) commutator, ms, before M12a -> now / imsrg++: emax 4: 1 thread 6.71 -> 1.16 / 5.21, 6 threads
   2.18 -> 0.65 / 1.53; emax 6: 100 -> 18.2 / 70.6, 24.9 -> 5.1 / 15.2 (18 threads 3.9 / 9.5); emax 8:
   866 -> 169 / 671, 199 -> 49 / 155 (18 threads 31 / 95). Full O16 flow (same steps and E0): emax 8
@@ -228,12 +228,13 @@ rows of the interview after run 2) and in the answers in `design/QUESTIONS.md`. 
 
 ## Brief for the N7 performance task (ready to use; adjust the hashes)
 
-> You lead **M10 N7 performance** on `feature/m10-n7-perf` (`develop` = bd2fda4, update it). Question
+> You lead **M10 N7 performance** on `feature/m10-n7-perf` (`develop` = 9bef685, update it). Question
 > ids `M10-Q<block>` (the last used is Q67). **Golden rule 10:** searches stay inside the repository,
 > its worktrees, `/Users/cheshyre/Downloads/new-imsrg-reference/`, `~/.cache/imsrg-deps/` and temp
 > directories; never `find /`, `find ~`, `mdfind`. emax <= 6 everywhere, IMSRG(3) only at emax 2 and 3.
-> Delegate code to Sonnet workers, one Opus review of the kernels; final report due by <TIME>
-> (keep working until then). Read `AGENTS.md`, `design/14-imsrg3-plan.md` section 1.1 and 4, `00` (D34,
+> Delegate code to Sonnet workers, one Opus review of the kernels; final report due by the owner's
+> wrap-up deadline (run 2: 08:00 JST; ask at launch if none is given; leads report about 1 h before
+> it; keep working until then). Read `AGENTS.md`, `design/14-imsrg3-plan.md` section 1.1 and 4, `00` (D34,
 > D43), `12` sections 3-5, `benchmarks/imsrg3-layout.md`, QUESTIONS M10-Q41..Q46 and M10-Q60..Q67, the
 > N7 kernels (`commutator/kernels/`), `30` section 6 M10-N7-1..3. State: all N7 terms are correct (<= 6.1e-15
 > vs the m-scheme brute force) and IT-9 passes (O16 emax 3: 644 s vs 21 min for imsrg++). Goal:
@@ -248,7 +249,7 @@ rows of the interview after run 2) and in the answers in `design/QUESTIONS.md`. 
 
 ## Brief for the M12a follow-ups (ready to use; adjust the hashes)
 
-> You lead **M12a — single-node CPU performance** on `feature/m12a-perf` (`develop` = bd2fda4, update it; base: the M12a
+> You lead **M12a — single-node CPU performance** on `feature/m12a-perf` (`develop` = 9bef685, update it; base: the M12a
 > merge). Question ids `M12-Q<block>` (Q1..Q5 used). **Golden rule 10 applies** (searches only inside the project
 > directories). Delegate to Sonnet workers; one Opus review per kernel merge. Goal (D40): imsrg++
 > parity is reached (1.5-3x faster); explore how far one node goes, judged mainly at larger emax. Known
@@ -267,7 +268,7 @@ rows of the interview after run 2) and in the answers in `design/QUESTIONS.md`. 
 
 ## Brief for M12b — MPI (ready to use once M12a's data structures have settled)
 
-> You lead **M12b — MPI distribution** on `feature/m12b-mpi` (`develop` = bd2fda4, update it). Question ids
+> You lead **M12b — MPI distribution** on `feature/m12b-mpi` (`develop` = 9bef685, update it). Question ids
 > `M12b-Q<block>`. **Golden rule 10 applies.** Read `AGENTS.md`, `14-imsrg3-plan.md` §4 item 4, `00`
 > (D14, D34, D40, D43), `12`, `comm` module headers (Communicator, serial stub), the `Workspace`
 > and ownership notes of M7. Phase 1 (D14): 1B/2B operator parts replicated; the expensive IMSRG(2)

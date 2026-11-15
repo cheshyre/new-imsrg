@@ -201,9 +201,15 @@ Format: **id** — summary; *assumption taken*; what an answer changes.
   time). *Assumed.*
 * **N7 results to mention** (no question): IT-9 passes with identical steps, |dE0| <= 3.8e-10 MeV, and
   the imsrg++ comm232 non-Hermitian bug is fixed; ours is 2x (emax 2) to 2.5x (emax 3) faster.
-* **M12-Q1..Q5** (M12a, `QUESTIONS.md`): the performance choices of M12a (stored sparse Pandya maps
-  not built, about six operators of memory; `Workspace` 5.5x a 2B operator; follow-ups `dsyr2k`, BCH
-  temporaries, launch overhead at small emax). Read them in `QUESTIONS.md`; *assumptions taken*.
+* **M12-Q1** — `get_pn` orbit scan and CGs tabulated (183 → 65 ns); six hash lookups remain. *Left as is.*
+* **M12-Q2** — `TwoBodyNorm` relies on contiguous `BlockSparseMatrix` blocks (checked); two small
+  device buffers per call. *Assumed this stays the layout.*
+* **M12-Q3** — the Python GIL-release test was wall-time fragile as the solver got faster; now a
+  builtin `list.append` callback counted from the main thread. *Resolved; no decision.*
+* **M12-Q4** — ladder-direct channels read X, Y in place when all weights are exactly 1.0; scratch
+  3.75× → 2.0× of a 2B operator. *No open decision.*
+* **M12-Q5** — `GroupedGemm` runs problems concurrently only with Accelerate; OpenBLAS/MKL keep the
+  sequential loop (oversubscription, MKL rounding). *To be decided with the cluster builds (M12b/M14).*
 
 **G. Low-impact confirmations (summarize one line each and ask the owner to flag any to revisit)**
 M8-Q22 (merge resolution), M8-Q21 (resolved: gen scripts default to the patched harness), M11-Q10
