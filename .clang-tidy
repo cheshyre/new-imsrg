@@ -24,7 +24,9 @@ CheckOptions:
   # Functions and methods: CamelCase. Accessors (const, return a property or part of the object,
   # possibly selected by an index or key), mutators (set_*) and STL analogs keep snake_case
   # (Google style guide, "Function Names"); MethodIgnoredRegexp is that allowlist, collected
-  # during the conversion (design/17 section 3). Static member functions are not accessors.
+  # during the conversion (design/17 section 3). Static member functions are not accessors,
+  # except ThreeBodyChannels::channel_index and the internal DeviceBufferAccess::view, which
+  # share the names of accessors.
   readability-identifier-naming.FunctionCase: CamelCase
   readability-identifier-naming.FunctionIgnoredRegexp: '^(swap|begin|end|size|data|get)$'
   readability-identifier-naming.MethodCase: CamelCase

@@ -72,8 +72,8 @@ int CheckedCount(std::size_t n) {
 }
 
 template <class T>
-void reduce_inplace(const Communicator::Impl& impl, std::span<T> data,
-                    MPI_Op op, const char* name) {
+void ReduceInPlace(const Communicator::Impl& impl, std::span<T> data, MPI_Op op,
+                   const char* name) {
   if (impl.serial || data.empty()) return;
   CheckMpi(MPI_Allreduce(MPI_IN_PLACE, data.data(), CheckedCount(data.size()),
                          MpiType(data.data()), op, impl.comm),
@@ -83,7 +83,7 @@ void reduce_inplace(const Communicator::Impl& impl, std::span<T> data,
 template <class T>
 T ReduceScalar(const Communicator::Impl& impl, T x, MPI_Op op,
                const char* name) {
-  reduce_inplace(impl, std::span<T>(&x, 1), op, name);
+  ReduceInPlace(impl, std::span<T>(&x, 1), op, name);
   return x;
 }
 
@@ -132,15 +132,15 @@ void Communicator::Barrier() const {
   CheckMpi(MPI_Barrier(impl_->comm), "MPI_Barrier");
 }
 
-#define IMSRG_COMM_REDUCE(T)                                  \
-  void Communicator::AllreduceSum(std::span<T> d) const {     \
-    reduce_inplace(*impl_, d, MPI_SUM, "MPI_Allreduce(sum)"); \
-  }                                                           \
-  void Communicator::AllreduceMax(std::span<T> d) const {     \
-    reduce_inplace(*impl_, d, MPI_MAX, "MPI_Allreduce(max)"); \
-  }                                                           \
-  void Communicator::AllreduceMin(std::span<T> d) const {     \
-    reduce_inplace(*impl_, d, MPI_MIN, "MPI_Allreduce(min)"); \
+#define IMSRG_COMM_REDUCE(T)                                 \
+  void Communicator::AllreduceSum(std::span<T> d) const {    \
+    ReduceInPlace(*impl_, d, MPI_SUM, "MPI_Allreduce(sum)"); \
+  }                                                          \
+  void Communicator::AllreduceMax(std::span<T> d) const {    \
+    ReduceInPlace(*impl_, d, MPI_MAX, "MPI_Allreduce(max)"); \
+  }                                                          \
+  void Communicator::AllreduceMin(std::span<T> d) const {    \
+    ReduceInPlace(*impl_, d, MPI_MIN, "MPI_Allreduce(min)"); \
   }
 IMSRG_COMM_REDUCE(double)
 IMSRG_COMM_REDUCE(float)

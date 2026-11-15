@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <optional>
 #include <string_view>
+#include <type_traits>
 
 namespace imsrg::commutator {
 
@@ -102,6 +103,8 @@ class TermMask {
   }
   std::uint64_t bits_ = 0;
 };
+static_assert(std::is_trivially_copyable_v<TermMask>,
+              "TermMask is passed by value into kernels and options");
 
 /// Options of `Commutator()`. Passed explicitly to every call (no global state,
 /// design/00 D10).

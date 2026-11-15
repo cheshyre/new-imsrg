@@ -110,8 +110,9 @@ unindented namespaces and access specifiers (clang-format Google base); project 
    side effects, possibly selected by an index or key (`num_orbits()`, `orbit(i)`, `channel(c)`,
    `spec()`, `zero_body()`, `norm()`, `get_normalized(...)`); mutators are `set_*`; STL analogs
    (`begin`, `size`, `data`, `find`, `value`, `has_value`, `error`, and `test`/`set`/`reset` of
-   the bitset-like `TermMask`) keep the STL spelling. Static member functions are never
-   accessors. `.clang-tidy` holds the allowlist (199 names, collected from the 349 flagged method
+   the bitset-like `TermMask`) keep the STL spelling. Static member functions are not accessors,
+   except `ThreeBodyChannels::channel_index` and the internal `DeviceBufferAccess::view`, which
+   share the names of accessors. `.clang-tidy` holds the allowlist (199 names, collected from the 349 flagged method
    names during the conversion); a new accessor name is added there.
 
 ## 4. Tooling (added by the conversion)
