@@ -3,12 +3,12 @@
 
 // IT-8 (design/30 section 4): the perturbative-triples correction after the
 // IMSRG(2) Magnus flow through the driver, against the imsrg++ goldens of
-// tests/golden/e2e/IT-8: He4 emax 2 (integration target) and O16 emax 3
-// (`IMSRG_TRIPLES_SLOW`, slow target). The flow must take the golden number of
-// steps, dE agrees with the imsrg++ log (8 decimals) within 1e-4 MeV (D19) and
-// with the 17-digit value of the reference harness (`harness_triples.json`)
-// to a regression guard of 1e-7 (expected 1e-10); the deviations are printed.
-// Skips without the 2N input file.
+// tests/golden/e2e/IT-8: He4 emax 2 and O16 emax 3 (about 7 s each in the dev
+// Debug build, so both are in the integration target). The flow must take the
+// golden number of steps, dE agrees with the imsrg++ log (8 decimals) within
+// 1e-4 MeV (D19) and with the 17-digit value of the reference harness
+// (`harness_triples.json`) to a regression guard of 1e-7 (measured: 1e-15);
+// the deviations are printed. Skips without the 2N input file.
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
@@ -75,15 +75,9 @@ void RunCase(const std::string& nucleus, int emax, const std::string& golden,
   EXPECT_LT(de, 0.0);
 }
 
-#ifdef IMSRG_TRIPLES_SLOW
-
-TEST(Triples, IT8_O16_Emax3) { RunCase("O16", 3, "emax3", 154); }
-
-#else
-
 TEST(Triples, IT8_He4_Emax2) { RunCase("He4", 2, "He4_emax2", 192); }
 
-#endif
+TEST(Triples, IT8_O16_Emax3) { RunCase("O16", 3, "emax3", 154); }
 
 }  // namespace
 }  // namespace imsrg::it
