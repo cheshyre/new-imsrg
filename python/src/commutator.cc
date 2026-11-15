@@ -74,9 +74,10 @@ void ClearWorkspaceCache() {
 void BindCommutator(nb::module_& m) {
   using commutator::Term;
   nb::enum_<Term>(m, "Term",
-                  "The scalar IMSRG(2) commutator terms, named as in imsrg++ "
+                  "The scalar commutator terms, named as in imsrg++ "
                   "(`commABCss`: A-body part of X and B-body part of Y to the "
-                  "C-body part of [X, Y]).")
+                  "C-body part of [X, Y]); IMSRG(2), then the IMSRG(3) terms "
+                  "(N7 first; the N8/N9 terms are not implemented).")
       .value("Comm110ss", Term::kComm110ss)
       .value("Comm220ss", Term::kComm220ss)
       .value("Comm111ss", Term::kComm111ss)
@@ -84,7 +85,20 @@ void BindCommutator(nb::module_& m) {
       .value("Comm221ss", Term::kComm221ss)
       .value("Comm122ss", Term::kComm122ss)
       .value("Comm222PpHhss", Term::kComm222PpHhss)
-      .value("Comm222Phss", Term::kComm222Phss);
+      .value("Comm222Phss", Term::kComm222Phss)
+      .value("Comm133ss", Term::kComm133ss)
+      .value("Comm330ss", Term::kComm330ss)
+      .value("Comm223ss", Term::kComm223ss)
+      .value("Comm232ss", Term::kComm232ss)
+      .value("Comm331ss", Term::kComm331ss)
+      .value("Comm231ss", Term::kComm231ss)
+      .value("Comm132ss", Term::kComm132ss)
+      .value("Comm233PpHhss", Term::kComm233PpHhss)
+      .value("Comm233Phss", Term::kComm233Phss)
+      .value("Comm332PpphHhhpss", Term::kComm332PpphHhhpss)
+      .value("Comm332Pphhss", Term::kComm332Pphhss)
+      .value("Comm333PppHhhss", Term::kComm333PppHhhss)
+      .value("Comm333PphHhpss", Term::kComm333PphHhpss);
   m.def(
       "term_name", [](Term t) { return std::string(commutator::TermName(t)); },
       nb::arg("term"), "The imsrg++ name of a term (\"comm110ss\", ...).");
@@ -99,6 +113,8 @@ void BindCommutator(nb::module_& m) {
       .def_static("none", &TermMask::None, "The empty set.")
       .def_static("imsrg2", &TermMask::Imsrg2,
                   "All scalar IMSRG(2) terms (the default).")
+      .def_static("imsrg3_n7", &TermMask::Imsrg3N7,
+                  "The IMSRG(2) terms and the seven N7 three-body terms.")
       .def_static("only", &TermMask::Only, nb::arg("term"),
                   "The set holding only `term`.")
       .def_static(

@@ -43,23 +43,30 @@ namespace imsrg::commutator {
 /// AntiHermitian if X and Y have the same (definite) hermiticity, Hermitian if
 /// they have opposite ones, NonHermitian if either is NonHermitian (imsrg++
 /// `CommutatorScalarScalar`, Commutator.cc:337-342).
-/// @throws NotImplementedError for non-scalar or non-number-conserving specs
-///         and for particle_rank 3 (IMSRG(3), milestone M10).
+/// @throws NotImplementedError for non-scalar or non-number-conserving specs.
 op::OperatorSpec CommutatorSpec(const op::OperatorSpec& x,
                                 const op::OperatorSpec& y);
 
-/// Z = [X, Y] restricted to the terms in `opts.terms` (IMSRG(2) truncation: Z
-/// has no 3B part). Z is overwritten: it is reset to zero if it already has
-/// spec `CommutatorSpec(X, Y)` and the workspace's model space (no allocation,
-/// the flow-loop case), otherwise it is replaced by a new operator of that
-/// spec. Terms that need a part X or Y lacks (particle_rank 1) are skipped. The
-/// 222 ladder and the 221 term share their intermediates when both are selected
-/// (imsrg++ `comm222_pp_hh_221ss`). Preconditions (InvariantError): X, Y on the
-/// workspace's model space (`ws.compatible`); Z is neither X nor Y.
-/// @throws NotImplementedError for X, Y or Z with a three-body part (the
-///         IMSRG(3) terms are not implemented; the [2,2]->3 term alone is
-///         `Comm223` of three_body.h) and for specs `CommutatorSpec` rejects.
-/// Complexity: dominated by the 2B terms, O(sum over channels of N^3) GEMMs.
+/// Z = [X, Y] restricted to the terms in `opts.terms`. Truncation: IMSRG(2)
+/// (Z has no 3B part) unless `opts.terms` holds an IMSRG(3) term, then
+/// IMSRG(3) (Z has particle rank 3; imsrg++ `use_imsrg3`). Z is overwritten:
+/// it is reset to zero if it already has spec `CommutatorSpec(X, Y)` (rank 3
+/// for IMSRG(3)) and the workspace's model space (no allocation, the
+/// flow-loop case), otherwise it is replaced by a new operator of that spec.
+/// Terms that need a part X or Y lacks are skipped. The 222 ladder and the
+/// 221 term share their intermediates when both are selected (imsrg++
+/// `comm222_pp_hh_221ss`). The IMSRG(3) terms (imsrg3.h) follow the IMSRG(2)
+/// ones in imsrg++'s order (133, 330, 223, 232, 331, 231, 132), only if
+/// ||X|| and ||Y|| exceed `opts.threebody_threshold`. Preconditions
+/// (InvariantError): X, Y on the workspace's model space (`ws.compatible`); Z
+/// is neither X nor Y.
+/// @throws NotImplementedError for X or Y with a three-body part and an
+///         IMSRG(2) term set (no silent drop), for the N8/N9 terms of the
+///         full IMSRG(3), and for specs `CommutatorSpec` rejects.
+/// @throws InputError for IMSRG(3) terms on a workspace without a three-body
+///         space (`Workspace::three_body_context()` null).
+/// Complexity: IMSRG(2): dominated by the 2B terms, O(sum over channels of
+/// N^3) GEMMs; IMSRG(3): see the terms in imsrg3.h.
 void Commutator(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                 const CommutatorOptions& opts, Workspace& ws);
 

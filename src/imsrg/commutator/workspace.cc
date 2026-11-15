@@ -10,6 +10,7 @@
 
 #include "imsrg/base/assert.h"
 #include "imsrg/commutator/detail/workspace_impl.h"
+#include "imsrg/commutator/three_body.h"
 
 namespace imsrg::commutator {
 
@@ -92,6 +93,9 @@ Workspace::Workspace(std::shared_ptr<const basis::ModelSpace> ms)
     : ms_(std::move(ms)) {
   IMSRG_CHECK(ms_ != nullptr, "Workspace: model space is null");
   impl_ = std::make_unique<Impl>(ms_);
+  if (ms_->three_body_space() != nullptr) {
+    three_body_ = std::make_unique<ThreeBodyContext>(ms_);
+  }
 }
 
 Workspace::~Workspace() = default;
