@@ -10,13 +10,26 @@
 # reference root. The old `install` target (which writes into $HOME) is never run.
 #
 # Usage:
-#   tools/reference/build_imsrg_devel.sh [all|imsrg|harness|checksum]   (default: all)
+#   tools/reference/build_imsrg_devel.sh [all|imsrg|harness|checksum|patched|patched-imsrg|patched-harness]
+#                                                                       (default: all)
 #
 #   imsrg     configure + build the old library (libIMSRG.so) and the imsrg++ executable,
 #             with the old src/CMakeLists.txt as the CMake root (build dir: $REF_ROOT/build)
 #   harness   configure + build refharness through tools/reference/CMakeLists.txt, which pulls
 #             the old src in via add_subdirectory (build dir: $REF_ROOT/harness-build)
 #   checksum  print the reference version string (sha256 over src/, the tree has no .git)
+#
+#   patched          owner decision D35: a SECOND, patched build, in directories of its own; the
+#                    pristine copy and the pristine build directories above are never touched.
+#                    Copies the pristine src/ into $REF_ROOT/imsrg-devel-src-d35/, applies
+#                    tools/reference/patches/imsrg-devel-d35.patch (Tcm without the 1e-7 two-body
+#                    threshold; Rp2 without the spin-orbit correction), then builds imsrg++ into
+#                    $REF_ROOT/build-d35/ and refharness into $REF_ROOT/harness-build-d35/
+#                    (override: HARNESS_BUILD_DIR_D35). Writes the version string of the patched
+#                    goldens to $REF_ROOT/REFERENCE_SRC_SHA256_D35 ("<pristine sha>+d35-patch:<patch
+#                    sha prefix>"; the gen scripts read it through IMSRG_REFERENCE_SHA_FILE).
+#   patched-imsrg    only the imsrg++ part of `patched`
+#   patched-harness  only the refharness part of `patched`
 #
 # Environment overrides:
 #   IMSRG_REFERENCE_SOURCE  reference checkout   (default /Users/cheshyre/Downloads/new-imsrg/imsrg-devel)
@@ -39,6 +52,8 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BREW="$(brew --prefix 2>/dev/null || echo /opt/homebrew)"
 
 COPY="${REF_ROOT}/imsrg-devel-src"   # pristine copy; COPY/src is the CMake source dir
+COPY_D35="${REF_ROOT}/imsrg-devel-src-d35"   # patched copy (D35); COPY_D35/src is the CMake source dir
+PATCH_D35="${HERE}/patches/imsrg-devel-d35.patch"
 
 # sha256 over all files of <dir>/src (relative paths, sorted, .DS_Store ignored).
 src_checksum() {
@@ -60,6 +75,46 @@ make_copy() {
   fi
   echo "reference src/ sha256 (tree checksum): $a"
   echo "$a" > "${REF_ROOT}/REFERENCE_SRC_SHA256"
+}
+
+# Patched copy (D35): pristine src/ -> COPY_D35/src, then the patch. Never touches COPY.
+COPIED_D35=0
+make_copy_d35() {
+  [[ "${COPIED_D35}" == 1 ]] && return 0   # `patched` runs both stages on one copy
+  COPIED_D35=1
+  [[ -f "${PATCH_D35}" ]] || { echo "ERROR: missing ${PATCH_D35}" >&2; exit 1; }
+  # Idempotent: a copy that already carries this patch is reused as it is. (Re-running rsync
+  # and `patch` on it, e.g. for `patched-harness` after `patched-imsrg`, would touch every file
+  # and, if the rsync did not restore a hunk's file, apply the patch twice.)
+  local ph0 stamp; ph0="$(shasum -a 256 "${PATCH_D35}" | cut -c1-16)"
+  stamp="${COPY_D35}/.d35-patch-applied"
+  if [[ -f "${stamp}" && "$(cat "${stamp}")" == "$(src_checksum "${REF_SRC}")+d35-patch:${ph0}" ]]; then
+    cp "${stamp}" "${REF_ROOT}/REFERENCE_SRC_SHA256_D35"
+    echo "patched copy already up to date: $(cat "${stamp}")"
+    return 0
+  fi
+  mkdir -p "${COPY_D35}"
+  rsync -a --delete --exclude '.DS_Store' "${REF_SRC}/src/" "${COPY_D35}/src/"
+  local a b
+  a="$(src_checksum "${REF_SRC}")"
+  b="$(src_checksum "${COPY_D35}")"
+  if [[ "$a" != "$b" ]]; then
+    echo "ERROR: copy of the reference src/ differs from the original ($a vs $b)" >&2
+    exit 1
+  fi
+  (cd "${COPY_D35}" && patch -p1 --no-backup-if-mismatch < "${PATCH_D35}")
+  # Build-system fix, NOT part of the physics patch: the old src/CMakeLists.txt forces
+  # CMAKE_CURRENT_BINARY_DIR to "../build", which only works when the binary directory is itself
+  # called "build"; for build-d35 it would point at the PRISTINE build directory. Use the real one.
+  sed -i.orig 's|^set(CMAKE_CURRENT_BINARY_DIR "\.\./build")|# (d35) use the real binary directory|' \
+      "${COPY_D35}/src/CMakeLists.txt"
+  rm -f "${COPY_D35}/src/CMakeLists.txt.orig"
+  grep -q '^# (d35) use the real binary directory' "${COPY_D35}/src/CMakeLists.txt" \
+    || { echo "ERROR: CMakeLists.txt build-dir fix did not apply" >&2; exit 1; }
+  local ph; ph="$(shasum -a 256 "${PATCH_D35}" | cut -c1-16)"
+  echo "${a}+d35-patch:${ph}" > "${REF_ROOT}/REFERENCE_SRC_SHA256_D35"
+  cp "${REF_ROOT}/REFERENCE_SRC_SHA256_D35" "${stamp}"
+  echo "patched reference version: $(cat "${REF_ROOT}/REFERENCE_SRC_SHA256_D35")"
 }
 
 # Common cache settings for both builds.
@@ -126,10 +181,30 @@ build_harness() {
   ls -l "${bdir}/refharness"
 }
 
+build_imsrg_d35() {
+  make_copy_d35
+  local bdir="${REF_ROOT}/build-d35"
+  cmake -S "${COPY_D35}/src" -B "${bdir}" "${common_args[@]}"
+  cmake --build "${bdir}" --target imsrg++ IMSRG -j "${JOBS}"
+  ls -l "${bdir}/imsrg++" "${bdir}/libIMSRG.so"
+}
+
+build_harness_d35() {
+  make_copy_d35
+  local bdir="${HARNESS_BUILD_DIR_D35:-${REF_ROOT}/harness-build-d35}"
+  cmake -S "${HERE}" -B "${bdir}" "${common_args[@]}" \
+        -DIMSRG_REFERENCE_SRC="${COPY_D35}/src"
+  cmake --build "${bdir}" --target refharness -j "${JOBS}"
+  ls -l "${bdir}/refharness"
+}
+
 case "${stage}" in
   all)      build_imsrg; build_harness ;;
   imsrg)    build_imsrg ;;
   harness)  build_harness ;;
   checksum) echo "$(src_checksum "${REF_SRC}")" ;;
-  *) echo "usage: $0 [all|imsrg|harness|checksum]" >&2; exit 2 ;;
+  patched)          build_imsrg_d35; build_harness_d35 ;;
+  patched-imsrg)    build_imsrg_d35 ;;
+  patched-harness)  build_harness_d35 ;;
+  *) echo "usage: $0 [all|imsrg|harness|checksum|patched|patched-imsrg|patched-harness]" >&2; exit 2 ;;
 esac
