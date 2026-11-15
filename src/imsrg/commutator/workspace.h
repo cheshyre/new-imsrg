@@ -16,6 +16,8 @@
 
 namespace imsrg::commutator {
 
+class ThreeBodyContext;
+
 /// Everything the IMSRG(2) kernels need besides X, Y and Z, built once per
 /// model space and reused by every commutator call on that model space (a flow
 /// performs thousands):
@@ -68,6 +70,13 @@ class Workspace {
   /// same object.
   bool Compatible(const op::Operator& op) const noexcept;
 
+  /// The tables of the IMSRG(3) terms (`ThreeBodyContext`, three_body.h),
+  /// built by the constructor iff the model space has a three-body space
+  /// (`ModelSpace::WithThreeBody`); null otherwise.
+  const ThreeBodyContext* three_body_context() const noexcept {
+    return three_body_.get();
+  }
+
   /// Internal data of the kernels (defined in `detail/workspace_impl.h`, not a
   /// public API).
   struct Impl;
@@ -79,6 +88,7 @@ class Workspace {
  private:
   std::shared_ptr<const basis::ModelSpace> ms_;
   std::unique_ptr<Impl> impl_;
+  std::unique_ptr<ThreeBodyContext> three_body_;
 };
 
 }  // namespace imsrg::commutator

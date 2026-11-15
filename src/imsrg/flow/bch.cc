@@ -52,6 +52,16 @@ class FactorizedTerm {
   std::optional<commutator::FactorizedEta> pre_;
 };
 
+/// Particle rank of the commutators selected by `copts` on `ws`: 3 if they
+/// include an IMSRG(3) term and the workspace has a three-body context.
+std::int32_t CommutatorRank(const commutator::CommutatorOptions& copts,
+                            const commutator::Workspace& ws) {
+  return (!copts.terms.ThreeBodyTerms().empty() &&
+          ws.three_body_context() != nullptr)
+             ? 3
+             : 2;
+}
+
 }  // namespace
 
 op::Operator WithParticleRank(const op::Operator& op,
@@ -71,7 +81,7 @@ op::Operator BchTransform(const op::Operator& X, const op::Operator& Omega,
   if (report != nullptr) *report = BchReport{};
   const double nx = op::Norm(X);
   const double ny = op::Norm(Omega);
-  op::Operator out = WithParticleRank(X, 2);
+  op::Operator out = WithParticleRank(X, CommutatorRank(copts, ws));
   if (!(nx > opts.transform_threshold)) return out;
 
   // Two alternating buffers hold the nested commutators (no allocation after
@@ -145,6 +155,7 @@ op::Operator BchProduct(const op::Operator& X, const op::Operator& Y,
   const double ny = op::Norm(Y);
 
   op::Operator Z = X + Y;
+  if (CommutatorRank(copts, ws) == 3) Z = WithParticleRank(Z, 3);
   op::Operator nested = commutator::Commutator(Y, X, copts, ws);  // [Y, X]
   op::Operator next;
   op::Operator corr;  // factorized correction (IMSRG(3f2))

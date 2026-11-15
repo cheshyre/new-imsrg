@@ -272,6 +272,8 @@ int main(int argc, char** argv) {
     if (c == "commutator") return rh::cmd_commutator(a);
     if (c == "bench-commutator") return rh::cmd_bench_commutator(a);
     if (c == "comm223") return rh::cmd_comm223(a);
+    if (c == "comm3") return rh::cmd_comm3(a);
+    if (c == "generator3") return rh::cmd_generator3(a);
     if (c == "generator") return rh::cmd_generator(a);
     if (c == "flow") return rh::cmd_flow(a);
     if (c == "factorized") return rh::cmd_factorized(a);

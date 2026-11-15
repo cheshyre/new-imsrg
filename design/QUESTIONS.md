@@ -649,6 +649,44 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   would need tens of GB. **Assumed meanwhile:** as imsrg++ (the triples are a post-processing step
   and `imsrg3.de3max` bounds the space). Follow-up if triples at emax >= 8 are wanted: build R per
   tile inside the kernel (it is a few 6j products per entry) and skip E for the triples context.
+* **M10-Q60** (2026-11-16, M10 step 3) - The three-body generator copies imsrg++ exactly: Delta3 is
+  the one-body diagonal only (no Epstein-Nesbet terms) and, unlike the one- and two-body
+  denominators, it has NO floor (`Get3bDenominator`, Generator.cc:231-239) and no
+  `denominator_delta`; a vanishing Delta3 gives inf/NaN with white. **Assumed meanwhile:** as
+  imsrg++ (the 2B floor deviation D21 is not extended to 3B). Floor it if a flow hits it.
+* **M10-Q61** (2026-11-16, M10 step 3) - With IMSRG(3) the final H and transformed operators have
+  their residual three-body part dropped before the valence-space/operator output (imsrg++.cc:1177,
+  1256 do the same after renormal ordering). Operators are transformed with the IMSRG(3) commutator
+  as in imsrg++ (rank-3 result, 3B part dropped), which for a rank-2 operator adds the terms that
+  need Omega_3. **Assumed meanwhile:** as imsrg++; not validated against an imsrg++ operator golden
+  (IT-9 has none).
+* **M10-Q62** (2026-11-16, M10 step 3) - `imsrg3.occ_nat3_cut` with IMSRG(3), `variant = "full"` and
+  `"mp4"`, `at_end`, `only_2b_omega` stay E-PLANNED: the cut needs the NAT occupations in the
+  three-body space (`ThreeBodyCuts::natural_occupations`) which the driver does not pass yet.
+* **M10-Q63** (2026-11-16, M10 step 3 lead) - `comm232ss` processes its pair-third intermediate
+  blocks in batches of channels under a 512 MiB budget, but never splits a channel (one block set
+  is ~33 GB at emax 12 / E3max 14) and every batch visits every Z2 element (Opus review findings
+  2-3). **Assumed meanwhile:** fine at emax <= 3 (60 ms at O16 emax 3); tile by column ranges and
+  clamp J3 per batch before production runs (design/14 section 1.1, next steps).
+* **M10-Q64** (2026-11-16, M10 step 3 lead) - `comm232ss` rebuilds its sorted pair-third tables on
+  every call (0.2 ms at emax 2, 3 ms at emax 3); they depend only on the model space. **Assumed
+  meanwhile:** per call; move them into `ThreeBodyContext` with the next kernel pass.
+* **M10-Q65** (2026-11-16, M10 step 3 lead) - The comm232ss kernels (like comm223) call Kokkos
+  policies (dynamic range, team) directly instead of the `exec` facade. **Assumed meanwhile:**
+  accepted in kernel TUs (design/12 section 5 allows Kokkos there); extend the facade when a second
+  backend needs it.
+* **M10-Q66** (2026-11-16, M10 step 3 lead) - A `commutator::Workspace` on a model space with a
+  three-body space always builds a `ThreeBodyContext` (6j table, pair-third maps), also when only
+  IMSRG(2) terms are used on it. **Assumed meanwhile:** fine (no lazy caches, D10; cheap at emax
+  <= 3); an explicit `Workspace` option could skip it if an IMSRG(2) flow on a three-body space
+  appears.
+* **M10-Q67** (2026-11-16, M10 step 3 lead; Python, not N7) - `tests/python/test_flow.py::
+  test_solve_releases_the_gil` failed on `tools/ci.sh dev-serial` (ticks 7 for a 45 ms solve; it
+  passes on dev-openmp): the emax-1 Magnus solve is short on the Serial backend and part of it runs
+  with the GIL held (setup, and since the M11 hardening the signal poll at each step). **Assumed
+  meanwhile:** the bound now scales with the measured solve time (`ticks > max(2, min(20,
+  elapsed_ms / 10))`, still failing if the GIL is held throughout); the M11 owner may prefer a
+  longer solve or a measurement of the GIL-free fraction.
 * **M8-Q50** (2026-11-15, M8 charge radius / two-stage ODE task) - (1) The charge radius needs `Rso`; if it was
   not requested the driver adds it as one more operator that flows alongside H (ODE methods) or is replayed
   with the Omega stack (Magnus). For the adaptive `flow` method the error norm of the step control includes

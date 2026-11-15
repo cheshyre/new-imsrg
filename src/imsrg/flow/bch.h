@@ -76,8 +76,10 @@ struct BchReport {
 /// epsilon by (i + 1); the factorized correction F(Omega, nested_{j-2}) then
 /// applies from nested_2 on, as without the skip (imsrg++ `i_min_factorized =
 /// 2`).
-/// Norms are `op::norm` (zero-body part excluded). X is promoted to
-/// particle_rank 2 (imsrg++ `SetParticleRank(2)`) so Z has a two-body part.
+/// Norms are `op::norm` (zero-body part excluded, three-body part included). X
+/// is promoted to particle_rank 2 (imsrg++ `SetParticleRank(2)`) so Z has a
+/// two-body part, and to particle_rank 3 if `copts` select IMSRG(3) terms and
+/// `ws` has a three-body context (the commutators then return rank 3).
 /// Omega must be anti-Hermitian for a unitary transformation; without
 /// `factorized` any hermiticity the commutator accepts works, with it Omega
 /// must be anti-Hermitian (NotImplementedError otherwise). Preconditions: X and
@@ -109,8 +111,10 @@ op::Operator BchTransform(const op::Operator& X, const op::Operator& Omega,
 /// term whose operands lack a two-body part vanishes and is skipped; with
 /// `factorized`, X and Y must be anti-Hermitian).
 /// Preconditions: X and Y scalar, number conserving, on `ws`'s
-/// model space; Z gets the larger particle_rank of X and Y. Complexity: up to 9
-/// commutators, plus up to 8 factorized double commutators with `factorized`.
+/// model space; Z gets the larger particle_rank of X and Y, and rank 3 if
+/// `copts` select IMSRG(3) terms and `ws` has a three-body context. Complexity:
+/// up to 9 commutators, plus up to 8 factorized double commutators with
+/// `factorized`.
 op::Operator BchProduct(const op::Operator& X, const op::Operator& Y,
                         const BchOptions& opts,
                         const commutator::CommutatorOptions& copts,

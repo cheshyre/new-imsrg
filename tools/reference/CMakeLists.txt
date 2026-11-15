@@ -32,6 +32,7 @@ add_executable(refharness
   rh_commutator.cpp
   rh_bench.cpp
   rh_imsrg3.cpp
+  rh_comm3.cpp
   rh_flow.cpp
   rh_factorized.cpp
 )

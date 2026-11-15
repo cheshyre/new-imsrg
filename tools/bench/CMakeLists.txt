@@ -19,3 +19,12 @@ target_link_libraries(commutator_bench PRIVATE imsrg::commutator imsrg::operator
 # IMSRG(3) three-body storage layout benchmark (design/14 section 2,
 # design/benchmarks/imsrg3-layout.md).
 add_subdirectory(imsrg3_layout)
+
+# Random particle-rank-3 operators (physical 3B part) as OperatorDumps: the inputs of the
+# IMSRG(3)-N7 reference goldens (tools/reference/gen_golden_n7.sh).
+add_executable(imsrg_n7_inputs
+  n7_inputs.cc
+  "${PROJECT_SOURCE_DIR}/tests/support/three_body_test_support.cc")
+target_include_directories(imsrg_n7_inputs PRIVATE "${PROJECT_SOURCE_DIR}")
+target_link_libraries(imsrg_n7_inputs PRIVATE imsrg::commutator imsrg::operator imsrg::exec
+                                              imsrg::basis imsrg::warnings)

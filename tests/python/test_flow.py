@@ -5,6 +5,7 @@ import csv
 import json
 import math
 import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -174,12 +175,19 @@ def test_solve_releases_the_gil(o16):
     done = threading.Event()
     t = threading.Thread(target=lambda: (s.solve(), done.set()))
     ticks = 0
+    t0 = time.perf_counter()
     t.start()
     while not done.is_set():
         ticks += 1
         done.wait(0.001)
     t.join()
-    assert ticks > 20  # the main thread ran while the solver worked
+    elapsed_ms = (time.perf_counter() - t0) * 1e3
+    # The main thread ran while the solver worked: up to one tick per ms with
+    # the GIL released, one or two in total without. The emax-1 solve takes
+    # only ~10-50 ms on the Serial backend (part of it with the GIL held for
+    # setup and the per-step signal polling), so the bound scales with its
+    # duration (design/QUESTIONS.md M10-Q67).
+    assert ticks > max(2.0, min(20.0, elapsed_ms / 10.0)), (ticks, elapsed_ms)
 
 
 def test_hunter_gatherer_he4_matches_imsrgpp(golden, he4_emax2):

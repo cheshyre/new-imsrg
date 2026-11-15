@@ -30,6 +30,17 @@
 ///   1 (Generator.cc:662-680).
 /// All other elements of eta are zero.
 ///
+/// Three-body part (H and eta of particle_rank 3, single-reference kinds only;
+/// imsrg++ `ConstructGenerator_SingleRef_3body`, Generator.cc:328-427): for
+/// every channel, bra row (a b c; Jab) whose three orbits are all non-core
+/// (valence or q-space) and ket row (i j k; Jij) whose three orbits are all
+/// core: eta(bra, ket) = f(H(bra, ket), Delta3) and eta(ket, bra) =
+/// -eta(bra, ket), with Delta3 = f_aa + f_bb + f_cc - f_ii - f_jj - f_kk from
+/// the one-body diagonal of H alone (`Get3bDenominator`: no Epstein-Nesbet
+/// terms, and, as in imsrg++, NO denominator floor, no `denominator_delta`: a
+/// vanishing Delta3 gives inf/NaN for white). Kets dropped by the three-body
+/// cuts do not exist.
+///
 /// Denominators (Generator.cc:122-230), f = the one-body part of H, n =
 /// reference occupations, V-bar_abab = the J-averaged unnormalized monopole
 ///   V-bar_abab = sum_J (2J+1) V^J_abab (unnormalized)
@@ -104,6 +115,9 @@ struct GeneratorOptions {
   int qtransfer_n = 1;
   /// Only the one-body part of eta (imsrg++ `only_1b_eta`).
   bool only_1b_eta = false;
+  /// Keep eta to its one- and two-body parts even for a rank-3 H (imsrg++
+  /// `only_2b_eta`).
+  bool only_2b_eta = false;
 };
 
 /// The generator function f(H_od, Delta) of `kind` (see the file comment). For
@@ -140,6 +154,11 @@ class Denominators {
   /// channel `ch` (floored).
   double two_body(ChannelIndex ch, LocalKetIndex ibra,
                   LocalKetIndex iket) const;
+  /// Three-body denominator f_aa + f_bb + f_cc - f_ii - f_jj - f_kk of bra
+  /// orbits (a, b, c) and ket orbits (i, j, k): one-body diagonal only, NOT
+  /// floored (imsrg++ `Get3bDenominator`).
+  double three_body(OrbitIndex a, OrbitIndex b, OrbitIndex c, OrbitIndex i,
+                    OrbitIndex j, OrbitIndex k) const;
   /// The unnormalized J-averaged monopole V-bar_abab (imsrg++
   /// `GetTBMEmonopole(a,b,a,b)`).
   double monopole(OrbitIndex a, OrbitIndex b) const;
@@ -163,8 +182,9 @@ op::OperatorSpec GeneratorSpec(const op::OperatorSpec& h, GeneratorKind kind);
 /// replaced by a new operator; otherwise it is reused without allocation (the
 /// flow-loop case). Host computation on copies of H's device data; eta's device
 /// data are current on return. Preconditions: H scalar, number conserving,
-/// particle_rank 2 (InvariantError).
-/// @throws NotImplementedError for ShellModelAtanNpnh and OnePa.
+/// particle_rank 2 or 3 (InvariantError; rank 3 needs a three-body part).
+/// @throws NotImplementedError for ShellModelAtanNpnh and OnePa, and for the
+///         shell-model kinds and hartree-fock with a rank-3 H.
 /// Complexity: O(norb^2 J) for the tables plus O(#decoupled elements).
 void ComputeGenerator(const op::Operator& H, op::Operator& eta,
                       const GeneratorOptions& opts);

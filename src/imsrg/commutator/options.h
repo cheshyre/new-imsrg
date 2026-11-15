@@ -16,10 +16,14 @@
 
 namespace imsrg::commutator {
 
-/// The scalar IMSRG(2) commutator terms, named as in imsrg++ (`Commutator.cc`):
-/// `commABCss` takes the A-body part of X and the B-body part of Y (plus the X
-/// <-> Y exchange) to the C-body part of Z = [X, Y]. The enumerator order is
-/// the call order of imsrg++ `CommutatorScalarScalar`.
+/// The scalar commutator terms, named as in imsrg++ (`Commutator.cc`,
+/// `IMSRG3Commutators.cc`): `commABCss` takes the A-body part of X and the
+/// B-body part of Y (plus the X <-> Y exchange) to the C-body part of Z = [X,
+/// Y]. The enumerator order is the call order of imsrg++
+/// `CommutatorScalarScalar` (Commutator.cc:359-454): the IMSRG(2) terms, then
+/// the IMSRG(3) block, the seven N7 terms first and then the six N8/N9 terms of
+/// the full IMSRG(3), which are not implemented (requesting them throws
+/// NotImplementedError).
 enum class Term : std::uint8_t {
   kComm110ss = 0,  ///< [X1, Y1] -> Z0.
   kComm220ss,      ///< [X2, Y2] -> Z0.
@@ -30,10 +34,27 @@ enum class Term : std::uint8_t {
   kComm222PpHhss,  ///< [X2, Y2] -> Z2, particle-particle and hole-hole
                    ///< ladders.
   kComm222Phss,    ///< [X2, Y2] -> Z2, particle-hole (Pandya-transformed) part.
+  kComm133ss,      ///< [X1, Y3] + [X3, Y1] -> Z3 (N7).
+  kComm330ss,      ///< [X3, Y3] -> Z0 (N7).
+  kComm223ss,      ///< [X2, Y2] -> Z3 (N7).
+  kComm232ss,      ///< [X2, Y3] + [X3, Y2] -> Z2 (N7).
+  kComm331ss,      ///< [X3, Y3] -> Z1 (N7).
+  kComm231ss,      ///< [X2, Y3] + [X3, Y2] -> Z1 (N7).
+  kComm132ss,      ///< [X1, Y3] + [X3, Y1] -> Z2 (N7).
+  kComm233PpHhss,  ///< [X2, Y3] + [X3, Y2] -> Z3, pp/hh (N8, planned).
+  kComm233Phss,    ///< [X2, Y3] + [X3, Y2] -> Z3, ph (N8, planned).
+  kComm332PpphHhhpss,  ///< [X3, Y3] -> Z2, ppph/hhhp (N8, planned).
+  kComm332Pphhss,      ///< [X3, Y3] -> Z2, pphh (N8, planned).
+  kComm333PppHhhss,    ///< [X3, Y3] -> Z3, ppp/hhh (N9, planned).
+  kComm333PphHhpss,    ///< [X3, Y3] -> Z3, pph/hhp (N9, planned).
 };
 
 /// Number of `Term` values.
-inline constexpr int kNumTerms = 8;
+inline constexpr int kNumTerms = 21;
+/// Number of IMSRG(2) terms (the enumerators kComm110ss..kComm222Phss).
+inline constexpr int kNumImsrg2Terms = 8;
+/// Number of N7 terms (the enumerators kComm133ss..kComm132ss).
+inline constexpr int kNumN7Terms = 7;
 
 /// The imsrg++ name of a term ("comm110ss", ...).
 std::string_view TermName(Term t) noexcept;
@@ -41,9 +62,11 @@ std::string_view TermName(Term t) noexcept;
 /// Inverse of `TermName`; nullopt for an unknown name.
 std::optional<Term> TermFromName(std::string_view name) noexcept;
 
-/// A set of `Term`s (bitset over the enumerators). Value type; the IMSRG(3)
-/// terms of M10 will add enumerators (the 64-bit storage leaves room) and
-/// presets `imsrg3_n7`, `imsrg3_full`.
+/// A set of `Term`s (bitset over the enumerators). Value type. Presets:
+/// `Imsrg2()` (imsrg++ with IMSRG(3) off), `Imsrg3N7()` (imsrg++ `IMSRG3=true
+/// imsrg3_n7=true`: the IMSRG(2) terms and the seven N7 terms,
+/// `SetUseIMSRG3N7`, Commutator.cc:111-129) and `Imsrg3Full()` (every term,
+/// `SetUseIMSRG3`; the N8/N9 terms are not implemented).
 class TermMask {
  public:
   /// The empty set.
@@ -59,7 +82,22 @@ class TermMask {
 
   /// All scalar IMSRG(2) terms (the imsrg++ default with IMSRG(3) off).
   static constexpr TermMask Imsrg2() noexcept {
+    return TermMask((std::uint64_t{1} << kNumImsrg2Terms) - 1);
+  }
+
+  /// The IMSRG(2) terms and the seven N7 three-body terms (IMSRG(3)-N7).
+  static constexpr TermMask Imsrg3N7() noexcept {
+    return TermMask((std::uint64_t{1} << (kNumImsrg2Terms + kNumN7Terms)) - 1);
+  }
+
+  /// Every term (full IMSRG(3); the N8/N9 terms are not implemented).
+  static constexpr TermMask Imsrg3Full() noexcept {
     return TermMask((std::uint64_t{1} << kNumTerms) - 1);
+  }
+
+  /// The IMSRG(3) terms of the set (the enumerators after the IMSRG(2) ones).
+  constexpr TermMask ThreeBodyTerms() const noexcept {
+    return TermMask(bits_ & ~((std::uint64_t{1} << kNumImsrg2Terms) - 1));
   }
 
   /// The set holding only `t`.
@@ -109,8 +147,15 @@ static_assert(std::is_trivially_copyable_v<TermMask>,
 /// Options of `Commutator()`. Passed explicitly to every call (no global state,
 /// design/00 D10).
 struct CommutatorOptions {
-  /// The terms to evaluate; default: all IMSRG(2) terms.
+  /// The terms to evaluate; default: all IMSRG(2) terms. A set with an
+  /// IMSRG(3) term (`ThreeBodyTerms()` not empty) selects the IMSRG(3)
+  /// truncation: Z gets a three-body part (imsrg++ `use_imsrg3`).
   TermMask terms = TermMask::Imsrg2();
+  /// The IMSRG(3) terms are evaluated only if ||X|| > threebody_threshold and
+  /// ||Y|| > threebody_threshold (full operator norms, `op::Norm`; imsrg++
+  /// `threebody_threshold`, Commutator.cc:396). Default 0: always, unless an
+  /// operand is exactly zero.
+  double threebody_threshold = 0.0;
 };
 
 }  // namespace imsrg::commutator

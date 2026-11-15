@@ -97,3 +97,18 @@ imsrg_add_test(NAME driver_triples
 target_compile_definitions(driver_triples PRIVATE
   "IMSRG_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden\""
   "IMSRG_TEST_DATA_DIR=\"${IMSRG_TEST_DATA_DIR}\"")
+
+# IT-9 IMSRG(3)-N7 Magnus flow (He4 and O16 emax 2) against tests/golden/e2e/IT-9; the emax-3 cases
+# (about 30 and 21 minutes in imsrg++) are the same source compiled for the slow label.
+imsrg_add_test(NAME driver_imsrg3_n7
+  SOURCES test_imsrg3_n7.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
+  DEPS driver LABELS integration NO_GTEST_MAIN)
+target_compile_definitions(driver_imsrg3_n7 PRIVATE
+  "IMSRG_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden\""
+  "IMSRG_TEST_DATA_DIR=\"${IMSRG_TEST_DATA_DIR}\"")
+imsrg_add_test(NAME driver_imsrg3_n7_slow
+  SOURCES test_imsrg3_n7.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
+  DEPS driver LABELS slow integration TIMEOUT 7200 NO_GTEST_MAIN)
+target_compile_definitions(driver_imsrg3_n7_slow PRIVATE IMSRG_IT9_SLOW
+  "IMSRG_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden\""
+  "IMSRG_TEST_DATA_DIR=\"${IMSRG_TEST_DATA_DIR}\"")

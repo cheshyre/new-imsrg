@@ -49,9 +49,11 @@ TEST(commutator_dispatch, spec_rules) {
   N2.hermiticity = Hermiticity::kNonHermitian;
   EXPECT_EQ(commutator::CommutatorSpec(N2, H2).hermiticity,
             Hermiticity::kNonHermitian);
-  EXPECT_THROW(commutator::CommutatorSpec(
-                   OperatorSpec::Scalar(3, Hermiticity::kHermitian), H2),
-               NotImplementedError);
+  // Particle rank 3 (IMSRG(3)): the rank is the larger one.
+  EXPECT_EQ(commutator::CommutatorSpec(
+                OperatorSpec::Scalar(3, Hermiticity::kHermitian), H2)
+                .particle_rank,
+            3);
 }
 
 TEST(commutator_dispatch, z_reuse_keeps_buffer) {

@@ -6,6 +6,7 @@
 
 #include <cmath>
 #include <fstream>
+#include <stdexcept>
 #include <iostream>
 #include <map>
 #include <sstream>
@@ -247,11 +248,16 @@ Operator read_opdump(const std::string& path, ModelSpace& ms) {
     get_key(is, "delta_Tz", r);      get(is, dTz, r, "delta_Tz");
     get_key(is, "hermiticity", r);   get(is, hc, r, "hermiticity");
   }
-  if (prank > 2) fail(path, r.lineno, "particle_rank 3 is not supported by this reader yet");
+  if (prank > 3) fail(path, r.lineno, "particle_rank > 3 is not supported");
+  if (prank == 3 && (rJ != 0 || par != 0 || dTz != 0))
+    fail(path, r.lineno, "particle_rank 3 is only supported for scalar operators");
+  if (prank == 3 && hc == "N")
+    fail(path, r.lineno, "non-Hermitian particle_rank 3 operators are not supported");
   Operator op(ms, rJ, dTz, par, std::max(prank, 2));
   if (hc == "H") op.SetHermitian();
   else if (hc == "A") op.SetAntiHermitian();
   else op.SetNonHermitian();
+  if (prank == 3) op.ThreeBody.SetMode("pn");  // allocated, herm taken from the line above
   { auto is = r.expect("zero_body"); get(is, op.ZeroBody, r, "zero_body"); }
 
   int n1 = 0;
@@ -302,7 +308,63 @@ Operator read_opdump(const std::string& path, ModelSpace& ms) {
     auto is = r.expect("three_body");
     std::string w;
     get(is, w, r, "count");
-    if (w != "none" && w != "0") fail(path, r.lineno, "three_body entries are not supported yet");
+    if (prank < 3) {
+      if (w != "none" && w != "0") fail(path, r.lineno, "three_body entries need particle_rank 3");
+    } else {
+      if (w == "none") fail(path, r.lineno, "particle_rank 3 needs a three_body count");
+      long n3 = std::stol(w);
+      // Stored triangle of imsrg++ (ThreeBodyStorage_pn::AccessME): ibra >= iket of one channel.
+      // Records of the other triangle are only checked against the mirrored value.
+      struct Mirror { size_t ch, ib, ik; double v; int line; };
+      std::vector<Mirror> mirrors;
+      double vmax3 = 0;
+      for (long i = 0; i < n3; ++i) {
+        std::string l;
+        if (!r.next(l)) fail(path, r.lineno, "unexpected end of three_body");
+        std::istringstream is3(l);
+        int lab[8], twoJ;
+        double v;
+        for (int k = 0; k < 8; ++k) get(is3, lab[k], r, "label");
+        get(is3, twoJ, r, "2J"); get(is3, v, r, "value");
+        for (int k : {0, 1, 2, 4, 5, 6})
+          if (lab[k] < 0 || lab[k] >= norb) fail(path, r.lineno, "orbit index out of range");
+        if (lab[0] > lab[1] || lab[1] > lab[2] || lab[4] > lab[5] || lab[5] > lab[6])
+          fail(path, r.lineno, "three-body entries need a <= b <= c and d <= e <= f");
+        int ob[6] = {map[lab[0]], map[lab[1]], map[lab[2]], map[lab[4]], map[lab[5]], map[lab[6]]};
+        auto channel = [&](const int* o, int& par3, int& tz3) {
+          par3 = (ms.GetOrbit(o[0]).l + ms.GetOrbit(o[1]).l + ms.GetOrbit(o[2]).l) % 2;
+          tz3 = ms.GetOrbit(o[0]).tz2 + ms.GetOrbit(o[1]).tz2 + ms.GetOrbit(o[2]).tz2;
+        };
+        int pb, tb, pk, tk;
+        channel(ob, pb, tb);
+        channel(ob + 3, pk, tk);
+        if (pb != pk || tb != tk) fail(path, r.lineno, "bra and ket are in different channels");
+        size_t ch = ms.GetThreeBodyChannelIndex(twoJ, pb, tb);
+        if (ch >= ms.GetNumberThreeBodyChannels()) fail(path, r.lineno, "three-body channel not in the model space");
+        ThreeBodyChannel& tbc = ms.GetThreeBodyChannel(ch);
+        size_t ib, ik;
+        try {
+          ib = tbc.GetLocalIndex(ob[0], ob[1], ob[2], lab[3]);
+          ik = tbc.GetLocalIndex(ob[3], ob[4], ob[5], lab[7]);
+        } catch (const std::out_of_range&) {
+          fail(path, r.lineno, "three-body ket not in the model space");
+        }
+        if (ib >= tbc.GetNumberKets() || ik >= tbc.GetNumberKets())
+          fail(path, r.lineno, "three-body ket not in the channel");
+        vmax3 = std::max(vmax3, std::abs(v));
+        if (ib == ik && hc == "A") {
+          if (v != 0.0) fail(path, r.lineno, "anti-Hermitian diagonal element is not zero");
+          continue;
+        }
+        if (ib >= ik) op.ThreeBody.SetME_pn_ch(ch, ch, ib, ik, v);
+        else mirrors.push_back({ch, ib, ik, v, r.lineno});
+      }
+      for (const Mirror& m : mirrors) {
+        double got = op.ThreeBody.GetME_pn_ch(m.ch, m.ch, m.ib, m.ik);
+        if (std::abs(got - m.v) > 1e-12 * std::max(vmax3, 1e-300))
+          fail(path, m.line, "three-body hermiticity check failed: stored " + fmt17(got) + ", dump " + fmt17(m.v));
+      }
+    }
   }
   r.expect("end");
 
@@ -354,7 +416,8 @@ int cmd_roundtrip(const Args& a) {
   const std::string& in = a.positional[0];
   auto ms = modelspace_for_dump(in, a);
   Operator op = read_opdump(in, *ms);
-  write_opdump(a.positional[1], op, {dump_source_line(in), dump_reference(in)});
+  write_opdump(a.positional[1], op, {dump_source_line(in), dump_reference(in)},
+               op.GetParticleRank() >= 3);
   return 0;
 }
 
