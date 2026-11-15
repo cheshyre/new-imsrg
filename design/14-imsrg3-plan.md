@@ -7,7 +7,14 @@ matter most *(user)*:
 1. **IMSRG(3)-N7**: only the N⁷-scaling 3B terms (imsrg++ `imsrg3_n7`).
 2. **IMSRG(3f2)**: factorized double commutators. They avoid storing 3B operators by
    evaluating the [[η,Γ]₃, ·] contributions through 2B intermediates
-   (imsrg++ `FactorizedDoubleCommutator.cc`, used from BCH).
+   (imsrg++ `FactorizedDoubleCommutator.cc`, used from BCH). **Definition (owner, D32):** plain
+   IMSRG(2) plus hunter-gatherer Magnus, `omega_norm_max` 0.1, the factorized correction in BCH,
+   1b intermediates on and 2b intermediates off. In pyIMSRG terms:
+   `imsrgsolver.SetHunterGatherer(True)`, `imsrgsolver.SetOmegaNormMax(0.1)`,
+   `BCH.SetUseFactorizedCorrection(True)`,
+   `Commutator.FactorizedDoubleCommutator.SetUse_1b_Intermediates(True)`,
+   `Commutator.FactorizedDoubleCommutator.SetUse_2b_Intermediates(False)` (imsrg++ defaults: both
+   intermediates on, `FactorizedDoubleCommutator.cc:15-16`).
 3. **Perturbative triples**: the energy correction from the induced [2,2]→3 part
    (imsrg++ `perturbative_triples`, which reuses `comm223ss` and takes denominators from the 1B part).
 
@@ -27,8 +34,13 @@ known bugs:
 * every scalar commutator with IMSRG(3) enabled allocates and zero-fills Z's full 3B storage,
   even when the 3B terms are skipped.
 
-Fix-and-document policy *(user)*: where a bug changes results, the new code is correct, and the
-validation for that path uses a brute-force m-scheme reference (below) instead of imsrg-devel.
+Fix-and-document policy *(user; confirmed for these IMSRG(3) bugs on 2026-11-15, D34)*: where a
+bug changes results, the new code is correct, and the validation for that path uses a brute-force
+m-scheme reference (below) instead of imsrg-devel. Tolerances are those of D19 (terms 1e-10
+relative, perturbative triples 1e-4 MeV, N7/3f2 E0 1e-3 MeV).
+
+**Production target (owner, D34):** IMSRG(3)-N7 at emax 10–12 on several nodes. Tests stay at
+emax 2 and 3; the layout, its memory per operator and MPI phase 2 must be judged against that target.
 
 ## 2. Step 1: 3B layout benchmark (decide by measurement) *(user)*
 
@@ -72,19 +84,31 @@ learn from (`reference/05` §3), but note its shadowed `random_me` bug, which ze
 
 ## 4. Step 3: implementation order
 
+**Order (owner, D39):** IMSRG(3f2) needs no 3B storage, so it is developed **in parallel with the
+layout benchmark** (item 3 below, as its own track); then perturbative triples → N7 on the chosen
+layout.
+
 1. **Perturbative triples**: the [2,2]→3 term streamed channel by channel. It needs no full 3B
    storage, because the energy accumulates per channel. Validate against imsrg-devel
    (`perturbative_triples=true`) on the O16/He4 emax 2/3 tests.
 2. **IMSRG(3)-N7 terms**: implement the 3B part of the operator (chosen layout), all terms in
-   the N7 preset, CommutatorOptions presets, and 3B cuts (E3max, dE3max, OccNat3Cut). Validate
+   the N7 preset, CommutatorOptions presets, and 3B cuts (E3max, dE3max, OccNat3Cut). Kets that
+   fail dE3max or OccNat3Cut are **dropped when the 3B kets are enumerated** (owner, D34, M3-Q9):
+   the cut defines the 3B space and acts identically in every term. Validate
    term by term against imsrg-devel on random operators (emax 2), against brute force where
    imsrg-devel is buggy, then end to end (E0 of a Magnus IMSRG(3)-N7 flow at emax 2 and 3).
 3. **IMSRG(3f2)**: the factorized double-commutator terms inside BCH. Validate against
    imsrg-devel (`UnitTestFactorized.py` cases) and against explicit IMSRG(3) evaluation of the
    same double commutator at emax 2. imsrg++ has no executable parameter for it (only
    `BCH::SetUseFactorizedCorrection`, reachable from pyIMSRG), so golden flow data come from the
-   harness (`refharness flow --factorized`). In our code it is `BchOptions::factorized`.
-4. Later: the full IMSRG(3) term set; MPI distribution of 3B blocks (D14 phase 2); GPU tuning.
+   harness (`refharness flow --factorized`). In our code it is `BchOptions::factorized`, with the
+   1b/2b-intermediate switches. **Prerequisites:** hunter-gatherer Magnus (an M8 follow-up) and
+   refharness flags for hunter-gatherer, `omega_norm_max` and the 2b-intermediate switch; the
+   IT-10 goldens are regenerated with the owner's settings (D32) before they are used.
+4. Later: the full IMSRG(3) term set; MPI distribution of 3B blocks (D14 phase 2, in M12b: evaluate
+   the row-wise, cost-balanced block distribution of Hagen and Nam, Prog. Theor. Phys. Suppl. 196,
+   102 (2012), arXiv:1203.3765, against distribution by channel, which is likely unbalanced; D40);
+   GPU tuning after M12.
 
 ## 5. Data-structure requirements fixed now (so core work does not block IMSRG(3))
 

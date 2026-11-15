@@ -9,6 +9,7 @@ cmake/                    helper modules (warnings, sanitizers, deps lookup, lay
 extern/                   git submodules (pinned release tags): kokkos, googletest, fmt, CLI11,
                           tomlplusplus, nanobind   [kokkos-kernels: optional, later]
 src/imsrg/<module>/       library code; headers included as "imsrg/<module>/x.hpp"
+                          ("x.h" after the run-2 Google-style conversion: .h/.cc files, D38)
 src/imsrg/<module>/kernels/   .cpp files that contain Kokkos kernels (only these include Kokkos)
 apps/imsrg/               the `imsrg` executable (CLI11, thin wrapper around imsrg::driver)
 python/src/               nanobind bindings (module imsrg._core)
@@ -247,7 +248,8 @@ Operator transform_basis(const Operator&, const UnitaryTransform& C);    // e.g.
   `Kokkos::Profiling::pushRegion`, so NVTX/rocTX tools see the same regions. It is never called
   from constructors or destructors of data types.
 * Errors: see D16. Every input-file reader validates headers, sizes and truncations, and reports
-  the file name and position on failure.
+  the file name and position on failure. Exceptions stay a documented exception to the Google
+  style guide (D38, `17-code-style.md` §3).
 
 ## 5. Header and compile-time policy
 

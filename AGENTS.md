@@ -25,14 +25,17 @@ we do not port it line by line.
 2. **Tests gate everything.** No merge without unit tests. Numerics must match imsrg-devel (or the
    brute-force reference) within the tolerances of `design/30-testing-and-validation.md` §2. Never
    loosen a tolerance silently.
-3. **Problem sizes:** emax ≤ 6 in every test and run; IMSRG(3) only at emax 2 and 3.
+3. **Problem sizes:** emax ≤ 6 in every test and run; IMSRG(3) only at emax 2 and 3. Exception
+   (owner, D40): occasional emax-8 IMSRG(2) performance benchmarks against imsrg++, never in CI.
 4. **Never block on a question.** Append it to `design/QUESTIONS.md`, choose the most reversible
    option, note the assumption, and continue.
 5. **Respect the module DAG** (`design/10-architecture.md` §2). `tools/check_layering.py`
    enforces it. A new module edge needs a design-doc update in the same commit.
 6. **Old-code bugs:** fix them, document each in `design/30-testing-and-validation.md` §6, and
    validate the fixed path another way (brute force, a patched reference copy, or a limit case).
-7. Never commit large files (> 1 MB) or generated data. Golden data in `tests/golden/` stays small.
+7. Never commit large files (> 1 MB) or generated data. Golden data in `tests/golden/` stays small
+   and is regenerated only through the `tools/reference` scripts, with the reason and the old vs
+   new numbers in the commit message (D42).
 8. Never run two builds in the same build directory at once. Tasks sharing a checkout use their own
    build directory (`cmake --preset dev-openmp -B build/<task>`) or build one after another.
 9. Scripts and globs work on `git ls-files`: the main checkout root also holds untracked
@@ -70,6 +73,11 @@ then `.venv/bin/pytest tests/python`.
 
 ## Code conventions
 
+* **Style: the Google C++ Style Guide** (owner, D38), with the exceptions and tooling in
+  `design/17-code-style.md` (exceptions D16, `<filesystem>` outside kernels, Kokkos `[=]` device
+  lambdas). The conversion of the existing code is the **first task of run 2**; until it lands, the
+  bullets below describe the code as it is (snake_case functions, `.hpp`/`.cpp`, 100 columns,
+  `#pragma once`), and the conversion replaces them with `design/17` §1.
 * C++20, no compiler extensions. Formatting: `.clang-format` (100 columns).
 * Naming: types `PascalCase`; functions and variables `snake_case`; private members
   `snake_case_`; macros `IMSRG_UPPER_CASE`; files `snake_case.hpp/.cpp`; namespaces
@@ -99,7 +107,9 @@ then `.venv/bin/pytest tests/python`.
 * Operator norms: 1B weighted by (2j+1), 2B by (2J+1)², 3B as imsrg++'s canonical pn Frobenius norm
   (for any layout); the zero-body part is excluded from the total. These drive step sizes and BCH
   thresholds; do not change them.
-* Units: MeV and fm. Physical constants are copied exactly from imsrg++ `PhysicalConstants.hh`.
+* Units: MeV and fm. Physical constants are copied exactly from imsrg++ `PhysicalConstants.hh`;
+  mathematical constants (e.g. 1/√2, which imsrg++ truncates to 13 digits) use full double
+  precision (D36).
 
 ## Commits
 

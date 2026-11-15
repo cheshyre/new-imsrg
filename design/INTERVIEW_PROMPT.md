@@ -1,5 +1,7 @@
 # Prompt for the owner Q&A and design-interview session
 
+> **Status:** used on 2026-11-15 (report `design/reports/2026-11-15-owner-interview.md`; decisions D30–D42). An owner interview follows every run (D42): the run-2 orchestrator refreshes the agenda below for the interview after run 2.
+
 **How to use:** after syncing the main checkout (QUESTIONS O1), start an **interactive** Claude
 Code session (Opus) in `/Users/cheshyre/Downloads/new-imsrg` on `develop`, and paste everything
 below the line. Plan 60–90 minutes. The session only edits documentation; the next unsupervised
