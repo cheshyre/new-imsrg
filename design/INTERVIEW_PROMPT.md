@@ -29,9 +29,7 @@ during run 2" only; everything before it is answered), and skim `design/40-roadm
 `design/14-imsrg3-plan.md` and `design/benchmarks/imsrg3-layout.md`. For every question on the
 agenda, note in 2–3 sentences the context (file/section), the options, the assumption the run made,
 and what would change under each answer. Look things up in the code only when needed to explain a
-consequence. IMSRG(3)-N7 merged during run 2 (its questions are M10-Q60..Q67 below); M12a was still running when
-this agenda was written: read the run-2 report for its final state and its question ids (M12-Q*),
-and add them to group F.
+consequence. IMSRG(3)-N7 merged during run 2 (its questions are M10-Q60..Q67 below); M12a merged too (questions M12-Q1..Q5, listed in group F).
 
 ## How to run the interview (the method that worked on 2026-11-15)
 
@@ -203,7 +201,9 @@ Format: **id** — summary; *assumption taken*; what an answer changes.
   time). *Assumed.*
 * **N7 results to mention** (no question): IT-9 passes with identical steps, |dE0| <= 3.8e-10 MeV, and
   the imsrg++ comm232 non-Hermitian bug is fixed; ours is 2x (emax 2) to 2.5x (emax 3) faster.
-* Add the M12a questions (M12-Q*) recorded at the end of run 2 (see the run-2 report).
+* **M12-Q1..Q5** (M12a, `QUESTIONS.md`): the performance choices of M12a (stored sparse Pandya maps
+  not built, about six operators of memory; `Workspace` 5.5x a 2B operator; follow-ups `dsyr2k`, BCH
+  temporaries, launch overhead at small emax). Read them in `QUESTIONS.md`; *assumptions taken*.
 
 **G. Low-impact confirmations (summarize one line each and ask the owner to flag any to revisit)**
 M8-Q22 (merge resolution), M8-Q21 (resolved: gen scripts default to the patched harness), M11-Q10
@@ -223,8 +223,7 @@ M8-Q22 (merge resolution), M8-Q21 (resolved: gen scripts default to the patched 
    and interconnect of the clusters, when the Hagen–Nam block-distribution evaluation should run
    and what scaling is "good enough"; when GPU work (M14, after M12) should start and on which
    machine first (H100/GH200, A100, MI250X/MI300A).
-4. **Performance goals (M12a)**: imsrg++ parity is the first target (today 1.10–1.20× the time at
-   emax 4/6); how much effort beyond parity; is the occasional emax-8 benchmark against imsrg++
+4. **Performance goals (M12a)**: imsrg++ parity is the first target (today 1.5-3x faster); how much effort beyond parity; is the occasional emax-8 benchmark against imsrg++
    (one run, never in CI) enough?
 5. **Outputs and workflows**: charge radius and other observables in the output stage (M8-Q20),
    me2jp/me3jp specifications (the owner supplies them), checkpoint/restart and Omega scratch

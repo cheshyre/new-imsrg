@@ -138,10 +138,14 @@ rows of the interview after run 2) and in the answers in `design/QUESTIONS.md`. 
   720 s vs 30 min (He4 emax 3). imsrg++ bug fixed: the `comm232` hermX*hermY shortcut is wrong for
   non-Hermitian operands (`30` section 6 M10-N7-1..3). Open: N7 is correct but not yet scalable (comm232
   tiling, tiled 133/132/231/331, `14` section 1.1; M10-Q60..Q67).
-* **M12a single-node performance, `feature/m12a-perf`:** (INSERT the final M12a result: what landed,
-  the benchmark table vs imsrg++ at emax 4/6/8, what remains, branch and merge state). Interim: an
-  emax-8 IMSRG(2) flow at 6 threads takes 59.8 s ours vs 192.3 s imsrg++ (209 steps, same E0), peak
-  RSS 1.10 vs 2.51 GB.
+* **M12a single-node performance: merged (9bef685; check `STATUS.md` that its CI passed).** Full
+  IMSRG(2) commutator, ms, before M12a -> now / imsrg++: emax 4: 1 thread 6.71 -> 1.16 / 5.21, 6 threads
+  2.18 -> 0.65 / 1.53; emax 6: 100 -> 18.2 / 70.6, 24.9 -> 5.1 / 15.2 (18 threads 3.9 / 9.5); emax 8:
+  866 -> 169 / 671, 199 -> 49 / 155 (18 threads 31 / 95). Full O16 flow (same steps and E0): emax 8
+  59.8 s vs 187.8 s (6 threads), 40.5 s vs 148.8 s (18); emax 6 7.9 s vs 24.3 s. Workspace scratch 10.4x
+  -> 5.5x a 2B operator; peak RSS at emax 8 1.1 GB vs 2.3-2.6 GB. Weak spot: emax 4 at 18 threads
+  only 1.1x (launch overhead). Not built: stored sparse Pandya maps. Report
+  `design/benchmarks/imsrg2-performance.md`; M12-Q1..Q5.
 * **Not started:** M12b (MPI), M13 (Makefile, docs), M14 (GPU), tensor operators (D39), IT-11, 3f2
   2b intermediates (E-PLANNED, M10-Q20), NAT options (M9-Q3), checkpoint/restart.
 * **Open questions** with assumptions: `design/QUESTIONS.md`, "Added during run 2" and the answers
@@ -154,7 +158,7 @@ rows of the interview after run 2) and in the answers in `design/QUESTIONS.md`. 
 2. **IMSRG(3)-N7 performance** (brief below): tile `comm232ss` and the 133/132/231/331 kernels so N7
    scales toward the production target (emax 10-12, D34), without changing any result (IT-9 and the
    term goldens stay). Then the 3f2 2b intermediates if the owner asked for them (M10-Q20).
-3. **M12a: finish and merge** if the run-2 lead did not (brief below): imsrg++ parity, then explore single-node limits; occasional
+3. **M12a follow-ups** (brief below): parity is reached; continue to explore single-node limits; occasional
    emax-8 benchmarks against imsrg++, never in CI.
 4. **M12b MPI** (brief below), after M12a's data structures settle: D14 phase 1 (IMSRG(2) by channel
    blocks), phase 2 (3B blocks, Hagen–Nam evaluation, D40), IT-11. N7 has merged, so phase 2 can
@@ -242,21 +246,21 @@ rows of the interview after run 2) and in the answers in `design/QUESTIONS.md`. 
 > arithmetic is unchanged), benchmark table before/after in `design/benchmarks/`, `tools/ci.sh
 > dev-openmp` PASS and `ctest -L slow` PASS. Report <= 250 words.
 
-## Brief for the M12a continuation (use only if M12a is not merged; adjust the hashes and the pending parts)
+## Brief for the M12a follow-ups (ready to use; adjust the hashes)
 
-> You lead **M12a — single-node CPU performance** on `feature/m12a-perf` (`develop` = bd2fda4, update it; state of
-> the previous lead: (INSERT: the M12a result of run 2: what landed, the benchmark table, what is
-> left)). Question ids `M12a-Q<block>`. **Golden rule 10 applies** (searches only inside the project
+> You lead **M12a — single-node CPU performance** on `feature/m12a-perf` (`develop` = bd2fda4, update it; base: the M12a
+> merge). Question ids `M12-Q<block>` (Q1..Q5 used). **Golden rule 10 applies** (searches only inside the project
 > directories). Delegate to Sonnet workers; one Opus review per kernel merge. Goal (D40): imsrg++
-> parity first, then explore how far one node goes, judged mainly at larger emax. Known follow-ups:
-> sparse Pandya maps and smaller `Workspace` (M7-Q4, the Workspace is ≈ 10× a 2B operator),
-> per-channel norm reductions, `op::No2bThreeBody::get_pn` linear scan and CG recomputation (M6-Q4),
+> parity is reached (1.5-3x faster); explore how far one node goes, judged mainly at larger emax. Known
+> follow-ups: `dsyr2k` for the Hermitian ladder, BCH temporaries kept across steps, launch overhead at
+> small emax (emax 4 at 18 threads is only 1.1x imsrg++), stored sparse Pandya maps (about six
+> operators of memory; only if the memory is affordable), per-channel norm reductions, `op::No2bThreeBody::get_pn` linear scan and CG recomputation (M6-Q4),
 > the `Denominators` copy of H (F2b), the general commutator paths' cost (M7-Q10: ≈ 2× ladder and 4×
 > ph flops, only when flagged NonHermitian), `Comm223` gathers (M10-Q41/Q42: per-tile transposed 6j
-> slices, a ket cache). Today: the full IMSRG(2) commutator is 1.10–1.20× the imsrg++ time at emax
-> 4/6 (5.7 vs 5.2 ms at emax 4, 1 thread; 80 vs 67 ms at emax 6); (INSERT: updated numbers).
+> slices, a ket cache). Today: the full IMSRG(2) commutator takes 1.16 ms (emax 4, 1 thread; imsrg++ 5.21), 18.2 ms
+> (emax 6; 70.6) and 169 ms (emax 8; 671); the Workspace is 5.5x a 2B operator.
 > Benchmarks: `tools/bench`, `refharness bench-commutator`, results in
-> `design/benchmarks/imsrg2-commutators.md` (emax 4, 6, and **occasional emax-8** runs against
+> `design/benchmarks/imsrg2-performance.md` (emax 4, 6, and **occasional emax-8** runs against
 > imsrg++, never in CI: the one exception to the emax rule, D40). Acceptance: no regression in any
 > golden test (bitwise where the arithmetic is unchanged); benchmark table with before/after and
 > imsrg++; `tools/ci.sh dev-openmp` PASS. Report ≤ 250 words.
