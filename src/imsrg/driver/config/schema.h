@@ -247,8 +247,8 @@ IMSRG_DRIVER_ENUM_TRAITS(Partitioning, "denominator partitioning",
                           Phase::kPlanned});
 IMSRG_DRIVER_ENUM_TRAITS(OmegaStorage, "Omega storage",
                          {OmegaStorage::kMemory, "memory"},
-                         {OmegaStorage::kScratch, "scratch"},
-                         {OmegaStorage::kDiscard, "discard"});
+                         {OmegaStorage::kScratch, "scratch", Phase::kPlanned},
+                         {OmegaStorage::kDiscard, "discard", Phase::kPlanned});
 IMSRG_DRIVER_ENUM_TRAITS(Imsrg3Variant, "IMSRG(3) variant",
                          {Imsrg3Variant::kFull, "full"},
                          {Imsrg3Variant::kN7, "n7"},
