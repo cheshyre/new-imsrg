@@ -16,6 +16,7 @@
 #include "imsrg/basis/reference.h"
 #include "imsrg/basis/single_particle_basis.h"
 #include "imsrg/basis/three_body_channels.h"
+#include "imsrg/basis/three_body_space.h"
 #include "imsrg/basis/two_body_channels.h"
 
 namespace imsrg::basis {
@@ -89,6 +90,13 @@ class ModelSpace {
     return three_body_.get();
   }
 
+  /// The kept canonical three-body space (the 3B kets that pass the
+  /// configuration cuts for this model space's reference), or nullptr unless
+  /// built with `WithThreeBody`.
+  const ThreeBodySpace* three_body_space() const noexcept {
+    return three_body_space_.get();
+  }
+
   /// Number of orbits.
   std::int32_t num_orbits() const noexcept { return basis_->num_orbits(); }
 
@@ -105,9 +113,11 @@ class ModelSpace {
   std::shared_ptr<const ModelSpace> WithReferenceAndPartition(
       Reference reference, Partition partition) const;
 
-  /// The same model space with three-body channels for `cuts` (the 3B kets
-  /// depend only on the basis and the cuts, so derived model spaces share
-  /// them). Cost: the 3B ket enumeration.
+  /// The same model space with three-body channels and the kept three-body
+  /// space for `cuts`. The channels depend only on the basis and the cuts, so
+  /// derived model spaces (`WithReference`) share them; the kept space also
+  /// depends on the reference (dE3max, occupations) and is rebuilt for every
+  /// derived reference. Cost: the 3B ket enumeration.
   std::shared_ptr<const ModelSpace> WithThreeBody(
       const ThreeBodyCuts& cuts) const;
 
@@ -125,7 +135,8 @@ class ModelSpace {
   std::shared_ptr<const TwoBodyChannels> two_body_;
   std::shared_ptr<const TwoBodyKetSubsets> two_body_subsets_;
   std::shared_ptr<const ParticleHoleChannels> particle_hole_;
-  std::shared_ptr<const ThreeBodyChannels> three_body_;  // may be null
+  std::shared_ptr<const ThreeBodyChannels> three_body_;     // may be null
+  std::shared_ptr<const ThreeBodySpace> three_body_space_;  // may be null
 };
 
 }  // namespace imsrg::basis
