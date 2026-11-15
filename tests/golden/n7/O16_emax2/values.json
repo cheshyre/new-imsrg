@@ -1,0 +1,298 @@
+{
+  "case": "O16_emax2",
+  "reference": "O16",
+  "emax": 2,
+  "reference_version": "imsrg-devel src-sha256:ddcbf1aff166414e746113d5f3de2ddc1e72783fb7c201829cd58e317717f40f+d35-patch:5fdd2b73265417f2",
+  "operators": "RandomThreeBodyOperator(ThreeBodyContext(MakeThreeBodySpace(emax, reference, {e3max})), h, seed) of tests/support/three_body_test_support.h, hw 16, valence = reference: X = anti-Hermitian seed 11, Y = Hermitian seed 12, H = Hermitian seed 13 (tools/bench/n7_inputs.cc). The dumps of X, Y, H are not committed; 'inputs' holds their imsrg++ norms (drift check)",
+  "commands": {
+    "inputs": "imsrg_n7_inputs --emax 2 --reference O16 --e3max <e3max> --seed <s> --herm <A|H> --out F",
+    "term": "refharness comm3 <TERM> X.dump Y.dump Z.dump e3max=<e3max>",
+    "generator": "refharness generator3 white H.dump ETA.dump e3max=<e3max>"
+  },
+  "terms": [
+    "comm330ss",
+    "comm331ss",
+    "comm231ss",
+    "comm132ss",
+    "comm232ss",
+    "comm133ss",
+    "comm223ss",
+    "n7"
+  ],
+  "dump_e3max": 3,
+  "norm_fields": "zero_body, one_body_norm, two_body_norm: imsrg++ OneBodyNorm/TwoBodyNorm; three_body_norm: imsrg++ ThreeBodyNorm (canonical pn Frobenius norm); *_str: %.17g text",
+  "cases": [
+    {
+      "e3max": 3,
+      "inputs": {
+        "X": {
+          "zero_body": 0.0,
+          "zero_body_str": "0",
+          "one_body_norm": 1.2015752608940218,
+          "one_body_norm_str": "1.2015752608940218",
+          "two_body_norm": 93.07268402731395,
+          "two_body_norm_str": "93.072684027313954",
+          "three_body_norm": 105.30995181656627,
+          "three_body_norm_str": "105.30995181656627"
+        },
+        "Y": {
+          "zero_body": 0.0,
+          "zero_body_str": "0",
+          "one_body_norm": 4.427521788129868,
+          "one_body_norm_str": "4.4275217881298676",
+          "two_body_norm": 97.73109969331216,
+          "two_body_norm_str": "97.73109969331216",
+          "three_body_norm": 95.16057503164278,
+          "three_body_norm_str": "95.160575031642779"
+        },
+        "H": {
+          "zero_body": 0.0,
+          "zero_body_str": "0",
+          "one_body_norm": 3.061646365284624,
+          "one_body_norm_str": "3.061646365284624",
+          "two_body_norm": 102.80163931066606,
+          "two_body_norm_str": "102.80163931066606",
+          "three_body_norm": 102.1784722907072,
+          "three_body_norm_str": "102.17847229070721"
+        }
+      },
+      "terms": {
+        "comm330ss": {
+          "zero_body": 0.0,
+          "zero_body_str": "0",
+          "one_body_norm": 0.0,
+          "one_body_norm_str": "0",
+          "two_body_norm": 0.0,
+          "two_body_norm_str": "0",
+          "three_body_norm": 0.0,
+          "three_body_norm_str": "0",
+          "dump": "comm330ss.dump"
+        },
+        "comm331ss": {
+          "zero_body": 0.0,
+          "zero_body_str": "0",
+          "one_body_norm": 0.0,
+          "one_body_norm_str": "0",
+          "two_body_norm": 0.0,
+          "two_body_norm_str": "0",
+          "three_body_norm": 0.0,
+          "three_body_norm_str": "0",
+          "dump": "comm331ss.dump"
+        },
+        "comm231ss": {
+          "zero_body": 0.0,
+          "zero_body_str": "0",
+          "one_body_norm": 0.0,
+          "one_body_norm_str": "0",
+          "two_body_norm": 0.0,
+          "two_body_norm_str": "0",
+          "three_body_norm": 0.0,
+          "three_body_norm_str": "0",
+          "dump": "comm231ss.dump"
+        },
+        "comm132ss": {
+          "zero_body": 0.0,
+          "zero_body_str": "0",
+          "one_body_norm": 0.0,
+          "one_body_norm_str": "0",
+          "two_body_norm": 154.35982630491554,
+          "two_body_norm_str": "154.35982630491554",
+          "three_body_norm": 0.0,
+          "three_body_norm_str": "0",
+          "dump": "comm132ss.dump"
+        },
+        "comm232ss": {
+          "zero_body": 0.0,
+          "zero_body_str": "0",
+          "one_body_norm": 0.0,
+          "one_body_norm_str": "0",
+          "two_body_norm": 554.5374090907479,
+          "two_body_norm_str": "554.53740909074793",
+          "three_body_norm": 0.0,
+          "three_body_norm_str": "0",
+          "dump": "comm232ss.dump"
+        },
+        "comm133ss": {
+          "zero_body": 0.0,
+          "zero_body_str": "0",
+          "one_body_norm": 0.0,
+          "one_body_norm_str": "0",
+          "two_body_norm": 0.0,
+          "two_body_norm_str": "0",
+          "three_body_norm": 159.36531438029735,
+          "three_body_norm_str": "159.36531438029735",
+          "dump": "comm133ss.dump"
+        },
+        "comm223ss": {
+          "zero_body": 0.0,
+          "zero_body_str": "0",
+          "one_body_norm": 0.0,
+          "one_body_norm_str": "0",
+          "two_body_norm": 0.0,
+          "two_body_norm_str": "0",
+          "three_body_norm": 95.1106504299359,
+          "three_body_norm_str": "95.110650429935902",
+          "dump": "comm223ss.dump"
+        },
+        "n7": {
+          "zero_body": 0.5778254822802555,
+          "zero_body_str": "0.57782548228025554",
+          "one_body_norm": 31.622733951478317,
+          "one_body_norm_str": "31.622733951478317",
+          "two_body_norm": 712.2352022349049,
+          "two_body_norm_str": "712.23520223490493",
+          "three_body_norm": 183.87778599037298,
+          "three_body_norm_str": "183.87778599037298",
+          "dump": "n7.dump"
+        }
+      },
+      "generator_white": {
+        "zero_body": 0.0,
+        "zero_body_str": "0",
+        "one_body_norm": 2.9067959613211842,
+        "one_body_norm_str": "2.9067959613211842",
+        "two_body_norm": 108.79612837977224,
+        "two_body_norm_str": "108.79612837977224",
+        "three_body_norm": 0.0,
+        "three_body_norm_str": "0",
+        "dump": "eta_white.dump"
+      }
+    },
+    {
+      "e3max": 6,
+      "inputs": {
+        "X": {
+          "zero_body": 0.0,
+          "zero_body_str": "0",
+          "one_body_norm": 1.2015752608940218,
+          "one_body_norm_str": "1.2015752608940218",
+          "two_body_norm": 93.07268402731395,
+          "two_body_norm_str": "93.072684027313954",
+          "three_body_norm": 359.0990635258095,
+          "three_body_norm_str": "359.09906352580953"
+        },
+        "Y": {
+          "zero_body": 0.0,
+          "zero_body_str": "0",
+          "one_body_norm": 4.427521788129868,
+          "one_body_norm_str": "4.4275217881298676",
+          "two_body_norm": 97.73109969331216,
+          "two_body_norm_str": "97.73109969331216",
+          "three_body_norm": 330.09550110184136,
+          "three_body_norm_str": "330.09550110184136"
+        },
+        "H": {
+          "zero_body": 0.0,
+          "zero_body_str": "0",
+          "one_body_norm": 3.061646365284624,
+          "one_body_norm_str": "3.061646365284624",
+          "two_body_norm": 102.80163931066606,
+          "two_body_norm_str": "102.80163931066606",
+          "three_body_norm": 355.8826147625777,
+          "three_body_norm_str": "355.8826147625777"
+        }
+      },
+      "terms": {
+        "comm330ss": {
+          "zero_body": 169.80147093936475,
+          "zero_body_str": "169.80147093936475",
+          "one_body_norm": 0.0,
+          "one_body_norm_str": "0",
+          "two_body_norm": 0.0,
+          "two_body_norm_str": "0",
+          "three_body_norm": 0.0,
+          "three_body_norm_str": "0",
+          "dump": null
+        },
+        "comm331ss": {
+          "zero_body": 0.0,
+          "zero_body_str": "0",
+          "one_body_norm": 758.2697104081009,
+          "one_body_norm_str": "758.26971040810088",
+          "two_body_norm": 0.0,
+          "two_body_norm_str": "0",
+          "three_body_norm": 0.0,
+          "three_body_norm_str": "0",
+          "dump": null
+        },
+        "comm231ss": {
+          "zero_body": 0.0,
+          "zero_body_str": "0",
+          "one_body_norm": 358.1933037636955,
+          "one_body_norm_str": "358.1933037636955",
+          "two_body_norm": 0.0,
+          "two_body_norm_str": "0",
+          "three_body_norm": 0.0,
+          "three_body_norm_str": "0",
+          "dump": null
+        },
+        "comm132ss": {
+          "zero_body": 0.0,
+          "zero_body_str": "0",
+          "one_body_norm": 0.0,
+          "one_body_norm_str": "0",
+          "two_body_norm": 578.5296971545815,
+          "two_body_norm_str": "578.52969715458153",
+          "three_body_norm": 0.0,
+          "three_body_norm_str": "0",
+          "dump": null
+        },
+        "comm232ss": {
+          "zero_body": 0.0,
+          "zero_body_str": "0",
+          "one_body_norm": 0.0,
+          "one_body_norm_str": "0",
+          "two_body_norm": 2969.8609648990396,
+          "two_body_norm_str": "2969.8609648990396",
+          "three_body_norm": 0.0,
+          "three_body_norm_str": "0",
+          "dump": null
+        },
+        "comm133ss": {
+          "zero_body": 0.0,
+          "zero_body_str": "0",
+          "one_body_norm": 0.0,
+          "one_body_norm_str": "0",
+          "two_body_norm": 0.0,
+          "two_body_norm_str": "0",
+          "three_body_norm": 633.6478089829027,
+          "three_body_norm_str": "633.64780898290269",
+          "dump": null
+        },
+        "comm223ss": {
+          "zero_body": 0.0,
+          "zero_body_str": "0",
+          "one_body_norm": 0.0,
+          "one_body_norm_str": "0",
+          "two_body_norm": 0.0,
+          "two_body_norm_str": "0",
+          "three_body_norm": 334.06650694121817,
+          "three_body_norm_str": "334.06650694121817",
+          "dump": null
+        },
+        "n7": {
+          "zero_body": 170.37929642164514,
+          "zero_body_str": "170.37929642164514",
+          "one_body_norm": 673.8674370830972,
+          "one_body_norm_str": "673.86743708309723",
+          "two_body_norm": 2991.329954370088,
+          "two_body_norm_str": "2991.3299543700882",
+          "three_body_norm": 715.2860961241566,
+          "three_body_norm_str": "715.28609612415664",
+          "dump": null
+        }
+      },
+      "generator_white": {
+        "zero_body": 0.0,
+        "zero_body_str": "0",
+        "one_body_norm": 2.9067959613211842,
+        "one_body_norm_str": "2.9067959613211842",
+        "two_body_norm": 108.79612837977224,
+        "two_body_norm_str": "108.79612837977224",
+        "three_body_norm": 1176.0323834745234,
+        "three_body_norm_str": "1176.0323834745234",
+        "dump": "eta_white_e3max6.dump"
+      }
+    }
+  ]
+}
