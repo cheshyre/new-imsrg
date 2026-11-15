@@ -576,7 +576,7 @@ Catalog entry (static table, one row per operator family): `{ name, n_params, pa
 **Rp2 and Rso (owner, 2026-11-15, D35):** `Rp2` is the point-proton mean-square radius **without**
 the spin-orbit correction (imsrg++'s `Rp2_corrected_Op` includes it); the correction is the separate
 operator `Rso` (imsrg++ `RpSpinOrbitCorrection`), added explicitly for charge radii. `opslib::Rp2`
-loses its `include_spin_orbit` parameter (run 2).
+has no `include_spin_orbit` parameter (done, run 2); `Rso` is implemented in `PrepareOperator`.
 
 | phase | operators |
 |---|---|

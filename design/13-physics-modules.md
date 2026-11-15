@@ -209,14 +209,13 @@ after IMSRG(3), D39), dagger, M0nu, DM NREFT. The name grammar and legacy names 
 **As implemented (M6).** Namespace `imsrg::opslib`, every physics parameter explicit (no hidden
 model-space state): `kinetic_energy(ms)` (Tlab), `t_cm(ms, A)`, `t_rel(ms, A)` (T_int used in
 H), `r2_cm(ms, A)`, `h_cm(ms, A, hw_trap)`, `r2_one_body/r2_two_body(ms, Species)`,
-`rp2(ms, A, Z, include_spin_orbit = true)` (imsrg++ "Rp2" includes `RpSpinOrbitCorrection`,
-M6-Q1), `rn2(ms, A, Z)`, `rm2(ms, A)`. Equal to the imsrg-devel dumps within 1.1e-14 (emax 2
+`rp2(ms, A, Z)` (imsrg++ "Rp2" includes `RpSpinOrbitCorrection`; ours does not, D35 below), `rn2(ms, A, Z)`, `rm2(ms, A)`. Equal to the imsrg-devel dumps within 1.1e-14 (emax 2
 and 4); emax 6 builds take 0.4 s (t_rel) and 0.7 s (rp2).
 
 **Owner decisions 2026-11-15 (D35), implemented in run 2:** `t_cm` keeps all two-body entries
 (imsrg++ drops |v| ≤ 1e-7, which also enters T_int and thus H); `rp2` loses `include_spin_orbit`
 and never includes the spin-orbit correction, which stays available as the separate `Rso` operator
-(`rp_spin_orbit_correction`). No imsrg++ compatibility switch: the goldens come from a patched
+(`RpSpinOrbitCorrection`, catalog name `Rso`; a charge radius adds `Rso/Z` explicitly). No imsrg++ compatibility switch: the goldens come from a patched
 imsrg-devel build (`30` §3).
 
 ## 9. driver

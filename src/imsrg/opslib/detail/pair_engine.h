@@ -106,8 +106,8 @@ void AddOscillatorOneBody(op::Operator& op, double scale, double off_sign,
 /// channel, and every pair of kets bra <= ket (local indices), writing both
 /// triangles (Hermitian operator). `value` has the signature `double(const
 /// TwoBodyChannel&, const Orbit& a, const Orbit& b, const Orbit& c, const
-/// Orbit& d)`; entries with |value| <= `threshold` are skipped (imsrg++ TCM_Op
-/// drops |v| <= 1e-7; pass 0 to keep all non-zero entries). Host mirror only.
+/// Orbit& d)`; entries with |value| <= `threshold` are skipped (pass 0 to keep
+/// all non-zero entries; every caller does, D35). Host mirror only.
 /// Cost: O(sum over channels of num_kets^2) calls of `value`.
 template <class Value>
 void AddTwoBody(op::Operator& op, double threshold, Value value) {

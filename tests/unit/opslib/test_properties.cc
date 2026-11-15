@@ -82,26 +82,67 @@ TEST(OpslibProperties, TrelIsKineticMinusTcmExactly) {
 
 TEST(OpslibProperties, MatterRadiusAgainstSpeciesRadii) {
   const auto ms = GoldenSpace();
-  // Without the spin-orbit term Z rp2 + N rn2 = A rm2 holds for the one-body
-  // parts exactly; the two-body parts agree because R2TwoBody(proton) +
-  // R2TwoBody(neutron) = R2TwoBody(matter) (the pn channels are split in
+  // Rp2 has no spin-orbit term (D35), so Z rp2 + N rn2 = A rm2 holds for the
+  // one-body parts exactly; the two-body parts agree because R2TwoBody(proton)
+  // + R2TwoBody(neutron) = R2TwoBody(matter) (the pn channels are split in
   // half). Print what actually holds.
-  op::Operator lhs = opslib::Rp2(ms, kA, kZ, false);
+  op::Operator lhs = opslib::Rp2(ms, kA, kZ);
   lhs *= static_cast<double>(kZ);
   op::Axpy(static_cast<double>(kA - kZ), opslib::Rn2(ms, kA, kZ), lhs);
   op::Operator rhs = opslib::Rm2(ms, kA);
   rhs *= static_cast<double>(kA);
   const op::PartMaxima d = op::MaxAbsDifference(lhs, rhs);
-  std::cout << "[props] max |Z rp2 + N rn2 - A rm2| (no spin-orbit): one-body "
-            << d.one_body << ", two-body " << d.two_body << "\n";
+  std::cout << "[props] max |Z rp2 + N rn2 - A rm2| : one-body " << d.one_body
+            << ", two-body " << d.two_body << "\n";
   EXPECT_LT(d.max(), 1.0e-10);
-  // With the spin-orbit term included the relation is broken by that term only.
-  op::Operator lhs_so = opslib::Rp2(ms, kA, kZ, true);
-  const op::PartMaxima so =
-      op::MaxAbsDifference(lhs_so, opslib::Rp2(ms, kA, kZ, false));
-  const op::PartMaxima so_ref = op::MaxAbs(opslib::RpSpinOrbitCorrection(ms));
-  EXPECT_NEAR(so.one_body, so_ref.one_body / kZ, 1.0e-12);
-  EXPECT_EQ(so.two_body, 0.0);
+}
+
+TEST(OpslibProperties, SpinOrbitIsSeparateDiagonalOneBodyOperator) {
+  const auto ms = GoldenSpace();
+  op::Operator rso = opslib::RpSpinOrbitCorrection(ms);
+  EXPECT_EQ(Asymmetry(rso), 0.0);
+  const op::PartMaxima m = op::MaxAbs(rso);
+  EXPECT_EQ(m.zero_body, 0.0);
+  EXPECT_EQ(m.two_body, 0.0);
+  EXPECT_GT(m.one_body, 0.05);
+  // Diagonal: orbit i != j has no element.
+  const std::int32_t n = ms->num_orbits();
+  for (std::int32_t a = 0; a < n; ++a) {
+    for (std::int32_t b = 0; b < n; ++b) {
+      if (a != b) {
+        EXPECT_EQ(rso.one_body().get(OrbitIndex{a}, OrbitIndex{b}), 0.0);
+      }
+    }
+  }
+  // D35: Rp2 does not contain it, so Rp2 carries no neutron/proton moment
+  // dependence: Rp2 + Rso/Z differs from Rp2 by exactly Rso/Z in the one-body
+  // part and not at all in the two-body part.
+  op::Operator with_so = opslib::Rp2(ms, kA, kZ);
+  op::Axpy(1.0 / kZ, rso, with_so);
+  const op::PartMaxima d =
+      op::MaxAbsDifference(with_so, opslib::Rp2(ms, kA, kZ));
+  EXPECT_NEAR(d.one_body, m.one_body / kZ, 1.0e-12);
+  EXPECT_EQ(d.two_body, 0.0);
+}
+
+TEST(OpslibProperties, TcmKeepsEveryNonzeroTwoBodyEntry) {
+  // D35: no 1e-7 threshold. Entries below it exist in the golden space (the
+  // imsrg++ threshold only removed round-off, <= 1e-15 MeV).
+  const auto ms = GoldenSpace();
+  op::Operator t = opslib::TCm(ms, kA);
+  t.SyncToHost();
+  std::int64_t tiny = 0;
+  const auto& chans = ms->two_body();
+  for (std::int32_t c = 0; c < chans.num_channels(); ++c) {
+    const auto block = t.two_body().host_block(ChannelIndex{c});
+    for (std::int64_t i = 0; i < block.rows; ++i) {
+      for (std::int64_t j = 0; j < block.cols; ++j) {
+        const double v = std::abs(block(i, j));
+        if (v > 0.0 && v <= 1.0e-7) ++tiny;
+      }
+    }
+  }
+  EXPECT_GT(tiny, 0);
 }
 
 TEST(OpslibProperties, SpeciesPartsAddUpToMatter) {

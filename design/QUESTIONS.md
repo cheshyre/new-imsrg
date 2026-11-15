@@ -439,3 +439,19 @@ further design decisions (D30–D42 in `00-requirements-and-decisions.md`; repor
   has no local edits, else `read-tree -m -u <old> develop`). **Assumed meanwhile:** acceptable, as in
   run 1. To start a run in the main checkout, the session has to be opened there without a
   worktree (app setting).
+* **M8-Q20** (2026-11-15, M8 D35 task) - D35 asks that "wherever the code computes a charge radius" the
+  Rso contribution is added. The code has no charge-radius computation yet (design/16 section 6 assigns
+  `PROTON_RCH2`, `NEUTRON_RCH2`, `DARWIN_FOLDY` to the output stage), so only the catalog operator `Rso`
+  (`PrepareOperator`) was added and the contract is documented (`opslib::Rp2` docstring, design/13,
+  design/30 D35-2): charge radius = Rp2 + Rso/Z + nucleon-size terms. **Assumed meanwhile:** the
+  output-stage task implements it that way. Not blocking.
+* **M8-Q21** (2026-11-15, M8 D35 task) - The gitignored emax-4 dumps in `build/golden-generated` (read
+  through `IMSRG_GENERATED_GOLDEN_DIR` by `opslib_golden`, `hf_*`, `io_*` emax-4 tests) must come from the
+  patched build too; with dumps from the pristine build `Emax4TrelAndRp2` fails (Rp2 differs by 0.063).
+  **Assumed meanwhile:** after merging, run `REFHARNESS=<ref root>/harness-build-d35/refharness
+  tools/reference/gen_golden_generated.sh` once per checkout (also done by `regen_golden_d35.sh` into
+  `<ref root>/golden-generated-d35`). Alternative: make the script default to the patched harness.
+* **M8-Q22** (2026-11-15, M8 D35 task) - `tools/reference/refharness.cpp` and `gen_golden_flow.sh` were
+  edited (a few lines each: `IMSRG_REFERENCE_SHA_FILE`, `IMSRG_GOLDEN_E2E_OUT`, `FLOW_JOBS`); the
+  hunter-gatherer task edits the same two files, so the merge may need a manual resolution of
+  neighbouring hunks. **Assumed meanwhile:** the orchestrator resolves it (both changes are independent).

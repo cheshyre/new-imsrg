@@ -51,9 +51,10 @@ op::Operator R2OneBody(const std::shared_ptr<const basis::ModelSpace>& ms,
 op::Operator R2TwoBody(const std::shared_ptr<const basis::ModelSpace>& ms,
                        Species species);
 
-/// Spin-orbit correction to the proton radius (imsrg++
-/// `RpSpinOrbitCorrection`): a diagonal one-body operator, for every orbit, of
-/// -mu_i (kappa + 1) / M^2 with M^2 = (m_nucleon / hbar c)^2 [fm^-2], mu_i =
+/// Spin-orbit correction to the proton radius, the catalog operator `Rso`
+/// (imsrg++ `RpSpinOrbitCorrection`; D35: no longer part of `Rp2`; the charge
+/// radius uses Rp2 + (1/Z) Rso): a diagonal one-body operator, for every orbit,
+/// of -mu_i (kappa + 1) / M^2 with M^2 = (m_nucleon / hbar c)^2 [fm^-2], mu_i =
 /// 2.793 - 1/2 for protons and -1.913 for neutrons (anomalous plus Dirac moment
 /// as in imsrg++) and kappa = l for j = l - 1/2, -(l + 1) for j = l + 1/2. fm^2
 /// units.
@@ -61,21 +62,23 @@ op::Operator R2TwoBody(const std::shared_ptr<const basis::ModelSpace>& ms,
 op::Operator RpSpinOrbitCorrection(
     const std::shared_ptr<const basis::ModelSpace>& ms);
 
-/// Intrinsic proton radius squared (imsrg++ `Rp2_corrected_Op(ms, A, Z)`),
-/// fm^2: R_cm^2 + (A-2)/(A Z) R2_1b(p) - 4/(A Z) R2_2b(p) [+ (1/Z) R_so], that
-/// is the point-proton mean square radius about the center of mass; the
-/// bracketed spin-orbit term is added when `include_spin_orbit` is true (the
-/// imsrg++ default and what the golden dumps contain). Returns the zero
-/// operator for Z == 0 (as imsrg++). The nucleon-size corrections are not
-/// included (imsrg++ applies them to the expectation value). Cost: that of
-/// `R2Cm` plus `R2TwoBody`.
+/// Intrinsic proton radius squared, fm^2: R_cm^2 + (A-2)/(A Z) R2_1b(p) - 4/(A
+/// Z) R2_2b(p), the point-proton mean square radius about the center of mass,
+/// WITHOUT the spin-orbit correction (owner decision D35). imsrg++
+/// `Rp2_corrected_Op(ms, A, Z)` adds (1/Z) `RpSpinOrbitCorrection` to this;
+/// here that term is the separate operator `Rso` (`RpSpinOrbitCorrection`), so
+/// imsrg++'s Rp2 equals `Rp2(ms, A, Z) + (1/Z) RpSpinOrbitCorrection(ms)`
+/// (checked to 3.5e-17 against the patched reference). Charge radii add the
+/// `Rso` expectation value explicitly. Returns the zero operator for Z == 0 (as
+/// imsrg++). The nucleon-size corrections are not included (imsrg++ applies
+/// them to the expectation value). Cost: that of `R2Cm` plus `R2TwoBody`.
 /// @pre `ms` not null, A >= 1, 0 <= Z <= A.
 op::Operator Rp2(const std::shared_ptr<const basis::ModelSpace>& ms, int A,
-                 int Z, bool include_spin_orbit = true);
+                 int Z);
 
 /// Intrinsic neutron radius squared (imsrg++ `Rn2_corrected_Op`), fm^2: R_cm^2
 /// + (A-2)/(A N) R2_1b(n) - 4/(A N) R2_2b(n), N = A - Z; no spin-orbit term.
-/// Zero operator for Z == A. Cost as `rp2`.
+/// Zero operator for Z == A. Cost as `Rp2`.
 /// @pre `ms` not null, A >= 1, 0 <= Z <= A.
 op::Operator Rn2(const std::shared_ptr<const basis::ModelSpace>& ms, int A,
                  int Z);
