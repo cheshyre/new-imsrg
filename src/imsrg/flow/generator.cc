@@ -136,6 +136,13 @@ Denominators::Denominators(const op::Operator& H, const GeneratorOptions& opts)
   }
 }
 
+double Denominators::three_body(OrbitIndex a, OrbitIndex b, OrbitIndex c,
+                                OrbitIndex i, OrbitIndex j,
+                                OrbitIndex k) const {
+  auto f = [&](OrbitIndex x) { return f_diag_[x.ToSize()]; };
+  return f(a) + f(b) + f(c) - f(i) - f(j) - f(k);
+}
+
 double Denominators::monopole(OrbitIndex a, OrbitIndex b) const {
   if (monopole_.empty()) return 0.0;
   return monopole_[a.ToSize() + b.ToSize() * static_cast<std::size_t>(norb_)];
@@ -195,8 +202,11 @@ void ComputeGenerator(const op::Operator& H, op::Operator& eta,
   IMSRG_CHECK(!H.empty(), "compute_generator: empty H");
   IMSRG_CHECK(H.spec().is_scalar() && H.spec().is_number_conserving(),
               "compute_generator: H must be scalar and number conserving");
-  IMSRG_CHECK(H.spec().particle_rank == 2,
-              "compute_generator: H must have particle_rank 2");
+  IMSRG_CHECK(H.spec().particle_rank == 2 || H.spec().particle_rank == 3,
+              "compute_generator: H must have particle_rank 2 or 3");
+  const bool rank3 = H.spec().particle_rank == 3;
+  IMSRG_CHECK(!rank3 || H.three_body().has_value(),
+              "compute_generator: rank-3 H without a three-body part");
   if (opts.kind == GeneratorKind::kShellModelAtanNpnh) {
     throw NotImplementedError(
         "generator shell-model-atan-npnh is not implemented");
@@ -205,6 +215,12 @@ void ComputeGenerator(const op::Operator& H, op::Operator& eta,
     throw NotImplementedError("generator 1PA is not implemented");
   }
 
+  if (rank3 &&
+      (IsShellModel(opts.kind) || opts.kind == GeneratorKind::kHartreeFock)) {
+    throw NotImplementedError(
+        "shell-model and hartree-fock generators with a rank-3 H are not "
+        "implemented");
+  }
   const op::OperatorSpec spec = GeneratorSpec(H.spec(), opts.kind);
   if (eta.empty() || !(eta.spec() == spec) || !op::SameModelSpace(eta, H)) {
     eta = op::Operator(H.model_space_ptr(), spec);
@@ -286,6 +302,44 @@ void ComputeGenerator(const op::Operator& H, op::Operator& eta,
         block(KetClass::kCc, {KetClass::kVv, KetClass::kQv, KetClass::kQq});
         block(KetClass::kVc, {KetClass::kVv, KetClass::kQv, KetClass::kQq});
         block(KetClass::kVv, {KetClass::kQv, KetClass::kQq});
+      }
+    }
+  }
+
+  // Three-body part (imsrg++ ConstructGenerator_SingleRef_3body).
+  if (rank3 && !opts.only_1b_eta && !opts.only_2b_eta) {
+    const basis::ThreeBodySpace& ts = *ms.three_body_space();
+    const op::ThreeBody& H3 = *Hh.three_body();
+    op::ThreeBody& eta3 = *eta.three_body();
+    using basis::OrbitClass;
+    const auto all_class = [&](const basis::OrbitTriple& t, bool core) {
+      const bool a = part.orbit_class(t.a) == OrbitClass::kCore;
+      const bool b = part.orbit_class(t.b) == OrbitClass::kCore;
+      const bool c = part.orbit_class(t.c) == OrbitClass::kCore;
+      return core ? (a && b && c) : (!a && !b && !c);
+    };
+    for (std::int32_t c = 0; c < ts.num_channels(); ++c) {
+      const Channel3Index ch{c};
+      const basis::KeptChannel3& kc = ts.channel(ch);
+      for (std::int32_t tb = kc.triple_begin.value();
+           tb < kc.triple_end.value(); ++tb) {
+        const basis::OrbitTriple& bt = ts.triple(basis::Triple3Index{tb});
+        if (!all_class(bt, false)) continue;
+        for (std::int32_t tk = kc.triple_begin.value();
+             tk < kc.triple_end.value(); ++tk) {
+          const basis::OrbitTriple& kt = ts.triple(basis::Triple3Index{tk});
+          if (!all_class(kt, true)) continue;
+          const double d = den.three_body(bt.a, bt.b, bt.c, kt.a, kt.b, kt.c);
+          for (std::int32_t i = bt.row_begin.value(); i < bt.row_end.value();
+               ++i) {
+            for (std::int32_t j = kt.row_begin.value(); j < kt.row_end.value();
+                 ++j) {
+              const basis::KeptRow3Index ri{i}, rj{j};
+              eta3.set(ch, ri, rj,
+                       GeneratorFunction(kind, H3.get(ch, ri, rj), d, nq));
+            }
+          }
+        }
       }
     }
   }

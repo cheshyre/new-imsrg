@@ -8,10 +8,12 @@
 
 #include <atomic>
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <utility>
 
 #include <nanobind/nanobind.h>
@@ -22,6 +24,26 @@
 #include "imsrg/operator/operator.h"
 
 namespace imsrg {
+
+/// A file that does not exist (Python: `imsrg.InputFileNotFoundError`, also a
+/// `FileNotFoundError`).
+class MissingFileError : public InputError {
+ public:
+  using InputError::InputError;
+};
+
+/// A file that exists but has malformed or inconsistent content (Python:
+/// `imsrg.FileFormatError`).
+class FileFormatError : public InputError {
+ public:
+  using InputError::InputError;
+};
+
+/// Operands on different model spaces (Python: `imsrg.ModelSpaceError`).
+class ModelSpaceError : public Error {
+ public:
+  using Error::Error;
+};
 
 /// Raised when a host view is requested of an operator whose host mirror is
 /// stale, or when the device data of an operator were released by a forced
@@ -38,8 +60,85 @@ namespace imsrg::py {
 /// Python-side ModelSpace: a handle to the immutable C++ model space (value
 /// semantics, shared).
 struct PyModelSpace {
+  /// Wraps a model space.
+  explicit PyModelSpace(std::shared_ptr<const basis::ModelSpace> p)
+      : ms(std::move(p)) {}
+  PyModelSpace(const PyModelSpace&) = default;
+  PyModelSpace(PyModelSpace&&) = default;
+  PyModelSpace& operator=(const PyModelSpace&) = default;
+  PyModelSpace& operator=(PyModelSpace&&) = default;
+  /// Drops the handle; then frees commutator workspaces nobody else uses, so
+  /// that `del ms` frees the model space (design/18 section 4.3).
+  ~PyModelSpace();
   std::shared_ptr<const basis::ModelSpace> ms;
 };
+
+/// Frees the cached commutator workspaces whose model space nothing else
+/// refers to.
+void PurgeWorkspaceCache();
+
+/// Number of calls that run without the GIL at the moment. Thread-safe.
+int CallsInFlight() noexcept;
+
+/// Marks a call that runs without the GIL (or with Kokkos kernels) as in
+/// flight, so that a forced finalize refuses while it runs.
+/// @throws StaleHostError if a forced release is in progress.
+class InFlight {
+ public:
+  InFlight();
+  InFlight(const InFlight&) = delete;
+  InFlight& operator=(const InFlight&) = delete;
+  ~InFlight();
+};
+
+/// `InFlight` plus `nb::gil_scoped_release`: declare it where the binding
+/// releases the GIL (the in-flight mark is taken first and dropped last).
+class GilFree {
+ public:
+  GilFree() = default;
+  GilFree(const GilFree&) = delete;
+  GilFree& operator=(const GilFree&) = delete;
+
+ private:
+  InFlight in_flight_;
+  nanobind::gil_scoped_release release_;
+};
+
+/// A per-object busy flag (design/18 section 4.1): the object may be used by
+/// one thread at a time; re-entry from the same thread (a callback of the
+/// running solve) is allowed.
+class BusyFlag {
+ public:
+  BusyFlag() = default;
+  BusyFlag(const BusyFlag&) = delete;
+  BusyFlag& operator=(const BusyFlag&) = delete;
+
+  /// Enters; @throws RuntimeError if another thread is inside.
+  void Enter();
+  /// Leaves.
+  void Leave() noexcept;
+
+ private:
+  std::mutex mutex_;
+  std::thread::id owner_;
+  int depth_ = 0;
+};
+
+/// RAII `BusyFlag::Enter`/`Leave`.
+class BusyScope {
+ public:
+  explicit BusyScope(BusyFlag& f) : flag_(f) { flag_.Enter(); }
+  BusyScope(const BusyScope&) = delete;
+  BusyScope& operator=(const BusyScope&) = delete;
+  ~BusyScope() { flag_.Leave(); }
+
+ private:
+  BusyFlag& flag_;
+};
+
+/// Runs Python's signal handlers; if one raised (Ctrl-C), throws the Python
+/// error. Call with the GIL held, at a safe point (a step boundary).
+void ThrowIfSignalPending();
 
 /// Which side of an operator holds the current data (design/18 section 2.2).
 /// Each Python `Operator` carries one of these.
@@ -145,6 +244,10 @@ struct PyOperator : op::Operator, Releasable {
   /// Number of live numpy views of this operator's host storage.
   std::shared_ptr<std::atomic<int>> views =
       std::make_shared<std::atomic<int>>(0);
+  /// Number of those views that are writable: while one lives the operator
+  /// stays HostCurrent (every compute call pushes first).
+  std::shared_ptr<std::atomic<int>> writable_views =
+      std::make_shared<std::atomic<int>>(0);
 };
 
 /// Checks that the device data were not released; returns `o`.
@@ -166,8 +269,37 @@ void PrepareHostAccess(PyOperator& o, bool writable);
 inline PyOperator Result(op::Operator&& o) { return PyOperator(std::move(o)); }
 
 /// A guard object for the ndarray `owner` of a numpy view of `self`: keeps the
-/// Python operator alive and counts the view in `PyOperator::views`.
-nanobind::object MakeViewGuard(nanobind::handle self);
+/// Python operator alive and counts the view in `PyOperator::views` (and
+/// `writable_views`).
+nanobind::object MakeViewGuard(nanobind::handle self, bool writable = false);
+
+/// Records that `o` was modified in place by a library call: DeviceCurrent, or
+/// (live writable view) the host mirror is refreshed and the state stays
+/// HostCurrent so the view's later edits are pushed.
+void MarkModifiedInPlace(PyOperator& o);
+
+/// @throws ModelSpaceError if `a` and `b` are not on the same model space.
+void RequireSameModelSpace(const op::Operator& a, const op::Operator& b);
+
+/// @throws MissingFileError if `path` does not exist.
+void RequireFile(const std::filesystem::path& path);
+
+/// Runs a reader on `path`: a missing file raises MissingFileError, any other
+/// InputError of the reader (malformed or inconsistent content) is reported as
+/// FileFormatError with the same message.
+template <class F>
+auto GuardRead(const std::filesystem::path& path, F&& f) -> decltype(f()) {
+  RequireFile(path);
+  try {
+    return f();
+  } catch (const MissingFileError&) {
+    throw;
+  } catch (const ConfigError&) {
+    throw;
+  } catch (const InputError& e) {
+    throw FileFormatError(e.what());
+  }
+}
 
 /// A commutator workspace (Kokkos scratch buffers and tables of one model
 /// space), shared by the commutator and BCH bindings. Not thread safe: users

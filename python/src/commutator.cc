@@ -62,6 +62,26 @@ std::shared_ptr<PyWorkspace> WorkspaceFor(
   return w;
 }
 
+void PurgeWorkspaceCache() {
+  auto& c = GetCache();
+  std::vector<std::shared_ptr<PyWorkspace>> dead;
+  {
+    std::unique_lock lock(c.mutex, std::try_to_lock);
+    if (!lock.owns_lock()) return;  // a lookup is running; purge next time
+    auto it = c.entries.begin();
+    while (it != c.entries.end()) {
+      // Held by the cache alone, and the model space only by the workspace
+      // (PyWorkspace and commutator::Workspace each keep one reference).
+      if (it->use_count() == 1 && (*it)->model_space().use_count() <= 2) {
+        dead.push_back(std::move(*it));
+        it = c.entries.erase(it);
+      } else {
+        ++it;
+      }
+    }
+  }
+}
+
 void ClearWorkspaceCache() {
   auto& c = GetCache();
   std::vector<std::shared_ptr<PyWorkspace>> old;
@@ -74,9 +94,10 @@ void ClearWorkspaceCache() {
 void BindCommutator(nb::module_& m) {
   using commutator::Term;
   nb::enum_<Term>(m, "Term",
-                  "The scalar IMSRG(2) commutator terms, named as in imsrg++ "
+                  "The scalar commutator terms, named as in imsrg++ "
                   "(`commABCss`: A-body part of X and B-body part of Y to the "
-                  "C-body part of [X, Y]).")
+                  "C-body part of [X, Y]); IMSRG(2), then the IMSRG(3) terms "
+                  "(N7 first; the N8/N9 terms are not implemented).")
       .value("Comm110ss", Term::kComm110ss)
       .value("Comm220ss", Term::kComm220ss)
       .value("Comm111ss", Term::kComm111ss)
@@ -84,7 +105,20 @@ void BindCommutator(nb::module_& m) {
       .value("Comm221ss", Term::kComm221ss)
       .value("Comm122ss", Term::kComm122ss)
       .value("Comm222PpHhss", Term::kComm222PpHhss)
-      .value("Comm222Phss", Term::kComm222Phss);
+      .value("Comm222Phss", Term::kComm222Phss)
+      .value("Comm133ss", Term::kComm133ss)
+      .value("Comm330ss", Term::kComm330ss)
+      .value("Comm223ss", Term::kComm223ss)
+      .value("Comm232ss", Term::kComm232ss)
+      .value("Comm331ss", Term::kComm331ss)
+      .value("Comm231ss", Term::kComm231ss)
+      .value("Comm132ss", Term::kComm132ss)
+      .value("Comm233PpHhss", Term::kComm233PpHhss)
+      .value("Comm233Phss", Term::kComm233Phss)
+      .value("Comm332PpphHhhpss", Term::kComm332PpphHhhpss)
+      .value("Comm332Pphhss", Term::kComm332Pphhss)
+      .value("Comm333PppHhhss", Term::kComm333PppHhhss)
+      .value("Comm333PphHhpss", Term::kComm333PphHhpss);
   m.def(
       "term_name", [](Term t) { return std::string(commutator::TermName(t)); },
       nb::arg("term"), "The imsrg++ name of a term (\"comm110ss\", ...).");
@@ -99,6 +133,8 @@ void BindCommutator(nb::module_& m) {
       .def_static("none", &TermMask::None, "The empty set.")
       .def_static("imsrg2", &TermMask::Imsrg2,
                   "All scalar IMSRG(2) terms (the default).")
+      .def_static("imsrg3_n7", &TermMask::Imsrg3N7,
+                  "The IMSRG(2) terms and the seven N7 three-body terms.")
       .def_static("only", &TermMask::Only, nb::arg("term"),
                   "The set holding only `term`.")
       .def_static(
@@ -117,7 +153,7 @@ void BindCommutator(nb::module_& m) {
       .def(
           "reset", [](TermMask& mk, Term t) { mk.reset(t); }, nb::arg("term"),
           "Removes `term`.")
-      .def("empty", &TermMask::empty)
+      .def("empty", &TermMask::empty, "True for the empty set.")
       .def_prop_ro("bits", &TermMask::bits)
       .def(
           "terms",
@@ -187,9 +223,13 @@ void BindCommutator(nb::module_& m) {
             new (self) PyWorkspace(ms.ms);
           },
           nb::arg("model_space"))
-      .def_prop_ro("model_space", [](const PyWorkspace& w) {
-        return PyModelSpace{w.model_space()};
-      });
+      .def_prop_ro(
+          "model_space",
+          [](PyWorkspace& w) {
+            w.ws();  // raises StaleHostError if released
+            return PyModelSpace{w.model_space()};
+          },
+          "The model space the workspace was built for.");
 
   m.def("clear_workspace_cache", &ClearWorkspaceCache,
         "Drops the workspaces cached by commutator() and the BCH functions.");
@@ -201,9 +241,13 @@ void BindCommutator(nb::module_& m) {
          std::shared_ptr<PyWorkspace> workspace) {
         const op::Operator& xi = Input(x);
         const op::Operator& yi = Input(y);
+        RequireSameModelSpace(xi, yi);
         if (!workspace) workspace = WorkspaceFor(xi.model_space_ptr());
-        nb::gil_scoped_release r;
+        GilFree r;
         std::lock_guard lock(workspace->mutex());
+        if (!workspace->ws().Compatible(xi))
+          throw ModelSpaceError(
+              "the workspace was built for another model space");
         return Result(commutator::Commutator(xi, yi, options, workspace->ws()));
       },
       nb::arg("x"), nb::arg("y"), nb::kw_only(),
@@ -222,9 +266,13 @@ void BindCommutator(nb::module_& m) {
          std::shared_ptr<PyWorkspace> workspace) {
         const op::Operator& e = Input(eta);
         const op::Operator& g = Input(gamma);
+        RequireSameModelSpace(e, g);
         if (!workspace) workspace = WorkspaceFor(e.model_space_ptr());
-        nb::gil_scoped_release r;
+        GilFree r;
         std::lock_guard lock(workspace->mutex());
+        if (!workspace->ws().Compatible(e))
+          throw ModelSpaceError(
+              "the workspace was built for another model space");
         op::Operator z;
         commutator::FactorizedDoubleCommutator(e, g, z, options,
                                                workspace->ws());

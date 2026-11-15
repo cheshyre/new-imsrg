@@ -74,12 +74,47 @@ def test_writable_view_marks_the_device_stale_and_compute_pushes(strict, op):
     assert op.one_body[0, 0] == w[0, 0]
     # a compute call pushes the edits to the device first
     diff = op - ref
-    assert op.residency == Residency.Both
+    # the writable view is alive: it can edit again, so the host stays authoritative
+    assert op.residency == Residency.HostCurrent
     assert diff.one_body_norm() > 1.0  # the pushed edits are in the result
     assert diff.two_body_norm() == 0.0
+    # edits made after a compute call are pushed by the next one (item: live views)
     w[0, 0] -= 3.0
     w[1, 1] -= 3.0
     assert (op - ref).norm() == pytest.approx(0.0, abs=1e-12)
+    assert op.residency == Residency.HostCurrent
+    del w  # the last writable view is gone: a push settles on Both
+    op - ref
+    assert op.residency == Residency.Both
+
+
+def test_live_writable_view_survives_in_place_and_device_calls(strict, op):
+    """Regression: Input() used to set Both while a writable view lived, so later
+    writes through it were never pushed."""
+    ref = op.copy()
+    op.sync_to_host()
+    w = op.one_body_view(writable=True)
+    for k in range(3):  # several edit/compute cycles through one view
+        w[0, 0] += 1.0
+        assert (op - ref).one_body_norm() > 0.0
+        assert op.residency == Residency.HostCurrent
+    # in-place library calls refresh the host mirror and keep the view authoritative
+    op *= 2.0
+    assert op.residency == Residency.HostCurrent
+    expect = w.copy()
+    w[1, 1] += 5.0
+    assert (op - ref).norm() > 0
+    op2 = op.copy()
+    assert op2.residency == Residency.Both
+    op2.sync_to_host()
+    assert op2.one_body[1, 1] == pytest.approx(expect[1, 1] + 5.0)
+    op.set_zero()
+    assert op.residency == Residency.HostCurrent
+    assert not np.any(w)  # the mirror was refreshed from the zeroed device data
+    w[0, 0] = 7.0
+    assert (op - ref.copy() * 0.0).one_body_norm() > 0.0  # pushed
+    del w
+    assert op.sync_to_device() is op and op.residency == Residency.Both
 
 
 def test_sync_to_device_and_noops(strict, op):
@@ -88,6 +123,9 @@ def test_sync_to_device_and_noops(strict, op):
     w[0, 0] += 1.0
     op.sync_to_host()  # host holds edits: must not clobber them
     assert op.residency == Residency.HostCurrent
+    assert op.sync_to_device() is op
+    assert op.residency == Residency.HostCurrent  # the writable view is alive
+    del w
     assert op.sync_to_device() is op
     assert op.residency == Residency.Both
     op.sync_to_device()  # no-op when both are current
@@ -120,7 +158,7 @@ def test_copy_inherits_the_state_and_is_deep(strict, op):
     assert op.one_body[0, 0] != c.one_body[0, 0]
     # copying a HostCurrent operator pushes its edits first
     c2 = c.copy()
-    assert c.residency == Residency.Both and c2.residency == Residency.Both
+    assert c.residency == Residency.HostCurrent and c2.residency == Residency.Both
     assert c2.one_body[0, 0] == c.one_body[0, 0]
 
 
@@ -130,6 +168,7 @@ def test_edit_context(strict, op):
         assert e.residency == Residency.Both
         w = e.one_body_view(writable=True)
         w[2, 2] += 2.0
+        del w
     assert op.residency == Residency.Both
     assert (op - ref).one_body_norm() > 1.0
     with op.edit() as e:

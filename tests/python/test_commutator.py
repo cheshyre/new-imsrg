@@ -60,7 +60,8 @@ def test_all_terms_equal_the_sum_of_the_terms(he4):
     full = comm.commutator(x, y)
     assert full.spec.hermiticity == imsrg.Hermiticity.Hermitian  # (A, H) -> H
     total = None
-    for t in Term.__members__.values():
+    # The IMSRG(2) terms (the IMSRG(3) ones need a three-body space).
+    for t in TermMask.imsrg2().terms():
         zt = comm.commutator(x, y, terms=[t])
         total = zt if total is None else total + zt
     assert _rel_dev(total, full) < 1e-12
@@ -164,6 +165,9 @@ def test_host_edits_are_pushed_before_the_commutator(he4):
     w[0, 0] += 1.0
     assert a.residency == imsrg.Residency.HostCurrent
     edited = comm.commutator(a, h)
+    assert a.residency == imsrg.Residency.HostCurrent  # the writable view is alive
+    del w
+    comm.commutator(a, h)
     assert a.residency == imsrg.Residency.Both
     assert (edited - ref).norm() > 1e-6
 

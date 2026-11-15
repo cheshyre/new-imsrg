@@ -186,6 +186,33 @@ ThreeBodyContext::Impl::Impl(
   tr_row_end = Upload(t_re, "commutator::comm223_tr_row_end");
   tr_sym = Upload(t_sym, "commutator::comm223_tr_sym");
 
+  // N7 tables: 2 Jab and triple per flat kept row, two-body block offsets,
+  // one-body channel CSR (orbits with equal (l, 2j, 2tz)).
+  {
+    const std::int64_t nrows = space.NumRows();
+    std::vector<std::int32_t> r_jab(U(nrows)), r_tr(U(nrows));
+    for (std::int64_t r = 0; r < nrows; ++r) {
+      r_jab[U(r)] = space.row_two_jab(r).twice;
+      r_tr[U(r)] = space.row_triple(r).value();
+    }
+    row_two_jab = Upload(r_jab, "commutator::n7_row_two_jab");
+    row_triple = Upload(r_tr, "commutator::n7_row_triple");
+    two_body_offset =
+        Upload(two_body_offset_host, "commutator::n7_two_body_offset");
+    const std::int32_t norb = ms3->num_orbits();
+    std::vector<std::int32_t> offs(U(norb) + 1, 0);
+    std::vector<std::int32_t> orbs;
+    for (std::int32_t p = 0; p < norb; ++p) {
+      for (const OrbitIndex q : ms3->basis().SameLjtz(OrbitIndex{p})) {
+        orbs.push_back(q.value());
+      }
+      offs[U(p) + 1] = static_cast<std::int32_t>(orbs.size());
+    }
+    ob_offsets = Upload(offs, "commutator::n7_ob_offsets");
+    ob_orbits = Upload(orbs, "commutator::n7_ob_orbits");
+    comm232 = detail::BuildComm232Tables(pair_third, *ms3);
+  }
+
   // Orbit groups by (parity, 2tz), sorted by (2j, index), with the j blocks.
   nj = ms3->basis().emax() + 1;
   std::vector<std::int32_t> g_off(5, 0);
@@ -357,7 +384,10 @@ ThreeBodyContext::Impl::Impl(
                 BufferBytes(pair_factor) + BufferBytes(leg_range) +
                 BufferBytes(state_bra_base) + BufferBytes(state_ket_base) +
                 BufferBytes(state_dim) + BufferBytes(order_lower) +
-                BufferBytes(order_full) + BufferBytes(order_triples);
+                BufferBytes(order_full) + BufferBytes(order_triples) +
+                BufferBytes(row_two_jab) + BufferBytes(row_triple) +
+                BufferBytes(two_body_offset) + BufferBytes(ob_offsets) +
+                BufferBytes(ob_orbits) + comm232.Bytes();
 }
 
 detail::TileViews ThreeBodyContext::Impl::Views() const {
@@ -408,6 +438,43 @@ detail::TileViews ThreeBodyContext::Impl::Views() const {
   return v;
 }
 
+detail::N7Views ThreeBodyContext::Impl::N7(const op::Operator* X,
+                                           const op::Operator* Y) const {
+  const detail::TileViews tv = Views();
+  detail::N7Views v;
+  v.sp = tv.sp;
+  v.row_two_jab = row_two_jab.device_data();
+  v.row_triple = row_triple.device_data();
+  v.sj = tv.sj;
+  v.ob = tv.ob;
+  v.ob_ch.offsets = ob_offsets.device_data();
+  v.ob_ch.orbits = ob_orbits.device_data();
+  v.norb = tv.ob.num_orbits;
+  const auto part_views = [&](const op::Operator* op, detail::TwoBodyView& v2,
+                              const double*& v1,
+                              detail::ThreeBodyPartView& v3) {
+    v2.tb = tables.two_body();
+    v2.block_offset = two_body_offset.device_data();
+    v2.data = nullptr;
+    v1 = nullptr;
+    v3 = detail::ThreeBodyPartView{};
+    if (op == nullptr || op->empty()) return;
+    v1 = op->one_body().buffer().device_data();
+    if (op->two_body().allocated()) {
+      v2.data = op->two_body().matrix().buffer().device_data();
+    }
+    if (op->three_body().has_value()) {
+      const op::ThreeBody& t = *op->three_body();
+      v3.data = t.device_data();
+      v3.packed = t.packed() ? 1 : 0;
+      v3.sign = t.hermiticity() == Hermiticity::kAntiHermitian ? -1 : 1;
+    }
+  };
+  part_views(X, v.x2, v.x1, v.x3);
+  part_views(Y, v.y2, v.y1, v.y3);
+  return v;
+}
+
 ThreeBodyContext::ThreeBodyContext(std::shared_ptr<const basis::ModelSpace> ms3)
     : ms_(std::move(ms3)) {
   if (ms_ == nullptr) throw InputError("ThreeBodyContext: null model space");
@@ -439,11 +506,19 @@ const ThreeBodyContext::Impl& ThreeBodyContext::impl() const {
 
 op::ThreeBody Comm223(const op::Operator& X, const op::Operator& Y,
                       const ThreeBodyContext& ctx) {
+  op::ThreeBody z(ctx.model_space_ptr(), CommutatorHermiticity(X, Y));
+  detail::AddComm223(X, Y, z, ctx);
+  return z;
+}
+
+void detail::AddComm223(const op::Operator& X, const op::Operator& Y,
+                        op::ThreeBody& z, const ThreeBodyContext& ctx) {
   const ThreeBodyContext::Impl& impl = ctx.impl();
   CheckOperand("Comm223", X, "X", ctx);
   CheckOperand("Comm223", Y, "Y", ctx);
   const Hermiticity h = CommutatorHermiticity(X, Y);
-  op::ThreeBody z(ctx.model_space_ptr(), h);
+  IMSRG_CHECK(z.hermiticity() == h,
+              "Comm223: Z's three-body hermiticity must be that of [X, Y]");
   const std::vector<std::int64_t>& expected =
       z.packed() ? impl.packed_offset_host : impl.dense_offset_host;
   IMSRG_CHECK(std::equal(z.block_offsets().begin(), z.block_offsets().end(),
@@ -461,7 +536,6 @@ op::ThreeBody Comm223(const op::Operator& X, const op::Operator& Y,
     detail::RunComm223Tiles(v, detail::TileMode::kFullDense,
                             impl.order_full.device_data(), impl.num_triples);
   }
-  return z;
 }
 
 double PerturbativeTriplesEnergy(const op::Operator& X, const op::Operator& Y,

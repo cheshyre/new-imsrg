@@ -165,3 +165,13 @@ before the final gather. The harness was cross-checked against `imsrg++ hunter_g
 
 O16 emax 2 converges (192 steps, s = 92.6); with the former imsrg++ defaults it ran into smax = 200.
 He4 emax 2 is kept as an extra case.
+
+## IT-15: two-stage ODE flow (M8)
+
+`bash tools/reference/gen_golden_e2e.sh IT-15` (patched executable): `emax=2 reference=He4
+valence_space=p-shell method=flow_RK4` and `method=flow`, 2N only, `hw=16`, no operators (O16 emax 2
+with the sd-shell diverges in IMSRG(2), see IT-8). Stage 1 uses the atan generator, stage 2
+`shell-model-atan`. `flow_RK4`: 196 + 96 steps, `s` continues (98 -> 146), E0 = -25.171619, the flow
+file (`flow.dat`) holds both stages (`istep` restarts at 0). `flow`: E0 = -25.167373; only `result.json`
+and `int.snt` are kept (the flow file has 1078 lines of right-hand-side evaluations and is not
+compared: imsrg++ restarts s at 0 in stage 2, M8-Q40). `int.snt` is the valence-space interaction.

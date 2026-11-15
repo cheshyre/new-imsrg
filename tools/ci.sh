@@ -147,7 +147,9 @@ step_mpi() {
 }
 
 step_python() {
-  PYTHONPATH="$build_dir/python" "$python" -m pytest -q tests/python
+  # The extension was built (the step only runs then): a missing _core must fail, not skip.
+  IMSRG_REQUIRE_PYTHON_EXT=1 IMSRG_TEST_DATA_DIR="$(cache_value IMSRG_TEST_DATA_DIR)" \
+    PYTHONPATH="$build_dir/python" "$python" -m pytest -q tests/python
 }
 
 step_layering() {

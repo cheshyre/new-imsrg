@@ -74,7 +74,12 @@ void BindHf(nb::module_& m) {
       .value("Linear", hf::Mixing::kLinear)
       .value("Diis", hf::Mixing::kDiis);
 
-  nb::class_<hf::HFOptions>(m, "HFOptions", "Options of hf.solve.")
+  nb::class_<hf::HFOptions>(
+      m, "HFOptions",
+      "Options of hf.solve. The default mixing is Linear (the C++ default and "
+      "the imsrg++ scheme that the goldens use); TOML pipelines "
+      "(load_config / pipeline.run) default to hartree_fock.mixing = \"diis\" "
+      "(D37), so pass mixing=Mixing.Diis to match a default config.")
       .def(
           "__init__",
           [](hf::HFOptions* self, hf::Mixing mixing, double tolerance,
@@ -141,7 +146,7 @@ void BindHf(nb::module_& m) {
       [](const PyOperator& h, const op::No2bThreeBody* v3,
          const hf::HFOptions& options) {
         const op::Operator& x = Input(h);
-        nb::gil_scoped_release r;
+        GilFree r;
         return hf::Solve(x, v3, options);
       },
       nb::arg("hamiltonian"), nb::arg("v3").none() = nb::none(),
@@ -156,7 +161,7 @@ void BindHf(nb::module_& m) {
          std::vector<double> occupations, const hf::HFOptions& options) {
         const op::Operator& x = Input(h);
         const linalg::Matrix<double> c = FromNumpy(c_ho2basis);
-        nb::gil_scoped_release r;
+        GilFree r;
         return hf::SolutionInBasis(x, v3, c, occupations, options);
       },
       nb::arg("hamiltonian"), nb::arg("v3").none(), nb::arg("c_ho2basis"),
@@ -168,7 +173,7 @@ void BindHf(nb::module_& m) {
       [](const PyOperator& h, const op::No2bThreeBody* v3,
          const hf::HFResult& res, const hf::HFOptions& options) {
         const op::Operator& x = Input(h);
-        nb::gil_scoped_release r;
+        GilFree r;
         return Result(hf::NormalOrderedHamiltonian(x, v3, res, options));
       },
       nb::arg("hamiltonian"), nb::arg("v3").none(), nb::arg("result"),
@@ -180,7 +185,7 @@ void BindHf(nb::module_& m) {
       "hf_to_hf_basis",
       [](const PyOperator& o, const hf::HFResult& res) {
         const op::Operator& x = Input(o);
-        nb::gil_scoped_release r;
+        GilFree r;
         return Result(hf::ToHfBasis(x, res));
       },
       nb::arg("operator"), nb::arg("result"),
@@ -196,7 +201,7 @@ void BindHf(nb::module_& m) {
       "mp2_energy",
       [](PyOperator& h) {
         op::Operator& x = Mutable(h);
-        nb::gil_scoped_release r;
+        GilFree r;
         return mbpt::Mp2Energy(x);
       },
       nb::arg("hamiltonian"),
@@ -206,7 +211,7 @@ void BindHf(nb::module_& m) {
       "mp3_energy",
       [](PyOperator& h) {
         op::Operator& x = Mutable(h);
-        nb::gil_scoped_release r;
+        GilFree r;
         return mbpt::ComputeMp3Energy(x);
       },
       nb::arg("hamiltonian"),
@@ -230,7 +235,7 @@ void BindHf(nb::module_& m) {
         op::Operator& x = Mutable(h);
         linalg::Matrix<double> rho;
         {
-          nb::gil_scoped_release r;
+          GilFree r;
           rho = mbpt::Mbpt2DensityMatrix(x);
         }
         return ToNumpy(rho);
@@ -242,7 +247,7 @@ void BindHf(nb::module_& m) {
       [](const nb::ndarray<const double, nb::ndim<2>>& rho_hf,
          const PyModelSpace& ms) {
         const linalg::Matrix<double> rho = FromNumpy(rho_hf);
-        nb::gil_scoped_release r;
+        GilFree r;
         return mbpt::ComputeNaturalOrbitals(rho, *ms.ms);
       },
       nb::arg("rho_hf"), nb::arg("model_space"),
@@ -262,7 +267,7 @@ void BindHf(nb::module_& m) {
       [](PyOperator& h, const nb::ndarray<const double, nb::ndim<2>>& c) {
         op::Operator& x = Mutable(h);
         const linalg::Matrix<double> cm = FromNumpy(c);
-        nb::gil_scoped_release r;
+        GilFree r;
         return Result(mbpt::ToNatBasis(x, cm));
       },
       nb::arg("hamiltonian"), nb::arg("c_hf2nat"),

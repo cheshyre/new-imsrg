@@ -47,6 +47,10 @@ void InitLocked(State& s, const exec::RuntimeOptions& opt, bool mpi) {
 
 void FinalizeLocked(State& s, bool force) {
   if (!s.rt) return;
+  if (CallsInFlight() > 0)
+    throw imsrg::RuntimeError(
+        "cannot finalize the imsrg Runtime while a call is running (another "
+        "thread, or this one from inside a callback)");
   ClearWorkspaceCache();
   if (LiveObjects() > 0) {
     if (!force)
@@ -54,6 +58,8 @@ void FinalizeLocked(State& s, bool force) {
           "cannot finalize the imsrg Runtime while Operator or solver objects "
           "are alive (Runtime.finalize(force=True) frees their device data)");
     const int blocked = ReleaseAllLive();
+    if (blocked < 0)
+      throw imsrg::RuntimeError("cannot force-finalize: a call is running");
     if (blocked > 0)
       throw imsrg::RuntimeError(
           "cannot force-finalize: " + std::to_string(blocked) +
@@ -116,13 +122,18 @@ void BindRuntime(nb::module_& m) {
           "solvers are alive, unless force=True: then their device data are "
           "freed first (later use of them raises StaleHostError; objects "
           "with numpy views alive block it). No re-init after.")
-      .def_static("is_initialized",
-                  [] { return exec::Runtime::IsInitialized(); })
-      .def_static("execution_space",
-                  [] { return exec::Runtime::ExecutionSpaceName(); })
-      .def_static("concurrency", [] { return exec::Runtime::Concurrency(); })
-      .def_static("mpi_enabled",
-                  [] { return comm::Environment::MpiEnabled(); });
+      .def_static(
+          "is_initialized", [] { return exec::Runtime::IsInitialized(); },
+          "True while Kokkos is initialized.")
+      .def_static(
+          "execution_space", [] { return exec::Runtime::ExecutionSpaceName(); },
+          "Name of the default execution space (OpenMP, Serial, Cuda, ...).")
+      .def_static(
+          "concurrency", [] { return exec::Runtime::Concurrency(); },
+          "Maximum concurrency (threads) of the default execution space.")
+      .def_static(
+          "mpi_enabled", [] { return comm::Environment::MpiEnabled(); },
+          "True if the build has MPI.");
 
   // Called by imsrg's atexit handler after gc.collect(): frees the device data
   // of objects still alive (M11-Q1, D41) and finalizes, unless numpy views of
@@ -131,7 +142,8 @@ void BindRuntime(nb::module_& m) {
     auto& s = GetState();
     std::lock_guard lock(s.mutex);
     ClearWorkspaceCache();
-    if (s.rt && ReleaseAllLive() == 0) FinalizeLocked(s, false);
+    if (s.rt && CallsInFlight() == 0 && ReleaseAllLive() == 0)
+      FinalizeLocked(s, false);
   });
   m.def(
       "live_objects", [] { return LiveObjects(); },

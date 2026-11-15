@@ -190,6 +190,32 @@ TEST(DriverIntegration, IT6_Rp2_Operator) {
   // imsrg++ (Rp2 without Rso), so the old 9.1e-5 offset is gone (dev ~2e-9).
   EXPECT_NEAR(imsrg, golden.zero_body, 1.0e-6);
   EXPECT_NEAR(ref, 4.294907, 1.0e-5);
+
+  // Charge radius (D35). The Magnus path of the pristine imsrg++ prints none,
+  // but it writes its transformed Rp2 (with the spin-orbit term) to intRp2.snt:
+  // zero-body part 4.45016791 (pristine build, same command line as IT-6). The
+  // charge radius of imsrg++'s formula (imsrg++.cc:1367) from that number must
+  // equal ours, which adds Rso/Z explicitly; Rso was not requested.
+  EXPECT_FALSE(r->results["operators"].has("Rso"));
+  ASSERT_TRUE(r->results.has("charge_radius"));
+  const Json& cr = r->results["charge_radius"];
+  const double rso = cr["rso"]["imsrg"].number;
+  const double rp2_pristine = 4.45016791;
+  const double rch_pristine =
+      std::sqrt(rp2_pristine + 0.707 + -0.1161 * (16 - 8) / 8 + 0.033172);
+  const double rch = cr["rch"]["imsrg"].number;
+  std::printf(
+      "[IT-6] Rso imsrg = %.8f; Rp2 + Rso/Z = %.8f (pristine %.8f); charge "
+      "radius %.8f (pristine formula %.8f, dev %.3e); HF %.8f\n",
+      rso, imsrg + rso / 8.0, rp2_pristine, rch, rch_pristine,
+      rch - rch_pristine, cr["rch"]["reference"].number);
+  EXPECT_NEAR(imsrg + rso / 8.0, rp2_pristine, 1.0e-7);
+  EXPECT_NEAR(rch, rch_pristine, 1.0e-7);
+  EXPECT_NEAR(cr["rch2"]["imsrg"].number, rch * rch, 1.0e-12);
+  EXPECT_NEAR(
+      cr["rch2"]["reference"].number,
+      ref + 0.707 - 0.1161 + 0.033172 + cr["rso"]["reference"].number / 8.0,
+      1.0e-12);
 }
 
 // -----------------------------------------------------------------------------

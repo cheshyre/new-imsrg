@@ -33,8 +33,32 @@ TEST(commutator_options, union_intersection_presets) {
   EXPECT_TRUE(TermMask::None().empty());
   const TermMask all = TermMask::Imsrg2();
   for (int t = 0; t < imsrg::commutator::kNumTerms; ++t)
-    EXPECT_TRUE(all.test(static_cast<Term>(t)));
+    EXPECT_EQ(all.test(static_cast<Term>(t)),
+              t < imsrg::commutator::kNumImsrg2Terms);
   EXPECT_EQ(CommutatorOptions{}.terms, all);
+  EXPECT_EQ(CommutatorOptions{}.threebody_threshold, 0.0);
+  EXPECT_TRUE(all.ThreeBodyTerms().empty());
+}
+
+// The N7 preset is imsrg++'s SetUseIMSRG3N7 set (Commutator.cc:111-129): the
+// IMSRG(2) terms plus comm330, 331, 231, 132, 232, 133, 223; the full preset
+// adds the six N8/N9 terms.
+TEST(commutator_options, imsrg3_presets) {
+  const TermMask n7 = TermMask::Imsrg3N7();
+  const TermMask expected_3b =
+      TermMask::Only(Term::kComm330ss) | TermMask::Only(Term::kComm331ss) |
+      TermMask::Only(Term::kComm231ss) | TermMask::Only(Term::kComm132ss) |
+      TermMask::Only(Term::kComm232ss) | TermMask::Only(Term::kComm133ss) |
+      TermMask::Only(Term::kComm223ss);
+  EXPECT_EQ(n7, TermMask::Imsrg2() | expected_3b);
+  EXPECT_EQ(n7.ThreeBodyTerms(), expected_3b);
+  const TermMask full = TermMask::Imsrg3Full();
+  for (int t = 0; t < imsrg::commutator::kNumTerms; ++t)
+    EXPECT_TRUE(full.test(static_cast<Term>(t)));
+  EXPECT_FALSE(n7.test(Term::kComm233PpHhss));
+  EXPECT_FALSE(n7.test(Term::kComm333PphHhpss));
+  EXPECT_EQ(imsrg::commutator::TermName(Term::kComm332PpphHhhpss),
+            "comm332_ppph_hhhpss");
 }
 
 TEST(commutator_options, name_round_trip) {

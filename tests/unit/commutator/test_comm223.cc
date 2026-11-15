@@ -585,13 +585,24 @@ TEST(Comm223Context, Imsrg2CommutatorRefusesThreeBodyParts) {
                NotImplementedError);
   EXPECT_THROW((void)Commutator(y3, x, CommutatorOptions{}, ws),
                NotImplementedError);
+  // An IMSRG(2) term set replaces a rank-3 Z by a rank-2 result.
   Operator z(ms3, OperatorSpec::Scalar(3, Hermiticity::kHermitian));
-  EXPECT_THROW(Commutator(x, y, z, CommutatorOptions{}, ws),
-               NotImplementedError);
+  Commutator(x, y, z, CommutatorOptions{}, ws);
+  EXPECT_FALSE(z.three_body().has_value());
   // Without three-body parts the entry point works on this model space.
   Operator z2;
   Commutator(x, y, z2, CommutatorOptions{}, ws);
   EXPECT_FALSE(z2.three_body().has_value());
+  // The N8/N9 terms of the full IMSRG(3) are not implemented.
+  CommutatorOptions full;
+  full.terms = TermMask::Imsrg3Full();
+  EXPECT_THROW((void)Commutator(x, y, full, ws), NotImplementedError);
+  // IMSRG(3) terms need a three-body space.
+  Workspace ws2(PlainSpace("He4", 1));
+  CommutatorOptions n7;
+  n7.terms = TermMask::Imsrg3N7();
+  const Operator x2 = Random(PlainSpace("He4", 1), Hermiticity::kHermitian, 3);
+  EXPECT_THROW((void)Commutator(x2, x2, n7, ws2), InputError);
 }
 
 }  // namespace

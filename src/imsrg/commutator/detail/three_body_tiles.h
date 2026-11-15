@@ -198,9 +198,10 @@ struct TileViews {
 static_assert(std::is_trivially_copyable_v<TileViews>);
 
 /// Runs the tiles of mode kLowerPacked or kFullDense: one team per bra triple
-/// `order[i]`, i in [0, league), writing `v.z` (every stored element of the
-/// layout; nothing else). Blocking. Defined in kernels/comm223.cc. Cost: see
-/// `Comm223` in three_body.h.
+/// `order[i]`, i in [0, league), ADDING to every stored element of the layout
+/// in `v.z` (each element is written by one work item; nothing else).
+/// Blocking. Defined in kernels/comm223.cc. Cost: see `Comm223` in
+/// three_body.h.
 void RunComm223Tiles(const TileViews& v, TileMode mode,
                      const std::int32_t* order, std::int32_t league);
 

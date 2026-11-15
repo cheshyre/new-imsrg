@@ -26,3 +26,12 @@ imsrg_add_test(NAME commutator_ref_factorized
   NO_GTEST_MAIN)
 target_compile_definitions(commutator_ref_factorized PRIVATE
   IMSRG_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/tests/golden")
+
+# The brute-force m-scheme commutator (IMSRG(3) validation oracle, design/14
+# section 3) against the J-scheme IMSRG(2) reference and Comm223.
+imsrg_add_test(NAME commutator_ref_mscheme
+  SOURCES test_mscheme.cc ${_imsrg_exec_main} ${_imsrg_comm_support}
+          "${PROJECT_SOURCE_DIR}/tests/support/three_body_test_support.cc"
+  DEPS commutator_ref commutator operator
+  LABELS unit
+  NO_GTEST_MAIN)

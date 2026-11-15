@@ -15,6 +15,8 @@
 #include "imsrg/angmom/sixj3_table.h"
 #include "imsrg/basis/device_tables.h"
 #include "imsrg/basis/model_space.h"
+#include "imsrg/commutator/detail/comm232.h"
+#include "imsrg/commutator/detail/n7_views.h"
 #include "imsrg/commutator/detail/three_body_tiles.h"
 #include "imsrg/commutator/three_body.h"
 #include "imsrg/exec/device_buffer.h"
@@ -72,10 +74,37 @@ struct ThreeBodyContext::Impl {
   std::int64_t table_bytes = 0;    ///< `ThreeBodyContext::TableBytes`.
   std::int64_t scratch_bytes = 0;  ///< `ThreeBodyContext::ScratchBytesPerTeam`.
 
+  /// Tables of the N7 terms (see `detail::N7Views`): 2 Jab and triple per
+  /// flat kept row, the two-body block offsets and the one-body channel CSR
+  /// on the device.
+  exec::DeviceBuffer<std::int32_t> row_two_jab, row_triple;
+  exec::DeviceBuffer<std::int64_t> two_body_offset;
+  exec::DeviceBuffer<std::int32_t> ob_offsets, ob_orbits;
+
+  /// The sorted pair-third tables of comm232ss (detail/comm232.h).
+  detail::Comm232Tables comm232;
+
   /// The kernel views of the tables (operands, output and epsilon unset).
   /// O(1).
   detail::TileViews Views() const;
+
+  /// The N7 kernel views with the parts of X and Y (either may be null: its
+  /// parts read as zero; a missing one-, two- or three-body part also reads
+  /// as zero). The operands must be laid out as the context's model space
+  /// (checked by the callers). O(1).
+  detail::N7Views N7(const op::Operator* X, const op::Operator* Y) const;
 };
+
+namespace detail {
+
+/// Adds the [2,2]->3 term of [X, Y] (`Comm223`, three_body.h) to `z` in
+/// place (no temporary three-body part). Preconditions as `Comm223`, and `z`
+/// laid out as the context's kept space with the hermiticity of [X, Y]
+/// (InvariantError otherwise).
+void AddComm223(const op::Operator& X, const op::Operator& Y, op::ThreeBody& z,
+                const ThreeBodyContext& ctx);
+
+}  // namespace detail
 
 }  // namespace imsrg::commutator
 

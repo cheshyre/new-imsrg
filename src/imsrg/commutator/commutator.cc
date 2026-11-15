@@ -9,6 +9,9 @@
 #include "imsrg/base/assert.h"
 #include "imsrg/base/error.h"
 #include "imsrg/commutator/detail/workspace_impl.h"
+#include "imsrg/commutator/imsrg3.h"
+#include "imsrg/commutator/three_body.h"
+#include "imsrg/operator/norms.h"
 
 namespace imsrg::commutator {
 
@@ -51,9 +54,6 @@ op::OperatorSpec CommutatorSpec(const op::OperatorSpec& x,
   if (!x.is_number_conserving() || !y.is_number_conserving())
     throw NotImplementedError(
         "commutator: only number-conserving operators are supported");
-  if (x.particle_rank > 2 || y.particle_rank > 2)
-    throw NotImplementedError(
-        "commutator: particle rank 3 is not supported (IMSRG(3), M10)");
   op::OperatorSpec z =
       op::OperatorSpec::Scalar(std::max(x.particle_rank, y.particle_rank));
   if (x.hermiticity == Hermiticity::kNonHermitian ||
@@ -74,24 +74,36 @@ void Commutator(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   IMSRG_CHECK(ws.Compatible(Y),
               "commutator: Y is not on the workspace's model space");
   IMSRG_CHECK(&Z != &X && &Z != &Y, "commutator: Z must not alias X or Y");
-  // The IMSRG(3) terms (N7) are not implemented yet: refuse three-body parts
-  // instead of silently dropping them (the [2,2]->3 term alone is
-  // commutator::Comm223, three_body.h).
-  if (X.three_body().has_value() || Y.three_body().has_value() ||
-      (!Z.empty() && Z.three_body().has_value()))
-    throw NotImplementedError(
-        "commutator: operands or outputs with a three-body part need the "
-        "IMSRG(3) terms, which are not implemented yet (use "
-        "commutator::Comm223 for the [2,2]->3 part)");
 
-  const op::OperatorSpec spec = CommutatorSpec(X.spec(), Y.spec());
+  const TermMask m = opts.terms;
+  const TermMask m3 = m.ThreeBodyTerms();
+  const bool imsrg3 = !m3.empty();
+  if (imsrg3) {
+    const TermMask n7_3b = TermMask::Imsrg3N7().ThreeBodyTerms();
+    if ((m3 | n7_3b) != n7_3b)
+      throw NotImplementedError(
+          "commutator: only the IMSRG(2) and the N7 IMSRG(3) terms are "
+          "implemented (the N8/N9 terms of the full IMSRG(3) are not)");
+    if (ws.three_body_context() == nullptr)
+      throw InputError(
+          "commutator: the IMSRG(3) terms need a workspace on a model space "
+          "with a three-body space (ModelSpace::WithThreeBody)");
+  } else if (X.three_body().has_value() || Y.three_body().has_value()) {
+    // Refuse three-body operands instead of silently dropping them.
+    throw NotImplementedError(
+        "commutator: operands with a three-body part need an IMSRG(3) term "
+        "set (e.g. TermMask::Imsrg3N7()); the [2,2]->3 part alone is "
+        "commutator::Comm223");
+  }
+
+  op::OperatorSpec spec = CommutatorSpec(X.spec(), Y.spec());
+  spec.particle_rank = imsrg3 ? 3 : spec.particle_rank;
   if (!Z.empty() && Z.spec() == spec && ws.Compatible(Z)) {
     Z.set_zero();
   } else {
     Z = op::Operator(ws.model_space_ptr(), spec);
   }
 
-  const TermMask m = opts.terms;
   if (m.test(Term::kComm110ss)) terms::Comm110ss(X, Y, Z, ws);
   if (m.test(Term::kComm220ss)) terms::Comm220ss(X, Y, Z, ws);
   if (m.test(Term::kComm111ss)) terms::Comm111ss(X, Y, Z, ws);
@@ -104,6 +116,24 @@ void Commutator(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
     if (m.test(Term::kComm222PpHhss)) terms::Comm222PpHhss(X, Y, Z, ws);
   }
   if (m.test(Term::kComm222Phss)) terms::Comm222Phss(X, Y, Z, ws);
+
+  if (!imsrg3) return;
+  // imsrg++ evaluates the IMSRG(3) block iff ||X|| > threshold and ||Y|| >
+  // threshold (Commutator.cc:396); with the default threshold 0 that only
+  // skips an exactly zero operand, whose terms vanish anyway.
+  if (opts.threebody_threshold > 0.0 &&
+      (op::Norm(X) <= opts.threebody_threshold ||
+       op::Norm(Y) <= opts.threebody_threshold))
+    return;
+  const ThreeBodyContext& ctx = *ws.three_body_context();
+  // imsrg++'s order (Commutator.cc:403-430).
+  if (m.test(Term::kComm133ss)) terms::Comm133ss(X, Y, Z, ctx);
+  if (m.test(Term::kComm330ss)) terms::Comm330ss(X, Y, Z, ctx);
+  if (m.test(Term::kComm223ss)) terms::Comm223ss(X, Y, Z, ctx);
+  if (m.test(Term::kComm232ss)) terms::Comm232ss(X, Y, Z, ctx);
+  if (m.test(Term::kComm331ss)) terms::Comm331ss(X, Y, Z, ctx);
+  if (m.test(Term::kComm231ss)) terms::Comm231ss(X, Y, Z, ctx);
+  if (m.test(Term::kComm132ss)) terms::Comm132ss(X, Y, Z, ctx);
 }
 
 op::Operator Commutator(const op::Operator& X, const op::Operator& Y,

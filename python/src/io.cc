@@ -146,8 +146,9 @@ void BindIo(nb::module_& m) {
         io::Me2jReadOptions opt;
         opt.file = {file_e1max, file_e2max, file_lmax};
         opt.read_whole_file = read_whole_file;
-        nb::gil_scoped_release r;
-        return Result(io::ReadMe2j(path, opt, ms.ms));
+        GilFree r;
+        return GuardRead(
+            path, [&] { return Result(io::ReadMe2j(path, opt, ms.ms)); });
       },
       nb::arg("path"), nb::arg("model_space"), nb::kw_only(),
       nb::arg("file_e1max"), nb::arg("file_e2max") = -1,
@@ -171,8 +172,11 @@ void BindIo(nb::module_& m) {
         io::No2bReadOptions opt;
         opt.file = {file_e1max, file_e2max, file_e3max, file_lmax};
         opt.precision = precision;
-        nb::gil_scoped_release r;
-        io::ReadNo2b(path, opt, v3);
+        GilFree r;
+        GuardRead(path, [&] {
+          io::ReadNo2b(path, opt, v3);
+          return 0;
+        });
         return v3;
       },
       nb::arg("path"), nb::arg("model_space"), nb::kw_only(),
@@ -190,7 +194,7 @@ void BindIo(nb::module_& m) {
       [](const std::filesystem::path& path, const PyOperator& o,
          const io::ValenceWriteOptions& opt) {
         const op::Operator& x = ForWriting(o);
-        nb::gil_scoped_release r;
+        GilFree r;
         io::WriteTokyo(path, x, opt);
       },
       nb::arg("path"), nb::arg("operator"),
@@ -202,7 +206,7 @@ void BindIo(nb::module_& m) {
       [](const std::filesystem::path& path, const PyOperator& o,
          const io::ValenceWriteOptions& opt) {
         const op::Operator& x = ForWriting(o);
-        nb::gil_scoped_release r;
+        GilFree r;
         io::WriteNushellxInt(path, x, opt);
       },
       nb::arg("path"), nb::arg("operator"),
@@ -212,7 +216,7 @@ void BindIo(nb::module_& m) {
       "write_nushellx_sps",
       [](const std::filesystem::path& path, const PyOperator& o) {
         const op::Operator& x = ForWriting(o);
-        nb::gil_scoped_release r;
+        GilFree r;
         io::WriteNushellxSps(path, x);
       },
       nb::arg("path"), nb::arg("operator"),

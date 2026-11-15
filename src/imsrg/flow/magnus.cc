@@ -29,9 +29,10 @@ double NowSeconds() {
 
 /// A zero Omega: scalar, anti-Hermitian, two-body (imsrg++ copies Eta and
 /// erases it).
-op::Operator ZeroOmega(const std::shared_ptr<const basis::ModelSpace>& ms) {
-  return op::Operator(ms,
-                      op::OperatorSpec::Scalar(2, Hermiticity::kAntiHermitian));
+op::Operator ZeroOmega(const std::shared_ptr<const basis::ModelSpace>& ms,
+                       std::int32_t particle_rank) {
+  return op::Operator(
+      ms, op::OperatorSpec::Scalar(particle_rank, Hermiticity::kAntiHermitian));
 }
 
 }  // namespace
@@ -72,13 +73,28 @@ MagnusSolver::MagnusSolver(op::Operator H0, const SolverOptions& solver,
   IMSRG_CHECK(!h0_.empty(), "MagnusSolver: empty Hamiltonian");
   IMSRG_CHECK(
       h0_.spec().is_scalar() && h0_.spec().is_number_conserving() &&
-          h0_.spec().particle_rank == 2,
-      "MagnusSolver: H0 must be a scalar, number-conserving two-body operator");
+          (h0_.spec().particle_rank == 2 || h0_.spec().particle_rank == 3),
+      "MagnusSolver: H0 must be a scalar, number-conserving operator of "
+      "particle rank 2 or 3");
+  const bool imsrg3 = !comm_.terms.ThreeBodyTerms().empty();
+  if (imsrg3 && h0_.spec().particle_rank < 3) {
+    if (h0_.model_space().three_body_space() == nullptr) {
+      throw InputError(
+          "MagnusSolver: IMSRG(3) terms need a model space with a three-body "
+          "space (ModelSpace::WithThreeBody)");
+    }
+    h0_ = WithParticleRank(h0_, 3);
+  }
+  if (!imsrg3 && h0_.spec().particle_rank == 3) {
+    throw InputError(
+        "MagnusSolver: a particle-rank-3 H0 needs IMSRG(3) commutator terms");
+  }
+  const std::int32_t rank = h0_.spec().particle_rank;
   ws_ = std::make_unique<commutator::Workspace>(h0_.model_space_ptr());
   h_ = h0_;
   eta_ = op::Operator(h0_.model_space_ptr(),
                       GeneratorSpec(h0_.spec(), generator_.kind));
-  omegas_.push_back(ZeroOmega(h0_.model_space_ptr()));
+  omegas_.push_back(ZeroOmega(h0_.model_space_ptr(), rank));
 }
 
 MagnusSolver::~MagnusSolver() = default;
@@ -90,7 +106,7 @@ void MagnusSolver::PushOmega() {
   // H(s), new zero Omega.
   h_saved_ = h_;
   log::Info("pushing back another Omega. Omega.size = {}", omegas_.size());
-  omegas_.push_back(ZeroOmega(h0_.model_space_ptr()));
+  omegas_.push_back(ZeroOmega(h0_.model_space_ptr(), h0_.spec().particle_rank));
 }
 
 void MagnusSolver::GatherOmega() {
@@ -100,7 +116,8 @@ void MagnusSolver::GatherOmega() {
   log::Info("gathering Omega.");
   ++num_gathers_;
   if (omegas_.size() < 2) {
-    omegas_.push_back(ZeroOmega(h0_.model_space_ptr()));
+    omegas_.push_back(
+        ZeroOmega(h0_.model_space_ptr(), h0_.spec().particle_rank));
   }
   op::Operator& hunter = omegas_.back();
   op::Operator& gatherer = omegas_[omegas_.size() - 2];
@@ -142,9 +159,11 @@ FlowStatus MagnusSolver::Status(int istep, double ds) const {
   st.norm_h = op::Norm(h_);
   st.norm_eta_1b = op::OneBodyNorm(eta_);
   st.norm_eta_2b = op::TwoBodyNorm(eta_);
+  st.norm_eta_3b = op::ThreeBodyNorm(eta_);
   st.norm_eta = op::Norm(eta_);
   st.norm_omega_1b = op::OneBodyNorm(omegas_.back());
   st.norm_omega_2b = op::TwoBodyNorm(omegas_.back());
+  st.norm_omega_3b = op::ThreeBodyNorm(omegas_.back());
   st.norm_omega = op::Norm(omegas_.back());
   st.num_omegas = omegas_.size();
   st.wall_seconds = NowSeconds() - t_start_;
