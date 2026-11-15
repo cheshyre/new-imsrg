@@ -647,3 +647,9 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   would need tens of GB. **Assumed meanwhile:** as imsrg++ (the triples are a post-processing step
   and `imsrg3.de3max` bounds the space). Follow-up if triples at emax >= 8 are wanted: build R per
   tile inside the kernel (it is a few 6j products per entry) and skip E for the triples context.
+
+* **M12-Q1** (2026-11-15, M12a get_pn) - M6-Q4 is resolved for the orbit scan and the CGs
+  (dense (n, l, 2j) table, tabulated isospin CGs, bitwise identical). In a release build `get_pn`
+  on calls passing the cheap filters drops from 183 to 65 ns; the remainder is the six
+  `channel.states.find` hash lookups in `get_isospin`. **Assumed:** left as is (no layout change
+  was allowed); a dense per-channel state table would remove it if HF-with-3N profiles still show it.
