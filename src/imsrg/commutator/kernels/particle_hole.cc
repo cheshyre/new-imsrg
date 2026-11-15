@@ -15,8 +15,9 @@
 // Only rows alpha (kets, first orbit <= second) are computed: the remaining
 // rows follow from hermiticity of X, Y and from the flip symmetry of the
 // ordered-pair basis; the inverse transform reads only the stored half (with
-// an explicit sign for flipped bra pairs), so it needs no lexicographic ket
-// order.
+// an explicit sign for flipped bra pairs). The ket-pair inverse relies on the
+// local ket order of every two-body channel being the global ket order
+// (`basis::TwoBodyChannels`), so that b >= a is the upper triangle.
 //
 // Performance (M12a): the fill, flip and combine kernels work on whole rows
 // or columns (one item per cc ket, dynamic scheduling) and the inverse on

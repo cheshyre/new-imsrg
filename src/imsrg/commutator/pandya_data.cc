@@ -102,7 +102,16 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
                                "pandya::local_index_table");
 
   // Kets by class (parity, Tz): class = 3 parity + Tz + 1, ascending ket
-  // order inside each class.
+  // order inside each class. The inverse transform over pairs of these kets
+  // needs every two-body channel to list its kets in ascending global order
+  // (then b >= a is the upper triangle of each block): checked here.
+  for (std::int32_t ch = 0; ch < tb.num_channels(); ++ch) {
+    const auto kets = tb.channel_kets(ChannelIndex{ch});
+    for (std::size_t i = 1; i < kets.size(); ++i)
+      IMSRG_CHECK(kets[i - 1].value() < kets[i].value(),
+                  "BuildPandyaData: two-body channel kets are not in "
+                  "ascending global order");
+  }
   {
     constexpr std::int32_t kNumClasses = 6;
     std::vector<std::vector<std::int32_t>> lists(kNumClasses);
