@@ -40,11 +40,16 @@ N=(3bme="${F3}" 3bme_type=no2b file3e1max=6 file3e2max=12 file3e3max=18)
 # the runaway (s ~ 25). IT-8/He4_emax2: O16 at emax 2 is unstable in IMSRG(2), He4 converges.
 # IT-14 (F2b, D42): the ODE flow methods `flow_RK4` (fixed-step RK4) and `flow` (odeint dopri5),
 # with Rp2 flowing alongside H. flow.dat of `flow` has one line per right-hand-side evaluation.
+# IT-15 (M8 two-stage ODE flow, D42): He4 emax 2 with the p-shell valence space (O16 emax 2 diverges), `flow_RK4` for both
+# decoupling stages (core atan, then the valence-space generator); the golden holds the flow file of
+# both stages, the final E0 and the valence-space .snt. The adaptive `flow` variant restarts s at 0 in
+# stage 2 (M8-Q40): compared by its final quantities only.
 declare -a JOBS=(IT-1 IT-2 IT-3 IT-4 IT-4/smax10 IT-5 IT-5/smax10 IT-6 IT-7 IT-8/emax2
                  IT-8/He4_emax2 IT-9/He4_emax2 IT-9/O16_emax2
                  IT-8/emax3 IT-9/He4_emax3 IT-9/O16_emax3
                  IT-14/He4_emax2_rk4 IT-14/He4_emax2_flow IT-14/O16_emax3_rk4
-                 IT-14/O16_emax3_flow IT-14/O16_emax4_rk4 IT-14/O16_emax4_flow)
+                 IT-14/O16_emax3_flow IT-14/O16_emax4_rk4 IT-14/O16_emax4_flow
+                 IT-15/He4_emax2_pshell_rk4 IT-15/He4_emax2_pshell_flow)
 job_args() {
   case "$1" in
     IT-1) echo emax=4 reference=O16 valence_space=O16 method=MP3 ;;
@@ -69,6 +74,8 @@ job_args() {
     IT-14/O16_emax3_flow) echo emax=3 reference=O16 valence_space=O16 method=flow Operators=Rp2 ;;
     IT-14/O16_emax4_rk4) echo emax=4 reference=O16 valence_space=O16 method=flow_RK4 Operators=Rp2 ;;
     IT-14/O16_emax4_flow) echo emax=4 reference=O16 valence_space=O16 method=flow Operators=Rp2 ;;
+    IT-15/He4_emax2_pshell_rk4) echo emax=2 reference=He4 valence_space=p-shell method=flow_RK4 ;;
+    IT-15/He4_emax2_pshell_flow) echo emax=2 reference=He4 valence_space=p-shell method=flow ;;
   esac
 }
 

@@ -18,6 +18,7 @@ imsrg_add_module(NAME driver
     config/load_config.cc
     legacy/legacy_parameters.cc
     operators/operator_request.cc
+    pipeline/charge_radius.cc
     pipeline/hamiltonian.cc
     run.cc
   DEPS base exec comm basis operator io opslib hf mbpt commutator flow
