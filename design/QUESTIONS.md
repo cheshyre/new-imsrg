@@ -455,6 +455,16 @@ which cannot happen after a hunter-gatherer `Solve`) is counted in `MagnusSolver
 `results.json` has `imsrg.num_gathers` (solver total) and `imsrg.stages[].num_gathers`.
 `imsrg.omega.hunter_gatherer` is rejected nowhere any more; `imsrg.omega.storage = scratch/discard`
 with hunter-gatherer is unchanged (not implemented either way).
+
+### M8-Q12 (flow fixes: ds with `magnus_adaptive = false`, divergence on NaN)
+(1) imsrg++'s member `ds` is set by `SetDs(ds_0)` and capped by `SetDsmax`; with `magnus_adaptive = false`
+the Magnus loop uses `ds` unchanged (then `min(ds, smax - s)`). **Assumed/implemented:** the solver
+starts each `Solve` with `ds = min(ds_0, dsmax)`; adaptive mode is untouched (golden flows identical).
+(2) A NaN/inf ||eta|| or E0 is `StopReason::kDiverged` (the driver then throws `NumericalError`, M8-3);
+unlike imsrg++ (`FlowingOps[0] *= 1.0/0.0`) H is left as it is. (3) `denominator_cutoff <= 0` is
+rejected by `ComputeGenerator` with `InputError` (0 would disable the floor and give inf/NaN).
+(4) `imsrg.omega.storage = scratch|discard` is `Phase::kPlanned` in the enum table (E-PLANNED at
+validation); the round-trip tests use `memory`.
 * **M8-Q20** (2026-11-15, M8 D35 task) - D35 asks that "wherever the code computes a charge radius" the
   Rso contribution is added. The code has no charge-radius computation yet (design/16 section 6 assigns
   `PROTON_RCH2`, `NEUTRON_RCH2`, `DARWIN_FOLDY` to the output stage), so only the catalog operator `Rso`

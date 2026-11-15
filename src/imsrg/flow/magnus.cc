@@ -12,6 +12,7 @@
 #include <utility>
 
 #include "imsrg/base/assert.h"
+#include "imsrg/base/error.h"
 #include "imsrg/base/log.h"
 #include "imsrg/operator/arithmetic.h"
 #include "imsrg/operator/norms.h"
@@ -33,7 +34,30 @@ op::Operator ZeroOmega(const std::shared_ptr<const basis::ModelSpace>& ms) {
                       op::OperatorSpec::Scalar(2, Hermiticity::kAntiHermitian));
 }
 
+/// @throws InputError for step options that never terminate or give NaN steps.
+void ValidateSolverOptions(const SolverOptions& o) {
+  auto positive = [](double x) { return std::isfinite(x) && x > 0.0; };
+  if (!positive(o.dsmax))
+    throw InputError("SolverOptions: dsmax must be positive and finite");
+  if (!positive(o.domega))
+    throw InputError("SolverOptions: domega must be positive and finite");
+  if (!positive(o.ds_0))
+    throw InputError("SolverOptions: ds_0 must be positive and finite");
+  if (!positive(o.omega_norm_max))
+    throw InputError(
+        "SolverOptions: omega_norm_max must be positive and finite");
+  if (!std::isfinite(o.smax))
+    throw InputError("SolverOptions: smax must be finite");
+  if (std::isnan(o.eta_criterion))
+    throw InputError("SolverOptions: eta_criterion must not be NaN");
+}
+
 }  // namespace
+
+void MagnusSolver::set_solver_options(const SolverOptions& solver) {
+  ValidateSolverOptions(solver);
+  solver_ = solver;
+}
 
 MagnusSolver::MagnusSolver(op::Operator H0, const SolverOptions& solver,
                            const GeneratorOptions& generator,
@@ -45,6 +69,7 @@ MagnusSolver::MagnusSolver(op::Operator H0, const SolverOptions& solver,
       comm_(comm),
       h0_(std::move(H0)),
       t_start_(NowSeconds()) {
+  ValidateSolverOptions(solver_);
   IMSRG_CHECK(!h0_.empty(), "MagnusSolver: empty Hamiltonian");
   IMSRG_CHECK(
       h0_.spec().is_scalar() && h0_.spec().is_number_conserving() &&
@@ -143,8 +168,9 @@ SolveResult MagnusSolver::Solve(const StatusCallback& on_status) {
   const double eta_criterion =
       static_cast<double>(static_cast<float>(solver_.eta_criterion));
   double e_last = h0_.zero_body();
-  double ds =
-      solver_.ds_0;  // used only if magnus_adaptive is off (imsrg++ member ds)
+  // Used only if magnus_adaptive is off: imsrg++'s member ds is set to ds_0
+  // and capped by SetDsmax (IMSRGSolver.cc:201-205).
+  double ds = std::min(solver_.ds_0, solver_.dsmax);
   if (on_status) on_status(Status(0, 0.0));
 
   int loop_gathers = 0;
@@ -156,7 +182,8 @@ SolveResult MagnusSolver::Solve(const StatusCallback& on_status) {
       result.reason = StopReason::kConverged;
       break;
     }
-    if (norm_eta > 1.0e12 || std::abs(e_last) > 1.0e9) {
+    // NaN-safe: a NaN norm or energy fails the "<=" and counts as divergence.
+    if (!(norm_eta <= 1.0e12) || !(std::abs(e_last) <= 1.0e9)) {
       log::Error("the IMSRG flow diverged: ||eta|| = {}, E0 = {} at s = {}",
                  norm_eta, e_last, s_);
       result.reason = StopReason::kDiverged;
@@ -196,6 +223,13 @@ SolveResult MagnusSolver::Solve(const StatusCallback& on_status) {
   result.s = s_;
   result.e0 = h_.zero_body();
   result.norm_eta = op::Norm(eta_);
+  // The last step may have produced a NaN that the loop condition never saw.
+  if (result.reason != StopReason::kDiverged &&
+      (!std::isfinite(result.norm_eta) || !std::isfinite(result.e0))) {
+    log::Error("the IMSRG flow diverged: non-finite ||eta|| or E0 at s = {}",
+               s_);
+    result.reason = StopReason::kDiverged;
+  }
   return result;
 }
 
