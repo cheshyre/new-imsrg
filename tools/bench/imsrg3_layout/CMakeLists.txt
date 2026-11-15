@@ -9,6 +9,7 @@ add_library(imsrg3_layout_proto STATIC
   layouts.cc
   kernel_context.cc
   cost_model.cc
+  production.cc
   kernels/comm223_ref.cc
   kernels/comm223_tiled.cc
   kernels/triples.cc)
@@ -29,7 +30,7 @@ target_link_libraries(imsrg3_layout_bench PRIVATE imsrg3_layout_proto
 if(IMSRG_BUILD_TESTS)
   imsrg_add_test(NAME imsrg3_layout_check
     SOURCES imsrg3_layout_check.cc check_pair_third.cc check_layouts.cc
-            check_kernels.cc check_tiled.cc
+            check_kernels.cc check_tiled.cc check_production.cc
             "${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc"
     LIBS imsrg3_layout_proto
     LABELS slow
