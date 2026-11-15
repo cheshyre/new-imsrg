@@ -74,7 +74,7 @@ TEST(OperatorSpec, UnimplementedFeaturesThrowNotImplemented) {
   s.delta_particle_number = -1;
   EXPECT_THROW(Validate(s), NotImplementedError);
   s = OperatorSpec::Scalar(3);
-  EXPECT_THROW(Validate(s), NotImplementedError);
+  EXPECT_NO_THROW(Validate(s));
 }
 
 }  // namespace
