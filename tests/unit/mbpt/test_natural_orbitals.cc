@@ -24,7 +24,7 @@ TEST(MbptNaturalOrbitals, Emax2Invariants) {
   double trace = 0.0;
   for (std::int32_t a = 0; a < N; ++a)
     trace += (basis.orbit(OrbitIndex(a)).j2.twice + 1) * res.rho_hf(a, a);
-  EXPECT_NEAR(trace, ms.reference().A(), 1e-6);
+  EXPECT_NEAR(trace, ms.reference().A(), 1.0e-6);
 
   double max_orth = 0.0, max_offblock = 0.0;
   for (std::int32_t a = 0; a < N; ++a) {
@@ -43,14 +43,15 @@ TEST(MbptNaturalOrbitals, Emax2Invariants) {
           res.nat.occupations[static_cast<std::size_t>(ch[k - 1].value())],
           res.nat.occupations[static_cast<std::size_t>(ch[k].value())]);
   }
-  EXPECT_LT(max_orth, 1e-12);
+  EXPECT_LT(max_orth, 1.0e-12);
   EXPECT_EQ(max_offblock, 0.0);
 
   std::cout << "[nat emax2] E_HF(HF) " << res.e_hf_hf << " E_HF(NAT) "
             << res.e_hf_nat << " E0(NAT H) " << res.h_nat.zero_body()
             << " MP2(NAT) " << mbpt::Mp2Energy(res.h_nat) << "\n";
-  EXPECT_GE(res.e_hf_nat, res.e_hf_hf - 1e-8);  // HF is the variational minimum
-  EXPECT_NEAR(res.h_nat.zero_body(), res.e_hf_nat, 1e-9);
+  EXPECT_GE(res.e_hf_nat,
+            res.e_hf_hf - 1.0e-8);  // HF is the variational minimum
+  EXPECT_NEAR(res.h_nat.zero_body(), res.e_hf_nat, 1.0e-9);
 }
 
 }  // namespace

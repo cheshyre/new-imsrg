@@ -74,7 +74,7 @@ TEST(Constants, EqualReferenceLiterals) {
 
 TEST(Constants, InvSqrt2IsTruncatedReferenceValue) {
   EXPECT_NE(c::kInvSqrt2, 1.0 / c::kSqrt2);
-  EXPECT_NEAR(c::kInvSqrt2, 1.0 / c::kSqrt2, 1e-12);
+  EXPECT_NEAR(c::kInvSqrt2, 1.0 / c::kSqrt2, 1.0e-12);
 }
 
 TEST(Constants, MatchReferenceFile) {

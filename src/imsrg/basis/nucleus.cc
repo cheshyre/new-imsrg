@@ -145,12 +145,12 @@ std::vector<OrbitOccupation> NaiveFilling(const Nucleus& nucleus,
       const Orbit proton{n, l, TwoJ{j2}, TwoTz::Proton()};
       const Orbit neutron{n, l, TwoJ{j2}, TwoTz::Neutron()};
       if (zz < Z && !skipped(proton)) {
-        const double dz = std::min(Z - zz, j2 + 1.);
+        const double dz = std::min(Z - zz, j2 + 1.0);
         filled.push_back({proton, dz / (j2 + 1.0)});
         zz += dz;
       }
       if (nn < A - Z && !skipped(neutron)) {
-        const double dn = std::min(A - Z - nn, j2 + 1.);
+        const double dn = std::min(A - Z - nn, j2 + 1.0);
         filled.push_back({neutron, dn / (j2 + 1.0)});
         nn += dn;
       }

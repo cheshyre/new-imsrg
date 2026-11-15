@@ -86,7 +86,7 @@ struct GeneratorOptions {
   GeneratorKind kind = GeneratorKind::kAtan;
   Partitioning partitioning = Partitioning::kEpsteinNesbet;
   /// Floor of |Delta| (imsrg++ `denominator_cutoff`, default 1e-6).
-  double denominator_cutoff = 1e-6;
+  double denominator_cutoff = 1.0e-6;
   /// Constant added to denominators (imsrg++ `denominator_delta`); active only
   /// if `denominator_delta_all` or `denominator_delta_orbit` is set (imsrg++
   /// quirk P5).

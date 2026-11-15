@@ -330,7 +330,7 @@ Operator ReadOperatorDump(std::istream& in, std::string_view name,
 
   const double hw_ms = ms->basis().hbar_omega();
   if (std::abs(hd.hw - hw_ms) >
-      1e-12 * std::max(std::abs(hd.hw), std::abs(hw_ms))) {
+      1.0e-12 * std::max(std::abs(hd.hw), std::abs(hw_ms))) {
     FailAt(name, ph.basis_line,
            "hw " + Fmt17(hd.hw) + " differs from the model space's " +
                Fmt17(hw_ms));
@@ -475,7 +475,7 @@ Operator ReadOperatorDump(std::istream& in, std::string_view name,
         AccumulateSymmetry(tb.data() + info.offset, info.rows, sgn, vmax, dev);
       }
     }
-    if (dev > 1e-12 * std::max(vmax, 1e-300)) {
+    if (dev > 1.0e-12 * std::max(vmax, 1.0e-300)) {
       FailAt(name, r.lineno(),
              "hermiticity check failed: max deviation " + Fmt17(dev) +
                  " for max|V| " + Fmt17(vmax));

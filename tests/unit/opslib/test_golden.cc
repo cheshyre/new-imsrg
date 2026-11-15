@@ -34,7 +34,7 @@ void ExpectMatches(const op::Operator& built,
             << ", one-body " << dev.one_body << ", two-body " << dev.two_body
             << " (max |dump| " << scale.max() << ")\n";
   ::testing::Test::RecordProperty(tag + "_max_dev", std::to_string(dev.max()));
-  EXPECT_LT(dev.max(), 1e-10);
+  EXPECT_LT(dev.max(), 1.0e-10);
   EXPECT_GT(scale.max(), 0.1);  // not a vacuous comparison
 }
 

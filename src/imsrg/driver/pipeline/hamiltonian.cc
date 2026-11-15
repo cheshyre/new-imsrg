@@ -92,7 +92,7 @@ PreparedHamiltonian PrepareHamiltonian(const RunConfig& config) {
   // Lawson term: beta_cm * HCM(hw = beta_cm_hw); its constant is removed after
   // normal ordering.
   const double beta = config.hamiltonian.beta_cm;
-  const bool lawson = std::abs(beta) > 1e-6;
+  const bool lawson = std::abs(beta) > 1.0e-6;
   if (lawson) {
     H += beta * opslib::HCm(ms, b.mass_number, config.hamiltonian.beta_cm_hw);
   }

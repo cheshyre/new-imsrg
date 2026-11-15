@@ -30,7 +30,8 @@ double Sgn(int n) { return (n % 2 == 0) ? 1.0 : -1.0; }
 
 /// Same acceptance as the reference test: max(1e-12 |exact|, 1e-14).
 bool Close(double got, double exact) {
-  return std::fabs(got - exact) <= std::max(1e-12 * std::fabs(exact), 1e-14);
+  return std::fabs(got - exact) <=
+         std::max(1.0e-12 * std::fabs(exact), 1.0e-14);
 }
 
 std::vector<int> SpOrbits() {
@@ -83,7 +84,7 @@ TEST(WignerIdentities, ThreeJOrthogonalityOverM) {
   }
   std::cout << "3j orthogonality: " << checks << " checks, max deviation "
             << max_dev << "\n";
-  EXPECT_LT(max_dev, 1e-13);
+  EXPECT_LT(max_dev, 1.0e-13);
 }
 
 TEST(WignerIdentities, ThreeJOrthogonalityOverJM) {
@@ -114,7 +115,7 @@ TEST(WignerIdentities, ThreeJOrthogonalityOverJM) {
     }
   }
   std::cout << "3j orthogonality over J,M: max deviation " << max_dev << "\n";
-  EXPECT_LT(max_dev, 1e-13);
+  EXPECT_LT(max_dev, 1.0e-13);
 }
 
 TEST(WignerIdentities, SixJOrthogonalityPandyaRange) {
@@ -156,7 +157,7 @@ TEST(WignerIdentities, SixJOrthogonalityPandyaRange) {
   std::cout << "6j orthogonality: " << checks << " checks, max deviation "
             << max_dev << "\n";
   EXPECT_GT(checks, 0);
-  EXPECT_LT(max_dev, 1e-13);
+  EXPECT_LT(max_dev, 1.0e-13);
 }
 
 TEST(WignerIdentities, SixJSymmetries) {
@@ -470,5 +471,5 @@ TEST(WignerIdentities, NormalizedNineJLsJjUnitarity) {
   std::cout << "LS-jj unitarity: " << checks << " checks, max deviation "
             << max_dev << "\n";
   EXPECT_GT(checks, 0);
-  EXPECT_LT(max_dev, 1e-13);
+  EXPECT_LT(max_dev, 1.0e-13);
 }

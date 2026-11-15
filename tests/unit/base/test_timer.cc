@@ -67,14 +67,14 @@ TEST(Timer, ThreadSafe) {
   std::vector<std::thread> ts;
   for (int t = 0; t < 8; ++t) {
     ts.emplace_back([&reg] {
-      for (int i = 0; i < 1000; ++i) reg.Add("shared", 1e-6);
+      for (int i = 0; i < 1000; ++i) reg.Add("shared", 1.0e-6);
     });
   }
   for (auto& th : ts) th.join();
   const auto es = reg.entries();
   ASSERT_EQ(es.size(), std::size_t{1});
   EXPECT_EQ(es[0].count, 8000);
-  EXPECT_NEAR(es[0].seconds, 8e-3, 1e-9);
+  EXPECT_NEAR(es[0].seconds, 8.0e-3, 1.0e-9);
 }
 
 TEST(Timer, HooksCalledInOrder) {

@@ -126,9 +126,9 @@ void SmallStepsForStiffGenerators(Generator g, flow::SolverOptions& so) {
   const std::string_view name = ToString(g);
   const bool stiff = name.find("imaginary") != std::string_view::npos ||
                      name.find("wegner") != std::string_view::npos;
-  if (stiff && so.ds_0 > 1e-2) {
-    so.ds_0 = 1e-4;
-    so.dsmax = 1e-2;
+  if (stiff && so.ds_0 > 1.0e-2) {
+    so.ds_0 = 1.0e-4;
+    so.dsmax = 1.0e-2;
   }
 }
 
@@ -224,7 +224,7 @@ bool NeedsRenormalOrdering(const basis::ModelSpace& ms) {
   const std::vector<double> core = CoreOccupations(ms);
   const auto occ = ms.reference().occupations();
   for (std::size_t a = 0; a < core.size(); ++a) {
-    if (std::abs(occ[a] - core[a]) > 1e-12) return true;
+    if (std::abs(occ[a] - core[a]) > 1.0e-12) return true;
   }
   return false;
 }

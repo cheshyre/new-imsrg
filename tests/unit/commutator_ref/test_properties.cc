@@ -30,7 +30,7 @@ using imsrg::testing::RandomOperator;
 using imsrg::testing::RelativeDeviation;
 namespace cr = imsrg::commutator_ref;
 
-constexpr double kTol = 1e-12;
+constexpr double kTol = 1.0e-12;
 
 using MS = std::shared_ptr<const imsrg::basis::ModelSpace>;
 

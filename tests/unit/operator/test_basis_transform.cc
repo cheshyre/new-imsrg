@@ -99,12 +99,12 @@ TEST(OperatorBasisTransform, GoldenHartreeFockBasis) {
   RecordProperty("max_dev_two", std::to_string(dev.two_body));
   std::cout << "golden max deviation: 0B " << dev.zero_body << "  1B "
             << dev.one_body << "  2B " << dev.two_body << "\n";
-  EXPECT_LT(dev.zero_body, 1e-12);
-  EXPECT_LT(dev.one_body, 1e-10);
-  EXPECT_LT(dev.two_body, 1e-10);
+  EXPECT_LT(dev.zero_body, 1.0e-12);
+  EXPECT_LT(dev.one_body, 1.0e-10);
+  EXPECT_LT(dev.two_body, 1.0e-10);
   // The input is untouched and unitary C preserves the norms.
-  EXPECT_NEAR(OneBodyNorm(out), OneBodyNorm(H), 1e-10 * OneBodyNorm(H));
-  EXPECT_NEAR(TwoBodyNorm(out), TwoBodyNorm(H), 1e-10 * TwoBodyNorm(H));
+  EXPECT_NEAR(OneBodyNorm(out), OneBodyNorm(H), 1.0e-10 * OneBodyNorm(H));
+  EXPECT_NEAR(TwoBodyNorm(out), TwoBodyNorm(H), 1.0e-10 * TwoBodyNorm(H));
 }
 
 TEST(OperatorBasisTransform, IdentityIsNoOp) {
@@ -113,7 +113,7 @@ TEST(OperatorBasisTransform, IdentityIsNoOp) {
                                     {.seed = 3, .zero_body_scale = 2.0});
   const Operator B = TransformBasis(A, Identity(ms->num_orbits()).const_view());
   const PartMaxima d = MaxAbsDifference(A, B);
-  EXPECT_LT(d.max(), 1e-14);
+  EXPECT_LT(d.max(), 1.0e-14);
 }
 
 TEST(OperatorBasisTransform, UnitaryPreservesNormsAndRoundTrips) {
@@ -126,9 +126,9 @@ TEST(OperatorBasisTransform, UnitaryPreservesNormsAndRoundTrips) {
     const linalg::Matrix<double> C = ClassRotation(*ms, 1.0);
     const Operator B = TransformBasis(A, C.const_view());
     EXPECT_GT(MaxAbsDifference(A, B).two_body,
-              1e-3);  // the rotation does change things
-    EXPECT_NEAR(OneBodyNorm(B), OneBodyNorm(A), 1e-12 * OneBodyNorm(A));
-    EXPECT_NEAR(TwoBodyNorm(B), TwoBodyNorm(A), 1e-12 * TwoBodyNorm(A));
+              1.0e-3);  // the rotation does change things
+    EXPECT_NEAR(OneBodyNorm(B), OneBodyNorm(A), 1.0e-12 * OneBodyNorm(A));
+    EXPECT_NEAR(TwoBodyNorm(B), TwoBodyNorm(A), 1.0e-12 * TwoBodyNorm(A));
 
     const std::int64_t n = ms->num_orbits();
     linalg::Matrix<double> Ct(n, n);
@@ -136,7 +136,7 @@ TEST(OperatorBasisTransform, UnitaryPreservesNormsAndRoundTrips) {
       for (std::int64_t j = 0; j < n; ++j) Ct(i, j) = C(j, i);
     }
     const Operator back = TransformBasis(B, Ct.const_view());
-    EXPECT_LT(MaxAbsDifference(A, back).max(), 1e-13);
+    EXPECT_LT(MaxAbsDifference(A, back).max(), 1.0e-13);
   }
 }
 
@@ -157,7 +157,7 @@ TEST(OperatorBasisTransform, ComposesAsMatrixProduct) {
   const Operator two_step =
       TransformBasis(TransformBasis(A, C1.const_view()), C2.const_view());
   const Operator one_step = TransformBasis(A, C12.const_view());
-  EXPECT_LT(MaxAbsDifference(two_step, one_step).max(), 1e-13);
+  EXPECT_LT(MaxAbsDifference(two_step, one_step).max(), 1.0e-13);
 }
 
 TEST(OperatorBasisTransform, RejectsWrongShape) {

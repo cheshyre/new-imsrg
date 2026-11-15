@@ -63,8 +63,8 @@ Reference Reference::FromOccupations(const SingleParticleBasis& basis,
       ref.particles_.push_back(ia);
     }
   }
-  double pmin_p = 1e6;
-  double pmin_n = 1e6;
+  double pmin_p = 1.0e6;
+  double pmin_n = 1.0e6;
   for (const OrbitIndex ia : ref.particles_) {
     const Orbit& o = basis.orbit(ia);
     double& pmin = o.is_proton() ? pmin_p : pmin_n;
@@ -72,8 +72,8 @@ Reference Reference::FromOccupations(const SingleParticleBasis& basis,
       pmin = static_cast<double>(o.e());
     }
   }
-  if (pmin_p == 1e6) pmin_p = e_fermi_p;
-  if (pmin_n == 1e6) pmin_n = e_fermi_n;
+  if (pmin_p == 1.0e6) pmin_p = e_fermi_p;
+  if (pmin_n == 1.0e6) pmin_n = e_fermi_n;
   if (occmax_p > 0.99) e_fermi_p = 0.5 * (e_fermi_p + pmin_p);
   if (occmax_n > 0.99) e_fermi_n = 0.5 * (e_fermi_n + pmin_n);
   ref.e_fermi_proton_ = e_fermi_p;
@@ -101,7 +101,7 @@ Reference Reference::FromOrbitOccupations(
     std::string name) {
   std::vector<double> occ(static_cast<std::size_t>(basis.num_orbits()), 0.0);
   for (const OrbitOccupation& oo : entries) {
-    if (std::abs(oo.occupation) < 1e-8) {
+    if (std::abs(oo.occupation) < 1.0e-8) {
       continue;
     }
     if (!IsValid(oo.orbit)) {

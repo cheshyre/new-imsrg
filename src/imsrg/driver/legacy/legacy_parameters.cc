@@ -740,7 +740,7 @@ class Translator {
       PutD("imsrg.step.omega_norm_max", onm, ref);
       if (const Entry* o = get("omega_norm_max")) {
         const auto given_v = ParseDouble(*o, "omega_norm_max");
-        if (given_v && std::abs(*given_v - onm) > 1e-12)
+        if (given_v && std::abs(*given_v - onm) > 1.0e-12)
           Warn("W-Q15", "imsrg.step.omega_norm_max",
                "method=" + v + " overrides omega_norm_max=" + o->value,
                ArgRef(*o));

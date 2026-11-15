@@ -38,7 +38,7 @@ TEST(MbptIntegration, IT1_Emp2) {
       ReadJson(fs::path(IMSRG_GOLDEN_DIR) / "e2e/IT-1/result.json");
   const double ref = res.at("mbpt").at("EMP2").number;
   std::cout << "[IT-1] dEMP2 " << mp2 - ref << "\n";
-  EXPECT_NEAR(mp2, ref, 1e-4);
+  EXPECT_NEAR(mp2, ref, 1.0e-4);
 }
 
 TEST(MbptIntegration, IT5_NatBasis) {
@@ -60,10 +60,10 @@ TEST(MbptIntegration, IT5_NatBasis) {
             << res.e_hf_nat - ehf_nat << " dE0(NAT H) "
             << res.h_nat.zero_body() - ehf_nat << " dE_MP2(NAT) "
             << mp2 - emp2_nat << "\n";
-  EXPECT_NEAR(res.e_hf_hf, ehf_hf, 1e-4);
-  EXPECT_NEAR(res.e_hf_nat, ehf_nat, 1e-4);
-  EXPECT_NEAR(res.h_nat.zero_body(), ehf_nat, 1e-4);
-  EXPECT_NEAR(mp2, emp2_nat, 1e-3);
+  EXPECT_NEAR(res.e_hf_hf, ehf_hf, 1.0e-4);
+  EXPECT_NEAR(res.e_hf_nat, ehf_nat, 1.0e-4);
+  EXPECT_NEAR(res.h_nat.zero_body(), ehf_nat, 1.0e-4);
+  EXPECT_NEAR(mp2, emp2_nat, 1.0e-3);
 }
 
 }  // namespace

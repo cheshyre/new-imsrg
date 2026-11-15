@@ -93,13 +93,13 @@ TEST(OpslibProperties, MatterRadiusAgainstSpeciesRadii) {
   const op::PartMaxima d = op::MaxAbsDifference(lhs, rhs);
   std::cout << "[props] max |Z rp2 + N rn2 - A rm2| (no spin-orbit): one-body "
             << d.one_body << ", two-body " << d.two_body << "\n";
-  EXPECT_LT(d.max(), 1e-10);
+  EXPECT_LT(d.max(), 1.0e-10);
   // With the spin-orbit term included the relation is broken by that term only.
   op::Operator lhs_so = opslib::Rp2(ms, kA, kZ, true);
   const op::PartMaxima so =
       op::MaxAbsDifference(lhs_so, opslib::Rp2(ms, kA, kZ, false));
   const op::PartMaxima so_ref = op::MaxAbs(opslib::RpSpinOrbitCorrection(ms));
-  EXPECT_NEAR(so.one_body, so_ref.one_body / kZ, 1e-12);
+  EXPECT_NEAR(so.one_body, so_ref.one_body / kZ, 1.0e-12);
   EXPECT_EQ(so.two_body, 0.0);
 }
 
@@ -109,13 +109,13 @@ TEST(OpslibProperties, SpeciesPartsAddUpToMatter) {
   sum += opslib::R2TwoBody(ms, opslib::Species::kNeutron);
   const op::PartMaxima d = op::MaxAbsDifference(
       sum, opslib::R2TwoBody(ms, opslib::Species::kMatter));
-  EXPECT_LT(d.max(), 1e-12);
+  EXPECT_LT(d.max(), 1.0e-12);
   op::Operator one = opslib::R2OneBody(ms, opslib::Species::kProton);
   one += opslib::R2OneBody(ms, opslib::Species::kNeutron);
   EXPECT_LT(
       op::MaxAbsDifference(one, opslib::R2OneBody(ms, opslib::Species::kMatter))
           .max(),
-      1e-12);
+      1.0e-12);
 }
 
 TEST(OpslibProperties, HcmUsesTrapFrequencyOnlyInThePrefactor) {
@@ -130,7 +130,7 @@ TEST(OpslibProperties, HcmUsesTrapFrequencyOnlyInThePrefactor) {
   op::Operator expect = opslib::R2Cm(ms, kA);
   expect *= 3.0 * 0.5 * kA * constants::kMNucleon * hw * hw /
             (constants::kHbarc * constants::kHbarc);
-  EXPECT_LT(op::MaxAbsDifference(d, expect).max(), 1e-10);
+  EXPECT_LT(op::MaxAbsDifference(d, expect).max(), 1.0e-10);
   // The default is the basis frequency.
   EXPECT_EQ(op::MaxAbsDifference(opslib::HCm(ms, kA), h1).max(), 0.0);
 }

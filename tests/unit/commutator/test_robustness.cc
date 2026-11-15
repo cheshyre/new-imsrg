@@ -103,14 +103,14 @@ TEST(commutator_robustness, rank1_equals_promoted_rank2) {
           Operator Zb = ZeroZ(ms, X2, Y2);
           t.fast(X1, Y1, Za, ws);
           t.fast(X2, Y2, Zb, ws);
-          EXPECT_LE(imsrg::testing::RelativeDeviation(Za, Zb), 1e-13)
+          EXPECT_LE(imsrg::testing::RelativeDeviation(Za, Zb), 1.0e-13)
               << "fast " << t.name << " " << sc.label
               << " x_rank1=" << x_is_rank1;
           Operator Ra = ZeroZ(ms, X1, Y1);
           Operator Rb = ZeroZ(ms, X2, Y2);
           t.ref(X1, Y1, Ra);
           t.ref(X2, Y2, Rb);
-          EXPECT_LE(imsrg::testing::RelativeDeviation(Ra, Rb), 1e-13)
+          EXPECT_LE(imsrg::testing::RelativeDeviation(Ra, Rb), 1.0e-13)
               << "ref " << t.name << " " << sc.label
               << " x_rank1=" << x_is_rank1;
           EXPECT_LE(imsrg::testing::RelativeDeviation(Za, Ra),
@@ -187,16 +187,16 @@ TEST(commutator_robustness, dispatcher_non_fused_branches) {
 
   EXPECT_LE(imsrg::testing::RelativeDeviation(
                 run(TermMask::Only(Term::kComm222PpHhss)), pp),
-            1e-13);
+            1.0e-13);
   EXPECT_LE(imsrg::testing::RelativeDeviation(
                 run(TermMask::Only(Term::kComm221ss)), s221),
-            1e-13);
+            1.0e-13);
   const TermMask both =
       TermMask::Only(Term::kComm222PpHhss) | TermMask::Only(Term::kComm221ss);
-  EXPECT_LE(imsrg::testing::RelativeDeviation(run(both), fused), 1e-13);
+  EXPECT_LE(imsrg::testing::RelativeDeviation(run(both), fused), 1.0e-13);
   Operator sum = pp;
   op::operator+=(sum, s221);
-  EXPECT_LE(imsrg::testing::RelativeDeviation(fused, sum), 1e-12);
+  EXPECT_LE(imsrg::testing::RelativeDeviation(fused, sum), 1.0e-12);
   // Against the reference as well.
   Operator rpp = ZeroZ(ms, X, Y);
   commutator_ref::Comm222PpHhss(X, Y, rpp);
@@ -225,7 +225,7 @@ TEST(commutator_robustness, scratch_footprint) {
         "[footprint] O16 emax=%d: two-body operator %.1f MB; ladder scratch "
         "%.1f MB (%.2fx); "
         "Pandya scratch %.1f MB (%.2fx)\n",
-        emax, op_bytes / 1e6, lad / 1e6, lad / op_bytes, pan / 1e6,
+        emax, op_bytes / 1.0e6, lad / 1.0e6, lad / op_bytes, pan / 1.0e6,
         pan / op_bytes);
     EXPECT_GT(lad, 0.0);
     EXPECT_GT(pan, 0.0);

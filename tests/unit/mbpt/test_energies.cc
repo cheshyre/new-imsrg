@@ -33,7 +33,7 @@ void Check(const fs::path& ham_dir, const fs::path& hfjson,
 TEST(MbptEnergies, Emax2TwoNucleon) {
   Check(fs::path(IMSRG_GOLDEN_DIR) / "hamiltonian/emax2_O16",
         fs::path(IMSRG_GOLDEN_DIR) / "hf/emax2_O16_2N/hf.json", nullptr,
-        "emax2_2N", 1e-9);
+        "emax2_2N", 1.0e-9);
 }
 
 TEST(MbptEnergies, Emax2TwoPlusThreeNucleon) {
@@ -43,7 +43,7 @@ TEST(MbptEnergies, Emax2TwoPlusThreeNucleon) {
   const op::No2bThreeBody v3 = LoadV3(file, {2, 4, 12, 2});
   Check(fs::path(IMSRG_GOLDEN_DIR) / "hamiltonian/emax2_O16",
         fs::path(IMSRG_GOLDEN_DIR) / "hf/emax2_O16_2N3N/hf.json", &v3,
-        "emax2_2N3N", 1e-9);
+        "emax2_2N3N", 1.0e-9);
 }
 
 }  // namespace

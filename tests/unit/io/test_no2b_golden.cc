@@ -46,7 +46,7 @@ void CompareWithDump(const fs::path& dump, const No2bTruncation& tr,
   const Operator got = NormalOrder(zero, v3);
   const PartMaxima dev = MaxAbsDifference(got, ref);
   const PartMaxima rm = MaxAbs(ref);
-  const double tol = 1e-10 * std::max(1.0, rm.max());
+  const double tol = 1.0e-10 * std::max(1.0, rm.max());
   std::cout << "[" << tag << "] read " << rep.values_read << " values ("
             << rep.values_stored << " stored) in " << rep.seconds
             << " s; max deviation 0b " << dev.zero_body << ", 1b "
@@ -140,7 +140,7 @@ std::int64_t ReferenceRead(const fs::path& path, No2bThreeBody& v3) {
                           (&o4 == &o5 && (J + T45) % 2 == 0)) {
                         continue;
                       }
-                      if (std::abs(v) > 1e-8) {
+                      if (std::abs(v) > 1.0e-8) {
                         v3.set_isospin(idx(o1), idx(o2), idx(o3), T12, idx(o4),
                                        idx(o5), idx(o6), T45, J, T3, v);
                         ++stored;

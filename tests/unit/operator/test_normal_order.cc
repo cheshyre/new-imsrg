@@ -65,14 +65,14 @@ TEST(NormalOrderGolden, HamiltonianO16) {
   const auto ms = MsFor("hamiltonian/emax2_O16/H.dump");
   const Operator h = ReadInto("hamiltonian/emax2_O16/H.dump", ms);
   const Operator want = ReadInto("operator/emax2/H_NO_O16.dump", ms);
-  ExpectEqualParts(NormalOrder(h), want, 1e-10, "H -> NO O16");
+  ExpectEqualParts(NormalOrder(h), want, 1.0e-10, "H -> NO O16");
 }
 
 TEST(NormalOrderGolden, RandomHermitianNe20) {
   const auto ms = MsFor("operator/emax2/randomH_NO_Ne20.dump");
   const Operator x = ReadInto("hamiltonian/emax2_O16/random_H.dump", ms, false);
   const Operator want = ReadInto("operator/emax2/randomH_NO_Ne20.dump", ms);
-  ExpectEqualParts(NormalOrder(x), want, 1e-10, "random_H -> NO Ne20");
+  ExpectEqualParts(NormalOrder(x), want, 1.0e-10, "random_H -> NO Ne20");
 }
 
 TEST(NormalOrderGolden, RandomAntiHermitianNe20) {
@@ -81,7 +81,7 @@ TEST(NormalOrderGolden, RandomAntiHermitianNe20) {
   ASSERT_EQ(x.hermiticity(), Hermiticity::kAntiHermitian);
   const Operator want = ReadInto("operator/emax2/randomA_NO_Ne20.dump", ms);
   const Operator got = NormalOrder(x);
-  ExpectEqualParts(got, want, 1e-10, "random_A -> NO Ne20");
+  ExpectEqualParts(got, want, 1.0e-10, "random_A -> NO Ne20");
   EXPECT_EQ(got.zero_body(), 0.0);
 }
 
@@ -90,9 +90,9 @@ TEST(NormalOrderGolden, UndoHamiltonianO16) {
   const Operator no = ReadInto("operator/emax2/H_NO_O16.dump", ms);
   const Operator undone = UndoNormalOrder(no);
   ExpectEqualParts(undone, ReadInto("operator/emax2/H_NO_O16_undo.dump", ms),
-                   1e-10, "undo(H_NO) vs H_NO_O16_undo");
-  ExpectEqualParts(undone, ReadInto("hamiltonian/emax2_O16/H.dump", ms), 1e-10,
-                   "undo(H_NO) vs H");
+                   1.0e-10, "undo(H_NO) vs H_NO_O16_undo");
+  ExpectEqualParts(undone, ReadInto("hamiltonian/emax2_O16/H.dump", ms),
+                   1.0e-10, "undo(H_NO) vs H");
 }
 
 // ---- Properties
@@ -189,9 +189,9 @@ TEST(NormalOrderProperties, RoundTripsFractionalOccupations) {
         RandomOperator(ms, herm, 2, 11 + static_cast<unsigned>(herm));
     const std::string tag = std::to_string(static_cast<int>(herm));
     // Model-space reference (Ne20, fractional 1/3 in 0d5/2).
-    ExpectEqualParts(UndoNormalOrder(NormalOrder(x)), x, 1e-12,
+    ExpectEqualParts(UndoNormalOrder(NormalOrder(x)), x, 1.0e-12,
                      "undo(NO) herm " + tag);
-    ExpectEqualParts(NormalOrder(UndoNormalOrder(x)), x, 1e-12,
+    ExpectEqualParts(NormalOrder(UndoNormalOrder(x)), x, 1.0e-12,
                      "NO(undo) herm " + tag);
     // Explicit occupations.
     const auto to_ref = [&](const Operator& o) {
@@ -200,9 +200,9 @@ TEST(NormalOrderProperties, RoundTripsFractionalOccupations) {
     const auto to_vac = [&](const Operator& o) {
       return NormalOrder(o, occ_custom, NormalOrderDirection::kToVacuum);
     };
-    ExpectEqualParts(to_vac(to_ref(x)), x, 1e-12,
+    ExpectEqualParts(to_vac(to_ref(x)), x, 1.0e-12,
                      "custom undo(NO) herm " + tag);
-    ExpectEqualParts(to_ref(to_vac(x)), x, 1e-12,
+    ExpectEqualParts(to_ref(to_vac(x)), x, 1.0e-12,
                      "custom NO(undo) herm " + tag);
   }
 }
@@ -231,7 +231,7 @@ TEST(NormalOrderProperties, IsLinear) {
     // the full operator (E0 included), so NO(aX + Y) = a NO(X) + NO(Y) exactly.
     const Operator rhs = a * NormalOrder(x) + NormalOrder(y);
     ExpectEqualParts(
-        lhs, rhs, 1e-12,
+        lhs, rhs, 1.0e-12,
         "linearity herm " + std::to_string(static_cast<int>(herm)));
   }
 }
@@ -276,7 +276,7 @@ TEST(NormalOrderProperties, OneBodyOperatorOnlyShiftsZeroBody) {
     }
   }
   const Operator no = NormalOrder(x);
-  EXPECT_NEAR(no.zero_body(), x.zero_body() + expected, 1e-13);
+  EXPECT_NEAR(no.zero_body(), x.zero_body() + expected, 1.0e-13);
   EXPECT_EQ(MaxAbsDifference(no,
                              [&] {
                                Operator y = x;
@@ -286,7 +286,7 @@ TEST(NormalOrderProperties, OneBodyOperatorOnlyShiftsZeroBody) {
                 .max(),
             0.0);
   const Operator back = UndoNormalOrder(no);
-  EXPECT_NEAR(back.zero_body(), x.zero_body(), 1e-13);
+  EXPECT_NEAR(back.zero_body(), x.zero_body(), 1.0e-13);
   EXPECT_FALSE(no.two_body().allocated());
 }
 
@@ -345,8 +345,8 @@ TEST(NormalOrderNo2b, IsLinearInThreeBodyValues) {
   const Operator base = NormalOrder(x);
   const Operator one = NormalOrder(x, SmallV3(1.0)) - base;
   const Operator two = NormalOrder(x, SmallV3(2.0)) - base;
-  EXPECT_GT(MaxAbs(one).max(), 1e-3);  // the 3N input contributes
-  ExpectEqualParts(two, 2.0 * one, 1e-12, "NO2B linearity");
+  EXPECT_GT(MaxAbs(one).max(), 1.0e-3);  // the 3N input contributes
+  ExpectEqualParts(two, 2.0 * one, 1.0e-12, "NO2B linearity");
 }
 
 TEST(NormalOrderNo2b, RejectsBadArguments) {

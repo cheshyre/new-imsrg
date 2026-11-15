@@ -72,7 +72,7 @@ void MagnusSolver::set_generator(const GeneratorOptions& generator) {
   // imsrg++ SetGenerator (IMSRGSolver.cc:157-178): a new Omega if the current
   // one is not ~0.
   generator_ = generator;
-  if (op::Norm(omegas_.back()) > 1e-6) {
+  if (op::Norm(omegas_.back()) > 1.0e-6) {
     eta_.set_zero();
     PushOmega();
   }
@@ -102,8 +102,8 @@ SolveResult MagnusSolver::Solve(const StatusCallback& on_status) {
   ComputeGenerator(h_, eta_, generator_);
   // imsrg++ bumps domega to avoid machine-dependent splitting
   // (IMSRGSolver.cc:290); the bump persists, as the member is modified there.
-  if (std::abs(solver_.omega_norm_max - solver_.domega) < 1e-6) {
-    solver_.domega += 1e-4;
+  if (std::abs(solver_.omega_norm_max - solver_.domega) < 1.0e-6) {
+    solver_.domega += 1.0e-4;
     log::Info(
         "adjusting domega to {} to avoid numerical trouble, since "
         "omega_norm_max = {}",
@@ -125,7 +125,7 @@ SolveResult MagnusSolver::Solve(const StatusCallback& on_status) {
       result.reason = StopReason::kConverged;
       break;
     }
-    if (norm_eta > 1e12 || std::abs(e_last) > 1e9) {
+    if (norm_eta > 1.0e12 || std::abs(e_last) > 1.0e9) {
       log::Error("the IMSRG flow diverged: ||eta|| = {}, E0 = {} at s = {}",
                  norm_eta, e_last, s_);
       result.reason = StopReason::kDiverged;
@@ -137,10 +137,10 @@ SolveResult MagnusSolver::Solve(const StatusCallback& on_status) {
       norm_omega = 0.0;
     }
     if (solver_.magnus_adaptive) {
-      ds =
-          std::min({solver_.domega / norm_eta,
-                    solver_.domega / norm_eta / (norm_omega + 1.0e-9),
-                    (solver_.omega_norm_max + 1e-5) / norm_eta, solver_.dsmax});
+      ds = std::min({solver_.domega / norm_eta,
+                     solver_.domega / norm_eta / (norm_omega + 1.0e-9),
+                     (solver_.omega_norm_max + 1.0e-5) / norm_eta,
+                     solver_.dsmax});
     }
     ds = std::min(ds, solver_.smax - s_);
     s_ += ds;

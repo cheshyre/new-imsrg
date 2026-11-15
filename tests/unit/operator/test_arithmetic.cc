@@ -174,7 +174,7 @@ TEST(OperatorArithmetic, AxpyEqualsElementwiseSum) {
   EXPECT_GT(d.one_body, 0.1);
   Operator back = y;
   Axpy(0.75, x, back);
-  EXPECT_LE(MaxAbsDifference(back, y0).max(), 1e-14 * 2);
+  EXPECT_LE(MaxAbsDifference(back, y0).max(), 1.0e-14 * 2);
   // exact element check on a few entries
   EXPECT_DOUBLE_EQ(y.one_body().get(OrbitIndex{3}, OrbitIndex{5}),
                    y0.one_body().get(OrbitIndex{3}, OrbitIndex{5}) -
@@ -203,7 +203,7 @@ TEST(OperatorArithmetic, SumThenDifferenceRecoversOperand) {
   const Operator x = MakeOp(ms, 2, 3);
   const Operator y = MakeOp(ms, 2, 4);
   const Operator r = (x + y) - y;
-  EXPECT_LE(MaxAbsDifference(r, x).max(), 1e-14 * 2);
+  EXPECT_LE(MaxAbsDifference(r, x).max(), 1.0e-14 * 2);
 }
 
 TEST(OperatorArithmetic, SelfSumIsDouble) {
@@ -224,7 +224,7 @@ TEST(OperatorArithmetic, NegationAndDivision) {
   Operator w = x;
   w /= 2.0;
   w *= 2.0;
-  EXPECT_LE(MaxAbsDifference(w, x).max(), 1e-15);
+  EXPECT_LE(MaxAbsDifference(w, x).max(), 1.0e-15);
   EXPECT_THROW(x / 0.0, InvariantError);
   Operator v = x;
   EXPECT_THROW(v /= 0.0, InvariantError);
@@ -272,7 +272,7 @@ TEST(OperatorArithmetic, RankPromotion) {
   // t - v: copy v, negate, add t
   const Operator d = t - v;
   EXPECT_EQ(d.spec().particle_rank, 2);
-  EXPECT_LE(MaxAbsDifference(d, -1.0 * (v - t)).max(), 1e-15);
+  EXPECT_LE(MaxAbsDifference(d, -1.0 * (v - t)).max(), 1.0e-15);
   EXPECT_DOUBLE_EQ(d.one_body().get(OrbitIndex{2}, OrbitIndex{4}),
                    t.one_body().get(OrbitIndex{2}, OrbitIndex{4}) -
                        v.one_body().get(OrbitIndex{2}, OrbitIndex{4}));
@@ -309,7 +309,7 @@ TEST(OperatorArithmetic, EqualButSeparatelyBuiltModelSpacesAreAccepted) {
   Operator b = MakeOp(ms2, 2, 16);
   const Operator b0 = b;
   EXPECT_NO_THROW(b += a);
-  EXPECT_NEAR(b.zero_body(), a.zero_body() + b0.zero_body(), 1e-15);
+  EXPECT_NEAR(b.zero_body(), a.zero_body() + b0.zero_body(), 1.0e-15);
 }
 
 TEST(OperatorArithmetic, EmptyOperatorsThrow) {

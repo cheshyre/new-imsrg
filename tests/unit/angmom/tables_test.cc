@@ -168,8 +168,8 @@ TEST(AngmomTables, DeviceViewsReproduceHostSums) {
     }
   }
   EXPECT_GT(host_abs, 0.0);
-  EXPECT_NEAR(dev, host, 1e-9 * host_abs);
-  EXPECT_NEAR(dev_abs, host_abs, 1e-9 * host_abs);
+  EXPECT_NEAR(dev, host, 1.0e-9 * host_abs);
+  EXPECT_NEAR(dev_abs, host_abs, 1.0e-9 * host_abs);
 
   const int lmax = 4;
   const NineJLSjjTable nt(lmax);
@@ -192,7 +192,7 @@ TEST(AngmomTables, DeviceViewsReproduceHostSums) {
     }
   }
   EXPECT_NEAR(test::SumNinejDevice(nt), host9,
-              1e-9 * std::max(1.0, std::abs(host9)));
+              1.0e-9 * std::max(1.0, std::abs(host9)));
 
   const MoshinskyTable m(6);
   std::vector<std::int32_t> q;

@@ -27,13 +27,13 @@ void CompareModes(const op::Operator& H, const op::No2bThreeBody* v3,
                                   std::to_string(diis.iterations));
   EXPECT_TRUE(lin.converged);
   EXPECT_TRUE(diis.converged);
-  EXPECT_NEAR(diis.e_hf, lin.e_hf, 1e-8);
+  EXPECT_NEAR(diis.e_hf, lin.e_hf, 1.0e-8);
   double dspe = 0.0;
   for (std::size_t i = 0; i < lin.spe.size(); ++i) {
     dspe = std::max(dspe, std::abs(diis.spe[i] - lin.spe[i]));
   }
   std::cout << "[" << tag << "] max|dspe| diis vs linear " << dspe << "\n";
-  EXPECT_LE(dspe, 1e-6);
+  EXPECT_LE(dspe, 1.0e-6);
 }
 
 TEST(HfDiis, Emax2TwoNucleon) {

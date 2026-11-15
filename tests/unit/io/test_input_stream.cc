@@ -121,7 +121,7 @@ TEST(InputStream, NextFloatParsesAndStopsAtEnd) {
   ASSERT_TRUE(in.NextFloat(v));
   EXPECT_EQ(v, 3.0F);
   ASSERT_TRUE(in.NextFloat(v));
-  EXPECT_EQ(v, 1e-3F);
+  EXPECT_EQ(v, 1.0e-3F);
   v = 7.0F;
   EXPECT_FALSE(in.NextFloat(v));
   EXPECT_EQ(v, 7.0F);  // unchanged at the end of data

@@ -33,7 +33,7 @@ double Mp2Energy(op::Operator& H) {
       const auto& oa = basis.orbit(a);
       const double ea = Diag(H, a);
       const double fia = H.one_body().get(i, a);
-      if (std::abs(fia) > 1e-9)
+      if (std::abs(fia) > 1.0e-9)
         e2 += (oa.j2.twice + 1) * ref.occupation(a) * fia * fia / (ea - ei);
       for (const OrbitIndex j : ref.particles()) {
         if (j.value() < i.value()) continue;
@@ -59,7 +59,7 @@ double Mp2Energy(op::Operator& H) {
           }
           for (int J = jmin; J <= jmax; J += dj) {
             const double t = two.get_normalized(a, b, i, j, TwoJ{2 * J});
-            if (std::abs(t) > 1e-9)
+            if (std::abs(t) > 1.0e-9)
               e2 += (2 * J + 1) * ref.occupation(a) * ref.occupation(b) * t *
                     t / denom;
           }

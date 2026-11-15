@@ -102,7 +102,7 @@ linalg::Matrix<double> PulayDiis::Extrapolate() const {
       bool ok = true;
       for (std::size_t i = 0; i < k; ++i) {
         const double c = rhs(static_cast<std::int64_t>(i), 0);
-        if (!std::isfinite(c) || std::abs(c) > 1e8) ok = false;
+        if (!std::isfinite(c) || std::abs(c) > 1.0e8) ok = false;
       }
       if (!ok) continue;
       std::fill(coeff.begin(), coeff.end(), 0.0);

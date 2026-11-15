@@ -155,7 +155,7 @@ TEST(No2b, SetGetRoundTrip) {
 
   // norm: diagonal element once, off-diagonal pair stored once.
   const double expect = std::sqrt(vf * vf + 0.25 * 0.25);
-  EXPECT_NEAR(w.norm(), expect, 1e-15);
+  EXPECT_NEAR(w.norm(), expect, 1.0e-15);
 }
 
 TEST(No2b, AbsentElementsAreZero) {
@@ -197,14 +197,14 @@ TEST(No2b, PnDiagonalCases) {
   for (int tz : {-1, +1}) {
     const auto s = Orb(0, 0, 1, tz);
     const auto p = Orb(0, 1, 1, tz);
-    EXPECT_NEAR(w.get_pn(s, p, s, s, p, s, 1), v, 1e-15) << tz;
+    EXPECT_NEAR(w.get_pn(s, p, s, s, p, s, 1), v, 1.0e-15) << tz;
   }
   // Mixed Tz in the isospin-3/2 element only: ppn gets CGs < 1 but T = 3/2
   // only, Tab = 1: <1/2 -1/2 1/2 -1/2|1 -1> = 1, <1 -1, 1/2 +1/2 | 3/2 -1/2> =
   // sqrt(1/3).
   EXPECT_NEAR(w.get_pn(Orb(0, 0, 1, -1), Orb(0, 1, 1, -1), Orb(0, 0, 1, +1),
                        Orb(0, 0, 1, -1), Orb(0, 1, 1, -1), Orb(0, 0, 1, +1), 1),
-              v / 3.0, 1e-7);
+              v / 3.0, 1.0e-7);
   // Tz mismatch between bra and ket.
   EXPECT_EQ(w.get_pn(Orb(0, 0, 1, -1), Orb(0, 1, 1, -1), Orb(0, 0, 1, -1),
                      Orb(0, 0, 1, -1), Orb(0, 1, 1, -1), Orb(0, 0, 1, +1), 1),
@@ -246,7 +246,7 @@ TEST(No2b, PnAgainstHandCgProducts) {
   const auto got =
       w.get_pn(Orb(0, 0, 1, -1), Orb(0, 1, 1, +1), Orb(0, 0, 1, -1),
                Orb(0, 0, 1, -1), Orb(0, 1, 1, +1), Orb(0, 0, 1, -1), 1);
-  EXPECT_NEAR(got, expect, 1e-7);
+  EXPECT_NEAR(got, expect, 1.0e-7);
   EXPECT_GT(std::abs(got), 0.1);
 }
 

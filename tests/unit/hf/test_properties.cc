@@ -45,8 +45,8 @@ TEST_F(HfProperties, DensityIsHermitianWithCorrectTrace) {
     for (std::int64_t j = 0; j < n; ++j)
       asym = std::max(asym, std::abs(r.rho(i, j) - r.rho(j, i)));
   }
-  EXPECT_LT(asym, 1e-13);
-  EXPECT_NEAR(trace, 16.0, 1e-10);
+  EXPECT_LT(asym, 1.0e-13);
+  EXPECT_NEAR(trace, 16.0, 1.0e-10);
 }
 
 TEST_F(HfProperties, DensityIsIdempotentAtConvergence) {
@@ -61,7 +61,7 @@ TEST_F(HfProperties, DensityIsIdempotentAtConvergence) {
     }
   }
   std::cout << "[properties] max|rho^2 - rho| " << dev << "\n";
-  EXPECT_LT(dev, 1e-10);
+  EXPECT_LT(dev, 1.0e-10);
 }
 
 TEST_F(HfProperties, FockMatrixIsHermitian) {
@@ -72,7 +72,7 @@ TEST_F(HfProperties, FockMatrixIsHermitian) {
       asym = std::max(asym, std::abs(r.F(i, j) - r.F(j, i)));
     }
   }
-  EXPECT_LT(asym, 1e-12);
+  EXPECT_LT(asym, 1.0e-12);
 }
 
 TEST_F(HfProperties, ChannelEnergiesAreAscending) {
@@ -102,7 +102,7 @@ TEST_F(HfProperties, CoefficientsAreOrthogonalWithPositiveDiagonal) {
       dev = std::max(dev, std::abs(s - (a == b ? 1.0 : 0.0)));
     }
   }
-  EXPECT_LT(dev, 1e-12);
+  EXPECT_LT(dev, 1.0e-12);
 }
 
 TEST_F(HfProperties, EnergyEqualsSumOfParts) {

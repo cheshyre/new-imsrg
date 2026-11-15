@@ -177,7 +177,7 @@ void WriteTokyo(const std::filesystem::path& path, const op::Operator& op,
     for (const OrbitIndex b : ms.partition().valence()) {
       if (a < b) continue;
       const double obme = op.one_body().get(a, b);
-      if (std::abs(obme) < 1e-7 * norm1b || norm1b < 1e-8) continue;
+      if (std::abs(obme) < 1.0e-7 * norm1b || norm1b < 1.0e-8) continue;
       one.push_back({num.file_index[static_cast<std::size_t>(a.value())],
                      num.file_index[static_cast<std::size_t>(b.value())],
                      obme});
@@ -188,9 +188,9 @@ void WriteTokyo(const std::filesystem::path& path, const op::Operator& op,
     double v;
   };
   std::vector<Row2> two;
-  if (norm2b >= 1e-7) {
+  if (norm2b >= 1.0e-7) {
     ForEachValenceTbme(op, options.mode, is_valence, [&](const TbmeRecord& r) {
-      if (std::abs(r.value) < norm2b * 1e-7) return;
+      if (std::abs(r.value) < norm2b * 1.0e-7) return;
       auto idx = [&](OrbitIndex o) {
         return num.file_index[static_cast<std::size_t>(o.value())];
       };
@@ -265,7 +265,7 @@ void WriteNushellxInt(const std::filesystem::path& path, const op::Operator& op,
                  d_ind = idx(r.d);
     std::int32_t T = std::abs(r.ch->Tz());
     double tbme = r.value;
-    if (std::abs(tbme) < 1e-6) return;
+    if (std::abs(tbme) < 1.0e-6) return;
     if (T == 0) {
       if (oa.j2 != ob.j2 || oa.l != ob.l || oa.n != ob.n)
         tbme *= constants::kSqrt2;

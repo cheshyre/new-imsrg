@@ -38,7 +38,7 @@ struct HFOptions {
   Mixing mixing = Mixing::kLinear;
   /// Convergence threshold on ||eps - eps_prev||_F / num_orbits (eps:
   /// single-particle energies).
-  double tolerance = 1e-8;
+  double tolerance = 1.0e-8;
   /// Maximum number of iterations.
   std::int32_t max_iterations = 1000;
   /// Linear mixing: weight of the OLD density (imsrg++ 0.2 for the density

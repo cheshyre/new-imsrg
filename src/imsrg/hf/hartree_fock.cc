@@ -361,7 +361,7 @@ op::Operator NormalOrderedHamiltonian(const op::Operator& H,
               const auto& ob = basis.orbit(OrbitIndex{b});
               if (ob.e() + e2ket > options.e3max) continue;
               const double rab = r.rho(a, b);
-              if (std::abs(rab) < 1e-8) continue;
+              if (std::abs(rab) < 1.0e-8) continue;
               // imsrg++ passes the integer J as the J2 argument.
               v += rab * v3->get_pn(orbit_p, oq, oa, orr, os, ob, J);
             }
@@ -382,7 +382,7 @@ op::Operator NormalOrderedHamiltonian(const op::Operator& H,
   bool changed = false;
   for (std::int32_t a = 0; a < norb; ++a) {
     const auto k = static_cast<std::size_t>(a);
-    if (std::abs(ref_occ[k] - r.occupations[k]) > 1e-3) changed = true;
+    if (std::abs(ref_occ[k] - r.occupations[k]) > 1.0e-3) changed = true;
   }
   if (changed) {
     auto ref = basis::Reference::FromOccupations(basis, r.occupations, "hf");

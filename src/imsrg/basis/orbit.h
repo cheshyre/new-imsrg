@@ -33,7 +33,7 @@ namespace imsrg::basis {
 
 /// Occupation threshold of imsrg++ (`ModelSpace::OCC_CUT`): an orbit with
 /// occupation n >= kOccupationCut is a hole, otherwise a particle.
-inline constexpr double kOccupationCut = 1e-6;
+inline constexpr double kOccupationCut = 1.0e-6;
 
 /// Quantum numbers of one spherical harmonic-oscillator orbit |n l j tz>.
 /// Trivially copyable, usable in device code. A default-constructed orbit is

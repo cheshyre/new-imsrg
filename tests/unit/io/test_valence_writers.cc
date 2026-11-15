@@ -76,7 +76,7 @@ double CompareFiles(const fs::path& got, const fs::path& want,
       if (ParseNumber(tg[k], a) && ParseNumber(tw[k], b)) {
         const double d = std::abs(a - b);
         max_dev = std::max(max_dev, d);
-        EXPECT_LE(d, 1e-10) << tag << " line " << i + 1 << " token " << k;
+        EXPECT_LE(d, 1.0e-10) << tag << " line " << i + 1 << " token " << k;
       } else {
         EXPECT_EQ(tg[k], tw[k]) << tag << " line " << i + 1 << " token " << k;
       }
@@ -132,7 +132,7 @@ void CheckMode(io::ValenceWriteMode mode, const std::string& stem) {
   const double d1 = CompareFiles(snt, g / (stem + ".snt"), stem + ".snt");
   const double d2 = CompareFiles(nint, g / (stem + ".int"), stem + ".int");
   const double d3 = CompareFiles(sp, g / (stem + ".sp"), stem + ".sp");
-  EXPECT_LE(std::max({d1, d2, d3}), 1e-10);
+  EXPECT_LE(std::max({d1, d2, d3}), 1.0e-10);
   std::error_code ec;
   fs::remove_all(dir, ec);
 }

@@ -50,9 +50,9 @@ void CheckDump(const GoldenBasisDump& d) {
   // imsrg++.
   EXPECT_TRUE(IsPartition({&d.holes, &d.particles}, norb));
   for (const int h : d.holes)
-    EXPECT_GE(d.orbits[static_cast<std::size_t>(h)].occupation, 1e-6);
+    EXPECT_GE(d.orbits[static_cast<std::size_t>(h)].occupation, 1.0e-6);
   for (const int p : d.particles)
-    EXPECT_LT(d.orbits[static_cast<std::size_t>(p)].occupation, 1e-6);
+    EXPECT_LT(d.orbits[static_cast<std::size_t>(p)].occupation, 1.0e-6);
 
   // core/valence/qspace partition the orbits consistently with cvq.
   EXPECT_TRUE(IsPartition({&d.core, &d.valence, &d.qspace}, norb));

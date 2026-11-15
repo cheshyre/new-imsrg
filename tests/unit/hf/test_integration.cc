@@ -59,12 +59,12 @@ void RunCase(const op::No2bThreeBody* v3, const std::string& golden_dir,
               << " s, iterations " << r.iterations << ", dE_HF "
               << r.e_hf - g.e_hf << ", max|dspe| " << MaxSpeDiff(r, g) << "\n";
     EXPECT_TRUE(r.converged);
-    EXPECT_NEAR(r.e_hf, g.e_hf, 1e-4);
-    EXPECT_LE(MaxSpeDiff(r, g), 1e-4);
+    EXPECT_NEAR(r.e_hf, g.e_hf, 1.0e-4);
+    EXPECT_LE(MaxSpeDiff(r, g), 1.0e-4);
     if (it1_ehf != nullptr) {
       std::cout << "[" << name << "] IT-1 result.json dE_HF "
                 << r.e_hf - *it1_ehf << "\n";
-      EXPECT_NEAR(r.e_hf, *it1_ehf, 1e-4);
+      EXPECT_NEAR(r.e_hf, *it1_ehf, 1.0e-4);
     }
   }
 }

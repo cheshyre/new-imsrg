@@ -24,10 +24,10 @@ TEST(HfGolden2N, Emax2O16Linear) {
           .count();
   std::cout << "[emax2_2N] solve time " << secs << " s\n";
   RecordProperty("solve_seconds", std::to_string(secs));
-  CompareToGolden(r, g, "emax2_2N", 1e-8, 1e-8, 1e-7);
-  EXPECT_NEAR(r.e_hf, -134.03044657048093, 1e-8);
-  EXPECT_NEAR(r.e1, 280.30704887012467, 1e-8);
-  EXPECT_NEAR(r.e2, -414.33749544060561, 1e-8);
+  CompareToGolden(r, g, "emax2_2N", 1.0e-8, 1.0e-8, 1.0e-7);
+  EXPECT_NEAR(r.e_hf, -134.03044657048093, 1.0e-8);
+  EXPECT_NEAR(r.e1, 280.30704887012467, 1.0e-8);
+  EXPECT_NEAR(r.e2, -414.33749544060561, 1.0e-8);
   EXPECT_EQ(r.e3, 0.0);
   EXPECT_EQ(r.iterations, 20);
 }

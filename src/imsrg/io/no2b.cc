@@ -26,7 +26,7 @@ static_assert(
     std::endian::native == std::endian::little,
     "binary NO2B files are little-endian; a byte swap is not implemented");
 
-constexpr double kStoreCut = 1e-8;
+constexpr double kStoreCut = 1.0e-8;
 constexpr std::size_t kChunkBytes = std::size_t{8} << 20;
 
 struct FileOrbit {

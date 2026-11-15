@@ -49,7 +49,7 @@ std::string TimerRegistry::Report() const {
                                 "total [s]", "count", "mean [ms]");
   for (const auto& e : es) {
     const double mean_ms =
-        e.count > 0 ? 1e3 * e.seconds / static_cast<double>(e.count) : 0.0;
+        e.count > 0 ? 1.0e3 * e.seconds / static_cast<double>(e.count) : 0.0;
     out += fmt::format("{:<{}}  {:>12.6f}  {:>10}  {:>12.6f}\n", e.name, w,
                        e.seconds, e.count, mean_ms);
   }

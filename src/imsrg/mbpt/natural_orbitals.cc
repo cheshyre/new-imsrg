@@ -15,7 +15,7 @@ namespace imsrg::mbpt {
 
 namespace {
 
-constexpr double kEps = 1e-8;
+constexpr double kEps = 1.0e-8;
 
 struct Ctx {
   op::Operator& H;
@@ -213,7 +213,7 @@ NaturalOrbitals ComputeNaturalOrbitals(const linalg::Matrix<double>& rho_hf,
       trace += (j2 + 1) * eig.eigenvalues[static_cast<size_t>(src)];
     }
   }
-  if (std::abs(trace - ms.reference().A()) > 1e-6)
+  if (std::abs(trace - ms.reference().A()) > 1.0e-6)
     throw InvariantError(
         "natural_orbitals: density-matrix trace " + std::to_string(trace) +
         " differs from A = " + std::to_string(ms.reference().A()));

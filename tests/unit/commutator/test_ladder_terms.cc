@@ -109,7 +109,7 @@ TEST(commutator_ladder_terms, fused_equals_separate) {
       const double dev = RelativeDeviation(Zf, Zs);
       std::printf("[fused-vs-sum] %s %s: %.3e\n", sc.label.c_str(), hp.label,
                   dev);
-      EXPECT_LE(dev, 1e-14) << sc.label << " " << hp.label;
+      EXPECT_LE(dev, 1.0e-14) << sc.label << " " << hp.label;
     }
   }
 }

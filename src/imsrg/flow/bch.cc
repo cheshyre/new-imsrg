@@ -73,9 +73,9 @@ op::Operator BchProduct(const op::Operator& X, const op::Operator& Y,
                         const commutator::CommutatorOptions& copts,
                         commutator::Workspace& ws) {
   constexpr std::array<double, 9> bernoulli = {
-      1.0, -0.5, 1. / 6, 0.0, -1. / 30, 0.0, 1. / 42, 0.0, -1. / 30};
-  constexpr std::array<double, 9> factorial = {1.0,  1.0,  2.0,   6.0,   24.,
-                                               120., 720., 5040., 40320.};
+      1.0, -0.5, 1.0 / 6, 0.0, -1.0 / 30, 0.0, 1.0 / 42, 0.0, -1.0 / 30};
+  constexpr std::array<double, 9> factorial = {
+      1.0, 1.0, 2.0, 6.0, 24.0, 120.0, 720.0, 5040.0, 40320.0};
   const double thr = opts.product_threshold;
   const double nx = op::Norm(X);
   const double ny = op::Norm(Y);
@@ -86,7 +86,7 @@ op::Operator BchProduct(const op::Operator& X, const op::Operator& Y,
   double nxy = op::Norm(nested);
   if (nxy * nx > thr) {
     commutator::Commutator(nested, X, next, copts, ws);
-    op::Axpy(1. / 12, next, Z);
+    op::Axpy(1.0 / 12, next, Z);
   }
   std::size_t k = 1;
   while (nxy > thr) {

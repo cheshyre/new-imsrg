@@ -136,7 +136,7 @@ std::size_t ReadNo2bFile(const std::filesystem::path& path, No2bThreeBody& v3,
                           (i4 == i5 && (J + T45) % 2 == 0)) {
                         continue;
                       }
-                      if (std::abs(v) > 1e-8) {
+                      if (std::abs(v) > 1.0e-8) {
                         v3.set_isospin(i1, i2, i3, T12, i4, i5, i6, T45, J, T3,
                                        v);
                       }
@@ -174,7 +174,7 @@ TEST(No2bGolden, V3NormalOrderedO16) {
 
   const PartMaxima rm = MaxAbs(ref);
   const PartMaxima dev = MaxAbsDifference(got, ref);
-  const double tol = 1e-10 * std::max(1.0, rm.max());
+  const double tol = 1.0e-10 * std::max(1.0, rm.max());
   std::printf("[ dev ] V3_NO2B zero %.3e  one %.3e  two %.3e  (tol %.1e)\n",
               dev.zero_body, dev.one_body, dev.two_body, tol);
   EXPECT_LE(dev.zero_body, tol);
@@ -194,10 +194,10 @@ TEST(No2bGolden, V3NormalOrderedO16) {
   std::printf("[ dev ] norms (relative): zero %.3e  one %.3e  two %.3e\n",
               std::abs(got.zero_body() - z_ref) / std::abs(z_ref),
               std::abs(n1 - n1_ref) / n1_ref, std::abs(n2 - n2_ref) / n2_ref);
-  EXPECT_NEAR(got.zero_body(), z_ref, 1e-10 * std::abs(z_ref));
-  EXPECT_NEAR(n1, n1_ref, 1e-10 * n1_ref);
-  EXPECT_NEAR(n2, n2_ref, 1e-10 * n2_ref);
-  EXPECT_NEAR(z_ref, -58.795424620310463, 1e-9);
+  EXPECT_NEAR(got.zero_body(), z_ref, 1.0e-10 * std::abs(z_ref));
+  EXPECT_NEAR(n1, n1_ref, 1.0e-10 * n1_ref);
+  EXPECT_NEAR(n2, n2_ref, 1.0e-10 * n2_ref);
+  EXPECT_NEAR(z_ref, -58.795424620310463, 1.0e-9);
 }
 
 }  // namespace

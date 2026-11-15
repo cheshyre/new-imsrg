@@ -29,8 +29,8 @@ TEST(HfGoldenEmax4, TwoNucleon) {
           .count();
   std::cout << "[emax4_2N] solve time " << secs << " s\n";
   RecordProperty("solve_seconds", std::to_string(secs));
-  CompareToGolden(r, g, "emax4_2N", 1e-8, 1e-8, 1e-7);
-  EXPECT_NEAR(r.e_hf, -147.89357642845789, 1e-8);
+  CompareToGolden(r, g, "emax4_2N", 1.0e-8, 1.0e-8, 1.0e-7);
+  EXPECT_NEAR(r.e_hf, -147.89357642845789, 1.0e-8);
   EXPECT_EQ(r.iterations, 30);
 }
 
@@ -51,8 +51,8 @@ TEST(HfGoldenEmax4, TwoPlusThreeNucleon) {
           .count();
   std::cout << "[emax4_2N3N] solve time " << secs << " s\n";
   RecordProperty("solve_seconds", std::to_string(secs));
-  CompareToGolden(r, g, "emax4_2N3N", 1e-8, 1e-8, 1e-7);
-  EXPECT_NEAR(r.e_hf, -313.16848141064463, 1e-8);
+  CompareToGolden(r, g, "emax4_2N3N", 1.0e-8, 1.0e-8, 1.0e-7);
+  EXPECT_NEAR(r.e_hf, -313.16848141064463, 1.0e-8);
   EXPECT_EQ(r.iterations, 25);
 }
 

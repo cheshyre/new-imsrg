@@ -69,8 +69,8 @@ TEST(Half, RoundingAndOverflow) {
   EXPECT_EQ(FloatToHalf(65504.0f), 0x7BFF);
   EXPECT_EQ(FloatToHalf(65519.0f), 0x7BFF);
   EXPECT_EQ(FloatToHalf(65520.0f), 0x7C00);
-  EXPECT_EQ(FloatToHalf(1e10f), 0x7C00);
-  EXPECT_EQ(FloatToHalf(-1e10f), 0xFC00);
+  EXPECT_EQ(FloatToHalf(1.0e10f), 0x7C00);
+  EXPECT_EQ(FloatToHalf(-1.0e10f), 0xFC00);
   EXPECT_EQ(FloatToHalf(std::numeric_limits<float>::infinity()), 0x7C00);
   // Ties to even in the normal range: 1 + 2^-11 is halfway between 0x3C00 and
   // 0x3C01.

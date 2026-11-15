@@ -410,8 +410,8 @@ struct StepConfig {
   double ds_0 = 0.5;
   double domega = 0.1;
   double omega_norm_max = 0.25;
-  double eta_criterion = 1e-6;
-  double ode_tolerance = 1e-6;
+  double eta_criterion = 1.0e-6;
+  double ode_tolerance = 1.0e-6;
   friend bool operator==(const StepConfig&, const StepConfig&) = default;
 };
 

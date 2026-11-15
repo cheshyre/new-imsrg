@@ -169,8 +169,8 @@ TEST(commutator_dispatch, full_commutator_matches_reference_and_properties) {
       const double danti = imsrg::testing::RelativeDeviation(Zswap, Z);
       const double dherm = HermiticityViolation(Z);
       EXPECT_LE(dref, commutator_test::kTol) << sc.label << " " << hp.label;
-      EXPECT_LE(danti, 1e-12) << sc.label << " " << hp.label;
-      EXPECT_LE(dherm, 1e-12) << sc.label << " " << hp.label;
+      EXPECT_LE(danti, 1.0e-12) << sc.label << " " << hp.label;
+      EXPECT_LE(dherm, 1.0e-12) << sc.label << " " << hp.label;
       worst_ref = std::max(worst_ref, dref);
       worst_anti = std::max(worst_anti, danti);
       worst_herm = std::max(worst_herm, dherm);

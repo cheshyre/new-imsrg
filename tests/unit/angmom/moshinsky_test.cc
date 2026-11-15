@@ -42,7 +42,7 @@ using imsrg::TwoJ;
 using imsrg::TwoM;
 
 bool Within(double got, double exact) {
-  return std::abs(got - exact) <= std::max(1e-12 * std::abs(exact), 1e-14);
+  return std::abs(got - exact) <= std::max(1.0e-12 * std::abs(exact), 1.0e-14);
 }
 
 struct Dev {
@@ -219,7 +219,7 @@ TEST(AngmomMoshinsky, OrthogonalityExhaustiveUpToE12) {
   std::cout << "[moshinsky orthogonality] E<=12 max |M M^T - 1| = " << worst
             << " (unit diagonals checked: " << ones << ")\n";
   EXPECT_GT(ones, 0);
-  EXPECT_LT(worst, 1e-12);
+  EXPECT_LT(worst, 1.0e-12);
 }
 
 TEST(AngmomMoshinsky, TalmiSumRules) {
@@ -229,7 +229,7 @@ TEST(AngmomMoshinsky, TalmiSumRules) {
   // against 1e-13 * sum_p |B I_p| (+ 1e-14), not an absolute tolerance.
   // (talmi_b itself is compared with exact values to 1e-12 relative above.)
   const auto ok = [](double got, double expect, double mag) {
-    return std::abs(got - expect) <= 1e-13 * mag + 1e-14;
+    return std::abs(got - expect) <= 1.0e-13 * mag + 1.0e-14;
   };
   // Per-identity worst deviation measured in units of the bound (<= 1 passes).
   double worst_sum = 0.0, worst_diag = 0.0, worst_off = 0.0,
@@ -237,7 +237,7 @@ TEST(AngmomMoshinsky, TalmiSumRules) {
   double worst_zero = 0.0;
   long bad = 0;
   const auto ratio = [](double got, double expect, double mag) {
-    return std::abs(got - expect) / (1e-13 * mag + 1e-14);
+    return std::abs(got - expect) / (1.0e-13 * mag + 1.0e-14);
   };
   for (int l = 0; l <= 12; ++l) {
     for (int n = 0; n <= 6; ++n) {
@@ -284,8 +284,8 @@ TEST(AngmomMoshinsky, TalmiSumRules) {
   EXPECT_EQ(bad, 0);
 
   for (int p = 0; p <= 30; ++p) {
-    EXPECT_NEAR(TalmiIntegral(p, 0.0), 1.0, 1e-13);
-    EXPECT_NEAR(TalmiIntegral(p, 2.0), p + 1.5, 1e-12 * (p + 2));
+    EXPECT_NEAR(TalmiIntegral(p, 0.0), 1.0, 1.0e-13);
+    EXPECT_NEAR(TalmiIntegral(p, 2.0), p + 1.5, 1.0e-12 * (p + 2));
   }
 }
 
@@ -294,14 +294,14 @@ TEST(AngmomDoubleDouble, Arithmetic) {
   // (1/3)*3 == 1 to dd precision.
   const DD third = Dd(1.0) / Dd(3.0);
   const DD one = third * Dd(3.0);
-  EXPECT_LT(std::abs((one - Dd(1.0)).hi), 1e-31);
+  EXPECT_LT(std::abs((one - Dd(1.0)).hi), 1.0e-31);
   // sqrt(2)^2 - 2.
   const DD r2 = DdSqrt(Dd(2.0));
-  EXPECT_LT(std::abs((r2 * r2 - Dd(2.0)).hi), 1e-31);
+  EXPECT_LT(std::abs((r2 * r2 - Dd(2.0)).hi), 1.0e-31);
   // 2^(1/4) to 1e-31: (2^(1/4))^4 == 2.
   const DD r4 = DdSqrt(r2);
   const DD r4p = r4 * r4;
-  EXPECT_LT(std::abs((r4p * r4p - Dd(2.0)).hi), 1e-31);
+  EXPECT_LT(std::abs((r4p * r4p - Dd(2.0)).hi), 1.0e-31);
   // 30! exactly against an integer product (30! < 2^108, use dd product of
   // exact small factors and compare with a __int128 product).
   DD f = Dd(1.0);
@@ -330,7 +330,7 @@ TEST(AngmomDoubleDouble, ClebschGordanZeroMatchesDouble) {
         // The double-precision reference is the limiting side here: its error
         // reaches ~5e-12 at l ~ 30 (exact values below, from Python big
         // rationals), hence 1e-10.
-        ASSERT_NEAR(got, ref, 1e-10) << l1 << " " << l2 << " " << L;
+        ASSERT_NEAR(got, ref, 1.0e-10) << l1 << " " << l2 << " " << L;
       }
     }
   }
@@ -338,11 +338,11 @@ TEST(AngmomDoubleDouble, ClebschGordanZeroMatchesDouble) {
   // Exact spot checks (the dd values are accurate to ~1e-17 where the double
   // ones are not).
   EXPECT_NEAR(imsrg::angmom::detail::DdCg0(11, 29, 32), 0.24719909357682662719,
-              1e-16);
+              1.0e-16);
   EXPECT_NEAR(imsrg::angmom::detail::DdCg0(27, 32, 37), -0.16559883667476296171,
-              1e-16);
+              1.0e-16);
   EXPECT_NEAR(imsrg::angmom::detail::DdCg0(16, 29, 31), -0.20414884248844674639,
-              1e-16);
+              1.0e-16);
 }
 
 TEST(AngmomDoubleDouble, NineJMatchesDouble) {
@@ -369,7 +369,7 @@ TEST(AngmomDoubleDouble, NineJMatchesDouble) {
     }
     ++tested;
     worst = std::max(worst, std::abs(got - ref));
-    ASSERT_NEAR(got, ref, 1e-14) << a << b << c << d << e << f << g << h << i;
+    ASSERT_NEAR(got, ref, 1.0e-14) << a << b << c << d << e << f << g << h << i;
   }
   EXPECT_GT(tested, 500);
   std::cout << "[dd] 9j max abs deviation " << worst << " over " << tested

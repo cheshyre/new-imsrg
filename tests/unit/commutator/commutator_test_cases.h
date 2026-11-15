@@ -20,7 +20,7 @@
 namespace imsrg::commutator_test {
 
 /// Tolerance of design/30 section 2 on `testing::RelativeDeviation`.
-inline constexpr double kTol = 1e-10;
+inline constexpr double kTol = 1.0e-10;
 
 /// One golden pair: directory below tests/golden/commutator and the names of
 /// the X and Y dumps.

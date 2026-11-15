@@ -79,7 +79,7 @@ TEST(Math, LogFactorial) {
   EXPECT_EQ(m::LogFactorial(0), 0.0);
   for (int n = 1; n <= 170; ++n) {
     const double ref = std::log(m::Factorial(n));
-    EXPECT_NEAR(m::LogFactorial(n), ref, 1e-14 * std::abs(ref)) << n;
+    EXPECT_NEAR(m::LogFactorial(n), ref, 1.0e-14 * std::abs(ref)) << n;
   }
 }
 

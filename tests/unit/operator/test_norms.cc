@@ -104,7 +104,7 @@ double BruteTwoBody(const Operator& o) {
 }
 
 void ExpectRel(double a, double b) {
-  EXPECT_NEAR(a, b, 1e-12 * std::max(1.0, std::abs(b)));
+  EXPECT_NEAR(a, b, 1.0e-12 * std::max(1.0, std::abs(b)));
 }
 
 TEST(OperatorNorms, ZeroOperatorHasZeroNorms) {

@@ -221,12 +221,12 @@ TEST_F(Me2jSynthetic, IdenticalOrbitJ0HasNormalizationAndPauliGating) {
   const OrbitIndex sn = Orbit(*ms_, 0, 0, 1, +1);
   // pp, nn: file value / sqrt2 per identical pair (up to the float widening of
   // exact values).
-  EXPECT_NEAR(tb.get_normalized(sp, sp, sp, sp, TwoJ{0}), 1.0 / 2.0, 1e-14);
-  EXPECT_NEAR(tb.get_normalized(sn, sn, sn, sn, TwoJ{0}), 0.5 / 2.0, 1e-14);
+  EXPECT_NEAR(tb.get_normalized(sp, sp, sp, sp, TwoJ{0}), 1.0 / 2.0, 1.0e-14);
+  EXPECT_NEAR(tb.get_normalized(sn, sn, sn, sn, TwoJ{0}), 0.5 / 2.0, 1.0e-14);
   // pn: (V_T1 + V_T0)/2 with T0 gated off for even J of identical orbits: 0.75
   // / 2 in the unnormalized-pair convention, times sqrt2 * sqrt2 * 1/2 for the
   // normalized pn state.
-  EXPECT_NEAR(tb.get_normalized(sp, sn, sp, sn, TwoJ{0}), 0.75 / 2.0, 1e-14);
+  EXPECT_NEAR(tb.get_normalized(sp, sn, sp, sn, TwoJ{0}), 0.75 / 2.0, 1.0e-14);
 }
 
 TEST_F(Me2jSynthetic, IdenticalOrbitJ1UsesOnlyIsospinZero) {
@@ -236,7 +236,7 @@ TEST_F(Me2jSynthetic, IdenticalOrbitJ1UsesOnlyIsospinZero) {
   const OrbitIndex sn = Orbit(*ms_, 0, 0, 1, +1);
   // T0 = 1.25 -> 1.25 / 2; the T1 value 1.75 is Pauli-forbidden for odd J of
   // identical orbits.
-  EXPECT_NEAR(tb.get_normalized(sp, sn, sp, sn, TwoJ{2}), 1.25 / 2.0, 1e-14);
+  EXPECT_NEAR(tb.get_normalized(sp, sn, sp, sn, TwoJ{2}), 1.25 / 2.0, 1.0e-14);
   EXPECT_EQ(tb.get_normalized(sp, sp, sp, sp, TwoJ{2}),
             0.0);  // no such two-proton state
 }
@@ -248,14 +248,16 @@ TEST_F(Me2jSynthetic, DistinctOrbitsGivePnpnAndPnnpFromT1AndT0) {
   const OrbitIndex pn1 = Orbit(*ms_, 0, 1, 1, +1);
   const OrbitIndex sp = Orbit(*ms_, 0, 0, 1, -1);
   const OrbitIndex sn = Orbit(*ms_, 0, 0, 1, +1);
-  EXPECT_NEAR(tb.get_normalized(pp1, sp, pp1, sp, TwoJ{0}), 8.0, 1e-13);  // pp
-  EXPECT_NEAR(tb.get_normalized(pn1, sn, pn1, sn, TwoJ{0}), 6.0, 1e-13);  // nn
+  EXPECT_NEAR(tb.get_normalized(pp1, sp, pp1, sp, TwoJ{0}), 8.0,
+              1.0e-13);  // pp
+  EXPECT_NEAR(tb.get_normalized(pn1, sn, pn1, sn, TwoJ{0}), 6.0,
+              1.0e-13);  // nn
   // V_pnpn = (T1 + T0) / 2 = 3, V_pnnp = (T1 - T0) / 2 = 1.
-  EXPECT_NEAR(tb.get_normalized(pp1, sn, pp1, sn, TwoJ{0}), 3.0, 1e-13);
-  EXPECT_NEAR(tb.get_normalized(pp1, sn, pn1, sp, TwoJ{0}), 1.0, 1e-13);
-  EXPECT_NEAR(tb.get_normalized(pn1, sp, pn1, sp, TwoJ{0}), 3.0, 1e-13);
+  EXPECT_NEAR(tb.get_normalized(pp1, sn, pp1, sn, TwoJ{0}), 3.0, 1.0e-13);
+  EXPECT_NEAR(tb.get_normalized(pp1, sn, pn1, sp, TwoJ{0}), 1.0, 1.0e-13);
+  EXPECT_NEAR(tb.get_normalized(pn1, sp, pn1, sp, TwoJ{0}), 3.0, 1.0e-13);
   // Hermitian partner.
-  EXPECT_NEAR(tb.get_normalized(pn1, sp, pp1, sn, TwoJ{0}), 1.0, 1e-13);
+  EXPECT_NEAR(tb.get_normalized(pn1, sp, pp1, sn, TwoJ{0}), 1.0, 1.0e-13);
 }
 
 TEST_F(Me2jSynthetic, GzipAndPlainGiveTheSameOperator) {
@@ -278,9 +280,9 @@ TEST_F(Me2jSynthetic, SmallerModelSpaceReadsOnlyThePrefix) {
   const OrbitIndex sp = Orbit(*ms0, 0, 0, 1, -1);
   const OrbitIndex sn = Orbit(*ms0, 0, 0, 1, +1);
   EXPECT_NEAR(H.two_body().get_normalized(sp, sn, sp, sn, TwoJ{0}), 0.375,
-              1e-14);
+              1.0e-14);
   EXPECT_NEAR(H.two_body().get_normalized(sp, sn, sp, sn, TwoJ{2}), 0.625,
-              1e-14);
+              1.0e-14);
   // A model space larger than the file: records beyond the file's e1max do not
   // exist.
   const auto ms2 = MakeModelSpace(2);

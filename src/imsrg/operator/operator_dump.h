@@ -49,7 +49,7 @@ struct OperatorDumpReadOptions {
   /// do not depend on it).
   bool check_occupations = true;
   /// Tolerance of the occupation check.
-  double occupation_tolerance = 1e-12;
+  double occupation_tolerance = 1.0e-12;
 };
 
 /// Options of the writers.

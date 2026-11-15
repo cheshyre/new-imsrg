@@ -21,9 +21,9 @@ namespace imsrg::flow {
 struct BchOptions {
   /// `BchTransform`: X with ||X|| <= this is returned unchanged; also scales
   /// the termination epsilon (imsrg++ `bch_transform_threshold`).
-  double transform_threshold = 1e-9;
+  double transform_threshold = 1.0e-9;
   /// `BchProduct` series threshold (imsrg++ `bch_product_threshold`).
-  double product_threshold = 1e-4;
+  double product_threshold = 1.0e-4;
   /// Maximum number of nested commutators in `BchTransform`.
   int max_iterations = 40;
   /// A warning is logged if `BchTransform` reaches this many nested

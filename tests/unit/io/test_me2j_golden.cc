@@ -41,7 +41,7 @@ void CompareWithDump(const fs::path& dump, const std::string& tag) {
                                   std::to_string(rep.seconds));
   ::testing::Test::RecordProperty(tag + "_values_read",
                                   std::to_string(rep.values_read));
-  EXPECT_LT(dev, 1e-10);
+  EXPECT_LT(dev, 1.0e-10);
   EXPECT_GT(scale, 1.0);  // the comparison is not vacuous
 }
 

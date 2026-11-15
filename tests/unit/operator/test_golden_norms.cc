@@ -106,11 +106,11 @@ TEST(OperatorGoldenNorms, EveryGoldenDumpMatchesImsrgDevelNorms) {
     const double d2 = RelDev(op::TwoBodyNorm(op), c.golden.two_body);
     const double d3 = RelDev(op::ThreeBodyNorm(op), c.golden.three_body);
     const double dn = RelDev(op::Norm(op), c.golden.norm);
-    EXPECT_LE(d0, 1e-10);
-    EXPECT_LE(d1, 1e-10);
-    EXPECT_LE(d2, 1e-10);
-    EXPECT_LE(d3, 1e-10);
-    EXPECT_LE(dn, 1e-10);
+    EXPECT_LE(d0, 1.0e-10);
+    EXPECT_LE(d1, 1.0e-10);
+    EXPECT_LE(d2, 1.0e-10);
+    EXPECT_LE(d3, 1.0e-10);
+    EXPECT_LE(dn, 1.0e-10);
     const double d = std::max({d0, d1, d2, d3, dn});
     if (d >= worst) {
       worst = d;

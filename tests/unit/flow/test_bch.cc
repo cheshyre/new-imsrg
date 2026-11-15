@@ -162,7 +162,7 @@ TEST(flow_bch, one_body_exactness) {
       // (2||Om||), so thr = 1e-12 makes the 1e-10 criterion a statement about
       // the algebra, not the cut.
       BchOptions bo;
-      bo.transform_threshold = 1e-12;
+      bo.transform_threshold = 1.0e-12;
       BchReport rep;
       Operator Z = flow::BchTransform(flow::WithParticleRank(X, rank),
                                       flow::WithParticleRank(Om, rank), bo,
@@ -178,14 +178,14 @@ TEST(flow_bch, one_body_exactness) {
               (ms->basis().orbit(OrbitIndex{a}).j2.twice + 1) *
               (Zref(a, a) - X1(a, a));
       const double dev0 = std::abs(Z.zero_body() - e0);
-      const double eps0 = op::Norm(X) * std::exp(-0.6) * 1e-12 / 0.6;
+      const double eps0 = op::Norm(X) * std::exp(-0.6) * 1.0e-12 / 0.6;
       std::printf(
           "[bch one-body] rank %d seed %llu: n_comm %d, dev1 %.2e dev0 %.2e "
           "(eps0 %.2e)\n",
           rank, static_cast<unsigned long long>(seed), rep.nested_commutators,
           dev1, dev0, eps0);
-      EXPECT_LT(dev1, 1e-10);
-      EXPECT_LT(dev0, 1e-10 * std::max(1.0, std::abs(e0)));
+      EXPECT_LT(dev1, 1.0e-10);
+      EXPECT_LT(dev0, 1.0e-10 * std::max(1.0, std::abs(e0)));
       EXPECT_LT(dev1, eps0);
       EXPECT_EQ(Z.spec().particle_rank,
                 2);  // the transform always returns rank >= 2
@@ -214,8 +214,8 @@ TEST(flow_bch, invertibility) {
   // in the limit; what remains is the series truncation: each pass stops once
   // ||nested_i|| < eps0 (i+1)!, with eps0 = ||X|| e^{-2||Om||} thr / (2||Om||),
   // so each leaves an error of order eps0.
-  const double eps0_h = op::Norm(H) * std::exp(-0.2) * 1e-9 / 0.2;
-  const double eps0_z = op::Norm(Z) * std::exp(-0.2) * 1e-9 / 0.2;
+  const double eps0_h = op::Norm(H) * std::exp(-0.2) * 1.0e-9 / 0.2;
+  const double eps0_z = op::Norm(Z) * std::exp(-0.2) * 1.0e-9 / 0.2;
   const double bound = 2 * (eps0_h + eps0_z);
   Operator d = Hb;
   op::Axpy(-1.0, H, d);
@@ -227,7 +227,7 @@ TEST(flow_bch, invertibility) {
       op::Norm(H), r1.nested_commutators, r2.nested_commutators, dnorm, bound,
       dmax);
   EXPECT_LT(dnorm, bound);
-  EXPECT_LT(dmax, 1e-8);
+  EXPECT_LT(dmax, 1.0e-8);
   EXPECT_TRUE(r1.converged && r2.converged);
 }
 
@@ -238,7 +238,7 @@ TEST(flow_bch, product_one_body) {
   const auto ms = MakeSpace(4, "O16");
   Workspace ws(ms);
   for (std::uint64_t seed : {31u, 32u, 33u}) {
-    Operator X = RandOp(ms, Hermiticity::kAntiHermitian, seed, 1, 1e-2);
+    Operator X = RandOp(ms, Hermiticity::kAntiHermitian, seed, 1, 1.0e-2);
     Operator Y = RandOp(ms, Hermiticity::kAntiHermitian, seed + 50, 1, 0.2);
     Operator Z = flow::BchProduct(X, Y, BchOptions{}, CommutatorOptions{}, ws);
     const Dense Xd = OneBodyDense(X), Yd = OneBodyDense(Y),
@@ -254,13 +254,13 @@ TEST(flow_bch, product_one_body) {
     // threshold and the fixed order (observed ~1e-7, dominated by the latter,
     // e.g. O(X^3 Y)); both are far below the product_threshold of 1e-4, which
     // is the asserted bound.
-    EXPECT_LT(dev, 2 * omitted + 1e-4);
-    EXPECT_LT(dev, 1e-4);
+    EXPECT_LT(dev, 2 * omitted + 1.0e-4);
+    EXPECT_LT(dev, 1.0e-4);
     EXPECT_EQ(Z.spec().particle_rank, 1);
     EXPECT_EQ(Z.hermiticity(), Hermiticity::kAntiHermitian);
   }
   // Neutral elements.
-  const Operator X = RandOp(ms, Hermiticity::kAntiHermitian, 41, 2, 1e-2);
+  const Operator X = RandOp(ms, Hermiticity::kAntiHermitian, 41, 2, 1.0e-2);
   const Operator zero(ms, OperatorSpec::Scalar(2, Hermiticity::kAntiHermitian));
   const Operator Zx =
       flow::BchProduct(X, zero, BchOptions{}, CommutatorOptions{}, ws);
@@ -277,7 +277,7 @@ TEST(flow_bch, thresholds_and_report) {
   // ||X|| <= transform_threshold: returned unchanged (promoted to rank 2), no
   // commutator.
   {
-    const Operator X = RandOp(ms, Hermiticity::kHermitian, 51, 1, 1e-10);
+    const Operator X = RandOp(ms, Hermiticity::kHermitian, 51, 1, 1.0e-10);
     const Operator Om = RandOp(ms, Hermiticity::kAntiHermitian, 52, 2, 0.5);
     BchReport rep;
     const Operator Z =
@@ -335,7 +335,7 @@ TEST(flow_bch, hermiticity) {
   EXPECT_EQ(Z.hermiticity(), Hermiticity::kHermitian);
   const Dense Z1 = OneBodyDense(Z);
   const double hz = MaxAbsDiff(Z1, Transpose(Z1));
-  EXPECT_LT(hz, 1e-12);
+  EXPECT_LT(hz, 1.0e-12);
   EXPECT_GT(MaxAbs(Z1), 0.0);
 
   const Operator A = RandOp(ms, Hermiticity::kAntiHermitian, 63, 2, 0.05);
@@ -344,7 +344,7 @@ TEST(flow_bch, hermiticity) {
   const Dense P1 = OneBodyDense(P);
   const double hp = MaxAbsDiff(P1, Add(Dense(P1.n), Transpose(P1), -1.0));
   std::printf("[bch hermiticity] transform %.2e, product %.2e\n", hz, hp);
-  EXPECT_LT(hp, 1e-12);
+  EXPECT_LT(hp, 1.0e-12);
   EXPECT_EQ(P.zero_body(), 0.0);
 }
 

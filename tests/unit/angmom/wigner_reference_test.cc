@@ -96,7 +96,7 @@ TEST(WignerReference, AgainstSympyExact) {
     const double delta = std::fabs(got - exact);
     s.max_abs = std::max(s.max_abs, delta);
     if (exact != 0.0) s.max_rel = std::max(s.max_rel, delta / std::fabs(exact));
-    if (!(delta <= std::max(1e-12 * std::fabs(exact), 1e-14))) {
+    if (!(delta <= std::max(1.0e-12 * std::fabs(exact), 1.0e-14))) {
       ++s.failures;
       if (failure_lines.size() < 20) {
         std::ostringstream os;

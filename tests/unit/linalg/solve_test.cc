@@ -44,7 +44,7 @@ TEST(LinalgSolve, RandomSystems) {
       for (int j = 0; j < nrhs; ++j)
         for (int i = 0; i < n; ++i)
           res = std::max(res, std::abs(R(i, j) - B(i, j)));
-      EXPECT_LE(res, 1e-12 * Frob(A) * Frob(X)) << "n=" << n;
+      EXPECT_LE(res, 1.0e-12 * Frob(A) * Frob(X)) << "n=" << n;
     }
   }
 }

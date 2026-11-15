@@ -62,7 +62,7 @@ double PairEngine::Element(PairKind kind, const basis::Orbit& oa,
             const int nab = (fab - 2 * Nab - Lam - lam) / 2;
             const double mab =
                 mosh({Nab, Lam}, {nab, lam}, {oa.n, oa.l}, {ob.n, ob.l}, Lab);
-            if (std::abs(mab) < 1e-8) {
+            if (std::abs(mab) < 1.0e-8) {
               continue;
             }
             for (int Ncd = std::max(0, Nab - 1); Ncd <= Nab + 1; ++Ncd) {
@@ -75,7 +75,7 @@ double PairEngine::Element(PairKind kind, const basis::Orbit& oa,
               }
               const double mcd =
                   mosh({Ncd, Lam}, {ncd, lam}, {oc.n, oc.l}, {od.n, od.l}, Lab);
-              if (std::abs(mcd) < 1e-8) {
+              if (std::abs(mcd) < 1.0e-8) {
                 continue;
               }
               double cm = 0.0;

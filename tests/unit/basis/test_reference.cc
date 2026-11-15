@@ -181,7 +181,7 @@ TEST(Reference, FromOrbitOccupations) {
   const Orbit p0s1 = ParseOrbitLabel("p0s1");
   const Orbit n0p3 = ParseOrbitLabel("n0p3");
   const std::vector<OrbitOccupation> entries = {
-      {p0s1, 0.5}, {n0p3, 1e-9}, {ParseOrbitLabel("n0s1"), 1.0}, {p0s1, 1.0}};
+      {p0s1, 0.5}, {n0p3, 1.0e-9}, {ParseOrbitLabel("n0s1"), 1.0}, {p0s1, 1.0}};
   const Reference ref = Reference::FromOrbitOccupations(basis, entries);
   EXPECT_EQ(ref.name(), "custom");
   EXPECT_EQ(Ints(ref.holes()),

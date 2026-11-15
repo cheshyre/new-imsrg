@@ -35,7 +35,7 @@ struct Term {
   TermFn fn;
 };
 
-constexpr double kTol = 1e-10;
+constexpr double kTol = 1.0e-10;
 
 const Term kTerms[] = {
     {"comm110ss", &cr::Comm110ss},

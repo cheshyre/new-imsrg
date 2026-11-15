@@ -62,7 +62,7 @@ flow::SolverOptions ShortFlow(double smax) {
 
 // imsrg++ prints 9 decimals; the codes agree far better than the 1e-8 used
 // here.
-constexpr double kTol = 1e-8;
+constexpr double kTol = 1.0e-8;
 
 TEST(MagnusSolver, ShortFlowMatchesImsrgFlowFile) {
   const auto golden =
@@ -82,8 +82,8 @@ TEST(MagnusSolver, ShortFlowMatchesImsrgFlowFile) {
     ASSERT_LT(static_cast<std::size_t>(st.istep), golden.size());
     const GoldenLine& g = golden[static_cast<std::size_t>(st.istep)];
     ASSERT_EQ(g.istep, st.istep);
-    if (g.s > smax - 1e-5) break;  // the last step is cut at smax
-    EXPECT_NEAR(st.s, g.s, 6e-6) << "step " << st.istep;
+    if (g.s > smax - 1.0e-5) break;  // the last step is cut at smax
+    EXPECT_NEAR(st.s, g.s, 6.0e-6) << "step " << st.istep;
     const double de0 = std::abs(st.e0 - g.e0);
     const double dnorm = std::max(
         {std::abs(st.norm_h - g.norm_h), std::abs(st.norm_omega_1b - g.om1),
@@ -110,7 +110,7 @@ TEST(MagnusSolver, ReplayOfOmegaStackReproducesH) {
   ASSERT_GT(solver.omegas().size(), 2u);
   const op::Operator replayed = solver.Transform(h0);
   const op::PartMaxima d = op::MaxAbsDifference(replayed, solver.hamiltonian());
-  EXPECT_LT(d.max(), 1e-12)
+  EXPECT_LT(d.max(), 1.0e-12)
       << d.zero_body << " " << d.one_body << " " << d.two_body;
 }
 
@@ -119,7 +119,7 @@ TEST(MagnusSolver, SecondStageOpensNewOmegaAndContinuesS) {
                             flow::GeneratorOptions{});
   const flow::SolveResult r1 = solver.Solve();
   const std::size_t n1 = solver.omegas().size();
-  ASSERT_GT(op::Norm(solver.omegas().back()), 1e-6);
+  ASSERT_GT(op::Norm(solver.omegas().back()), 1.0e-6);
   solver.set_generator(flow::GeneratorOptions{});
   EXPECT_EQ(solver.omegas().size(), n1 + 1);
   EXPECT_EQ(op::Norm(solver.omegas().back()), 0.0);

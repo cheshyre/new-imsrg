@@ -32,7 +32,7 @@ struct SolverOptions {
   double domega = 0.1;  ///< Bound of ||eta ds|| (and of ||eta ds|| ||Omega||).
   double omega_norm_max = 0.25;  ///< Split Omega when ||Omega|| exceeds this.
   double eta_criterion =
-      1e-6;  ///< Converged when ||eta|| < this (compared as a float, P7).
+      1.0e-6;  ///< Converged when ||eta|| < this (compared as a float, P7).
   bool magnus_adaptive =
       true;  ///< Recompute ds every step (imsrg++ `magnus_adaptive`).
 };

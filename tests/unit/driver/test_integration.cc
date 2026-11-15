@@ -88,7 +88,7 @@ TEST(DriverIntegration, IT2_O16_Magnus_Atan) {
               e0 - golden_e0);
   std::printf("[IT-2] steps = %ld  golden 256  (stages %zu)\n",
               TotalSteps(r->results), r->results["imsrg"]["stages"].size());
-  EXPECT_NEAR(e0, golden_e0, 1e-3);
+  EXPECT_NEAR(e0, golden_e0, 1.0e-3);
 
   // First ten trajectory steps against the golden trajectory.
   const auto traj_path = GoldenFile("IT-2/trajectory.csv");
@@ -113,10 +113,10 @@ TEST(DriverIntegration, IT2_O16_Magnus_Atan) {
       "[IT-2] first-10 trajectory max dev: s %.3e  E0 %.3e  norm_eta %.3e  "
       "norm_omega %.3e\n",
       dev_s, dev_e, dev_eta, dev_om);
-  EXPECT_LE(dev_s, 1e-6);
-  EXPECT_LE(dev_e, 1e-6);
-  EXPECT_LE(dev_eta, 1e-6);
-  EXPECT_LE(dev_om, 1e-6);
+  EXPECT_LE(dev_s, 1.0e-6);
+  EXPECT_LE(dev_e, 1.0e-6);
+  EXPECT_LE(dev_eta, 1.0e-6);
+  EXPECT_LE(dev_om, 1.0e-6);
 }
 
 // -----------------------------------------------------------------------------
@@ -138,8 +138,8 @@ TEST(DriverIntegration, IT6_Rp2_Operator) {
               golden.zero_body, imsrg - golden.zero_body);
   std::printf("[IT-6] Rp2 HF    = %.8f  golden 4.294907  dev %.3e\n", ref,
               ref - 4.294907);
-  EXPECT_NEAR(imsrg, golden.zero_body, 1e-4);
-  EXPECT_NEAR(ref, 4.294907, 1e-5);
+  EXPECT_NEAR(imsrg, golden.zero_body, 1.0e-4);
+  EXPECT_NEAR(ref, 4.294907, 1.0e-5);
 }
 
 // -----------------------------------------------------------------------------
@@ -231,8 +231,8 @@ TEST(DriverIntegration, IT4_ThreeBody_NO2B_Smax10) {
   std::printf("[IT-4] E0(s=10) = %.9f  golden -343.761780688  dev %.3e\n", e0,
               e0 + 343.761780688);
   std::printf("[IT-4] steps = %ld  golden 29\n", TotalSteps(r.results));
-  EXPECT_NEAR(e_hf, -313.1684814, 1e-4);
-  EXPECT_NEAR(e0, -343.761780688, 1e-3);
+  EXPECT_NEAR(e_hf, -313.1684814, 1.0e-4);
+  EXPECT_NEAR(e0, -343.761780688, 1.0e-3);
 }
 
 // -----------------------------------------------------------------------------
@@ -266,7 +266,7 @@ void RunValenceCase(const char* tag, const char* nucleus,
 
   const SntData got = ReadSnt(snt);
   const SntData want = ReadSnt(golden_path);
-  const SntComparison c = CompareSnt(got, want, 1e-3);
+  const SntComparison c = CompareSnt(got, want, 1.0e-3);
   std::printf("[%s] zero body %.6f vs %.6f (dev %.3e)\n", tag, got.zero_body,
               want.zero_body, c.zero_dev);
   std::printf("[%s] one-body elements %zu vs %zu, max dev %.3e\n", tag, c.n1b_a,
@@ -280,23 +280,23 @@ void RunValenceCase(const char* tag, const char* nucleus,
   std::printf("[%s] orbits equal: %s; worst 2B: %s\n", tag,
               c.orbits_equal ? "yes" : "NO", c.worst.c_str());
 
-  EXPECT_LE(c.zero_dev, 1e-3);
-  EXPECT_LE(c.max_dev_1b, 1e-3);
-  EXPECT_LE(c.max_dev_2b, 1e-3);
+  EXPECT_LE(c.zero_dev, 1.0e-3);
+  EXPECT_LE(c.max_dev_1b, 1.0e-3);
+  EXPECT_LE(c.max_dev_2b, 1.0e-3);
 }
 
 TEST(DriverIntegration, SntReaderSelfComparison) {
   const auto path = GoldenFile("IT-3/int.snt");
   IMSRG_IT_REQUIRE_FILE(path);
   const SntData d = ReadSnt(path);
-  const SntComparison c = CompareSnt(d, d, 1e-3);
+  const SntComparison c = CompareSnt(d, d, 1.0e-3);
   std::printf(
       "[snt] IT-3 golden: zero %.6f, %zu 1B, %zu 2B (%zu lines, %zu "
       "duplicates)\n",
       d.zero_body, d.one_body.size(), d.two_body.size(), d.two_body_lines,
       d.duplicate_lines);
   EXPECT_EQ(c.max_dev(), 0.0);
-  EXPECT_NEAR(d.zero_body, -164.648772, 1e-6);
+  EXPECT_NEAR(d.zero_body, -164.648772, 1.0e-6);
   EXPECT_FALSE(d.two_body.empty());
 }
 

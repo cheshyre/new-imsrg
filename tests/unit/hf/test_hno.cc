@@ -40,7 +40,7 @@ void CheckHno(const fs::path& ham_dir, const fs::path& hno_dump,
 TEST(HfHno, Emax2TwoNucleon) {
   CheckHno(fs::path(IMSRG_GOLDEN_DIR) / "hamiltonian/emax2_O16",
            fs::path(IMSRG_GOLDEN_DIR) / "hf/emax2_O16_2N/HNO.dump", nullptr,
-           "emax2_2N", 1e-8);
+           "emax2_2N", 1.0e-8);
 }
 
 TEST(HfHno, ToHfBasis) {
@@ -51,7 +51,7 @@ TEST(HfHno, ToHfBasis) {
   const double dev = CompareDump(
       t, fs::path(IMSRG_GOLDEN_DIR) / "operator/emax2/H_HFbasis.dump",
       "H_HFbasis");
-  EXPECT_LE(dev, 1e-10);
+  EXPECT_LE(dev, 1.0e-10);
 }
 
 TEST(HfHnoIntegration, Emax2TwoPlusThreeNucleon) {
@@ -61,7 +61,7 @@ TEST(HfHnoIntegration, Emax2TwoPlusThreeNucleon) {
   const op::No2bThreeBody v3 = LoadV3(file, {2, 4, 12, 2});
   CheckHno(fs::path(IMSRG_GOLDEN_DIR) / "hamiltonian/emax2_O16",
            fs::path(IMSRG_GOLDEN_DIR) / "hf/emax2_O16_2N3N/HNO.dump", &v3,
-           "emax2_2N3N", 1e-8);
+           "emax2_2N3N", 1.0e-8);
 }
 
 TEST(HfHnoReference, Emax4TwoNucleon) {
@@ -70,7 +70,7 @@ TEST(HfHnoReference, Emax4TwoNucleon) {
       !fs::exists(gen / "hamiltonian/emax4_O16/H.dump"))
     GTEST_SKIP() << "no generated golden in " << gen;
   CheckHno(gen / "hamiltonian/emax4_O16", gen / "hf/emax4_O16_2N/HNO.dump",
-           nullptr, "emax4_2N", 1e-8);
+           nullptr, "emax4_2N", 1.0e-8);
 }
 
 TEST(HfHnoReference, Emax4TwoPlusThreeNucleon) {
@@ -83,7 +83,7 @@ TEST(HfHnoReference, Emax4TwoPlusThreeNucleon) {
     GTEST_SKIP() << "no generated golden in " << gen;
   const op::No2bThreeBody v3 = LoadV3(file, {4, 8, 12, 4});
   CheckHno(gen / "hamiltonian/emax4_O16", gen / "hf/emax4_O16_2N3N/HNO.dump",
-           &v3, "emax4_2N3N", 1e-8);
+           &v3, "emax4_2N3N", 1.0e-8);
 }
 
 }  // namespace

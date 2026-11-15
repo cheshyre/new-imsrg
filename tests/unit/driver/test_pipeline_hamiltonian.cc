@@ -79,9 +79,9 @@ TEST(PipelineHamiltonian, O16TwoBody) {
   ASSERT_TRUE(ph.hf.has_value());
   std::cout << "[dev] O16 2N E_HF - golden = "
             << ph.hf->e_hf - -147.89357642845789 << "\n";
-  EXPECT_NEAR(ph.hf->e_hf, -147.89357642845789, 1e-6);
-  EXPECT_NEAR(ph.hno.zero_body(), -147.89357642845789, 1e-6);
-  EXPECT_NEAR(ph.e_reference, ph.hf->e_hf, 1e-12);
+  EXPECT_NEAR(ph.hf->e_hf, -147.89357642845789, 1.0e-6);
+  EXPECT_NEAR(ph.hno.zero_body(), -147.89357642845789, 1.0e-6);
+  EXPECT_NEAR(ph.e_reference, ph.hf->e_hf, 1.0e-12);
   EXPECT_EQ(ph.mass_number, 16);
   EXPECT_EQ(ph.proton_number, 8);
 }
@@ -96,7 +96,7 @@ TEST(PipelineHamiltonian, O16WithNo2b) {
   ASSERT_TRUE(ph.hf.has_value());
   std::cout << "[dev] O16 NO2B E_HF - golden = "
             << ph.hf->e_hf - -313.16848141064463 << "\n";
-  EXPECT_NEAR(ph.hf->e_hf, -313.16848141064463, 1e-6);
+  EXPECT_NEAR(ph.hf->e_hf, -313.16848141064463, 1.0e-6);
 }
 
 TEST(PipelineHamiltonian, Ne20Sd) {
@@ -110,9 +110,9 @@ TEST(PipelineHamiltonian, Ne20Sd) {
   std::cout << "[dev] Ne20 E_HF - IT-7 golden = " << ph.hf->e_hf - -170.4417504
             << " e1 = " << ph.hf->e1 << " e2 = " << ph.hf->e2
             << " it = " << ph.hf->iterations << "\n";
-  EXPECT_NEAR(ph.hf->e_hf, -170.4417504, 1e-6);
-  EXPECT_NEAR(ph.hf->e1, 487.6161119, 1e-6);
-  EXPECT_NEAR(ph.hf->e2, -658.0578624, 1e-6);
+  EXPECT_NEAR(ph.hf->e_hf, -170.4417504, 1.0e-6);
+  EXPECT_NEAR(ph.hf->e1, 487.6161119, 1.0e-6);
+  EXPECT_NEAR(ph.hf->e2, -658.0578624, 1.0e-6);
   EXPECT_EQ(ph.proton_number, 10);
 }
 
@@ -123,7 +123,7 @@ TEST(PipelineHamiltonian, Rp2ZeroBodyMatchesIt6) {
   const op::Operator rp2 = PrepareOperator(Request("Rp2"), ph, cfg);
   std::cout << "[dev] Rp2 zero body - IT-6 golden = "
             << rp2.zero_body() - 4.294907 << " (" << rp2.zero_body() << ")\n";
-  EXPECT_NEAR(rp2.zero_body(), 4.294907, 5e-7);
+  EXPECT_NEAR(rp2.zero_body(), 4.294907, 5.0e-7);
   EXPECT_EQ(rp2.model_space_ptr(), ph.hno.model_space_ptr());
 }
 

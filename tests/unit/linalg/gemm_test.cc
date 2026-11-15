@@ -87,7 +87,8 @@ TEST(LinalgGemm, AllOpCombinationsAndShapes) {
   for (auto& s : shapes)
     for (Op oa : {Op::kNoTrans, Op::kTrans})
       for (Op ob : {Op::kNoTrans, Op::kTrans})
-        RunCase<double>(rng, s[0], s[1], s[2], oa, ob, 1.0, 0.0, false, 1e-12);
+        RunCase<double>(rng, s[0], s[1], s[2], oa, ob, 1.0, 0.0, false,
+                        1.0e-12);
 }
 
 TEST(LinalgGemm, AlphaBeta) {
@@ -97,28 +98,30 @@ TEST(LinalgGemm, AlphaBeta) {
   for (auto& p : ab)
     for (Op oa : {Op::kNoTrans, Op::kTrans})
       for (Op ob : {Op::kNoTrans, Op::kTrans})
-        RunCase<double>(rng, 7, 5, 6, oa, ob, p[0], p[1], false, 1e-12);
+        RunCase<double>(rng, 7, 5, 6, oa, ob, p[0], p[1], false, 1.0e-12);
 }
 
 TEST(LinalgGemm, BetaZeroIgnoresNaN) {
   std::mt19937_64 rng(3);
   RunCase<double>(rng, 6, 5, 4, Op::kNoTrans, Op::kNoTrans, 1.5, 0.0, true,
-                  1e-12);
-  RunCase<double>(rng, 6, 5, 4, Op::kTrans, Op::kTrans, 1.0, 0.0, true, 1e-12);
+                  1.0e-12);
+  RunCase<double>(rng, 6, 5, 4, Op::kTrans, Op::kTrans, 1.0, 0.0, true,
+                  1.0e-12);
   // Also the k == 0 path.
   RunCase<double>(rng, 3, 3, 0, Op::kNoTrans, Op::kNoTrans, 1.0, 0.0, true,
-                  1e-12);
+                  1.0e-12);
 }
 
 TEST(LinalgGemm, ZeroSized) {
   std::mt19937_64 rng(4);
   RunCase<double>(rng, 0, 4, 3, Op::kNoTrans, Op::kNoTrans, 1.0, 0.0, false,
-                  1e-12);
+                  1.0e-12);
   RunCase<double>(rng, 4, 0, 3, Op::kNoTrans, Op::kNoTrans, 1.0, 0.0, false,
-                  1e-12);
+                  1.0e-12);
   RunCase<double>(rng, 4, 3, 0, Op::kNoTrans, Op::kNoTrans, 1.0, 2.0, false,
-                  1e-12);
-  RunCase<double>(rng, 4, 3, 0, Op::kTrans, Op::kTrans, 1.0, 0.0, false, 1e-12);
+                  1.0e-12);
+  RunCase<double>(rng, 4, 3, 0, Op::kTrans, Op::kTrans, 1.0, 0.0, false,
+                  1.0e-12);
 }
 
 TEST(LinalgGemm, SubViewsWithLargerLd) {
@@ -138,7 +141,7 @@ TEST(LinalgGemm, SubViewsWithLargerLd) {
     for (std::int64_t i = 0; i < 12; ++i) {
       const bool inside = i >= 5 && i < 9 && j >= 4 && j < 7;
       if (inside)
-        EXPECT_NEAR(bigC(i, j), ref(i - 5, j - 4), 1e-12);
+        EXPECT_NEAR(bigC(i, j), ref(i - 5, j - 4), 1.0e-12);
       else
         EXPECT_EQ(bigC(i, j), before(i, j));
     }
@@ -148,9 +151,9 @@ TEST(LinalgGemm, Float) {
   std::mt19937_64 rng(6);
   for (Op oa : {Op::kNoTrans, Op::kTrans})
     for (Op ob : {Op::kNoTrans, Op::kTrans}) {
-      RunCase<float>(rng, 9, 7, 5, oa, ob, 1.0f, 0.0f, false, 1e-5);
-      RunCase<float>(rng, 9, 7, 5, oa, ob, 2.0f, 0.5f, false, 1e-5);
-      RunCase<float>(rng, 5, 1, 4, oa, ob, 1.0f, 0.0f, true, 1e-5);
+      RunCase<float>(rng, 9, 7, 5, oa, ob, 1.0f, 0.0f, false, 1.0e-5);
+      RunCase<float>(rng, 9, 7, 5, oa, ob, 2.0f, 0.5f, false, 1.0e-5);
+      RunCase<float>(rng, 5, 1, 4, oa, ob, 1.0f, 0.0f, true, 1.0e-5);
     }
 }
 
@@ -192,8 +195,8 @@ TEST(LinalgGroupedGemm, Mix) {
   auto r1 = Naive<double>(2.0, A1.const_view(), Op::kTrans, B1.const_view(),
                           Op::kTrans, 0.5, C1_0.const_view());
   for (int j = 0; j < 5; ++j)
-    for (int i = 0; i < 4; ++i) EXPECT_NEAR(C0(i, j), r0(i, j), 1e-12);
+    for (int i = 0; i < 4; ++i) EXPECT_NEAR(C0(i, j), r0(i, j), 1.0e-12);
   for (int j = 0; j < 4; ++j)
-    for (int i = 0; i < 2; ++i) EXPECT_NEAR(C1(i, j), r1(i, j), 1e-12);
+    for (int i = 0; i < 2; ++i) EXPECT_NEAR(C1(i, j), r1(i, j), 1.0e-12);
   GroupedGemm({});
 }

@@ -201,12 +201,12 @@ TEST(ThreeBodyChannels, ConfigurationCutOnAHandCheckedKet) {
   EXPECT_FALSE(tb.PassesConfigurationCut(k, b, ref, de - 0.1, 0.0));
   // The s orbits are fully occupied: n (1 - n) = 0, so any positive occupation
   // cut rejects the ket with the reference occupations ...
-  EXPECT_FALSE(tb.PassesConfigurationCut(k, b, ref, 10.0, 1e-3));
+  EXPECT_FALSE(tb.PassesConfigurationCut(k, b, ref, 10.0, 1.0e-3));
   // ... while natural occupations of 1/2 give a product of (1/4)^3.
   const std::vector<double> half(static_cast<std::size_t>(b.num_orbits()), 0.5);
   EXPECT_TRUE(tb.PassesConfigurationCut(k, b, ref, 10.0, 1.0 / 64.0, half));
   EXPECT_FALSE(
-      tb.PassesConfigurationCut(k, b, ref, 10.0, 1.0 / 64.0 + 1e-6, half));
+      tb.PassesConfigurationCut(k, b, ref, 10.0, 1.0 / 64.0 + 1.0e-6, half));
 }
 
 }  // namespace
