@@ -10,7 +10,9 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "${HERE}/../.." && pwd)"
 ROOT="${IMSRG_REFERENCE_ROOT:-/Users/cheshyre/Downloads/new-imsrg-reference}"
-RH="${REFHARNESS:-${ROOT}/harness-build/refharness}"
+RH="${REFHARNESS:-${ROOT}/harness-build-d35/refharness}"
+# D35: default = the patched harness (harness-build-d35) and its version string (tests/golden/README.md).
+export IMSRG_REFERENCE_SHA_FILE="${IMSRG_REFERENCE_SHA_FILE:-${IMSRG_REFERENCE_ROOT:-/Users/cheshyre/Downloads/new-imsrg-reference}/REFERENCE_SRC_SHA256_D35}"
 DATA="${IMSRG_TEST_DATA_DIR:-/Users/cheshyre/Downloads/new-imsrg}"
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-8}"
 OUT="${REPO}/tests/golden/commutator/emax2_O16"

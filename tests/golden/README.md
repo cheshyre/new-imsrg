@@ -33,6 +33,14 @@ for how the tests use them and §2 for the tolerances.
   `REFHARNESS=<root>/harness-build-d35/refharness tools/reference/gen_golden_generated.sh`.
   Goldens not listed here (V2, V3_NO2B, random_H, commutator, basis, IT-8/9/10 other jobs) still come from
   the pristine build.
+* **Default build of the generation scripts (D35).** Every `tools/reference/gen_golden_*.sh` that runs
+  `refharness` or `imsrg++` now defaults to the patched build (`harness-build-d35/refharness`,
+  `build-d35/imsrg++`, run directory `runs-d35/e2e`) and to its version file `REFERENCE_SRC_SHA256_D35`,
+  with the same overrides as before (`REFHARNESS`, `IMSRG_REFERENCE_EXE`, `IMSRG_REFERENCE_RUNS`,
+  `IMSRG_REFERENCE_SHA_FILE`, `IMSRG_REFERENCE_ROOT`). Regenerating a golden that still comes from the
+  pristine build (V2, V3_NO2B, random_H, basis, commutator, IT-8/9/10 other jobs) with these defaults
+  changes its `source` version string, and its values where the patch matters; set the overrides to the
+  pristine paths to reproduce the old file.
 * **Inputs** (never copied into the repo), in `/Users/cheshyre/Downloads/new-imsrg/`:
   2N `VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz` (`file2e1max=14 file2e2max=28
   file2lmax=14`), 3N `NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin`
