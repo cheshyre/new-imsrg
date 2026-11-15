@@ -27,6 +27,7 @@
 #include "imsrg/mbpt/energies.h"
 #include "tests/unit/driver/integration/mini_json.h"
 #include "tests/unit/driver/integration/run_support.h"
+#include "tests/unit/driver/integration/snt_compare.h"
 
 namespace imsrg::it {
 namespace {
@@ -164,10 +165,23 @@ TEST(FlowMethods, He4Emax2AdaptiveMatchesImsrgFlowFile) {
 
 #endif  // IMSRG_FLOW_SLOW
 
+/// The charge radii (fm) that the PRISTINE imsrg++ prints for `Operators=Rp2`
+/// with a non-Magnus method ("HF charge radius", "IMSRG charge radius"; its
+/// Rp2 still contained the spin-orbit term, so they must equal our
+/// `charge_radius.rch` = sqrt(Rp2 + Rso/Z + nucleon terms), D35). Printed with
+/// 8 (HF) and 6 (IMSRG) decimals. From the pristine build
+/// (new-imsrg-reference/build), same command lines as the IT-14 goldens.
+struct PristineRadius {
+  double hf;
+  double imsrg;
+};
+
 /// A full driver run of `method` (config key `imsrg.method`) for a nucleus at
-/// the given emax with Rp2 requested, compared with the golden.
+/// the given emax with Rp2 requested, compared with the golden. With `radius`
+/// the charge radius of results.json is compared with the pristine imsrg++.
 void DriverLevel(const std::string& nucleus, const std::string& method,
-                 int emax, const char* golden_dir, const char* tag) {
+                 int emax, const char* golden_dir, const char* tag,
+                 const PristineRadius* radius = nullptr) {
   if (!std::filesystem::exists(DataFile(TwoBodyName())))
     GTEST_SKIP() << "missing 2N input file";
   const auto dir = FreshDir(std::string("flow_") + golden_dir);
@@ -187,22 +201,33 @@ void DriverLevel(const std::string& nucleus, const std::string& method,
   const std::string gdir = std::string("IT-14/") + golden_dir;
   const std::vector<GoldLine> gold = ReadGoldFlow(gdir + "/flow.dat");
   const Json res = ParseJson(Slurp(GoldenFile(gdir + "/result.json")));
-  ASSERT_EQ(r.flow.rows.size(), gold.size()) << tag << ": flow lines";
-  Deviations d;
-  for (std::size_t i = 0; i < gold.size(); ++i) {
-    d.s = std::max(d.s, std::abs(r.flow.at(i, "s") - gold[i].s));
-    d.e0 = std::max(d.e0, std::abs(r.flow.at(i, "E0") - gold[i].e0));
-    d.norm_h =
-        std::max(d.norm_h, std::abs(r.flow.at(i, "norm_H") - gold[i].norm_h));
-    d.eta1 =
-        std::max(d.eta1, std::abs(r.flow.at(i, "norm_eta_1b") - gold[i].eta1));
-    d.eta2 =
-        std::max(d.eta2, std::abs(r.flow.at(i, "norm_eta_2b") - gold[i].eta2));
-    d.e_mp2 =
-        std::max(d.e_mp2, std::abs(r.flow.at(i, "E_MP2") - gold[i].e_mp2));
+  if (method == "flow_rk4") {
+    ASSERT_EQ(r.flow.rows.size(), gold.size()) << tag << ": flow lines";
+    Deviations d;
+    for (std::size_t i = 0; i < gold.size(); ++i) {
+      d.s = std::max(d.s, std::abs(r.flow.at(i, "s") - gold[i].s));
+      d.e0 = std::max(d.e0, std::abs(r.flow.at(i, "E0") - gold[i].e0));
+      d.norm_h =
+          std::max(d.norm_h, std::abs(r.flow.at(i, "norm_H") - gold[i].norm_h));
+      d.eta1 = std::max(d.eta1,
+                        std::abs(r.flow.at(i, "norm_eta_1b") - gold[i].eta1));
+      d.eta2 = std::max(d.eta2,
+                        std::abs(r.flow.at(i, "norm_eta_2b") - gold[i].eta2));
+      d.e_mp2 =
+          std::max(d.e_mp2, std::abs(r.flow.at(i, "E_MP2") - gold[i].e_mp2));
+    }
+    Report(tag, gold.size(), d);
+    ExpectDeviationsSmall(d);
+  } else {
+    // The charge radius needs Rso, which flows alongside H as one more state
+    // component of the adaptive method and so changes its step-size control
+    // (M8-Q50): the trajectory differs from the golden (generated with Rp2
+    // alone; the solver-level tests above still compare it line by line). The
+    // end point agrees, checked below.
+    std::printf(
+        "[%s] adaptive trajectory with Rso flowing: %zu rows (golden %zu)\n",
+        tag, r.flow.rows.size(), gold.size());
   }
-  Report(tag, gold.size(), d);
-  ExpectDeviationsSmall(d);
 
   const double e0 = r.results["imsrg"]["e0"].number;
   const double rp2 = r.results["operators"]["Rp2"]["imsrg"].number;
@@ -213,20 +238,144 @@ void DriverLevel(const std::string& nucleus, const std::string& method,
   EXPECT_NEAR(e0, res["core_energy"].number, 1.0e-6);
   EXPECT_NEAR(rp2, rp2_gold, 1.0e-6);
   EXPECT_EQ(static_cast<int>(r.results["imsrg"]["num_omegas"].number), 1);
+  // Rso was not requested: evaluated internally, no `operators` entry.
+  EXPECT_FALSE(r.results["operators"].has("Rso"));
+  if (radius != nullptr) {
+    const double rch_hf = r.results["charge_radius"]["rch"]["reference"].number;
+    const double rch = r.results["charge_radius"]["rch"]["imsrg"].number;
+    std::printf(
+        "[%s] charge radius HF %.8f (pristine %.8f, dev %.1e)  IMSRG %.8f "
+        "(pristine %.6f, dev %.1e)\n",
+        tag, rch_hf, radius->hf, rch_hf - radius->hf, rch, radius->imsrg,
+        rch - radius->imsrg);
+    EXPECT_NEAR(rch_hf, radius->hf, 2.0e-8);
+    EXPECT_NEAR(rch, radius->imsrg, 2.0e-6);
+  }
 }
 
 #ifndef IMSRG_FLOW_SLOW
 TEST(FlowMethods, He4Emax2Rk4Driver) {
-  DriverLevel("He4", "flow_rk4", 2, "He4_emax2_rk4", "driver RK4 He4 emax2");
+  const PristineRadius pristine{1.66192448, 1.690996};
+  DriverLevel("He4", "flow_rk4", 2, "He4_emax2_rk4", "driver RK4 He4 emax2",
+              &pristine);
 }
 TEST(FlowMethods, He4Emax2AdaptiveDriver) {
-  DriverLevel("He4", "flow", 2, "He4_emax2_flow", "driver dopri5 He4 emax2");
+  const PristineRadius pristine{1.66192448, 1.691025};
+  DriverLevel("He4", "flow", 2, "He4_emax2_flow", "driver dopri5 He4 emax2",
+              &pristine);
 }
 TEST(FlowMethods, O16Emax3Rk4Driver) {
-  DriverLevel("O16", "flow_rk4", 3, "O16_emax3_rk4", "RK4 O16 emax3");
+  const PristineRadius pristine{2.22458311, 2.269411};
+  DriverLevel("O16", "flow_rk4", 3, "O16_emax3_rk4", "RK4 O16 emax3",
+              &pristine);
 }
 TEST(FlowMethods, O16Emax3AdaptiveDriver) {
-  DriverLevel("O16", "flow", 3, "O16_emax3_flow", "dopri5 O16 emax3");
+  const PristineRadius pristine{2.22458311, 2.269443};
+  DriverLevel("O16", "flow", 3, "O16_emax3_flow", "dopri5 O16 emax3",
+              &pristine);
+}
+
+// IT-15: two decoupling stages with an ODE method (He4 emax 2, p-shell valence
+// space: core atan, then shell-model-atan). O16 emax 2 with the sd-shell is
+// unstable in IMSRG(2) (design/30 IT-8 note), He4 converges. Compared with the
+// imsrg++ golden tests/golden/e2e/IT-15 (patched build, D42): E0, the
+// valence-space .snt elements (1e-3 MeV) and, for `flow_rk4`, the per-stage
+// step counts and the flow file (s continues across the stages). imsrg++'s
+// adaptive `flow` restarts s at 0 in stage 2 (M8-Q40), so only its final
+// quantities are compared. Deviations are printed.
+void TwoStage(const std::string& method, const char* gdir, const char* tag) {
+  if (!std::filesystem::exists(DataFile(TwoBodyName())))
+    GTEST_SKIP() << "missing 2N input file";
+  const bool rk4 = method == "flow_rk4";
+  const auto dir = FreshDir("flow_two_stage_" + method);
+  std::ostringstream t;
+  t << "[basis]\nemax = 2\nhw = 16.0\n\n[reference]\nnucleus = \"He4\"\n\n"
+    << "[interaction.two_body]\nfile = \"" << DataFile(TwoBodyName()).string()
+    << "\"\ne1max = 14\ne2max = 28\nlmax = 14\n\n"
+    << "[valence]\nspace = \"p-shell\"\n\n"
+    << "[imsrg]\nmethod = \"" << method << "\"\n\n"
+    << "[output]\ndirectory = \"" << dir.string() << "\"\n";
+  driver::ConfigSources src;
+  src.config_text = t.str();
+  const RunResult r = Execute(src, dir);
+  ASSERT_FALSE(r.planned) << r.note;
+  const Json res =
+      ParseJson(Slurp(GoldenFile(std::string(gdir) + "/result.json")));
+  const auto& stages = r.results["imsrg"]["stages"];
+  ASSERT_EQ(stages.items.size(), 2u);
+  EXPECT_EQ(stages.items[1]["generator"].text, "shell_model_atan");
+  std::printf(
+      "[%s] steps per stage: %d %d; s at the end of the stages: %.4f %.4f\n",
+      tag, static_cast<int>(stages.items[0]["steps"].number),
+      static_cast<int>(stages.items[1]["steps"].number),
+      stages.items[0]["s"].number, stages.items[1]["s"].number);
+
+  if (rk4) {
+    // Steps per stage of the golden: istep restarts at 0 for stage 2.
+    const std::vector<GoldLine> gold =
+        ReadGoldFlow(std::string(gdir) + "/flow.dat");
+    std::vector<int> gold_steps;
+    for (const GoldLine& g : gold) {
+      if (g.istep == 0) gold_steps.push_back(0);
+      gold_steps.back() = g.istep;
+    }
+    ASSERT_EQ(gold_steps.size(), 2u);
+    std::printf("[%s] golden steps per stage: %d %d\n", tag, gold_steps[0],
+                gold_steps[1]);
+    EXPECT_EQ(static_cast<int>(stages.items[0]["steps"].number), gold_steps[0]);
+    EXPECT_EQ(static_cast<int>(stages.items[1]["steps"].number), gold_steps[1]);
+
+    // The flow file, both stages, row by row.
+    ASSERT_EQ(r.flow.rows.size(), gold.size());
+    Deviations d;
+    for (std::size_t i = 0; i < gold.size(); ++i) {
+      d.s = std::max(d.s, std::abs(r.flow.at(i, "s") - gold[i].s));
+      d.e0 = std::max(d.e0, std::abs(r.flow.at(i, "E0") - gold[i].e0));
+      d.norm_h =
+          std::max(d.norm_h, std::abs(r.flow.at(i, "norm_H") - gold[i].norm_h));
+      d.eta1 = std::max(d.eta1,
+                        std::abs(r.flow.at(i, "norm_eta_1b") - gold[i].eta1));
+      d.eta2 = std::max(d.eta2,
+                        std::abs(r.flow.at(i, "norm_eta_2b") - gold[i].eta2));
+      d.e_mp2 =
+          std::max(d.e_mp2, std::abs(r.flow.at(i, "E_MP2") - gold[i].e_mp2));
+    }
+    Report(tag, gold.size(), d);
+    EXPECT_LT(d.s, 1.0e-5);
+    EXPECT_LT(d.e0, 1.0e-6);
+    EXPECT_LT(d.norm_h, 1.0e-6);
+    EXPECT_LT(d.eta1, 1.0e-6);
+    EXPECT_LT(d.eta2, 1.0e-6);
+  }
+
+  // Final E0 and the valence-space interaction.
+  const double e0 = r.results["imsrg"]["e0"].number;
+  const double e0_gold = res["flow"]["final_E0"].number;
+  std::printf("[%s] E0 %.9f golden %.9f dev %.3e\n", tag, e0, e0_gold,
+              e0 - e0_gold);
+  EXPECT_NEAR(e0, e0_gold, 1.0e-3);
+
+  ASSERT_EQ(r.results["valence_interaction"].kind, Json::Kind::kString);
+  const SntData got = ReadSnt(r.results["valence_interaction"].text);
+  const SntData want = ReadSnt(GoldenFile(std::string(gdir) + "/int.snt"));
+  const SntComparison c = CompareSnt(got, want, 1.0e-3);
+  std::printf(
+      "[%s] .snt zero body dev %.3e, 1B max dev %.3e (%zu elements), 2B max "
+      "dev %.3e (%zu elements), missing %zu, orbits equal %s\n",
+      tag, c.zero_dev, c.max_dev_1b, c.n1b_a, c.max_dev_2b, c.n2b_a, c.missing,
+      c.orbits_equal ? "yes" : "NO");
+  EXPECT_TRUE(c.orbits_equal);
+  EXPECT_LE(c.zero_dev, 1.0e-3);
+  EXPECT_LE(c.max_dev_1b, 1.0e-3);
+  EXPECT_LE(c.max_dev_2b, 1.0e-3);
+  EXPECT_EQ(c.missing, 0u);
+}
+
+TEST(FlowMethods, TwoStageRk4He4PShellDriver) {
+  TwoStage("flow_rk4", "IT-15/He4_emax2_pshell_rk4", "IT-15 RK4 He4 p-shell");
+}
+TEST(FlowMethods, TwoStageAdaptiveHe4PShellDriver) {
+  TwoStage("flow", "IT-15/He4_emax2_pshell_flow", "IT-15 dopri5 He4 p-shell");
 }
 #else   // IMSRG_FLOW_SLOW: O16 emax 4, 7-14 s each in a debug build
 TEST(FlowMethods, O16Emax4Rk4Driver) {
