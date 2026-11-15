@@ -31,6 +31,7 @@ add_executable(refharness
   rh_valence.cpp
   rh_commutator.cpp
   rh_bench.cpp
+  rh_imsrg3.cpp
   rh_flow.cpp
 )
 target_compile_features(refharness PRIVATE cxx_std_17)
