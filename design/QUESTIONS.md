@@ -680,6 +680,13 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   IMSRG(2) terms are used on it. **Assumed meanwhile:** fine (no lazy caches, D10; cheap at emax
   <= 3); an explicit `Workspace` option could skip it if an IMSRG(2) flow on a three-body space
   appears.
+* **M10-Q67** (2026-11-16, M10 step 3 lead; Python, not N7) - `tests/python/test_flow.py::
+  test_solve_releases_the_gil` failed on `tools/ci.sh dev-serial` (ticks 7 for a 45 ms solve; it
+  passes on dev-openmp): the emax-1 Magnus solve is short on the Serial backend and part of it runs
+  with the GIL held (setup, and since the M11 hardening the signal poll at each step). **Assumed
+  meanwhile:** the bound now scales with the measured solve time (`ticks > max(2, min(20,
+  elapsed_ms / 10))`, still failing if the GIL is held throughout); the M11 owner may prefer a
+  longer solve or a measurement of the GIL-free fraction.
 * **M8-Q50** (2026-11-15, M8 charge radius / two-stage ODE task) - (1) The charge radius needs `Rso`; if it was
   not requested the driver adds it as one more operator that flows alongside H (ODE methods) or is replayed
   with the Omega stack (Magnus). For the adaptive `flow` method the error norm of the step control includes
