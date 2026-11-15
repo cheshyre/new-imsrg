@@ -80,6 +80,10 @@ std::shared_ptr<const ModelSpace> ModelSpace::WithReferenceAndPartition(
   ms->partition_ = std::make_shared<const Partition>(std::move(partition));
   ms->two_body_subsets_ = std::make_shared<const TwoBodyKetSubsets>(
       *ms->two_body_, *ms->reference_, *ms->partition_);
+  if (three_body_ != nullptr) {
+    ms->three_body_space_ = std::make_shared<const ThreeBodySpace>(
+        *three_body_, *basis_, *ms->reference_, three_body_->cuts());
+  }
   return ms;
 }
 
@@ -87,16 +91,16 @@ std::shared_ptr<const ModelSpace> ModelSpace::WithThreeBody(
     const ThreeBodyCuts& cuts) const {
   std::shared_ptr<ModelSpace> ms(new ModelSpace(*this));
   ms->three_body_ = std::make_shared<const ThreeBodyChannels>(*basis_, cuts);
+  ms->three_body_space_ = std::make_shared<const ThreeBodySpace>(
+      *ms->three_body_, *basis_, *reference_, ms->three_body_->cuts());
   return ms;
 }
 
 bool operator==(const ModelSpace& a, const ModelSpace& b) noexcept {
   if (&a == &b) return true;
-  const bool same_3b =
-      (a.three_body_ == nullptr && b.three_body_ == nullptr) ||
-      (a.three_body_ != nullptr && b.three_body_ != nullptr &&
-       a.three_body_->cuts().e3max == b.three_body_->cuts().e3max &&
-       a.three_body_->cuts().emax_3body == b.three_body_->cuts().emax_3body);
+  const bool same_3b = (a.three_body_ == nullptr && b.three_body_ == nullptr) ||
+                       (a.three_body_ != nullptr && b.three_body_ != nullptr &&
+                        a.three_body_->cuts() == b.three_body_->cuts());
   return same_3b && *a.basis_ == *b.basis_ && *a.reference_ == *b.reference_ &&
          *a.partition_ == *b.partition_;
 }

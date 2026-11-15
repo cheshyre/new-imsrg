@@ -26,6 +26,7 @@
 ///   in ascending global ket order.
 
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <span>
 #include <type_traits>
@@ -40,12 +41,28 @@ namespace imsrg::basis {
 /// Index of a three-body ket inside one three-body channel.
 using LocalKet3Index = StrongIndex<struct LocalKet3Tag>;
 
-/// Truncation of the three-body space.
+/// Truncation of the three-body space. `e3max` and `emax_3body` define the
+/// occupation-independent ket set of `ThreeBodyChannels`; `de3max`,
+/// `occnat3_cut` and `natural_occupations` are the configuration cuts that
+/// `ThreeBodySpace` applies on top of it for a given reference
+/// (`ThreeBodyChannels` ignores them).
 struct ThreeBodyCuts {
   std::int32_t e3max =
       12;  ///< Largest 2 (n_p + n_q + n_r) + l_p + l_q + l_r of a ket.
   std::int32_t emax_3body =
       -1;  ///< Largest single-particle shell e; -1 means the basis emax.
+  /// Largest sum_i |e_i - e_fermi(tz_i)| of a kept ket (imsrg++ `dE3max`);
+  /// infinity means no cut.
+  double de3max = std::numeric_limits<double>::infinity();
+  /// Smallest prod_i n_i (1 - n_i) of a kept ket (imsrg++ `OccNat3Cut`); a
+  /// negative value means no cut.
+  double occnat3_cut = -1.0;
+  /// Natural occupations (one per orbit, index order) for the OccNat cut; if
+  /// empty, the occupations of the reference are used.
+  std::vector<double> natural_occupations{};
+
+  /// Field-wise equality.
+  friend bool operator==(const ThreeBodyCuts&, const ThreeBodyCuts&) = default;
 };
 
 /// A three-body ket |pqr; Jpq> with p <= q <= r (orbit indices); Jpq couples p
