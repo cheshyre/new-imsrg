@@ -663,6 +663,23 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
 * **M10-Q62** (2026-11-16, M10 step 3) - `imsrg3.occ_nat3_cut` with IMSRG(3), `variant = "full"` and
   `"mp4"`, `at_end`, `only_2b_omega` stay E-PLANNED: the cut needs the NAT occupations in the
   three-body space (`ThreeBodyCuts::natural_occupations`) which the driver does not pass yet.
+* **M10-Q63** (2026-11-16, M10 step 3 lead) - `comm232ss` processes its pair-third intermediate
+  blocks in batches of channels under a 512 MiB budget, but never splits a channel (one block set
+  is ~33 GB at emax 12 / E3max 14) and every batch visits every Z2 element (Opus review findings
+  2-3). **Assumed meanwhile:** fine at emax <= 3 (60 ms at O16 emax 3); tile by column ranges and
+  clamp J3 per batch before production runs (design/14 section 1.1, next steps).
+* **M10-Q64** (2026-11-16, M10 step 3 lead) - `comm232ss` rebuilds its sorted pair-third tables on
+  every call (0.2 ms at emax 2, 3 ms at emax 3); they depend only on the model space. **Assumed
+  meanwhile:** per call; move them into `ThreeBodyContext` with the next kernel pass.
+* **M10-Q65** (2026-11-16, M10 step 3 lead) - The comm232ss kernels (like comm223) call Kokkos
+  policies (dynamic range, team) directly instead of the `exec` facade. **Assumed meanwhile:**
+  accepted in kernel TUs (design/12 section 5 allows Kokkos there); extend the facade when a second
+  backend needs it.
+* **M10-Q66** (2026-11-16, M10 step 3 lead) - A `commutator::Workspace` on a model space with a
+  three-body space always builds a `ThreeBodyContext` (6j table, pair-third maps), also when only
+  IMSRG(2) terms are used on it. **Assumed meanwhile:** fine (no lazy caches, D10; cheap at emax
+  <= 3); an explicit `Workspace` option could skip it if an IMSRG(2) flow on a three-body space
+  appears.
 * **M8-Q50** (2026-11-15, M8 charge radius / two-stage ODE task) - (1) The charge radius needs `Rso`; if it was
   not requested the driver adds it as one more operator that flows alongside H (ODE methods) or is replayed
   with the Omega stack (Magnus). For the adaptive `flow` method the error norm of the step control includes
