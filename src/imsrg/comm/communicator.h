@@ -26,8 +26,6 @@
 
 namespace imsrg::comm {
 
-class Environment;
-
 /// Cheap, copyable handle to a group of ranks. Copies share the underlying
 /// communicator, which is freed (if it was created by `split`/`duplicate`) when
 /// the last handle is destroyed, never after MPI_Finalize. Not thread-safe
