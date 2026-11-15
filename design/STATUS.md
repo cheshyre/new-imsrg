@@ -2,40 +2,41 @@
 
 ## Current state (keep this section up to date)
 
-* **Phase:** **run 2 in progress** (started 2026-11-15 13:50 JST; plan `design/NEXT_SESSION_PROMPT.md`;
-  draft report `design/reports/2026-11-15-run2.md`). Merged in run 2 so far: MS (Google style),
-  hunter-gatherer, D35 (Tcm/Rp2/Rso with a patched reference), the flow-review fixes, the D37
-  config/driver tasks, the reference-tooling clean-up. In progress: M10 layout benchmark
-  (`feature/m10-layout`). Also merged: flow-RK4/DP45, M10 IMSRG(3f2).
-  Run 1 ended 2026-11-12 ~08:45 JST (report
+* **Phase:** **run 2 ended** 2026-11-16 ~07:30 JST (started 2026-11-15 13:50; report
+  `design/reports/2026-11-15-run2.md`). Next: the owner interview (agenda `design/INTERVIEW_PROMPT.md`),
+  then run 3 (`design/NEXT_SESSION_PROMPT.md`). Run 1 ended 2026-11-12 ~08:45 JST (report
   `design/reports/2026-11-12-overnight.md`); the owner interviews of 2026-11-13 (D25–D29) and
   2026-11-15 (D30–D42, `design/reports/2026-11-15-owner-interview.md`) answered every run-1 question.
-* **Integration branch:** `develop` (local). Run 2 again runs in an app worktree, so `develop` is
+* **Integration branch:** `develop` (local). Run 2 again ran in an app worktree, so `develop` was
   advanced from the staging branch `claude/imsrg-rewrite-run-2-36094d` with `tools/ci.sh dev-openmp
-  && git update-ref refs/heads/develop <new> <old>` (QUESTIONS O1, O3). **The main checkout's files
-  do not follow; sync it before committing there (O3).**
+  [&& ctest -L slow] && git update-ref refs/heads/develop <new> <old>` (QUESTIONS O1, O3). **The main
+  checkout's files do not follow; sync it before committing there (O3).**
 * **Code style:** Google C++ Style Guide since the MS merge (D38, `17-code-style.md`): `.h`/`.cc`,
   PascalCase functions, `kName` constants and enumerators, 80 columns, blocking cpplint step in
   `tools/ci.sh`, clang-tidy naming check `tools/lint.sh`; exceptions and allowlists in `17` §3.
-* **Merged:** M0 bootstrap; M1 reference build, refharness, golden data (IT-1..IT-10); M2
-  base/exec/comm/linalg/angmom; M3 basis; M4 operator (`imsrg::op`); M5+M6 io/opslib/hf (mixing +
-  DIIS); M7 IMSRG(2) commutators (Kokkos kernels + `commutator_ref`); M8a config/legacy CLI/`apps/imsrg`;
-  M8 flow (generators, BCH, Magnus) + driver pipeline; M9 mbpt; M11 phase 1 Python bindings;
-  MS Google-style conversion; hunter-gatherer Magnus; D35 fixes; flow-review fixes; D37 config/driver
-  tasks (DIIS default, config-relative paths, `schema_version`, EMP2, NAT basis).
-* **End to end:** `imsrg` reproduces imsrg-devel (the D35-patched build since run 2) for IT-1 (EMP2),
-  IT-2, IT-3, IT-4, IT-5 (NAT, smax 10), IT-6, IT-7, IT-12 and the hunter-gatherer cases (same step
-  and gather counts, |ΔE0| ≤ 3e-10 MeV, `.snt` ≤ 2e-14, IT-6 Rp2 1.8e-9 fm²). IT-8, IT-9, IT-10 wait
-  for M10. CI on `develop`: 877 unit, 44 integration, 3 MPI, 23 Python tests, dev-openmp PASS in
-  ~75 s. The reference: patched imsrg-devel `new-imsrg-reference/build-d35`, `harness-build-d35`
-  (default of every `tools/reference/gen_golden_*.sh`).
-* **Not started:** non-Hermitian fast-commutator paths and full-precision 1/√2 (wait for the 3f2
-  merge: same kernels), M11 phase 2, M12a/M12b (D40), M13, M14 (GPU, after M12). The
-  `feature/m10-layout-benchmark` branch of run 1 is empty and checked out in a stale worktree; the
-  layout track uses `feature/m10-layout`. Implementation plans made during MS:
-  `new-imsrg-reference/plans/m10-layout-plan.md`, `m10-3f2-plan.md`.
+* **Merged:** run 1: M0–M9 and M11 phase 1. Run 2: MS (Google style); hunter-gatherer Magnus; D35
+  (Tcm, Rp2, `Rso`, patched reference build); flow-review fixes; D37 config/driver tasks;
+  reference-tooling clean-up; ODE flow methods `flow_rk4`/`flow` (dopri5); IMSRG(3f2) (D32); M10 layout
+  decision D43 (layout A); general (non-Hermitian) IMSRG(2) commutator and full-precision 1/√2 (D36);
+  M11 phase 2 Python bindings and their hardening; M10 step 2 (3B storage, `Comm223`, perturbative
+  triples); charge radius with Rso and a two-stage ODE test; M10 step 3 IMSRG(3)-N7 with the comm232
+  batching follow-up; robust Ctrl-C tests; M12a single-node performance.
+* **End to end:** `imsrg` reproduces imsrg-devel (the D35-patched build) for IT-1 … IT-10 (IT-4/IT-5
+  at smax 10; IT-8 He4 emax 2 / O16 emax 3; IT-9 emax 2 and 3; IT-10 3f2), IT-12, IT-14 (ODE methods),
+  IT-15 (two-stage ODE) and the hunter-gatherer cases: same step counts, |ΔE0| ≤ 3.8e-10 MeV for
+  IMSRG(2)/(3)-N7/3f2, triples ≤ 1.3e-15 rel., `.snt` ≤ 2e-14 (details in the run-2 report §3). CI
+  on `develop` (9bef685): 1069 unit, 61 integration, 3 MPI, 149 Python (1 skipped), 6 slow tests; `ci.sh` ~130 s; the slow suite (incl. IT-9 emax 3) passes (~46–50 min on a loaded machine).
+* **Performance** (`design/benchmarks/`): IMSRG(2) commutator 3.6–4× faster than imsrg++ at emax 6–8,
+  O16 emax-8 flow 3.1–3.7× (59.8 s vs 187.8 s at 6 threads); peak memory of that flow 1.1 GB vs
+  2.3–2.6 GB; production `Comm223` 15.2 ms vs imsrg++ 482 ms (O16 emax 3, 18 threads); IT-9 2–3×
+  faster than imsrg++; 3f2 step 1.10× a plain hunter-gatherer step.
+* **Not started / next:** N7 performance (comm232 tiling, tiled 133/132/231/331), M12b MPI (D14/D40,
+  Hagen–Nam evaluation), tensor operators (D39, first extension after IMSRG(3)), 3f2 2b intermediates
+  (E-PLANNED), M13, M14 (GPU after M12). No unmerged branch holds unique work; `tmp/m12a-bench-base`
+  (scratch) and run 1's empty `feature/m10-layout-benchmark` (checked out in a stale worktree) can go.
 * **Interruptions:** run 1: 5-hour usage limit 01:30–02:30 and 04:15–07:30 JST. Run 2: limit reached
-  ~16:35, reset 18:00 JST; agents resumed with `SendMessage`. Usage budget, not wall time, binds.
+  ~16:35, ~21:15 and ~01:30 JST (resets 18:00, 23:00, 04:00); agents resumed with `SendMessage`;
+  weekly usage ~8 % → ~32 %. The usage budget, not wall time, binds.
 * **Toolchain:** Homebrew cmake 4.4.5, ninja 1.13.2, ccache 4.14.3, Open MPI 5.0.11, libomp 23.1.5,
   clang-format 23.1.5, gsl, boost, openblas; Apple clang 21; Python 3.15.2; Kokkos 5.3.0 per backend
   in `~/.cache/imsrg-deps` (`tools/bootstrap_deps.sh`); shared venv `~/.cache/imsrg-deps/venv`. The
@@ -46,9 +47,10 @@
 * **Inputs:** me2j test file = 168,066,656 values (e1max 14, e2max 28, lmax 14); NO2B test file =
   32,685,840 floats (6, 12, 18; single precision) holding only the cE contact term (M1-Q1); it stays
   the 3N test input until the owner provides a full N2LO file (D33).
-* **Blocking questions:** none. Open (run 2, under "Added during run 2" in `QUESTIONS.md`):
-  MS-Q1..MS-Q5, O3, M8-Q10..Q12, M8-Q20..Q22, M8-Q30..Q33, M8-Q40..Q41, M10-Q20..Q23 (all with
-  assumptions; none blocks).
+* **Blocking questions:** none. Open (run 2, under "Added during run 2" in `QUESTIONS.md`, all with
+  assumptions): MS-Q1..Q5, O3, M7-Q10..Q11, M8-Q10..Q12, M8-Q20..Q22, M8-Q30..Q33, M8-Q40..Q41,
+  M8-Q50..Q52, M10-Q1..Q3, M10-Q20..Q23, M10-Q40..Q46, M10-Q60..Q67, M11-Q10..Q16 (Q10 resolved),
+  M12-Q1..Q5; the interview agenda groups them (`INTERVIEW_PROMPT.md`).
 
 ## Log (append one entry per merged branch)
 
@@ -93,3 +95,4 @@
 | 2026-11-16 05:15 | feature/m10-n7 (d69f2b4..47aa8b2) → develop | **comm232ss batching follow-up (M10-Q63/Q64)**: a batch is a range of W columns (scratch bounded by the budget unless one column exceeds it), batches only touch the Z2 blocks their 2J3 range reaches (c, J', J3 loops clamped; single-channel tiles loop over their own thirds), `Comm232Tables` built in `ThreeBodyContext::Impl` and counted in `TableBytes` (0.4 MB at O16 emax 2) | New tests TinyBudgetSplitsChannels (budget 1/40 vs reference ≤ 1e-12 at emax 2; one column per batch vs brute force at emax 1) and TablesLiveInTheContext; `ctest -R "commutator|driver_imsrg3_n7"` 131/131 incl. the slow IT-9 emax-3 runs on 47aa8b2 (worker). Release min times old→new, 18/8 threads: emax 2 2.0→1.5 / 3.0→2.4 ms, emax 3 69→68 / 111→106 ms. The merge result's code equals 47aa8b2 (only design/ differs), so the merge ran ci.sh dev-openmp; the slow suite had passed on that tree | Two WIP commits remain in the history (fa280cb, c0caa02). The `TableBytes` docstring in `three_body.h` still needs updating |
 | 2026-11-16 05:32 | feature/m11-ctrl-c-tests → develop | **Robust Ctrl-C tests**: `test_ctrl_c_interrupts_a_solve` and `test_ctrl_c_stops_a_pipeline_run` failed once in a loaded `ci.sh` run (the run finished before the signal; the comm232 merge above was held back for it). The children now repeat their C++ call (200 solves / 500 pipeline runs), the parent's `_interrupt()` re-sends SIGINT up to 3 times before failing clearly, and an interrupt pending at the first status poll counts as prompt. No bug in the signal polling | 100 loaded runs (`ctest -L unit -j 18` in parallel), 0 failures; ci.sh dev-openmp PASS (worker) and on the merge, which also carries the comm232 batching merge | Timing-sensitive subprocess tests must tolerate a loaded machine |
 | 2026-11-16 05:37 | feature/m12a-perf → develop | **M12a, single-node CPU performance (D40)**: contiguous 6j rows and a pair table for the Pandya ph term (the stored sparse Pandya maps of `12` §4.2 were not built: ~6 operators of memory for little extra gain), a new YK GEMM shape, Workspace scratch 10.4× → 5.5× a two-body operator (emax 8: 558 → 288 MB), per-channel norm reductions, faster `No2bThreeBody::get_pn`, concurrent GroupedGemm with Accelerate; report `design/benchmarks/imsrg2-performance.md`. Merge: the GIL-release test conflict resolved in favour of M12a's load-independent rewrite (M12-Q3 supersedes the relaxation of M10-Q67) | Full commutator ms, develop → now / imsrg++: emax 4 1 thr 6.71 → 1.16 / 5.21, 6 thr 2.18 → 0.65 / 1.53; emax 6 1 thr 100 → 18.2 / 70.6, 6 thr 24.9 → 5.1 / 15.2, 18 thr 3.9 / 9.5; emax 8 1 thr 866 → 169 / 671, 6 thr 199 → 49 / 155, 18 thr 31 / 95. Full O16 IMSRG(2) flow (same steps and E0): emax 8 59.8 s vs 187.8 s (6 thr), 40.5 s vs 148.8 s (18 thr); emax 6 7.9 s vs 24.3 s (6 thr). With imsrg++'s OpenBLAS still 2.0–2.6× faster at emax 6–8. Peak flow RSS emax 8 1097 MiB vs 2306–2551 MiB. IT step counts unchanged; the only bitwise change is round-off in the emax-2 [A,H] result (new GEMM shape). dev-openmp + dev-serial + slow PASS (lead); dev-openmp + slow (incl. IT-9 emax 3) PASS on the merge | emax 4 at 18 threads only 1.1× imsrg++ (launch overhead). M12-Q1..Q5. Next: dsyr2k for the Hermitian ladder, BCH temporaries reused across steps, lower launch overhead at small emax, then M12b. Scratch branch `tmp/m12a-bench-base` can be deleted |
+| 2026-11-16 06:22 | feature/run2-handoff-docs → develop | **End-of-run documents of run 2**: final report `design/reports/2026-11-15-run2.md` (run-1 format: summary, owner actions, validation table, performance, old-code bugs, deviations, next steps), `design/NEXT_SESSION_PROMPT.md` for run 3 (state, plan, lessons, briefs for the N7 performance follow-up, M12a follow-up and M12b), `design/INTERVIEW_PROMPT.md` (agenda for the owner interview after run 2: every open run-2 question by topic, decisions, owner actions); the orchestrator rewrote the current-state section of this file and corrected the M12a speedups in the report and prompts at the merge | ci.sh dev-openmp PASS on the merge (documentation only) | Owner: interview (D42), then run 3 |
