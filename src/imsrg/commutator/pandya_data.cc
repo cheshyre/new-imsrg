@@ -95,6 +95,32 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
   d.local_index_table = Upload(std::vector<std::int32_t>(lt.begin(), lt.end()),
                                "pandya::local_index_table");
 
+  // Kets by class (parity, Tz): class = 3 parity + Tz + 1, ascending ket
+  // order inside each class.
+  {
+    constexpr std::int32_t kNumClasses = 6;
+    std::vector<std::vector<std::int32_t>> lists(kNumClasses);
+    const auto& orbits = ms.basis();
+    for (std::int32_t k = 0; k < tb.num_kets(); ++k) {
+      const auto& ket = tb.ket(KetIndex{k});
+      const auto& a = orbits.orbit(ket.p);
+      const auto& b = orbits.orbit(ket.q);
+      const std::int32_t parity = (a.l + b.l) % 2;
+      const std::int32_t tz = (a.tz2.twice + b.tz2.twice) / 2;
+      lists[static_cast<std::size_t>(3 * parity + tz + 1)].push_back(k);
+    }
+    std::vector<std::int32_t> flat;
+    std::vector<std::int32_t> offsets{0};
+    for (const auto& l : lists) {
+      flat.insert(flat.end(), l.begin(), l.end());
+      offsets.push_back(static_cast<std::int32_t>(flat.size()));
+    }
+    d.num_class_kets = static_cast<std::int64_t>(flat.size());
+    d.class_kets = Upload(flat, "pandya::class_kets");
+    d.class_offset = Upload(offsets, "pandya::class_offset");
+    d.kernel_view.num_classes = kNumClasses;
+  }
+
   const auto sz = [](const std::vector<std::int64_t>& off) {
     return static_cast<std::size_t>(off.back());
   };
@@ -121,6 +147,8 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
   v.xk = d.xk.device_data();
   v.yk = d.yk.device_data();
   v.w = d.w.device_data();
+  v.class_kets = d.class_kets.device_data();
+  v.class_offset = d.class_offset.device_data();
 
   for (std::int32_t c = 0; c < ncc; ++c) {
     const auto cs = static_cast<std::size_t>(c);

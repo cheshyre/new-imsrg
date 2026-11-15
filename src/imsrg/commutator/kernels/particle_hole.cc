@@ -65,6 +65,10 @@ IMSRG_INLINE_FUNCTION double ParitySign(int n) noexcept {
   return (n & 1) ? -1.0 : 1.0;
 }
 
+/// Capacity of the per-pair J' buffers of the inverse transform: J' <= 2 emax
+/// + 1, so emax <= 31 (checked on the host).
+constexpr int kMaxJp = 64;
+
 /// Pandya transform xbar(p, q, r, s; J') = - sum_{J''} (2J''+1) {jp jq J'; jr
 /// js J''} X~^{J''}_{psrq} with X~ the unnormalized coupled element. `two_Jp`
 /// is 2J'. O(J'' range).
@@ -270,41 +274,6 @@ IMSRG_FORCEINLINE_FUNCTION double CcValue(const PhArgs& a, const CcTerm& t,
   const int beta = lb + (t.ket_flip ? n : 0);
   return t.sign *
          a.pv.w[a.pv.w_off[c] + alpha + static_cast<std::int64_t>(beta) * n];
-}
-
-/// Inverse Pandya transform of one element Z(ij, kl; J) before the
-/// normalization of equal-orbit pairs: sum over J' of (2J' + 1) [{ji jj J; jk
-/// jl J'} zbar(i, l, k, j; J') - (-1)^((ji + jj)/2 - J) {jj ji J; jk jl J'}
-/// zbar(j, l, k, i; J')], with the operation order of the per-element kernel
-/// it replaced (bitwise identical). O(J' range).
-IMSRG_FORCEINLINE_FUNCTION double InverseElement(const PhArgs& a, int i, int j,
-                                                 int k, int l,
-                                                 int two_J) noexcept {
-  const int* j2 = a.zv.tb.orbit_j2;
-  const int ji = j2[i], jj = j2[j], jk = j2[k], jl = j2[l];
-  const auto iabs = [](int v) { return v < 0 ? -v : v; };
-  const auto imax = [](int u, int v) { return u > v ? u : v; };
-  const auto imin = [](int u, int v) { return u < v ? u : v; };
-  const int lo2 = imin(imax(iabs(ji - jl), iabs(jj - jk)),
-                       imax(iabs(jj - jl), iabs(ji - jk)));
-  const int hi2 = imax(imin(ji + jl, jj + jk), imin(jj + jl, ji + jk));
-  const double ph_ij = ParitySign((ji + jj) / 2 - two_J / 2);
-  const CcTerm t1 = MakeCcTerm(a, i, l, k, j);
-  const CcTerm t2 = MakeCcTerm(a, j, l, k, i);
-  const double* row1 =
-      a.sj.row(TwoJ{ji}, TwoJ{jj}, TwoJ{two_J}, TwoJ{jk}, TwoJ{jl});
-  const double* row2 =
-      a.sj.row(TwoJ{jj}, TwoJ{ji}, TwoJ{two_J}, TwoJ{jk}, TwoJ{jl});
-  double z = 0.0;
-  for (int Jp = lo2 / 2; Jp <= hi2 / 2; ++Jp) {
-    const double s1 = row1[Jp];
-    const double s2 = row2[Jp];
-    double t = 0.0;
-    if (s1 != 0.0) t += s1 * CcValue(a, t1, Jp);
-    if (s2 != 0.0) t -= ph_ij * s2 * CcValue(a, t2, Jp);
-    z += (2 * Jp + 1) * t;
-  }
-  return z;
 }
 
 /// POD bundle of the general-path kernels (PhArgs plus the general scratch).
@@ -580,38 +549,96 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
       });
   exec::Fence("commutator::comm222_phss::combine");
 
-  // Inverse transform: one item per column (ket kl) of every two-body block,
-  // computing the upper triangle (rows ij <= kl) and mirroring with hZ.
+  // Inverse transform over pairs of kets: item = ket a = (i, j) of a class
+  // (parity, Tz), partners b >= a of the same class, b = (k, l). The two zbar
+  // values per J' depend only on the four orbits, not on J, so they are
+  // gathered once per pair and reused for every J the two kets share: one
+  // element Z(ij, kl; J) of the upper triangle per J (inside a channel the
+  // local order is the global ket order, so b >= a means column >= row), plus
+  // its mirror hZ Z. The arithmetic per element is that of the per-element
+  // kernel it replaced (bitwise identical). Writes are race free: item a
+  // writes row a (columns >= a) and column a (rows > a) of every channel.
+  IMSRG_CHECK(2 * impl.sixj.emax() + 2 <= kMaxJp,
+              "comm222_phss: emax too large for the J' buffer of the inverse");
   double* z2 = Z.two_body().matrix().buffer().device_data();
   const std::int64_t* block_offset = impl.block_offsets.device_data();
-  const std::int32_t* entry_channel = impl.entry_channel.device_data();
-  const auto columns = static_cast<exec::Index>(impl.entry_channel.size());
   exec::ParallelForDynamic(
-      "commutator::comm222_phss::inverse", columns,
+      "commutator::comm222_phss::inverse",
+      static_cast<exec::Index>(pd.num_class_kets),
       IMSRG_LAMBDA(const exec::Index e) {
         const auto& tb = a.zv.tb;
-        const int ch = entry_channel[e];
-        const std::int64_t off = tb.channel_ket_offset[ch];
-        const int ik = static_cast<int>(e - off);
-        const std::int64_t n = tb.channel_num_kets[ch];
-        const int* kets = tb.channel_kets + off;
-        const int k = tb.ket_p[kets[ik]];
-        const int l = tb.ket_q[kets[ik]];
-        const int two_J = tb.channel_two_j[ch];
-        double* zb = z2 + block_offset[ch];
-        for (int ib = 0; ib <= ik; ++ib) {
-          const int i = tb.ket_p[kets[ib]];
-          const int j = tb.ket_q[kets[ib]];
-          double z = InverseElement(a, i, j, k, l, two_J);
-          // imsrg++ normalization: divide by sqrt(2) per equal-orbit pair
-          // (exact constants::kSqrt2).
-          if (i == j) z /= constants::kSqrt2;
-          if (k == l) z /= constants::kSqrt2;
-          zb[ib + ik * n] += z;
-          // Z is (anti-)Hermitian with sign hZ = -hX hY: the mirrored
-          // element (ik, ib) lies in column ib, row ik > ib, which no other
-          // item writes.
-          if (ib != ik) zb[ik + ib * n] -= a.hxhy * z;
+        const int* j2 = tb.orbit_j2;
+        const int cl =
+            detail::FindBlock(a.pv.class_offset, a.pv.num_classes, e);
+        const int last = a.pv.class_offset[cl + 1];
+        const int ka = a.pv.class_kets[e];
+        const int i = tb.ket_p[ka];
+        const int j = tb.ket_q[ka];
+        const int ji = j2[i], jj = j2[j];
+        const int jmin_a = (ji > jj ? ji - jj : jj - ji) / 2;
+        const int jmax_a = (ji + jj) / 2;
+        const std::int32_t* lit_a =
+            tb.local_index_table + tb.ket_J_offsets[ka] - jmin_a;
+        // Two-body channel of the class at J: 3 (2J) + cls.
+        const int cls = tb.orbit_tz2[i] + tb.orbit_tz2[j] + 2 +
+                        (tb.orbit_l[i] + tb.orbit_l[j]) % 2;
+        const auto iabs = [](int v) { return v < 0 ? -v : v; };
+        const auto imax = [](int u, int v) { return u > v ? u : v; };
+        const auto imin = [](int u, int v) { return u < v ? u : v; };
+        for (int pb = static_cast<int>(e); pb < last; ++pb) {
+          const int kb = a.pv.class_kets[pb];
+          const int k = tb.ket_p[kb];
+          const int l = tb.ket_q[kb];
+          const int jk = j2[k], jl = j2[l];
+          const int jmin_b = iabs(jk - jl) / 2;
+          const int jlo = imax(jmin_a, jmin_b);
+          const int jhi = imin(jmax_a, (jk + jl) / 2);
+          if (jlo > jhi) continue;
+          const std::int32_t* lit_b =
+              tb.local_index_table + tb.ket_J_offsets[kb] - jmin_b;
+          const int lo2 = imin(imax(iabs(ji - jl), iabs(jj - jk)),
+                               imax(iabs(jj - jl), iabs(ji - jk)));
+          const int hi2 = imax(imin(ji + jl, jj + jk), imin(jj + jl, ji + jk));
+          const int jp0 = lo2 / 2;
+          const int jp1 = hi2 / 2;
+          const CcTerm t1 = MakeCcTerm(a, i, l, k, j);
+          const CcTerm t2 = MakeCcTerm(a, j, l, k, i);
+          double zbar1[kMaxJp];
+          double zbar2[kMaxJp];
+          for (int Jp = jp0; Jp <= jp1; ++Jp) {
+            zbar1[Jp - jp0] = CcValue(a, t1, Jp);
+            zbar2[Jp - jp0] = CcValue(a, t2, Jp);
+          }
+          for (int J = jlo; J <= jhi; ++J) {
+            const std::int32_t ib = lit_a[J];
+            if (ib < 0) continue;
+            const std::int32_t ik = lit_b[J];
+            if (ik < 0) continue;
+            const int ch = 6 * J + cls;
+            const std::int64_t n = tb.channel_num_kets[ch];
+            double* zb = z2 + block_offset[ch];
+            const double ph_ij = ParitySign((ji + jj) / 2 - J);
+            const double* row1 =
+                a.sj.row(TwoJ{ji}, TwoJ{jj}, TwoJ{2 * J}, TwoJ{jk}, TwoJ{jl});
+            const double* row2 =
+                a.sj.row(TwoJ{jj}, TwoJ{ji}, TwoJ{2 * J}, TwoJ{jk}, TwoJ{jl});
+            double z = 0.0;
+            for (int Jp = jp0; Jp <= jp1; ++Jp) {
+              const double s1 = row1[Jp];
+              const double s2 = row2[Jp];
+              double t = 0.0;
+              if (s1 != 0.0) t += s1 * zbar1[Jp - jp0];
+              if (s2 != 0.0) t -= ph_ij * s2 * zbar2[Jp - jp0];
+              z += (2 * Jp + 1) * t;
+            }
+            // imsrg++ normalization: divide by sqrt(2) per equal-orbit pair
+            // (exact constants::kSqrt2).
+            if (i == j) z /= constants::kSqrt2;
+            if (k == l) z /= constants::kSqrt2;
+            zb[ib + ik * n] += z;
+            // Z is (anti-)Hermitian with sign hZ = -hX hY.
+            if (ib != ik) zb[ik + ib * n] -= a.hxhy * z;
+          }
         }
       });
   exec::Fence("commutator::comm222_phss");
