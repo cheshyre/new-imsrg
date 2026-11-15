@@ -83,10 +83,17 @@ std::shared_ptr<const basis::ModelSpace> ModelSpaceForDump(
 /// counts, index ranges, p <= q and r <= s, kets that exist in their channel
 /// and channel pairs allowed by the spec; hw equal to the model space's (1e-12
 /// relative); occupations (see the options); and the hermiticity declared in
-/// `spec` within 1e-12 * max|V| (one-body and two-body parts).
+/// `spec` within 1e-12 * max|V| (one-, two- and three-body parts).
+/// The `three_body` section (`a b c Jab d e f Jde 2J value`, canonical orbits
+/// a <= b <= c, d <= e <= f of the dump's orbit list, Jab and Jde integers,
+/// 2J odd) is mapped to the kept rows of `ms->three_body_space()`: bra and ket
+/// must be kept kets of the same channel (2J, parity, 2Tz); records may be
+/// given in either triangle, the unlisted elements of a particle_rank 3
+/// operator are zero. A non-empty section for particle_rank <= 2 is an
+/// InputError; so is a particle_rank 3 operator on a model space without a
+/// three-body space.
 /// @throws InputError ("<path>:<line>: <message>") on any violation.
-/// @throws NotImplementedError for specs `validate` rejects and for a non-empty
-///         `three_body` section (reserved for M10).
+/// @throws NotImplementedError for specs `validate` rejects.
 Operator ReadOperatorDump(const std::filesystem::path& path,
                           std::shared_ptr<const basis::ModelSpace> ms,
                           const OperatorDumpReadOptions& options = {});
@@ -101,7 +108,10 @@ Operator ReadOperatorDump(std::istream& in, std::string_view name,
 /// byte-identically: values with `%.17g`; the one-body entries row by row (a,
 /// then b) and the two-body entries channel by channel, bra (local index), then
 /// ket, both only where the value is nonzero (so both (pq, rs) and (rs, pq)
-/// appear); `three_body none`. The `basis` record holds the model space's emax,
+/// appear); the three-body section (`three_body <count>`, channel by channel,
+/// bra local row, then ket local row, every nonzero element of the full matrix,
+/// i.e. both triangles; Jab and Jde are integers) or `three_body none` if the
+/// operator has no three-body part. The `basis` record holds the model space's emax,
 /// effective lmax and hw; the orbit records its orbits and reference
 /// occupations.
 /// @throws InputError if the file cannot be written.

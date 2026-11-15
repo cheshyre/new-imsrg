@@ -8,6 +8,7 @@ imsrg_add_module(NAME operator
     operator_spec.cc
     one_body.cc
     two_body.cc
+    three_body.cc
     operator.cc
     compare.cc
     arithmetic.cc

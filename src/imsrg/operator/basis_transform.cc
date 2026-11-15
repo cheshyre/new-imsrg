@@ -55,6 +55,11 @@ linalg::Matrix<double> ChannelTransform(const basis::TwoBodyChannels& chans,
 Operator TransformBasis(const Operator& op,
                         linalg::MatrixView<const double> C) {
   IMSRG_CHECK(!op.empty());
+  if (op.three_body()) {
+    throw NotImplementedError(
+        "transform_basis: operators with a three-body part (particle_rank 3) are not "
+        "supported");
+  }
   const std::int64_t norb = op.model_space().num_orbits();
   if (C.rows != norb || C.cols != norb) {
     throw InvariantError("transform_basis: C must be norb x norb");
@@ -98,6 +103,12 @@ Operator WithModelSpace(const Operator& op,
                         std::shared_ptr<const basis::ModelSpace> ms) {
   if (op.empty()) throw InvariantError("with_model_space: empty operator");
   if (!ms) throw InvariantError("with_model_space: null model space");
+  if (op.three_body()) {
+    throw NotImplementedError(
+        "with_model_space: operators with a three-body part (particle_rank 3) are not "
+        "supported");
+  }
+
   const auto a = op.model_space().two_body().orbits();
   const auto b = ms->two_body().orbits();
   if (a.size() != b.size() || !std::equal(a.begin(), a.end(), b.begin())) {

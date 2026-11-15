@@ -13,6 +13,7 @@
 #include <memory>
 #include <optional>
 #include <ostream>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -286,6 +287,175 @@ void AccumulateSymmetry(const double* data, std::int64_t n, double sgn,
   }
 }
 
+
+/// The records of the three-body section that lie above the diagonal of a
+/// Hermitian or anti-Hermitian part (the packed storage keeps the lower
+/// triangle only): their values per stored element, to check the declared
+/// symmetry after reading.
+class ThreeBodyRecords {
+ public:
+  /// Prepares the storage for `t` (packed parts only).
+  void Init(const ThreeBody& t) {
+    if (t.packed()) values_.assign(t.size(), 0.0);
+  }
+  /// Records the file value `v` of the element (i, j), i < j, of block `ch`.
+  void Set(std::size_t index, double v) { values_[index] = v; }
+
+  /// Adds max|V| and the largest violation of the declared symmetry to `vmax`
+  /// and `dev`: `lower` are the stored values of `t` (packed: lower triangle
+  /// as read; the upper-triangle records must equal h times them, and the
+  /// anti-Hermitian diagonal must be zero as read).
+  void Accumulate(const ThreeBody& t, const std::vector<double>& lower,
+                  double& vmax, double& dev) const {
+    if (!t.packed()) {
+      for (const double v : lower) vmax = std::max(vmax, std::abs(v));
+      return;
+    }
+    const double h = HermiticitySign(t.hermiticity());
+    const auto offsets = t.block_offsets();
+    for (std::size_t ch = 0; ch + 1 < offsets.size(); ++ch) {
+      const std::int64_t n = t.dim(Channel3Index{static_cast<std::int32_t>(ch)});
+      for (std::int64_t j = 0; j < n; ++j) {
+        for (std::int64_t i = j; i < n; ++i) {
+          const std::size_t k = static_cast<std::size_t>(
+              offsets[ch] + ThreeBody::PackedIndex(n, i, j));
+          const double lo = lower[k];
+          vmax = std::max(vmax, std::max(std::abs(lo), std::abs(values_[k])));
+          // i == j: the lower record stands for both; h = -1 requires zero.
+          dev = std::max(dev, i == j ? std::abs(lo - h * lo)
+                                     : std::abs(values_[k] - h * lo));
+        }
+      }
+    }
+  }
+
+ private:
+  std::vector<double> values_;
+};
+
+/// Reads one `a b c Jab d e f Jde 2J value` record and stores it in `t`.
+/// Both labels of the record must be canonical kept kets of the same channel
+/// (`two_j`, parity, 2Tz); errors carry the line of `f`. Lower-triangle (and
+/// dense) elements are written to the host mirror, upper-triangle ones to
+/// `upper`.
+void ReadThreeBodyRecord(Fields& f, const basis::ModelSpace& ms,
+                         const OperatorDumpHeader& hd,
+                         const std::vector<OrbitIndex>& map, ThreeBody& t,
+                         ThreeBodyRecords& upper) {
+  const auto norb = static_cast<std::int32_t>(hd.orbits.size());
+  std::int32_t x[8];
+  static const char* const kLabels[8] = {"a", "b", "c", "Jab",
+                                         "d", "e", "f", "Jde"};
+  for (int k = 0; k < 8; ++k) x[k] = f.NextInt(kLabels[k]);
+  const std::int32_t two_j = f.NextInt("2J");
+  const double v = f.NextDouble("value");
+  f.ExpectEnd();
+  for (const int k : {0, 1, 2, 4, 5, 6}) {
+    if (x[k] < 0 || x[k] >= norb) f.Fail("orbit index out of range");
+  }
+  if (x[3] < 0 || x[7] < 0) f.Fail("negative J");
+  if (two_j <= 0 || two_j % 2 == 0) f.Fail("2J must be a positive odd number");
+  if (x[0] > x[1] || x[1] > x[2] || x[4] > x[5] || x[5] > x[6]) {
+    f.Fail("three-body entries need a <= b <= c and d <= e <= f");
+  }
+  const basis::ThreeBodySpace& space = t.space();
+  const auto& sp = ms.basis();
+  struct KetLoc {
+    Channel3Index ch;
+    basis::KeptRow3Index row;
+  };
+  const auto locate = [&](int k0, const char* what) {
+    OrbitIndex o[3];
+    Parity par = Parity::kEven;
+    std::int32_t tz = 0;
+    for (int m = 0; m < 3; ++m) {
+      o[m] = map[static_cast<std::size_t>(x[k0 + m])];
+      const basis::Orbit& orb = sp.orbit(o[m]);
+      par = par * orb.parity();
+      tz += orb.tz2.twice;
+    }
+    if (o[0].value() > o[1].value() || o[1].value() > o[2].value()) {
+      f.Fail(std::string(what) +
+             " ket is not canonical in the model space's orbit order");
+    }
+    const auto ch = ms.three_body()->find_channel(TwoJ{two_j}, par, TwoTz{tz});
+    if (!ch) {
+      f.Fail(std::string(what) +
+             " ket: 2J, parity or 2Tz does not belong to a three-body channel");
+    }
+    const auto row =
+        space.find_row(*ch, o[0], o[1], o[2], TwoJ::FromInteger(x[k0 + 3]));
+    if (!row) {
+      f.Fail(std::string(what) +
+             " ket |(a b) Jab, c; 2J> is not a kept ket of the three-body "
+             "space (not coupled, cut, or outside its channel)");
+    }
+    return KetLoc{*ch, *row};
+  };
+  const KetLoc bra = locate(0, "bra");
+  const KetLoc ket = locate(4, "ket");
+  if (bra.ch != ket.ch) {
+    f.Fail("bra and ket are in different three-body channels");
+  }
+  const std::int64_t n = t.dim(bra.ch);
+  const std::int64_t i = bra.row.value();
+  const std::int64_t j = ket.row.value();
+  const std::int64_t off = t.block_offsets()[bra.ch.ToSize()];
+  auto host = t.host_span();
+  if (!t.packed()) {
+    host[static_cast<std::size_t>(off + i + j * n)] = v;
+  } else if (i >= j) {
+    host[static_cast<std::size_t>(off + ThreeBody::PackedIndex(n, i, j))] = v;
+  } else {
+    upper.Set(static_cast<std::size_t>(off + ThreeBody::PackedIndex(n, j, i)),
+              v);
+  }
+}
+
+/// Writes the `three_body` section: channel by channel, bra row then ket row,
+/// every nonzero element of the full matrix.
+void WriteThreeBody(std::ostream& out, const ThreeBody& t) {
+  const basis::ThreeBodySpace& space = t.space();
+  const std::vector<double> data = t.buffer().ToVector();
+  const auto offsets = t.block_offsets();
+  const int h = HermiticitySign(t.hermiticity());
+  std::ostringstream body;
+  std::int64_t count = 0;
+  for (std::int32_t c = 0; c < space.num_channels(); ++c) {
+    const basis::KeptChannel3& kc = space.channel(Channel3Index{c});
+    const std::int64_t n = kc.dim;
+    const std::int64_t off = offsets[static_cast<std::size_t>(c)];
+    const auto label = [&](std::int64_t row) {
+      const std::int64_t flat = kc.row_offset + row;
+      const basis::OrbitTriple& tr = space.triple(space.row_triple(flat));
+      return std::to_string(tr.a.value()) + " " + std::to_string(tr.b.value()) +
+             " " + std::to_string(tr.c.value()) + " " +
+             std::to_string(space.row_two_jab(flat).twice / 2);
+    };
+    for (std::int64_t i = 0; i < n; ++i) {
+      for (std::int64_t j = 0; j < n; ++j) {
+        double v;
+        if (!t.packed()) {
+          v = data[static_cast<std::size_t>(off + i + j * n)];
+        } else if (i >= j) {
+          v = i == j && h < 0
+                  ? 0.0
+                  : data[static_cast<std::size_t>(
+                        off + ThreeBody::PackedIndex(n, i, j))];
+        } else {
+          v = h * data[static_cast<std::size_t>(
+                      off + ThreeBody::PackedIndex(n, j, i))];
+        }
+        if (v == 0.0) continue;
+        body << label(i) << " " << label(j) << " " << kc.two_j.twice << " "
+             << Fmt17(v) << "\n";
+        ++count;
+      }
+    }
+  }
+  out << "three_body " << count << "\n" << body.str();
+}
+
 }  // namespace
 
 OperatorDumpHeader ReadOperatorDumpHeader(const std::filesystem::path& path) {
@@ -445,14 +615,24 @@ Operator ReadOperatorDump(std::istream& in, std::string_view name,
     op.two_body().set(*bra.ch, *ket.ch, *bra.idx, *ket.idx,
                       bra.phase * ket.phase * v);
   }
+  ThreeBodyRecords upper;  // upper-triangle records, for the symmetry check
   {
     auto f = r.Expect("three_body");
     const std::string w = f.NextToken("count");
     f.ExpectEnd();
-    if (w != "none" && w != "0") {
-      throw NotImplementedError(std::string(name) + ":" +
-                                std::to_string(f.lineno()) +
-                                ": three_body entries are not supported yet");
+    std::int32_t n3 = 0;
+    if (w != "none") {
+      Fields cf(w, name, f.lineno());
+      n3 = ReadCount(cf, "count");
+    }
+    if (n3 > 0 && !op.three_body()) {
+      f.Fail("three_body entries in an operator with particle_rank " +
+             std::to_string(hd.spec.particle_rank) + " (need 3)");
+    }
+    if (op.three_body()) upper.Init(*op.three_body());
+    for (std::int32_t i = 0; i < n3; ++i) {
+      auto g = r.data("three_body");
+      ReadThreeBodyRecord(g, *ms, hd, map, *op.three_body(), upper);
     }
   }
   {
@@ -460,6 +640,9 @@ Operator ReadOperatorDump(std::istream& in, std::string_view name,
     f.ExpectEnd();
   }
   op.SyncToDevice();
+  const std::vector<double> three_body_values =
+      op.three_body() ? std::as_const(op).three_body()->buffer().ToVector()
+                      : std::vector<double>();
 
   // Hermiticity check, tolerance 1e-12 * max|V| (design/15).
   if (hd.spec.hermiticity != Hermiticity::kNonHermitian) {
@@ -477,6 +660,9 @@ Operator ReadOperatorDump(std::istream& in, std::string_view name,
         const auto& info = mat.block_info(k);
         AccumulateSymmetry(tb.data() + info.offset, info.rows, sgn, vmax, dev);
       }
+    }
+    if (op.three_body()) {
+      upper.Accumulate(*op.three_body(), three_body_values, vmax, dev);
     }
     if (dev > 1.0e-12 * std::max(vmax, 1.0e-300)) {
       FailAt(name, r.lineno(),
@@ -574,7 +760,11 @@ void WriteOperatorDump(std::ostream& out, const Operator& op,
       }
     }
   }
-  out << "three_body none\n";
+  if (op.three_body()) {
+    WriteThreeBody(out, *op.three_body());
+  } else {
+    out << "three_body none\n";
+  }
   out << "end\n";
 }
 

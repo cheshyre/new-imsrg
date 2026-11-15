@@ -16,6 +16,11 @@ Operator& Axpy(double a, const Operator& x, Operator& y) {
               "axpy: operators live on different model spaces");
   IMSRG_CHECK(x.spec().SameSymmetry(y.spec()),
               "axpy: operators differ in symmetry");
+  IMSRG_CHECK(!x.three_body() || !y.three_body() ||
+                  (x.three_body()->size() == y.three_body()->size() &&
+                   x.three_body()->space().NumRows() ==
+                       y.three_body()->space().NumRows()),
+              "axpy: operators differ in three-body layout");
   IMSRG_CHECK(x.spec().particle_rank <= y.spec().particle_rank,
               "axpy: y must hold every part of x (particle_rank of x exceeds "
               "that of y)");
@@ -29,6 +34,21 @@ Operator& Axpy(double a, const Operator& x, Operator& y) {
     detail::Axpy(a, x.two_body().matrix().buffer(),
                  y.two_body().matrix().buffer());
   }
+  if (x.three_body()) {
+    IMSRG_CHECK(y.three_body().has_value(), "axpy: y has no three-body part");
+    ThreeBody& y3 = *y.three_body();
+    const ThreeBody& x3 = *x.three_body();
+    if (x3.hermiticity() == y3.hermiticity()) {
+      detail::Axpy(a, x3.buffer(), y3.buffer());
+    } else {
+      // Mixed symmetry: the combination is non-Hermitian, so both parts go to
+      // the dense layout first (the packed layouts differ from it).
+      y3.set_hermiticity(Hermiticity::kNonHermitian);
+      ThreeBody x3_dense = x3;
+      x3_dense.set_hermiticity(Hermiticity::kNonHermitian);
+      detail::Axpy(a, x3_dense.buffer(), y3.buffer());
+    }
+  }
   y.set_hermiticity(CombinedHermiticity(y.hermiticity(), x.hermiticity()));
   return y;
 }
@@ -39,6 +59,7 @@ Operator& Scale(Operator& x, double a) {
   if (x.two_body().allocated()) {
     detail::Scale(a, x.two_body().matrix().buffer());
   }
+  if (x.three_body()) detail::Scale(a, x.three_body()->buffer());
   return x;
 }
 

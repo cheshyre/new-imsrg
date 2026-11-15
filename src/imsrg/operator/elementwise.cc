@@ -6,12 +6,19 @@
 #include <cmath>
 
 #include "imsrg/base/assert.h"
+#include "imsrg/base/error.h"
 #include "imsrg/operator/detail/part_kernels.h"
 
 namespace imsrg::op {
 
 void ElementwiseAbs(Operator& x) {
   IMSRG_CHECK(!x.empty(), "ElementwiseAbs: empty operator");
+  if (x.three_body()) {
+    throw NotImplementedError(
+        "ElementwiseAbs: operators with a three-body part (particle_rank 3) are not "
+        "supported");
+  }
+
   x.zero_body() = std::abs(x.zero_body());
   detail::Abs(x.one_body().buffer());
   if (x.two_body().allocated()) detail::Abs(x.two_body().matrix().buffer());
@@ -21,6 +28,12 @@ void ElementwiseAbs(Operator& x) {
 void ElementwiseDivide(Operator& num, const Operator& denom) {
   IMSRG_CHECK(!num.empty() && !denom.empty(),
               "ElementwiseDivide: empty operator");
+  if (num.three_body()) {
+    throw NotImplementedError(
+        "ElementwiseDivide: operators with a three-body part (particle_rank 3) are not "
+        "supported");
+  }
+
   IMSRG_CHECK(SameModelSpace(num, denom),
               "ElementwiseDivide: different model spaces");
   IMSRG_CHECK(num.spec().SameSymmetry(denom.spec()) &&
@@ -39,6 +52,12 @@ void ElementwiseDivide(Operator& num, const Operator& denom) {
 
 void AddToEveryElement(Operator& x, double c) {
   IMSRG_CHECK(!x.empty(), "AddToEveryElement: empty operator");
+  if (x.three_body()) {
+    throw NotImplementedError(
+        "AddToEveryElement: operators with a three-body part (particle_rank 3) are not "
+        "supported");
+  }
+
   x.zero_body() += c;
   detail::AddScalar(c, x.one_body().buffer());
   if (x.two_body().allocated()) {

@@ -16,6 +16,11 @@ namespace imsrg::op {
 Operator NormalOrder(const Operator& op, std::span<const double> occupations,
                      NormalOrderDirection direction) {
   IMSRG_CHECK(!op.empty(), "normal_order: empty operator");
+  if (op.three_body()) {
+    throw NotImplementedError(
+        "normal_order: operators with a three-body part (particle_rank 3) are not "
+        "supported");
+  }
   const basis::ModelSpace& ms = op.model_space();
   const basis::SingleParticleBasis& sp = ms.basis();
   const std::int32_t norb = sp.num_orbits();
