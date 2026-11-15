@@ -91,6 +91,7 @@ struct Comm232Tables {
   std::vector<std::int32_t> ch_begin_host;   ///< Host copy of ch_begin.
   std::vector<std::int32_t> ch_active_host;  ///< Host copy of ch_active.
   std::vector<std::int32_t> ch_two_j_host;   ///< 2 J3 per channel.
+  std::vector<std::int32_t> third_host;      ///< Third orbit per sorted t.
   std::int32_t norb = 0;                     ///< Orbits of the basis.
   std::int32_t nj = 0;                       ///< Two-body J values.
   std::int32_t max_two_jc = 0;               ///< Largest 2j of an orbit.

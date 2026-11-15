@@ -222,6 +222,10 @@ struct BatchBlocks {
   std::int32_t ch_hi = 0;       ///< One past the channel of column t1 - 1.
   std::int32_t two_j3_lo = 0;   ///< 2 J3 of channel ch_lo.
   std::int32_t two_j3_hi = 0;   ///< 2 J3 of channel ch_hi - 1.
+  /// Thirds c that columns of the batch can have: [c_lo, c_hi] (all orbits
+  /// for a batch of several channels; the thirds of a channel are sorted).
+  std::int32_t c_lo = 0;
+  std::int32_t c_hi = 0;
 };
 static_assert(std::is_trivially_copyable_v<BatchBlocks>);
 
@@ -268,7 +272,7 @@ IMSRG_INLINE_FUNCTION double HalfSumPairThird(
   const int rs_key = r * pb.norb + s;
   const int rs_class = PairClass(v.ob.occupation[r], v.ob.occupation[s]);
   double total = 0.0;
-  for (int c = 0; c < v.norb; ++c) {
+  for (int c = bb.c_lo; c <= bb.c_hi; ++c) {
     const int jc = v.ob.j2[c];
     // 2 J3 of the column (r s) J c within the batch.
     const int c_lo = Max(AbsDiff(two_J, jc), bb.two_j3_lo);
@@ -637,7 +641,7 @@ Comm232Tables BuildComm232Tables(const op::PairThirdSpace& pair_third,
   };
   std::vector<std::int32_t> count(kComm232Classes * nblocks + 1, 0);
   std::vector<std::int32_t> ch_begin(at(nch) + 1, 0);
-  std::vector<std::int32_t> orig(ns), key(ns), local(ns);
+  std::vector<std::int32_t> orig(ns), third(ns), key(ns), local(ns);
   std::vector<double> occ_hh(ns), occ_pp(ns);
   std::vector<std::int32_t> perm;
   std::int32_t next = 0;
@@ -667,6 +671,7 @@ Comm232Tables BuildComm232Tables(const op::PairThirdSpace& pair_third,
       const int q = pt.st_q[f];
       const int two_jpq = pt.st_two_jpq[f];
       orig[t] = f;
+      third[t] = pt.st_r[f];
       key[t] = p * norb + q;
       const std::optional<LocalKetIndex> li = two.local_index(
           two.ket_index(OrbitIndex{p}, OrbitIndex{q}), TwoJ{two_jpq});
@@ -735,6 +740,7 @@ Comm232Tables BuildComm232Tables(const op::PairThirdSpace& pair_third,
   t.ch_begin_host = std::move(ch_begin);
   t.ch_active_host = std::move(ch_active);
   t.ch_two_j_host = std::move(ch_two_j);
+  t.third_host = std::move(third);
   t.norb = norb;
   t.nj = nj;
   t.max_two_jc = ms3.basis().max_j2().twice;
@@ -830,6 +836,9 @@ void Comm232ssPairThird(const op::Operator& X, const op::Operator& Y,
     bb.ch_hi = b.ch_hi;
     bb.two_j3_lo = tables.ch_two_j_host[at(b.ch_lo)];
     bb.two_j3_hi = tables.ch_two_j_host[at(b.ch_hi - 1)];
+    const bool one_channel = b.ch_hi - b.ch_lo == 1;
+    bb.c_lo = one_channel ? tables.third_host[at(b.t0)] : 0;
+    bb.c_hi = one_channel ? tables.third_host[at(b.t1 - 1)] : tables.norb - 1;
     BuildPairThirdBlocks(v, pb, e, bb.w_base, b.size, o);
     // Z2 blocks whose pair J reaches the batch: |2J - j_c| <= 2 J3 <= 2J +
     // j_c for some 2 J3 of the batch and j_c <= 2 emax + 1. Two-body
