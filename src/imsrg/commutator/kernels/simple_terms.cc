@@ -84,6 +84,11 @@ void Comm220ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   const TwoBodyView yv = impl.two_body_view(Y);
   const double* occ = impl.tables.orbits().occupation;
   const std::int32_t* entry_channel = impl.entry_channel.device_data();
+  // The kets k with (1 - n_p)(1 - n_q) != 0 of each channel, ascending: the
+  // ladder's pp list (the same exact test), so the loop below visits the
+  // non-zero terms of the full loop over k in the same order (M12a).
+  const std::int32_t* pp_list = impl.ladder.pp.list.device_data();
+  const std::int64_t* pp_offset = impl.ladder.pp.list_offset.device_data();
   const exec::Index nentries =
       static_cast<exec::Index>(impl.entry_channel.size());
   double sum = 0.0;
@@ -100,8 +105,10 @@ void Comm220ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
         const int pi = xv.tb.ket_p[kets[i]];
         const int qi = xv.tb.ket_q[kets[i]];
         const double nn_i = occ[pi] * occ[qi];
+        if (nn_i == 0.0) return;  // every term of the row vanishes
         double s = 0.0;
-        for (int k = 0; k < n; ++k) {
+        for (std::int64_t m = pp_offset[ch]; m < pp_offset[ch + 1]; ++m) {
+          const int k = pp_list[m];
           const int pk = xv.tb.ket_p[kets[k]];
           const int qk = xv.tb.ket_q[kets[k]];
           const double nb_k = (1.0 - occ[pk]) * (1.0 - occ[qk]);
