@@ -647,3 +647,17 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   would need tens of GB. **Assumed meanwhile:** as imsrg++ (the triples are a post-processing step
   and `imsrg3.de3max` bounds the space). Follow-up if triples at emax >= 8 are wanted: build R per
   tile inside the kernel (it is a few 6j products per entry) and skip E for the triples context.
+* **M10-Q60** (2026-11-16, M10 step 3) - The three-body generator copies imsrg++ exactly: Delta3 is
+  the one-body diagonal only (no Epstein-Nesbet terms) and, unlike the one- and two-body
+  denominators, it has NO floor (`Get3bDenominator`, Generator.cc:231-239) and no
+  `denominator_delta`; a vanishing Delta3 gives inf/NaN with white. **Assumed meanwhile:** as
+  imsrg++ (the 2B floor deviation D21 is not extended to 3B). Floor it if a flow hits it.
+* **M10-Q61** (2026-11-16, M10 step 3) - With IMSRG(3) the final H and transformed operators have
+  their residual three-body part dropped before the valence-space/operator output (imsrg++.cc:1177,
+  1256 do the same after renormal ordering). Operators are transformed with the IMSRG(3) commutator
+  as in imsrg++ (rank-3 result, 3B part dropped), which for a rank-2 operator adds the terms that
+  need Omega_3. **Assumed meanwhile:** as imsrg++; not validated against an imsrg++ operator golden
+  (IT-9 has none).
+* **M10-Q62** (2026-11-16, M10 step 3) - `imsrg3.occ_nat3_cut` with IMSRG(3), `variant = "full"` and
+  `"mp4"`, `at_end`, `only_2b_omega` stay E-PLANNED: the cut needs the NAT occupations in the
+  three-body space (`ThreeBodyCuts::natural_occupations`) which the driver does not pass yet.

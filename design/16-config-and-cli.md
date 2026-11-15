@@ -165,6 +165,8 @@ Generator enum: `white`, `atan`, `imaginary_time`, `wegner`, `qtransfer_atan`, `
 
 Whole table absent or all-default = IMSRG(2). Non-default keys without `in_flow` or `at_end` are errors in TOML (except `factorized`, which works with IMSRG(2) storage).
 
+**Implemented (run 2, M10 step 3):** `in_flow = true` with `variant = "n7"` (legacy `IMSRG3=true imsrg3_n7=true`), Magnus method only (V-46): the IMSRG model space gets the three-body space (`e3max` = effective `basis.e3max`, `de3max`; `emax_3body` = `emax`), H is promoted to particle rank 3 with a zero three-body part (a NO2B 3N input stays at rank-2 normal ordering), the commutators use the seven N7 terms, `threebody_threshold` and `only_2b_eta` are honoured, and the single-reference generators get the three-body part of imsrg++ (`white`, `atan`, ...; shell-model generators with IMSRG(3) are `NotImplementedError`). The residual three-body part of H and of transformed operators is dropped before output. **Still E-PLANNED:** `variant = "full"` / `"mp4"`, `at_end`, `only_2b_omega`, `no_qqq`, `occ_nat3_cut` with IMSRG(3), and `imsrg.perturbative_triples` together with `in_flow`.
+
 | key | type | default | meaning |
 |---|---|---|---|
 | `in_flow` | bool | `false` | include 3-body terms in commutators during the flow (old `IMSRG3`). |
@@ -253,7 +255,9 @@ The flow file (`output.flow_file`, CSV with a header line) has one row per solve
 being the initial state of each stage. Columns: `stage, istep, s, ds, E0, norm_H, norm_eta_1b,
 norm_eta_2b, norm_eta, norm_omega_1b, norm_omega_2b, norm_omega, num_omegas, E_MP2, wall_s`.
 `E_MP2` is the MBPT(2) correlation energy of the current Hamiltonian H(s), as in imsrg++'s flow
-file (`E(MP2)` column); it costs one MP2 evaluation per step.
+file (`E(MP2)` column); it costs one MP2 evaluation per step. With `imsrg3.in_flow` the columns
+`norm_eta_3b` (after `norm_eta_2b`) and `norm_omega_3b` (after `norm_omega_2b`) are added; the other
+runs keep the columns above.
 
 Changelog (newest first):
 
