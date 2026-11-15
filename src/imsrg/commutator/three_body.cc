@@ -247,6 +247,24 @@ ThreeBodyContext::Impl::Impl(
   }
   pair_local = Upload(p_local, "commutator::comm223_pair_local");
   pair_factor = Upload(p_factor, "commutator::comm223_pair_factor");
+  // Leg ranges: positions of the j blocks in the triangle range of (o, J).
+  {
+    std::vector<std::int32_t> range(U(norb) * U(num_j) * 8, 0);
+    for (std::int32_t o = 0; o < norb; ++o) {
+      const std::int32_t j2o = orbits[U(o)].j2.twice;
+      for (std::int32_t J = 0; J < num_j; ++J) {
+        const std::int32_t ij_lo = (std::abs(2 * J - j2o) - 1) / 2;
+        const std::int32_t ij_hi = std::min((2 * J + j2o - 1) / 2, nj - 1);
+        for (std::int32_t g = 0; g < 4; ++g) {
+          const std::size_t e = ((U(o) * U(num_j) + U(J)) * 4 + U(g)) * 2;
+          if (ij_lo > ij_hi) continue;
+          range[e] = g_jpos[U(g * (nj + 1) + ij_lo)];
+          range[e + 1] = g_jpos[U(g * (nj + 1) + ij_hi + 1)];
+        }
+      }
+    }
+    leg_range = Upload(range, "commutator::comm223_leg_range");
+  }
   // Per pair-third state: the two-body bases of its pair (p, q) at Jpq.
   {
     const auto ns = static_cast<std::size_t>(pv.num_states);
@@ -336,10 +354,10 @@ ThreeBodyContext::Impl::Impl(
                 BufferBytes(tr_row_end) + BufferBytes(tr_sym) +
                 BufferBytes(group_offset) + BufferBytes(group_orbits) +
                 BufferBytes(group_j_pos) + BufferBytes(pair_local) +
-                BufferBytes(pair_factor) + BufferBytes(state_bra_base) +
-                BufferBytes(state_ket_base) + BufferBytes(state_dim) +
-                BufferBytes(order_lower) + BufferBytes(order_full) +
-                BufferBytes(order_triples);
+                BufferBytes(pair_factor) + BufferBytes(leg_range) +
+                BufferBytes(state_bra_base) + BufferBytes(state_ket_base) +
+                BufferBytes(state_dim) + BufferBytes(order_lower) +
+                BufferBytes(order_full) + BufferBytes(order_triples);
 }
 
 detail::TileViews ThreeBodyContext::Impl::Views() const {
@@ -369,6 +387,7 @@ detail::TileViews ThreeBodyContext::Impl::Views() const {
   v.groups.nj = nj;
   v.legs.pair_local = pair_local.device_data();
   v.legs.pair_factor = pair_factor.device_data();
+  v.legs.leg_range = leg_range.device_data();
   v.legs.state_bra_base = state_bra_base.device_data();
   v.legs.state_ket_base = state_ket_base.device_data();
   v.legs.state_dim = state_dim.device_data();

@@ -55,6 +55,7 @@ struct ThreeBodyContext::Impl {
   /// Gather tables of the legs (see `detail::LegTablesView`).
   exec::DeviceBuffer<std::int32_t> pair_local;
   exec::DeviceBuffer<double> pair_factor;
+  exec::DeviceBuffer<std::int32_t> leg_range;
   exec::DeviceBuffer<std::int64_t> state_bra_base, state_ket_base;
   exec::DeviceBuffer<std::int32_t> state_dim;
   std::int32_t num_j = 0;  ///< 2 emax + 2.

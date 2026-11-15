@@ -112,7 +112,8 @@ struct TileScratchCounts {
 };
 
 /// Number of per-state int32 tables in the team scratch (rows: J1', index of
-/// z, 2 j_z; columns: J2', index of w, cache slot, 2 j_w).
+/// z, 6j offset c3 J1' + c4 (2 j_z - 1) / 2; columns: J2', index of w, cache
+/// slot, 2 j_w).
 inline constexpr std::int64_t kStateTables = 7;
 
 /// The scratch counts for `ext`: bra cache kBraSlots m S 2, ket legs
@@ -147,6 +148,10 @@ enum class TileMode : std::int8_t {
 /// * `pair_factor[e]`: 1 for o < a, `basis::ExchangePhase(j_o, j_a, J)` for
 ///   o > a, sqrt 2 for o == a (the unnormalized (o a) pair), and 0 if the ket
 ///   does not exist (triangle, Pauli), so a gather is branch-free.
+/// Per leg key (o, J) and orbit group g: `leg_range[((o num_j + J) 4 + g) 2]`
+/// and `[... + 1]` are the first and one-past-last positions in group g
+/// (relative to its offset) of the orbits a with 2 j_a in [|2J - 2 j_o|, 2J
+/// + 2 j_o] (the triangle range of the leg; empty if none).
 /// Per flat pair-third state f with pair (p, q) and Jpq (always an existing
 /// ket): `state_bra_base[f]` = block offset + local index of (p, q), the
 /// element (P, k) at `state_bra_base[f] + k state_dim[f]`;
@@ -155,6 +160,7 @@ enum class TileMode : std::int8_t {
 struct LegTablesView {
   const std::int32_t* pair_local = nullptr;
   const double* pair_factor = nullptr;
+  const std::int32_t* leg_range = nullptr;
   const std::int64_t* state_bra_base = nullptr;
   const std::int64_t* state_ket_base = nullptr;
   const std::int32_t* state_dim = nullptr;
