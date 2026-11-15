@@ -15,9 +15,11 @@
 #include <vector>
 
 #include "imsrg/base/assert.h"
+#include "imsrg/base/constants.h"
 #include "imsrg/base/error.h"
 #include "imsrg/base/types.h"
 #include "imsrg/basis/three_body_space.h"
+#include "imsrg/basis/two_body_channels.h"
 #include "imsrg/commutator/detail/three_body_impl.h"
 #include "imsrg/commutator/detail/three_body_tiles.h"
 #include "imsrg/operator/operator_spec.h"
@@ -131,8 +133,6 @@ ThreeBodyContext::Impl::Impl(
     const std::int64_t n = tbc.channel(ChannelIndex{ch}).num_kets;
     two_body_offset_host[U(ch) + 1] = two_body_offset_host[U(ch)] + n * n;
   }
-  two_body_offset =
-      Upload(two_body_offset_host, "commutator::comm223_two_body_offset");
 
   // Kept canonical space.
   const auto channels = space.channels();
@@ -218,6 +218,60 @@ ThreeBodyContext::Impl::Impl(
   group_orbits = Upload(g_orb, "commutator::comm223_group_orbits");
   group_j_pos = Upload(g_jpos, "commutator::comm223_group_j_pos");
 
+  // Leg tables (detail::LegTablesView): per (third o, J, grouped position of
+  // a) the local index of the ket (min(o, a), max(o, a)) and the factor
+  // (exchange phase for o > a, sqrt 2 for o == a, 0 if the ket is absent).
+  const std::int32_t norb = ms3->num_orbits();
+  num_j = 2 * ms3->basis().emax() + 2;
+  std::vector<std::int32_t> p_local(U(norb) * U(num_j) * U(norb), 0);
+  std::vector<double> p_factor(p_local.size(), 0.0);
+  for (std::int32_t o = 0; o < norb; ++o) {
+    const TwoJ jo = orbits[U(o)].j2;
+    for (std::int32_t J = 0; J < num_j; ++J) {
+      for (std::int32_t gp = 0; gp < norb; ++gp) {
+        const std::int32_t a = g_orb[U(gp)];
+        const TwoJ ja = orbits[U(a)].j2;
+        const KetIndex ket = tbc.ket_index(OrbitIndex{std::min(o, a)},
+                                           OrbitIndex{std::max(o, a)});
+        const auto li = tbc.local_index(ket, TwoJ{2 * J});
+        if (!li.has_value()) continue;
+        const std::size_t e = (U(o) * U(num_j) + U(J)) * U(norb) + U(gp);
+        p_local[e] = li->value();
+        p_factor[e] =
+            o < a ? 1.0
+            : o > a
+                ? static_cast<double>(basis::ExchangePhase(jo, ja, TwoJ{2 * J}))
+                : constants::kSqrt2;
+      }
+    }
+  }
+  pair_local = Upload(p_local, "commutator::comm223_pair_local");
+  pair_factor = Upload(p_factor, "commutator::comm223_pair_factor");
+  // Per pair-third state: the two-body bases of its pair (p, q) at Jpq.
+  {
+    const auto ns = static_cast<std::size_t>(pv.num_states);
+    std::vector<std::int64_t> bra(ns);
+    std::vector<std::int64_t> ket(ns);
+    std::vector<std::int32_t> dim(ns);
+    for (std::size_t f = 0; f < ns; ++f) {
+      const OrbitIndex p{pv.st_p[f]};
+      const OrbitIndex q{pv.st_q[f]};
+      const TwoJ tj{pv.st_two_jpq[f]};
+      const auto li = tbc.local_index(tbc.ket_index(p, q), tj);
+      IMSRG_CHECK(li.has_value(),
+                  "ThreeBodyContext: pair-third state without a two-body ket");
+      const ChannelIndex ch = tbc.channel_of(p, q, tj);
+      const std::int64_t n = tbc.channel(ch).num_kets;
+      const std::int64_t off = two_body_offset_host[ch.ToSize()];
+      bra[f] = off + li->value();
+      ket[f] = off + n * li->value();
+      dim[f] = static_cast<std::int32_t>(n);
+    }
+    state_bra_base = Upload(bra, "commutator::comm223_state_bra_base");
+    state_ket_base = Upload(ket, "commutator::comm223_state_ket_base");
+    state_dim = Upload(dim, "commutator::comm223_state_dim");
+  }
+
   // Tile extents and work orders. Estimated work of bra triple t: m_t times
   // the summed m of its ket triples (m = pair-third states).
   std::vector<double> cost_lower(nt, 0.0);
@@ -273,17 +327,19 @@ ThreeBodyContext::Impl::Impl(
 
   scratch_bytes = num_triples > 0 ? detail::TeamScratchBytes(ext) : 0;
   table_bytes = DeviceTablesBytes(*ms3) + sixj.size_bytes() +
-                pair_third.Bytes() + BufferBytes(two_body_offset) +
-                BufferBytes(ch_two_j) + BufferBytes(ch_dim) +
-                BufferBytes(ch_triple_begin) + BufferBytes(ch_triple_end) +
-                BufferBytes(ch_row_offset) + BufferBytes(ch_packed_offset) +
-                BufferBytes(ch_dense_offset) + BufferBytes(tr_a) +
-                BufferBytes(tr_b) + BufferBytes(tr_c) +
+                pair_third.Bytes() + BufferBytes(ch_two_j) +
+                BufferBytes(ch_dim) + BufferBytes(ch_triple_begin) +
+                BufferBytes(ch_triple_end) + BufferBytes(ch_row_offset) +
+                BufferBytes(ch_packed_offset) + BufferBytes(ch_dense_offset) +
+                BufferBytes(tr_a) + BufferBytes(tr_b) + BufferBytes(tr_c) +
                 BufferBytes(tr_channel) + BufferBytes(tr_row_begin) +
                 BufferBytes(tr_row_end) + BufferBytes(tr_sym) +
                 BufferBytes(group_offset) + BufferBytes(group_orbits) +
-                BufferBytes(group_j_pos) + BufferBytes(order_lower) +
-                BufferBytes(order_full) + BufferBytes(order_triples);
+                BufferBytes(group_j_pos) + BufferBytes(pair_local) +
+                BufferBytes(pair_factor) + BufferBytes(state_bra_base) +
+                BufferBytes(state_ket_base) + BufferBytes(state_dim) +
+                BufferBytes(order_lower) + BufferBytes(order_full) +
+                BufferBytes(order_triples);
 }
 
 detail::TileViews ThreeBodyContext::Impl::Views() const {
@@ -307,12 +363,17 @@ detail::TileViews ThreeBodyContext::Impl::Views() const {
   v.pt = pair_third.device_view();
   v.sj = sixj.device_view();
   v.ob = tables.orbits();
-  v.tb = tables.two_body();
   v.groups.offset = group_offset.device_data();
   v.groups.orbits = group_orbits.device_data();
   v.groups.j_pos = group_j_pos.device_data();
   v.groups.nj = nj;
-  v.two_body_offset = two_body_offset.device_data();
+  v.legs.pair_local = pair_local.device_data();
+  v.legs.pair_factor = pair_factor.device_data();
+  v.legs.state_bra_base = state_bra_base.device_data();
+  v.legs.state_ket_base = state_ket_base.device_data();
+  v.legs.state_dim = state_dim.device_data();
+  v.legs.num_j = num_j;
+  v.legs.num_orbits = static_cast<std::int32_t>(group_orbits.size());
   // Strides of SixJ3View's layout ((((i1 nj + i2) nJ + J12) nj + i3) nJ3 + iJ)
   // nJ + J23.
   const std::int64_t e = sixj.emax();

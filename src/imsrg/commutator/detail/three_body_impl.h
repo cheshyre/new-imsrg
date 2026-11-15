@@ -37,7 +37,6 @@ struct ThreeBodyContext::Impl {
   /// Offsets of the two-body channel blocks of `op::TwoBody` (one n x n block
   /// per channel, in channel order; num_channels + 1 entries).
   std::vector<std::int64_t> two_body_offset_host;
-  exec::DeviceBuffer<std::int64_t> two_body_offset;  ///< Device copy.
 
   /// Kept canonical space (see `detail::Space3View`).
   exec::DeviceBuffer<std::int32_t> ch_two_j, ch_dim, ch_triple_begin,
@@ -52,6 +51,13 @@ struct ThreeBodyContext::Impl {
   /// Orbit groups (see `detail::OrbitGroupsView`).
   exec::DeviceBuffer<std::int32_t> group_offset, group_orbits, group_j_pos;
   std::int32_t nj = 0;  ///< emax + 1.
+
+  /// Gather tables of the legs (see `detail::LegTablesView`).
+  exec::DeviceBuffer<std::int32_t> pair_local;
+  exec::DeviceBuffer<double> pair_factor;
+  exec::DeviceBuffer<std::int64_t> state_bra_base, state_ket_base;
+  exec::DeviceBuffer<std::int32_t> state_dim;
+  std::int32_t num_j = 0;  ///< 2 emax + 2.
 
   /// Team work orders (bra triples, largest estimated work first): all
   /// triples for the tiles T' <= T (`order_lower`) and for all tiles

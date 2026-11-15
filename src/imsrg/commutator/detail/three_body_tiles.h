@@ -20,7 +20,9 @@
 ///     (consecutive T' share thirds, so most legs are reused), and the ket
 ///     legs X/Y_{(z a),Q_s} for the columns s of T' and the distinct thirds z
 ///     of T; only the internal orbits a whose j lies in the triangle range of
-///     the leg are gathered;
+///     the leg are gathered, through the index tables of `LegTablesView`
+///     (O(norb^2 emax) pair entries and O(states) base indices, not gathered
+///     values);
 ///  2. computes W[r, s] over the 6j-allowed j blocks of the orbit group of a
 ///     (one 6j lookup per j block);
 ///  3. applies the epilogue R_T W R_T'^T and writes the packed lower
@@ -106,21 +108,23 @@ static_assert(std::is_trivially_copyable_v<TileExtents>);
 /// Element counts of the team scratch of one team, by type.
 struct TileScratchCounts {
   std::int64_t doubles = 0;  ///< Bra cache, ket legs, W, U, hats.
-  std::int64_t int64s = 0;   ///< Two-body base indices of rows and columns.
   std::int64_t int32s = 0;   ///< Per-state index tables.
 };
 
+/// Number of per-state int32 tables in the team scratch (rows: J1', index of
+/// z, 2 j_z; columns: J2', index of w, cache slot, 2 j_w).
+inline constexpr std::int64_t kStateTables = 7;
+
 /// The scratch counts for `ext`: bra cache kBraSlots m S 2, ket legs
 /// kMaxThirds m S 2, W m^2, U m k, two hat tables of m (m = m_max, S = s_max,
-/// k = k_max) doubles; 2 m int64; 10 m int32. O(1).
+/// k = k_max) doubles; kStateTables m int32. O(1).
 inline TileScratchCounts ScratchCounts(const TileExtents& ext) {
   const std::int64_t m = ext.m_max;
   const std::int64_t s = ext.s_max;
   const std::int64_t k = ext.k_max;
   TileScratchCounts c;
   c.doubles = (kBraSlots + kMaxThirds) * m * 2 * s + m * m + m * k + 2 * m;
-  c.int64s = 2 * m;
-  c.int32s = 10 * m;
+  c.int32s = kStateTables * m;
   return c;
 }
 
@@ -132,6 +136,33 @@ enum class TileMode : std::int8_t {
   kTriples,      ///< Tiles T' < T with a nonzero occupation factor; energy.
 };
 
+/// Gather tables of the two-body legs (built once per model space; they
+/// replace the full `get_normalized` per gathered element).
+///
+/// Per orbit pair: for a leg with third orbit o (w of a bra leg, z of a ket
+/// leg), pair J and internal orbit a at grouped position gpos (index into
+/// `OrbitGroupsView::orbits`), entry e = (o num_j + J) num_orbits + gpos holds
+/// * `pair_local[e]`: the local index of the two-body ket (min(o, a),
+///   max(o, a)) at J in its channel, or 0 if that ket does not exist;
+/// * `pair_factor[e]`: 1 for o < a, `basis::ExchangePhase(j_o, j_a, J)` for
+///   o > a, sqrt 2 for o == a (the unnormalized (o a) pair), and 0 if the ket
+///   does not exist (triangle, Pauli), so a gather is branch-free.
+/// Per flat pair-third state f with pair (p, q) and Jpq (always an existing
+/// ket): `state_bra_base[f]` = block offset + local index of (p, q), the
+/// element (P, k) at `state_bra_base[f] + k state_dim[f]`;
+/// `state_ket_base[f]` = block offset + state_dim[f] local index, the element
+/// (k, P) at `state_ket_base[f] + k`; `state_dim[f]` the channel dimension.
+struct LegTablesView {
+  const std::int32_t* pair_local = nullptr;
+  const double* pair_factor = nullptr;
+  const std::int64_t* state_bra_base = nullptr;
+  const std::int64_t* state_ket_base = nullptr;
+  const std::int32_t* state_dim = nullptr;
+  std::int32_t num_j = 0;       ///< Two-body J values, 2 emax + 2.
+  std::int32_t num_orbits = 0;  ///< Orbits of the basis.
+};
+static_assert(std::is_trivially_copyable_v<LegTablesView>);
+
 /// Everything a tile kernel reads or writes (raw device pointers, captured
 /// by value).
 struct TileViews {
@@ -139,9 +170,8 @@ struct TileViews {
   op::PairThirdView pt;        ///< Pair-third states and R.
   angmom::SixJ3View sj;        ///< 3B 6j table.
   basis::OrbitTableView ob;    ///< Orbit quantum numbers and occupations.
-  basis::TwoBodyTableView tb;  ///< Two-body kets and channels.
   OrbitGroupsView groups;      ///< Range of the internal orbit.
-  const std::int64_t* two_body_offset = nullptr;  ///< 2B block offsets.
+  LegTablesView legs;          ///< Gather tables of the two-body legs.
   const double* x2 = nullptr;  ///< Two-body data of X (op::TwoBody layout).
   const double* y2 = nullptr;  ///< Two-body data of Y.
   double* z = nullptr;         ///< Output blocks (packed or dense modes).

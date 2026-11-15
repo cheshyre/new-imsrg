@@ -12,9 +12,6 @@
 #include <type_traits>
 
 #include "imsrg/base/assert.h"
-#include "imsrg/base/constants.h"
-#include "imsrg/base/types.h"
-#include "imsrg/basis/two_body_channels.h"
 #include "imsrg/commutator/detail/three_body_tiles.h"
 #include "imsrg/exec/kokkos_backend.h"
 #include "imsrg/operator/three_body.h"
@@ -70,14 +67,9 @@ struct TileScratch {
   double* u = nullptr;    ///< U[i, k'] = (W R_T'^T)[i, k'] at i + k' m.
   double* row_hat = nullptr;         ///< Hat(J1') of row r.
   double* col_hat = nullptr;         ///< Hat(J2') of column s.
-  std::int64_t* row_base = nullptr;  ///< Block offset + local index of P.
-  std::int64_t* col_base = nullptr;  ///< Block offset + n * local index of Q.
-  std::int32_t* row_z = nullptr;     ///< Third z of row r.
   std::int32_t* row_J = nullptr;     ///< J1' of row r (integer).
   std::int32_t* row_zi = nullptr;    ///< Index of z among the thirds of T.
-  std::int32_t* row_n = nullptr;     ///< Dimension of P's two-body channel.
   std::int32_t* row_jz = nullptr;    ///< 2 j_z of row r.
-  std::int32_t* col_w = nullptr;     ///< Third w of column s.
   std::int32_t* col_J = nullptr;     ///< J2' of column s (integer).
   std::int32_t* col_wi = nullptr;    ///< Index of w among the thirds of T'.
   std::int32_t* col_slot = nullptr;  ///< Bra-cache slot of w.
@@ -86,14 +78,12 @@ struct TileScratch {
 static_assert(std::is_trivially_copyable_v<TileScratch>);
 
 /// Carves the team scratch (level `level`) into the tables of `TileScratch`.
-/// The three typed views are taken in the order of `TeamScratchBytes`.
+/// The typed views are taken in the order of `TeamScratchBytes`.
 IMSRG_INLINE_FUNCTION TileScratch CarveScratch(const Member& team, int level,
                                                const TileExtents& ext) {
   const TileScratchCounts cnt = ScratchCounts(ext);
   ScratchView<double> d(team.team_scratch(level),
                         static_cast<std::size_t>(cnt.doubles));
-  ScratchView<std::int64_t> l(team.team_scratch(level),
-                              static_cast<std::size_t>(cnt.int64s));
   ScratchView<std::int32_t> i(team.team_scratch(level),
                               static_cast<std::size_t>(cnt.int32s));
   const std::int64_t m = ext.m_max;
@@ -111,19 +101,14 @@ IMSRG_INLINE_FUNCTION TileScratch CarveScratch(const Member& team, int level,
   sc.row_hat = p;
   p += m;
   sc.col_hat = p;
-  sc.row_base = l.data();
-  sc.col_base = l.data() + m;
   std::int32_t* q = i.data();
-  sc.row_z = q;
-  sc.row_J = q + m;
-  sc.row_zi = q + 2 * m;
-  sc.row_n = q + 3 * m;
-  sc.row_jz = q + 4 * m;
-  sc.col_w = q + 5 * m;
-  sc.col_J = q + 6 * m;
-  sc.col_wi = q + 7 * m;
-  sc.col_slot = q + 8 * m;
-  sc.col_jw = q + 9 * m;
+  sc.row_J = q;
+  sc.row_zi = q + m;
+  sc.row_jz = q + 2 * m;
+  sc.col_J = q + 3 * m;
+  sc.col_wi = q + 4 * m;
+  sc.col_slot = q + 5 * m;
+  sc.col_jw = q + 6 * m;
   return sc;
 }
 
@@ -145,90 +130,54 @@ IMSRG_INLINE_FUNCTION double TripleEnergy(const TileViews& v,
          v.epsilon[v.sp.tr_c[t]];
 }
 
-/// Two-body channel and local index of the pair (p <= q) at 2J = `two_j`
-/// (an existing ket: pair-third states satisfy Pauli and the triangle).
-struct PairSlot {
-  std::int32_t channel;
-  std::int32_t local;
-};
-
-IMSRG_INLINE_FUNCTION PairSlot PairOf(const TileViews& v, std::int32_t p,
-                                      std::int32_t q,
-                                      std::int32_t two_j) noexcept {
-  const KetIndex ket = v.tb.ket_index(OrbitIndex{p}, OrbitIndex{q});
-  PairSlot s;
-  s.local = v.tb.local_index(ket, TwoJ{two_j});
-  s.channel =
-      v.tb.channel_of(OrbitIndex{p}, OrbitIndex{q}, TwoJ{two_j}).value();
-  return s;
-}
-
-/// Gathers one leg: for the positions k of group `g` whose orbit a has
-/// 2 j_a in [|2J - j2_o|, 2J + j2_o] (`two_J` = 2J of the leg's pair, `o` the
-/// leg's third orbit with 2j = `j2_o`), writes
-///   out_x[k] = f X[base + li(o, a) stride], out_y[k] = f Y[...],
-/// li(o, a) the local index of the ket (min(o, a), max(o, a)) at J (zero if
-/// it does not exist, i.e. o == a with odd J), f = ExchangePhase(j_o, j_a, J)
-/// for o > a, sqrt 2 for o == a, else 1. `stride` is the channel dimension
-/// for a bra leg (element (P, (o a)): row P fixed) and 1 for a ket leg
-/// (element ((o a), Q): column Q fixed). Vector-parallel over k. O(n_a).
+/// Gathers one leg: for the positions k of group `g` whose orbit a has 2 j_a
+/// in [|2J - 2 j_o|, 2J + 2 j_o] (`J` the pair J of the leg, `o` its third
+/// orbit), writes out_x[k] = f X[base + li stride], out_y[k] = f Y[...] with
+/// the local index li of the ket (min(o, a), max(o, a)) at J and its factor
+/// f from the leg tables (f = 0 for an absent ket). `base` and `stride` come
+/// from the state tables: the row of the pair P (stride: channel dimension)
+/// for a bra leg X_{P,(o a)}, its column (stride 1) for a ket leg
+/// X_{(o a),P}. Branch-free and vector-parallel over k. O(n_a).
 IMSRG_INLINE_FUNCTION void GatherLeg(const Member& team, const TileViews& v,
                                      std::int32_t g, std::int32_t o,
-                                     std::int32_t two_J, std::int64_t base,
+                                     std::int32_t J, std::int64_t base,
                                      std::int64_t stride, double* out_x,
                                      double* out_y) {
   const std::int32_t nj = v.groups.nj;
   const std::int32_t j2o = v.ob.j2[o];
-  const std::int32_t ij_lo = (AbsDiff(two_J, j2o) - 1) / 2;
-  std::int32_t ij_hi = (two_J + j2o - 1) / 2;
+  const std::int32_t ij_lo = (AbsDiff(2 * J, j2o) - 1) / 2;
+  std::int32_t ij_hi = (2 * J + j2o - 1) / 2;
   if (ij_hi > nj - 1) ij_hi = nj - 1;
   if (ij_lo > ij_hi) return;
   const std::int32_t* jp = v.groups.j_pos + g * (nj + 1);
-  const std::int32_t* orbs = v.groups.orbits + v.groups.offset[g];
-  const std::int32_t J = two_J / 2;
-  const std::int32_t norb = v.tb.num_orbits;
+  const std::int64_t e0 =
+      (static_cast<std::int64_t>(o) * v.legs.num_j + J) * v.legs.num_orbits +
+      v.groups.offset[g];
+  const std::int32_t* li = v.legs.pair_local + e0;
+  const double* f = v.legs.pair_factor + e0;
+  const double* x2 = v.x2;
+  const double* y2 = v.y2;
   Kokkos::parallel_for(
       Kokkos::ThreadVectorRange(team, jp[ij_lo], jp[ij_hi + 1]),
       [&](const std::int32_t k) {
-        const std::int32_t a = orbs[k];
-        const std::int32_t j2a = v.ob.j2[a];
-        double f = 1.0;
-        std::int32_t lo = o;
-        std::int32_t hi = a;
-        if (o > a) {
-          lo = a;
-          hi = o;
-          f = basis::ExchangePhase(TwoJ{j2o}, TwoJ{j2a}, TwoJ{two_J});
-        } else if (o == a) {
-          f = constants::kSqrt2;
-        }
-        const std::int32_t ket =
-            basis::ImsrgppKetIndex(OrbitIndex{lo}, OrbitIndex{hi}, norb)
-                .value();
-        const std::int32_t li =
-            v.tb.local_index_table[v.tb.ket_J_offsets[ket] + J -
-                                   AbsDiff(j2o, j2a) / 2];
-        if (li < 0) {
-          out_x[k] = 0.0;
-          out_y[k] = 0.0;
-          return;
-        }
-        const std::int64_t idx = base + li * stride;
-        out_x[k] = f * v.x2[idx];
-        out_y[k] = f * v.y2[idx];
+        const std::int64_t idx = base + li[k] * stride;
+        out_x[k] = f[k] * x2[idx];
+        out_y[k] = f[k] * y2[idx];
       });
 }
 
-/// W[r, s] of the tile (formula in three_body.h) from the gathered legs: the
-/// sum over the j blocks of the orbit group `g` allowed by both triangles,
-/// one 6j per block. `xb`/`yb` are the bra legs of (r, w_s), `xk`/`yk` the
-/// ket legs of (s, z_r). O(n_a).
-IMSRG_INLINE_FUNCTION double TileElement(const Member& team, const TileViews& v,
-                                         std::int32_t g, std::int32_t iJ,
-                                         std::int32_t J1, std::int32_t jz,
-                                         std::int32_t J2, std::int32_t jw,
-                                         const double* xb, const double* yb,
-                                         const double* xk, const double* yk) {
+/// The sum over a of W[r, s] / (Hat(J1') Hat(J2')) from the gathered legs:
+/// the j blocks of the orbit group `g` allowed by both triangles (2 j_a in
+/// [|2J1' - 2j_w|, 2J1' + 2j_w] and in [|2J2' - 2j_z|, 2J2' + 2j_z]), one 6j
+/// per block from `six` (six[c2 ia] = {j_w j_a J1'; j_z J J2'}, ia = (2 j_a -
+/// 1) / 2). `xb`/`yb` are the bra legs of (r, w), `xk`/`yk` the ket legs of
+/// (s, z). Sequential (one vector lane per (r, s)). O(n_a).
+IMSRG_INLINE_FUNCTION double TileSum(const TileViews& v, std::int32_t g,
+                                     std::int32_t J1, std::int32_t jz,
+                                     std::int32_t J2, std::int32_t jw,
+                                     const double* six, const double* xb,
+                                     const double* yb, const double* xk,
+                                     const double* yk) noexcept {
   const std::int32_t nj = v.groups.nj;
   const std::int32_t lo1 = AbsDiff(2 * J1, jw);
   const std::int32_t lo2 = AbsDiff(2 * J2, jz);
@@ -238,21 +187,13 @@ IMSRG_INLINE_FUNCTION double TileElement(const Member& team, const TileViews& v,
   std::int32_t ij_hi = ((hi1 < hi2 ? hi1 : hi2) - 1) / 2;
   if (ij_hi > nj - 1) ij_hi = nj - 1;
   const std::int32_t* jp = v.groups.j_pos + g * (nj + 1);
-  // {j_w j_a J1'; j_z J J2'} = six[c2 ia] with ia = (2 j_a - 1) / 2.
-  const double* six = v.sj.data + v.c1 * ((jw - 1) / 2) + v.c3 * J1 +
-                      v.c4 * ((jz - 1) / 2) + v.c5 * iJ + J2;
   double acc = 0.0;
   for (std::int32_t ij = ij_lo; ij <= ij_hi; ++ij) {
-    const std::int32_t k0 = jp[ij];
     const std::int32_t k1 = jp[ij + 1];
-    if (k0 == k1) continue;
     double d = 0.0;
-    Kokkos::parallel_reduce(
-        Kokkos::ThreadVectorRange(team, k0, k1),
-        [&](const std::int32_t k, double& t) {
-          t += xb[k] * yk[k] - yb[k] * xk[k];
-        },
-        d);
+    for (std::int32_t k = jp[ij]; k < k1; ++k) {
+      d += xb[k] * yk[k] - yb[k] * xk[k];
+    }
     acc += six[v.c2 * ij] * d;
   }
   return acc;
@@ -267,6 +208,7 @@ IMSRG_INLINE_FUNCTION void TeamTiles(const Member& team, const TileViews& v,
                                      double& acc) {
   const TileScratch sc = CarveScratch(team, level, v.ext);
   const std::int32_t S = v.ext.s_max;
+  const std::int64_t leg = 2 * static_cast<std::int64_t>(S);
   const std::int64_t m_max = v.ext.m_max;
   const std::int32_t c = v.sp.tr_channel[T];
   const std::int32_t two_J = v.sp.ch_two_j[c];
@@ -291,20 +233,16 @@ IMSRG_INLINE_FUNCTION void TeamTiles(const Member& team, const TileViews& v,
   }
 
   // Rows r = (P, z, J1') of T.
-  Kokkos::parallel_for(
-      Kokkos::TeamThreadRange(team, m), [&](const std::int32_t r) {
-        const std::int32_t f = st0 + rs0 + r;
-        const std::int32_t z = v.pt.st_r[f];
-        const std::int32_t tj = v.pt.st_two_jpq[f];
-        const PairSlot ps = PairOf(v, v.pt.st_p[f], v.pt.st_q[f], tj);
-        sc.row_z[r] = z;
-        sc.row_jz[r] = v.ob.j2[z];
-        sc.row_J[r] = tj / 2;
-        sc.row_zi[r] = SlotOf(zs, z);
-        sc.row_hat[r] = v.sj.Hat(tj / 2);
-        sc.row_n[r] = v.tb.channel_num_kets[ps.channel];
-        sc.row_base[r] = v.two_body_offset[ps.channel] + ps.local;
-      });
+  Kokkos::parallel_for(Kokkos::TeamVectorRange(team, m),
+                       [&](const std::int32_t r) {
+                         const std::int32_t f = st0 + rs0 + r;
+                         const std::int32_t z = v.pt.st_r[f];
+                         const std::int32_t J1 = v.pt.st_two_jpq[f] / 2;
+                         sc.row_J[r] = J1;
+                         sc.row_zi[r] = SlotOf(zs, z);
+                         sc.row_jz[r] = v.ob.j2[z];
+                         sc.row_hat[r] = v.sj.Hat(J1);
+                       });
   team.team_barrier();
 
   // Bra-leg cache: slot -> third orbit w and the tick of its last use. Every
@@ -338,7 +276,8 @@ IMSRG_INLINE_FUNCTION void TeamTiles(const Member& team, const TileViews& v,
         DistinctOrbits(v.sp.tr_a[tp], v.sp.tr_b[tp], v.sp.tr_c[tp]);
     // Orbit group of a for each (z of T, w of T'): l_a = l_P + l_w = pi -
     // l_z + l_w (mod 2), tz_a = tz_P - tz_w = 2Tz - tz_z - tz_w.
-    std::int32_t gzw[kMaxThirds][kMaxThirds];
+    std::int32_t gzw[kMaxThirds][kMaxThirds] = {
+        {-1, -1, -1}, {-1, -1, -1}, {-1, -1, -1}};
     for (std::int32_t iz = 0; iz < zs.n; ++iz) {
       for (std::int32_t iw = 0; iw < ws.n; ++iw) {
         const std::int32_t z = zs.orbit[iz];
@@ -378,23 +317,18 @@ IMSRG_INLINE_FUNCTION void TeamTiles(const Member& team, const TileViews& v,
     // Columns s = (Q, w, J2') of T'.
     const std::int32_t cs0 = v.pt.tr_state_begin[tp];
     const std::int32_t mp = v.pt.tr_state_end[tp] - cs0;
-    Kokkos::parallel_for(
-        Kokkos::TeamThreadRange(team, mp), [&](const std::int32_t s) {
-          const std::int32_t f = st0 + cs0 + s;
-          const std::int32_t w = v.pt.st_r[f];
-          const std::int32_t tj = v.pt.st_two_jpq[f];
-          const PairSlot ps = PairOf(v, v.pt.st_p[f], v.pt.st_q[f], tj);
-          const std::int32_t iw = SlotOf(ws, w);
-          sc.col_w[s] = w;
-          sc.col_jw[s] = v.ob.j2[w];
-          sc.col_J[s] = tj / 2;
-          sc.col_wi[s] = iw;
-          sc.col_slot[s] = wslot[iw];
-          sc.col_hat[s] = v.sj.Hat(tj / 2);
-          sc.col_base[s] = v.two_body_offset[ps.channel] +
-                           static_cast<std::int64_t>(ps.local) *
-                               v.tb.channel_num_kets[ps.channel];
-        });
+    Kokkos::parallel_for(Kokkos::TeamVectorRange(team, mp),
+                         [&](const std::int32_t s) {
+                           const std::int32_t f = st0 + cs0 + s;
+                           const std::int32_t w = v.pt.st_r[f];
+                           const std::int32_t J2 = v.pt.st_two_jpq[f] / 2;
+                           const std::int32_t iw = SlotOf(ws, w);
+                           sc.col_J[s] = J2;
+                           sc.col_wi[s] = iw;
+                           sc.col_slot[s] = wslot[iw];
+                           sc.col_jw[s] = v.ob.j2[w];
+                           sc.col_hat[s] = v.sj.Hat(J2);
+                         });
     team.team_barrier();
 
     // Gathers: the bra legs of the missing thirds (all rows of T) and the ket
@@ -408,70 +342,95 @@ IMSRG_INLINE_FUNCTION void TeamTiles(const Member& team, const TileViews& v,
             const std::int32_t iw = miss[item / m];
             const std::int32_t g = gzw[sc.row_zi[r]][iw];
             if (g < 0) return;
-            double* xb = sc.bra + (wslot[iw] * m_max + r) * 2 * S;
-            GatherLeg(team, v, g, ws.orbit[iw], 2 * sc.row_J[r], sc.row_base[r],
-                      sc.row_n[r], xb, xb + S);
+            const std::int32_t f = st0 + rs0 + r;
+            double* xb = sc.bra + (wslot[iw] * m_max + r) * leg;
+            GatherLeg(team, v, g, ws.orbit[iw], sc.row_J[r],
+                      v.legs.state_bra_base[f], v.legs.state_dim[f], xb,
+                      xb + S);
           } else {
             const std::int32_t s = (item - n_bra) % mp;
             const std::int32_t iz = (item - n_bra) / mp;
             const std::int32_t g = gzw[iz][sc.col_wi[s]];
             if (g < 0) return;
-            double* xk = sc.ket + (iz * m_max + s) * 2 * S;
-            GatherLeg(team, v, g, zs.orbit[iz], 2 * sc.col_J[s], sc.col_base[s],
-                      1, xk, xk + S);
+            double* xk = sc.ket + (iz * m_max + s) * leg;
+            GatherLeg(team, v, g, zs.orbit[iz], sc.col_J[s],
+                      v.legs.state_ket_base[st0 + cs0 + s], 1, xk, xk + S);
           }
         });
     team.team_barrier();
 
-    // W[r, s].
+    // W[r, s]: a team thread per column s, a vector lane per row r.
     Kokkos::parallel_for(
-        Kokkos::TeamThreadRange(team, m * mp), [&](const std::int32_t idx) {
-          const std::int32_t r = idx % m;
-          const std::int32_t s = idx / m;
-          const std::int32_t iz = sc.row_zi[r];
-          const std::int32_t g = gzw[iz][sc.col_wi[s]];
-          double val = 0.0;
-          if (g >= 0) {
-            const double* xb = sc.bra + (sc.col_slot[s] * m_max + r) * 2 * S;
-            const double* xk = sc.ket + (iz * m_max + s) * 2 * S;
-            val =
-                sc.row_hat[r] * sc.col_hat[s] *
-                TileElement(team, v, g, iJ, sc.row_J[r], sc.row_jz[r],
-                            sc.col_J[s], sc.col_jw[s], xb, xb + S, xk, xk + S);
-          }
-          Kokkos::single(Kokkos::PerThread(team), [&]() { sc.w[idx] = val; });
+        Kokkos::TeamThreadRange(team, mp), [&](const std::int32_t s) {
+          const std::int32_t J2 = sc.col_J[s];
+          const std::int32_t jw = sc.col_jw[s];
+          const std::int32_t iw = sc.col_wi[s];
+          const double hat_s = sc.col_hat[s];
+          const double* xb_slot = sc.bra + sc.col_slot[s] * m_max * leg;
+          const double* six_s =
+              v.sj.data + v.c1 * ((jw - 1) / 2) + v.c5 * iJ + J2;
+          double* wcol = sc.w + static_cast<std::int64_t>(s) * m;
+          Kokkos::parallel_for(
+              Kokkos::ThreadVectorRange(team, m), [&](const std::int32_t r) {
+                const std::int32_t iz = sc.row_zi[r];
+                const std::int32_t g = gzw[iz][iw];
+                double val = 0.0;
+                if (g >= 0) {
+                  const std::int32_t J1 = sc.row_J[r];
+                  const std::int32_t jz = sc.row_jz[r];
+                  const double* xb = xb_slot + r * leg;
+                  const double* xk = sc.ket + (iz * m_max + s) * leg;
+                  val = sc.row_hat[r] * hat_s *
+                        TileSum(v, g, J1, jz, J2, jw,
+                                six_s + v.c3 * J1 + v.c4 * ((jz - 1) / 2), xb,
+                                xb + S, xk, xk + S);
+                }
+                wcol[r] = val;
+              });
         });
     team.team_barrier();
 
-    // U = W R_T'^T (m x k').
+    // U = W R_T'^T (m x k'): a team thread per column k', vector over rows.
     const std::int64_t r_row_p = v.sp.ch_row_offset[c] + v.sp.tr_row_begin[tp];
     const std::int32_t kp = v.sp.tr_row_end[tp] - v.sp.tr_row_begin[tp];
     Kokkos::parallel_for(
-        Kokkos::TeamThreadRange(team, m * kp), [&](const std::int32_t idx) {
-          const std::int32_t i = idx % m;
-          const std::int64_t row = r_row_p + idx / m;
-          double sum = 0.0;
+        Kokkos::TeamThreadRange(team, kp), [&](const std::int32_t kc) {
+          const std::int64_t row = r_row_p + kc;
+          double* uc = sc.u + static_cast<std::int64_t>(kc) * m;
+          Kokkos::parallel_for(Kokkos::ThreadVectorRange(team, m),
+                               [&](const std::int32_t i) { uc[i] = 0.0; });
           for (std::int64_t e = v.pt.r.ptr[row]; e < v.pt.r.ptr[row + 1]; ++e) {
-            sum += v.pt.r.val[e] * sc.w[i + (v.pt.r.col[e] - cs0) * m];
+            const double rv = v.pt.r.val[e];
+            const double* wc =
+                sc.w + static_cast<std::int64_t>(v.pt.r.col[e] - cs0) * m;
+            Kokkos::parallel_for(
+                Kokkos::ThreadVectorRange(team, m),
+                [&](const std::int32_t i) { uc[i] += rv * wc[i]; });
           }
-          Kokkos::single(Kokkos::PerThread(team), [&]() { sc.u[idx] = sum; });
         });
     team.team_barrier();
 
-    // Z[k, k'] = (R_T U)[k, k'].
+    // Z[k, k'] = (R_T U)[k, k']: a team thread per column k', vector over k.
     if (mode == TileMode::kTriples) {
       double tile = 0.0;
       Kokkos::parallel_reduce(
-          Kokkos::TeamThreadRange(team, kt * kp),
-          [&](const std::int32_t idx, double& t) {
-            const std::int64_t row = r_row_t + idx % kt;
-            const double* uc = sc.u + (idx / kt) * m;
-            double zv = 0.0;
-            for (std::int64_t e = v.pt.r.ptr[row]; e < v.pt.r.ptr[row + 1];
-                 ++e) {
-              zv += v.pt.r.val[e] * uc[v.pt.r.col[e] - rs0];
-            }
-            t += zv * zv;
+          Kokkos::TeamThreadRange(team, kp),
+          [&](const std::int32_t kc, double& t) {
+            const double* uc = sc.u + static_cast<std::int64_t>(kc) * m;
+            double tk = 0.0;
+            Kokkos::parallel_reduce(
+                Kokkos::ThreadVectorRange(team, kt),
+                [&](const std::int32_t k, double& tt) {
+                  const std::int64_t row = r_row_t + k;
+                  double zv = 0.0;
+                  for (std::int64_t e = v.pt.r.ptr[row];
+                       e < v.pt.r.ptr[row + 1]; ++e) {
+                    zv += v.pt.r.val[e] * uc[v.pt.r.col[e] - rs0];
+                  }
+                  tt += zv * zv;
+                },
+                tk);
+            t += tk;
           },
           tile);
       Kokkos::single(Kokkos::PerTeam(team), [&]() { acc += factor * tile; });
@@ -480,27 +439,28 @@ IMSRG_INLINE_FUNCTION void TeamTiles(const Member& team, const TileViews& v,
       const std::int64_t rb = v.sp.tr_row_begin[T];
       const std::int64_t cb = v.sp.tr_row_begin[tp];
       const bool diagonal = tp == T;
+      const bool packed = mode == TileMode::kLowerPacked;
+      const std::int64_t off =
+          packed ? v.sp.ch_packed_offset[c] : v.sp.ch_dense_offset[c];
       Kokkos::parallel_for(
-          Kokkos::TeamThreadRange(team, kt * kp), [&](const std::int32_t idx) {
-            const std::int32_t k = idx % kt;
-            const std::int32_t kc = idx / kt;
-            if (mode == TileMode::kLowerPacked && diagonal && k < kc) return;
-            const std::int64_t row = r_row_t + k;
-            const double* uc = sc.u + kc * m;
-            double zv = 0.0;
-            for (std::int64_t e = v.pt.r.ptr[row]; e < v.pt.r.ptr[row + 1];
-                 ++e) {
-              zv += v.pt.r.val[e] * uc[v.pt.r.col[e] - rs0];
-            }
-            if (v.zero_diagonal != 0 && diagonal && k == kc) zv = 0.0;
-            const std::int64_t i = rb + k;
+          Kokkos::TeamThreadRange(team, kp), [&](const std::int32_t kc) {
+            const double* uc = sc.u + static_cast<std::int64_t>(kc) * m;
             const std::int64_t j = cb + kc;
-            const std::int64_t dst =
-                mode == TileMode::kLowerPacked
-                    ? v.sp.ch_packed_offset[c] +
-                          op::ThreeBody::PackedIndex(n_dim, i, j)
-                    : v.sp.ch_dense_offset[c] + i + j * n_dim;
-            Kokkos::single(Kokkos::PerThread(team), [&]() { v.z[dst] = zv; });
+            Kokkos::parallel_for(
+                Kokkos::ThreadVectorRange(team, packed && diagonal ? kc : 0,
+                                          kt),
+                [&](const std::int32_t k) {
+                  const std::int64_t row = r_row_t + k;
+                  double zv = 0.0;
+                  for (std::int64_t e = v.pt.r.ptr[row];
+                       e < v.pt.r.ptr[row + 1]; ++e) {
+                    zv += v.pt.r.val[e] * uc[v.pt.r.col[e] - rs0];
+                  }
+                  if (v.zero_diagonal != 0 && diagonal && k == kc) zv = 0.0;
+                  const std::int64_t i = rb + k;
+                  v.z[off + (packed ? op::ThreeBody::PackedIndex(n_dim, i, j)
+                                    : i + j * n_dim)] = zv;
+                });
           });
     }
     team.team_barrier();
@@ -549,8 +509,6 @@ std::int64_t TeamScratchBytes(const TileExtents& ext) {
   const TileScratchCounts c = ScratchCounts(ext);
   return static_cast<std::int64_t>(
       ScratchView<double>::shmem_size(static_cast<std::size_t>(c.doubles)) +
-      ScratchView<std::int64_t>::shmem_size(
-          static_cast<std::size_t>(c.int64s)) +
       ScratchView<std::int32_t>::shmem_size(
           static_cast<std::size_t>(c.int32s)));
 }
