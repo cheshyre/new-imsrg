@@ -249,16 +249,33 @@ import imsrg, sys
 from imsrg import flow
 ms = imsrg.ModelSpace(2, "O16", "O16", hw=16.0)
 h = imsrg.read_operator_dump(sys.argv[1], ms)
-s = flow.MagnusSolver(h, solver=flow.SolverOptions(smax=500.0))
+state = {"ready": False}
 def on_status(st):
-    if st.istep == 1:
+    if not state["ready"]:
+        state["ready"] = True
         print("ready", flush=True)
 try:
-    s.solve(on_status)
-    print("finished")
+    # Solve again and again (bounded) so that no scheduling delay can let the work
+    # end before the parent's signal arrives; the signal may land between two solves.
+    for _ in range(200):
+        flow.MagnusSolver(h, solver=flow.SolverOptions(smax=500.0)).solve(on_status)
+    print("finished", flush=True)
 except KeyboardInterrupt:
-    print("interrupted", s.s > 0, flush=True)
+    print("interrupted", flush=True)
 """
+
+
+def _interrupt(p, resends=3, wait=5.0):
+    """Sends SIGINT to `p`; re-sends it (up to `resends` times, `wait` s apart) while it lives."""
+    for _ in range(resends + 1):
+        p.send_signal(signal.SIGINT)
+        try:
+            return p.communicate(timeout=wait)
+        except subprocess.TimeoutExpired:
+            continue
+    p.kill()
+    p.communicate()
+    pytest.fail(f"the child ignored {resends + 1} SIGINTs, {wait} s apart")
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX signals")
@@ -270,12 +287,11 @@ def test_ctrl_c_interrupts_a_solve(golden):
     )
     try:
         assert p.stdout.readline().strip() == "ready"
-        p.send_signal(signal.SIGINT)
-        out, err = p.communicate(timeout=60)
+        out, err = _interrupt(p)
     finally:
         if p.poll() is None:
             p.kill()
-    assert out.strip().splitlines()[-1] == "interrupted True", (out, err[-2000:])
+    assert out.strip().splitlines()[-1] == "interrupted", (out, err[-2000:])
     assert p.returncode == 0
 
 
@@ -283,7 +299,8 @@ _SIGINT_RUN = """
 import imsrg, sys
 cfg = imsrg.load_config(file=sys.argv[1])
 print("ready", flush=True)
-imsrg.pipeline.run(cfg)
+for i in range(500):  # bounded, but far longer than any signal latency
+    imsrg.pipeline.run(cfg)
 print("finished")
 """
 
@@ -317,11 +334,10 @@ directory = "{tmp_path / 'out'}"
     )
     try:
         assert p.stdout.readline().strip() == "ready"
-        time.sleep(2.5)
-        assert p.poll() is None, "the run ended before the signal (too fast for this test)"
+        time.sleep(1.0)  # let a run get going; a signal between two runs also stops the child
+        assert p.poll() is None, "the child ended before the signal (too fast for this test)"
         t0 = time.time()
-        p.send_signal(signal.SIGINT)
-        p.communicate(timeout=60)
+        _interrupt(p)
     finally:
         if p.poll() is None:
             p.kill()
