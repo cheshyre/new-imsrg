@@ -128,13 +128,13 @@ void BindHf(nb::module_& m) {
                    [](const hf::HFResult& r) { return r.ediff_history; })
       .def_prop_ro(
           "c", [](const hf::HFResult& r) { return ToNumpy(r.C); },
-          "C(ho orbit, hf orbit), column-major copy.")
+          nb::rv_policy::move, "C(ho orbit, hf orbit), column-major copy.")
       .def_prop_ro(
           "rho", [](const hf::HFResult& r) { return ToNumpy(r.rho); },
-          "Density matrix in the oscillator basis.")
+          nb::rv_policy::move, "Density matrix in the oscillator basis.")
       .def_prop_ro(
           "fock", [](const hf::HFResult& r) { return ToNumpy(r.F); },
-          "Fock matrix in the oscillator basis.");
+          nb::rv_policy::move, "Fock matrix in the oscillator basis.");
 
   m.def(
       "hf_solve",
@@ -218,6 +218,7 @@ void BindHf(nb::module_& m) {
       .def_prop_ro(
           "c_hf2nat",
           [](const mbpt::NaturalOrbitals& n) { return ToNumpy(n.c_hf2nat); },
+          nb::rv_policy::move,
           "Row = HF orbit, column = NAT orbit; block diagonal in "
           "(l, j, tz).")
       .def_prop_ro("occupations", [](const mbpt::NaturalOrbitals& n) {
@@ -227,8 +228,12 @@ void BindHf(nb::module_& m) {
       "mbpt2_density_matrix",
       [](PyOperator& h) {
         op::Operator& x = Mutable(h);
-        nb::gil_scoped_release r;
-        return ToNumpy(mbpt::Mbpt2DensityMatrix(x));
+        linalg::Matrix<double> rho;
+        {
+          nb::gil_scoped_release r;
+          rho = mbpt::Mbpt2DensityMatrix(x);
+        }
+        return ToNumpy(rho);
       },
       nb::arg("hamiltonian"),
       "MBPT(2) one-body density matrix in the HF basis (norb x norb).");
