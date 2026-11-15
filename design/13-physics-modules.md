@@ -182,7 +182,17 @@ to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9.
 * **Hunter-gatherer** (`imsrg.omega.hunter_gatherer`, imsrg++ `IMSRGSolver.cc:85-115`): only two
   Omegas are kept; the hunter accumulates η ds by BCH products and, when its norm exceeds
   `omega_norm_max`, is gathered into the gatherer (`gatherer = BCH_Product(hunter, gatherer)`) and
-  reset. Not implemented yet; a **prerequisite of IMSRG(3f2)** (D32), so it is an M8 follow-up in run 2.
+  reset. **As implemented (M8, `SolverOptions::hunter_gatherer`):** a verbatim copy of imsrg++'s
+  semantics (decision of the orchestrator, flow review item 3): the stack is `{gatherer, hunter}`;
+  `GatherOmega` with a one-entry stack appends a zero hunter, else `gatherer = BchProduct(hunter,
+  gatherer)` if `‖hunter‖ > 1e-12`, then zeroes the hunter and rebuilds `H_saved` from `H_0` through
+  the gatherer; **`H(s)` is left untouched**, and `Solve` gathers once more after the loop (also
+  `set_generator` gathers if the hunter is non-zero). `SolveResult::num_gathers` counts them as the
+  `gathering Omega.` lines of imsrg++ (loop gathers + the final one); `results.json` carries
+  `num_gathers` per stage and in total. Consequence: `H(s)` differs from `Transform(H_0)` at the BCH
+  truncation level (unit test `HunterGathererDocumentsImsrgSemantics`; the replay test holds for the
+  split stack only). Goldens: `tests/golden/e2e/IT-2/hunter_gatherer`. A **prerequisite of
+  IMSRG(3f2)** (D32).
 * BCH transform: nested commutators with 1/i!, terminating on a threshold epsilon, at most 40
   terms. BCH product: implement exactly the terms imsrg++ includes; its comment lists a
   −1/24 [Y,[X,[X,Y]]] term that the code does **not** implement. That is a truncation choice,
@@ -209,14 +219,13 @@ after IMSRG(3), D39), dagger, M0nu, DM NREFT. The name grammar and legacy names 
 **As implemented (M6).** Namespace `imsrg::opslib`, every physics parameter explicit (no hidden
 model-space state): `kinetic_energy(ms)` (Tlab), `t_cm(ms, A)`, `t_rel(ms, A)` (T_int used in
 H), `r2_cm(ms, A)`, `h_cm(ms, A, hw_trap)`, `r2_one_body/r2_two_body(ms, Species)`,
-`rp2(ms, A, Z, include_spin_orbit = true)` (imsrg++ "Rp2" includes `RpSpinOrbitCorrection`,
-M6-Q1), `rn2(ms, A, Z)`, `rm2(ms, A)`. Equal to the imsrg-devel dumps within 1.1e-14 (emax 2
+`rp2(ms, A, Z)` (imsrg++ "Rp2" includes `RpSpinOrbitCorrection`; ours does not, D35 below), `rn2(ms, A, Z)`, `rm2(ms, A)`. Equal to the imsrg-devel dumps within 1.1e-14 (emax 2
 and 4); emax 6 builds take 0.4 s (t_rel) and 0.7 s (rp2).
 
 **Owner decisions 2026-11-15 (D35), implemented in run 2:** `t_cm` keeps all two-body entries
 (imsrg++ drops |v| ≤ 1e-7, which also enters T_int and thus H); `rp2` loses `include_spin_orbit`
 and never includes the spin-orbit correction, which stays available as the separate `Rso` operator
-(`rp_spin_orbit_correction`). No imsrg++ compatibility switch: the goldens come from a patched
+(`RpSpinOrbitCorrection`, catalog name `Rso`; a charge radius adds `Rso/Z` explicitly). No imsrg++ compatibility switch: the goldens come from a patched
 imsrg-devel build (`30` §3).
 
 ## 9. driver

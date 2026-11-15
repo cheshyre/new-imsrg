@@ -42,7 +42,6 @@ void RejectPlanned(const RunConfig& c) {
   if (c.run.task == Task::kFciExport) Planned("run.task = \"fci_export\"");
   if (c.imsrg.method != Method::kMagnus)
     Planned("imsrg.method other than \"magnus\"");
-  if (c.imsrg.omega.hunter_gatherer) Planned("imsrg.omega.hunter_gatherer");
   if (c.imsrg.use_brueckner_bch) Planned("imsrg.use_brueckner_bch");
   if (c.imsrg.goose_tank) Planned("imsrg.goose_tank");
   if (c.imsrg.perturbative_triples) Planned("imsrg.perturbative_triples");
@@ -275,7 +274,7 @@ void WriteValenceFile(const fs::path& path, op::Operator O, const RunConfig& c,
 
 void WriteResults(const fs::path& path, const pipeline::PreparedHamiltonian& ph,
                   const std::vector<StageRecord>& stages, double e0,
-                  std::size_t num_omegas,
+                  std::size_t num_omegas, int num_gathers,
                   const std::vector<OperatorRecord>& ops,
                   const std::string& valence_file) {
   std::ofstream out(path);
@@ -290,12 +289,14 @@ void WriteResults(const fs::path& path, const pipeline::PreparedHamiltonian& ph,
         << "},\n";
   }
   out << "  \"imsrg\": {\"e0\": " << Fmt17(e0)
-      << ", \"num_omegas\": " << num_omegas << ", \"stages\": [";
+      << ", \"num_omegas\": " << num_omegas
+      << ", \"num_gathers\": " << num_gathers << ", \"stages\": [";
   for (std::size_t i = 0; i < stages.size(); ++i) {
     const StageRecord& st = stages[i];
     out << (i ? ", " : "") << "{\"stage\": " << st.stage
         << ", \"generator\": " << JsonString(st.generator)
         << ", \"steps\": " << st.result.steps
+        << ", \"num_gathers\": " << st.result.num_gathers
         << ", \"s\": " << Fmt17(st.result.s)
         << ", \"e0\": " << Fmt17(st.result.e0)
         << ", \"norm_eta\": " << Fmt17(st.result.norm_eta)
@@ -322,7 +323,7 @@ void Run(const RunConfig& config) {
 
   const pipeline::PreparedHamiltonian ph = pipeline::PrepareHamiltonian(config);
   if (config.run.task == Task::kHf) {
-    WriteResults(dir / "results.json", ph, {}, ph.e_reference, 0, {}, "");
+    WriteResults(dir / "results.json", ph, {}, ph.e_reference, 0, 0, {}, "");
     return;
   }
   const basis::ModelSpace& ms = ph.hno.model_space();
@@ -336,6 +337,7 @@ void Run(const RunConfig& config) {
   so.ds_0 = step.ds_0;
   so.domega = step.domega;
   so.omega_norm_max = step.omega_norm_max;
+  so.hunter_gatherer = config.imsrg.omega.hunter_gatherer;
   so.eta_criterion = step.eta_criterion;
   const Generator core_gen = config.imsrg.generator.core;
   SmallStepsForStiffGenerators(core_gen, so);
@@ -367,9 +369,11 @@ void Run(const RunConfig& config) {
         {2, std::string(ToString(val_gen)), solver.Solve(std::ref(flow_log))});
   }
   for (const StageRecord& st : stages) {
-    log::Info("stage {} ({}): {} steps, s = {}, E0 = {:.9f}, stop: {}",
-              st.stage, st.generator, st.result.steps, st.result.s,
-              st.result.e0, StopName(st.result.reason));
+    log::Info(
+        "stage {} ({}): {} steps, {} Omega gathers, s = {}, E0 = {:.9f}, "
+        "stop: {}",
+        st.stage, st.generator, st.result.steps, st.result.num_gathers,
+        st.result.s, st.result.e0, StopName(st.result.reason));
   }
   const bool diverged =
       stages.back().result.reason == flow::StopReason::kDiverged;
@@ -416,7 +420,7 @@ void Run(const RunConfig& config) {
   }
 
   WriteResults(dir / "results.json", ph, stages, e0, solver.omegas().size(),
-               ops, valence_file);
+               solver.num_gathers(), ops, valence_file);
   if (diverged) {
     throw NumericalError(
         "the IMSRG flow diverged (see the flow log); results.json was written");

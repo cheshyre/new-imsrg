@@ -69,13 +69,42 @@ void MagnusSolver::PushOmega() {
   omegas_.push_back(ZeroOmega(h0_.model_space_ptr()));
 }
 
+void MagnusSolver::GatherOmega() {
+  // imsrg++ GatherOmega (IMSRGSolver.cc:98-122). With a one-entry stack the
+  // single Omega becomes the gatherer and the hunter is a fresh zero Omega
+  // (imsrg++ copies and erases the last one; the hunter is zero either way).
+  log::Info("gathering Omega.");
+  ++num_gathers_;
+  if (omegas_.size() < 2) {
+    omegas_.push_back(ZeroOmega(h0_.model_space_ptr()));
+  }
+  op::Operator& hunter = omegas_.back();
+  op::Operator& gatherer = omegas_[omegas_.size() - 2];
+  if (op::Norm(hunter) > 1.0e-12) {
+    gatherer = BchProduct(hunter, gatherer, bch_, comm_, *ws_);
+  }
+  hunter.set_zero();
+  h_saved_ = h0_;
+  for (std::size_t i = 0; i + 1 < omegas_.size(); ++i) {
+    h_saved_ = BchTransform(h_saved_, omegas_[i], bch_, comm_, *ws_);
+  }
+}
+
+void MagnusSolver::StartNewPiece() {
+  if (solver_.hunter_gatherer) {
+    GatherOmega();
+  } else {
+    PushOmega();
+  }
+}
+
 void MagnusSolver::set_generator(const GeneratorOptions& generator) {
   // imsrg++ SetGenerator (IMSRGSolver.cc:157-178): a new Omega if the current
   // one is not ~0.
   generator_ = generator;
   if (op::Norm(omegas_.back()) > 1.0e-6) {
     eta_.set_zero();
-    PushOmega();
+    StartNewPiece();
   }
 }
 
@@ -118,6 +147,7 @@ SolveResult MagnusSolver::Solve(const StatusCallback& on_status) {
       solver_.ds_0;  // used only if magnus_adaptive is off (imsrg++ member ds)
   if (on_status) on_status(Status(0, 0.0));
 
+  int loop_gathers = 0;
   SolveResult result;
   result.reason = StopReason::kSmaxReached;
   for (int istep = 1; s_ < solver_.smax; ++istep) {
@@ -134,7 +164,8 @@ SolveResult MagnusSolver::Solve(const StatusCallback& on_status) {
     }
     double norm_omega = op::Norm(omegas_.back());
     if (norm_omega > solver_.omega_norm_max) {
-      PushOmega();
+      StartNewPiece();
+      if (solver_.hunter_gatherer) ++loop_gathers;
       norm_omega = 0.0;
     }
     if (solver_.magnus_adaptive) {
@@ -156,6 +187,11 @@ SolveResult MagnusSolver::Solve(const StatusCallback& on_status) {
     if (on_status) on_status(Status(istep, ds));
     result.steps = istep;
     e_last = h_.zero_body();
+  }
+  // imsrg++ Solve() gathers once more at the end (IMSRGSolver.cc:236-239).
+  if (solver_.hunter_gatherer) {
+    GatherOmega();
+    result.num_gathers = loop_gathers + 1;
   }
   result.s = s_;
   result.e0 = h_.zero_body();

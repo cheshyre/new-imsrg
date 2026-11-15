@@ -18,6 +18,7 @@
 #include "imsrg/driver/config/load_config.h"
 #include "imsrg/driver/operators/operator_request.h"
 #include "imsrg/driver/pipeline/hamiltonian.h"
+#include "imsrg/operator/compare.h"
 
 namespace imsrg::driver::pipeline {
 namespace {
@@ -125,6 +126,21 @@ TEST(PipelineHamiltonian, Rp2ZeroBodyMatchesIt6) {
             << rp2.zero_body() - 4.294907 << " (" << rp2.zero_body() << ")\n";
   EXPECT_NEAR(rp2.zero_body(), 4.294907, 5.0e-7);
   EXPECT_EQ(rp2.model_space_ptr(), ph.hno.model_space_ptr());
+}
+
+// D35: Rso is its own catalog operator. Its reference expectation value for
+// the closed-shell O16 vanishes (the spin-orbit pairs j = l +- 1/2 cancel in
+// every filled shell, so the HF value of Rp2 is the one without Rso as well),
+// while the operator itself is nonzero.
+TEST(PipelineHamiltonian, RsoIsAnOperatorAndVanishesForClosedShells) {
+  if (!Have(kVnn)) GTEST_SKIP() << "missing " << kVnn;
+  const RunConfig cfg = Load(Toml(kO16, false));
+  const PreparedHamiltonian ph = PrepareHamiltonian(cfg);
+  const op::Operator rso = PrepareOperator(Request("Rso"), ph, cfg);
+  std::cout << "[dev] Rso zero body (O16) = " << rso.zero_body() << "\n";
+  EXPECT_NEAR(rso.zero_body(), 0.0, 1.0e-10);
+  EXPECT_GT(op::MaxAbs(rso).one_body, 0.05);
+  EXPECT_EQ(rso.model_space_ptr(), ph.hno.model_space_ptr());
 }
 
 TEST(PipelineHamiltonian, PlannedOptionsThrow) {

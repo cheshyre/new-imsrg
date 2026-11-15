@@ -54,6 +54,56 @@ TEST(OpslibGolden, Emax2TrelAndRp2) {
   CheckDir(fs::path(IMSRG_GOLDEN_DIR) / "hamiltonian/emax2_O16", "emax2");
 }
 
+/// The spin-orbit correction against the patched imsrg++ `Rso` dump (D35),
+/// relative to the largest dump element.
+TEST(OpslibGolden, Emax2RsoRelative1e10) {
+  const fs::path dir = fs::path(IMSRG_GOLDEN_DIR) / "hamiltonian/emax2_O16";
+  const auto ms =
+      op::ModelSpaceForDump(op::ReadOperatorDumpHeader(dir / "T.dump"));
+  const op::Operator ref = op::ReadOperatorDump(dir / "Rso.dump", ms);
+  const op::Operator built = opslib::RpSpinOrbitCorrection(ms);
+  const op::PartMaxima dev = op::MaxAbsDifference(built, ref);
+  const double scale = op::MaxAbs(ref).max();
+  std::cout << "[emax2_Rso] max |built - dump| " << dev.max() << " (max |dump| "
+            << scale << ", relative " << dev.max() / scale << ")\n";
+  ::testing::Test::RecordProperty("emax2_Rso_max_dev",
+                                  std::to_string(dev.max()));
+  EXPECT_GT(scale, 0.1);
+  EXPECT_LT(dev.max(), 1.0e-10 * scale);
+}
+
+/// D35-2: the original imsrg++ Rp2 equals the new Rp2 plus Rso/Z. The numbers
+/// are diagonal elements of the pre-D35 `Rp2.dump` (pristine imsrg++, before
+/// the regeneration; design/30 section 6).
+TEST(OpslibGolden, OldRp2IsNewRp2PlusRsoOverZ) {
+  const fs::path dir = fs::path(IMSRG_GOLDEN_DIR) / "hamiltonian/emax2_O16";
+  const auto ms =
+      op::ModelSpaceForDump(op::ReadOperatorDumpHeader(dir / "T.dump"));
+  const op::Operator rp2 = op::ReadOperatorDump(dir / "Rp2.dump", ms);
+  const op::Operator rso = op::ReadOperatorDump(dir / "Rso.dump", ms);
+  struct Old {
+    int n, l, j2, tz2;
+    double value;
+  };
+  const Old kOld[] = {{0, 2, 3, -1, 0.98968387},
+                      {0, 1, 3, -1, 0.74670537},
+                      {0, 1, 3, +1, 0.01475002}};
+  for (const Old& o : kOld) {
+    bool found = false;
+    for (std::int32_t i = 0; i < ms->num_orbits(); ++i) {
+      const basis::Orbit& orb = ms->basis().orbit(OrbitIndex{i});
+      if (orb.n == o.n && orb.l == o.l && orb.j2.twice == o.j2 &&
+          orb.tz2.twice == o.tz2) {
+        const double v = rp2.one_body().get(OrbitIndex{i}, OrbitIndex{i}) +
+                         rso.one_body().get(OrbitIndex{i}, OrbitIndex{i}) / kZ;
+        EXPECT_NEAR(v, o.value, 5.0e-9);
+        found = true;
+      }
+    }
+    EXPECT_TRUE(found);
+  }
+}
+
 TEST(OpslibGolden, Emax4TrelAndRp2) {
   CheckDir(fs::path(IMSRG_GENERATED_GOLDEN_DIR) / "hamiltonian/emax4_O16",
            "emax4");

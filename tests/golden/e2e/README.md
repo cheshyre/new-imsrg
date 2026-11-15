@@ -84,7 +84,7 @@ IT-8/He4_emax2 (E0 and dE_triples at emax 2) and IT-8/emax3 (O16).
   diverges (E0 ~ -1e9 at s ~ 38). See "Diverging flows" above; compare with IT-4/smax10, IT-5/smax10.  IT-5
   (NAT): `Hbare_0b` differs from the HF value (-313.00439075 vs -313.16848141), as expected after the
   basis change.
-* **IT-6.** `intRp2.snt` (zero body 4.45016791 transformed; HF value of Rp2 4.294907).  The
+* **IT-6.** `intRp2.snt` (zero body 4.45025883 transformed, patched build D35 where Rp2 has no spin-orbit term, was 4.45016791; HF value of Rp2 4.294907).  The
   single-reference run writes only the operator `.snt`, not the Hamiltonian.
 * **IT-7.** `int.snt` zero body term -161.03272 (Ne20 reference, sd-shell valence space).
 * **IT-8.** emax=2 diverges (see "Diverging flows"; use IT-8/He4_emax2 instead); its `Perturbative triples: 0.00000000 -> -inf` line is
@@ -107,19 +107,39 @@ IT-8/He4_emax2 (E0 and dE_triples at emax 2) and IT-8/emax3 (O16).
 imsrg++ pipeline (me2j 14/28/14, hw=16, HF, normal ordering, Magnus with the executable's default
 step control, atan generator) with a verbatim copy of `Solve_magnus_euler` and prints every step as
 `step,s,E0,norm_eta,norm_omega` (`%.17g`). Options: `emax reference valence_space generator smax
---imsrg3 --n7 --factorized`.
+--imsrg3 --n7 --factorized --hunter-gatherer --omega-norm-max X --factorized-1b-intermediates 0|1
+--factorized-2b-intermediates 0|1` (defaults reproduce the earlier goldens bit for bit). `result.json`
+of a run with a new flag gains `hunter_gatherer`, `omega_norm_max`, `n_gathers` (loop gathers plus the
+final gather of `Solve()`, i.e. the number of `gathering Omega.` lines of imsrg++),
+`norm_omega_gathered` and `factorized_{1,2}b_intermediates`; `norm_omega_final` is the hunter's norm
+before the final gather. The harness was cross-checked against `imsrg++ hunter_gatherer=true` itself
+(same steps, s, E0 and gather count for the three IT-2/hunter_gatherer cases).
 
 * **IT-2 check:** `refharness flow emax=4 reference=O16 valence_space=O16 hw=16`: 256 steps, s =
   124.45796230102064, E0 = -164.6487723082966 vs golden -164.648772308: |dE0| = 3e-10 (<= 1e-8).
   Wall 6.3 s (8 threads, includes file read). `IT-2/trajectory.csv` = steps 0-9 + step 256;
   `IT-2/refharness_result.json` is the harness result.
-* **IT-10** (IMSRG(3f2) = IMSRG(2) + `BCH::SetUseFactorizedCorrection(true)`; no executable switch):
+* **IT-2/hunter_gatherer** (IMSRG(2), hunter-gatherer Magnus, complete `%.17g` trajectories; the
+  trajectory column `norm_omega` is the hunter's norm). Plain split-Omega IMSRG(2): 256 steps, E0
+  -164.6487723083.
 
-| case | E_HF | E0 | steps / s_final | wall (s) |
+| case | E_HF | E0 | steps / s_final | gathers (incl. final) |
 |---|---|---|---|---|
-| IT-10/O16_emax2 | -134.03044657 | -147.389459022 | 407 / 200 (smax reached) | 3.8 |
-| IT-10/He4_emax2 | -22.98970175 | -25.153996210 | 193 / 95.90493 (|eta| < 1e-6) | 2.1 |
-| IT-10/O16_emax3 | -147.43333256 | -157.777153257 | 152 / 73.38877 (|eta| < 1e-6) | 5.0 |
+| omax_0.25 (O16 emax 4) | -147.8935764285 | -164.9671965257 | 292 / 142.45672 | 8 |
+| omax_0.10 (O16 emax 4) | -147.8935764285 | -165.0014416512 | 298 / 145.45693 | 21 |
+| He4_emax2_omax_0.10 | -22.9897017465 | -25.1967654146 | 196 / 97.39937 | 7 |
 
-O16 emax 2 does NOT diverge with 3f2 (unlike 2N-only IMSRG(2)); it needs the full smax = 200 and
-ends with |eta| = 2.5e-5, i.e. slow tail convergence. He4 emax 2 is kept as an extra case.
+  Hunter-gatherer is not a re-ordering of the split-Omega calculation: the gatherer reaches a norm of
+  about 1.7 and its BCH product and transform are truncated, so E0 differs from the split run by
+  -0.32 MeV (0.25) and -0.35 MeV (0.1). The rewrite must implement `GatherOmega` exactly.
+* **IT-10** (IMSRG(3f2), owner recipe D32: IMSRG(2) + hunter-gatherer Magnus with `omega_norm_max` 0.1 +
+  `BCH::SetUseFactorizedCorrection(true)` with 1b intermediates on and 2b off):
+
+| case | E_HF | E0 | steps / s_final | gathers (incl. final) | wall (s) |
+|---|---|---|---|---|---|
+| IT-10/O16_emax2 | -134.03044657 | -145.683281903 | 192 / 92.62615 (|eta| < 1e-6) | 24 | 0.65 |
+| IT-10/He4_emax2 | -22.98970175 | -25.183340567 | 198 / 98.40187 (|eta| < 1e-6) | 8 | 0.47 |
+| IT-10/O16_emax3 | -147.43333256 | -157.675593064 | 150 / 72.41060 (|eta| < 1e-6) | 13 | 0.96 |
+
+O16 emax 2 converges (192 steps, s = 92.6); with the former imsrg++ defaults it ran into smax = 200.
+He4 emax 2 is kept as an extra case.

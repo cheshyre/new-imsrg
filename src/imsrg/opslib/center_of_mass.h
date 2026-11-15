@@ -32,10 +32,12 @@ namespace imsrg::opslib {
 /// sum_{i<j} p_i.p_j/(m A), MeV. One body part: T/A (see `KineticEnergy`).
 /// Two-body part: the normalized antisymmetrized element of p1.p2/(m A),
 /// obtained from the (T_cm - T_rel) oscillator sums of the Moshinsky
-/// transformation times hbar_omega/2 (see `Calculate_p1p2`); elements with |v|
-/// <= 1e-7 are not stored, as in imsrg++ `TCM_Op` (an imsrg++ quirk kept on
-/// purpose). Reproduces `TCM_Op`. Complexity: O(sum over channels of num_kets^2
-/// x E^3) with O(1) table lookups; about a second at emax 6.
+/// transformation times hbar_omega/2 (see `Calculate_p1p2`). Every two-body
+/// entry is kept (D35): imsrg++ `TCM_Op` drops elements with |v| <= 1e-7, which
+/// only ever removes round-off (<= 2.4e-15 MeV at emax 4); the goldens come
+/// from an imsrg++ build without that threshold. Complexity: O(sum over
+/// channels of num_kets^2 x E^3) with O(1) table lookups; about a second at
+/// emax 6.
 /// @pre `ms` not null, `A` >= 1.
 op::Operator TCm(const std::shared_ptr<const basis::ModelSpace>& ms, int A);
 
