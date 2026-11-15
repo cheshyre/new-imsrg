@@ -3,8 +3,9 @@
 
 // IMSRG(3)-N7 term comm232ss (imsrg3.h) against the m-scheme brute force
 // (emax 1, closed-shell, open-shell and fractional references, general
-// hermiticity), against imsrg-devel (emax 2) and for antisymmetry under
-// X <-> Y.
+// hermiticity), against imsrg-devel (emax 2), for antisymmetry under
+// X <-> Y, and the pair-third path of terms::Comm232ss against the
+// element-wise reference (detail/comm232.h).
 
 #include <algorithm>
 #include <chrono>
@@ -118,6 +119,76 @@ TEST(N7Comm232, MatchesImsrgDevel) {
           "comm232ss %s e3max %d: two-body norm deviation %.3g, %.1f ms\n",
           dir.c_str(), e3max, Rel(got, expect), ms);
     }
+  }
+}
+
+// Z = comm232ss(X, Y) through the element-wise reference.
+op::Operator EvaluateReference(const op::Operator& X, const op::Operator& Y,
+                               const ThreeBodyContext& ctx) {
+  op::Operator z = testing::ZeroN7Output(X, Y, ctx.model_space_ptr());
+  detail::Comm232ssReference(X, Y, z, ctx);
+  return z;
+}
+
+// Largest |a - b| over the two-body elements, relative to max(1, max |b|).
+double TwoBodyDeviation(const op::Operator& a, const op::Operator& b) {
+  const std::vector<double> va = a.two_body().matrix().buffer().ToVector();
+  const std::vector<double> vb = b.two_body().matrix().buffer().ToVector();
+  EXPECT_EQ(va.size(), vb.size());
+  double scale = 1.0;
+  double worst = 0.0;
+  for (std::size_t k = 0; k < va.size() && k < vb.size(); ++k) {
+    scale = std::max(scale, std::abs(vb[k]));
+    worst = std::max(worst, std::abs(va[k] - vb[k]));
+  }
+  return worst / scale;
+}
+
+// The pair-third path (terms::Comm232ss) against the element-wise reference
+// (golden inputs, both E3max; the brute-force cases with non-Hermitian
+// operands).
+TEST(N7Comm232, PairThirdMatchesReference) {
+  for (const char* ref : {"He4", "O16"}) {
+    for (const int e3max : {3, 6}) {
+      const N7Inputs in = GoldenN7Inputs(2, ref, e3max);
+      auto t0 = std::chrono::steady_clock::now();
+      const op::Operator fast =
+          EvaluateN7Term(Term::kComm232ss, in.x, in.y, *in.ctx);
+      const double ms_fast = Milliseconds(t0);
+      t0 = std::chrono::steady_clock::now();
+      const op::Operator slow = EvaluateReference(in.x, in.y, *in.ctx);
+      const double ms_slow = Milliseconds(t0);
+      const double dev = TwoBodyDeviation(fast, slow);
+      EXPECT_LE(dev, 1.0e-12) << ref << " e3max " << e3max;
+      std::printf(
+          "comm232ss %s emax 2 e3max %d: pair third vs element-wise "
+          "%.3g (%.1f ms vs %.1f ms)\n",
+          ref, e3max, dev, ms_fast, ms_slow);
+    }
+  }
+  for (N7Inputs& c : BruteForceCases()) {
+    const op::Operator fast =
+        EvaluateN7Term(Term::kComm232ss, c.x, c.y, *c.ctx);
+    const op::Operator slow = EvaluateReference(c.x, c.y, *c.ctx);
+    EXPECT_LE(TwoBodyDeviation(fast, slow), 1.0e-12)
+        << c.ms3->reference().name();
+  }
+}
+
+// Timing of the pair-third path (printed; repeated calls on fresh outputs).
+TEST(N7Comm232, Timing) {
+  for (const char* ref : {"He4", "O16"}) {
+    const N7Inputs in = GoldenN7Inputs(2, ref, 6);
+    std::vector<double> ms;
+    for (int rep = 0; rep < 7; ++rep) {
+      op::Operator z = testing::ZeroN7Output(in.x, in.y, in.ms3);
+      const auto t0 = std::chrono::steady_clock::now();
+      terms::Comm232ss(in.x, in.y, z, *in.ctx);
+      ms.push_back(Milliseconds(t0));
+    }
+    std::sort(ms.begin(), ms.end());
+    std::printf("comm232ss %s emax 2 e3max 6: min %.2f ms, median %.2f ms\n",
+                ref, ms.front(), ms[ms.size() / 2]);
   }
 }
 
