@@ -18,3 +18,11 @@ imsrg_add_test(NAME commutator_ref_properties
   NO_GTEST_MAIN)
 target_compile_definitions(commutator_ref_properties PRIVATE
   IMSRG_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/tests/golden")
+
+imsrg_add_test(NAME commutator_ref_factorized
+  SOURCES test_factorized.cc ${_imsrg_exec_main} ${_imsrg_comm_support}
+  DEPS commutator_ref operator
+  LABELS unit
+  NO_GTEST_MAIN)
+target_compile_definitions(commutator_ref_factorized PRIVATE
+  IMSRG_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/tests/golden")
