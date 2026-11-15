@@ -85,12 +85,13 @@ void Flatten(const Json& v, const std::string& path,
 }
 
 std::string HeTomlText(const std::filesystem::path& dir, bool hf_only,
-                       bool operators) {
+                       bool operators, bool triples = false) {
   std::ostringstream t;
   t << "[run]\ntask = \"" << (hf_only ? "hf" : "imsrg") << "\"\n\n"
     << "[basis]\nemax = 2\nhw = 16.0\n\n[reference]\nnucleus = \"He4\"\n\n"
     << "[interaction.two_body]\nfile = \"" << DataFile(TwoBodyName()).string()
     << "\"\ne1max = 14\ne2max = 28\nlmax = 14\n\n";
+  if (triples) t << "[imsrg]\nperturbative_triples = true\n\n";
   if (operators) t << "[operators]\nlist = [\"Rp2\"]\n\n";
   t << "[output]\ndirectory = \"" << dir.string() << "\"\n";
   return t.str();
@@ -107,10 +108,10 @@ TEST(ResultsSchema, WrittenKeysMatchTheDocumentedTable) {
   }
   ASSERT_GT(documented.size(), 20u) << "table not found in design/16";
 
-  // Full run with an operator: every documented key is written.
+  // Full run with an operator and the triples: every documented key is written.
   const auto dir = FreshDir("schema_full");
   driver::ConfigSources src;
-  src.config_text = HeTomlText(dir, false, true);
+  src.config_text = HeTomlText(dir, false, true, true);
   const RunResult full = Execute(src, dir);
   ASSERT_FALSE(full.planned) << full.note;
   std::set<std::string> written;
@@ -122,7 +123,7 @@ TEST(ResultsSchema, WrittenKeysMatchTheDocumentedTable) {
 
   // The version.
   ASSERT_TRUE(full.results.has("schema_version"));
-  EXPECT_EQ(full.results["schema_version"].number, 1.0);
+  EXPECT_EQ(full.results["schema_version"].number, 2.0);
 
   // HF-only run: a subset of the table that includes every "always" key.
   const auto dir_hf = FreshDir("schema_hf");

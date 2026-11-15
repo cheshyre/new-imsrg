@@ -557,6 +557,15 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   (upper triangle, as imsrg++), which halves the memory; unpacking a channel for GEMM-type terms cost
   4 % of a [2,2]->3 evaluation at emax 3 (0.40 of 9 ms). **Assumed meanwhile:** packed storage, dense
   scratch per channel inside kernels. Alternative: dense blocks (simpler kernels, twice the memory).
+* **M10-Q40** (2026-11-15, M10 triples driver) - imsrg++ `CalculatePerturbativeTriples`
+  (IMSRGSolver.cc:1186) combines a split Omega stack as `omega = BCH_Product(omega, Omega[n])`, i.e.
+  e^omega = e^{Omega_0} e^{Omega_n}, while the transformation of H is e^{Omega_n} ... e^{Omega_0} H
+  e^{-Omega_0} ... e^{-Omega_n} (the oldest piece acts first). For a single Omega (no split, as in
+  IT-8 He4 emax 2, O16 emax 3) the order is irrelevant; for a split stack the combined omega differs
+  from the one that generated H at the commutator level. **Assumed meanwhile:** reproduce imsrg++
+  (`flow::PerturbativeTriples` uses `BchProduct(omega, Omega_n)`). Alternative: `BchProduct(Omega_n,
+  omega)`, consistent with the transform order; say if wanted (a fix would be an old-code bug entry
+  in design/30 section 6).
 * **M10-Q30** (2026-11-15, M10 T5 production comm223) - The production `commutator::Comm223`
   gathers the two-body legs per tile (no global gather tables, as the layout review asked) and is
   1.7x slower than the prototype K1 at O16 emax 3 E3max 9 (15.3 vs 9.0 ms, 18 threads): W sums 6.8 ms

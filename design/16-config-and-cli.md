@@ -216,7 +216,7 @@ first column of this table and compares it with the keys of a real run, so the t
 
 | key | type | present | meaning |
 |---|---|---|---|
-| `schema_version` | int | always | layout version of this table (currently 1). |
+| `schema_version` | int | always | layout version of this table (currently 2). |
 | `e_reference` | number | always | reference energy: E_HF in the basis of the flow (HF or NAT basis) or the zero-body part of the normal-ordered Hamiltonian (oscillator basis); Lawson constant not included. |
 | `e_mp2` | number | always | MBPT(2) correlation energy of the normal-ordered Hamiltonian that enters the flow (HF or NAT basis; imsrg++ `EMP2`), MeV. Equals the `E_MP2` of flow-file step 0. *(added in run 2)* |
 | `hf` | object | `basis.kind = "hf"` | the Hartree-Fock solution. |
@@ -239,6 +239,9 @@ first column of this table and compares it with the keys of a real run, so the t
 | `imsrg.stages[].e0` | number | per stage | E0 at the end of the stage. |
 | `imsrg.stages[].norm_eta` | number | per stage | norm of the generator at the end. |
 | `imsrg.stages[].stop` | string | per stage | `converged`, `smax` or `diverged`. |
+| `imsrg.perturbative_triples` | object | `imsrg.perturbative_triples = true` | the perturbative-triples correction after stage 1 (imsrg++ `Perturbative triples:` line). *(added in version 2)* |
+| `imsrg.perturbative_triples.de` | number | with `imsrg.perturbative_triples` | the energy correction dE, MeV. |
+| `imsrg.perturbative_triples.e0_plus_de` | number | with `imsrg.perturbative_triples` | E0 of H(s) after stage 1 plus dE (not the E0 after stage 2). |
 | `operators` | object | always | transformed operators by canonical name (empty if none requested). |
 | `operators.<name>` | object | per operator | one entry per requested operator. |
 | `operators.<name>.reference` | number | per operator | zero-body part before the flow (HF basis, normal ordered). |
@@ -253,6 +256,9 @@ norm_eta_2b, norm_eta, norm_omega_1b, norm_omega_2b, norm_omega, num_omegas, E_M
 file (`E(MP2)` column); it costs one MP2 evaluation per step.
 
 Changelog (newest first):
+
+* **2** (run 2, M10, 2026-11-15): added `imsrg.perturbative_triples` (`de`, `e0_plus_de`), written only
+  when `imsrg.perturbative_triples = true`. No other key changed.
 
 * **1** (run 2, 2026-11-15): first documented layout; `schema_version` added. The keys are those of the
   table above, including `imsrg.num_gathers` and `imsrg.stages[].num_gathers` of the hunter-gatherer
