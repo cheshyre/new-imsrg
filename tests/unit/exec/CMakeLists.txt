@@ -26,3 +26,10 @@ imsrg_add_test(NAME exec_kernels
   DEPS exec
   LABELS unit
   NO_GTEST_MAIN)
+
+imsrg_add_test(NAME exec_host_parallel
+  SOURCES host_parallel_test.cc
+          ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
+  DEPS exec
+  LABELS unit
+  NO_GTEST_MAIN)

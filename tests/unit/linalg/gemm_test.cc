@@ -3,8 +3,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <limits>
 #include <random>
+#include <span>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -202,6 +204,96 @@ TEST(LinalgGroupedGemm, Mix) {
   for (int j = 0; j < 4; ++j)
     for (int i = 0; i < 2; ++i) EXPECT_NEAR(C1(i, j), r1(i, j), 1.0e-12);
   GroupedGemm({});
+}
+
+/// A group of problems of mixed shapes (dimensions 32..96, all transpose
+/// combinations, alpha and beta not in {0, 1}); owns the storage.
+struct Group {
+  std::vector<Matrix<double>> A, B, C, C0;
+  std::vector<GemmProblem> ps;
+  std::vector<double> alpha, beta;
+  std::vector<Op> oa, ob;
+};
+
+Group MakeGroup(std::mt19937_64& rng, int count) {
+  Group g;
+  std::uniform_int_distribution<int> dim(32, 96);
+  for (int p = 0; p < count; ++p) {
+    const int m = dim(rng), n = dim(rng), k = dim(rng);
+    const Op oa = (p & 1) ? Op::kTrans : Op::kNoTrans;
+    const Op ob = (p & 2) ? Op::kTrans : Op::kNoTrans;
+    g.A.push_back(oa == Op::kTrans ? RandomMatrix<double>(rng, k, m)
+                                   : RandomMatrix<double>(rng, m, k));
+    g.B.push_back(ob == Op::kTrans ? RandomMatrix<double>(rng, n, k)
+                                   : RandomMatrix<double>(rng, k, n));
+    g.C.push_back(RandomMatrix<double>(rng, m, n));
+    g.alpha.push_back(0.5 + 0.25 * p);
+    g.beta.push_back(p % 3 == 0 ? 0.0 : -0.75 + 0.1 * p);
+    g.oa.push_back(oa);
+    g.ob.push_back(ob);
+  }
+  g.C0 = g.C;
+  for (std::size_t p = 0; p < g.C.size(); ++p) {
+    g.ps.push_back({g.alpha[p], g.A[p].const_view(), g.oa[p],
+                    g.B[p].const_view(), g.ob[p], g.beta[p], g.C[p].view()});
+  }
+  return g;
+}
+
+void ExpectMatchesNaive(const Group& g, std::size_t p) {
+  const Matrix<double> ref = Naive<double>(
+      g.alpha[p], g.A[p].const_view(), g.oa[p], g.B[p].const_view(), g.ob[p],
+      g.beta[p], g.C0[p].const_view());
+  for (std::int64_t j = 0; j < ref.cols(); ++j) {
+    for (std::int64_t i = 0; i < ref.rows(); ++i) {
+      ASSERT_NEAR(g.C[p](i, j), ref(i, j),
+                  1.0e-13 * std::max(1.0, std::abs(ref(i, j))))
+          << "problem " << p << " (" << i << ", " << j << ")";
+    }
+  }
+}
+
+TEST(LinalgGroupedGemm, LargeMixedGroupMatchesNaive) {
+  // 12 problems of about 2 * 64^3 flops each: several Mflop in total, above
+  // kConcurrentGemmMinFlops, so with Accelerate and >= 2 host threads the
+  // problems run concurrently.
+  std::mt19937_64 rng(11);
+  Group g = MakeGroup(rng, 12);
+  GroupedGemm(g.ps);
+  for (std::size_t p = 0; p < g.ps.size(); ++p) {
+    ExpectMatchesNaive(g, p);
+  }
+}
+
+TEST(LinalgGroupedGemm, InvalidLastProblemThrowsAndLeavesAllCUntouched) {
+  std::mt19937_64 rng(12);
+  Group g = MakeGroup(rng, 9);
+  Matrix<double> Ab = RandomMatrix<double>(rng, 40, 50);
+  Matrix<double> Bb = RandomMatrix<double>(rng, 49, 30);  // inner 50 != 49
+  Matrix<double> Cb = RandomMatrix<double>(rng, 40, 30);
+  const Matrix<double> Cb0 = Cb;
+  g.ps.push_back({1.0, Ab.const_view(), Op::kNoTrans, Bb.const_view(),
+                  Op::kNoTrans, 0.0, Cb.view()});
+  EXPECT_THROW(GroupedGemm(g.ps), imsrg::InvariantError);
+  auto same = [](const Matrix<double>& x, const Matrix<double>& y) {
+    if (x.rows() != y.rows() || x.cols() != y.cols()) return false;
+    for (std::int64_t j = 0; j < x.cols(); ++j)
+      for (std::int64_t i = 0; i < x.rows(); ++i)
+        if (std::memcmp(&x(i, j), &y(i, j), sizeof(double)) != 0) return false;
+    return true;
+  };
+  for (std::size_t p = 0; p < g.C.size(); ++p) {
+    EXPECT_TRUE(same(g.C[p], g.C0[p])) << "problem " << p;
+  }
+  EXPECT_TRUE(same(Cb, Cb0));
+}
+
+TEST(LinalgGroupedGemm, EmptyAndSingleProblemGroups) {
+  EXPECT_NO_THROW(GroupedGemm(std::span<const GemmProblem>{}));
+  std::mt19937_64 rng(13);
+  Group g = MakeGroup(rng, 1);
+  GroupedGemm(g.ps);
+  ExpectMatchesNaive(g, 0);
 }
 
 }  // namespace imsrg::linalg
