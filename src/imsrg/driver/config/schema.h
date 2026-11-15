@@ -469,7 +469,7 @@ struct Imsrg3Config {
   /// 3f2: two-body intermediates (`...two_body_intermediates`; not
   /// implemented, E-PLANNED together with `factorized`).
   bool factorized_2b_intermediates = false;
-  bool no_qqq = false;      ///< planned
+  bool no_qqq = false;  ///< planned
   bool only_2b_eta = false;
   bool only_2b_omega = false;
   bool discard_residual_input_3n = false;

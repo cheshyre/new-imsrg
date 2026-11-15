@@ -369,10 +369,10 @@ TEST(Validate, factorized_recipe_keys_do_not_trip_v50_or_v56) {
   EXPECT_EQ(FindIssue(r.issues, "V-57"), nullptr);
   EXPECT_FALSE(HasErrors(r.issues));
   // Explicit sub-switches with factorized are accepted.
-  const auto r2 =
-      Resolve(With(Minimal(), {{"imsrg3.factorized", B(true)},
-                               {"imsrg3.factorized_1b_intermediates", B(false)}}),
-              ResolveOptions{false, false});
+  const auto r2 = Resolve(
+      With(Minimal(), {{"imsrg3.factorized", B(true)},
+                       {"imsrg3.factorized_1b_intermediates", B(false)}}),
+      ResolveOptions{false, false});
   EXPECT_FALSE(HasErrors(r2.issues));
 }
 

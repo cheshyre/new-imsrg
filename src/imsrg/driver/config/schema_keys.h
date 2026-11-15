@@ -277,8 +277,7 @@ void VisitSchema(Config& c, Visitor&& v) {
                   "true"},
           c.imsrg3.factorized_1b_intermediates);
   v.Field(KeyInfo{"imsrg3.factorized_2b_intermediates",
-                  "3f2: two-body intermediates (not implemented yet)",
-                  "false"},
+                  "3f2: two-body intermediates (not implemented yet)", "false"},
           c.imsrg3.factorized_2b_intermediates);
   v.Field(KeyInfo{"imsrg3.no_qqq", "drop qqq terms", "false", false, false, PL},
           c.imsrg3.no_qqq);

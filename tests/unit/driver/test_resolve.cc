@@ -107,15 +107,15 @@ TEST(Resolve, factorized_sets_the_3f2_recipe_defaults) {
 }
 
 TEST(Resolve, explicit_keys_win_over_the_3f2_recipe) {
-  const auto r = ResolveTree(
-      With(Minimal(), {{"imsrg3.factorized", B(true)},
-                       {"imsrg.omega.hunter_gatherer", B(false)},
-                       {"imsrg.step.omega_norm_max", D(0.25)}}));
+  const auto r =
+      ResolveTree(With(Minimal(), {{"imsrg3.factorized", B(true)},
+                                   {"imsrg.omega.hunter_gatherer", B(false)},
+                                   {"imsrg.step.omega_norm_max", D(0.25)}}));
   EXPECT_FALSE(r.config.imsrg.omega.hunter_gatherer);
   EXPECT_DOUBLE_EQ(r.config.imsrg.step.omega_norm_max, 0.25);
-  const auto r2 = ResolveTree(With(
-      Minimal(), {{"imsrg3.factorized", B(true)},
-                  {"imsrg.step.omega_norm_max", D(0.3)}}));
+  const auto r2 =
+      ResolveTree(With(Minimal(), {{"imsrg3.factorized", B(true)},
+                                   {"imsrg.step.omega_norm_max", D(0.3)}}));
   EXPECT_TRUE(r2.config.imsrg.omega.hunter_gatherer);
   EXPECT_DOUBLE_EQ(r2.config.imsrg.step.omega_norm_max, 0.3);
   const auto r3 = ResolveTree(
