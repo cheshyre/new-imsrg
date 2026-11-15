@@ -228,38 +228,27 @@ static_assert(std::is_trivially_copyable_v<CcTerm>);
 /// cc channel classes give an empty J' range. O(1).
 IMSRG_FORCEINLINE_FUNCTION CcTerm MakeCcTerm(const PhArgs& a, int p, int q,
                                              int r, int s) noexcept {
-  const auto& tb = a.zv.tb;
-  const int* j2 = tb.orbit_j2;
+  // Precomputed descriptors of the cc kets of (p, q) and (r, s)
+  // (`PandyaView::cc_pair`): local-index-table offset, J' range, class.
+  const int norb = a.zv.tb.num_orbits;
+  const std::int32_t* d1 = a.pv.cc_pair + 4 * (p * norb + q);
+  const std::int32_t* d2 = a.pv.cc_pair + 4 * (r * norb + s);
   CcTerm t;
-  const int dpq = tb.orbit_tz2[p] - tb.orbit_tz2[q];
-  const int drs = tb.orbit_tz2[r] - tb.orbit_tz2[s];
-  const int cls =
-      (dpq < 0 ? -dpq : dpq) + 2 + ((tb.orbit_l[p] + tb.orbit_l[q]) & 1);
-  if (cls != (drs < 0 ? -drs : drs) + 2 + ((tb.orbit_l[r] + tb.orbit_l[s]) & 1))
-    return t;
+  const int cls = d1[3] & 255;
+  if (cls != (d2[3] & 255)) return t;
   t.cls = cls;
-  const int ba = p <= q ? p : q;
-  const int bb = p <= q ? q : p;
-  const int ka = r <= s ? r : s;
-  const int kb = r <= s ? s : r;
   if (p <= q) {
     t.ket_flip = r > s;
   } else {
     t.ket_flip = s > r;
-    const double phi = ParitySign((j2[p] + j2[q]) / 2 + (j2[r] + j2[s]) / 2);
+    // phi = (-1)^((jp + jq)/2 + (jr + js)/2).
+    const double phi = ParitySign((d1[3] >> 8) + (d2[3] >> 8));
     t.sign = -a.hxhy * phi;
   }
-  const int jba = j2[ba], jbb = j2[bb], jka = j2[ka], jkb = j2[kb];
-  const int bmin = (jba > jbb ? jba - jbb : jbb - jba) / 2;
-  const int kmin = (jka > jkb ? jka - jkb : jkb - jka) / 2;
-  const int kbra = tb.ket_index(OrbitIndex{ba}, OrbitIndex{bb}).value();
-  const int kket = tb.ket_index(OrbitIndex{ka}, OrbitIndex{kb}).value();
-  t.lit_bra = a.pv.local_index_table + a.pv.ket_J_offsets[kbra] - bmin;
-  t.lit_ket = a.pv.local_index_table + a.pv.ket_J_offsets[kket] - kmin;
-  const int bmax = (jba + jbb) / 2;
-  const int kmax = (jka + jkb) / 2;
-  t.lo = bmin > kmin ? bmin : kmin;
-  t.hi = bmax < kmax ? bmax : kmax;
+  t.lit_bra = a.pv.local_index_table + d1[0];
+  t.lit_ket = a.pv.local_index_table + d2[0];
+  t.lo = d1[1] > d2[1] ? d1[1] : d2[1];
+  t.hi = d1[2] < d2[2] ? d1[2] : d2[2];
   return t;
 }
 

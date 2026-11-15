@@ -4,11 +4,13 @@
 // Construction of the Pandya data of the particle-hole term (design/12 section
 // 4.2). Host-side only; no Kokkos.
 
+#include <algorithm>
 #include <cstdint>
 #include <utility>
 #include <vector>
 
 #include "imsrg/base/assert.h"
+#include "imsrg/basis/two_body_channels.h"
 #include "imsrg/commutator/detail/pandya.h"
 
 namespace imsrg::commutator::detail {
@@ -125,6 +127,39 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
     d.kernel_view.num_classes = kNumClasses;
   }
 
+  // Descriptors of the cc ket of every ordered orbit pair (inverse transform).
+  {
+    const auto& sp = ms.basis();
+    const std::int32_t norb = sp.num_orbits();
+    const auto jo_host = ph.ket_J_offsets();
+    std::vector<std::int32_t> pairs(4 * static_cast<std::size_t>(norb) *
+                                    static_cast<std::size_t>(norb));
+    for (std::int32_t p = 0; p < norb; ++p) {
+      for (std::int32_t q = 0; q < norb; ++q) {
+        const auto& op = sp.orbit(OrbitIndex{p});
+        const auto& oq = sp.orbit(OrbitIndex{q});
+        const std::int32_t jp = op.j2.twice, jq = oq.j2.twice;
+        const std::int32_t jmin = (jp > jq ? jp - jq : jq - jp) / 2;
+        const std::int32_t k =
+            basis::ImsrgppKetIndex(OrbitIndex{std::min(p, q)},
+                                   OrbitIndex{std::max(p, q)}, norb)
+                .value();
+        const std::int32_t dtz = op.tz2.twice - oq.tz2.twice;
+        const std::int32_t cls =
+            (dtz < 0 ? -dtz : dtz) + 2 + ((op.l + oq.l) & 1);
+        std::int32_t* e =
+            pairs.data() +
+            4 * (static_cast<std::size_t>(p) * static_cast<std::size_t>(norb) +
+                 static_cast<std::size_t>(q));
+        e[0] = jo_host[static_cast<std::size_t>(k)] - jmin;
+        e[1] = jmin;
+        e[2] = (jp + jq) / 2;
+        e[3] = cls + 256 * (((jp + jq) / 2) & 1);
+      }
+    }
+    d.cc_pair = Upload(pairs, "pandya::cc_pair");
+  }
+
   const auto sz = [](const std::vector<std::int64_t>& off) {
     return static_cast<std::size_t>(off.back());
   };
@@ -153,6 +188,7 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
   v.w = d.w.device_data();
   v.class_kets = d.class_kets.device_data();
   v.class_offset = d.class_offset.device_data();
+  v.cc_pair = d.cc_pair.device_data();
 
   for (std::int32_t c = 0; c < ncc; ++c) {
     const auto cs = static_cast<std::size_t>(c);

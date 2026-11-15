@@ -81,9 +81,15 @@ struct PandyaView {
   /// class (`kernels/particle_hole.cc`).
   const std::int32_t* class_kets = nullptr;
   const std::int32_t* class_offset = nullptr;  ///< num_classes + 1 offsets.
-  std::int32_t num_classes = 0;                ///< Number of classes (6).
-  double* xk = nullptr;                        ///< Scratch XK.
-  double* yk = nullptr;                        ///< Scratch YK.
+  /// Per ordered orbit pair (p, q), at 4 (p num_orbits + q): what the inverse
+  /// transform needs of the cc ket (min(p, q), max(p, q)): [0] its
+  /// `local_index_table` offset minus jmin (so the table is indexed by J'),
+  /// [1] jmin = |jp - jq| / 2, [2] jmax = (jp + jq) / 2, [3] its channel class
+  /// |tz_p - tz_q| + 2 + parity plus 256 ((jp + jq) / 2 mod 2).
+  const std::int32_t* cc_pair = nullptr;
+  std::int32_t num_classes = 0;  ///< Number of classes (6).
+  double* xk = nullptr;          ///< Scratch XK.
+  double* yk = nullptr;          ///< Scratch YK.
   /// Scratch W = XK YK, combined in place into the stored half of the
   /// Pandya-transformed result.
   double* w = nullptr;
@@ -145,6 +151,8 @@ struct PandyaData {
   exec::DeviceBuffer<double> xk, yk, w;  ///< Scratch buffers.
   exec::DeviceBuffer<std::int32_t> class_kets,
       class_offset;  ///< Kets by class (see `PandyaView::class_kets`).
+  exec::DeviceBuffer<std::int32_t>
+      cc_pair;  ///< Pair descriptors (see `PandyaView::cc_pair`).
   std::int64_t num_class_kets = 0;  ///< Size of `class_kets`.
 
   /// One GEMM W(:, 0 .. Ncc) = XK YK (the left half of W) per channel with
