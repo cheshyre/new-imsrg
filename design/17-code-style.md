@@ -6,8 +6,9 @@ clang-format applies the formatting rules automatically, and cpplint lints the c
 linter is **not followed blindly** (§4). Naming is enforced with clang-tidy, because cpplint does not
 check names.
 
-**Status:** decided; the conversion of the existing code is the **first task of run 2** (§5). Until
-it lands, the conventions in `AGENTS.md` describe the code as it is.
+**Status:** done. The existing code was converted in run 2 (2026-11-15, branch
+`feature/style-google`, §6); `tools/ci.sh` enforces clang-format and cpplint, `tools/lint.sh` the
+naming. The structural items of §2.D are done in part (§6); `AGENTS.md` states the conventions.
 
 ## 1. Rules in one paragraph
 
@@ -98,6 +99,20 @@ unindented namespaces and access specifiers (clang-format Google base); project 
 4. **`///` doc comments** stay for API documentation (Doxygen, M13); they are `//` comments, used
    consistently.
 5. `tools/reference/` and `extern/` are not converted.
+6. **Physics notation in variable names** *(run 2, MS-Q1)*: variables, parameters and data members
+   keep the capitals of the physics symbols they name (`X`, `Y`, `Z` for commutator operands, `H`,
+   `A`/`Z` for nucleon numbers, `J`, `Jp`, `Tz`, `hw_MeV`, `twoJ`), as in imsrg++ and the
+   literature; lower-casing them would merge distinct quantities (`j` and `J`) and break the
+   element-by-element comparison with imsrg++. The naming check accepts any name with a capital
+   for these kinds; everything else follows the guide.
+7. **Accessors** *(run 2, MS-Q2)*: the guide lets accessors and mutators be named like variables.
+   Here an accessor is a const method that returns a property or a part of the object without
+   side effects, possibly selected by an index or key (`num_orbits()`, `orbit(i)`, `channel(c)`,
+   `spec()`, `zero_body()`, `norm()`, `get_normalized(...)`); mutators are `set_*`; STL analogs
+   (`begin`, `size`, `data`, `find`, `value`, `has_value`, `error`, and `test`/`set`/`reset` of
+   the bitset-like `TermMask`) keep the STL spelling. Static member functions are never
+   accessors. `.clang-tidy` holds the allowlist (199 names, collected from the 349 flagged method
+   names during the conversion); a new accessor name is added there.
 
 ## 4. Tooling (added by the conversion)
 
@@ -111,11 +126,15 @@ IncludeCategories:
     Priority: 1          # C system headers
   - Regex: '^<[a-z_0-9]+>$'
     Priority: 2          # C++ standard library
-  - Regex: '^"imsrg/'
-    Priority: 4          # project headers
+  - Regex: '^("|<imsrg/)'
+    Priority: 4          # project headers: every quoted include, and <imsrg/...>
   - Regex: '.*'
     Priority: 3
 ```
+
+As built, every quoted include is a project header (the sketch had only `"imsrg/`): test- and
+binding-local headers (`"tests/unit/hf/hf_test_support.h"`, `"python/src/bindings.h"`) would
+otherwise sort before `<gtest/gtest.h>` and violate cpplint's include order.
 
 `CPPLINT.cfg` at the repository root (cpplint is a lint, not an oracle; every filter has a reason):
 
@@ -135,15 +154,21 @@ filter=-whitespace/indent_namespace,-whitespace/braces,-whitespace/parens,-build
   contradict clang-format's own output (continuation lines inside namespaces, `std::errc{}`, macro
   parameter lists); clang-format is the formatting authority.
 * `build/c++17`: the `<filesystem>` exception (§3).
-* Directories outside `src/` (tests, python, apps) get their own `CPPLINT.cfg` with a matching `root`
-  if the header-guard check needs it. Justified exceptions use `// NOLINT(<category>)` with a reason.
+* Header guards outside `src/` need no extra `CPPLINT.cfg`: cpplint falls back to the path from the
+  repository root (`TESTS_UNIT_HF_HF_TEST_SUPPORT_H_`, `PYTHON_SRC_BINDINGS_H_`; MS-Q3), and
+  `.clang-tidy` exempts `*_H_` from the `IMSRG_` macro prefix. Justified exceptions use
+  `// NOLINT(<category>): <reason>`; after the conversion there are three (§6).
 
 `.clang-tidy`: add `readability-identifier-naming` with the Google naming of §1 (classes, structs,
 enums, functions, methods, type aliases and template parameters CamelCase; variables, parameters and
 members lower_case; private members suffix `_`; constexpr/static constants and enumerators prefix `k`
 plus CamelCase; namespaces lower_case; macros UPPER_CASE with prefix `IMSRG_`). STL-analog members and
 the accessor/mutator allowlist collected during the conversion go into the ignore regexps. Verify the
-option names against the installed clang-tidy.
+option names against the installed clang-tidy. As built (clang-tidy 23.1.5): `MethodIgnoredRegexp`
+is the allowlist of §3 item 7; variables, parameters and members accept names with capitals (§3
+item 6); local constants accept `kName` as well as snake_case (the guide makes `kName` optional for
+automatic variables); STL protocol aliases (`value_type`, ...) are exempt; header guards are exempt
+from the macro prefix. `tools/lint.sh` runs the check.
 
 `tools/ci.sh`: a cpplint step (fails on findings) next to the clang-format check; the clang-tidy naming
 check runs on the changed files (or in a separate `tools/lint.sh`) so that `ci.sh` stays under 5 minutes
@@ -174,3 +199,38 @@ branch starts until it is merged (D38). One commit per step; after every step th
 Acceptance: `ci.sh` passes with the blocking cpplint step and zero findings (apart from NOLINTs with
 reasons); clang-format clean at 80 columns; clang-tidy naming clean; Python tests unchanged;
 bitwise-identical test results.
+
+## 6. As converted (run 2, 2026-11-15)
+
+One commit per step on `feature/style-google` (cut from `develop` c01d766); after every step
+`tools/ci.sh dev-openmp` passed with the same test counts (851 unit, 34 integration, 3 MPI, 23
+Python) and the integration-test outputs (results.json, flow CSVs without `wall_s`, `.snt`,
+resolved configs without date and git hash, and the printed IT numbers) were identical to the
+pre-conversion baseline; the Python export list never changed.
+
+| Step | Commit | Result |
+|------|--------|--------|
+| 1 tooling | `de6fbf6` | `CPPLINT.cfg`, `.clang-tidy` naming, advisory cpplint step, `tools/lint.sh`, `AUTHORS`; the `.clang-format` change moved to step 5 so that every commit passes the format check |
+| 2 renames | `00f16d8` | 299 files `.hpp/.cpp` -> `.h/.cc`, references by basename (code, CMake, layering fixtures, living docs) |
+| 3 guards | `46e6f63` | 113 headers |
+| 4 license | `aa8d342` | 304 files |
+| 5 reformat | `1c59fec` (+ `728cfaa` blame-ignore) | 80 columns, include order; long comment paragraphs re-wrapped with hanging indentation before clang-format, 14 formula/pseudo-code comment blocks laid out by hand |
+| 6 naming | `4ee5688` | 1,205 declarations (612 functions, 182 methods, 164 enumerators, 38 constants, ...); naming check clean |
+| 7 literals | `6185891` | 340 literals |
+| 8 cpplint | `ca9812e`, `7990487` | 6,139 findings after step 2 (5,512 line length, 304 copyright, 109 IWYU, 86 using-directives, 42 runtime/int, 41 include_subdir, ...) -> 0; step blocking |
+| 9 structural | `c9cee57`, `c97f04c`, `da651d3`, `e0eec54`, `9f704e8` | see below |
+
+NOLINTs (all with reasons in the code): the layering fixture's relative include
+(`build/include_subdir`, it is what the fixture tests) and two `build/include_order` lines in
+`tests/smoke/kokkos_smoke_test.cc` (cpplint counts `<Kokkos_Core.hpp>` as a project header because
+of its extension).
+
+Structural items (§2.D) done: static-storage objects trivially destructible (11 statics in src and
+tests now leaked `new` objects); explicit copy/move declarations for all 37 classes in headers
+(trait-checked: the supported set is unchanged); `ConfigEnum` internal (`driver::detail`) with
+requires-clauses; no namespace aliases at namespace scope in headers; the one struct with a private
+section; one redundant forward declaration. Not done (left as guidelines for new code, MS-Q5):
+inline functions longer than ~10 lines in headers (the remaining ones are device-code lookups,
+templates or header-only test helpers; moving the former out of line could cost performance),
+the review of the 36 structs that have member functions, functions longer than ~40 lines, the
+review of unsigned types, and descriptive wording of the remaining imperative function comments.

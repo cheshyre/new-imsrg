@@ -177,7 +177,7 @@ done
 
 # ---- Python venv -----------------------------------------------------------------------------
 if [ "$do_venv" -eq 1 ]; then
-  check_imports='import numpy, pytest, sympy, scikit_build_core'
+  check_imports='import numpy, pytest, sympy, scikit_build_core, cpplint'
   if [ -x "$IMSRG_VENV/bin/python" ] && "$IMSRG_VENV/bin/python" -c "$check_imports" 2>/dev/null
   then
     log "venv $IMSRG_VENV is up to date"

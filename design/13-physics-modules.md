@@ -149,7 +149,7 @@ to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9.
   3f2 recipe (D32): hunter-gatherer Magnus, `omega_norm_max` 0.1, 1b intermediates on, 2b
   intermediates off; `factorized = true` sets these as defaults (`16` §2.8).
 * **As implemented (M7, tag `m7-api-ready`):** headers `imsrg/commutator/{options,workspace,
-  commutator}.hpp`. `commutator(X, Y, Z, opts, ws)` overwrites Z (reusing its storage when the
+  commutator}.h`. `Commutator(X, Y, Z, opts, ws)` overwrites Z (reusing its storage when the
   spec matches) and an allocating overload returns Z; `terms::Comm*ss` add one term each;
   `commutator_spec` gives Z's spec (rank max of the inputs, hermiticity rule of imsrg++). The
   `Workspace` (one per model space, eagerly built, one call at a time) holds the device tables,

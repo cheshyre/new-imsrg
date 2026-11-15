@@ -395,3 +395,31 @@ further design decisions (D30–D42 in `00-requirements-and-decisions.md`; repor
 `design/reports/2026-11-15-owner-interview.md`). Run 2 appends its new questions below.
 
 ## Added during run 2
+
+* **MS-Q1** (2026-11-15, MS Google style) - Google style names variables in snake_case, but the code
+  uses physics notation with capitals in about 900 variable, parameter and member names (`X`, `Y`,
+  `Z` for commutator operands, `H`, `A`/`Z`, `J`, `Jp`, `Tz`, `hw_MeV`, `twoJ`). Lower-casing them
+  would merge distinct quantities (`j` and `J` often live in the same scope) and lose the
+  correspondence with imsrg++ and the literature. **Assumed meanwhile:** they keep their capitals;
+  documented as exception 6 in design/17 section 3; `.clang-tidy` accepts any variable name with a
+  capital. Reversible by a clang-tidy run if the owner prefers strict snake_case.
+* **MS-Q2** (2026-11-15, MS Google style) - The guide lets accessors and mutators keep variable-style
+  names. **Assumed meanwhile:** an accessor is a const method returning a property or part of the
+  object, possibly selected by an index or key (`num_orbits()`, `orbit(i)`, `spec()`,
+  `get_normalized(...)`); `set_*` mutators and STL analogs also stay snake_case; everything else is
+  PascalCase (static factories too: `ModelSpace::FromNames`). The 199-name allowlist is in
+  `.clang-tidy` (design/17 section 3 item 7). Alternative: PascalCase for all methods (would collide
+  with type names such as `Orbit`, `Channel`, `Reference`, `Partition`, `ModelSpace`).
+* **MS-Q3** (2026-11-15, MS Google style) - Header guards outside `src/` use cpplint's fallback, the
+  path from the repository root without the `IMSRG_` prefix (`TESTS_UNIT_HF_HF_TEST_SUPPORT_H_`,
+  `PYTHON_SRC_BINDINGS_H_`). **Assumed meanwhile:** fine (unique, and what the blocking cpplint step
+  accepts); an `IMSRG_` prefix there would need NOLINTs or extra CPPLINT.cfg files.
+* **MS-Q4** (2026-11-15, MS Google style) - `AUTHORS` lists the owner (taken from the git history) as
+  the copyright holder named by "Copyright 2026 The imsrg authors"; the SPDX line says
+  `GPL-3.0-or-later` as written in design/17 section 2.A (LICENSE is the GPL-3.0 text). **Assumed
+  meanwhile:** as written; please confirm the holder list and "or later".
+* **MS-Q5** (2026-11-15, MS Google style) - Structural items not converted (design/17 section 6):
+  inline functions over ~10 lines in headers (device-code lookups, templates, header-only test
+  helpers), the 36 structs with member functions, functions over ~40 lines, unsigned types.
+  **Assumed meanwhile:** guidelines for new code, not worth a churn of the existing code; device
+  lookups stay inline for performance. Schedule a cleanup task if wanted.
