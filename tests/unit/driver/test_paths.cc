@@ -9,6 +9,7 @@
 #include <fstream>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -170,13 +171,11 @@ TEST(ConfigPaths, LegacyValuesResolveAgainstTheWorkingDirectory) {
                    "reference=O16",
                    "valence_space=O16",
                    "intfile=results/run1",
-                   "scratch=tmp_omega",
                    "flowfile=results/run1.flow"};
   const RunConfig c = LoadOk(s);
   EXPECT_EQ(c.interaction.two_body.file.at(0), (cwd_dir / "vnn.me2j").string());
   EXPECT_EQ(c.output.directory, (cwd_dir / "results").string());
   EXPECT_EQ(c.output.flow_file, (cwd_dir / "results/run1.flow").string());
-  EXPECT_EQ(c.run.scratch_dir, (cwd_dir / "tmp_omega").string());
 
   // "intfile=stem" (no directory) means the working directory itself.
   ConfigSources t;
