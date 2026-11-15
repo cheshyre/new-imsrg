@@ -1,0 +1,4 @@
+# Commits that only reformat code; git blame skips them with
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# Google-style conversion, step 5: clang-format at 80 columns (design/17 section 5).
+1c59fec368ca82bea59b65b069f58218616e184c
