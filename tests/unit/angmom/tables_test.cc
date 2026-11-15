@@ -15,6 +15,7 @@
 
 #include "imsrg/angmom/moshinsky.h"
 #include "imsrg/angmom/wigner.h"
+#include "imsrg/base/error.h"
 #include "tests/unit/angmom/tables_kernels.h"
 
 namespace imsrg::angmom {
@@ -47,12 +48,14 @@ TEST(AngmomTables, SixJEqualsWignerExhaustively) {
   EXPECT_GT(checked, 0);
 }
 
-TEST(AngmomTables, SixJOutOfRangeIsZero) {
+TEST(AngmomTables, SixJInvalidArgumentsAreZero) {
   const SixJTable t(3);
-  EXPECT_EQ(t(TwoJ{9}, TwoJ{1}, TwoJ{0}, TwoJ{1}, TwoJ{1}, TwoJ{0}),
-            0.0);  // ja too large
-  EXPECT_EQ(t(TwoJ{1}, TwoJ{1}, TwoJ{20}, TwoJ{1}, TwoJ{1}, TwoJ{0}),
-            0.0);  // J too large
+  // Parity-valid arguments beyond the coverage throw (host lookup) or give NaN
+  // (view); more in sixj3_test.cc.
+  EXPECT_THROW(t(TwoJ{9}, TwoJ{1}, TwoJ{0}, TwoJ{1}, TwoJ{1}, TwoJ{0}),
+               InvariantError);  // ja too large
+  EXPECT_THROW(t(TwoJ{1}, TwoJ{1}, TwoJ{20}, TwoJ{1}, TwoJ{1}, TwoJ{0}),
+               InvariantError);  // J too large
   EXPECT_EQ(t(TwoJ{1}, TwoJ{1}, TwoJ{-2}, TwoJ{1}, TwoJ{1}, TwoJ{0}),
             0.0);  // J negative
   EXPECT_EQ(t(TwoJ{2}, TwoJ{1}, TwoJ{0}, TwoJ{1}, TwoJ{1}, TwoJ{0}),

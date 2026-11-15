@@ -13,7 +13,8 @@
 /// offers `host_view()` and `device_view()`: small trivially copyable `View`
 /// structs of raw pointers that kernels capture by value; `View::operator()` is
 /// `IMSRG_INLINE_FUNCTION`, free of exceptions, and returns 0.0 for
-/// out-of-range or invalid arguments (cheap integer checks only). The host
+/// out-of-range or invalid arguments (cheap integer checks only); `SixJView` is
+/// the exception: parity-valid arguments beyond its coverage give NaN. The host
 /// mirrors are created in the constructors, so const member functions are
 /// thread-safe afterwards. Building and destroying a table needs an initialized
 /// `exec::Runtime`. Views stay valid while the table is alive and unmoved-from.
@@ -37,19 +38,35 @@ struct SixJView {
 
   /// 6j symbol {ja jb J; jc jd J'} (the same value as `Wigner6j(ja, jb, J, jc,
   /// jd, Jp)`) for single-particle ja..jd (odd 2j in [1, 2 emax + 1]) and
-  /// integer J, J' (`.twice` even, in [0, 2 (2 emax + 1)]); 0.0 outside this
-  /// range. O(1).
+  /// integer J, J' (`.twice` even, in [0, 2 (2 emax + 1)]). O(1).
+  ///
+  /// Misuse guard (the "6j trap", design/benchmarks/imsrg3-layout.md section
+  /// 7): an argument of the right parity (odd 2j, even 2J) that lies BEYOND the
+  /// table's coverage (2j > 2 emax + 1, or J > 2 emax + 1) returns a quiet NaN,
+  /// so that the misuse poisons every result it touches (the flow aborts on a
+  /// non-finite norm); this view cannot throw. Wrong-parity or non-positive
+  /// arguments (even 2j, odd 2J, 2j < 1, 2J < 0) return 0.0, as do failed
+  /// triangles. A three-body total J (half-integer, up to 3 emax + 3/2) must
+  /// NOT be passed in any slot: use `SixJ3Table` for that 6j family.
   IMSRG_INLINE_FUNCTION double operator()(TwoJ ja, TwoJ jb, TwoJ J, TwoJ jc,
                                           TwoJ jd, TwoJ Jp) const noexcept {
     const std::int32_t nj = emax + 1;
     const std::int32_t nJ = 2 * emax + 2;
     const std::int32_t tmax = 2 * emax + 1;
-    if (data == nullptr || ja.twice < 1 || ja.twice > tmax || jb.twice < 1 ||
-        jb.twice > tmax || jc.twice < 1 || jc.twice > tmax || jd.twice < 1 ||
-        jd.twice > tmax || (ja.twice & 1) == 0 || (jb.twice & 1) == 0 ||
-        (jc.twice & 1) == 0 || (jd.twice & 1) == 0 || J.twice < 0 ||
-        Jp.twice < 0 || (J.twice & 1) != 0 || (Jp.twice & 1) != 0 ||
-        J.twice / 2 >= nJ || Jp.twice / 2 >= nJ) {
+    if (data == nullptr) {
+      return 0.0;
+    }
+    if (BeyondOdd(ja.twice, tmax) || BeyondOdd(jb.twice, tmax) ||
+        BeyondOdd(jc.twice, tmax) || BeyondOdd(jd.twice, tmax) ||
+        BeyondEven(J.twice, 2 * tmax) || BeyondEven(Jp.twice, 2 * tmax)) {
+      return __builtin_nan("");
+    }
+    if (ja.twice < 1 || ja.twice > tmax || jb.twice < 1 || jb.twice > tmax ||
+        jc.twice < 1 || jc.twice > tmax || jd.twice < 1 || jd.twice > tmax ||
+        (ja.twice & 1) == 0 || (jb.twice & 1) == 0 || (jc.twice & 1) == 0 ||
+        (jd.twice & 1) == 0 || J.twice < 0 || Jp.twice < 0 ||
+        (J.twice & 1) != 0 || (Jp.twice & 1) != 0 || J.twice / 2 >= nJ ||
+        Jp.twice / 2 >= nJ) {
       return 0.0;
     }
     const std::int64_t i =
@@ -64,6 +81,17 @@ struct SixJView {
             nJ +
         Jp.twice / 2;
     return data[i];
+  }
+
+ private:
+  // Parity-valid but uncovered: odd t above tmax / even t above tmax.
+  static IMSRG_INLINE_FUNCTION constexpr bool BeyondOdd(
+      std::int32_t t, std::int32_t tmax) noexcept {
+    return t > tmax && (t & 1) == 1;
+  }
+  static IMSRG_INLINE_FUNCTION constexpr bool BeyondEven(
+      std::int32_t t, std::int32_t tmax) noexcept {
+    return t > tmax && (t & 1) == 0;
   }
 };
 static_assert(std::is_trivially_copyable_v<SixJView>);
@@ -97,11 +125,12 @@ class SixJTable {
   /// View of the device data (the same memory as the host view on host
   /// backends).
   View device_view() const noexcept;
-  /// Host lookup, see `SixJView::operator()`.
-  double operator()(TwoJ ja, TwoJ jb, TwoJ J, TwoJ jc, TwoJ jd,
-                    TwoJ Jp) const noexcept {
-    return host_view()(ja, jb, J, jc, jd, Jp);
-  }
+  /// Host lookup, see `SixJView::operator()`, except that a parity-valid
+  /// argument beyond the table's coverage (2j > 2 emax + 1 or J > 2 emax + 1)
+  /// throws `InvariantError` instead of returning NaN. Wrong-parity arguments
+  /// and failed triangles still give 0.0. Three-body total J belongs in
+  /// `SixJ3Table`.
+  double operator()(TwoJ ja, TwoJ jb, TwoJ J, TwoJ jc, TwoJ jd, TwoJ Jp) const;
 
  private:
   int emax_;
