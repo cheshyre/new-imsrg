@@ -162,7 +162,15 @@ class MagnusSolver {
   /// stack in chronological order with `BchTransform` (imsrg++
   /// `IMSRGSolver::Transform`). O must live on the solver's model space.
   op::Operator Transform(const op::Operator& O);
+  /// `Transform` with the BCH options `bch` instead of the solver's own (e.g.
+  /// `skip_first_commutator` for the perturbative triples); the commutator
+  /// options and the workspace are the solver's.
+  op::Operator Transform(const op::Operator& O, const BchOptions& bch);
 
+  /// H_0, the Hamiltonian the solver was constructed with.
+  const op::Operator& initial_hamiltonian() const noexcept { return h0_; }
+  /// The BCH options of the flow.
+  const BchOptions& bch_options() const noexcept { return bch_; }
   /// H(s).
   const op::Operator& hamiltonian() const noexcept { return h_; }
   /// eta(s) (zero before the first `solve`).
