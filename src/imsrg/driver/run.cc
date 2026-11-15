@@ -13,6 +13,8 @@
 #include <fstream>
 #include <functional>
 #include <string>
+#include <utility>
+#include <variant>
 #include <vector>
 
 #include "imsrg/base/error.h"
@@ -21,6 +23,7 @@
 #include "imsrg/driver/config/writer.h"
 #include "imsrg/driver/pipeline/hamiltonian.h"
 #include "imsrg/flow/magnus.h"
+#include "imsrg/flow/ode.h"
 #include "imsrg/io/valence_writers.h"
 #include "imsrg/mbpt/energies.h"
 #include "imsrg/operator/normal_ordering.h"
@@ -41,8 +44,15 @@ namespace fs = std::filesystem;
 void RejectPlanned(const RunConfig& c) {
   if (c.run.task == Task::kMp3) Planned("run.task = \"mp3\"");
   if (c.run.task == Task::kFciExport) Planned("run.task = \"fci_export\"");
-  if (c.imsrg.method != Method::kMagnus)
-    Planned("imsrg.method other than \"magnus\"");
+  if (c.imsrg.method != Method::kMagnus && c.imsrg.method != Method::kFlow &&
+      c.imsrg.method != Method::kFlowRk4) {
+    Planned("imsrg.method other than \"magnus\", \"flow\", \"flow_rk4\"");
+  }
+  if (c.imsrg.method != Method::kMagnus && c.imsrg.omega.hunter_gatherer) {
+    throw ConfigError(
+        "imsrg.omega.hunter_gatherer requires imsrg.method = \"magnus\" (the "
+        "flow methods keep no Omega)");
+  }
   if (c.imsrg.use_brueckner_bch) Planned("imsrg.use_brueckner_bch");
   if (c.imsrg.goose_tank) Planned("imsrg.goose_tank");
   if (c.imsrg.perturbative_triples) Planned("imsrg.perturbative_triples");
@@ -176,16 +186,18 @@ class FlowLog {
         "stage", "step", "s", "E0", "|eta_1b|", "|eta_2b|", "|Omega_1b|",
         "|Omega_2b|", "nOm", "wall(s)");
   }
-  /// The solver whose current Hamiltonian the `E_MP2` column evaluates.
-  void set_solver(const flow::MagnusSolver* solver) { solver_ = solver; }
+  /// Gives the current Hamiltonian that the `E_MP2` column evaluates.
+  void set_hamiltonian(std::function<const op::Operator&()> current) {
+    current_h_ = std::move(current);
+  }
 
   void operator()(const flow::FlowStatus& st) {
     // imsrg++'s flow file column E(MP2): the MBPT(2) correlation energy of the
     // current Hamiltonian H(s) (IMSRGSolver.cc:1273). Mp2Energy syncs its
     // argument to the host, so it works on a copy.
     double e_mp2 = std::nan("");
-    if (solver_ != nullptr) {
-      op::Operator h = solver_->hamiltonian();
+    if (current_h_) {
+      op::Operator h = current_h_();
       e_mp2 = mbpt::Mp2Energy(h);
     }
     out_ << st.stage << ',' << st.istep << ',' << Fmt17(st.s) << ','
@@ -206,7 +218,60 @@ class FlowLog {
 
  private:
   std::ofstream out_;
-  const flow::MagnusSolver* solver_ = nullptr;
+  std::function<const op::Operator&()> current_h_;
+};
+
+/// The solver of a run: Magnus (an Omega stack, operators replayed after the
+/// flow) or an ODE flow method (operators evolve alongside H, imsrg++.cc:1074).
+class Engine {
+ public:
+  explicit Engine(flow::MagnusSolver&& s) : v_(std::move(s)) {}
+  explicit Engine(flow::OdeSolver&& s) : v_(std::move(s)) {}
+
+  bool is_magnus() const { return v_.index() == 0; }
+  flow::SolveResult Solve(const flow::MagnusSolver::StatusCallback& cb) {
+    return std::visit([&](auto& s) { return s.Solve(cb); }, v_);
+  }
+  void set_generator(const flow::GeneratorOptions& g) {
+    std::visit([&](auto& s) { s.set_generator(g); }, v_);
+  }
+  void set_solver_options(const flow::SolverOptions& o) {
+    std::visit([&](auto& s) { s.set_solver_options(o); }, v_);
+  }
+  const flow::SolverOptions& solver_options() const {
+    return std::visit(
+        [](const auto& s) -> const flow::SolverOptions& {
+          return s.solver_options();
+        },
+        v_);
+  }
+  const op::Operator& hamiltonian() const {
+    return std::visit(
+        [](const auto& s) -> const op::Operator& { return s.hamiltonian(); },
+        v_);
+  }
+  /// Size of the Omega stack (1 for the ODE methods, which keep none).
+  std::size_t num_omegas() const {
+    if (const auto* m = std::get_if<flow::MagnusSolver>(&v_))
+      return m->omegas().size();
+    return 1;
+  }
+  int num_gathers() const {
+    if (const auto* m = std::get_if<flow::MagnusSolver>(&v_))
+      return m->num_gathers();
+    return 0;
+  }
+  /// The i-th requested operator transformed to the end of the flow: replayed
+  /// Omega stack (Magnus, `prepared` is the HF-basis operator) or the operator
+  /// that flowed alongside H (ODE methods).
+  op::Operator Transformed(std::size_t i, const op::Operator& prepared) {
+    if (auto* m = std::get_if<flow::MagnusSolver>(&v_))
+      return m->Transform(prepared);
+    return std::get<flow::OdeSolver>(v_).flowing_operator(i);
+  }
+
+ private:
+  std::variant<flow::MagnusSolver, flow::OdeSolver> v_;
 };
 
 struct StageRecord {
@@ -365,9 +430,32 @@ void Run(const RunConfig& config) {
   FlowLog flow_log(config.output.flow_file.empty()
                        ? dir / "flow.csv"
                        : fs::path(config.output.flow_file));
-  flow::MagnusSolver solver(ph.hno, so,
-                            MakeGeneratorOptions(config, core_gen, ms));
-  flow_log.set_solver(&solver);
+  // The ODE methods evolve the requested operators alongside H, so these are
+  // built first (imsrg++.cc:1074); Magnus replays its Omega stack afterwards.
+  const bool magnus = config.imsrg.method == Method::kMagnus;
+  std::vector<op::Operator> prepared;
+  std::vector<OperatorRecord> ops;
+  if (!magnus) {
+    for (const OperatorRequest& req : config.operators.list) {
+      prepared.push_back(pipeline::PrepareOperator(req, ph, config));
+      OperatorRecord rec;
+      rec.name = req.canonical_name;
+      rec.reference = prepared.back().zero_body();
+      log::Info("{}   HF: {:.6f}", rec.name, rec.reference);
+      ops.push_back(rec);
+    }
+  }
+  const flow::GeneratorOptions core_opts =
+      MakeGeneratorOptions(config, core_gen, ms);
+  Engine solver =
+      magnus ? Engine(flow::MagnusSolver(ph.hno, so, core_opts))
+             : Engine(flow::OdeSolver(config.imsrg.method == Method::kFlowRk4
+                                          ? flow::OdeMethod::kRk4
+                                          : flow::OdeMethod::kDopri5,
+                                      ph.hno, prepared, so, step.ode_tolerance,
+                                      core_opts));
+  flow_log.set_hamiltonian(
+      [&solver]() -> const op::Operator& { return solver.hamiltonian(); });
   std::vector<StageRecord> stages;
   log::Info("Setting generator to {}", ToString(core_gen));
   stages.push_back(
@@ -377,12 +465,12 @@ void Run(const RunConfig& config) {
       config.imsrg.steps > 1 && config.valence.has_valence_space();
   if (second_stage &&
       stages.back().result.reason != flow::StopReason::kDiverged) {
-    // imsrg++.cc:1122-1143: smax doubled for the second Magnus stage, new
-    // Omega.
+    // imsrg++.cc:1122-1143: smax doubled for the second Magnus stage only (not
+    // for the flow methods), new Omega.
     const Generator val_gen = config.imsrg.generator.valence;
     // Derived from the solver's options so that the domega bump persists.
     flow::SolverOptions so2 = solver.solver_options();
-    so2.smax = 2.0 * step.smax;
+    so2.smax = (magnus ? 2.0 : 1.0) * step.smax;
     SmallStepsForStiffGenerators(val_gen, so2);
     log::Info("Setting generator to {}", ToString(val_gen));
     solver.set_generator(MakeGeneratorOptions(config, val_gen, ms));
@@ -424,24 +512,28 @@ void Run(const RunConfig& config) {
 
   // ---- Operators: HF-basis, normal-ordered operators transformed with the
   // Omega stack.
-  std::vector<OperatorRecord> ops;
-  for (const OperatorRequest& req : config.operators.list) {
-    op::Operator O = pipeline::PrepareOperator(req, ph, config);
-    OperatorRecord rec;
-    rec.name = req.canonical_name;
-    rec.reference = O.zero_body();
-    log::Info("{}   HF: {:.6f}", rec.name, rec.reference);
-    O = solver.Transform(O);
+  for (std::size_t i = 0; i < config.operators.list.size(); ++i) {
+    const OperatorRequest& req = config.operators.list[i];
+    op::Operator hf;
+    if (magnus) {
+      hf = pipeline::PrepareOperator(req, ph, config);
+      OperatorRecord rec;
+      rec.name = req.canonical_name;
+      rec.reference = hf.zero_body();
+      log::Info("{}   HF: {:.6f}", rec.name, rec.reference);
+      ops.push_back(rec);
+    }
+    OperatorRecord& rec = ops.at(i);
+    op::Operator O = solver.Transformed(i, hf);
     if (renormal) O = RenormalOrderToCore(O);
     rec.imsrg = O.zero_body();
     log::Info("{}   IMSRG: {:.8f}", rec.name, rec.imsrg);
     rec.file = (dir / (stem + "_" + rec.name + ".snt")).string();
     WriteValenceFile(rec.file, O, config, ph,
                      io::ValenceWriteMode::kIsospinAveragedOperator);
-    ops.push_back(rec);
   }
 
-  WriteResults(dir / "results.json", ph, stages, e0, solver.omegas().size(),
+  WriteResults(dir / "results.json", ph, stages, e0, solver.num_omegas(),
                solver.num_gathers(), ops, valence_file);
   if (diverged) {
     throw NumericalError(

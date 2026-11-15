@@ -655,3 +655,34 @@ TEST(GeneratorReuse, SecondCallDoesNotReallocate) {
 
 }  // namespace
 }  // namespace imsrg
+
+namespace imsrg {
+namespace {
+
+// The generator reads H in place (flow review item: Denominators and
+// ComputeGenerator used to copy H on every call): H is not modified, and eta is
+// bitwise identical for H and for an independent deep copy of H.
+TEST(GeneratorNoCopy, ReadsHInPlaceAndIsBitwiseReproducible) {
+  const std::string dir =
+      std::string(IMSRG_GOLDEN_DIR) + "/commutator/emax2_O16/";
+  const auto ms =
+      op::ModelSpaceForDump(op::ReadOperatorDumpHeader(dir + "H.dump"));
+  const Operator H = op::ReadOperatorDump(dir + "H.dump", ms);
+  const Operator H_before = H;
+  for (const GeneratorKind kind :
+       {GeneratorKind::kWhite, GeneratorKind::kAtan, GeneratorKind::kWegner,
+        GeneratorKind::kShellModelAtan}) {
+    GeneratorOptions opts;
+    opts.kind = kind;
+    const Operator eta = flow::ComputeGenerator(H, opts);
+    const Operator H_copy = H_before;
+    const Operator eta_copy = flow::ComputeGenerator(H_copy, opts);
+    const op::PartMaxima d = op::MaxAbsDifference(eta, eta_copy);
+    EXPECT_EQ(d.max(), 0.0) << static_cast<int>(kind);
+    EXPECT_GT(op::MaxAbs(eta).max(), 0.0) << static_cast<int>(kind);
+  }
+  EXPECT_EQ(op::MaxAbsDifference(H, H_before).max(), 0.0);
+}
+
+}  // namespace
+}  // namespace imsrg

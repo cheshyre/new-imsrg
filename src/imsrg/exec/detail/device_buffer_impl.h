@@ -232,7 +232,7 @@ std::span<const T> DeviceBuffer<T>::host_span() const {
 }
 
 template <class T>
-void DeviceBuffer<T>::SyncToHost() {
+void DeviceBuffer<T>::SyncToHost() const {
   if (size() == 0) {
     return;
   }

@@ -101,6 +101,28 @@ IT-8/He4_emax2 (E0 and dE_triples at emax 2) and IT-8/emax3 (O16).
 * The single-reference run only writes the operator file `intRp2.snt`, no Hamiltonian file.
 * `perturbative_triples=true` after a diverged flow prints `-inf` rather than failing.
 
+## IT-14: the ODE flow methods (F2b)
+
+`bash tools/reference/gen_golden_e2e.sh IT-14` (patched executable, see the D35 environment variables
+above): `method=flow_RK4` and `method=flow` (boost odeint dopri5, `ode_tolerance` 1e-6) with
+`Operators=Rp2`, 2N only, `hw=16`. Single reference, so imsrg++ prints "Core Energy" and the flowed
+`Rp2 = <value>` (6 decimals; `result.json` key `flowing_operators`) and writes `intRp2.snt` (8
+decimals). The flow file of `flow` has a line for every right-hand-side evaluation (`istep` always 0;
+first the initial status with eta 0, then the evaluation at s = 0, then 6 per try of a step: the 5
+stages and the FSAL derivative at the new point), so its length is 2 + 6 x (accepted + rejected steps).
+
+| case | method | E0 | Rp2 (HF -> IMSRG) | steps (flow lines) |
+|---|---|---|---|---|
+| IT-14/He4_emax2_rk4 | flow_RK4 | -25.171619 | 2.137921 -> 2.235829 | 196 (197) |
+| IT-14/He4_emax2_flow | flow | -25.167373 | 2.137921 -> 2.235928 | 85 accepted (572) |
+| IT-14/O16_emax3_rk4 | flow_RK4 | -157.865817 | -> 4.526183 | 154 (155) |
+| IT-14/O16_emax3_flow | flow | -157.848379 | -> 4.526330 | (548) |
+| IT-14/O16_emax4_rk4 | flow_RK4 | -164.687336 | -> 4.450114 | 254 (255) |
+| IT-14/O16_emax4_flow | flow | -164.650734 | -> 4.450196 | (776) |
+
+(Magnus IMSRG(2) O16 emax 4: -164.648772, IT-2. The Magnus/RK4/dopri5 energies differ by the
+truncation error of each integrator, up to 4e-2 MeV for O16 emax 4 and the default step control.)
+
 ## Trajectories and IT-10 (refharness flow)
 
 `bash tools/reference/gen_golden_flow.sh [refharness]`, `OMP_NUM_THREADS=8`. `refharness flow` runs the

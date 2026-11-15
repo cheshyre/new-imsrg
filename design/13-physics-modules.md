@@ -169,6 +169,20 @@ to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9. In the driver (run 2): IT
 
 ## 7. flow (reference: `reference/03`)
 
+* **As implemented (F2b, `flow/ode.{h,cc}`, `OdeSolver`):** `flow_rk4` and `flow` integrate
+  dH/ds = [eta(H), H] with the requested operators flowing alongside (`dO/ds = [eta, O]`; the driver
+  builds them before the flow, imsrg++.cc:1074, and smax is doubled for stage 2 only for Magnus).
+  `flow_rk4` is imsrg++ `Solve_flow_RK4` (ds = min(dsmax, smax - s), eta recomputed at every stage,
+  `shell-model-atan` cutoff 1.0 until ||eta|| < 1); `flow` is boost odeint 1.92 `integrate_adaptive`
+  with `make_controlled<runge_kutta_dopri5>` reimplemented step by step (6 right-hand-side
+  evaluations per try, FSAL, `decrease_step` 0.9 err^(-1/3) >= 0.2, `increase_step` for err < 0.5), with
+  imsrg++'s error norm: sum over the state's operators of `||(|xerr|)/(eps_abs + eps_rel(|x| +
+  |dt||dxdt|))||` (zero-body excluded), built from the element-wise operations of
+  `operator/elementwise.h` (abs, divide, add a scalar to every element: NOT `operator+=(Operator&,
+  double)`, which touches E0 only). `ode_tolerance` is rounded to float as in imsrg++. As in imsrg++,
+  after ||eta|| < eta_criterion dxdt = 0 and the integration runs on to smax. The status callback of
+  `flow` fires for every right-hand-side evaluation, like the imsrg++ flow file; the flow log's E_MP2
+  evaluates the H of that line. Deviations: M8-Q40. Goldens: `tests/golden/e2e/IT-14`.
 * Methods, phase 1: `magnus` (the default: an Euler step on Omega,
   `Omega ← BCH_Product(η ds, Omega)`, then `H ← BCH_Transform(H0, Omega)`) and `flow_rk4` /
   `flow` (DP45 on H). Later: `magnus_modified_euler`, `magnus_adaptive`, `restore_4th_order`.

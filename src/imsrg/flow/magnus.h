@@ -42,6 +42,11 @@ struct SolverOptions {
   bool hunter_gatherer = false;
 };
 
+/// Checks the step options: dsmax, domega, ds_0 and omega_norm_max positive and
+/// finite, smax finite, eta_criterion not NaN.
+/// @throws InputError otherwise (ds would be 0 or NaN and the loops endless).
+void ValidateSolverOptions(const SolverOptions& options);
+
 /// One line of the flow log: the state after the step (istep 0 = the initial
 /// state of a stage).
 struct FlowStatus {

@@ -36,7 +36,7 @@ void Operator::set_zero() {
   two_body_.set_zero();
 }
 
-void Operator::SyncToHost() {
+void Operator::SyncToHost() const {
   one_body_.SyncToHost();
   two_body_.SyncToHost();
 }

@@ -58,3 +58,22 @@ target_compile_definitions(driver_integration PRIVATE
   "IMSRG_SOURCE_DIR=\"${PROJECT_SOURCE_DIR}\""
   "IMSRG_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden\""
   "IMSRG_TEST_DATA_DIR=\"${IMSRG_TEST_DATA_DIR}\"")
+
+# The ODE flow methods (flow_rk4, flow) against the imsrg++ goldens of tests/golden/e2e/IT-14: He4 and
+# the driver level in the regular suite (He4 emax 2, O16 emax 3), O16 emax 4 (7-14 s each in a debug build) under `slow`.
+foreach(_variant "" "_slow")
+  if(_variant STREQUAL "")
+    set(_flow_labels integration)
+  else()
+    set(_flow_labels integration slow)
+  endif()
+  imsrg_add_test(NAME driver_flow_methods${_variant}
+    SOURCES test_flow_methods.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
+    DEPS driver mbpt
+    LABELS ${_flow_labels}
+    NO_GTEST_MAIN)
+  target_compile_definitions(driver_flow_methods${_variant} PRIVATE
+    "IMSRG_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden\""
+    "IMSRG_TEST_DATA_DIR=\"${IMSRG_TEST_DATA_DIR}\"")
+endforeach()
+target_compile_definitions(driver_flow_methods_slow PRIVATE IMSRG_FLOW_SLOW=1)

@@ -22,6 +22,16 @@ void Axpy(double a, const exec::DeviceBuffer<double>& x,
 /// x[i] *= a for every element. Asynchronous on async backends. O(n).
 void Scale(double a, exec::DeviceBuffer<double>& x);
 
+/// x[i] = |x[i]| for every element. Asynchronous on async backends. O(n).
+void Abs(exec::DeviceBuffer<double>& x);
+
+/// x[i] /= y[i] for every element (IEEE division: 0/0 = NaN). Precondition:
+/// x.size() == y.size() (IMSRG_CHECK). Asynchronous on async backends. O(n).
+void Divide(exec::DeviceBuffer<double>& x, const exec::DeviceBuffer<double>& y);
+
+/// x[i] += c for every element. Asynchronous on async backends. O(n).
+void AddScalar(double c, exec::DeviceBuffer<double>& x);
+
 /// Sum of x[i]^2 over i in [offset, offset + count). Precondition: the range
 /// lies inside x (IMSRG_CHECK). Blocking (device reduction). O(count).
 double SumOfSquares(const exec::DeviceBuffer<double>& x, std::int64_t offset,

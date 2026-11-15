@@ -98,8 +98,8 @@ Denominators::Denominators(const op::Operator& H, const GeneratorOptions& opts)
         opts.denominator_cutoff > 0.0)) {
     throw InputError("denominator_cutoff must be positive and finite");
   }
-  op::Operator Hh(H);
-  Hh.SyncToHost();
+  H.SyncToHost();
+  const op::Operator& Hh = H;
   const basis::SingleParticleBasis& sp = ms_->basis();
   norb_ = sp.num_orbits();
   const auto n = static_cast<std::size_t>(norb_);
@@ -212,8 +212,8 @@ void ComputeGenerator(const op::Operator& H, op::Operator& eta,
   eta.set_zero();
   eta.SyncToHost();
 
-  op::Operator Hh(H);
-  Hh.SyncToHost();
+  H.SyncToHost();  // host reads below (no copy of H, flow review item)
+  const op::Operator& Hh = H;
   const Denominators den(H, opts);
   const basis::ModelSpace& ms = H.model_space();
   const basis::SingleParticleBasis& sp = ms.basis();

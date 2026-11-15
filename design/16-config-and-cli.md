@@ -143,7 +143,7 @@ Generator enum: `white`, `atan`, `imaginary_time`, `wegner`, `qtransfer_atan`, `
 | `domega` | double > 0 | `0.1` | max `\|\|eta ds\|\|`. |
 | `omega_norm_max` | double > 0 | `0.25` | norm at which Omega is split. |
 | `eta_criterion` | double > 0 | `1e-6` | convergence threshold on `\|\|eta\|\|` (old code stored this as `float`; now double). |
-| `ode_tolerance` | double > 0 | `1e-6` | ODE solver tolerance (flow methods, PL). |
+| `ode_tolerance` | double > 0 | `1e-6` | absolute and relative tolerance of the adaptive `flow` method (odeint dopri5; rounded to float as imsrg++). |
 
 `[imsrg.omega]`
 

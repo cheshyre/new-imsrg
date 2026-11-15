@@ -12,7 +12,9 @@
 
 #include <gtest/gtest.h>
 
+#include "imsrg/base/error.h"
 #include "imsrg/driver/config/load_config.h"
+#include "imsrg/driver/run.h"
 #include "tests/unit/driver/integration/run_support.h"
 
 namespace imsrg::it {
@@ -69,6 +71,34 @@ TEST(FlowFixes, OmegaStorageScratchAndDiscardArePlanned) {
     }
     EXPECT_TRUE(planned) << storage;
   }
+}
+
+// Review item 4: the flow methods are accepted by the driver; Omega options
+// that need an Omega stack are rejected with a clear message before any work.
+TEST(FlowFixes, HunterGathererRequiresMagnus) {
+  const auto dir = FreshDir("flow_hg");
+  driver::ConfigSources src;
+  src.config_text = std::string(
+                        "[basis]\nemax = 2\nhw = 16.0\n[reference]\nnucleus = "
+                        "\"He4\"\n[interaction.two_body]\nfile = \"x.me2j\"\n"
+                        "e1max = 14\ne2max = 28\nlmax = 14\n[imsrg]\nmethod = "
+                        "\"flow_rk4\"\n[imsrg.omega]\nhunter_gatherer = "
+                        "true\n[output]\ndirectory = \"") +
+                    dir.string() + "\"\n";
+  auto loaded =
+      driver::LoadConfig(src, driver::LoadOptions{.check_files = false});
+  ASSERT_TRUE(loaded.has_value());
+  EXPECT_THROW(driver::Run(loaded.value()), ConfigError);
+  // method = flow_euler is still planned.
+  src.config_text = std::string(
+                        "[basis]\nemax = 2\nhw = 16.0\n[reference]\nnucleus = "
+                        "\"He4\"\n[interaction.two_body]\nfile = \"x.me2j\"\n"
+                        "e1max = 14\ne2max = 28\nlmax = 14\n[imsrg]\nmethod = "
+                        "\"flow_euler\"\n[output]\ndirectory = \"") +
+                    dir.string() + "\"\n";
+  auto planned =
+      driver::LoadConfig(src, driver::LoadOptions{.check_files = false});
+  EXPECT_FALSE(planned.has_value());
 }
 
 }  // namespace

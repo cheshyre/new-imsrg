@@ -226,6 +226,19 @@ def main():
         res["perturbative_triples"] = {"dE": fin(m.group(1)), "dE_str": m.group(1),
                                        "E0_plus_dE": fin(m.group(2)),
                                        "E0_plus_dE_str": m.group(2)}
+    # single-reference flow methods (flow_RK4, flow): the operators that flowed with H are printed
+    # right after "Core Energy = ...", one "<name> = <zero-body value>" line each (6 decimals)
+    flowing = {}
+    for idx, ln in enumerate(lines):
+        if re.match(r"^Core Energy = ", ln):
+            for ln2 in lines[idx + 1:]:
+                m2 = re.match(r"^(\w+) = (" + NUM + r")\s*$", ln2)
+                if not m2:
+                    break
+                flowing[m2.group(1)] = {"value": float(m2.group(2)), "value_str": m2.group(2)}
+            break
+    if flowing:
+        res["flowing_operators"] = flowing
     norms3 = re.findall(r"^Norm of 3-body = (" + NUM + ")", out_text, re.M)
     if norms3:
         res["norm_of_3body_str"] = norms3

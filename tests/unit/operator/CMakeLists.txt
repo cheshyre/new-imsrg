@@ -11,7 +11,7 @@ imsrg_add_test(NAME operator_core
   NO_GTEST_MAIN)
 
 imsrg_add_test(NAME operator_arithmetic
-  SOURCES test_arithmetic.cc test_norms.cc ${_imsrg_exec_main}
+  SOURCES test_arithmetic.cc test_elementwise.cc test_norms.cc ${_imsrg_exec_main}
   DEPS operator
   LABELS unit
   NO_GTEST_MAIN)
