@@ -7,13 +7,31 @@
 /// Shared declarations of the nanobind bindings (design/18). No Kokkos headers.
 
 #include <atomic>
+#include <cstdint>
 #include <memory>
+#include <mutex>
+#include <stdexcept>
+#include <string>
 #include <utility>
 
 #include <nanobind/nanobind.h>
 
+#include "imsrg/base/error.h"
 #include "imsrg/basis/model_space.h"
+#include "imsrg/commutator/workspace.h"
 #include "imsrg/operator/operator.h"
+
+namespace imsrg {
+
+/// Raised when a host view is requested of an operator whose host mirror is
+/// stale, or when the device data of an operator were released by a forced
+/// `Runtime.finalize` (design/18 section 2.2). Python: `imsrg.StaleHostError`.
+class StaleHostError : public Error {
+ public:
+  using Error::Error;
+};
+
+}  // namespace imsrg
 
 namespace imsrg::py {
 
@@ -23,28 +41,173 @@ struct PyModelSpace {
   std::shared_ptr<const basis::ModelSpace> ms;
 };
 
-/// Number of live Python `Operator` objects (they own Kokkos buffers); the
-/// Runtime refuses to finalize while this is nonzero. Thread-safe.
-std::atomic<int>& LiveOperators() noexcept;
-
-/// An `op::Operator` that counts itself in `LiveOperators()`.
-struct PyOperator : op::Operator {
-  /// Wraps (moves) an operator.
-  explicit PyOperator(op::Operator&& o) : op::Operator(std::move(o)) {
-    ++LiveOperators();
-  }
-  /// Copies an operator.
-  explicit PyOperator(const op::Operator& o) : op::Operator(o) {
-    ++LiveOperators();
-  }
-  PyOperator(const PyOperator& o) : op::Operator(o) { ++LiveOperators(); }
-  PyOperator(PyOperator&& o) noexcept : op::Operator(std::move(o)) {
-    ++LiveOperators();
-  }
-  PyOperator& operator=(const PyOperator&) = default;
-  PyOperator& operator=(PyOperator&&) = default;
-  ~PyOperator() { --LiveOperators(); }
+/// Which side of an operator holds the current data (design/18 section 2.2).
+/// Each Python `Operator` carries one of these.
+///
+/// State machine (the transitions are the contract tested in
+/// tests/python/test_residency.py):
+///   * a zero operator made by the constructor: kBoth;
+///   * every result of a library call (arithmetic, normal ordering, readers,
+///     HF, commutators, flow, ...): kDeviceCurrent;
+///   * `sync_to_host()`: kDeviceCurrent -> kBoth (otherwise unchanged);
+///   * `sync_to_device()`: kHostCurrent -> kBoth (otherwise unchanged);
+///   * a read-only host view needs host data: raises StaleHostError in
+///     kDeviceCurrent (when residency is enforced), leaves the state alone;
+///   * a writable host view needs host data as well and sets kHostCurrent;
+///   * a library call that takes the operator as input first pushes it to the
+///     device if it is kHostCurrent (-> kBoth); a call that modifies it in
+///     place leaves it kDeviceCurrent;
+///   * `set_zero()` -> kDeviceCurrent; `copy` of an operator inherits the state
+///     (after a push if kHostCurrent).
+enum class Residency : std::uint8_t {
+  kHostCurrent,    ///< Host mirror has edits the device data lack.
+  kDeviceCurrent,  ///< Device data are current, the host mirror may be stale.
+  kBoth            ///< Both sides hold the same data.
 };
+
+/// Whether a stale host view raises (design/18 section 2.2).
+enum class ResidencyPolicy : std::uint8_t {
+  kAuto,     ///< Strict if the device memory is not host accessible (GPU),
+             ///< implicit syncing if it is (Serial/OpenMP: a fence only).
+  kStrict,   ///< Always raise StaleHostError on a stale view (portable
+             ///< scripts; the setting of the residency tests).
+  kImplicit  ///< Never raise: sync implicitly (opt-in; hides device-to-host
+             ///< copies).
+};
+
+/// Sets the process-wide policy.
+void SetResidencyPolicy(ResidencyPolicy p);
+/// The process-wide policy (default kAuto; the environment variable
+/// `IMSRG_RESIDENCY=strict|implicit|auto` sets the initial value).
+ResidencyPolicy GetResidencyPolicy();
+/// True if a stale host view currently raises.
+bool ResidencyEnforced();
+
+/// An object that owns device (Kokkos) data and registers itself in the live
+/// registry, so that `Runtime.finalize(force=True)` and the exit hook can free
+/// it (M11-Q1 answer of the owner, D41).
+class Releasable {
+ public:
+  Releasable();
+  Releasable(const Releasable&);
+  Releasable& operator=(const Releasable&) = default;
+  virtual ~Releasable();
+  /// False while numpy views of the object's storage are alive: freeing it
+  /// would leave them dangling.
+  virtual bool CanRelease() const noexcept = 0;
+  /// Frees the device data; later use raises StaleHostError. Precondition:
+  /// CanRelease().
+  virtual void Release() noexcept = 0;
+  /// True once `Release()` ran (set by `ReleaseAllLive`).
+  bool released = false;
+};
+
+/// Number of live objects that still own device data (not released).
+/// Thread-safe.
+int LiveObjects() noexcept;
+
+/// Frees the device data of every live object (the force-finalize of
+/// M11-Q1). Returns the number of objects that could not be freed because
+/// numpy views of them are alive (nothing is freed in that case: all or
+/// nothing). Thread-safe.
+int ReleaseAllLive() noexcept;
+
+/// An `op::Operator` that counts itself as a live object and carries its
+/// residency state.
+struct PyOperator : op::Operator, Releasable {
+  /// Wraps (moves) a library result: the device data are current.
+  explicit PyOperator(op::Operator&& o, Residency r = Residency::kDeviceCurrent)
+      : op::Operator(std::move(o)), residency(r) {}
+  /// Copies an operator (library result, device current).
+  explicit PyOperator(const op::Operator& o,
+                      Residency r = Residency::kDeviceCurrent)
+      : op::Operator(o), residency(r) {}
+  PyOperator(const PyOperator& o)
+      : op::Operator(o), Releasable(o), residency(o.residency) {}
+  PyOperator(PyOperator&& o) noexcept
+      : op::Operator(std::move(o)), Releasable(o), residency(o.residency) {}
+  PyOperator& operator=(const PyOperator& o) {
+    op::Operator::operator=(o);
+    residency = o.residency;
+    return *this;
+  }
+  PyOperator& operator=(PyOperator&& o) noexcept {
+    op::Operator::operator=(std::move(o));
+    residency = o.residency;
+    return *this;
+  }
+  ~PyOperator() override = default;
+
+  bool CanRelease() const noexcept override { return views->load() == 0; }
+  void Release() noexcept override { op::Operator::operator=(op::Operator()); }
+
+  Residency residency = Residency::kBoth;  ///< See `Residency`.
+  /// Number of live numpy views of this operator's host storage.
+  std::shared_ptr<std::atomic<int>> views =
+      std::make_shared<std::atomic<int>>(0);
+};
+
+/// Checks that the device data were not released; returns `o`.
+/// @throws StaleHostError if `Runtime.finalize(force=True)` freed them.
+const PyOperator& Alive(const PyOperator& o);
+
+/// Prepares `o` as the input of a library call: pushes host edits to the device
+/// if the state is kHostCurrent (then kBoth) and returns the C++ operator.
+/// @throws StaleHostError if released.
+const op::Operator& Input(const PyOperator& o);
+
+/// Prepares host access to `o` (a view of the host mirror). Raises
+/// StaleHostError if the state is kDeviceCurrent and residency is enforced;
+/// otherwise syncs implicitly. `writable` sets the state to kHostCurrent.
+/// @throws StaleHostError as described, or if released.
+void PrepareHostAccess(PyOperator& o, bool writable);
+
+/// Makes a library result the Python object: state kDeviceCurrent.
+inline PyOperator Result(op::Operator&& o) { return PyOperator(std::move(o)); }
+
+/// A guard object for the ndarray `owner` of a numpy view of `self`: keeps the
+/// Python operator alive and counts the view in `PyOperator::views`.
+nanobind::object MakeViewGuard(nanobind::handle self);
+
+/// A commutator workspace (Kokkos scratch buffers and tables of one model
+/// space), shared by the commutator and BCH bindings. Not thread safe: users
+/// hold `mutex()` during a call.
+class PyWorkspace : public Releasable {
+ public:
+  /// Builds the workspace (needs the Runtime).
+  explicit PyWorkspace(std::shared_ptr<const basis::ModelSpace> ms)
+      : ms_(ms), ws_(std::make_unique<commutator::Workspace>(std::move(ms))) {}
+  PyWorkspace(const PyWorkspace&) = delete;
+  PyWorkspace& operator=(const PyWorkspace&) = delete;
+  bool CanRelease() const noexcept override { return true; }
+  void Release() noexcept override { ws_.reset(); }
+  /// The workspace. @throws StaleHostError if released.
+  commutator::Workspace& ws() {
+    if (!ws_) throw StaleHostError("the commutator workspace was released");
+    return *ws_;
+  }
+  /// The model space the workspace was built for.
+  const std::shared_ptr<const basis::ModelSpace>& model_space() const {
+    return ms_;
+  }
+  /// Guards the scratch buffers.
+  std::mutex& mutex() { return mutex_; }
+
+ private:
+  std::shared_ptr<const basis::ModelSpace> ms_;
+  std::unique_ptr<commutator::Workspace> ws_;
+  std::mutex mutex_;
+};
+
+/// The workspace for `ms` from a small process-wide cache (built on first use).
+/// The cache is dropped by `ClearWorkspaceCache`.
+std::shared_ptr<PyWorkspace> WorkspaceFor(
+    const std::shared_ptr<const basis::ModelSpace>& ms);
+
+/// Drops the cached commutator workspaces (they hold Kokkos buffers); called
+/// before the Runtime is finalized. Workspaces a Python object still refers to
+/// stay alive.
+void ClearWorkspaceCache();
 
 /// Initializes the process Runtime (Kokkos, optionally MPI) if it is not yet;
 /// idempotent. Called by every constructor of a ModelSpace or Operator (lazy
@@ -58,8 +221,18 @@ void BindRuntime(nanobind::module_& m);
 void BindBasis(nanobind::module_& m);
 /// Binds Operator, OperatorSpec, enums, dump I/O, norms, random operators.
 void BindOperator(nanobind::module_& m);
-/// Binds RunConfig and load_config.
+/// Binds RunConfig, load_config and the pipeline run.
 void BindConfig(nanobind::module_& m);
+/// Binds the readers and writers of the io module.
+void BindIo(nanobind::module_& m);
+/// Binds hf and mbpt.
+void BindHf(nanobind::module_& m);
+/// Binds the commutator.
+void BindCommutator(nanobind::module_& m);
+/// Binds the generators, the solvers and the BCH functions of the flow module.
+void BindFlow(nanobind::module_& m);
+/// Binds the operator library (kinetic energy, center of mass, radii).
+void BindOpslib(nanobind::module_& m);
 
 }  // namespace imsrg::py
 
