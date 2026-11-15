@@ -184,7 +184,7 @@ TEST(N7Comm232, MissingThreeBodyParts) {
 }
 
 // Element-wise against the imsrg++ dumps (E3max 3) and the two-body norms of
-// values.json (E3max 3 and 6, where the hhh-ppp couplings exist).
+// values.json (E3max 3, and 6 where the hhh-ppp couplings exist).
 TEST(N7Comm232, MatchesImsrgDevel) {
   for (const char* ref : {"He4", "O16"}) {
     const std::string dir = std::string(ref) + "_emax2";
