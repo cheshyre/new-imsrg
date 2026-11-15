@@ -674,3 +674,14 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   O16 emax 3: agreement 2e-9 fm HF, within the 6 printed decimals after the flow); the Magnus radius uses the same
   code path with the replayed operators. **Assumed meanwhile:** sufficient; no Magnus-path radius number from
   imsrg++ exists.
+* **M11-Q15** (2026-11-16, M11 python hardening) - Ctrl-C: the solvers poll Python signals at every status
+  line (a step boundary) and raise `KeyboardInterrupt`; the pipeline driver (`driver::Run`) has no
+  cancellation hook, so `pipeline.run` lets Ctrl-C stop the process (SIGINT default action) while the run
+  is in progress instead of ignoring it. **Assumed meanwhile:** fine for scripts; a cancel flag in
+  `driver::Run` would allow a clean `KeyboardInterrupt`.
+* **M11-Q16** (2026-11-16, M11 python hardening) - `SymmetryError` and `ConvergenceError` exist as classes
+  (design/18): `ConvergenceError` is raised by `pipeline.run` on divergence and by
+  `hf.solve(raise_on_failure=True)` (default False, so existing results stay reportable); `SymmetryError` is
+  reserved until tensor operators exist. A missing file raises `InputFileNotFoundError` (an `InputError`
+  and a `FileNotFoundError`), malformed content `FileFormatError`, operands on different model spaces
+  `ModelSpaceError`. **Assumed meanwhile:** as described.

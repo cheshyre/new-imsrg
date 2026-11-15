@@ -143,11 +143,13 @@ void BindBasis(nb::module_& m) {
             return std::vector<basis::Orbit>(o.begin(), o.end());
           },
           "List of Orbit in index order.")
-      .def("occupations",
-           [](const PyModelSpace& s) {
-             const auto o = s.ms->reference().occupations();
-             return std::vector<double>(o.begin(), o.end());
-           })
+      .def(
+          "occupations",
+          [](const PyModelSpace& s) {
+            const auto o = s.ms->reference().occupations();
+            return std::vector<double>(o.begin(), o.end());
+          },
+          "Reference occupations by orbit index.")
       .def(
           "kets",
           [](const PyModelSpace& s) {
@@ -173,7 +175,7 @@ void BindBasis(nb::module_& m) {
               throw imsrg::InputError("channel index out of range");
             return MakeChannel(tb, ChannelIndex{index});
           },
-          nb::arg("index"))
+          nb::arg("index"), "The two-body channel with this index.")
       .def(
           "find_channel",
           [](const PyModelSpace& s, int two_j, int parity,
@@ -184,7 +186,9 @@ void BindBasis(nb::module_& m) {
             if (!ch) return std::nullopt;
             return MakeChannel(tb, *ch);
           },
-          nb::arg("two_j"), nb::arg("parity"), nb::arg("two_tz"))
+          nb::arg("two_j"), nb::arg("parity"), nb::arg("two_tz"),
+          "The channel with these quantum numbers (2J, parity 0/1, 2Tz), or "
+          "None if the model space has none.")
       .def(
           "channel_kets",
           [](const PyModelSpace& s, int index) {

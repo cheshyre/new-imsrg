@@ -10,6 +10,8 @@ CSV) are returned as a ``RunResult``.
 """
 
 import json
+import signal
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -101,12 +103,37 @@ def run(config):
         For options that are not implemented yet or inconsistent input.
     InputError
         For unreadable inputs or unwritable outputs.
-    NumericalError
-        If the flow diverged (``results.json`` is still written).
+    ConvergenceError
+        (a ``NumericalError``) if the flow diverged; ``results.json`` is still
+        written.
+
+    Notes
+    -----
+    Ctrl-C stops the process (the driver run cannot be interrupted midway);
+    ``MagnusSolver.solve`` and ``OdeSolver.solve`` raise ``KeyboardInterrupt``
+    at the next step instead.
     """
     if isinstance(config, (str, Path)):
         config = _core.load_config(file=str(config))
-    _core.run_config(config)
+    # The driver cannot be cancelled from inside: while it runs without the GIL
+    # Python's KeyboardInterrupt handler would never run, so Ctrl-C takes its
+    # conventional effect on native code (the process stops) instead of being
+    # ignored until the run ends. Other handlers installed by the user stay.
+    restore = None
+    if (
+        threading.current_thread() is threading.main_thread()
+        and signal.getsignal(signal.SIGINT) is signal.default_int_handler
+    ):
+        restore = signal.signal(signal.SIGINT, signal.SIG_DFL)
+    try:
+        _core.run_config(config)
+    except _core.NumericalError as exc:
+        if isinstance(exc, _core.ConvergenceError):
+            raise
+        raise _core.ConvergenceError(str(exc)) from exc
+    finally:
+        if restore is not None:
+            signal.signal(signal.SIGINT, restore)
     directory = Path(config.output_directory)
     results = json.loads((directory / "results.json").read_text())
     return RunResult(config=config, directory=directory, results=results)
