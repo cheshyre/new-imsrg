@@ -67,6 +67,15 @@ reasoning and the numbers, add a decision D-row to `00-requirements-and-decision
 with the IMSRG(3) terms. Keep the non-chosen prototypes out of the
 production library (delete them or move them to `tools/bench/`).
 
+**Result (run 2, 2026-11-15, D43): layout A**, stored as packed channel blocks, with the [2,2]→3
+term and the perturbative triples computed through pair-third tiles. Numbers and reasoning:
+`benchmarks/imsrg3-layout.md`. In short: C needs 8.8× A's memory (702 GB per operator at emax 12 /
+E3max 14) and fails the memory gate; B saves 2 % memory at the target and is within the run-to-run
+spread of A in every kernel; A compares element by element with imsrg++. The pair-third tiling
+reproduces imsrg++ `comm223ss` to 1e-15 and is 54× faster at emax 3 (18 threads). The prototypes
+stay in `tools/bench/imsrg3_layout/` (benchmark target only); [2,3]→3 and [3,3]→2 were not
+prototyped and move to the N7 work below.
+
 ## 3. Step 2: brute-force m-scheme reference (validation backbone)
 
 Independent of imsrg++, implement a **tiny m-scheme engine** for validation only (in
@@ -88,9 +97,26 @@ learn from (`reference/05` §3), but note its shadowed `random_me` bug, which ze
 layout benchmark** (item 3 below, as its own track); then perturbative triples → N7 on the chosen
 layout.
 
+0. **Production pieces of the layout decision (D43)**, each a small task with the benchmark
+   prototype (`tools/bench/imsrg3_layout/`) as the reference implementation:
+   * `basis`: the kept canonical space (kets failing dE3max/OccNat3Cut dropped at enumeration,
+     orbit-triple blocks with their symmetry factors; prototype `CanonicalSpace`), as part of
+     `ModelSpace::WithThreeBody` with the cuts in `ThreeBodyCuts`;
+   * `angmom`: the 3B 6j family {j1 j2 J12; j3 J J23} (prototype `SixJ3Table`); the existing
+     `SixJTable` reads 0 for a three-body J and must not be used for it;
+   * `operator`: `op::ThreeBody` in layout A, packed channel blocks, `imsrgpp_norm` (D12), dump
+     support; the pair-third states with the maps R and E (prototype `PairThirdSpace`), which
+     the [2,2]→3 term and the readers of recoupled 3B elements (232, 331, 231, 132) share;
+   * `commutator`: `comm223ss` as the tiled kernel K1, with the production changes the review
+     asked for: a per-tile gather instead of the benchmark's global gather tables (15 GB at
+     emax 12), the internal orbit a restricted to the 6j-allowed j range (60-75 % of the group
+     terms vanish), team-level parallelism and staging through device buffers, and writes of
+     the packed triangle only; a second gather for non-Hermitian operands (D36).
 1. **Perturbative triples**: the [2,2]→3 term streamed channel by channel. It needs no full 3B
    storage, because the energy accumulates per channel. Validate against imsrg-devel
-   (`perturbative_triples=true`) on the O16/He4 emax 2/3 tests.
+   (`perturbative_triples=true`) on the O16/He4 emax 2/3 tests. The tiled prototype
+   (`TriplesTiled`) already agrees with imsrg++ to 3e-15 at O16 emax 3 through
+   `refharness comm223 ... epsilon=` and costs 5 % of a full [2,2]→3.
 2. **IMSRG(3)-N7 terms**: implement the 3B part of the operator (chosen layout), all terms in
    the N7 preset, CommutatorOptions presets, and 3B cuts (E3max, dE3max, OccNat3Cut). Kets that
    fail dE3max or OccNat3Cut are **dropped when the 3B kets are enumerated** (owner, D34, M3-Q9):
@@ -113,7 +139,8 @@ layout.
 ## 5. Data-structure requirements fixed now (so core work does not block IMSRG(3))
 
 * `Operator::three_body` is `std::optional<ThreeBody>`. `ThreeBody` hides its layout behind a
-  small interface, so the layout choice does not leak into the commutator signatures.
+  small interface, so the layout choice does not leak into the commutator signatures. The layout
+  is A (D43): canonical kets, packed channel blocks; kernels see it through the pair-third maps.
 * `ThreeBodyLayout` provides `imsrgpp_norm()`, which reproduces imsrg++'s n3 for any layout (D12).
 * `ThreeBodyChannels` lives in `basis` and is built lazily on request
   (`ModelSpace::WithThreeBody(cuts)`).

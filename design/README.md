@@ -23,7 +23,7 @@ Reading order for a new agent or developer:
 | `NEXT_SESSION_PROMPT.md` | The prompt that starts the next unsupervised implementation run |
 | `INTERVIEW_PROMPT.md` | The prompt for an interactive session that answers the open questions and interviews the owner |
 | `reports/` | Reports of the unsupervised runs (e.g. `2026-11-12-overnight.md`) and owner interviews (`2026-11-15-owner-interview.md`) |
-| `benchmarks/` | Benchmark results (e.g. `imsrg2-commutators.md`) |
+| `benchmarks/` | Benchmark results (`imsrg2-commutators.md`; `imsrg3-layout.md`, the IMSRG(3) layout decision D43) |
 | `claude-settings.proposed.json` | Proposed Claude Code settings for the unattended run (owner installs) |
 | `reference/01..05-*.md` | Detailed analyses of imsrg-devel with file:line citations (feature checklists) |
 
