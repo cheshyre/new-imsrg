@@ -263,42 +263,47 @@ void Comm122ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   }
   const double hz =
       static_cast<double>(detail::CommutatorHermiticitySign(X, Y));
-  // One thread per element (r, c) with r <= c. B(r, c) is the bra part (lifted
-  // one-body list of row r acting on column c of X, Y); the ket part of Z(r, c)
-  // is hZ B(c, r) by hermiticity of X, Y, and Z(c, r) = hZ Z(r, c). No
-  // division or sqrt.
-  exec::ParallelFor(
-      "commutator::comm122ss", total, IMSRG_LAMBDA(const exec::Index e) {
-        const int ch = detail::FindBlock(block_offset, nch, e);
+  // One item per column c of every block (dynamic scheduling: the triangle
+  // makes the items ragged), rows r <= c. B(r, c) is the bra part (lifted
+  // one-body list of row r acting on column c of X, Y); the ket part of Z(r,
+  // c) is hZ B(c, r) by hermiticity of X, Y, and Z(c, r) = hZ Z(r, c). No
+  // division or sqrt; the block search and index arithmetic run once per
+  // column (M12a), the arithmetic on every element is unchanged.
+  const std::int32_t* entry_channel = impl.entry_channel.device_data();
+  const std::int32_t* channel_ket_offset = xv.tb.channel_ket_offset;
+  const auto columns = static_cast<exec::Index>(impl.entry_channel.size());
+  exec::ParallelForDynamic(
+      "commutator::comm122ss", columns, IMSRG_LAMBDA(const exec::Index e) {
+        const int ch = entry_channel[e];
+        const int c = static_cast<int>(e - channel_ket_offset[ch]);
         const std::int64_t off = block_offset[ch];
-        const std::int64_t local = e - off;
-        const int n = num_kets[ch];
-        const int r = static_cast<int>(local % n);
-        const int c = static_cast<int>(local / n);
-        if (r > c) return;
+        const std::int64_t n = num_kets[ch];
         const int rb = row_base[ch];
-        double b_rc = 0.0;
-        double b_cr = 0.0;
-        for (int side = 0; side < 2; ++side) {
-          const int row = side == 0 ? r : c;
-          const std::int64_t col = side == 0 ? c : r;
-          double acc = 0.0;
-          for (int t = entry_offset[rb + row]; t < entry_offset[rb + row + 1];
+        const int tc0 = entry_offset[rb + c];
+        const int tc1 = entry_offset[rb + c + 1];
+        double* zcol = z2 + off + c * n;
+        for (int r = 0; r <= c; ++r) {
+          double b_rc = 0.0;
+          for (int t = entry_offset[rb + r]; t < entry_offset[rb + r + 1];
                ++t) {
-            const std::int64_t idx = off + lm[t] + col * n;
+            const std::int64_t idx = off + lm[t] + c * n;
             double v = 0.0;
             if (yd != nullptr) v += x1(lfrom[t], lto[t]) * yd[idx];
             if (xd != nullptr) v -= y1(lfrom[t], lto[t]) * xd[idx];
-            acc += lcoef[t] * v;
+            b_rc += lcoef[t] * v;
           }
-          if (side == 0)
-            b_rc = acc;
-          else
-            b_cr = acc;
+          double b_cr = 0.0;
+          for (int t = tc0; t < tc1; ++t) {
+            const std::int64_t idx = off + lm[t] + r * n;
+            double v = 0.0;
+            if (yd != nullptr) v += x1(lfrom[t], lto[t]) * yd[idx];
+            if (xd != nullptr) v -= y1(lfrom[t], lto[t]) * xd[idx];
+            b_cr += lcoef[t] * v;
+          }
+          const double z = b_rc + hz * b_cr;
+          zcol[r] += z;
+          if (r < c) z2[off + c + r * n] += hz * z;
         }
-        const double z = b_rc + hz * b_cr;
-        z2[off + r + static_cast<std::int64_t>(c) * n] += z;
-        if (r < c) z2[off + c + static_cast<std::int64_t>(r) * n] += hz * z;
       });
   exec::Fence("commutator::comm122ss");
 }
