@@ -29,9 +29,9 @@ during run 2" only; everything before it is answered), and skim `design/40-roadm
 `design/14-imsrg3-plan.md` and `design/benchmarks/imsrg3-layout.md`. For every question on the
 agenda, note in 2–3 sentences the context (file/section), the options, the assumption the run made,
 and what would change under each answer. Look things up in the code only when needed to explain a
-consequence. Run 2 did not finish IMSRG(3)-N7 and M12a at the time this agenda was written: read the
-run-2 report for the final state and any question ids it adds (M10-Q50 and later, M12a-Q...), and
-add them to the matching group below.
+consequence. IMSRG(3)-N7 merged during run 2 (its questions are M10-Q60..Q67 below); M12a was still running when
+this agenda was written: read the run-2 report for its final state and its question ids (M12-Q*),
+and add them to group F.
 
 ## How to run the interview (the method that worked on 2026-11-15)
 
@@ -138,6 +138,18 @@ Format: **id** — summary; *assumption taken*; what an answer changes.
   member functions, functions over ~40 lines, unsigned types. *Guidelines for new code; a cleanup
   task if wanted.*
 
+**C2. Charge radius and flow (run 2, late)**
+* **M8-Q50** — Rso flows alongside H (or is replayed) when only Rp2 is requested, so the adaptive
+  `flow` error norm includes it and the step sequence differs from imsrg++'s (end results agree:
+  E0 4e-8 MeV, radius 5e-8 fm); the driver-level adaptive tests compare final quantities. Also stage 2
+  of the adaptive `flow` integrates [s1, s1 + smax] (imsrg++ restarts s at 0, M8-Q40). *Assumed.*
+  Alternative: exclude passive operators from the error norm.
+* **M8-Q51** — the charge radius is produced only for plain `Rp2` (not `Rp2Z_*`/`Rp2AZ_*`, not for
+  `run.task = "hf"`); `Rch` is null when Rch2 < 0; N/Z from `basis.mass_number`. *Assumed.*
+* **M8-Q52** — pristine imsrg++ prints a radius only for non-Magnus methods, so the Magnus radius has
+  no imsrg++ number to compare with (validated through `flow_RK4`/`flow` runs and IT-6's `.snt`).
+  *Assumed sufficient.*
+
 **D. Configuration and outputs**
 * **M8-Q30** — a default `output.directory` (no key in the file) and `--set` values resolve against
   the working directory, not the config directory. *Assumed.*
@@ -156,6 +168,13 @@ Format: **id** — summary; *assumption taken*; what an answer changes.
   and solvers but refuse while numpy views are alive. *Assumed.*
 * **M11-Q13** — no stop request from a C++ solver status callback (an exception aborts at a step
   boundary); Python generator callbacks are not bound. *Assumed enough; a `flow` API addition if not.*
+* **M11-Q15** — Ctrl-C: solvers raise `KeyboardInterrupt` at a step boundary, but `pipeline.run` has no
+  cancel hook, so SIGINT stops the process. *Fine for scripts*; a cancel flag in `driver::Run` for a
+  clean interrupt?
+* **M11-Q16** — exception classes completed per `18` (`ConvergenceError` on divergence and with
+  `hf.solve(raise_on_failure=True)`, default False; `SymmetryError` reserved for tensor operators;
+  `InputFileNotFoundError` is also a `FileNotFoundError`). *Assumed.* (Q11 and Q14 are the pending
+  owner decisions of the hardening merge.)
 * **M11-Q14** — the bound API follows the C++ modules (`imsrg.io.read_me2j`, `hf.solve`,
   `flow.MagnusSolver`, `pipeline.run`) rather than the dataclass tree proposed in `18`; `opslib`
   bound too. *Assumed.* Update `18` or rework?
@@ -168,7 +187,23 @@ Format: **id** — summary; *assumption taken*; what an answer changes.
   emax 4–6 would settle it: *allowed?* **M10-Q44** — the kernel calls Kokkos directly until
   `exec::TeamFor` gets schedule/scratch/reducer options. **M10-Q45** — extra accessors
   (`ScratchBytesPerTeam()`, `impl()`) kept; the E map is built but unused by these kernels.
-* Add the questions the N7 and M12a leads recorded at the end of run 2 (see the run-2 report).
+* **M10-Q60** — the 3B generator copies imsrg++ (Delta3 one-body diagonal only, no floor, no
+  `denominator_delta`; vanishing Delta3 gives inf/NaN with white). *As imsrg++* (D21 floor not
+  extended to 3B). Floor it? Under D35 (fix quirks) likely yes.
+* **M10-Q61** — with IMSRG(3) the residual 3B part of H and of transformed operators is dropped
+  before output (as imsrg++); a rank-2 operator transformed with the IMSRG(3) commutator gets the
+  terms that need Omega_3. *As imsrg++; no operator golden exists (IT-9 has none).* Wanted?
+* **M10-Q62** — `imsrg3.occ_nat3_cut`, `variant = "full"`/`"mp4"`, `at_end`, `only_2b_omega` stay
+  E-PLANNED (the driver does not pass NAT occupations to the 3B space). *Needed for production?*
+* **M10-Q63 / Q64 / Q65 / Q66** — `comm232ss` batching never splits a channel (one block set ~33 GB at
+  emax 12 / E3max 14); its sorted tables moved into the context (Q64 resolved by the follow-up);
+  direct Kokkos policies in kernel TUs; a `Workspace` on a 3B space always builds the 3B context.
+  *Assumed fine at emax <= 3; the N7-performance task of run 3 addresses them.*
+* **M10-Q67** — a Python GIL timing test was relaxed for dev-serial (bound scales with the solve
+  time). *Assumed.*
+* **N7 results to mention** (no question): IT-9 passes with identical steps, |dE0| <= 3.8e-10 MeV, and
+  the imsrg++ comm232 non-Hermitian bug is fixed; ours is 2x (emax 2) to 2.5x (emax 3) faster.
+* Add the M12a questions (M12-Q*) recorded at the end of run 2 (see the run-2 report).
 
 **G. Low-impact confirmations (summarize one line each and ask the owner to flag any to revisit)**
 M8-Q22 (merge resolution), M8-Q21 (resolved: gen scripts default to the patched harness), M11-Q10
@@ -176,9 +211,10 @@ M8-Q22 (merge resolution), M8-Q21 (resolved: gen scripts default to the patched 
 
 ## Agenda, part 2: further design decisions (interview)
 
-1. **Priorities for run 3**: the proposal is N7/IT-9 first, then M12a, M12b MPI, tensor operators,
-   M13 only if all done (D39/D40). Is the order right now that 3f2 and the triples are done?
-   Which IMSRG(3)-N7 terms and presets matter most, and what accuracy is expected at emax 2/3 (D34)?
+1. **Priorities for run 3**: the proposal is N7 performance first, then finishing M12a, M12b MPI, tensor operators, M13 only if
+   all done (D39/D40). Is the order right now that 3f2, the triples and N7 are done? Are the 3f2 2b
+   intermediates (M10-Q20) and the `full`/`mp4` variants (M10-Q62) wanted, and which emax and E3max
+   matter for N7 production?
 2. **Tensor operators (D39, first extension)**: which operators and ranks first (E1/E2 transitions,
    M1, Gamow-Teller, 0νββ, dagger, DM), transformation only or also flow (M8-Q40: tensors cannot
    flow today), `ch_bra ≤ ch_ket` storage (D25), validation against imsrg++ (goldens needed from

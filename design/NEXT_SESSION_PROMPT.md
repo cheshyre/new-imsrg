@@ -3,8 +3,8 @@
 The first run (2026-11-11/12) merged M0–M9 and M11 phase 1 (`design/reports/2026-11-12-overnight.md`).
 The second run (2026-11-15/16, `design/reports/2026-11-15-run2.md`) did the Google-style conversion
 (MS), the M8 follow-ups, IMSRG(3f2) (IT-10), the three-body layout decision (D43), production
-three-body storage with `Comm223` and perturbative triples (IT-8), M11 phase 2, and started
-IMSRG(3)-N7 (IT-9) and M12a. The owner interviews of 2026-11-13 (D25–D29), 2026-11-15 (D30–D42) and
+three-body storage with `Comm223` and perturbative triples (IT-8), **IMSRG(3)-N7 (IT-9)**, the charge
+radius, M11 phase 2 and its hardening, and started M12a. The owner interviews of 2026-11-13 (D25–D29), 2026-11-15 (D30–D42) and
 the one after run 2 (D44 and later; `design/reports/<date>-owner-interview.md`, written by that
 session) answered the open questions. This prompt starts the third run. (The prompts of runs 1 and 2
 are in the git history of this file.)
@@ -125,14 +125,23 @@ rows of the interview after run 2) and in the answers in `design/QUESTIONS.md`. 
   full-precision 1/√2 (D36); M10 3f2 (IT-10, 1b intermediates); M10 layout benchmark and decision
   (D43, layout A, packed); M10 production three-body pieces (`ThreeBodySpace`, `SixJ3Table`,
   `op::ThreeBody`, `PairThirdSpace`, `commutator::Comm223`, `PerturbativeTriplesEnergy`) and the
-  perturbative triples in the driver (IT-8, `results.json` schema 2).
+  perturbative triples in the driver (IT-8, `results.json` schema 2); **IMSRG(3)-N7** (m-scheme brute
+  force, all N7 terms, three-body generator, rank-3 Magnus/BCH, `[imsrg3] variant = "n7"`, IT-9);
+  charge radius with Rso (`results.json` schema 3) and the two-stage ODE test (IT-15); Python hardening
+  (149 tests).
 * **End to end:** `imsrg` reproduces imsrg-devel (D35-patched) for IT-1..IT-8, IT-10, IT-12, IT-14 and
   the hunter-gatherer cases (identical step and gather counts, |ΔE0| ≤ 3e-10 MeV); numbers in the
-  run-2 report §3. CI on `develop`: (INSERT: final counts and time, from the end of run 2).
-* **IMSRG(3)-N7 (IT-9), `feature/m10-n7`:** (INSERT the N7 result: terms implemented, IT-9 deviations
-  and step counts, what remains, branch and merge state, new M10-Q ids).
-* **M12a single-node performance, `feature/m12a-perf`:** (INSERT the M12a result: what landed, the
-  benchmark table vs imsrg++ at emax 4/6/8, what remains, branch and merge state).
+  run-2 report §3. CI on `develop`: 1055 unit, 61 integration, 3 MPI, 149 Python tests (1 skipped), `ci.sh dev-openmp` 101 s (`develop` bd2fda4 at the time of writing; use the hash in STATUS); the `slow` suite has 6 tests (IT-9 emax 3 takes ~46 min on a loaded machine), run it before numerics merges.
+* **IMSRG(3)-N7 (IT-9): merged.** Every N7 term vs the m-scheme brute force <= 6.1e-15 and vs imsrg-devel
+  <= 6.1e-16 (full commutator 5.7e-16); IT-9 He4/O16 at emax 2 and 3 with identical step counts
+  (250/147/248/173), |dE0| <= 3.8e-10 MeV; ours 12.5 s vs 24 s (O16 emax 2), 644 s vs 21 min (O16 emax 3),
+  720 s vs 30 min (He4 emax 3). imsrg++ bug fixed: the `comm232` hermX*hermY shortcut is wrong for
+  non-Hermitian operands (`30` section 6 M10-N7-1..3). Open: N7 is correct but not yet scalable (comm232
+  tiling, tiled 133/132/231/331, `14` section 1.1; M10-Q60..Q67).
+* **M12a single-node performance, `feature/m12a-perf`:** (INSERT the final M12a result: what landed,
+  the benchmark table vs imsrg++ at emax 4/6/8, what remains, branch and merge state). Interim: an
+  emax-8 IMSRG(2) flow at 6 threads takes 59.8 s ours vs 192.3 s imsrg++ (209 steps, same E0), peak
+  RSS 1.10 vs 2.51 GB.
 * **Not started:** M12b (MPI), M13 (Makefile, docs), M14 (GPU), tensor operators (D39), IT-11, 3f2
   2b intermediates (E-PLANNED, M10-Q20), NAT options (M9-Q3), checkpoint/restart.
 * **Open questions** with assumptions: `design/QUESTIONS.md`, "Added during run 2" and the answers
@@ -142,15 +151,14 @@ rows of the interview after run 2) and in the answers in `design/QUESTIONS.md`. 
 
 1. Preflight (above); apply the interview answers that change code or goldens (small tasks, one
    Sonnet implementer each, review per D42 where goldens change).
-2. **Finish and merge IMSRG(3)-N7 and IT-9** (brief below). Remaining terms, validation against
-   imsrg-devel where it is right and against the brute-force m-scheme reference where it is buggy
-   (D34), IT-9 at emax 2 (emax 3 under `slow`), `slow` run before the merge. This is the top
-   priority.
-3. **M12a continuation** (brief below): imsrg++ parity, then explore single-node limits; occasional
+2. **IMSRG(3)-N7 performance** (brief below): tile `comm232ss` and the 133/132/231/331 kernels so N7
+   scales toward the production target (emax 10-12, D34), without changing any result (IT-9 and the
+   term goldens stay). Then the 3f2 2b intermediates if the owner asked for them (M10-Q20).
+3. **M12a: finish and merge** if the run-2 lead did not (brief below): imsrg++ parity, then explore single-node limits; occasional
    emax-8 benchmarks against imsrg++, never in CI.
 4. **M12b MPI** (brief below), after M12a's data structures settle: D14 phase 1 (IMSRG(2) by channel
-   blocks), phase 2 (3B blocks, Hagen–Nam evaluation, D40), IT-11. Starts when N7 has merged, because
-   phase 2 distributes N7's blocks.
+   blocks), phase 2 (3B blocks, Hagen–Nam evaluation, D40), IT-11. N7 has merged, so phase 2 can
+   distribute its blocks.
 5. **Tensor operators** (D39: the first extension after IMSRG(3); tensor `OperatorSpec` exists, only
    `ch_bra ≤ ch_ket` blocks stored, D25): design check against `13`/`15`, tensor commutators for the
    IMSRG(2) terms, transformation of tensor observables (not number-conserving operators cannot flow
@@ -171,7 +179,11 @@ rows of the interview after run 2) and in the answers in `design/QUESTIONS.md`. 
   so start long leads right after a reset and avoid launching new leads in the last minutes of a
   window. When agents stop on a limit, resume each with `SendMessage` after the reset (transcripts
   are kept); do not start new agents for the same work. Run 2 hit the limit at ~16:35 and ~21:15 and
-  used about 12 % of the weekly budget in 9 hours.
+  also ~01:30; ~30 % of the weekly budget was used by 05:30 after 16 h). The owner sets a wrap-up
+  deadline and does not mind finishing early or late: state it unambiguously in every brief.
+* **Timing-sensitive tests must tolerate load** (the Ctrl-C Python tests failed once in a loaded CI
+  run and held back a merge): repeat the timed action, allow retries, and run candidate tests 100x under
+  `ctest -j 18` before merging them.
 * **Prepare outside the repository during exclusive tasks.** When one task has to run alone
   (a rename, a regeneration of goldens), do the work that cannot conflict in a scratch tree: reference
   builds and goldens, refharness flags, read-only Opus reviews, and implementation plans
@@ -210,38 +222,29 @@ rows of the interview after run 2) and in the answers in `design/QUESTIONS.md`. 
   processes): use `tests/support/scratch_dir.h`.
 * Reading inputs is fast (me2j emax-4 prefix 3.6 ms, whole file 9 s): no caches are needed.
 
-## Brief for the IMSRG(3)-N7 continuation (ready to use; adjust the hashes and the pending parts)
+## Brief for the N7 performance task (ready to use; adjust the hashes)
 
-> You lead **M10 step 3 — IMSRG(3)-N7** on branch `feature/m10-n7` (`develop` = <HASH>; the previous
-> lead's state: (INSERT: the N7 result of run 2: branch head, terms done, tests, open findings)).
-> Question ids `M10-Q<block>`. **Golden rule 10:** searches stay inside the repository, its
-> worktrees, `/Users/cheshyre/Downloads/new-imsrg-reference/`, `~/.cache/imsrg-deps/` and temp
-> directories; never `find /`, `find ~`, `mdfind`. emax ≤ 6 everywhere, IMSRG(3) only at emax 2 and 3.
-> Usage is tight: delegate code to Sonnet workers, one Opus review of the kernels. Final report due
-> by <TIME> (keep working until then). Read `AGENTS.md`, `design/14-imsrg3-plan.md` §1, §4 item 2 and
-> §5, `00` (D12, D34, D36, D43), `12` §3–§5, `reference/02-commutators.md` (the IMSRG(3) terms),
-> `benchmarks/imsrg3-layout.md`, QUESTIONS M10-Q40..Q46, `commutator/three_body.h`, `op::ThreeBody`
-> and `op::PairThirdSpace` headers, imsrg-devel `IMSRG3Commutators.cc`. Goal: all terms of the
-> N7 preset on `op::ThreeBody` (layout A, packed): the remaining three-body commutator terms beyond
-> [2,2]→3 (231/232/331/132-type, [2,3]→3, [3,3]→2, 1B/2B outputs: take the list from `14` §1 and
-> imsrg++'s N7 preset), `CommutatorOptions` presets, Magnus flow with three-body H and Omega (BCH
-> with 3B operands, general operands per D36), the driver and `[imsrg3]` config keys
-> (`method = n7`, E3max/dE3max/OccNat3Cut), `results.json` entries. Validation: term by term against
-> imsrg-devel on random operators at emax 2 (1e-10 relative); where imsrg-devel is buggy (`14` §1)
-> fix the bug and validate against the **brute-force m-scheme reference** (`commutator_ref`
-> three-body, tests only; D34; a bug entry in `30` §6 for each); IT-9 end to end (E0 within 1e-3 MeV,
-> identical step counts where the reference is right; emax 2 in CI, emax 3 under `slow`; golden
-> values in `tests/golden/`: N7 E0 −145.489827 (emax 2), −158.254073 (emax 3), O16, imsrg++ as
-> committed; regenerate through scripts only, D42). Known open items from run 2: `Comm223` kernel calls
-> Kokkos directly (M10-Q44: add `exec::TeamFor`/`TeamReduce` options when the next team kernels
-> arrive), per-tile gather cost (M10-Q41), the early return of imsrg++ comm223ss (M10-Q43, answer in
-> the interview), Omega combination order for split stacks (M10-Q40, answer in the interview).
-> Acceptance: IT-9 within tolerance, every term tested, `tools/ci.sh dev-openmp` PASS and `ctest -L
-> slow` PASS. Report ≤ 250 words (deviations, step counts, timings per term).
+> You lead **M10 N7 performance** on `feature/m10-n7-perf` (`develop` = bd2fda4, update it). Question
+> ids `M10-Q<block>` (the last used is Q67). **Golden rule 10:** searches stay inside the repository,
+> its worktrees, `/Users/cheshyre/Downloads/new-imsrg-reference/`, `~/.cache/imsrg-deps/` and temp
+> directories; never `find /`, `find ~`, `mdfind`. emax <= 6 everywhere, IMSRG(3) only at emax 2 and 3.
+> Delegate code to Sonnet workers, one Opus review of the kernels; final report due by <TIME>
+> (keep working until then). Read `AGENTS.md`, `design/14-imsrg3-plan.md` section 1.1 and 4, `00` (D34,
+> D43), `12` sections 3-5, `benchmarks/imsrg3-layout.md`, QUESTIONS M10-Q41..Q46 and M10-Q60..Q67, the
+> N7 kernels (`commutator/kernels/`), `30` section 6 M10-N7-1..3. State: all N7 terms are correct (<= 6.1e-15
+> vs the m-scheme brute force) and IT-9 passes (O16 emax 3: 644 s vs 21 min for imsrg++). Goal:
+> scalability toward emax 10-12 without changing results: tile `comm232ss` by column ranges and clamp
+> J3 per batch (the one block set is ~33 GB at emax 12 / E3max 14, M10-Q63), tiled 133/132/231/331
+> kernels in the style of `Comm223`, `exec::TeamFor`/`TeamReduce` options instead of direct Kokkos
+> (M10-Q44/Q65), per-tile 6j slices and a ket cache (M10-Q41/Q42), a lazy `ThreeBodyContext` for
+> IMSRG(2)-only use (M10-Q66). Judge scaling by counting and cost models, not by running beyond
+> emax 3. Acceptance: all existing term, IT-9 and brute-force tests unchanged (bitwise where the
+> arithmetic is unchanged), benchmark table before/after in `design/benchmarks/`, `tools/ci.sh
+> dev-openmp` PASS and `ctest -L slow` PASS. Report <= 250 words.
 
-## Brief for the M12a continuation (ready to use; adjust the hashes and the pending parts)
+## Brief for the M12a continuation (use only if M12a is not merged; adjust the hashes and the pending parts)
 
-> You lead **M12a — single-node CPU performance** on `feature/m12a-perf` (`develop` = <HASH>; state of
+> You lead **M12a — single-node CPU performance** on `feature/m12a-perf` (`develop` = bd2fda4, update it; state of
 > the previous lead: (INSERT: the M12a result of run 2: what landed, the benchmark table, what is
 > left)). Question ids `M12a-Q<block>`. **Golden rule 10 applies** (searches only inside the project
 > directories). Delegate to Sonnet workers; one Opus review per kernel merge. Goal (D40): imsrg++
@@ -260,7 +263,7 @@ rows of the interview after run 2) and in the answers in `design/QUESTIONS.md`. 
 
 ## Brief for M12b — MPI (ready to use once M12a's data structures have settled)
 
-> You lead **M12b — MPI distribution** on `feature/m12b-mpi` (`develop` = <HASH>). Question ids
+> You lead **M12b — MPI distribution** on `feature/m12b-mpi` (`develop` = bd2fda4, update it). Question ids
 > `M12b-Q<block>`. **Golden rule 10 applies.** Read `AGENTS.md`, `14-imsrg3-plan.md` §4 item 4, `00`
 > (D14, D34, D40, D43), `12`, `comm` module headers (Communicator, serial stub), the `Workspace`
 > and ownership notes of M7. Phase 1 (D14): 1B/2B operator parts replicated; the expensive IMSRG(2)
