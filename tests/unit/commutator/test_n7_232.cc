@@ -246,6 +246,28 @@ TEST(N7Comm232, PairThirdMatchesReference) {
   }
 }
 
+// Column batching: a budget of one byte (one column per batch) gives the
+// result of the default budget (one batch at emax 2).
+TEST(N7Comm232, BatchesAgree) {
+  const N7Inputs in = GoldenN7Inputs(2, "O16", 6);
+  op::Operator one = testing::ZeroN7Output(in.x, in.y, in.ms3);
+  op::Operator many = testing::ZeroN7Output(in.x, in.y, in.ms3);
+  detail::Comm232ssPairThird(in.x, in.y, one, *in.ctx,
+                             detail::kComm232MaxBlockBytes);
+  detail::Comm232ssPairThird(in.x, in.y, many, *in.ctx, 1);
+  EXPECT_GT(op::TwoBodyNorm(one), 1.0);
+  EXPECT_LE(TwoBodyDeviation(many, one), 1.0e-13);
+  // Non-Hermitian operands (two block sets per operand).
+  for (N7Inputs& c : BruteForceCases()) {
+    op::Operator a = testing::ZeroN7Output(c.x, c.y, c.ms3);
+    op::Operator b = testing::ZeroN7Output(c.x, c.y, c.ms3);
+    detail::Comm232ssPairThird(c.x, c.y, a, *c.ctx,
+                               detail::kComm232MaxBlockBytes);
+    detail::Comm232ssPairThird(c.x, c.y, b, *c.ctx, 1);
+    EXPECT_LE(TwoBodyDeviation(b, a), 1.0e-13) << c.ms3->reference().name();
+  }
+}
+
 // A tiny scratch budget (1/40 of one block set) splits the largest channels
 // over several column tiles and runs dozens of batches; the result matches
 // the element-wise reference (emax 2) and, with one column per batch

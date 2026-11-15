@@ -49,9 +49,13 @@
 //   visited. B^T uses V = W^T, which is h_B W for a three-body part of
 //   definite hermiticity (not stored; its active rows are those of W).
 //   Memory: one (non-Hermitian part: two) sum over channels of A_ch S_ch
-//   doubles per three-body operand (S_ch states, A_ch active ones); channels
-//   are processed in batches whose blocks fit `max_block_bytes` (the element
-//   kernel runs once per batch, adding the batch's channels).
+//   doubles per three-body operand (S_ch states, A_ch active ones). The
+//   sorted tables are built once per context (`detail::Comm232Tables`); the
+//   blocks are built per call for batches of consecutive columns (flat over
+//   the channels, so a batch holds several channels or part of one) that fit
+//   `max_block_bytes`. The element kernel runs once per batch, over the Z2
+//   blocks whose J reaches the batch's 2 J3 range, with the c, J' and J3
+//   loops clamped to it.
 
 #include "imsrg/commutator/detail/comm232.h"
 
@@ -845,9 +849,9 @@ void Comm232ssPairThird(const op::Operator& X, const op::Operator& Y,
     // channels are ordered by J (6 per J).
     const std::int32_t j_lo = std::max(0, (bb.two_j3_lo - max_jc + 1) / 2);
     const std::int32_t j_hi = (bb.two_j3_hi + max_jc) / 2;
-    const std::int32_t c_lo = std::min(nch2, 6 * j_lo);
-    const std::int32_t c_hi = std::min(nch2, 6 * (j_hi + 1));
-    AddBatch(v, pb, bb, out, z_off[at(c_lo)], z_off[at(c_hi)]);
+    const std::int32_t z_lo = std::min(nch2, 6 * j_lo);
+    const std::int32_t z_hi = std::min(nch2, 6 * (j_hi + 1));
+    AddBatch(v, pb, bb, out, z_off[at(z_lo)], z_off[at(z_hi)]);
   }
   exec::Fence("commutator::comm232ss");
 }
