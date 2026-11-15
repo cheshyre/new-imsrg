@@ -140,7 +140,9 @@ TEST(DriverIntegration, IT6_Rp2_Operator) {
               golden.zero_body, imsrg - golden.zero_body);
   std::printf("[IT-6] Rp2 HF    = %.8f  golden 4.294907  dev %.3e\n", ref,
               ref - 4.294907);
-  EXPECT_NEAR(imsrg, golden.zero_body, 1.0e-4);
+  // Tightened from 1e-4 with D35: the golden now comes from the patched
+  // imsrg++ (Rp2 without Rso), so the old 9.1e-5 offset is gone (dev ~2e-9).
+  EXPECT_NEAR(imsrg, golden.zero_body, 1.0e-6);
   EXPECT_NEAR(ref, 4.294907, 1.0e-5);
 }
 

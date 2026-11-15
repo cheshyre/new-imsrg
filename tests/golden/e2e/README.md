@@ -84,7 +84,7 @@ IT-8/He4_emax2 (E0 and dE_triples at emax 2) and IT-8/emax3 (O16).
   diverges (E0 ~ -1e9 at s ~ 38). See "Diverging flows" above; compare with IT-4/smax10, IT-5/smax10.  IT-5
   (NAT): `Hbare_0b` differs from the HF value (-313.00439075 vs -313.16848141), as expected after the
   basis change.
-* **IT-6.** `intRp2.snt` (zero body 4.45016791 transformed; HF value of Rp2 4.294907).  The
+* **IT-6.** `intRp2.snt` (zero body 4.45025883 transformed, patched build D35 where Rp2 has no spin-orbit term, was 4.45016791; HF value of Rp2 4.294907).  The
   single-reference run writes only the operator `.snt`, not the Hamiltonian.
 * **IT-7.** `int.snt` zero body term -161.03272 (Ne20 reference, sd-shell valence space).
 * **IT-8.** emax=2 diverges (see "Diverging flows"; use IT-8/He4_emax2 instead); its `Perturbative triples: 0.00000000 -> -inf` line is

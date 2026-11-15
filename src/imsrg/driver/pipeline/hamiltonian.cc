@@ -152,6 +152,8 @@ op::Operator PrepareOperator(const OperatorRequest& request,
     switch (request.kind) {
       case OperatorKind::kRp2:
         return opslib::Rp2(ms, A, Z);
+      case OperatorKind::kRso:
+        return opslib::RpSpinOrbitCorrection(ms);
       case OperatorKind::kRn2:
         return opslib::Rn2(ms, A, Z);
       case OperatorKind::kRm2:
