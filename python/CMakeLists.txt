@@ -12,11 +12,13 @@ find_package(Python 3.12 REQUIRED COMPONENTS Interpreter ${_imsrg_py_dev})
 add_subdirectory("${PROJECT_SOURCE_DIR}/extern/nanobind" "${CMAKE_BINARY_DIR}/extern/nanobind")
 
 nanobind_add_module(_core NB_STATIC STABLE_ABI
-  src/module.cc src/runtime.cc src/basis.cc src/operator.cc src/config.cc)
+  src/module.cc src/runtime.cc src/residency.cc src/basis.cc src/operator.cc
+  src/config.cc src/opslib.cc src/io.cc src/hf.cc src/commutator.cc src/flow.cc)
 # Binding-local headers are included by their path from the repository root
 # ("python/src/bindings.h").
 target_include_directories(_core PRIVATE "${PROJECT_SOURCE_DIR}")
-target_link_libraries(_core PRIVATE imsrg::operator imsrg::driver imsrg::exec imsrg::comm)
+target_link_libraries(_core PRIVATE imsrg::operator imsrg::driver imsrg::exec imsrg::comm
+  imsrg::io imsrg::hf imsrg::mbpt imsrg::commutator imsrg::flow imsrg::opslib)
 target_compile_features(_core PRIVATE cxx_std_20)
 
 # Development layout: <build>/python/imsrg/{__init__.py,_core*.so}, so that

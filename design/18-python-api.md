@@ -491,3 +491,23 @@ Notes: nanobind comes from the submodule; `python/CMakeLists.txt` must call `fin
 Operators must be released before `Runtime` finalizes; the atexit hook runs `gc.collect()` first.
 Golden basis files store pair J and Tz (not 2J, 2Tz) in `channel` lines. Tests: `tests/python`
 (basis golden, H/T/V2 dump norms at 1e-10, numpy views, config examples); `tools/ci.sh` runs them.
+
+## 9. Implementation status (M11 phase 2, 2026-11-15)
+
+Bound in addition to section 8 (sources `python/src/{residency,io,hf,commutator,flow,opslib}.cc`, Python
+modules `imsrg.{io,hf,mbpt,commutators,flow,operators,pipeline}`, `python -m imsrg run`):
+* **Residency (2.2/4.2).** `Operator.residency` (`Residency.HostCurrent/DeviceCurrent/Both`), the state
+  machine documented at `Residency` in `python/src/bindings.h`, `StaleHostError`, `sync_to_host()`/
+  `sync_to_device()` (return the operator), `op.edit()`, policy `Auto/Strict/Implicit`
+  (`set_residency_policy`, `strict_residency()`, env `IMSRG_RESIDENCY`); numpy views count themselves.
+  `Runtime.finalize(force=True)` and the exit hook free live operators/solvers (M11-Q1; see M11-Q11/Q12).
+* **io:** `read_me2j`, `read_no2b` (-> `No2bThreeBody`), value counts, `write_tokyo`,
+  `write_nushellx_int`, `write_nushellx_sps`, `ValenceWriteOptions`.
+* **hf/mbpt:** `hf.solve` with `HFOptions` (`mixing` Linear/Diis, `density_mixing`, ...), `HFResult`
+  (`transform`, `normal_ordered_hamiltonian`), `solution_in_basis`; `mbpt.mp2/mp3`, NAT basis.
+* **commutator:** `commutator(x, y, terms=/options=)` with `Term`/`TermMask`, `CommutatorWorkspace`,
+  `factorized_double_commutator`. **flow:** generators, `MagnusSolver` (hunter-gatherer), `OdeSolver`
+  (`flow_rk4`, `flow`), `bch_transform`/`bch_product` with the 3f2 options.
+* **pipeline:** `pipeline.run(config) -> RunResult`; example `examples/python/he4_pipeline.py`.
+Tests: `tests/python` (goldens of imsrg++ throughout). Not bound: term-by-term functions, `angmom`,
+Python generator callbacks, type stubs (see QUESTIONS M11-Q13, Q14).

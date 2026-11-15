@@ -18,6 +18,7 @@
 #include "imsrg/driver/config/config_issue.h"
 #include "imsrg/driver/config/load_config.h"
 #include "imsrg/driver/config/writer.h"
+#include "imsrg/driver/run.h"
 #include "python/src/bindings.h"
 
 namespace imsrg::py {
@@ -59,11 +60,32 @@ void BindConfig(nb::module_& m) {
           },
           "The resolved config as nested dicts (parsed from its canonical "
           "TOML).")
+      .def_prop_ro(
+          "output_directory",
+          [](const RunConfig& c) { return c.output.directory; },
+          "Directory the run writes results.json, the flow file and the "
+          "valence interaction to.")
+      .def_prop_ro(
+          "flow_file", [](const RunConfig& c) { return c.output.flow_file; },
+          "Path of the flow CSV written by the run.")
       .def_prop_ro("warnings", [](const RunConfig& c) {
         std::vector<std::string> w;
         for (const auto& i : c.provenance.warnings) w.push_back(i.ToString());
         return w;
       });
+
+  m.def(
+      "run_config",
+      [](const RunConfig& c) {
+        EnsureRuntime();
+        nb::gil_scoped_release r;
+        driver::Run(c);
+      },
+      nb::arg("config"),
+      "Runs the pipeline of the driver (model space, interaction, HF, normal "
+      "ordering, IMSRG flow, operators, outputs) for a resolved RunConfig; "
+      "the results are written to `config.output_directory` (use "
+      "imsrg.pipeline.run to get them as Python objects).");
 
   m.def(
       "load_config",

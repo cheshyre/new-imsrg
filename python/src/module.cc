@@ -8,15 +8,6 @@
 #include "imsrg/base/error.h"
 #include "python/src/bindings.h"
 
-namespace imsrg::py {
-
-std::atomic<int>& LiveOperators() noexcept {
-  static std::atomic<int> n{0};
-  return n;
-}
-
-}  // namespace imsrg::py
-
 NB_MODULE(_core, m) {
   namespace nb = nanobind;
   m.doc() =
@@ -31,9 +22,15 @@ NB_MODULE(_core, m) {
   nb::exception<imsrg::RuntimeError>(m, "RuntimeError", err.ptr());
   nb::exception<imsrg::NotImplementedError>(m, "NotImplementedError",
                                             err.ptr());
+  nb::exception<imsrg::StaleHostError>(m, "StaleHostError", err.ptr());
 
   imsrg::py::BindRuntime(m);
   imsrg::py::BindBasis(m);
   imsrg::py::BindOperator(m);
   imsrg::py::BindConfig(m);
+  imsrg::py::BindOpslib(m);
+  imsrg::py::BindIo(m);
+  imsrg::py::BindHf(m);
+  imsrg::py::BindCommutator(m);
+  imsrg::py::BindFlow(m);
 }

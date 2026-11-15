@@ -45,11 +45,20 @@ void InitLocked(State& s, const exec::RuntimeOptions& opt, bool mpi) {
   s.rt = std::make_unique<exec::Runtime>(opt);
 }
 
-void FinalizeLocked(State& s) {
+void FinalizeLocked(State& s, bool force) {
   if (!s.rt) return;
-  if (LiveOperators().load() > 0)
-    throw imsrg::RuntimeError(
-        "cannot finalize the imsrg Runtime while Operator objects are alive");
+  ClearWorkspaceCache();
+  if (LiveObjects() > 0) {
+    if (!force)
+      throw imsrg::RuntimeError(
+          "cannot finalize the imsrg Runtime while Operator or solver objects "
+          "are alive (Runtime.finalize(force=True) frees their device data)");
+    const int blocked = ReleaseAllLive();
+    if (blocked > 0)
+      throw imsrg::RuntimeError(
+          "cannot force-finalize: " + std::to_string(blocked) +
+          " object(s) have numpy views alive; delete the views first");
+  }
   s.rt.reset();
   s.env.reset();
   s.finalized = true;
@@ -91,19 +100,22 @@ void BindRuntime(nb::module_& m) {
            [](RuntimeHandle&, nb::args) {
              auto& s = GetState();
              std::lock_guard lock(s.mutex);
-             FinalizeLocked(s);
+             FinalizeLocked(s, false);
            })
       .def_static("ensure", &EnsureRuntime,
                   "Initializes with defaults if not yet initialized.")
       .def_static(
           "finalize",
-          [] {
+          [](bool force) {
             auto& s = GetState();
             std::lock_guard lock(s.mutex);
-            FinalizeLocked(s);
+            FinalizeLocked(s, force);
           },
-          "Finalizes Kokkos (and MPI); raises if Operators are alive. No "
-          "re-init after.")
+          nb::arg("force") = false,
+          "Finalizes Kokkos (and MPI). Raises RuntimeError if Operators or "
+          "solvers are alive, unless force=True: then their device data are "
+          "freed first (later use of them raises StaleHostError; objects "
+          "with numpy views alive block it). No re-init after.")
       .def_static("is_initialized",
                   [] { return exec::Runtime::IsInitialized(); })
       .def_static("execution_space",
@@ -112,13 +124,19 @@ void BindRuntime(nb::module_& m) {
       .def_static("mpi_enabled",
                   [] { return comm::Environment::MpiEnabled(); });
 
-  // Called by imsrg's atexit handler after gc.collect(): finalize only if
-  // nothing is alive.
+  // Called by imsrg's atexit handler after gc.collect(): frees the device data
+  // of objects still alive (M11-Q1, D41) and finalizes, unless numpy views of
+  // them are alive (then Kokkos is left to process exit).
   m.def("_atexit", [] {
     auto& s = GetState();
     std::lock_guard lock(s.mutex);
-    if (s.rt && LiveOperators().load() == 0) FinalizeLocked(s);
+    ClearWorkspaceCache();
+    if (s.rt && ReleaseAllLive() == 0) FinalizeLocked(s, false);
   });
+  m.def(
+      "live_objects", [] { return LiveObjects(); },
+      "Number of live objects (operators, solvers, workspaces) that own "
+      "device data.");
 }
 
 }  // namespace imsrg::py
