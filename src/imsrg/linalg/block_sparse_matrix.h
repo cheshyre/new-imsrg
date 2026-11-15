@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_LINALG_BLOCK_SPARSE_MATRIX_H_
+#define IMSRG_LINALG_BLOCK_SPARSE_MATRIX_H_
 /// @file
 /// `BlockSparseMatrix<T>`: a set of dense column-major blocks stored back to back in ONE
 /// `exec::DeviceBuffer<T>` (design/10 section 3.3). Each block is labelled by a (row block, column
@@ -102,3 +103,5 @@ extern template class BlockSparseMatrix<double>;
 extern template class BlockSparseMatrix<float>;
 
 }  // namespace imsrg::linalg
+
+#endif  // IMSRG_LINALG_BLOCK_SPARSE_MATRIX_H_

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_OPERATOR_NORMAL_ORDERING_H_
+#define IMSRG_OPERATOR_NORMAL_ORDERING_H_
 /// @file
 /// Normal ordering of scalar operators with respect to a reference with (possibly fractional)
 /// occupations, its inverse, and the normal ordering of a three-nucleon force given as NO2B input
@@ -58,3 +59,5 @@ Operator normal_order(const Operator& op, const No2bThreeBody& v3,
 Operator normal_order(const Operator& op, const No2bThreeBody& v3);
 
 }  // namespace imsrg::op
+
+#endif  // IMSRG_OPERATOR_NORMAL_ORDERING_H_

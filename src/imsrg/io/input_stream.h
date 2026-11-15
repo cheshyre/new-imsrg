@@ -1,5 +1,6 @@
 // Buffered text input over zlib (plain or gzip, detected by content) and a small gzip writer.
-#pragma once
+#ifndef IMSRG_IO_INPUT_STREAM_H_
+#define IMSRG_IO_INPUT_STREAM_H_
 
 #include <filesystem>
 #include <memory>
@@ -77,3 +78,5 @@ class GzipWriter {
 };
 
 }  // namespace imsrg::io
+
+#endif  // IMSRG_IO_INPUT_STREAM_H_

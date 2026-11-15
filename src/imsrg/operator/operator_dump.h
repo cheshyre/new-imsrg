@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_OPERATOR_OPERATOR_DUMP_H_
+#define IMSRG_OPERATOR_OPERATOR_DUMP_H_
 /// @file
 /// OperatorDump v1 reader and writer: the plain-text exchange format with imsrg-devel
 /// (`tools/reference/refharness`), specified in design/15-operator-dump-format.md.
@@ -98,3 +99,5 @@ void write_operator_dump(std::ostream& out, const Operator& op,
                          const OperatorDumpWriteOptions& options = {});
 
 }  // namespace imsrg::op
+
+#endif  // IMSRG_OPERATOR_OPERATOR_DUMP_H_

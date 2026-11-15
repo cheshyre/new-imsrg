@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_COMMUTATOR_DETAIL_LIFTED_H_
+#define IMSRG_COMMUTATOR_DETAIL_LIFTED_H_
 
 /// @file
 /// Precomputed "lifted one-body" lists of the 2-body-reduced term comm122ss (no Kokkos).
@@ -36,3 +37,5 @@ struct LiftedData {
 LiftedData build_lifted_data(const basis::ModelSpace& ms);
 
 }  // namespace imsrg::commutator::detail
+
+#endif  // IMSRG_COMMUTATOR_DETAIL_LIFTED_H_

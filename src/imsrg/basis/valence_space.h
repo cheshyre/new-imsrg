@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_BASIS_VALENCE_SPACE_H_
+#define IMSRG_BASIS_VALENCE_SPACE_H_
 /// @file
 /// Valence-space definitions: the named valence spaces of imsrg++ and the interpretation of its
 /// `valence_space` strings (design/13 section 1, design/reference/01 section 1.5).
@@ -71,3 +72,5 @@ ValenceSpaceDefinition define_valence_space(std::string_view spec, const SingleP
 Nucleus default_reference_nucleus(std::string_view spec);
 
 }  // namespace imsrg::basis
+
+#endif  // IMSRG_BASIS_VALENCE_SPACE_H_

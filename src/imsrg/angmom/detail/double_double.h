@@ -2,7 +2,8 @@
 // |lo| <= ulp(hi)/2, giving about 106 bits (~32 decimal digits). Built from the classic exact
 // error-free transformations (Knuth two_sum, fma-based two_prod). Requires strict IEEE
 // evaluation: do not compile with -ffast-math. Not part of the public API.
-#pragma once
+#ifndef IMSRG_ANGMOM_DETAIL_DOUBLE_DOUBLE_H_
+#define IMSRG_ANGMOM_DETAIL_DOUBLE_DOUBLE_H_
 
 #include <cmath>
 
@@ -87,3 +88,5 @@ inline DD dd_ldexp(DD a, int k) noexcept { return {std::ldexp(a.hi, k), std::lde
 inline double to_double(DD a) noexcept { return a.hi + a.lo; }
 
 }  // namespace imsrg::angmom::detail
+
+#endif  // IMSRG_ANGMOM_DETAIL_DOUBLE_DOUBLE_H_

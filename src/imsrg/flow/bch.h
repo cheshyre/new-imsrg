@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_FLOW_BCH_H_
+#define IMSRG_FLOW_BCH_H_
 /// @file
 /// Baker-Campbell-Hausdorff machinery of the Magnus solver (design/13 section 7,
 /// design/reference/03 section 3, imsrg++ `BCH.cc`): the similarity transformation
@@ -67,3 +68,5 @@ op::Operator bch_product(const op::Operator& X, const op::Operator& Y, const Bch
 op::Operator with_particle_rank(const op::Operator& op, std::int32_t particle_rank);
 
 }  // namespace imsrg::flow
+
+#endif  // IMSRG_FLOW_BCH_H_

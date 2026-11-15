@@ -1,4 +1,5 @@
-#pragma once
+#ifndef TESTS_SUPPORT_COMMUTATOR_TEST_SUPPORT_H_
+#define TESTS_SUPPORT_COMMUTATOR_TEST_SUPPORT_H_
 
 /// @file
 /// Test helpers shared by the commutator and commutator_ref tests: model spaces with closed-shell
@@ -53,3 +54,5 @@ op::Operator read_golden(std::string_view relative, std::shared_ptr<const basis:
 std::shared_ptr<const basis::ModelSpace> golden_model_space(std::string_view relative);
 
 }  // namespace imsrg::testing
+
+#endif  // TESTS_SUPPORT_COMMUTATOR_TEST_SUPPORT_H_

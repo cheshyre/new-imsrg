@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_FLOW_MAGNUS_H_
+#define IMSRG_FLOW_MAGNUS_H_
 /// @file
 /// The Magnus IMSRG solver (design/13 section 7, design/reference/03 section 2.1, imsrg++
 /// `IMSRGSolver::Solve_magnus_euler`, IMSRGSolver.cc:280-366): Euler steps on Omega through the
@@ -142,3 +143,5 @@ class MagnusSolver {
 };
 
 }  // namespace imsrg::flow
+
+#endif  // IMSRG_FLOW_MAGNUS_H_

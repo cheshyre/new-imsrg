@@ -1,5 +1,6 @@
 // Reader for the NO2B (normal-ordered two-body approximation) three-nucleon matrix-element files.
-#pragma once
+#ifndef IMSRG_IO_NO2B_H_
+#define IMSRG_IO_NO2B_H_
 
 #include <cstdint>
 #include <filesystem>
@@ -69,3 +70,5 @@ void read_no2b(const std::filesystem::path& path, const No2bReadOptions& options
                op::No2bThreeBody& v3, No2bReadReport* report = nullptr);
 
 }  // namespace imsrg::io
+
+#endif  // IMSRG_IO_NO2B_H_

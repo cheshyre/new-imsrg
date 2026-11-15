@@ -1,4 +1,5 @@
-#pragma once
+#ifndef TESTS_UNIT_COMMUTATOR_COMMUTATOR_TEST_CASES_H_
+#define TESTS_UNIT_COMMUTATOR_COMMUTATOR_TEST_CASES_H_
 
 /// @file
 /// Test data shared by the commutator unit tests: the golden pairs, the random-operator model
@@ -60,3 +61,5 @@ struct HermPair {
 const std::vector<HermPair>& herm_pairs();
 
 }  // namespace imsrg::commutator_test
+
+#endif  // TESTS_UNIT_COMMUTATOR_COMMUTATOR_TEST_CASES_H_

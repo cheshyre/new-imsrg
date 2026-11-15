@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_DRIVER_CONFIG_PHASE_H_
+#define IMSRG_DRIVER_CONFIG_PHASE_H_
 /// @file
 /// Implementation phase of a configuration value, key or operator (design/16 section 2).
 
@@ -24,3 +25,5 @@ constexpr std::string_view phase_name(Phase phase) noexcept {
 }
 
 }  // namespace imsrg::driver
+
+#endif  // IMSRG_DRIVER_CONFIG_PHASE_H_

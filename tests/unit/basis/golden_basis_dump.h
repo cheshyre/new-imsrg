@@ -1,4 +1,5 @@
-#pragma once
+#ifndef TESTS_UNIT_BASIS_GOLDEN_BASIS_DUMP_H_
+#define TESTS_UNIT_BASIS_GOLDEN_BASIS_DUMP_H_
 /// @file
 /// Test helper: strict parser of the "imsrg-basis-dump v1" golden files of tests/golden/basis/
 /// (format: tests/golden/README.md). The files hold the orbit list, occupations, partitions,
@@ -70,3 +71,5 @@ std::filesystem::path golden_basis_dir();
 std::vector<std::string> golden_basis_files();
 
 }  // namespace imsrg::basis::testing
+
+#endif  // TESTS_UNIT_BASIS_GOLDEN_BASIS_DUMP_H_

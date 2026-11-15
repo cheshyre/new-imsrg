@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_EXEC_RUNTIME_H_
+#define IMSRG_EXEC_RUNTIME_H_
 /// @file
 /// Process-wide execution runtime: RAII guard around Kokkos initialization (design/10 section 4,
 /// design/12 section 2). This header does not include Kokkos.
@@ -64,3 +65,5 @@ void push_profiling_region(const char* name);
 void pop_profiling_region();
 
 }  // namespace imsrg::exec
+
+#endif  // IMSRG_EXEC_RUNTIME_H_

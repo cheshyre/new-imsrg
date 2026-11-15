@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_HF_HARTREE_FOCK_H_
+#define IMSRG_HF_HARTREE_FOCK_H_
 /// @file
 /// Spherical Hartree-Fock in the harmonic-oscillator basis (imsrg++ `HartreeFock`). Given a
 /// normal-ordered-free Hamiltonian H (one-body kinetic part, two-body interaction in the
@@ -108,3 +109,5 @@ op::Operator normal_ordered_hamiltonian(const op::Operator& H, const op::No2bThr
 op::Operator to_hf_basis(const op::Operator& O, const HFResult& r);
 
 }  // namespace imsrg::hf
+
+#endif  // IMSRG_HF_HARTREE_FOCK_H_

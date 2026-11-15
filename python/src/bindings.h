@@ -1,4 +1,5 @@
-#pragma once
+#ifndef PYTHON_SRC_BINDINGS_H_
+#define PYTHON_SRC_BINDINGS_H_
 /// @file
 /// Shared declarations of the nanobind bindings (design/18). No Kokkos headers.
 
@@ -52,3 +53,5 @@ void bind_operator(nb::module_& m);
 void bind_config(nb::module_& m);
 
 }  // namespace imsrg::py
+
+#endif  // PYTHON_SRC_BINDINGS_H_

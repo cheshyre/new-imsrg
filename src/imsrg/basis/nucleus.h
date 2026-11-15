@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_BASIS_NUCLEUS_H_
+#define IMSRG_BASIS_NUCLEUS_H_
 /// @file
 /// Nucleus names ("O16", "vacuum", "mix_A4.5_Z2.5") and the naive shell-model filling of
 /// imsrg++ (design/13 section 1, design/reference/01 section 1.5).
@@ -72,3 +73,5 @@ std::vector<OrbitOccupation> naive_filling(const Nucleus& nucleus, std::int32_t 
                                            std::span<const Orbit> skip = {});
 
 }  // namespace imsrg::basis
+
+#endif  // IMSRG_BASIS_NUCLEUS_H_

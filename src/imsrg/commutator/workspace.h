@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_COMMUTATOR_WORKSPACE_H_
+#define IMSRG_COMMUTATOR_WORKSPACE_H_
 
 /// @file
 /// `Workspace`: the per-model-space precomputed data and preallocated scratch buffers of the
@@ -66,3 +67,5 @@ class Workspace {
 };
 
 }  // namespace imsrg::commutator
+
+#endif  // IMSRG_COMMUTATOR_WORKSPACE_H_

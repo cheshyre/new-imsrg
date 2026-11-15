@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_BASE_ASSERT_H_
+#define IMSRG_BASE_ASSERT_H_
 /// @file
 /// Invariant checks (design/00 D16, AGENTS.md "Code conventions").
 ///
@@ -41,3 +42,5 @@ namespace imsrg::detail {
     (void)sizeof(!(cond));      \
   } while (false)
 #endif
+
+#endif  // IMSRG_BASE_ASSERT_H_

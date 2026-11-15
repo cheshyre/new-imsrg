@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_HF_DIIS_H_
+#define IMSRG_HF_DIIS_H_
 /// @file
 /// Internal: Pulay DIIS extrapolation of the Fock matrix for the Hartree-Fock iteration. Not part
 /// of the public API of the hf module. Host only.
@@ -52,3 +53,5 @@ class PulayDiis {
 };
 
 }  // namespace imsrg::hf::detail
+
+#endif  // IMSRG_HF_DIIS_H_

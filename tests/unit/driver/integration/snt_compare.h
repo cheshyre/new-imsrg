@@ -1,4 +1,5 @@
-#pragma once
+#ifndef TESTS_UNIT_DRIVER_INTEGRATION_SNT_COMPARE_H_
+#define TESTS_UNIT_DRIVER_INTEGRATION_SNT_COMPARE_H_
 /// @file
 /// Reader and comparison of tokyo-format `.snt` files (the format of imsrg++ `int.snt` and of
 /// `io::write_tokyo`): zero body from the "! Zero body term:" comment, the orbit table, one-body
@@ -169,3 +170,5 @@ inline SntComparison compare_snt(const SntData& a, const SntData& b, double thre
 }
 
 }  // namespace imsrg::it
+
+#endif  // TESTS_UNIT_DRIVER_INTEGRATION_SNT_COMPARE_H_

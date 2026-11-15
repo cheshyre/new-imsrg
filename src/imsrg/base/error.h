@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_BASE_ERROR_H_
+#define IMSRG_BASE_ERROR_H_
 /// @file
 /// Typed exceptions of the imsrg library (design/00 D16).
 ///
@@ -58,3 +59,5 @@ class NotImplementedError : public Error {
 };
 
 }  // namespace imsrg
+
+#endif  // IMSRG_BASE_ERROR_H_

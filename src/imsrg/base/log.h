@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_BASE_LOG_H_
+#define IMSRG_BASE_LOG_H_
 /// @file
 /// Minimal thread-safe logging (design/10 section 3.1). A `Logger` is an explicit object; the one
 /// process-wide instance `default_logger()` only configures output and never affects results.
@@ -120,3 +121,5 @@ void error(fmt::format_string<Args...> f, Args&&... args) {
 }
 
 }  // namespace imsrg::log
+
+#endif  // IMSRG_BASE_LOG_H_

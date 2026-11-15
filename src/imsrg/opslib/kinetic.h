@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_OPSLIB_KINETIC_H_
+#define IMSRG_OPSLIB_KINETIC_H_
 /// @file
 /// Kinetic energy in the harmonic-oscillator basis (imsrg++ `imsrg_util::KineticEnergy_Op`).
 
@@ -21,3 +22,5 @@ namespace imsrg::opslib {
 op::Operator kinetic_energy(const std::shared_ptr<const basis::ModelSpace>& ms);
 
 }  // namespace imsrg::opslib
+
+#endif  // IMSRG_OPSLIB_KINETIC_H_

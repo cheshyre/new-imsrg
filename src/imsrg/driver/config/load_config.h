@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_DRIVER_CONFIG_LOAD_CONFIG_H_
+#define IMSRG_DRIVER_CONFIG_LOAD_CONFIG_H_
 /// @file
 /// The configuration entry point (design/16 sections 1.3 and 6.1): merge the sources (TOML file
 /// or text, or legacy key=value tokens; then `--set` overrides) into one raw tree, resolve and
@@ -39,3 +40,5 @@ Expected<RunConfig, ConfigIssues> load_config(const ConfigSources& sources,
                                               const LoadOptions& options = {});
 
 }  // namespace imsrg::driver
+
+#endif  // IMSRG_DRIVER_CONFIG_LOAD_CONFIG_H_

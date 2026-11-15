@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_DRIVER_CONFIG_WRITER_H_
+#define IMSRG_DRIVER_CONFIG_WRITER_H_
 /// @file
 /// `RunConfig` -> TOML (`resolved_config.toml`, design/16 sections 1.3, 1.7 and 6.1).
 ///
@@ -26,3 +27,5 @@ std::string to_toml(const RunConfig& config, bool include_provenance = true);
 void write_resolved_config(const RunConfig& config, const std::filesystem::path& file);
 
 }  // namespace imsrg::driver
+
+#endif  // IMSRG_DRIVER_CONFIG_WRITER_H_

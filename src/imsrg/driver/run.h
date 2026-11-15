@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_DRIVER_RUN_H_
+#define IMSRG_DRIVER_RUN_H_
 /// @file
 /// The pipeline entry point of the `imsrg` executable and the Python bindings.
 
@@ -25,3 +26,5 @@ namespace imsrg::driver {
 void run(const RunConfig& config);
 
 }  // namespace imsrg::driver
+
+#endif  // IMSRG_DRIVER_RUN_H_

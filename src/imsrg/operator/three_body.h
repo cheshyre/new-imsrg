@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_OPERATOR_THREE_BODY_H_
+#define IMSRG_OPERATOR_THREE_BODY_H_
 /// @file
 /// `ThreeBody`: placeholder for the three-body part of an operator (design/00 D15).
 
@@ -13,3 +14,5 @@ namespace imsrg::op {
 class ThreeBody {};
 
 }  // namespace imsrg::op
+
+#endif  // IMSRG_OPERATOR_THREE_BODY_H_

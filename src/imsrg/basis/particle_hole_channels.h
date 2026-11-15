@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_BASIS_PARTICLE_HOLE_CHANNELS_H_
+#define IMSRG_BASIS_PARTICLE_HOLE_CHANNELS_H_
 /// @file
 /// Cross-coupled (particle-hole, Pandya) two-body channels (design/reference/01 sections 2.2-2.3,
 /// imsrg++ `TwoBodyChannel_CC`). Only the channel and ket structure lives here; the 6j-weighted
@@ -102,3 +103,5 @@ class ParticleHoleChannels {
 };
 
 }  // namespace imsrg::basis
+
+#endif  // IMSRG_BASIS_PARTICLE_HOLE_CHANNELS_H_

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_BASE_HALF_H_
+#define IMSRG_BASE_HALF_H_
 /// @file
 /// IEEE-754 binary16 ("half") <-> binary32 conversion on raw bit patterns, for compact storage of
 /// matrix elements. Usable in host and device code, constexpr, no exceptions.
@@ -63,3 +64,5 @@ IMSRG_INLINE_FUNCTION constexpr std::uint16_t float_to_half(float value) noexcep
 }
 
 }  // namespace imsrg
+
+#endif  // IMSRG_BASE_HALF_H_

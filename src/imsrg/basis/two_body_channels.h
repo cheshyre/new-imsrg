@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_BASIS_TWO_BODY_CHANNELS_H_
+#define IMSRG_BASIS_TWO_BODY_CHANNELS_H_
 /// @file
 /// Two-body kets, J-coupled two-body channels (J, parity, Tz) and their per-channel ket subsets
 /// (design/10 section 3.2, design/13 section 1, design/reference/01 sections 2.1-2.4).
@@ -238,3 +239,5 @@ class TwoBodyKetSubsets {
 };
 
 }  // namespace imsrg::basis
+
+#endif  // IMSRG_BASIS_TWO_BODY_CHANNELS_H_

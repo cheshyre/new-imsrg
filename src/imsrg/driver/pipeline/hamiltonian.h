@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_DRIVER_PIPELINE_HAMILTONIAN_H_
+#define IMSRG_DRIVER_PIPELINE_HAMILTONIAN_H_
 /// @file
 /// Pipeline stage 1 of `driver::run` (design/13 section 9, design/reference/03 section 1.2 steps
 /// 5-11): model space, bare Hamiltonian, Hartree-Fock and normal ordering; and the construction of
@@ -51,3 +52,5 @@ op::Operator prepare_operator(const OperatorRequest& request, const PreparedHami
                               const RunConfig& config);
 
 }  // namespace imsrg::driver::pipeline
+
+#endif  // IMSRG_DRIVER_PIPELINE_HAMILTONIAN_H_

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_COMMUTATOR_DETAIL_WORKSPACE_IMPL_H_
+#define IMSRG_COMMUTATOR_DETAIL_WORKSPACE_IMPL_H_
 
 /// @file
 /// Internal data of `commutator::Workspace` (no Kokkos): device tables, 6j table, one-body
@@ -76,3 +77,5 @@ int commutator_hermiticity_sign(const op::Operator& X, const op::Operator& Y);
 }  // namespace detail
 
 }  // namespace imsrg::commutator
+
+#endif  // IMSRG_COMMUTATOR_DETAIL_WORKSPACE_IMPL_H_

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_OPERATOR_NORMS_H_
+#define IMSRG_OPERATOR_NORMS_H_
 /// @file
 /// Operator norms with the imsrg++ conventions (design/00 D12, design/13 section 2,
 /// design/reference/01 section 3.4). They drive the Magnus step size, the Omega splitting and the
@@ -29,3 +30,5 @@ double three_body_norm(const Operator& op);
 double norm(const Operator& op);
 
 }  // namespace imsrg::op
+
+#endif  // IMSRG_OPERATOR_NORMS_H_

@@ -1,6 +1,7 @@
-#pragma once
+#ifndef IMSRG_EXEC_DETAIL_DEVICE_BUFFER_IMPL_H_
+#define IMSRG_EXEC_DETAIL_DEVICE_BUFFER_IMPL_H_
 /// @file
-/// Implementation of `DeviceBuffer<T>` (all member definitions), including Kokkos. For `.cpp`
+/// Implementation of `DeviceBuffer<T>` (all member definitions), including Kokkos. For `.cc`
 /// files in `src/imsrg/exec/` and `src/imsrg/*/kernels/` only (design/20 section 4). Including
 /// this header lets a kernel TU explicitly instantiate `DeviceBuffer<MyPod>`.
 
@@ -261,3 +262,5 @@ const T* DeviceBuffer<T>::device_data() const noexcept {
 }
 
 }  // namespace imsrg::exec
+
+#endif  // IMSRG_EXEC_DETAIL_DEVICE_BUFFER_IMPL_H_

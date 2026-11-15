@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_BASE_DEVICE_H_
+#define IMSRG_BASE_DEVICE_H_
 /// @file
 /// Device annotations usable in every public header, without including Kokkos
 /// (design/20-build-and-tooling.md section 4, design/12-compute-backend.md section 5).
@@ -19,3 +20,5 @@
 #endif
 
 #define IMSRG_INLINE_FUNCTION IMSRG_FUNCTION inline
+
+#endif  // IMSRG_BASE_DEVICE_H_

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_COMMUTATOR_DETAIL_PANDYA_H_
+#define IMSRG_COMMUTATOR_DETAIL_PANDYA_H_
 
 /// @file
 /// Precomputed data of the particle-hole term comm222_phss (design/12 section 4.2; imsrg++
@@ -101,3 +102,5 @@ struct PandyaData {
 PandyaData build_pandya_data(const basis::ModelSpace& ms);
 
 }  // namespace imsrg::commutator::detail
+
+#endif  // IMSRG_COMMUTATOR_DETAIL_PANDYA_H_

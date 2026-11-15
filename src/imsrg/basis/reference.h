@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_BASIS_REFERENCE_H_
+#define IMSRG_BASIS_REFERENCE_H_
 /// @file
 /// The reference state: occupations of the orbits of a single-particle basis (design/10
 /// section 3.2, design/13 section 1, design/reference/01 sections 1.4-1.5).
@@ -108,3 +109,5 @@ class Reference {
 };
 
 }  // namespace imsrg::basis
+
+#endif  // IMSRG_BASIS_REFERENCE_H_

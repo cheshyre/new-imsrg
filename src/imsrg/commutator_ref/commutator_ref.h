@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_COMMUTATOR_REF_COMMUTATOR_REF_H_
+#define IMSRG_COMMUTATOR_REF_COMMUTATOR_REF_H_
 
 /// @file
 /// Slow, transparent reference implementations of the scalar IMSRG(2) commutator terms
@@ -58,3 +59,5 @@ void comm222_pp_hh_221ss(const op::Operator& X, const op::Operator& Y, op::Opera
 op::Operator commutator(const op::Operator& X, const op::Operator& Y);
 
 }  // namespace imsrg::commutator_ref
+
+#endif  // IMSRG_COMMUTATOR_REF_COMMUTATOR_REF_H_

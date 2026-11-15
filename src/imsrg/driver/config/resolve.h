@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_DRIVER_CONFIG_RESOLVE_H_
+#define IMSRG_DRIVER_CONFIG_RESOLVE_H_
 /// @file
 /// Raw tree -> `RunConfig` (design/16 sections 1.3, 5 and 6.1): typed reading, defaults, derived
 /// values, then validation (rules V-xx), all issues accumulated.
@@ -42,3 +43,5 @@ ResolveResult resolve(const RawTree& tree, const ResolveOptions& options);
 ConfigIssues validate(const RunConfig& config, const RawTree& tree, const ResolveOptions& options);
 
 }  // namespace imsrg::driver
+
+#endif  // IMSRG_DRIVER_CONFIG_RESOLVE_H_

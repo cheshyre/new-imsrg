@@ -1,4 +1,5 @@
-#pragma once
+#ifndef TESTS_UNIT_BASIS_DEVICE_TABLES_KERNELS_H_
+#define TESTS_UNIT_BASIS_DEVICE_TABLES_KERNELS_H_
 // Test-only kernel entry points (Kokkos-free interface) that evaluate the device accessors of
 // basis/device_tables.h; the kernels are in device_tables_kernels.cc.
 #include <cstdint>
@@ -40,3 +41,5 @@ void eval_orbits(const OrbitTableView& ov, exec::DeviceBuffer<std::int32_t>& n,
                  exec::DeviceBuffer<double>& occ);
 
 }  // namespace imsrg::basis::test
+
+#endif  // TESTS_UNIT_BASIS_DEVICE_TABLES_KERNELS_H_

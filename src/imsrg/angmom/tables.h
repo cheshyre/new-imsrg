@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_ANGMOM_TABLES_H_
+#define IMSRG_ANGMOM_TABLES_H_
 /// @file
 /// Dense, immutable, device-copyable angular-momentum tables (design/12 section 4.4): Pandya 6j
 /// symbols, LS-jj 9j recoupling coefficients and Talmi-Moshinsky brackets.
@@ -223,3 +224,5 @@ class MoshinskyTable {
 };
 
 }  // namespace imsrg::angmom
+
+#endif  // IMSRG_ANGMOM_TABLES_H_

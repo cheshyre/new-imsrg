@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_COMMUTATOR_OPTIONS_H_
+#define IMSRG_COMMUTATOR_OPTIONS_H_
 
 /// @file
 /// Explicit options of the commutator module (design/00 D10, design/13 section 6): the term
@@ -98,3 +99,5 @@ struct CommutatorOptions {
 };
 
 }  // namespace imsrg::commutator
+
+#endif  // IMSRG_COMMUTATOR_OPTIONS_H_

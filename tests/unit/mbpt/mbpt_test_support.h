@@ -1,4 +1,5 @@
-#pragma once
+#ifndef TESTS_UNIT_MBPT_MBPT_TEST_SUPPORT_H_
+#define TESTS_UNIT_MBPT_MBPT_TEST_SUPPORT_H_
 /// Test-side assembly of the NAT-basis Hamiltonian. mbpt does not depend on hf, so the test
 /// drives the hf internals (design/13, M9-Q1): the HF result is modified to describe the NAT
 /// orbitals (C = C_ho2hf C_hf2nat, rho = reference density in the oscillator basis,
@@ -76,3 +77,5 @@ inline NatResult build_nat(op::Operator H, const op::No2bThreeBody* v3) {
 }
 
 }  // namespace imsrg::mbtest
+
+#endif  // TESTS_UNIT_MBPT_MBPT_TEST_SUPPORT_H_

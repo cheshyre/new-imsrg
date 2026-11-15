@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_BASIS_DEVICE_TABLES_H_
+#define IMSRG_BASIS_DEVICE_TABLES_H_
 /// @file
 /// Device-copyable index tables of the basis for kernels (design/12 sections 2 and 5): trivially
 /// copyable views with raw device pointers and `IMSRG_INLINE_FUNCTION` accessors, plus
@@ -161,3 +162,5 @@ class DeviceTables {
 };
 
 }  // namespace imsrg::basis
+
+#endif  // IMSRG_BASIS_DEVICE_TABLES_H_

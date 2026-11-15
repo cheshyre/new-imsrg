@@ -1,7 +1,8 @@
-#pragma once
+#ifndef IMSRG_EXEC_KOKKOS_BACKEND_H_
+#define IMSRG_EXEC_KOKKOS_BACKEND_H_
 /// @file
 /// The restricted Kokkos vocabulary for kernels (design/12 section 2). Includes Kokkos: only for
-/// `.cpp` files in `src/imsrg/exec/` and `src/imsrg/*/kernels/` (design/20 section 4); never
+/// `.cc` files in `src/imsrg/exec/` and `src/imsrg/*/kernels/` (design/20 section 4); never
 /// include it from a header that other modules include.
 ///
 /// Kernel rules (design/12 section 5): lambdas are `IMSRG_LAMBDA` and capture by value only
@@ -103,3 +104,5 @@ void team_for(const char* name, int league_size, int team_size, std::size_t scra
 inline void fence(const char* name) { DefaultExecSpace().fence(name); }
 
 }  // namespace imsrg::exec
+
+#endif  // IMSRG_EXEC_KOKKOS_BACKEND_H_

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_BASE_CONSTANTS_H_
+#define IMSRG_BASE_CONSTANTS_H_
 /// @file
 /// Physical and mathematical constants, copied literally from imsrg++ (`PhysicalConstants.hh`) so
 /// that numerical results can be reproduced bit for bit. Each constant cites its line in the
@@ -58,3 +59,5 @@ inline constexpr double pi = 3.14159265358979324;
 inline constexpr double sqrt_pi = 1.7724538509055160;
 
 }  // namespace imsrg::constants
+
+#endif  // IMSRG_BASE_CONSTANTS_H_

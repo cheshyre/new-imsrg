@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_DRIVER_CONFIG_EXPECTED_H_
+#define IMSRG_DRIVER_CONFIG_EXPECTED_H_
 /// @file
 /// A minimal `Expected<T, E>` (value or error), standing in for C++23 `std::expected`, which the
 /// C++20 toolchains of this project do not provide. Only the operations the driver needs exist.
@@ -85,3 +86,5 @@ class [[nodiscard]] Expected {
 };
 
 }  // namespace imsrg::driver
+
+#endif  // IMSRG_DRIVER_CONFIG_EXPECTED_H_

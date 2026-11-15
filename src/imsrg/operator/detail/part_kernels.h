@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_OPERATOR_DETAIL_PART_KERNELS_H_
+#define IMSRG_OPERATOR_DETAIL_PART_KERNELS_H_
 /// @file
 /// Internal (not a public header of the module): flat device kernels on the buffers of operator
 /// parts, defined in `kernels/part_kernels.cc` (the only translation unit that sees Kokkos).
@@ -20,3 +21,5 @@ void scale(double a, exec::DeviceBuffer<double>& x);
 double sum_of_squares(const exec::DeviceBuffer<double>& x, std::int64_t offset, std::int64_t count);
 
 }  // namespace imsrg::op::detail
+
+#endif  // IMSRG_OPERATOR_DETAIL_PART_KERNELS_H_

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_OPSLIB_CENTER_OF_MASS_H_
+#define IMSRG_OPSLIB_CENTER_OF_MASS_H_
 /// @file
 /// Center-of-mass operators in the harmonic-oscillator basis: T_cm, T_rel, R^2_cm and H_cm
 /// (imsrg++ `imsrg_util::TCM_Op`, `Trel_Op`, `R2CM_Op`, `HCM_Op`).
@@ -58,3 +59,5 @@ op::Operator h_cm(const std::shared_ptr<const basis::ModelSpace>& ms, int A,
                   std::optional<double> hbar_omega_trap = std::nullopt);
 
 }  // namespace imsrg::opslib
+
+#endif  // IMSRG_OPSLIB_CENTER_OF_MASS_H_

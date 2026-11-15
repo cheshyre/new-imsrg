@@ -1,4 +1,5 @@
-#pragma once
+#ifndef TESTS_UNIT_DRIVER_INTEGRATION_MINI_JSON_H_
+#define TESTS_UNIT_DRIVER_INTEGRATION_MINI_JSON_H_
 /// @file
 /// A minimal JSON reader for the integration tests (objects, arrays, strings, numbers, true,
 /// false, null). The driver's `results.json` is machine written with `%.17g` numbers, so no
@@ -178,3 +179,5 @@ class JsonParser {
 inline Json parse_json(const std::string& text) { return detail::JsonParser(text).parse(); }
 
 }  // namespace imsrg::it
+
+#endif  // TESTS_UNIT_DRIVER_INTEGRATION_MINI_JSON_H_

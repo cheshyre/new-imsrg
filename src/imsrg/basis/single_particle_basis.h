@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_BASIS_SINGLE_PARTICLE_BASIS_H_
+#define IMSRG_BASIS_SINGLE_PARTICLE_BASIS_H_
 /// @file
 /// The harmonic-oscillator single-particle basis: the orbit list in imsrg++ order and its
 /// truncations (design/10 section 3.2, design/13 section 1, design/reference/01 sections 1.2-1.3).
@@ -101,3 +102,5 @@ class SingleParticleBasis {
 };
 
 }  // namespace imsrg::basis
+
+#endif  // IMSRG_BASIS_SINGLE_PARTICLE_BASIS_H_

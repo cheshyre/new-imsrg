@@ -1,4 +1,5 @@
-#pragma once
+#ifndef TESTS_UNIT_HF_HF_TEST_SUPPORT_H_
+#define TESTS_UNIT_HF_HF_TEST_SUPPORT_H_
 // Shared helpers of the hf tests: a tiny JSON reader for the golden hf.json files, loading of
 // the Hamiltonian / NO2B inputs, and the comparison of an HFResult with the golden values.
 #include <algorithm>
@@ -196,3 +197,5 @@ inline op::No2bThreeBody load_v3(const fs::path& file, const op::No2bTruncation&
 }
 
 }  // namespace imsrg::hftest
+
+#endif  // TESTS_UNIT_HF_HF_TEST_SUPPORT_H_

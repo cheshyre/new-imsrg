@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_MBPT_ENERGIES_H_
+#define IMSRG_MBPT_ENERGIES_H_
 /// @file
 /// Second- and third-order many-body perturbation energies of a normal-ordered Hamiltonian
 /// expressed in the (HF) basis where the one-body part is diagonal (imsrg++
@@ -30,3 +31,5 @@ double mp2_energy(op::Operator& H);
 Mp3Energy mp3_energy(op::Operator& H);
 
 }  // namespace imsrg::mbpt
+
+#endif  // IMSRG_MBPT_ENERGIES_H_

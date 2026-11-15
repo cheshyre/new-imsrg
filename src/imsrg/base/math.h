@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_BASE_MATH_H_
+#define IMSRG_BASE_MATH_H_
 /// @file
 /// Small integer/combinatorial math helpers usable in host and device code (no exceptions, no
 /// allocation). Factorials use successive multiplication from 1.0, so results are bitwise
@@ -43,3 +44,5 @@ IMSRG_INLINE_FUNCTION constexpr double binomial(int n, int k) noexcept {
 inline double log_factorial(int n) { return std::lgamma(n + 1.0); }
 
 }  // namespace imsrg::math
+
+#endif  // IMSRG_BASE_MATH_H_

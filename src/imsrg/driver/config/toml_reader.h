@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_DRIVER_CONFIG_TOML_READER_H_
+#define IMSRG_DRIVER_CONFIG_TOML_READER_H_
 /// @file
 /// TOML -> raw tree (design/16 sections 2 and 6.1). toml++ is used only in toml_reader.cc.
 ///
@@ -30,3 +31,5 @@ ConfigIssues read_toml_string(std::string_view text, std::string_view source_nam
 ConfigIssues apply_set_override(std::string_view assignment, RawTree& tree);
 
 }  // namespace imsrg::driver
+
+#endif  // IMSRG_DRIVER_CONFIG_TOML_READER_H_

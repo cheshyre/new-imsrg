@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_BASIS_ORBIT_H_
+#define IMSRG_BASIS_ORBIT_H_
 /// @file
 /// Single-particle orbit quantum numbers and the imsrg++ orbit-ordering formula (design/00 D11,
 /// design/reference/01 sections 1.1-1.2).
@@ -93,3 +94,5 @@ std::string orbit_label(const Orbit& o);
 Orbit parse_orbit_label(std::string_view label);
 
 }  // namespace imsrg::basis
+
+#endif  // IMSRG_BASIS_ORBIT_H_

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_OPERATOR_ARITHMETIC_H_
+#define IMSRG_OPERATOR_ARITHMETIC_H_
 /// @file
 /// Linear algebra on operators: axpy, scaling and the arithmetic operators (design/10 section
 /// 3.3). Whole parts are combined with flat device kernels (the blocks of two operators on the
@@ -47,3 +48,5 @@ Operator& operator+=(Operator& x, double c);
 Operator& operator-=(Operator& x, double c);
 
 }  // namespace imsrg::op
+
+#endif  // IMSRG_OPERATOR_ARITHMETIC_H_

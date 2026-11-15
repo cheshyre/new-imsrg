@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_FLOW_GENERATOR_H_
+#define IMSRG_FLOW_GENERATOR_H_
 /// @file
 /// IMSRG generators eta(H) (design/13 section 7, design/reference/03 section 4, imsrg++
 /// `Generator.cc`). A generator is an enum `GeneratorKind` plus options, evaluated by a free
@@ -140,3 +141,5 @@ void compute_generator(const op::Operator& H, op::Operator& eta, const Generator
 op::Operator compute_generator(const op::Operator& H, const GeneratorOptions& opts);
 
 }  // namespace imsrg::flow
+
+#endif  // IMSRG_FLOW_GENERATOR_H_

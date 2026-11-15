@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_LINALG_MATRIX_VIEW_H_
+#define IMSRG_LINALG_MATRIX_VIEW_H_
 /// @file
 /// Column-major matrix views and an owning host matrix. Column-major (element (i, j) at
 /// `data[i + j * ld]`) matches BLAS/LAPACK and imsrg++ (Armadillo), so blocks can be handed to
@@ -84,3 +85,5 @@ extern template class Matrix<double>;
 extern template class Matrix<float>;
 
 }  // namespace imsrg::linalg
+
+#endif  // IMSRG_LINALG_MATRIX_VIEW_H_

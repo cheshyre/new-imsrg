@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_DRIVER_LEGACY_LEGACY_PARAMETERS_H_
+#define IMSRG_DRIVER_LEGACY_LEGACY_PARAMETERS_H_
 /// @file
 /// The legacy layer (design/16 section 3): imsrg++'s `key=value` command line (the 85 keys of
 /// `Parameters.hh`) translated into the raw tree of the new schema, with the shorthand methods,
@@ -60,3 +61,5 @@ LegacyTranslation translate_legacy(std::span<const std::string> args);
 std::string legacy_keys_text();
 
 }  // namespace imsrg::driver
+
+#endif  // IMSRG_DRIVER_LEGACY_LEGACY_PARAMETERS_H_

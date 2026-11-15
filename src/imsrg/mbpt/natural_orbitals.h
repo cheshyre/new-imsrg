@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_MBPT_NATURAL_ORBITALS_H_
+#define IMSRG_MBPT_NATURAL_ORBITALS_H_
 /// @file
 /// MBPT(2) one-body density matrix and natural orbitals (imsrg++ `HFMBPT::GetNaturalOrbitals`,
 /// HFMBPT.cc:421-777). All matrices are indexed by orbit index (row = old orbit, column = new
@@ -47,3 +48,5 @@ linalg::Matrix<double> matmul(const linalg::Matrix<double>& a, const linalg::Mat
 op::Operator to_nat_basis(op::Operator& H, const linalg::Matrix<double>& c_hf2nat);
 
 }  // namespace imsrg::mbpt
+
+#endif  // IMSRG_MBPT_NATURAL_ORBITALS_H_

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_BASIS_PARTITION_H_
+#define IMSRG_BASIS_PARTITION_H_
 /// @file
 /// Partition of the orbits into core, valence and q-space (imsrg++ `cvq`; design/10 section 3.2,
 /// design/reference/01 sections 1.4-1.5).
@@ -89,3 +90,5 @@ class Partition {
 };
 
 }  // namespace imsrg::basis
+
+#endif  // IMSRG_BASIS_PARTITION_H_

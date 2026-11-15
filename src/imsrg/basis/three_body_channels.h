@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_BASIS_THREE_BODY_CHANNELS_H_
+#define IMSRG_BASIS_THREE_BODY_CHANNELS_H_
 /// @file
 /// Three-body kets and channels (design/reference/01 section 3, imsrg++ `ModelSpace::Setup3bKets`
 /// and `ThreeBodyChannel`). Only the structure lives here; the storage of three-body matrix
@@ -135,3 +136,5 @@ class ThreeBodyChannels {
 };
 
 }  // namespace imsrg::basis
+
+#endif  // IMSRG_BASIS_THREE_BODY_CHANNELS_H_

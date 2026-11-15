@@ -1,4 +1,5 @@
-#pragma once
+#ifndef TESTS_UNIT_EXEC_KERNELS_IMPL_H_
+#define TESTS_UNIT_EXEC_KERNELS_IMPL_H_
 // Test-local kernel entry points (Kokkos-free interface); the kernels are in kernels_impl.cc.
 #include <cstdint>
 
@@ -28,3 +29,5 @@ void row_sums_team(const DeviceBuffer<std::int64_t>& m, std::int64_t n0, std::in
 void fill_pods(DeviceBuffer<Pod>& p);
 
 }  // namespace imsrg::exec::test
+
+#endif  // TESTS_UNIT_EXEC_KERNELS_IMPL_H_

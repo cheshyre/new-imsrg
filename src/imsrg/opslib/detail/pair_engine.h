@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_OPSLIB_DETAIL_PAIR_ENGINE_H_
+#define IMSRG_OPSLIB_DETAIL_PAIR_ENGINE_H_
 /// @file
 /// Internal helpers of the opslib module (not public API): the two-body matrix-element engine of
 /// the operators p1.p2 and r1.r2 (imsrg++ `Calculate_p1p2` / `Calculate_r1r2`) and the host fills
@@ -119,3 +120,5 @@ void add_two_body(op::Operator& op, double threshold, Value value) {
 }
 
 }  // namespace imsrg::opslib::detail
+
+#endif  // IMSRG_OPSLIB_DETAIL_PAIR_ENGINE_H_

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_COMM_ENVIRONMENT_H_
+#define IMSRG_COMM_ENVIRONMENT_H_
 /// @file
 /// `imsrg::comm::Environment`: RAII owner of the MPI runtime (design/10 section 4).
 ///
@@ -43,3 +44,5 @@ class Environment {
 };
 
 }  // namespace imsrg::comm
+
+#endif  // IMSRG_COMM_ENVIRONMENT_H_

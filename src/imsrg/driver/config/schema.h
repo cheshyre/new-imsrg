@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_DRIVER_CONFIG_SCHEMA_H_
+#define IMSRG_DRIVER_CONFIG_SCHEMA_H_
 /// @file
 /// The typed run configuration of the `imsrg` executable (design/16-config-and-cli.md section 2):
 /// the `RunConfig` tree, its enums with their canonical TOML spellings and phases, and the
@@ -485,3 +486,5 @@ struct RunConfig {
 };
 
 }  // namespace imsrg::driver
+
+#endif  // IMSRG_DRIVER_CONFIG_SCHEMA_H_

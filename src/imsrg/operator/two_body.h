@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_OPERATOR_TWO_BODY_H_
+#define IMSRG_OPERATOR_TWO_BODY_H_
 /// @file
 /// `TwoBody`: the J-coupled two-body part of an operator on a `linalg::BlockSparseMatrix`
 /// (design/10 section 3.3, design/13 section 2, design/reference/01 sections 2.5 and 4).
@@ -111,3 +112,5 @@ class TwoBody {
 };
 
 }  // namespace imsrg::op
+
+#endif  // IMSRG_OPERATOR_TWO_BODY_H_

@@ -1,7 +1,8 @@
-#pragma once
+#ifndef IMSRG_LINALG_DETAIL_BLAS_H_
+#define IMSRG_LINALG_DETAIL_BLAS_H_
 /// @file
 /// Private BLAS/LAPACK shim: one thin wrapper per routine, column-major, LP64 (32-bit int)
-/// interface. Included only by linalg `.cpp` files. With Apple Accelerate (`IMSRG_BLAS_ACCELERATE`)
+/// interface. Included only by linalg `.cc` files. With Apple Accelerate (`IMSRG_BLAS_ACCELERATE`)
 /// the CBLAS interface and the new LAPACK headers (`ACCELERATE_NEW_LAPACK`) are used; otherwise
 /// the Fortran symbols are declared directly (OpenBLAS, MKL, reference LAPACK).
 
@@ -98,3 +99,5 @@ inline int gesv(int n, int nrhs, double* a, int lda, double* b, int ldb) {
 }
 
 }  // namespace imsrg::linalg::detail
+
+#endif  // IMSRG_LINALG_DETAIL_BLAS_H_

@@ -1,5 +1,6 @@
 // Reader for the Darmstadt (me2j) two-body matrix element format.
-#pragma once
+#ifndef IMSRG_IO_ME2J_H_
+#define IMSRG_IO_ME2J_H_
 
 #include <cstdint>
 #include <filesystem>
@@ -68,3 +69,5 @@ op::Operator read_me2j(const std::filesystem::path& path, const Me2jReadOptions&
                        Me2jReadReport* report = nullptr);
 
 }  // namespace imsrg::io
+
+#endif  // IMSRG_IO_ME2J_H_

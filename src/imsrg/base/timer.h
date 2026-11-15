@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_BASE_TIMER_H_
+#define IMSRG_BASE_TIMER_H_
 /// @file
 /// Wall-clock timing of named regions (design/10 section 3.1). `TimerRegistry` is an explicit,
 /// thread-safe object (no globals); `ScopedTimer` measures one region with
@@ -84,3 +85,5 @@ class ScopedTimer {
 /// Declares a uniquely named `ScopedTimer` for the rest of the enclosing scope.
 #define IMSRG_SCOPED_TIMER(registry, name) \
   ::imsrg::ScopedTimer IMSRG_DETAIL_CONCAT(imsrg_scoped_timer_, __LINE__)((registry), (name))
+
+#endif  // IMSRG_BASE_TIMER_H_

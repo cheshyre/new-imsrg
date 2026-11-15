@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_COMMUTATOR_DETAIL_DEVICE_VIEWS_H_
+#define IMSRG_COMMUTATOR_DETAIL_DEVICE_VIEWS_H_
 
 /// @file
 /// Trivially copyable, Kokkos-free views of the data the commutator kernels read (design/12
@@ -98,3 +99,5 @@ IMSRG_INLINE_FUNCTION int find_block(const std::int64_t* offsets, int num_blocks
 }
 
 }  // namespace imsrg::commutator::detail
+
+#endif  // IMSRG_COMMUTATOR_DETAIL_DEVICE_VIEWS_H_

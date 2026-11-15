@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_OPERATOR_ONE_BODY_H_
+#define IMSRG_OPERATOR_ONE_BODY_H_
 /// @file
 /// `OneBody`: the dense one-body part O_ab of an operator (design/10 section 3.3).
 #include <cstdint>
@@ -75,3 +76,5 @@ class OneBody {
 };
 
 }  // namespace imsrg::op
+
+#endif  // IMSRG_OPERATOR_ONE_BODY_H_

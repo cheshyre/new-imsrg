@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_LINALG_BLAS_H_
+#define IMSRG_LINALG_BLAS_H_
 /// @file
 /// Dense linear algebra on HOST memory (CPU backends): gemm, grouped gemm, symmetric eigensolver,
 /// linear solve. All matrices are column-major (see matrix_view.h). GPU backends will route the
@@ -69,3 +70,5 @@ EighResult eigh(MatrixView<const double> A);
 void solve(MatrixView<const double> A, MatrixView<double> B);
 
 }  // namespace imsrg::linalg
+
+#endif  // IMSRG_LINALG_BLAS_H_

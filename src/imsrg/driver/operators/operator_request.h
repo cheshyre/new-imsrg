@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_DRIVER_OPERATORS_OPERATOR_REQUEST_H_
+#define IMSRG_DRIVER_OPERATORS_OPERATOR_REQUEST_H_
 /// @file
 /// Operator requests: the table-driven operator-name grammar and catalog of design/16 section 4,
 /// which replaces imsrg++'s `OperatorFromString` if/else chain.
@@ -144,3 +145,5 @@ Expected<std::vector<OperatorRequest>, ConfigIssues> parse_operator_spec(
 std::string operator_catalog_text();
 
 }  // namespace imsrg::driver
+
+#endif  // IMSRG_DRIVER_OPERATORS_OPERATOR_REQUEST_H_

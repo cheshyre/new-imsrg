@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_OPERATOR_OPERATOR_H_
+#define IMSRG_OPERATOR_OPERATOR_H_
 /// @file
 /// `Operator`: a value-semantic many-body operator built by composition (design/00 D8,
 /// design/10 section 3.3). Arithmetic, norms, normal ordering etc. are free functions in the
@@ -99,3 +100,5 @@ class Operator {
 bool same_model_space(const Operator& a, const Operator& b) noexcept;
 
 }  // namespace imsrg::op
+
+#endif  // IMSRG_OPERATOR_OPERATOR_H_

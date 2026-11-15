@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_DRIVER_CONFIG_CONFIG_ISSUE_H_
+#define IMSRG_DRIVER_CONFIG_CONFIG_ISSUE_H_
 /// @file
 /// Configuration diagnostics (design/16 sections 1.4 and 6.2): where a value came from
 /// (`SourceRef`), one error or warning (`ConfigIssue`), and the did-you-mean helper.
@@ -99,3 +100,5 @@ std::optional<std::string> did_you_mean(std::string_view word,
                                         const std::vector<std::string>& candidates);
 
 }  // namespace imsrg::driver
+
+#endif  // IMSRG_DRIVER_CONFIG_CONFIG_ISSUE_H_

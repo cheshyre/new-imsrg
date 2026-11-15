@@ -1,4 +1,5 @@
-#pragma once
+#ifndef TESTS_UNIT_DRIVER_INTEGRATION_RUN_SUPPORT_H_
+#define TESTS_UNIT_DRIVER_INTEGRATION_RUN_SUPPORT_H_
 /// @file
 /// Helpers shared by the driver integration tests: temporary output directories, the flow-CSV
 /// reader, and `execute()`, which loads a config, runs the pipeline and collects the
@@ -161,3 +162,5 @@ inline std::string toml_text(const fs::path& dir, const std::string& nucleus,
 }
 
 }  // namespace imsrg::it
+
+#endif  // TESTS_UNIT_DRIVER_INTEGRATION_RUN_SUPPORT_H_

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_EXEC_DEVICE_BUFFER_H_
+#define IMSRG_EXEC_DEVICE_BUFFER_H_
 /// @file
 /// `DeviceBuffer<T>`: an owning, resizable array of trivially copyable `T` in the default memory
 /// space of the compute backend (host memory for Serial/OpenMP, device memory for CUDA/HIP), with
@@ -130,3 +131,5 @@ extern template class DeviceBuffer<std::uint16_t>;
 extern template class DeviceBuffer<std::uint8_t>;
 
 }  // namespace imsrg::exec
+
+#endif  // IMSRG_EXEC_DEVICE_BUFFER_H_

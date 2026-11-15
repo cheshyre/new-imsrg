@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_COMMUTATOR_COMMUTATOR_H_
+#define IMSRG_COMMUTATOR_COMMUTATOR_H_
 
 /// @file
 /// Scalar IMSRG(2) commutators Z = [X, Y] (design/13 section 6, design/reference/02 sections 2-4)
@@ -108,3 +109,5 @@ void comm222_pp_hh_221ss(const op::Operator& X, const op::Operator& Y, op::Opera
 }  // namespace terms
 
 }  // namespace imsrg::commutator
+
+#endif  // IMSRG_COMMUTATOR_COMMUTATOR_H_

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_BASIS_MODEL_SPACE_H_
+#define IMSRG_BASIS_MODEL_SPACE_H_
 /// @file
 /// The ModelSpace bundle: basis, reference, partition and the channel structures built from them
 /// (design/10 section 3.2).
@@ -100,3 +101,5 @@ class ModelSpace {
 };
 
 }  // namespace imsrg::basis
+
+#endif  // IMSRG_BASIS_MODEL_SPACE_H_

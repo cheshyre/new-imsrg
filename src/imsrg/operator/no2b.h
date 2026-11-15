@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_OPERATOR_NO2B_H_
+#define IMSRG_OPERATOR_NO2B_H_
 /// @file
 /// `No2bThreeBody`: the input container for normal-ordered-two-body (NO2B) three-nucleon matrix
 /// elements in isospin coupling (design/00 D15, design/10 section 2: input 3N containers are data
@@ -135,3 +136,5 @@ class No2bThreeBody {
 };
 
 }  // namespace imsrg::op
+
+#endif  // IMSRG_OPERATOR_NO2B_H_

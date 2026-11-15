@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_BASE_TYPES_H_
+#define IMSRG_BASE_TYPES_H_
 /// @file
 /// Strong types for indices and quantum numbers (design/00 D9, design/10 section 3.1).
 ///
@@ -214,3 +215,5 @@ struct std::hash<imsrg::StrongIndex<Tag, Rep>> {
     return std::hash<Rep>{}(i.value());
   }
 };
+
+#endif  // IMSRG_BASE_TYPES_H_

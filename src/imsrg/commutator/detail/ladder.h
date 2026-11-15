@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_COMMUTATOR_DETAIL_LADDER_H_
+#define IMSRG_COMMUTATOR_DETAIL_LADDER_H_
 
 /// @file
 /// Precomputed data of the particle-particle / hole-hole ladder terms (comm222_pp_hhss, comm221ss
@@ -57,3 +58,5 @@ struct LadderData {
 LadderData build_ladder_data(const basis::ModelSpace& ms);
 
 }  // namespace imsrg::commutator::detail
+
+#endif  // IMSRG_COMMUTATOR_DETAIL_LADDER_H_

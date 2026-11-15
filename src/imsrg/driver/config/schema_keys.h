@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_DRIVER_CONFIG_SCHEMA_KEYS_H_
+#define IMSRG_DRIVER_CONFIG_SCHEMA_KEYS_H_
 /// @file
 /// The single schema table (design/16 section 6.1): every TOML key of `RunConfig`, once, with its
 /// path, doc, default text, requiredness and phase, bound to its `RunConfig` field.
@@ -252,3 +253,5 @@ std::span<const std::string_view> schema_tables();
 std::vector<std::string_view> schema_children(std::string_view table);
 
 }  // namespace imsrg::driver
+
+#endif  // IMSRG_DRIVER_CONFIG_SCHEMA_KEYS_H_

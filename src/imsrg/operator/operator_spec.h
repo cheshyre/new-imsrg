@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_OPERATOR_OPERATOR_SPEC_H_
+#define IMSRG_OPERATOR_OPERATOR_SPEC_H_
 /// @file
 /// `OperatorSpec`: rank and symmetry description of an operator (design/10 section 3.3).
 ///
@@ -83,3 +84,5 @@ Hermiticity hermiticity_from_code(char c);
 void validate(const OperatorSpec& spec);
 
 }  // namespace imsrg::op
+
+#endif  // IMSRG_OPERATOR_OPERATOR_SPEC_H_

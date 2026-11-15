@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_DRIVER_CONFIG_RAW_TREE_H_
+#define IMSRG_DRIVER_CONFIG_RAW_TREE_H_
 /// @file
 /// The raw configuration tree (design/16 section 1.3): what the TOML reader, the legacy translator
 /// and `--set` produce, before type conversion, defaults and validation (`resolve`).
@@ -73,3 +74,5 @@ class RawTree {
 };
 
 }  // namespace imsrg::driver
+
+#endif  // IMSRG_DRIVER_CONFIG_RAW_TREE_H_

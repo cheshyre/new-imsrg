@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_HF_MONOPOLE_H_
+#define IMSRG_HF_MONOPOLE_H_
 /// @file
 /// Internal: the two- and three-body monopole interactions that turn a density matrix into the
 /// mean-field one-body potentials of Hartree-Fock (imsrg++ `HartreeFock::BuildMonopoleV`,
@@ -79,3 +80,5 @@ class Monopole3B {
 };
 
 }  // namespace imsrg::hf::detail
+
+#endif  // IMSRG_HF_MONOPOLE_H_

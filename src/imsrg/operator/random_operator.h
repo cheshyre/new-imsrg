@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_OPERATOR_RANDOM_OPERATOR_H_
+#define IMSRG_OPERATOR_RANDOM_OPERATOR_H_
 /// @file
 /// Random operators with an explicit seed, for property tests and for golden data exchanged
 /// with imsrg-devel through OperatorDump (design/30 section 1). imsrg++ uses a static incrementing
@@ -41,3 +42,5 @@ Operator random_operator(std::shared_ptr<const basis::ModelSpace> ms, const Oper
                          const RandomOperatorOptions& options = {});
 
 }  // namespace imsrg::op
+
+#endif  // IMSRG_OPERATOR_RANDOM_OPERATOR_H_

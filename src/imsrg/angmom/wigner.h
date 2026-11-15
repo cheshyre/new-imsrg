@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_ANGMOM_WIGNER_H_
+#define IMSRG_ANGMOM_WIGNER_H_
 /// @file
 /// Wigner 3j, 6j and 9j symbols and Clebsch-Gordan coefficients (design/10 section 2, layer 1).
 ///
@@ -58,3 +59,5 @@ double norm_9j(TwoJ j11, TwoJ j12, TwoJ j13, TwoJ j21, TwoJ j22, TwoJ j23, TwoJ 
                TwoJ j33) noexcept;
 
 }  // namespace imsrg::angmom
+
+#endif  // IMSRG_ANGMOM_WIGNER_H_

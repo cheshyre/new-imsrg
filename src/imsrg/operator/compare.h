@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_OPERATOR_COMPARE_H_
+#define IMSRG_OPERATOR_COMPARE_H_
 /// @file
 /// Element-wise comparison of operators, for tests and golden comparisons (design/30 section 2:
 /// tolerances of the form max|dZ| <= tol * max(1, max|Z|)).
@@ -25,3 +26,5 @@ PartMaxima max_abs(const Operator& op);
 PartMaxima max_abs_difference(const Operator& a, const Operator& b);
 
 }  // namespace imsrg::op
+
+#endif  // IMSRG_OPERATOR_COMPARE_H_

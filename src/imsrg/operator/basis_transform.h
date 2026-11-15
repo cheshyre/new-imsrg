@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_OPERATOR_BASIS_TRANSFORM_H_
+#define IMSRG_OPERATOR_BASIS_TRANSFORM_H_
 /// @file
 /// Unitary single-particle basis transformations of operators (e.g. HO -> HF basis), design/10
 /// section 3.3, imsrg++ `HartreeFock::TransformToHFBasis` (HartreeFock.cc:914-1000).
@@ -32,3 +33,5 @@ Operator transform_basis(const Operator& op, linalg::MatrixView<const double> C)
 Operator with_model_space(const Operator& op, std::shared_ptr<const basis::ModelSpace> ms);
 
 }  // namespace imsrg::op
+
+#endif  // IMSRG_OPERATOR_BASIS_TRANSFORM_H_

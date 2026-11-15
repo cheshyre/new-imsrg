@@ -1,5 +1,6 @@
 // Writers of valence-space interaction files: KSHELL/tokyo (.snt) and NuShellX (.int, .sp).
-#pragma once
+#ifndef IMSRG_IO_VALENCE_WRITERS_H_
+#define IMSRG_IO_VALENCE_WRITERS_H_
 
 #include <cstdint>
 #include <filesystem>
@@ -98,3 +99,5 @@ void write_nushellx_sps(const std::filesystem::path& path, const op::Operator& o
                         const NushellxWriteOptions& options = {});
 
 }  // namespace imsrg::io
+
+#endif  // IMSRG_IO_VALENCE_WRITERS_H_

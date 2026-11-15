@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_COMM_COMMUNICATOR_H_
+#define IMSRG_COMM_COMMUNICATOR_H_
 /// @file
 /// `imsrg::comm::Communicator`: the MPI facade (design/10 sections 2 and 4). A communicator is
 /// always passed explicitly; nothing in imsrg uses MPI_COMM_WORLD implicitly. This header does not
@@ -130,3 +131,5 @@ class Communicator {
 };
 
 }  // namespace imsrg::comm
+
+#endif  // IMSRG_COMM_COMMUNICATOR_H_

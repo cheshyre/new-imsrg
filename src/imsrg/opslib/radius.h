@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_OPSLIB_RADIUS_H_
+#define IMSRG_OPSLIB_RADIUS_H_
 /// @file
 /// Intrinsic point-nucleon radius operators in the harmonic-oscillator basis (imsrg++
 /// `imsrg_util::Rp2_corrected_Op`, `Rn2_corrected_Op`, `Rm2_corrected_Op`, `R2_1body_Op`,
@@ -69,3 +70,5 @@ op::Operator rn2(const std::shared_ptr<const basis::ModelSpace>& ms, int A, int 
 op::Operator rm2(const std::shared_ptr<const basis::ModelSpace>& ms, int A);
 
 }  // namespace imsrg::opslib
+
+#endif  // IMSRG_OPSLIB_RADIUS_H_

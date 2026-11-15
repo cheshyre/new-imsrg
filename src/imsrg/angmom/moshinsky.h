@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMSRG_ANGMOM_MOSHINSKY_H_
+#define IMSRG_ANGMOM_MOSHINSKY_H_
 /// @file
 /// Talmi-Moshinsky brackets and Talmi coefficients for harmonic-oscillator (HO) states
 /// (design/10 section 2, layer 1; replaces imsrg++ `AngMom::Moshinsky`, `AngMom::TalmiB` and
@@ -53,3 +54,5 @@ double talmi_b(HoNL a, HoNL b, int p) noexcept;
 double talmi_integral(int p, double k) noexcept;
 
 }  // namespace imsrg::angmom
+
+#endif  // IMSRG_ANGMOM_MOSHINSKY_H_
