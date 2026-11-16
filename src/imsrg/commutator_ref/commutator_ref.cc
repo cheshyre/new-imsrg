@@ -334,10 +334,10 @@ std::size_t PandyaIndex(int n, int Jp, int p, int q, int r, int s) {
 ///   F[Jp][p][q][r][s] = - sum_Jpp (2 Jpp + 1) {j_p j_q Jp; j_r j_s Jpp}
 ///                       <p s; Jpp| V |r q; Jpp>   (unnormalized),
 /// so xbar_ilab = F[Jp][i][l][a][b] and xbar_abkj = F[Jp][a][b][k][j].
-std::vector<double> BuildPandyaTable(const Operator& O, int n, int Jbig) {
-  std::vector<double> F(static_cast<std::size_t>(Jbig + 1) * PandyaStride(n),
+std::vector<double> BuildPandyaTable(const Operator& O, int n, int J_big) {
+  std::vector<double> F(static_cast<std::size_t>(J_big + 1) * PandyaStride(n),
                         0.0);
-  for (int Jp = 0; Jp <= Jbig; ++Jp) {
+  for (int Jp = 0; Jp <= J_big; ++Jp) {
     for (int p = 0; p < n; ++p) {
       for (int q = 0; q < n; ++q) {
         for (int r = 0; r < n; ++r) {
@@ -369,10 +369,10 @@ void Comm222Phss(const Operator& X, const Operator& Y, Operator& Z) {
   if (!X.two_body().allocated() || !Y.two_body().allocated()) return;
   const int n = X.model_space().num_orbits();
   const auto occ = OccupationsOf(X);
-  const int Jbig = X.model_space().basis().max_two_body_J();
+  const int J_big = X.model_space().basis().max_two_body_J();
 
-  const std::vector<double> FX = BuildPandyaTable(X, n, Jbig);
-  const std::vector<double> FY = BuildPandyaTable(Y, n, Jbig);
+  const std::vector<double> FX = BuildPandyaTable(X, n, J_big);
+  const std::vector<double> FY = BuildPandyaTable(Y, n, J_big);
 
   AddToEveryTwoBodyElement(Z, [&](int J, int i, int j, int k, int l) {
     const int ji = J2Of(X, i);
