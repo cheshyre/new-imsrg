@@ -49,6 +49,18 @@ imsrg_add_test(NAME commutator_n7_batch_loop
   LABELS unit
   NO_GTEST_MAIN)
 
+# The row-tiled comm133ss (pair-third batch path) against its element-wise
+# reference, the public term's dispatch, and partition invariance with masked
+# operands.
+imsrg_add_test(NAME commutator_n7_133_batch
+  SOURCES test_n7_133_batch.cc ${_imsrg_exec_main} ${_imsrg_comm_support}
+          "${PROJECT_SOURCE_DIR}/tests/support/three_body_test_support.cc"
+          "${PROJECT_SOURCE_DIR}/tests/support/row_mask.cc"
+          "${PROJECT_SOURCE_DIR}/tests/support/n7_partition_support.cc"
+  DEPS commutator operator
+  LABELS unit
+  NO_GTEST_MAIN)
+
 # The IMSRG(3)-N7 terms (design/14 section 4 item 2) against the m-scheme brute
 # force (commutator_ref::mscheme, emax 1) and the imsrg-devel goldens of
 # tests/golden/n7 (emax 2). One target per group of terms.
