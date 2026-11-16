@@ -184,3 +184,13 @@ with the sd-shell diverges in IMSRG(2), see IT-8). Stage 1 uses the atan generat
 file (`flow.dat`) holds both stages (`istep` restarts at 0). `flow`: E0 = -25.167373; only `result.json`
 and `int.snt` are kept (the flow file has 1078 lines of right-hand-side evaluations and is not
 compared: imsrg++ restarts s at 0 in stage 2, M8-Q40). `int.snt` is the valence-space interaction.
+
+**IT-15 `_smax10` (D47, 2026-11-16):** the same He4 emax 2 p-shell case with `smax=10`, so that stage 1 stops at
+smax and stage 2 integrates [s1, s1 + smax] = [10, 20] for every method (the D35 patch has `smax += s` in
+`imsrg++.cc`; the pristine code leaves the `flow_RK4` stage 2 empty and doubles smax only for Magnus; the
+adaptive `flow` method restarts at s = 0 and integrates a copy of the solver, so its flow file ends at s = 10 and
+only `result.json` and `int.snt` are kept). `flow_RK4`: 20 + 20 steps, E0 = -25.171401444; Magnus: 22 + 82 steps,
+E0 = -25.169486339 (flow file kept, `s` continues to 20); `flow`: E0 = -25.167136457. Regenerate with
+`bash tools/reference/gen_golden_e2e.sh IT-15/He4_emax2_pshell_rk4_smax10 IT-15/He4_emax2_pshell_flow_smax10
+IT-15/He4_emax2_pshell_magnus_smax10`. The existing IT-15 and IT-14 goldens were regenerated with the new patch
+and are unchanged (stage 2 converges before either range ends).

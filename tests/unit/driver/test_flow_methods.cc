@@ -283,18 +283,26 @@ TEST(FlowMethods, O16Emax3AdaptiveDriver) {
 // step counts and the flow file (s continues across the stages). imsrg++'s
 // adaptive `flow` restarts s at 0 in stage 2 (M8-Q40), so only its final
 // quantities are compared. Deviations are printed.
-void TwoStage(const std::string& method, const char* gdir, const char* tag) {
+//
+// The `_smax10` cases (D47) run with smax = 10 so that stage 1 stops at smax;
+// stage 2 then integrates [s1, s1 + smax] for every method (final s = 20 for
+// Magnus and `flow_rk4`; imsrg++ leaves a `flow_rk4` stage 2 empty and doubles
+// smax for Magnus only, the patched reference does the same as we do). Magnus
+// and RK4 flow files are compared line by line.
+void TwoStage(const std::string& method, const char* gdir, const char* tag,
+              const std::string& step_toml = "") {
   if (!std::filesystem::exists(DataFile(TwoBodyName())))
     GTEST_SKIP() << "missing 2N input file";
-  const bool rk4 = method == "flow_rk4";
-  const auto dir = FreshDir("flow_two_stage_" + method);
+  const bool compare_flow = method != "flow";
+  const auto dir = FreshDir("flow_two_stage_" + method +
+                            (step_toml.empty() ? "" : "_smax10"));
   std::ostringstream t;
   t << "[basis]\nemax = 2\nhw = 16.0\n\n[reference]\nnucleus = \"He4\"\n\n"
     << "[interaction.two_body]\nfile = \"" << DataFile(TwoBodyName()).string()
     << "\"\ne1max = 14\ne2max = 28\nlmax = 14\n\n"
     << "[valence]\nspace = \"p-shell\"\n\n"
     << "[imsrg]\nmethod = \"" << method << "\"\n\n"
-    << "[output]\ndirectory = \"" << dir.string() << "\"\n";
+    << step_toml << "[output]\ndirectory = \"" << dir.string() << "\"\n";
   driver::ConfigSources src;
   src.config_text = t.str();
   const RunResult r = Execute(src, dir);
@@ -304,13 +312,17 @@ void TwoStage(const std::string& method, const char* gdir, const char* tag) {
   const auto& stages = r.results["imsrg"]["stages"];
   ASSERT_EQ(stages.items.size(), 2u);
   EXPECT_EQ(stages.items[1]["generator"].text, "shell_model_atan");
+  if (!step_toml.empty()) {  // D47: [s1, s1 + smax], s continues
+    EXPECT_NEAR(stages.items[0]["s"].number, 10.0, 1.0e-12);
+    EXPECT_NEAR(stages.items[1]["s"].number, 20.0, 1.0e-6);
+  }
   std::printf(
       "[%s] steps per stage: %d %d; s at the end of the stages: %.4f %.4f\n",
       tag, static_cast<int>(stages.items[0]["steps"].number),
       static_cast<int>(stages.items[1]["steps"].number),
       stages.items[0]["s"].number, stages.items[1]["s"].number);
 
-  if (rk4) {
+  if (compare_flow) {
     // Steps per stage of the golden: istep restarts at 0 for stage 2.
     const std::vector<GoldLine> gold =
         ReadGoldFlow(std::string(gdir) + "/flow.dat");
@@ -376,6 +388,23 @@ TEST(FlowMethods, TwoStageRk4He4PShellDriver) {
 }
 TEST(FlowMethods, TwoStageAdaptiveHe4PShellDriver) {
   TwoStage("flow", "IT-15/He4_emax2_pshell_flow", "IT-15 dopri5 He4 p-shell");
+}
+
+// D47: stage 1 stops at smax = 10, stage 2 integrates [10, 20] (golden: the
+// patched imsrg++). The final s of both stages is checked here, the rest in
+// `TwoStage`.
+const char kSmax10[] = "[imsrg.step]\nsmax = 10.0\n\n";
+TEST(FlowMethods, StageTwoRangeRk4Smax10) {
+  TwoStage("flow_rk4", "IT-15/He4_emax2_pshell_rk4_smax10", "IT-15 RK4 smax 10",
+           kSmax10);
+}
+TEST(FlowMethods, StageTwoRangeAdaptiveSmax10) {
+  TwoStage("flow", "IT-15/He4_emax2_pshell_flow_smax10", "IT-15 dopri5 smax 10",
+           kSmax10);
+}
+TEST(FlowMethods, StageTwoRangeMagnusSmax10) {
+  TwoStage("magnus", "IT-15/He4_emax2_pshell_magnus_smax10",
+           "IT-15 Magnus smax 10", kSmax10);
 }
 #else   // IMSRG_FLOW_SLOW: O16 emax 4, 7-14 s each in a debug build
 TEST(FlowMethods, O16Emax4Rk4Driver) {

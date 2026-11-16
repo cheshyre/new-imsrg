@@ -35,6 +35,12 @@ for how the tests use them and §2 for the tolerances.
   `source` lines then carry the `+d35-patch` version string). Why: with dumps from the pristine build the
   test `OpslibGolden.Emax4TrelAndRp2` fails (Rp2 differs by 0.063), and the emax-4 tests skip when the
   directory is absent (a fresh checkout has none).
+  **Run 3 (D47, D48, 2026-11-16):** the same patch also changes the flow semantics (hunter-gatherer
+  H(s) = H_saved after the final gather, stage 2 over [s1, s1 + smax] for every method, `eta_criterion` and
+  `ode_tolerance` in double; new version stamp `...+d35-patch:0c7af4dd0112f621`). Goldens regenerated for it:
+  `e2e/IT-2/hunter_gatherer/*` and `e2e/IT-10/*` (E0 changes, `e2e/README.md`), new `e2e/IT-15/*_smax10`; every
+  other golden keeps its old `source` string because its numbers are unchanged (checked, `design/30` section 6,
+  D47-2).
   Goldens not listed here (V2, V3_NO2B, random_H, commutator, basis, IT-9/10 other jobs) still come from
   the pristine build.
 * **Default build of the generation scripts (D35).** Every `tools/reference/gen_golden_*.sh` that runs
