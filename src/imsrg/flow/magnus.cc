@@ -66,6 +66,25 @@ void MarkNonFiniteDiverged(SolveResult& result, double s) {
   }
 }
 
+// Returns true (after logging) when the flow has diverged. NaN-safe: a NaN
+// norm or energy fails the "<=" and counts as divergence.
+bool HasDiverged(double norm_eta, double e_last, double s) {
+  if (!(norm_eta <= 1.0e12) || !(std::abs(e_last) <= 1.0e9)) {
+    log::Error("the IMSRG flow diverged: ||eta|| = {}, E0 = {} at s = {}",
+               norm_eta, e_last, s);
+    return true;
+  }
+  return false;
+}
+
+// Returns the adaptive Magnus step ds from the current ||eta|| and ||Omega||.
+double AdaptiveStep(const SolverOptions& solver, double norm_eta,
+                    double norm_omega) {
+  return std::min({solver.domega / norm_eta,
+                   solver.domega / norm_eta / (norm_omega + 1.0e-9),
+                   (solver.omega_norm_max + 1.0e-5) / norm_eta, solver.dsmax});
+}
+
 }  // namespace
 
 void ValidateSolverOptions(const SolverOptions& o) {
@@ -230,10 +249,7 @@ SolveResult MagnusSolver::Solve(const StatusCallback& on_status) {
       result.reason = StopReason::kConverged;
       break;
     }
-    // NaN-safe: a NaN norm or energy fails the "<=" and counts as divergence.
-    if (!(norm_eta <= 1.0e12) || !(std::abs(e_last) <= 1.0e9)) {
-      log::Error("the IMSRG flow diverged: ||eta|| = {}, E0 = {} at s = {}",
-                 norm_eta, e_last, s_);
+    if (HasDiverged(norm_eta, e_last, s_)) {
       result.reason = StopReason::kDiverged;
       break;
     }
@@ -244,10 +260,7 @@ SolveResult MagnusSolver::Solve(const StatusCallback& on_status) {
       norm_omega = 0.0;
     }
     if (solver_.magnus_adaptive) {
-      ds = std::min({solver_.domega / norm_eta,
-                     solver_.domega / norm_eta / (norm_omega + 1.0e-9),
-                     (solver_.omega_norm_max + 1.0e-5) / norm_eta,
-                     solver_.dsmax});
+      ds = AdaptiveStep(solver_, norm_eta, norm_omega);
     }
     ds = std::min(ds, solver_.smax - s_);
     s_ += ds;
