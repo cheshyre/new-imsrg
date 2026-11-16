@@ -74,7 +74,9 @@ Phase-1 formats, in this order:
    format.
 5. Later: full me3j (isospin), Navratil/Miyagi operator formats (needed, per the owner),
    binary scratch and checkpoint files (with a magic number, version and endianness tag; imsrg++
-   has none).
+   has none). **The owner's ME1J/ME2JP/ME3JP formats** (pn-resolved ME2J/ME3J; readers and
+   writers, text, gzip and later binary) carry the evolved H, stored Omegas and checkpoints:
+   specification in `19-mexj-formats.md` (D54), milestone after tensor operators (D53).
 6. **Dropped** *(owner)*: HDF5 3N, Oslo, OakRidge, "Jason", "Takayuki" and the other older readers.
 
 **As implemented (M5).** `imsrg/io/input_stream.h` (`TextInput`: zlib `gzread` for plain and
@@ -202,10 +204,12 @@ to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9. In the driver (run 2): IT
   imsrg++'s error norm: sum over the state's operators of `||(|xerr|)/(eps_abs + eps_rel(|x| +
   |dt||dxdt|))||` (zero-body excluded), built from the element-wise operations of
   `operator/elementwise.h` (abs, divide, add a scalar to every element: NOT `operator+=(Operator&,
-  double)`, which touches E0 only). `ode_tolerance` is rounded to float as in imsrg++. As in imsrg++,
+  double)`, which touches E0 only). `ode_tolerance` is rounded to float as in imsrg++ (**to change
+  (D47):** `eta_criterion` and `ode_tolerance` become doubles). As in imsrg++,
   after ||eta|| < eta_criterion dxdt = 0 and the integration runs on to smax. The status callback of
   `flow` fires for every right-hand-side evaluation, like the imsrg++ flow file; the flow log's E_MP2
-  evaluates the H of that line. Deviations: M8-Q40. Goldens: `tests/golden/e2e/IT-14`.
+  evaluates the H of that line. Deviations: M8-Q40. Goldens: `tests/golden/e2e/IT-14`. Every flowing
+  operator stays in the error norm (owner, M8-Q50, D47).
 * Methods, phase 1: `magnus` (the default: an Euler step on Omega,
   `Omega ← BCH_Product(η ds, Omega)`, then `H ← BCH_Transform(H0, Omega)`) and `flow_rk4` /
   `flow` (DP45 on H). Later: `magnus_modified_euler`, `magnus_adaptive`, `restore_4th_order`.
@@ -213,8 +217,9 @@ to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9. In the driver (run 2): IT
   recomputed every step, then capped with `ds = min(ds, smax - s)`; replicate the `domega` bump
   too (`IMSRGSolver.cc:290`, `:335`). `ds_0` is effectively unused in magnus; keep it for flow methods.
 * Omega stack: when `‖Ω‖ > omega_norm_max`, push Ω and restart from the transformed H.
-  Operators are transformed afterwards by replaying the stack. Optional scratch-to-disk (deferred
-  with checkpoint/restart until after M13, D39).
+  Operators are transformed afterwards by replaying the stack. Storing the Omega stack (ME1J/ME2JP/
+  ME3JP files, a `transform` task) and checkpoint/restart form the milestone after tensor operators
+  (D53, D54, `19-mexj-formats.md`).
 * **Hunter-gatherer** (`imsrg.omega.hunter_gatherer`, imsrg++ `IMSRGSolver.cc:85-115`): only two
   Omegas are kept; the hunter accumulates η ds by BCH products and, when its norm exceeds
   `omega_norm_max`, is gathered into the gatherer (`gatherer = BCH_Product(hunter, gatherer)`) and
@@ -228,7 +233,11 @@ to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9. In the driver (run 2): IT
   `num_gathers` per stage and in total. Consequence: `H(s)` differs from `Transform(H_0)` at the BCH
   truncation level (unit test `HunterGathererDocumentsImsrgSemantics`; the replay test holds for the
   split stack only). Goldens: `tests/golden/e2e/IT-2/hunter_gatherer`. A **prerequisite of
-  IMSRG(3f2)** (D32).
+  IMSRG(3f2)** (D32). **To change (owner, D48, M8-Q10):** after the final gather H(s) becomes the
+  rebuilt `H_saved` (H(s) = e^Ω H0 e^−Ω with the gathered Ω), so E0 and every transformed operator
+  come from one Ω and stage 2 starts from it; measured ΔE0 −13.4 keV (IT-10 O16 emax 2), +2.8 keV
+  (He4 emax 2), −43 / −22 keV (IT-2 hunter-gatherer O16 emax 4, 0.25 / 0.1), −8.1 keV (He4 emax 2),
+  steps and gathers unchanged; the D35 patch gets the same change and the goldens are regenerated.
 * IMSRG(3f2) (`BchOptions::factorized`, M10 3f2): `BchTransform` adds F(Omega, nested_{i-2}) to
   every nested term from the second on (before the series update and the epsilon test);
   `BchProduct` adds F(X, Y)/12 to the 1/12 term and F(Y, N_{k-2}) (N_0 = X) to N_k for k >= 2, as
@@ -244,9 +253,12 @@ to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9. In the driver (run 2): IT
   definitions in `reference/03` §4). Denominators: Epstein-Nesbet (default) and
   Møller-Plesset, plus `denominator_delta` (and its orbit-restricted variant). The denominator
   floor in imsrg++ loses the sign of the denominator. **Owner: this is a bug, so fix it** (keep the
-  sign), add it to the deviation log, and test it (QUESTIONS Q7).
+  sign), add it to the deviation log, and test it (QUESTIONS Q7). The three-body denominator
+  (IMSRG(3) generator) gets the same sign-keeping floor, without `denominator_delta` (owner,
+  M10-Q60, D49).
 * Two-step decoupling: the core generator first, then the valence generator, with a new Omega.
-  imsrg++ doubles `smax` for the second Magnus stage; keep that.
+  imsrg++ doubles `smax` for the second Magnus stage, and its `flow_RK4` stage 2 runs only to the
+  same smax. **To change (owner, D47):** stage 2 integrates [s1, s1 + smax] for every method.
 * Convergence: `‖η‖ < eta_criterion` or `s ≥ smax`.
 * Flow log: CSV with a header (s, E0, ‖η‖, ‖Ω‖, ds, MP2 estimate, wall time) plus the same
   lines to stdout. The integration tests parse the CSV.
