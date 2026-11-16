@@ -60,6 +60,13 @@ op::OperatorSpec CommutatorSpec(const op::OperatorSpec& x,
 /// ||X|| and ||Y|| exceed `opts.threebody_threshold`. Preconditions
 /// (InvariantError): X, Y on the workspace's model space (`ws.compatible`); Z
 /// is neither X nor Y.
+/// MPI (D14 phase 1): on a workspace whose communicator has more than one
+/// rank (`WorkspaceOptions::comm`) this is a collective: every rank calls it
+/// with the same X and Y (identical bits), computes its share of the terms
+/// (the expensive IMSRG(2) terms over its work items, the cheap ones and the
+/// N7 terms on rank 0), and the shares are combined
+/// (`detail::CombinePartials`), so every rank returns the same Z, bit for
+/// bit. The result equals the serial one up to the reordering of sums.
 /// @throws NotImplementedError for X or Y with a three-body part and an
 ///         IMSRG(2) term set (no silent drop), for the N8/N9 terms of the
 ///         full IMSRG(3), and for specs `CommutatorSpec` rejects.
@@ -80,7 +87,10 @@ op::Operator Commutator(const op::Operator& X, const op::Operator& Y,
 /// Z on the workspace's model space, Z with spec `CommutatorSpec(X.spec(),
 /// Y.spec())` (or at least the part written allocated and the same
 /// hermiticity). A term whose input parts are missing (particle_rank 1) adds
-/// nothing.
+/// nothing. On a distributed workspace (more than one part, see
+/// `detail::AssignWork`) the comm122, ladder (pp/hh, 221) and particle-hole
+/// terms add only this part's share and nothing combines it; use `Commutator`
+/// for the full result.
 namespace terms {
 
 /// Z0 += sum_ab (2 j_a + 1) n_a nbar_b (X_ab Y_ba - Y_ab X_ba). Adds nothing if

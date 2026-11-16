@@ -107,6 +107,17 @@ struct PandyaGeneralData {
   exec::DeviceBuffer<double> a, b, z;              ///< A, B and Z = A B.
   std::vector<linalg::GemmProblem> gemms;  ///< One GEMM per channel with
                                            ///< Ncc > 0 and |K| > 0.
+  /// Cc channel of each entry of `gemms` (ascending).
+  std::vector<std::int32_t> gemm_channel;
+  /// The entries of `gemms` of the owned channels (distributed work only,
+  /// see `AttachPandyaWork`; empty otherwise).
+  std::vector<linalg::GemmProblem> gemms_owned;
+  /// Distributed work: the owned cc channels, their fill items and offsets
+  /// (`owned_prefix`: cumulative A/B element counts, owned + 1 entries).
+  exec::DeviceBuffer<std::int32_t> owned_channels;
+  exec::DeviceBuffer<std::int64_t> owned_prefix;
+  std::int64_t owned_total = 0;  ///< Number of A (= B) elements owned.
+  std::int32_t num_owned = 0;    ///< Number of owned cc channels.
 
   /// True once `EnsureGeneralScratch` has run. O(1).
   bool allocated() const noexcept { return !gz_off_host.empty(); }
@@ -161,6 +172,19 @@ struct PandyaData {
   /// The matching GEMMs W(:, Ncc .. 2 Ncc) = XK YK' (the right half), run
   /// after the in-place row-pair flip YK -> YK'.
   std::vector<linalg::GemmProblem> gemms_right;
+  /// Cc channel of each entry of `gemms` and `gemms_right` (ascending).
+  std::vector<std::int32_t> gemm_channel;
+
+  /// Distributed work (`AttachPandyaWork`): true if only a share of the cc
+  /// channels is computed; `gemms_owned` and `gemms_right_owned` are then the
+  /// entries of the two lists for the owned channels, `owned_kets` the global
+  /// cc kets (`ket_off` order, ascending) of the owned channels. All empty
+  /// when not distributed.
+  bool distributed = false;
+  std::vector<linalg::GemmProblem> gemms_owned, gemms_right_owned;
+  exec::DeviceBuffer<std::int32_t> owned_kets;
+  std::int64_t num_owned_kets = 0;                ///< Size of `owned_kets`.
+  std::vector<std::int32_t> owned_channels_host;  ///< Owned cc channels.
 
   PandyaGeneralData general;  ///< Scratch of the general path (lazy).
 
@@ -202,6 +226,17 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms);
 /// allocated. Idempotent; strongly exception safe (a throwing allocation
 /// leaves the scratch unallocated). Needs an initialized `exec::Runtime`.
 void EnsureGeneralScratch(PandyaData& pd);
+
+/// Restricts the particle-hole term to the cc channels `owned` (ascending,
+/// each in [0, pd.num_cc)) of this part when `distributed` (design/12 section
+/// 6, M12b): builds the owned sublists of the prebuilt GEMM lists, the list of
+/// owned cc kets and, if the general scratch is already allocated, its owned
+/// fill list (otherwise `EnsureGeneralScratch` builds them). With `distributed
+/// == false` the owned lists are cleared and the serial path is used.
+/// Replaces any previous assignment. Needs an initialized `exec::Runtime`.
+/// Called by `AssignWork`; complexity O(cc channels + owned kets).
+void AttachPandyaWork(PandyaData& pd, const std::vector<std::int32_t>& owned,
+                      bool distributed);
 
 }  // namespace imsrg::commutator::detail
 

@@ -6,9 +6,13 @@
 /// ranks; every rank runs the tests, only rank 0 prints, and the exit code is
 /// the maximum over ranks.
 
+#include <algorithm>
 #include <array>
+#include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -207,6 +211,80 @@ TEST(CommMpi, Duplicate) {
   EXPECT_EQ(dup.size(), g_world.size());
   EXPECT_EQ(dup.rank(), g_world.rank());
   EXPECT_EQ(dup.AllreduceSum(std::int64_t{1}), g_world.size());
+}
+
+// 64-bit FNV-1a hash of the bytes of `v`, bit-cast to int64 for Allgather.
+std::int64_t Fnv1a(const std::vector<double>& v) {
+  std::uint64_t h = 14695981039346656037ULL;
+  std::vector<unsigned char> bytes(v.size() * sizeof(double));
+  if (!v.empty()) std::memcpy(bytes.data(), v.data(), bytes.size());
+  for (const unsigned char b : bytes) {
+    h ^= b;
+    h *= 1099511628211ULL;
+  }
+  return static_cast<std::int64_t>(h);
+}
+
+std::vector<double> RankData(int rank, std::size_t n) {
+  std::vector<double> d(n);
+  for (std::size_t i = 0; i < n; ++i) {
+    const auto k = static_cast<int>(i % 7) - 3;
+    d[i] = std::sin(0.1 * static_cast<double>(i) + rank) * std::pow(10.0, k);
+  }
+  return d;
+}
+
+TEST(CommMpi, ReduceBcastSumIsBitwiseIdenticalOnAllRanks) {
+  const std::size_t n = 100003;
+  auto data = RankData(g_world.rank(), n);
+  g_world.ReduceBcastSum(data);
+  const auto hashes = g_world.Allgather(Fnv1a(data));
+  for (const std::int64_t h : hashes) EXPECT_EQ(h, hashes[0]);
+
+  std::vector<double> ref(n, 0.0);
+  for (int r = 0; r < g_world.size(); ++r) {
+    const auto d = RankData(r, n);
+    for (std::size_t i = 0; i < n; ++i) ref[i] += d[i];
+  }
+  double max_ref = 1.0;
+  double max_d = 0.0;
+  for (std::size_t i = 0; i < n; ++i) {
+    max_ref = std::max(max_ref, std::abs(ref[i]));
+    max_d = std::max(max_d, std::abs(data[i] - ref[i]));
+  }
+  if (g_world.is_root()) std::printf("ReduceBcastSum max|d| = %.3e\n", max_d);
+  EXPECT_LE(max_d, 1.0e-15 * max_ref);
+}
+
+TEST(CommMpi, ReduceSumToNonZeroRoot) {
+  ASSERT_GT(g_world.size(), 1);
+  const std::size_t n = 1000;
+  const auto mine = RankData(g_world.rank(), n);
+  auto data = mine;
+  g_world.ReduceSum(data, 1);
+  if (g_world.rank() == 1) {
+    std::vector<double> ref(n, 0.0);
+    for (int r = 0; r < g_world.size(); ++r) {
+      const auto d = RankData(r, n);
+      for (std::size_t i = 0; i < n; ++i) ref[i] += d[i];
+    }
+    double max_d = 0.0;
+    for (std::size_t i = 0; i < n; ++i) {
+      max_d = std::max(max_d, std::abs(data[i] - ref[i]));
+    }
+    EXPECT_LE(max_d, 1.0e-15 * 4.0e3);
+  } else {
+    EXPECT_EQ(data, mine);
+  }
+}
+
+TEST(CommMpi, ReduceZeroLengthAndScalar) {
+  std::vector<double> empty;
+  g_world.ReduceSum(empty, 1);
+  g_world.ReduceBcastSum(empty);
+  const double x = g_world.ReduceBcastSum(std::sin(1.0 + g_world.rank()));
+  const auto all = g_world.Allgather(x);
+  for (const double v : all) EXPECT_EQ(v, all[0]);
 }
 
 TEST(CommMpi, SerialCommunicatorWorksAlongside) {

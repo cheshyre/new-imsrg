@@ -242,6 +242,7 @@ void BuildGemmProblems(PandyaData& d, std::int32_t ncc) {
     g.beta = 0.0;
     g.C = linalg::MatrixView<double>{v.w + d.w_off_host[cs], n, n, n};
     d.gemms.push_back(g);
+    d.gemm_channel.push_back(c);
     g.C = linalg::MatrixView<double>{v.w + d.w_off_host[cs] + n * n, n, n, n};
     d.gemms_right.push_back(g);
   }
@@ -273,6 +274,35 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
   BuildGemmProblems(d, ncc);
   return d;
 }
+
+namespace {
+
+/// Builds the owned fill list and the owned GEMM sublist of the general
+/// scratch `g` for the owned channels of `pd` (needs `g.g_off_host`).
+void BuildGeneralOwned(const PandyaData& pd, PandyaGeneralData& g) {
+  const auto& owned = pd.owned_channels_host;
+  std::vector<std::int32_t> channels;
+  std::vector<std::int64_t> prefix{0};
+  std::vector<char> flag(static_cast<std::size_t>(pd.num_cc), 0);
+  for (const std::int32_t c : owned) {
+    const auto cs = static_cast<std::size_t>(c);
+    const std::int64_t size = g.g_off_host[cs + 1] - g.g_off_host[cs];
+    if (size == 0) continue;  // empty block: nothing to fill
+    channels.push_back(c);
+    prefix.push_back(prefix.back() + size);
+    flag[cs] = 1;
+  }
+  g.num_owned = static_cast<std::int32_t>(channels.size());
+  g.owned_total = prefix.back();
+  g.owned_channels = Upload(channels, "pandya_general::owned_channels");
+  g.owned_prefix = Upload(prefix, "pandya_general::owned_prefix");
+  g.gemms_owned.clear();
+  for (std::size_t i = 0; i < g.gemms.size(); ++i)
+    if (flag[static_cast<std::size_t>(g.gemm_channel[i])])
+      g.gemms_owned.push_back(g.gemms[i]);
+}
+
+}  // namespace
 
 void EnsureGeneralScratch(PandyaData& pd) {
   if (pd.general.allocated()) return;
@@ -313,10 +343,63 @@ void EnsureGeneralScratch(PandyaData& pd) {
     p.C = linalg::MatrixView<double>{g.z.device_data() + gz_off[c], 2 * n,
                                      2 * n, 2 * n};
     g.gemms.push_back(p);
+    g.gemm_channel.push_back(static_cast<std::int32_t>(c));
   }
   g.g_off_host = std::move(g_off);
   g.gz_off_host = std::move(gz_off);
+  if (pd.distributed) BuildGeneralOwned(pd, g);
   pd.general = std::move(g);
+}
+
+namespace {
+
+/// The entries of `problems` (one per channel of `channel`) whose channel is
+/// flagged in `flag` (indexed by cc channel).
+std::vector<linalg::GemmProblem> OwnedGemms(
+    const std::vector<linalg::GemmProblem>& problems,
+    const std::vector<std::int32_t>& channel, const std::vector<char>& flag) {
+  std::vector<linalg::GemmProblem> out;
+  for (std::size_t i = 0; i < problems.size(); ++i)
+    if (flag[static_cast<std::size_t>(channel[i])]) out.push_back(problems[i]);
+  return out;
+}
+
+}  // namespace
+
+void AttachPandyaWork(PandyaData& pd, const std::vector<std::int32_t>& owned,
+                      bool distributed) {
+  pd.distributed = distributed;
+  pd.gemms_owned.clear();
+  pd.gemms_right_owned.clear();
+  pd.owned_channels_host.clear();
+  pd.owned_kets = exec::DeviceBuffer<std::int32_t>();
+  pd.num_owned_kets = 0;
+  pd.general.gemms_owned.clear();
+  pd.general.owned_channels = exec::DeviceBuffer<std::int32_t>();
+  pd.general.owned_prefix = exec::DeviceBuffer<std::int64_t>();
+  pd.general.owned_total = 0;
+  pd.general.num_owned = 0;
+  if (!distributed) return;
+  std::vector<char> flag(static_cast<std::size_t>(pd.num_cc), 0);
+  for (const std::int32_t c : owned) {
+    IMSRG_CHECK(c >= 0 && c < pd.num_cc, "AttachPandyaWork: bad cc channel");
+    flag[static_cast<std::size_t>(c)] = 1;
+  }
+  pd.owned_channels_host = owned;
+  pd.gemms_owned = OwnedGemms(pd.gemms, pd.gemm_channel, flag);
+  pd.gemms_right_owned = OwnedGemms(pd.gemms_right, pd.gemm_channel, flag);
+  std::vector<std::int32_t> kets;
+  std::int32_t first = 0;
+  for (std::int32_t c = 0; c < pd.num_cc; ++c) {
+    const std::int32_t n = pd.ncc_host[static_cast<std::size_t>(c)];
+    if (flag[static_cast<std::size_t>(c)]) {
+      for (std::int32_t i = 0; i < n; ++i) kets.push_back(first + i);
+    }
+    first += n;
+  }
+  pd.num_owned_kets = static_cast<std::int64_t>(kets.size());
+  pd.owned_kets = Upload(kets, "pandya::owned_kets");
+  if (pd.general.allocated()) BuildGeneralOwned(pd, pd.general);
 }
 
 }  // namespace imsrg::commutator::detail

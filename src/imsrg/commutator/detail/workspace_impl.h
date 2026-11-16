@@ -20,6 +20,7 @@
 #include "imsrg/commutator/detail/ladder.h"
 #include "imsrg/commutator/detail/lifted.h"
 #include "imsrg/commutator/detail/pandya.h"
+#include "imsrg/commutator/detail/work_items.h"
 #include "imsrg/commutator/workspace.h"
 #include "imsrg/exec/device_buffer.h"
 #include "imsrg/operator/operator.h"
@@ -73,6 +74,10 @@ struct Workspace::Impl {
   detail::LadderData ladder;  ///< Data of the pp/hh ladder terms (T3b).
   detail::PandyaData pandya;  ///< Data of the particle-hole term (T4).
   detail::LiftedData lifted;  ///< Lifted one-body lists of comm122ss.
+  /// This rank's share of the ladder, comm122 and particle-hole work and its
+  /// device lists (`detail::AssignWork`; everything owned on one rank).
+  detail::WorkAssignment work;
+  detail::WorkDeviceData work_device;  ///< Device copies of the owned lists.
   detail::FactorizedScratch
       factorized;  ///< One-body scratch of the factorized double commutator.
 
@@ -108,6 +113,19 @@ bool IsGeneral(const op::Operator& X, const op::Operator& Y);
 /// Kernels use this instead of Z's flag. Precondition: `!IsGeneral(X, Y)`
 /// (asserted in debug builds).
 int CommutatorHermiticitySign(const op::Operator& X, const op::Operator& Y);
+
+/// Combines the per-part results of a commutator over the ranks of
+/// `ws.comm()` (D14 phase 1): Z0, Z1 and Z2 hold each part's partial sum and
+/// become the sum over all parts by `Communicator::ReduceBcastSum` (reduce to
+/// rank 0, then broadcast, so every rank holds rank 0's bits, M12b-Q2); Z3,
+/// computed on rank 0 alone in phase 1, is broadcast from rank 0. Nothing
+/// happens on a one-rank communicator (fake parts of a serial workspace stay
+/// partial). Collective over `ws.comm()`: every rank calls it once per
+/// commutator, in the same order. Precondition (InvariantError): on more than
+/// one rank the work assignment is (comm.rank(), comm.size()). Host buffers
+/// (the operator is synced to the host and back). Complexity: O(size of Z)
+/// communication per rank, independent of the number of ranks.
+void CombinePartials(op::Operator& Z, const Workspace& ws);
 
 }  // namespace detail
 

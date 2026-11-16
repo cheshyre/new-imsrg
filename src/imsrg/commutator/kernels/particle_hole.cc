@@ -32,6 +32,7 @@
 #include <cmath>
 #include <cstdint>
 #include <type_traits>
+#include <vector>
 
 #include "imsrg/base/assert.h"
 #include "imsrg/base/constants.h"
@@ -61,12 +62,24 @@ struct PhArgs {
       1.0;  ///< Hermiticity sign of X (+1 Hermitian, -1 anti-Hermitian).
   double hy = 1.0;    ///< Hermiticity sign of Y.
   double hxhy = 1.0;  ///< hX hY.
+  /// Distributed work: per cc channel 1 if owned, else 0; null if everything
+  /// is owned (serial path, no mask reads).
+  const std::int32_t* owned = nullptr;
+  /// Distributed work: the global cc kets of the owned channels (null: all).
+  const std::int32_t* owned_kets = nullptr;
 };
 static_assert(std::is_trivially_copyable_v<PhArgs>);
 
 /// (-1)^n for integer n (any sign).
 IMSRG_INLINE_FUNCTION double ParitySign(int n) noexcept {
   return (n & 1) ? -1.0 : 1.0;
+}
+
+/// Global cc ket of work item `i`: item `i` itself, or entry `i` of the owned
+/// list in the distributed case. O(1).
+IMSRG_INLINE_FUNCTION exec::Index OwnedKet(const PhArgs& a,
+                                           exec::Index i) noexcept {
+  return a.owned_kets != nullptr ? a.owned_kets[i] : i;
 }
 
 /// Capacity of the per-pair J' buffers of the inverse transform (checked by
@@ -260,6 +273,7 @@ IMSRG_FORCEINLINE_FUNCTION double CcValue(const PhArgs& a, const CcTerm& t,
   if (Jp < t.lo || Jp > t.hi) return 0.0;
   const int c = 6 * Jp + t.cls;
   if (c >= a.pv.num_cc) return 0.0;
+  if (a.owned != nullptr && a.owned[c] == 0) return 0.0;  // not this part's
   const int n = a.pv.ncc[c];
   if (n == 0) return 0.0;
   const std::int32_t alpha = t.lit_bra[Jp];
@@ -278,6 +292,11 @@ struct PhGeneralArgs {
   double* a = nullptr;
   double* b = nullptr;
   double* z = nullptr;
+  /// Distributed work: the owned channels with non-empty blocks, and the
+  /// cumulative sizes of their A blocks (null `owned_channels`: all).
+  const std::int32_t* owned_channels = nullptr;
+  const std::int64_t* owned_prefix = nullptr;
+  int num_owned = 0;
 };
 static_assert(std::is_trivially_copyable_v<PhGeneralArgs>);
 
@@ -289,6 +308,7 @@ IMSRG_INLINE_FUNCTION double ZbarGeneral(const PhGeneralArgs& g, int p, int q,
   const PhArgs& a = g.ph;
   const int c = CcChannel(a, p, q, Jp);
   if (c < 0 || c >= a.pv.num_cc || c != CcChannel(a, r, s, Jp)) return 0.0;
+  if (a.owned != nullptr && a.owned[c] == 0) return 0.0;  // not this part's
   const int n = a.pv.ncc[c];
   if (n == 0) return 0.0;
   const int la = p <= q ? CcLocal(a, p, q, Jp) : CcLocal(a, q, p, Jp);
@@ -315,9 +335,19 @@ void Comm222PhssGeneral(const op::Operator& X, const op::Operator& Y,
   g.a = pd.general.a.device_data();
   g.b = pd.general.b.device_data();
   g.z = pd.general.z.device_data();
+  const bool distributed = pd.distributed;
+  if (distributed) {
+    g.ph.owned = impl.work_device.ph_owned.device_data();
+    g.owned_channels = pd.general.owned_channels.device_data();
+    g.owned_prefix = pd.general.owned_prefix.device_data();
+    g.num_owned = pd.general.num_owned;
+  }
+  std::vector<linalg::GemmProblem>& gemm_list =
+      distributed ? pd.general.gemms_owned : pd.general.gemms;
 
   const int num_cc = pd.num_cc;
-  const auto g_total = static_cast<exec::Index>(pd.general.g_off_host.back());
+  const auto g_total = static_cast<exec::Index>(
+      distributed ? pd.general.owned_total : pd.general.g_off_host.back());
   // Host BLAS only; device backends need a device gemm (design/12 section 3).
   IMSRG_CHECK(pd.general.z.host_is_device(),
               "comm222_phss: host BLAS on device memory; needs a device gemm "
@@ -335,8 +365,18 @@ void Comm222PhssGeneral(const op::Operator& X, const op::Operator& Y,
           "commutator::comm222_phss_general::fill", g_total,
           IMSRG_LAMBDA(const exec::Index e) {
             const PhArgs& a = g.ph;
-            const int c = detail::FindBlock(g.g_off, num_cc, e);
-            const std::int64_t local = e - g.g_off[c];
+            int c = 0;
+            std::int64_t local = 0;
+            std::int64_t eg = e;  // element index in the A and B buffers
+            if (g.owned_channels != nullptr) {
+              const int b = detail::FindBlock(g.owned_prefix, g.num_owned, e);
+              c = g.owned_channels[b];
+              local = e - g.owned_prefix[b];
+              eg = g.g_off[c] + local;
+            } else {
+              c = detail::FindBlock(g.g_off, num_cc, e);
+              local = e - g.g_off[c];
+            }
             const int n = a.pv.ncc[c];
             const int nk = a.pv.nk[c];
             if (nk == 0) return;
@@ -353,8 +393,8 @@ void Comm222PhssGeneral(const op::Operator& X, const op::Operator& Y,
               const int pa = alpha < n ? kp[alpha] : kq[alpha - n];
               const int qa = alpha < n ? kq[alpha] : kp[alpha - n];
               const double d = pass == 0 ? a.pv.k_d[ka] : -a.pv.k_d[ka];
-              g.a[e] = d * PandyaBar(first, a.sj, pa, qa, a.pv.k_a[ka],
-                                     a.pv.k_b[ka], two_Jp);
+              g.a[eg] = d * PandyaBar(first, a.sj, pa, qa, a.pv.k_a[ka],
+                                      a.pv.k_b[ka], two_Jp);
             }
             // B element (row kappa < nk, column beta < 2n).
             {
@@ -363,14 +403,14 @@ void Comm222PhssGeneral(const op::Operator& X, const op::Operator& Y,
               const int ka = a.pv.k_off[c] + kappa;
               const int rb = beta < n ? kp[beta] : kq[beta - n];
               const int sb = beta < n ? kq[beta] : kp[beta - n];
-              g.b[e] = PandyaBar(second, a.sj, a.pv.k_a[ka], a.pv.k_b[ka], rb,
-                                 sb, two_Jp);
+              g.b[eg] = PandyaBar(second, a.sj, a.pv.k_a[ka], a.pv.k_b[ka], rb,
+                                  sb, two_Jp);
             }
           });
     }
     exec::Fence("commutator::comm222_phss_general::fill");
-    for (auto& gemm : pd.general.gemms) gemm.beta = pass == 0 ? 0.0 : 1.0;
-    linalg::GroupedGemm(pd.general.gemms);
+    for (auto& gemm : gemm_list) gemm.beta = pass == 0 ? 0.0 : 1.0;
+    linalg::GroupedGemm(gemm_list);
   }
 
   double* z2 = Z.two_body().matrix().buffer().device_data();
@@ -447,11 +487,20 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   a.hx = hx;
   a.hy = hy;
   a.hxhy = hx * hy;
+  if (pd.distributed) {
+    a.owned = impl.work_device.ph_owned.device_data();
+    a.owned_kets = pd.owned_kets.device_data();
+  }
 
   const int num_cc = pd.num_cc;
-  // One work item per cc ket of every channel (rows of XK, columns of W).
+  // One work item per cc ket of every (owned) channel (rows of XK, columns of
+  // W); item i is the cc ket `Ket(a, i)` (the owned list if distributed).
   exec::Index cc_kets = 0;
-  for (const std::int32_t v : pd.ncc_host) cc_kets += v;
+  if (pd.distributed) {
+    cc_kets = pd.num_owned_kets;
+  } else {
+    for (const std::int32_t v : pd.ncc_host) cc_kets += v;
+  }
   const std::int32_t* ket_off = pd.ket_off.device_data();
 
   if (pd.xk_off_host.back() > 0) {
@@ -466,7 +515,8 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
     // by the neighbouring items.
     exec::ParallelForDynamic(
         "commutator::comm222_phss::fill", cc_kets,
-        IMSRG_LAMBDA(const exec::Index e) {
+        IMSRG_LAMBDA(const exec::Index i) {
+          const exec::Index e = OwnedKet(a, i);
           const int c = detail::FindBlock(ket_off, num_cc, e);
           const int nk = a.pv.nk[c];
           if (nk == 0) return;
@@ -497,7 +547,9 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   IMSRG_CHECK(pd.w.host_is_device(),
               "comm222_phss: host BLAS on device memory; needs a device gemm "
               "(GPU backends)");
-  linalg::GroupedGemm(pd.gemms);  // left halves: W(:, 0 .. Ncc) = XK YK
+  linalg::GroupedGemm(pd.distributed
+                          ? pd.gemms_owned
+                          : pd.gemms);  // left halves: W(:, 0 .. Ncc) = XK YK
 
   // The right half of W needs YK_R(kappa ^ 1, beta) = hY phi_kappa phi_beta
   // YK(kappa, beta). With YK'(kappa, beta) = phi_kappa YK(kappa ^ 1, beta)
@@ -507,7 +559,8 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   // combine below applies hY phi_beta. Item (c, beta) flips column beta.
   exec::ParallelForDynamic(
       "commutator::comm222_phss::flip", cc_kets,
-      IMSRG_LAMBDA(const exec::Index e) {
+      IMSRG_LAMBDA(const exec::Index i) {
+        const exec::Index e = OwnedKet(a, i);
         const int c = detail::FindBlock(ket_off, num_cc, e);
         const int nk = a.pv.nk[c];
         if (nk == 0) return;
@@ -524,7 +577,9 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
         }
       });
   exec::Fence("commutator::comm222_phss::flip");
-  linalg::GroupedGemm(pd.gemms_right);  // W'(:, Ncc .. 2 Ncc) = XK YK'
+  linalg::GroupedGemm(pd.distributed
+                          ? pd.gemms_right_owned
+                          : pd.gemms_right);  // W'(:, Ncc .. 2 Ncc) = XK YK'
 
   // Combine W in place into the stored half of the Pandya-transformed result:
   //   left block  (beta < Ncc):  W(alpha, beta) - hX hY W(beta, alpha),
@@ -536,7 +591,8 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   // element is read and written by exactly one item (no separate ZB buffer).
   exec::ParallelForDynamic(
       "commutator::comm222_phss::combine", cc_kets,
-      IMSRG_LAMBDA(const exec::Index e) {
+      IMSRG_LAMBDA(const exec::Index i) {
+        const exec::Index e = OwnedKet(a, i);
         const int c = detail::FindBlock(ket_off, num_cc, e);
         if (a.pv.nk[c] == 0) return;  // W stays zero
         const std::int64_t n = a.pv.ncc[c];
@@ -619,9 +675,26 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
           const CcTerm t2 = MakeCcTerm(a, j, l, k, i);
           double zbar1[kMaxJp];
           double zbar2[kMaxJp];
+          // Distributed: the masked reads leave only the owned cc channels
+          // nonzero, so skip the pair when all vanish and trim the J' loop to
+          // the span of nonzero entries (skipped terms add exactly 0). The
+          // serial path keeps the full range (bitwise identical).
+          int jq0 = jp0;
+          int jq1 = jp1;
           for (int Jp = jp0; Jp <= jp1; ++Jp) {
             zbar1[Jp - jp0] = CcValue(a, t1, Jp);
             zbar2[Jp - jp0] = CcValue(a, t2, Jp);
+          }
+          if (a.owned != nullptr) {
+            while (jq0 <= jq1 && zbar1[jq0 - jp0] == 0.0 &&
+                   zbar2[jq0 - jp0] == 0.0) {
+              ++jq0;
+            }
+            while (jq1 >= jq0 && zbar1[jq1 - jp0] == 0.0 &&
+                   zbar2[jq1 - jp0] == 0.0) {
+              --jq1;
+            }
+            if (jq0 > jq1) continue;
           }
           for (int J = jlo; J <= jhi; ++J) {
             const std::int32_t ib = lit_a[J];
@@ -637,7 +710,7 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
             const double* row2 =
                 a.sj.row(TwoJ{jj}, TwoJ{ji}, TwoJ{2 * J}, TwoJ{jk}, TwoJ{jl});
             double z = 0.0;
-            for (int Jp = jp0; Jp <= jp1; ++Jp) {
+            for (int Jp = jq0; Jp <= jq1; ++Jp) {
               const double s1 = row1[Jp];
               const double s2 = row2[Jp];
               double t = 0.0;

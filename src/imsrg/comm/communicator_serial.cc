@@ -60,6 +60,12 @@ void Communicator::Broadcast(std::string&, int root) const {
   IMSRG_CHECK(root == 0, "broadcast: root out of range");
 }
 
+void Communicator::ReduceSum(std::span<double>, int root) const {
+  IMSRG_CHECK(root == 0, "reduce: root out of range");
+}
+void Communicator::ReduceBcastSum(std::span<double>) const {}
+double Communicator::ReduceBcastSum(double x) const { return x; }
+
 std::vector<double> Communicator::Allgather(double x) const { return {x}; }
 std::vector<std::int64_t> Communicator::Allgather(std::int64_t x) const {
   return {x};

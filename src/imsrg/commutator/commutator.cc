@@ -8,9 +8,12 @@
 
 #include "imsrg/base/assert.h"
 #include "imsrg/base/error.h"
+#include "imsrg/comm/communicator.h"
+#include "imsrg/commutator/detail/work_items.h"
 #include "imsrg/commutator/detail/workspace_impl.h"
 #include "imsrg/commutator/imsrg3.h"
 #include "imsrg/commutator/three_body.h"
+#include "imsrg/exec/device_buffer.h"
 #include "imsrg/operator/norms.h"
 
 namespace imsrg::commutator {
@@ -106,13 +109,23 @@ void PrepareOutput(const op::Operator& X, const op::Operator& Y, bool imsrg3,
   }
 }
 
-/// Adds the IMSRG(2) terms selected by `m` to Z (Z0, Z1 and Z2 only).
+/// True on the part (rank) that evaluates the terms which are not split by
+/// the work assignment: part 0, or the only part of a serial workspace.
+bool IsFirstPart(const Workspace& ws) { return ws.impl().work.part() == 0; }
+
+/// Adds the IMSRG(2) terms selected by `m` to Z (Z0, Z1 and Z2 only). On a
+/// distributed workspace this is the part's share (D14 phase 1): the cheap
+/// terms 110, 220, 111 and 121 run on part 0 only (every part would add them
+/// once to the combined sum otherwise), the expensive ones over the part's
+/// work items (detail/work_items.h).
 void TwoBodyTerms(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                   const TermMask m, Workspace& ws) {
-  if (m.test(Term::kComm110ss)) terms::Comm110ss(X, Y, Z, ws);
-  if (m.test(Term::kComm220ss)) terms::Comm220ss(X, Y, Z, ws);
-  if (m.test(Term::kComm111ss)) terms::Comm111ss(X, Y, Z, ws);
-  if (m.test(Term::kComm121ss)) terms::Comm121ss(X, Y, Z, ws);
+  if (IsFirstPart(ws)) {
+    if (m.test(Term::kComm110ss)) terms::Comm110ss(X, Y, Z, ws);
+    if (m.test(Term::kComm220ss)) terms::Comm220ss(X, Y, Z, ws);
+    if (m.test(Term::kComm111ss)) terms::Comm111ss(X, Y, Z, ws);
+    if (m.test(Term::kComm121ss)) terms::Comm121ss(X, Y, Z, ws);
+  }
   if (m.test(Term::kComm122ss)) terms::Comm122ss(X, Y, Z, ws);
   if (m.test(Term::kComm222PpHhss) && m.test(Term::kComm221ss)) {
     terms::Comm222PpHh221ss(X, Y, Z, ws);
@@ -165,11 +178,39 @@ void Commutator(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   PrepareOutput(X, Y, imsrg3, ws, Z);
 
   TwoBodyTerms(X, Y, Z, m, ws);
-  if (imsrg3 && ThreeBodyGateOpen(X, Y, opts.threebody_threshold))
+  // Every part evaluates the gate (identical operands give identical norms);
+  // the N7 terms run on part 0 only until the three-body storage is
+  // distributed (M12b phase 1, M12b-Q5): CombinePartials sums their Z0-Z2
+  // contributions with the others and broadcasts Z3 from rank 0.
+  if (imsrg3 && ThreeBodyGateOpen(X, Y, opts.threebody_threshold) &&
+      IsFirstPart(ws))
     ThreeBodyTerms(X, Y, Z, m, ws);
   // Single exit (M12b review note m2): every call, IMSRG(2)-only or gated,
-  // reaches this point, where the MPI combine of the partial results goes.
+  // reaches the combine.
+  detail::CombinePartials(Z, ws);
 }
+
+namespace detail {
+
+void CombinePartials(op::Operator& Z, const Workspace& ws) {
+  const comm::Communicator& comm = ws.comm();
+  if (comm.size() == 1) return;
+  const WorkAssignment& work = ws.impl().work;
+  IMSRG_CHECK(work.num_parts() == comm.size() && work.part() == comm.rank(),
+              "commutator: the work assignment does not match the "
+              "workspace's communicator");
+  Z.SyncToHost();
+  Z.zero_body() = comm.ReduceBcastSum(Z.zero_body());
+  for (exec::DeviceBuffer<double>* b :
+       {&Z.one_body().buffer(), &Z.two_body().matrix().buffer()}) {
+    if (!b->empty()) comm.ReduceBcastSum(b->host_span());
+  }
+  if (Z.three_body().has_value() && !Z.three_body()->buffer().empty())
+    comm.Broadcast(Z.three_body()->buffer().host_span(), 0);
+  Z.SyncToDevice();
+}
+
+}  // namespace detail
 
 op::Operator Commutator(const op::Operator& X, const op::Operator& Y,
                         const CommutatorOptions& opts, Workspace& ws) {

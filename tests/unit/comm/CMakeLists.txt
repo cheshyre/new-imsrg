@@ -3,6 +3,11 @@ imsrg_add_test(NAME comm_serial
   DEPS comm
   LABELS unit)
 
+imsrg_add_test(NAME comm_ownership_map
+  SOURCES ownership_map_test.cc
+  DEPS comm
+  LABELS unit)
+
 # Two source files: the serial-semantics tests need a gtest main; the MPI test owns main().
 imsrg_add_test(NAME comm_mpi_2ranks
   SOURCES comm_mpi_test.cc

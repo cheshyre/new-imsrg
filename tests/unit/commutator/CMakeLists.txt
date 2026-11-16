@@ -4,7 +4,8 @@ set(_imsrg_comm_support "${PROJECT_SOURCE_DIR}/tests/support/commutator_test_sup
 set(_imsrg_comm_cases "${CMAKE_CURRENT_SOURCE_DIR}/commutator_test_cases.cc")
 
 foreach(_t options simple_terms ladder_terms particle_hole dispatch robustness
-          factorized general)
+          factorized general work_items distributed_ladder
+          distributed_ph)
   imsrg_add_test(NAME commutator_${_t}
     SOURCES test_${_t}.cc ${_imsrg_exec_main} ${_imsrg_comm_support} ${_imsrg_comm_cases}
     DEPS commutator commutator_ref operator
@@ -47,3 +48,13 @@ imsrg_add_test(NAME commutator_n7_cost
   DEPS commutator operator
   LABELS unit
   NO_GTEST_MAIN)
+
+# The distributed commutator on real MPI ranks (M12b phase 1, D3): one source,
+# two rank counts; the shared MPI main provides the Kokkos runtime.
+foreach(_ranks 2 4)
+  imsrg_add_test(NAME commutator_mpi_${_ranks}ranks
+    SOURCES test_mpi_commutator.cc ${PROJECT_SOURCE_DIR}/tests/support/mpi_test_main.cc
+            ${_imsrg_comm_support} ${_imsrg_n7_support}
+    DEPS commutator commutator_ref operator flow comm
+    LABELS mpi MPI_RANKS ${_ranks} NO_GTEST_MAIN TIMEOUT 600)
+endforeach()

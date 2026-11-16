@@ -14,6 +14,7 @@
 #include "imsrg/base/assert.h"
 #include "imsrg/base/error.h"
 #include "imsrg/comm/communicator.h"
+#include "imsrg/comm/detail/chunks.h"
 
 namespace imsrg::comm {
 
@@ -65,19 +66,25 @@ MPI_Datatype MpiType(const std::int32_t*) { return MPI_INT32_T; }
 MPI_Datatype MpiType(const std::int64_t*) { return MPI_INT64_T; }
 MPI_Datatype MpiType(const std::byte*) { return MPI_BYTE; }
 
-int CheckedCount(std::size_t n) {
-  IMSRG_CHECK(n <= static_cast<std::size_t>(INT32_MAX),
-              "comm: message longer than 2^31-1 elements");
-  return static_cast<int>(n);
+/// Calls `f(offset, count)` once per chunk of a message of `n` elements, in
+/// order; `count` always fits in int (at most kMaxMessageElements).
+template <class F>
+void ForEachChunk(std::size_t n, F f) {
+  for (const detail::Chunk& c : detail::ChunkRanges(
+           static_cast<std::int64_t>(n), detail::kMaxMessageElements)) {
+    f(static_cast<std::size_t>(c.offset), static_cast<int>(c.count));
+  }
 }
 
 template <class T>
 void ReduceInPlace(const Communicator::Impl& impl, std::span<T> data, MPI_Op op,
                    const char* name) {
   if (impl.serial || data.empty()) return;
-  CheckMpi(MPI_Allreduce(MPI_IN_PLACE, data.data(), CheckedCount(data.size()),
-                         MpiType(data.data()), op, impl.comm),
-           name);
+  ForEachChunk(data.size(), [&](std::size_t offset, int count) {
+    CheckMpi(MPI_Allreduce(MPI_IN_PLACE, data.data() + offset, count,
+                           MpiType(data.data()), op, impl.comm),
+             name);
+  });
 }
 
 template <class T>
@@ -91,9 +98,24 @@ template <class T>
 void Bcast(const Communicator::Impl& impl, std::span<T> data, int root) {
   IMSRG_CHECK(root >= 0 && root < impl.size, "broadcast: root out of range");
   if (impl.serial || data.empty()) return;
-  CheckMpi(MPI_Bcast(data.data(), CheckedCount(data.size()),
-                     MpiType(data.data()), root, impl.comm),
-           "MPI_Bcast");
+  ForEachChunk(data.size(), [&](std::size_t offset, int count) {
+    CheckMpi(MPI_Bcast(data.data() + offset, count, MpiType(data.data()), root,
+                       impl.comm),
+             "MPI_Bcast");
+  });
+}
+
+void ReduceToRoot(const Communicator::Impl& impl, std::span<double> data,
+                  int root) {
+  IMSRG_CHECK(root >= 0 && root < impl.size, "reduce: root out of range");
+  if (impl.serial || data.empty()) return;
+  const bool is_root = impl.rank == root;
+  ForEachChunk(data.size(), [&](std::size_t offset, int count) {
+    double* p = data.data() + offset;
+    CheckMpi(MPI_Reduce(is_root ? MPI_IN_PLACE : p, is_root ? p : nullptr,
+                        count, MPI_DOUBLE, MPI_SUM, root, impl.comm),
+             "MPI_Reduce");
+  });
 }
 
 template <class T>
@@ -191,6 +213,20 @@ void Communicator::Broadcast(std::string& s, int root) const {
   if (impl_->rank != root) s.resize(static_cast<std::size_t>(n));
   Bcast(*impl_, std::as_writable_bytes(std::span<char>(s.data(), s.size())),
         root);
+}
+
+void Communicator::ReduceSum(std::span<double> data, int root) const {
+  ReduceToRoot(*impl_, data, root);
+}
+
+void Communicator::ReduceBcastSum(std::span<double> data) const {
+  ReduceToRoot(*impl_, data, 0);
+  Bcast(*impl_, data, 0);
+}
+
+double Communicator::ReduceBcastSum(double x) const {
+  ReduceBcastSum(std::span<double>(&x, 1));
+  return x;
 }
 
 std::vector<double> Communicator::Allgather(double x) const {
