@@ -182,6 +182,38 @@ TEST(OdeFlow, ConvergenceStopsRk4AndDopri5Reports) {
   EXPECT_LT(d.norm_eta, 0.5);
 }
 
+// D47: eta_criterion is a double (as MagnusSolver.EtaCriterionIsADouble).
+// One ulp above ||eta|| of the initial H stops rk4 at once and freezes dopri5
+// (dxdt = 0); one ulp below does neither. Rounded through float one of the two
+// thresholds would land on the other side of ||eta||. ode_tolerance is not
+// separable the same way (it enters only through the step-size controller).
+TEST(OdeFlow, EtaCriterionIsADouble) {
+  flow::OdeSolver probe = Make(flow::OdeMethod::kRk4, Options(0.0));
+  const double norm_eta = probe.Solve().norm_eta;  // smax 0: only computes eta
+  ASSERT_GT(norm_eta, 0.0);
+  const double above = std::nextafter(norm_eta, 1.0e300);
+  const double below = std::nextafter(norm_eta, 0.0);
+  ASSERT_TRUE(static_cast<double>(static_cast<float>(above)) <= norm_eta ||
+              static_cast<double>(static_cast<float>(below)) >= norm_eta);
+  const double e0_initial = Emax2Hno().zero_body();
+  for (const flow::OdeMethod m :
+       {flow::OdeMethod::kRk4, flow::OdeMethod::kDopri5}) {
+    for (const double crit : {above, below}) {
+      flow::SolverOptions o = Options(0.3);
+      o.eta_criterion = crit;
+      flow::OdeSolver solver = Make(m, o);
+      const flow::SolveResult r = solver.Solve();
+      if (crit > norm_eta) {
+        EXPECT_EQ(r.reason, flow::StopReason::kConverged);
+        EXPECT_DOUBLE_EQ(r.e0, e0_initial);
+        if (m == flow::OdeMethod::kRk4) EXPECT_EQ(r.steps, 0);
+      } else {
+        EXPECT_NE(r.e0, e0_initial);
+      }
+    }
+  }
+}
+
 TEST(OdeFlow, SecondStageContinuesS) {
   for (const auto method : {flow::OdeMethod::kRk4, flow::OdeMethod::kDopri5}) {
     flow::OdeSolver s = Make(method, Options(0.3), {Emax2Hno()});
