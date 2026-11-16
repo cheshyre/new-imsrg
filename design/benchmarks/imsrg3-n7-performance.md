@@ -253,13 +253,13 @@ same setup as above, 18 threads, release build), `t_part = alpha cost_part + bet
 A triples term does not help (the fit makes beta negative and the largest relative residual
 worse), so the model keeps two terms. Refit on the re-measured parts (new weights, `--reps 5`):
 alpha 4.97e-8, beta 6.09e-3, beta/alpha 1.23e5, R^2 0.998, so the ratio is stable under the
-change of the partition. The row term is about 20 % of the run time (1.4e5 x 144,162 rows =
-2.0e10 multiply-add equivalents against 1.05e11 counted).
+change of the partition. The row term is about 15 % of the modeled time (1.3e5 x 144,162 rows =
+1.9e10 multiply-add equivalents against 1.05e11 counted).
 
 Weights: `N7LineWeights(ms3, row_overhead_madd = kRowOverheadMadd)` adds
 `row_overhead_madd` x rows of the triple to its compute weight; the memory weight is unchanged.
-`commutator::kRowOverheadMadd = 1.3e5` multiply-add equivalents per row, the rounded middle of the
-three ratios above (measured on this machine; refit it on other hardware, any value >= 0 keeps the
+`commutator::kRowOverheadMadd = 1.3e5` multiply-add equivalents per row, about the mean of the
+three fitted ratios above (1.21e5, 1.23e5, 1.38e5; median 1.23e5) (measured on this machine; refit it on other hardware, any value >= 0 keeps the
 partition valid).
 
 Before / after, balanced partition, O16 emax 5 E3max 12, best of 3 (before) and 5 (after), whole

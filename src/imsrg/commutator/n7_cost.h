@@ -185,12 +185,14 @@ class N7CostModel {
 
 /// Per-row overhead of the N7 kernels in multiply-add equivalents: the time
 /// of a part grows with its row count by more than the counted multiply-adds
-/// (loop set-up, scratch fills, the transposed output and halo traffic per
-/// line). Fitted as t_part = alpha cost_part + beta rows_part by least
-/// squares over the parts of balanced partitions P = 4, 16, 64, O16 emax 5
-/// E3max 12, Apple M5 Pro, 18 OpenMP threads (2026-11-17; the ratio beta /
-/// alpha, see design/benchmarks/imsrg3-n7-performance.md). A machine number:
-/// refit on other hardware; the partition stays correct for any value >= 0.
+/// (loop set-up, scratch fills and the transposed output per line). Fitted as
+/// t_part = alpha cost_part + beta rows_part by least squares over the parts
+/// of balanced partitions P = 4, 16, 64, O16 emax 5 E3max 12, Apple M5 Pro,
+/// 18 OpenMP threads, in n7_bench's simulated single-process partition
+/// (2026-11-17; the ratio beta / alpha, see
+/// design/benchmarks/imsrg3-n7-performance.md). A machine number that may
+/// also depend on the thread count and the problem size: refit when they
+/// change (QUESTIONS O5); the partition stays correct for any value >= 0.
 inline constexpr double kRowOverheadMadd = 1.3e5;
 
 /// Per-triple weights for `basis::RowPartition::Balanced`: compute = the sum

@@ -172,8 +172,8 @@ in the answers in `design/QUESTIONS.md`. The most important:
 1. **M12b phase 2 completion** (brief "D-phase2"): row panels for comm122 and the particle-hole
    terms, D9 halo exchange, D10 distributed N7 driver and lifting the D7 guard, D11, D12, weight
    recalibration on an idle machine.
-2. **N7 follow-ups** (brief "C-followup"): first a row-cost model with per-row terms (the measured
-   partition imbalance), then tiled `BuildH`, C15,
+2. **N7 follow-ups** (brief "C-followup"): the row-cost model's open points (P = 64 at 1.16, refit,
+   runtime option; O5; the per-row term landed at the end of run 3), tiled `BuildH`, C15,
    `CommutatorOptions::imsrg3_batch_bytes`, factoring the duplicated triples table builders.
    Items 1 and 2 touch different files except `ThreeBodyTerms()` and the batch interface (D9/D10 vs
    `imsrg3_batch_bytes`): merge shared interfaces early.
@@ -288,12 +288,11 @@ interview.
 > rows into scratch first; H runs at ~4e9 multiply-adds/s against ~1.7e10 for W at emax 4, so it is
 > the largest single-node gain left besides comm232); (2) **C15** Comm223 locality (per-tile 6j
 > slices, ket cache; M10-Q41/Q42), kept only if quiet-machine timings at emax 4-6 show a gain;
-> (3) **a row-cost model that matches the measured partition timings**: the quiet-machine run at
-> the end of run 3 (O16 emax 5, `n7_bench --partition`) gave balanced max/mean 1.16 / 1.31 / 1.46
-> at P = 4 / 16 / 64 against 1.02-1.04 predicted by the R5 weights, because a part's time grows
-> with its row count (`design/benchmarks/imsrg3-n7-performance.md`, "Quiet-machine
-> measurements"); fit per-row terms, re-run the partition timings, target max/mean <= 1.10 at
-> P = 16, and do this **first**, before the D-phase2 lead relies on the weights; (4) **`CommutatorOptions::imsrg3_batch_bytes`** (M10-Q74), after agreeing with the
+> (3) **the row-cost model**: the per-row term `kRowOverheadMadd = 1.3e5` landed at the end of
+> run 3 (balanced max/mean 1.04 / 1.07 / 1.16 at P = 4 / 16 / 64 in `n7_bench --partition`, loaded
+> machine; before: 1.16 / 1.31 / 1.46); left: P = 64, a refit at another emax and thread count
+> with a committed fit script, a runtime option, the `--row-overhead` validation (QUESTIONS O5);
+> do it **first**, before the D-phase2 lead relies on the weights; (4) **`CommutatorOptions::imsrg3_batch_bytes`** (M10-Q74), after agreeing with the
 > D-phase2 lead who edits `ThreeBodyTerms()`; (5) factor the duplicated group/leg table builders of
 > `commutator/triples.cc` and `three_body.cc` (M10-Q75; the `TriplesContext` build at emax 12 takes
 > ~150 s and 4.4 GB), reuse the unused rank-3 output of `n7_bench --partition`. Timing runs: schedule

@@ -1117,6 +1117,8 @@ the orchestrator uses `O4` and up).
   Omega of norm 0.3, not a flow-produced Omega. **Assumed:** acceptable; a flow-produced Omega
   (`refharness flow` writes none) needs a harness hook. The imsrg++ `BCH_Transform` stops at the default thresholds,
   so the golden contains truncation error of that order.
+### MPI (M12b, brief D) and N7 performance (brief C), run 3
+
 * **M12b-Q1** (2026-11-17, run 3 brief D) - Where the communicator lives: `WorkspaceOptions::comm` (phase 1) and the model space's `ThreeBodyDistribution` (phase 2, adding the edge `basis -> comm`; comm is layer 0). **Assumed:** yes; phase 1 is done with `WorkspaceOptions::comm`; the alternative (`operator -> comm`) would let operators of one model space disagree.
 * **M12b-Q2** (2026-11-17, run 3 brief D) - Combine by reduce + broadcast (identical bits by construction) instead of `Allreduce`. **Assumed:** yes, implemented as `ReduceBcastSum`; `Allreduce` only after a measured gain and a bitwise check.
 * **M12b-Q3** (2026-11-17, run 3 brief D) - Row blocks of big 2B/cc channels (whole channels fail beyond ~8 ranks). **Assumed:** the ladder is split by a contiguous cost-balanced cut of the global row sequence (done); the particle-hole term goes by whole cc channels for now (imbalance 5/151/903 % at 22/64/256 ranks at emax 12); ph row panels are a follow-up.
@@ -1169,3 +1171,16 @@ the orchestrator uses `O4` and up).
   * **Q79** Additions per output part keep imsrg++'s order (Z3 133 -> 223, Z2 232 -> 132, Z1 331 -> 231). The fused
     driver equals the per-term sequence bitwise when a commutator fits one batch (all emax <= 2 cases) and differs
     at 8e-17 in Z1/Z2 at emax 3 (two batches); IT-9 step counts and E0 are unchanged at emax 2 and 3.
+
+### Orchestrator, end of run 3
+
+* **O5** (2026-11-17, orchestrator, N7 row-cost model) - `commutator::kRowOverheadMadd = 1.3e5`, the
+  per-row term of `N7LineWeights`, was fitted on this machine at O16 emax 5 with 18 threads in
+  `n7_bench`'s simulated single-process partition, on a loaded machine (Opus review of
+  `feature/n7-row-cost-model`). beta/alpha may depend on the thread count and the problem size (at
+  emax 12 a row averages 1.9e7 multiply-adds, so the term is about 0.7 % of a row's weight), and the
+  fit exists only as prose. **Assumed meanwhile:** the constant stays a documented machine number;
+  no production code uses it yet (M12b's `ThreeBodyDistribution` takes a ready-made partition).
+  Run 4: decide whether it becomes a runtime option; refit at another emax and thread count with a
+  committed fit script; validate `n7_bench --row-overhead` (silently ignored without `--partition`
+  or with `--partition-contiguous`) and add it to the usage text; P = 64 still has max/mean 1.16.
