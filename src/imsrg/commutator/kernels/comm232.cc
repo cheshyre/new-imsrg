@@ -220,22 +220,32 @@ struct Column {
 };
 static_assert(std::is_trivially_copyable_v<Column>);
 
+/// Two half sums of one column (`HalfSumsColumn`).
+struct HalfSums {
+  double first = 0.0;   ///< F[A, B] (or F[A^T, B^T]).
+  double second = 0.0;  ///< F[C, D] (or F[C^T, D^T]); 0 unless kPair.
+};
+static_assert(std::is_trivially_copyable_v<HalfSums>);
+
 /// The creator-side half sum F[A, B](p, q; r s) at pair J restricted to one
 /// column `col` = ((r s) J, c) of W(B) (`w`, a W block of the batch;
 /// `trans` != 0 evaluates F[A^T, B^T] with `w` the block of B^T, the sign
-/// of which the caller applies). J3 and c are fixed by the column, so the
-/// sum runs over the J' allowed by triangle(j_p, j_c, J') and
-/// triangle(J', j_q, J3), and per J' over the rows ((a b) J' q) of the
-/// visited classes (by n_c). The arithmetic per J' is that of the
-/// element-wise pair-third kernel this replaces. Zero if A or `w` is
-/// missing. Cost O(J'-range * visited rows of the block (q, J')).
-IMSRG_INLINE_FUNCTION double HalfSumColumn(const detail::N7Views& v,
-                                           const detail::Comm232TablesView& tab,
-                                           const detail::TwoBodyView& a2,
-                                           const double* w, int trans, int p,
-                                           int q, int J,
-                                           const Column& col) noexcept {
-  if (a2.data == nullptr || w == nullptr) return 0.0;
+/// of which the caller applies), and for `kPair` likewise F[C, D] with C =
+/// `c2` and W(D) = `u` in the same loops (C shares the two-body tables of A,
+/// `u` the layout of `w`), so the rows, the 6j and the table reads are
+/// shared; each sum's arithmetic is the same as alone. J3 and c are fixed
+/// by the column, so the sum runs over the J' allowed by triangle(j_p, j_c,
+/// J') and triangle(J', j_q, J3), and per J' over the rows ((a b) J' q) of
+/// the visited classes (by n_c). The arithmetic per J' is that of the
+/// element-wise pair-third kernel this replaces. Preconditions: A and `w`
+/// (for `kPair` also C and `u`) are present. Cost O(J'-range * visited rows
+/// of the block (q, J')).
+template <bool kPair>
+IMSRG_INLINE_FUNCTION HalfSums
+HalfSumsColumn(const detail::N7Views& v, const detail::Comm232TablesView& tab,
+               const detail::TwoBodyView& a2, const double* w,
+               const detail::TwoBodyView& c2, const double* u, int trans, int p,
+               int q, int J, const Column& col) noexcept {
   const basis::TwoBodyTableView& tb = a2.tb;
   const int jp = v.ob.j2[p];
   const int jq = v.ob.j2[q];
@@ -257,7 +267,7 @@ IMSRG_INLINE_FUNCTION double HalfSumColumn(const detail::N7Views& v,
   const int jp_hi = Min((jp + jc) / 2, (two_j3 + jq) / 2);
   // W[t, col] at w[wc + t] for the sorted rows t of channel ch3.
   const std::int64_t wc = col.offset - tab.ch_begin[col.ch3];
-  double total = 0.0;
+  HalfSums total;
   for (int Jp = jp_lo; Jp <= jp_hi; ++Jp) {
     const std::int32_t xloc = tb.local_index(pc, TwoJ{2 * Jp});
     if (xloc < 0) continue;
@@ -287,12 +297,31 @@ IMSRG_INLINE_FUNCTION double HalfSumColumn(const detail::N7Views& v,
         Phase((jq + jc) / 2 + J + Jp) * xf * v.sj.Hat(Jp) / v.sj.Hat(J);
     double acc_hh = 0.0;
     double acc_pp = 0.0;
-    for (int t = r0; t < r1; ++t) {
-      const double xw = xb[x0 + tab.local[t] * xs] * w[wc + t];
-      acc_hh += tab.occ_hh[t] * xw;
-      acc_pp += tab.occ_pp[t] * xw;
+    if constexpr (kPair) {
+      const double* yb = c2.data + c2.block_offset[ch2];
+      double acc2_hh = 0.0;
+      double acc2_pp = 0.0;
+      for (int t = r0; t < r1; ++t) {
+        const std::int64_t xi = x0 + tab.local[t] * xs;
+        const double oh = tab.occ_hh[t];
+        const double op = tab.occ_pp[t];
+        const double xw = xb[xi] * w[wc + t];
+        const double yu = yb[xi] * u[wc + t];
+        acc_hh += oh * xw;
+        acc_pp += op * xw;
+        acc2_hh += oh * yu;
+        acc2_pp += op * yu;
+      }
+      total.second +=
+          pref * (two_j3 + 1) * six * (nbar_c * acc2_hh + nc * acc2_pp);
+    } else {
+      for (int t = r0; t < r1; ++t) {
+        const double xw = xb[x0 + tab.local[t] * xs] * w[wc + t];
+        acc_hh += tab.occ_hh[t] * xw;
+        acc_pp += tab.occ_pp[t] * xw;
+      }
     }
-    total += pref * (two_j3 + 1) * six * (nbar_c * acc_hh + nc * acc_pp);
+    total.first += pref * (two_j3 + 1) * six * (nbar_c * acc_hh + nc * acc_pp);
   }
   return total;
 }
@@ -473,18 +502,21 @@ WorkView ViewOf(const WorkBuffers& b, const WorkList& w) {
 /// element (o, key), with W(Y3) = `wy` and W(X3) = `wx`; otherwise the
 /// transposed terms -F[A^T, B^T](p, q; key) + p_pq F[A^T, B^T](q, p; key)
 /// of element (key, o), with W(Y3^T) = `sy` * `wy`, W(X3^T) = `sx` * `wx`.
-/// [X2, Y3] minus [Y2, X3], times s, normalized, added to Z2. Cost per item
-/// O(4 entries HalfSumColumn).
+/// [X2, Y3] minus [Y2, X3], times s, normalized, added to Z2. With both
+/// terms present their half sums share the row loops (`HalfSumsColumn`).
+/// Cost per item O(2 entries HalfSumsColumn).
 struct PassFunctor {
   detail::N7Views v;
   detail::Comm232TablesView tab;
   WorkView work;
   detail::TwoBodyOutView out;
-  const double* wx = nullptr;  ///< W(X3), or W(X3^T) up to sx.
-  const double* wy = nullptr;  ///< W(Y3), or W(Y3^T) up to sy.
-  double sx = 1.0;             ///< Sign of wx (transposed pass).
-  double sy = 1.0;             ///< Sign of wy (transposed pass).
-  int transposed = 0;          ///< 0: direct pass, 1: transposed pass.
+  /// W(X3), or W(X3^T) up to sx; null if X3 or Y2 is missing.
+  const double* wx = nullptr;
+  /// W(Y3), or W(Y3^T) up to sy; null if Y3 or X2 is missing.
+  const double* wy = nullptr;
+  double sx = 1.0;     ///< Sign of wx (transposed pass).
+  double sy = 1.0;     ///< Sign of wy (transposed pass).
+  int transposed = 0;  ///< 0: direct pass, 1: transposed pass.
 
   IMSRG_FUNCTION void operator()(const exec::Index idx) const {
     const int k = detail::FindBlock(work.key_item, work.num_keys, idx);
@@ -506,10 +538,30 @@ struct PassFunctor {
       col.c = work.entry[kEntryFields * std::int64_t{e} + 1];
       col.two_j3 = v.sp.ch_two_j[col.ch3];
       col.offset = work.column[e];
-      f1y += HalfSumColumn(v, tab, v.x2, wy, transposed, p, q, J, col);
-      f2y += HalfSumColumn(v, tab, v.x2, wy, transposed, q, p, J, col);
-      f1x += HalfSumColumn(v, tab, v.y2, wx, transposed, p, q, J, col);
-      f2x += HalfSumColumn(v, tab, v.y2, wx, transposed, q, p, J, col);
+      if (wy != nullptr && wx != nullptr) {
+        const HalfSums a = HalfSumsColumn<true>(v, tab, v.x2, wy, v.y2, wx,
+                                                transposed, p, q, J, col);
+        const HalfSums b = HalfSumsColumn<true>(v, tab, v.x2, wy, v.y2, wx,
+                                                transposed, q, p, J, col);
+        f1y += a.first;
+        f2y += b.first;
+        f1x += a.second;
+        f2x += b.second;
+      } else if (wy != nullptr) {
+        f1y += HalfSumsColumn<false>(v, tab, v.x2, wy, v.x2, wy, transposed, p,
+                                     q, J, col)
+                   .first;
+        f2y += HalfSumsColumn<false>(v, tab, v.x2, wy, v.x2, wy, transposed, q,
+                                     p, J, col)
+                   .first;
+      } else {
+        f1x += HalfSumsColumn<false>(v, tab, v.y2, wx, v.y2, wx, transposed, p,
+                                     q, J, col)
+                   .first;
+        f2x += HalfSumsColumn<false>(v, tab, v.y2, wx, v.y2, wx, transposed, q,
+                                     p, J, col)
+                   .first;
+      }
     }
     const int p_pq = Phase((v.ob.j2[p] + v.ob.j2[q]) / 2 - J);
     const double gy = transposed != 0 ? -sy : 1.0;
@@ -533,19 +585,22 @@ static_assert(std::is_trivially_copyable_v<PassFunctor>);
 /// per (key, local ket)), then fences.
 void RunPasses(const detail::N7BatchInputs& in,
                const detail::TwoBodyOutView& z2, const WorkView& work) {
+  // [X2, Y3] needs X2 and W(Y3), [Y2, X3] needs Y2 and W(X3).
+  const bool xy = in.v.x2.data != nullptr;
+  const bool yx = in.v.y2.data != nullptr;
   PassFunctor f;
   f.v = in.v;
   f.tab = in.tab;
   f.work = work;
   f.out = z2;
-  f.wx = in.wx;
-  f.wy = in.wy;
+  f.wx = yx ? in.wx : nullptr;
+  f.wy = xy ? in.wy : nullptr;
   exec::ParallelForDynamic("commutator::comm232ss_direct", work.num_items, f);
   // The transposed items write other elements than the direct ones of the
   // same key, so they run after the direct pass (same execution space, in
   // order).
-  f.wx = in.wxt;
-  f.wy = in.wyt;
+  f.wx = yx ? in.wxt : nullptr;
+  f.wy = xy ? in.wyt : nullptr;
   f.sx = in.sxt;
   f.sy = in.syt;
   f.transposed = 1;
