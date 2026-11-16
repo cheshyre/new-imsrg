@@ -12,6 +12,32 @@
 
 namespace imsrg::commutator::detail {
 
+namespace {
+
+/// Copies the host tables of the lifted one-body entries to device buffers.
+LiftedData UploadLifted(const std::vector<std::int32_t>& row_base,
+                        const std::vector<std::int32_t>& entry_offset,
+                        const std::vector<std::int32_t>& m_list,
+                        const std::vector<std::int32_t>& from_list,
+                        const std::vector<std::int32_t>& to_list,
+                        const std::vector<double>& coef_list) {
+  LiftedData d;
+  auto upload = [](auto& buf, const auto& host, const char* tag) {
+    using T = typename std::decay_t<decltype(host)>::value_type;
+    buf = exec::DeviceBuffer<T>(host.size(), tag);
+    if (!host.empty()) buf.CopyFromHost(host);
+  };
+  upload(d.row_base, row_base, "commutator::lifted_row_base");
+  upload(d.entry_offset, entry_offset, "commutator::lifted_entry_offset");
+  upload(d.m, m_list, "commutator::lifted_m");
+  upload(d.from, from_list, "commutator::lifted_from");
+  upload(d.to, to_list, "commutator::lifted_to");
+  upload(d.coef, coef_list, "commutator::lifted_coef");
+  return d;
+}
+
+}  // namespace
+
 LiftedData BuildLiftedData(const basis::ModelSpace& ms) {
   const auto& channels = ms.two_body();
   const auto& sp = ms.basis();
@@ -58,19 +84,8 @@ LiftedData BuildLiftedData(const basis::ModelSpace& ms) {
     row_base[ch + 1] = row_base[ch] + static_cast<std::int32_t>(kets.size());
   }
 
-  LiftedData d;
-  auto upload = [](auto& buf, const auto& host, const char* tag) {
-    using T = typename std::decay_t<decltype(host)>::value_type;
-    buf = exec::DeviceBuffer<T>(host.size(), tag);
-    if (!host.empty()) buf.CopyFromHost(host);
-  };
-  upload(d.row_base, row_base, "commutator::lifted_row_base");
-  upload(d.entry_offset, entry_offset, "commutator::lifted_entry_offset");
-  upload(d.m, m_list, "commutator::lifted_m");
-  upload(d.from, from_list, "commutator::lifted_from");
-  upload(d.to, to_list, "commutator::lifted_to");
-  upload(d.coef, coef_list, "commutator::lifted_coef");
-  return d;
+  return UploadLifted(row_base, entry_offset, m_list, from_list, to_list,
+                      coef_list);
 }
 
 }  // namespace imsrg::commutator::detail

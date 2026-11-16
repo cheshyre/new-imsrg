@@ -14,6 +14,39 @@
 
 namespace imsrg::commutator {
 
+namespace {
+
+/// Builds the one-body channel CSR: for each orbit p the orbits with equal
+/// (l, 2j, 2tz) (`orbits`, delimited by `offsets`) and the owner of each entry.
+void BuildOneBodyChannels(const basis::ModelSpace& ms,
+                          std::vector<std::int32_t>& offsets,
+                          std::vector<std::int32_t>& orbits,
+                          std::vector<std::int32_t>& owner) {
+  const std::size_t norb = static_cast<std::size_t>(ms.num_orbits());
+  offsets.assign(norb + 1, 0);
+  for (std::size_t p = 0; p < norb; ++p) {
+    for (const OrbitIndex q :
+         ms.basis().SameLjtz(OrbitIndex{static_cast<std::int32_t>(p)})) {
+      orbits.push_back(static_cast<std::int32_t>(q.value()));
+      owner.push_back(static_cast<std::int32_t>(p));
+    }
+    offsets[p + 1] = static_cast<std::int32_t>(orbits.size());
+  }
+}
+
+/// Returns the channel of each entry of the flat channel-ket table.
+std::vector<std::int32_t> EntryChannels(const basis::ModelSpace& ms) {
+  const auto& channels = ms.two_body();
+  std::vector<std::int32_t> ec;
+  for (std::int32_t ch = 0; ch < channels.num_channels(); ++ch) {
+    const auto n = channels.channel_kets(ChannelIndex{ch}).size();
+    ec.insert(ec.end(), n, ch);
+  }
+  return ec;
+}
+
+}  // namespace
+
 Workspace::Impl::Impl(const std::shared_ptr<const basis::ModelSpace>& ms)
     : tables(*ms),
       sixj(ms->basis().emax()),
@@ -23,17 +56,10 @@ Workspace::Impl::Impl(const std::shared_ptr<const basis::ModelSpace>& ms)
   const std::size_t norb = static_cast<std::size_t>(ms->num_orbits());
 
   // One-body channel CSR: orbits with equal (l, 2j, 2tz).
-  std::vector<std::int32_t> offsets(norb + 1, 0);
+  std::vector<std::int32_t> offsets;
   std::vector<std::int32_t> orbits;
   std::vector<std::int32_t> owner;
-  for (std::size_t p = 0; p < norb; ++p) {
-    for (const OrbitIndex q :
-         ms->basis().SameLjtz(OrbitIndex{static_cast<std::int32_t>(p)})) {
-      orbits.push_back(static_cast<std::int32_t>(q.value()));
-      owner.push_back(static_cast<std::int32_t>(p));
-    }
-    offsets[p + 1] = static_cast<std::int32_t>(orbits.size());
-  }
+  BuildOneBodyChannels(*ms, offsets, orbits, owner);
   ob_offsets = exec::DeviceBuffer<std::int32_t>(offsets.size(),
                                                 "commutator::ob_offsets");
   ob_offsets.CopyFromHost(offsets);
@@ -66,12 +92,7 @@ Workspace::Impl::Impl(const std::shared_ptr<const basis::ModelSpace>& ms)
 
   // Channel of each entry of the flat channel-ket table.
   {
-    const auto& channels = ms->two_body();
-    std::vector<std::int32_t> ec;
-    for (std::int32_t ch = 0; ch < channels.num_channels(); ++ch) {
-      const auto n = channels.channel_kets(ChannelIndex{ch}).size();
-      ec.insert(ec.end(), n, ch);
-    }
+    const std::vector<std::int32_t> ec = EntryChannels(*ms);
     entry_channel = exec::DeviceBuffer<std::int32_t>(
         ec.size(), "commutator::entry_channel");
     entry_channel.CopyFromHost(ec);

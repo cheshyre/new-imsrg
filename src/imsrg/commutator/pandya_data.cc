@@ -27,17 +27,23 @@ exec::DeviceBuffer<T> Upload(const std::vector<T>& v, const char* label) {
 
 }  // namespace
 
-PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
-  IMSRG_CHECK(2 * ms.basis().emax() + 2 <= kPandyaMaxJp,
-              "BuildPandyaData: emax too large for the J' buffers of the "
-              "particle-hole inverse transform (kPandyaMaxJp)");
+namespace {
+
+/// Host tables of the cc channels uploaded by UploadChannelTables.
+struct ChannelHostTables {
+  std::vector<std::int32_t> ket_off, k_off, ket_p, ket_q, k_a, k_b;
+  std::vector<double> k_d;
+};
+
+/// Fills the per-channel host sizes and offsets of `d` (ncc_host, nk_host,
+/// xk_off_host, yk_off_host, w_off_host) and builds the ket and nonzero-
+/// occupation-difference tables of every particle-hole channel.
+ChannelHostTables BuildChannelTables(const basis::ModelSpace& ms,
+                                     PandyaData& d) {
   const auto& ph = ms.particle_hole();
   const auto& tb = ms.two_body();
   const auto occ = ms.reference().occupations();
   const std::int32_t ncc = ph.num_channels();
-
-  PandyaData d;
-  d.num_cc = ncc;
   d.ncc_host.assign(static_cast<std::size_t>(ncc), 0);
   d.nk_host.assign(static_cast<std::size_t>(ncc), 0);
   d.xk_off_host.assign(static_cast<std::size_t>(ncc) + 1, 0);
@@ -81,16 +87,25 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
         d.yk_off_host[cs] + static_cast<std::int64_t>(nk) * n;
     d.w_off_host[cs + 1] = d.w_off_host[cs] + n * 2 * n;
   }
+  return {std::move(ket_off), std::move(k_off), std::move(ket_p),
+          std::move(ket_q),   std::move(k_a),   std::move(k_b),
+          std::move(k_d)};
+}
 
+/// Uploads the channel tables and the ket-J offsets of the particle-hole
+/// channels to device buffers of `d`.
+void UploadChannelTables(const basis::ModelSpace& ms,
+                         const ChannelHostTables& t, PandyaData& d) {
+  const auto& ph = ms.particle_hole();
   d.ncc = Upload(d.ncc_host, "pandya::ncc");
   d.nk = Upload(d.nk_host, "pandya::nk");
-  d.ket_off = Upload(ket_off, "pandya::ket_off");
-  d.k_off = Upload(k_off, "pandya::k_off");
-  d.ket_p = Upload(ket_p, "pandya::ket_p");
-  d.ket_q = Upload(ket_q, "pandya::ket_q");
-  d.k_a = Upload(k_a, "pandya::k_a");
-  d.k_b = Upload(k_b, "pandya::k_b");
-  d.k_d = Upload(k_d, "pandya::k_d");
+  d.ket_off = Upload(t.ket_off, "pandya::ket_off");
+  d.k_off = Upload(t.k_off, "pandya::k_off");
+  d.ket_p = Upload(t.ket_p, "pandya::ket_p");
+  d.ket_q = Upload(t.ket_q, "pandya::ket_q");
+  d.k_a = Upload(t.k_a, "pandya::k_a");
+  d.k_b = Upload(t.k_b, "pandya::k_b");
+  d.k_d = Upload(t.k_d, "pandya::k_d");
   d.xk_off = Upload(d.xk_off_host, "pandya::xk_off");
   d.yk_off = Upload(d.yk_off_host, "pandya::yk_off");
   d.w_off = Upload(d.w_off_host, "pandya::w_off");
@@ -100,7 +115,12 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
                            "pandya::ket_J_offsets");
   d.local_index_table = Upload(std::vector<std::int32_t>(lt.begin(), lt.end()),
                                "pandya::local_index_table");
+}
 
+/// Builds the kets-by-class tables of `d` (and checks the ascending ket order
+/// of every two-body channel).
+void BuildClassKets(const basis::ModelSpace& ms, PandyaData& d) {
+  const auto& tb = ms.two_body();
   // Kets by class (parity, Tz): class = 3 parity + Tz + 1, ascending ket
   // order inside each class. The inverse transform over pairs of these kets
   // needs every two-body channel to list its kets in ascending global order
@@ -135,7 +155,11 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
     d.class_offset = Upload(offsets, "pandya::class_offset");
     d.kernel_view.num_classes = kNumClasses;
   }
+}
 
+/// Builds the cc-ket descriptors of every ordered orbit pair of `d`.
+void BuildCcPairs(const basis::ModelSpace& ms, PandyaData& d) {
+  const auto& ph = ms.particle_hole();
   // Descriptors of the cc ket of every ordered orbit pair (inverse transform).
   {
     const auto& sp = ms.basis();
@@ -168,14 +192,10 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
     }
     d.cc_pair = Upload(pairs, "pandya::cc_pair");
   }
+}
 
-  const auto sz = [](const std::vector<std::int64_t>& off) {
-    return static_cast<std::size_t>(off.back());
-  };
-  d.xk = exec::DeviceBuffer<double>(sz(d.xk_off_host), "pandya::XK");
-  d.yk = exec::DeviceBuffer<double>(sz(d.yk_off_host), "pandya::YK");
-  d.w = exec::DeviceBuffer<double>(sz(d.w_off_host), "pandya::W");
-
+/// Points the kernel view of `d` at its device buffers.
+void FillKernelView(PandyaData& d, std::int32_t ncc) {
   PandyaView& v = d.kernel_view;
   v.num_cc = ncc;
   v.ncc = d.ncc.device_data();
@@ -198,7 +218,11 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
   v.class_kets = d.class_kets.device_data();
   v.class_offset = d.class_offset.device_data();
   v.cc_pair = d.cc_pair.device_data();
+}
 
+/// Builds the per-channel GEMM problems of `d` over the kernel-view buffers.
+void BuildGemmProblems(PandyaData& d, std::int32_t ncc) {
+  const PandyaView& v = d.kernel_view;
   for (std::int32_t c = 0; c < ncc; ++c) {
     const auto cs = static_cast<std::size_t>(c);
     const std::int64_t n = d.ncc_host[cs];
@@ -221,6 +245,32 @@ PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
     g.C = linalg::MatrixView<double>{v.w + d.w_off_host[cs] + n * n, n, n, n};
     d.gemms_right.push_back(g);
   }
+}
+
+}  // namespace
+
+PandyaData BuildPandyaData(const basis::ModelSpace& ms) {
+  IMSRG_CHECK(2 * ms.basis().emax() + 2 <= kPandyaMaxJp,
+              "BuildPandyaData: emax too large for the J' buffers of the "
+              "particle-hole inverse transform (kPandyaMaxJp)");
+  const std::int32_t ncc = ms.particle_hole().num_channels();
+
+  PandyaData d;
+  d.num_cc = ncc;
+  const ChannelHostTables t = BuildChannelTables(ms, d);
+  UploadChannelTables(ms, t, d);
+  BuildClassKets(ms, d);
+  BuildCcPairs(ms, d);
+
+  const auto sz = [](const std::vector<std::int64_t>& off) {
+    return static_cast<std::size_t>(off.back());
+  };
+  d.xk = exec::DeviceBuffer<double>(sz(d.xk_off_host), "pandya::XK");
+  d.yk = exec::DeviceBuffer<double>(sz(d.yk_off_host), "pandya::YK");
+  d.w = exec::DeviceBuffer<double>(sz(d.w_off_host), "pandya::W");
+
+  FillKernelView(d, ncc);
+  BuildGemmProblems(d, ncc);
   return d;
 }
 
