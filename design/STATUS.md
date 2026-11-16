@@ -50,7 +50,8 @@
   10, 146 % at emax 8), 310-880 % at 256 ranks (whole comm122/ph channels; row panels next).
 * **Not started / next (run 4, details in `NEXT_SESSION_PROMPT.md`):** M12b phase 2 rest (row panels
   for comm122/ph, D9, D10 and lifting the D7 guard, D11, D12, weights recalibrated on an idle
-  machine); N7 follow-ups (tiled `BuildH`, C15 Comm223 locality, partition timings at emax 5,
+  machine); N7 follow-ups (first a row-cost model with per-row terms, because the measured balanced
+  partition misses the 1.10 target; tiled `BuildH`, C15 Comm223 locality,
   `CommutatorOptions::imsrg3_batch_bytes`, factoring the duplicated triples table builders); M15
   tensor operators after M15-Q1..Q5; M16 formats; fillers (Python hooks D51,
   run-2 section 7 cleanup); M13, M14 (GPU after M12b). 3f2 2b intermediates stay E-PLANNED.

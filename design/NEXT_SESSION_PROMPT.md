@@ -172,7 +172,8 @@ in the answers in `design/QUESTIONS.md`. The most important:
 1. **M12b phase 2 completion** (brief "D-phase2"): row panels for comm122 and the particle-hole
    terms, D9 halo exchange, D10 distributed N7 driver and lifting the D7 guard, D11, D12, weight
    recalibration on an idle machine.
-2. **N7 follow-ups** (brief "C-followup"): tiled `BuildH`, C15, partition timings at emax 5,
+2. **N7 follow-ups** (brief "C-followup"): first a row-cost model with per-row terms (the measured
+   partition imbalance), then tiled `BuildH`, C15,
    `CommutatorOptions::imsrg3_batch_bytes`, factoring the duplicated triples table builders.
    Items 1 and 2 touch different files except `ThreeBodyTerms()` and the batch interface (D9/D10 vs
    `imsrg3_batch_bytes`): merge shared interfaces early.
