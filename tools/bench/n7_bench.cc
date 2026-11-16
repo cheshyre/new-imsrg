@@ -5,7 +5,7 @@
 //
 //   n7_bench --emax E [--e3max M] [--reference R] [--reps N] [--herm XY]
 //            [--terms LIST] [--checksum] [--seed S] [--count-only]
-//            [--triples]
+//            [--triples] [--partition P [--partition-contiguous]]
 //
 // Operands X, Y = RandomThreeBodyOperator(ctx, h, S) and (ctx, h, S + 1) on
 // MakeThreeBodySpace(E, R, {e3max = M}); `--herm` gives the hermiticities of X
@@ -18,6 +18,17 @@
 // bytes of Z (zero-body value, one-, two-, three-body buffers) is printed, and
 // the same hash of X and Y (are the inputs themselves reproducible?). This
 // is the "before" tool of milestone M10 (N7 performance).
+//
+// `--partition P` (simulated P-rank partition, plan 3.13/6.5): builds
+// `basis::RowPartition::Balanced(space, N7LineWeights, P)` (or, with
+// `--partition-contiguous`, P contiguous triple ranges), runs the seven N7
+// terms through `commutator::detail::RunN7` for each part in turn (each timed
+// separately: warm-up, best of `--reps`, fenced) accumulating into one Z,
+// then times the whole-space run the same way. Prints a line per part and a
+// summary (sum of part times / whole time, max/mean of the part times, and
+// max|dZ| / max(1, max|Z|) of the summed Z against the whole Z, which must be
+// <= 1e-12). The parts run one after another on this process, so the part
+// times show the balance, not the speed-up.
 //
 // `--count-only` builds neither a context nor an operator: it prints the
 // exact counts of the kept space (rows, triples, pair-third states, packed
@@ -36,6 +47,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cinttypes>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -52,7 +64,10 @@
 #include "imsrg/base/types.h"
 #include "imsrg/basis/model_space.h"
 #include "imsrg/basis/three_body_channels.h"
+#include "imsrg/basis/three_body_rows.h"
+#include "imsrg/basis/three_body_space.h"
 #include "imsrg/commutator/commutator.h"
+#include "imsrg/commutator/detail/n7_terms.h"
 #include "imsrg/commutator/imsrg3.h"
 #include "imsrg/commutator/n7_cost.h"
 #include "imsrg/commutator/options.h"
@@ -81,8 +96,13 @@ constexpr char kUsage[] =
     "usage: n7_bench --emax E [--e3max M] [--reference R] [--reps N]\n"
     "                [--herm XY] [--terms LIST] [--checksum] [--seed S]\n"
     "                [--count-only] [--triples]\n"
+    "                [--partition P [--partition-contiguous]]\n"
     "  XY: two letters of H, A, N (default AH); LIST: comma separated of\n"
-    "  133,330,223,232,331,231,132,full\n";
+    "  133,330,223,232,331,231,132,full\n"
+    "  --partition P: simulated P-part run of the seven N7 terms (parts\n"
+    "  timed one after another, then the whole space; sum checked against\n"
+    "  the whole); --partition-contiguous: contiguous triple ranges\n"
+    "  instead of the balanced partition\n";
 
 struct Options {
   int emax = -1;
@@ -94,6 +114,8 @@ struct Options {
   bool checksum = false;
   bool count_only = false;
   bool triples = false;
+  int partition = 0;  // 0: normal mode; P >= 1: simulated partition
+  bool partition_contiguous = false;
   std::uint64_t seed = 1;
 };
 
@@ -133,6 +155,12 @@ Options ParseOptions(int argc, char** argv) {
         o.count_only = true;
       } else if (a == "--triples") {
         o.triples = true;
+      } else if (a == "--partition") {
+        o.partition = std::stoi(value());
+        if (o.partition < 1)
+          throw std::runtime_error("--partition must be >= 1");
+      } else if (a == "--partition-contiguous") {
+        o.partition_contiguous = true;
       } else if (a == "--seed") {
         o.seed = std::stoull(value());
       } else {
@@ -339,6 +367,136 @@ void RunCountOnly(const Options& o) {
               6.0 * model.PackedBytes() / 1.0e9, 6.0 * twobody_gb);
 }
 
+/// Time of one call of `run` into the zeroed `z`: untimed warm-up, then the
+/// best of `reps` fenced calls (each from Z = 0).
+double BestMs(const std::function<void()>& run, op::Operator& z, int reps) {
+  z.set_zero();
+  run();
+  imsrg::exec::Fence("n7_bench warm-up");
+  double best = std::numeric_limits<double>::max();
+  for (int i = 0; i < reps; ++i) {
+    z.set_zero();
+    imsrg::exec::Fence("n7_bench pre");
+    const auto t0 = Clock::now();
+    run();
+    imsrg::exec::Fence("n7_bench post");
+    best = std::min(best, ElapsedMs(t0));
+  }
+  return best;
+}
+
+/// The zero-, one-, two- and three-body values of `z` on the host.
+std::vector<double> AllValues(const op::Operator& z) {
+  z.SyncToHost();
+  std::vector<double> v{z.zero_body()};
+  const auto append = [&v](const std::vector<double>& b) {
+    v.insert(v.end(), b.begin(), b.end());
+  };
+  append(z.one_body().buffer().ToVector());
+  append(z.two_body().matrix().buffer().ToVector());
+  if (z.three_body().has_value()) append(z.three_body()->buffer().ToVector());
+  return v;
+}
+
+/// `parts` contiguous ranges of the triple list (as the test support
+/// `ContiguousParts`); a range never crosses a channel.
+std::vector<imsrg::basis::RowSet> ContiguousParts(
+    const imsrg::basis::ThreeBodySpace& s, std::int32_t parts) {
+  namespace bs = imsrg::basis;
+  const std::int32_t nt = s.num_triples();
+  std::vector<bs::RowSet> out;
+  for (std::int32_t p = 0; p < parts; ++p) {
+    const auto lo =
+        static_cast<std::int32_t>(static_cast<std::int64_t>(p) * nt / parts);
+    const auto hi = static_cast<std::int32_t>(static_cast<std::int64_t>(p + 1) *
+                                              nt / parts);
+    std::vector<bs::RowRange> r;
+    std::int32_t t = lo;
+    while (t < hi) {
+      const bs::OrbitTriple& first = s.triple(bs::Triple3Index{t});
+      const imsrg::Channel3Index ch = first.channel;
+      const std::int32_t end = std::min(hi, s.channel(ch).triple_end.value());
+      const bs::OrbitTriple& last = s.triple(bs::Triple3Index{end - 1});
+      r.push_back(bs::RowRange{ch, bs::Triple3Index{t}, bs::Triple3Index{end},
+                               first.row_begin, last.row_end});
+      t = end;
+    }
+    out.push_back(bs::RowSet::FromRanges(s, std::move(r)));
+  }
+  return out;
+}
+
+/// `--partition P`: the seven N7 terms part by part, then on the whole space.
+void RunPartition(const Options& o, const op::Operator& x,
+                  const op::Operator& y, const cm::ThreeBodyContext& ctx) {
+  namespace bs = imsrg::basis;
+  const auto& ms = *ctx.model_space_ptr();
+  const bs::ThreeBodySpace& space = *ms.three_body_space();
+  std::vector<bs::RowSet> parts;
+  if (o.partition_contiguous) {
+    parts = ContiguousParts(space, o.partition);
+  } else {
+    const bs::RowPartition rp =
+        bs::RowPartition::Balanced(space, cm::N7LineWeights(ms), o.partition);
+    for (std::int32_t p = 0; p < rp.num_parts(); ++p)
+      parts.push_back(rp.part(p));
+  }
+  const cm::TermMask mask = cm::TermMask::Imsrg3N7().ThreeBodyTerms();
+  const std::int64_t budget = cm::detail::kN7BatchBytes;
+  op::Operator zsum = ZeroOutput(x, y, ctx);
+  op::Operator zp = ZeroOutput(x, y, ctx);
+  std::printf("partition %s P %d\n",
+              o.partition_contiguous ? "contiguous" : "balanced", o.partition);
+  std::vector<double> times;
+  for (std::size_t p = 0; p < parts.size(); ++p) {
+    const bs::RowSet& rows = parts[p];
+    const auto run = [&](op::Operator& z) {
+      cm::detail::RunN7(x, y, z, ctx, mask, rows, budget);
+    };
+    const double ms_p = BestMs([&] { run(zp); }, zp, o.reps);
+    run(zsum);  // accumulate (untimed)
+    imsrg::exec::Fence("n7_bench part");
+    times.push_back(ms_p);
+    std::printf("part %zu rows %" PRId64 " stored_doubles %" PRId64
+                " batches n/a best_ms %.3f\n",
+                p, rows.NumRows(), rows.StoredSize(true), ms_p);
+    std::fflush(stdout);
+  }
+  const bs::RowSet whole = bs::RowSet::Whole(space);
+  op::Operator zwhole = ZeroOutput(x, y, ctx);
+  const double whole_ms =
+      BestMs([&] { cm::detail::RunN7(x, y, zwhole, ctx, mask, whole, budget); },
+             zwhole, o.reps);
+  zwhole.set_zero();
+  cm::detail::RunN7(x, y, zwhole, ctx, mask, whole, budget);
+  imsrg::exec::Fence("n7_bench whole");
+  const std::vector<double> a = AllValues(zsum);
+  const std::vector<double> b = AllValues(zwhole);
+  double max_diff = 0.0;
+  double max_ref = 0.0;
+  bool bitwise = a.size() == b.size();
+  for (std::size_t i = 0; i < a.size() && i < b.size(); ++i) {
+    max_diff = std::max(max_diff, std::abs(a[i] - b[i]));
+    max_ref = std::max(max_ref, std::abs(b[i]));
+    bitwise = bitwise && std::memcmp(&a[i], &b[i], sizeof(double)) == 0;
+  }
+  double sum = 0.0;
+  double mx = 0.0;
+  for (const double t : times) {
+    sum += t;
+    mx = std::max(mx, t);
+  }
+  const double mean = sum / static_cast<double>(times.size());
+  std::printf("whole best_ms %.3f\n", whole_ms);
+  std::printf("summary sum_parts/whole %.3f max/mean %.3f\n", sum / whole_ms,
+              mean > 0.0 ? mx / mean : 0.0);
+  const double dev = max_diff / std::max(1.0, max_ref);
+  std::printf("deviation max|dZ|/max(1,max|Z|) %.3e (%s, max|Z| %.4g) %s\n",
+              dev, bitwise ? "bitwise" : "not bitwise", max_ref,
+              dev <= 1.0e-12 ? "OK" : "FAIL");
+  if (dev > 1.0e-12) throw std::runtime_error("partition deviation > 1e-12");
+}
+
 /// Builds the operands and runs the selected terms.
 void Run(const Options& o) {
   imsrg::basis::ThreeBodyCuts cuts;
@@ -362,6 +520,10 @@ void Run(const Options& o) {
                 Checksum(x));
     std::printf("checksum input_Y %c 0x%016" PRIx64 "\n", o.herm[1],
                 Checksum(y));
+  }
+  if (o.partition >= 1) {
+    RunPartition(o, x, y, ctx);
+    return;
   }
   for (const std::string& name : Split(o.terms)) {
     const Term t = MakeTerm(name, ctx, ws);
