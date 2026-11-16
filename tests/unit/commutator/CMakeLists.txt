@@ -47,3 +47,13 @@ imsrg_add_test(NAME commutator_n7_cost
   DEPS commutator operator
   LABELS unit
   NO_GTEST_MAIN)
+
+# Batch planner and the shared pair-third intermediates H and W of the
+# row-tiled N7 terms (detail/n7_batch.h) against dense host references.
+imsrg_add_test(NAME commutator_n7_batch
+  SOURCES test_n7_batch.cc ${_imsrg_exec_main}
+          "${PROJECT_SOURCE_DIR}/tests/support/three_body_test_support.cc"
+          "${PROJECT_SOURCE_DIR}/tests/support/row_mask.cc"
+  DEPS commutator operator
+  LABELS unit
+  NO_GTEST_MAIN)
