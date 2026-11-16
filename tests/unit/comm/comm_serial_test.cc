@@ -90,6 +90,18 @@ TEST(CommSerial, AlltoallvCopies) {
                imsrg::InvariantError);
 }
 
+TEST(CommSerial, ReduceSumAndReduceBcastSumLeaveDataUnchanged) {
+  const auto c = Communicator::Serial();
+  std::vector<double> v{1.5, -2.0, 3.25};
+  c.ReduceSum(v, 0);
+  EXPECT_EQ(v, (std::vector<double>{1.5, -2.0, 3.25}));
+  c.ReduceBcastSum(v);
+  EXPECT_EQ(v, (std::vector<double>{1.5, -2.0, 3.25}));
+  EXPECT_EQ(c.ReduceBcastSum(0.125), 0.125);
+  c.ReduceSum(std::span<double>(), 0);
+  EXPECT_THROW(c.ReduceSum(v, 1), imsrg::InvariantError);
+}
+
 TEST(CommSerial, SplitAndDuplicate) {
   const auto c = Communicator::Serial();
   const auto s = c.Split(3, 0);

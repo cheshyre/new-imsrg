@@ -13,8 +13,10 @@
 /// Reductions use MPI's reduction order: results are identical on all ranks,
 /// but they are invariant under the rank count only up to floating-point
 /// reassociation (design/12 section 6). All collectives must be called by every
-/// rank of the communicator in the same order. MPI failures are reported as
-/// `imsrg::RuntimeError` carrying the MPI error string.
+/// rank of the communicator in the same order. Span collectives split
+/// messages longer than 2^30 elements into consecutive chunks (one MPI call
+/// each, same order on all ranks); `Alltoallv` does not. MPI failures are
+/// reported as `imsrg::RuntimeError` carrying the MPI error string.
 
 #include <cstddef>
 #include <cstdint>
@@ -112,6 +114,20 @@ class Communicator {
   /// overwritten.
   void Broadcast(std::string& s, int root) const;
 
+  /// Collective. Element-wise sum over all ranks into `data` of rank `root`
+  /// (MPI_Reduce, in place on the root); on the other ranks `data` is left
+  /// unchanged. Every rank passes the same length. Precondition: 0 <= root <
+  /// size(). Messages longer than 2^30 elements are sent in chunks.
+  void ReduceSum(std::span<double> data, int root) const;
+  /// Collective. Sums `data` over all ranks to rank 0 and broadcasts the result
+  /// from rank 0, so every rank ends with rank 0's bits. Unlike MPI_Allreduce,
+  /// this guarantees bitwise-identical results on all ranks (design M12b-Q2).
+  /// Every rank passes the same length.
+  void ReduceBcastSum(std::span<double> data) const;
+  /// Collective. Scalar version of `ReduceBcastSum(std::span<double>)`: the
+  /// sum over all ranks, bitwise identical on every rank.
+  double ReduceBcastSum(double x) const;
+
   /// Gathers one value per rank, ordered by rank, on every rank.
   std::vector<double> Allgather(double x) const;
   /// Gathers one value per rank, ordered by rank, on every rank.
@@ -121,7 +137,8 @@ class Communicator {
   /// starting at `send_displs[r]` go to rank r; `recv_counts[r]` starting at
   /// `recv_displs[r]` arrive from r. All four count/displacement spans have
   /// length size(); the data spans must cover the ranges (checked). Counts and
-  /// displacements are in elements.
+  /// displacements are in elements and are `int`: per-peer counts and
+  /// displacements must fit in int (checked), as there is no chunking here.
   void Alltoallv(std::span<const double> send, std::span<const int> send_counts,
                  std::span<const int> send_displs, std::span<double> recv,
                  std::span<const int> recv_counts,
