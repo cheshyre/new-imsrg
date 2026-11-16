@@ -68,8 +68,8 @@ job_args() {
     IT-8/emax2) echo emax=2 reference=O16 valence_space=O16 method=magnus perturbative_triples=true ;;
     IT-8/He4_emax2) echo emax=2 reference=He4 valence_space=He4 method=magnus perturbative_triples=true ;;
     IT-8/emax3) echo emax=3 reference=O16 valence_space=O16 method=magnus perturbative_triples=true ;;
-    IT-9/He4_emax2) echo emax=2 IMSRG3=true imsrg3_n7=true method=magnus reference=He4 valence_space=He4 ;;
-    IT-9/O16_emax2) echo emax=2 IMSRG3=true imsrg3_n7=true method=magnus reference=O16 valence_space=O16 ;;
+    IT-9/He4_emax2) echo emax=2 IMSRG3=true imsrg3_n7=true method=magnus reference=He4 valence_space=He4 Operators=Rp2 ;;
+    IT-9/O16_emax2) echo emax=2 IMSRG3=true imsrg3_n7=true method=magnus reference=O16 valence_space=O16 Operators=Rp2 ;;
     IT-9/He4_emax3) echo emax=3 IMSRG3=true imsrg3_n7=true method=magnus reference=He4 valence_space=He4 ;;
     IT-9/O16_emax3) echo emax=3 IMSRG3=true imsrg3_n7=true method=magnus reference=O16 valence_space=O16 ;;
     IT-14/He4_emax2_rk4) echo emax=2 reference=He4 valence_space=He4 method=flow_RK4 Operators=Rp2 ;;

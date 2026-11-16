@@ -194,3 +194,10 @@ E0 = -25.169486339 (flow file kept, `s` continues to 20); `flow`: E0 = -25.16713
 `bash tools/reference/gen_golden_e2e.sh IT-15/He4_emax2_pshell_rk4_smax10 IT-15/He4_emax2_pshell_flow_smax10
 IT-15/He4_emax2_pshell_magnus_smax10`. The existing IT-15 and IT-14 goldens were regenerated with the new patch
 and are unchanged (stage 2 converges before either range ends).
+
+**IT-9 `Operators=Rp2` (D49, M10-Q61, 2026-11-16):** `IT-9/He4_emax2` and `IT-9/O16_emax2` are run with
+`Operators=Rp2` added (patched `imsrg++`): Rp2 is transformed with the same Omega stack and the IMSRG(3)
+commutators (imsrg++ transforms rank-2 operators with the IMSRG(3) terms and drops the residual three-body
+part before the output). New files `intRp2.snt` (core-only valence file: zero-body part He4 2.27494683, O16
+5.18255589 fm^2) and the `operators` entry of `result.json` (HF value 2.137921 / 5.400941); E0, step counts and
+the flow file are those of the earlier runs (unchanged, checked).
