@@ -61,29 +61,95 @@ differs between rank counts by floating-point reassociation (expected, design/12
 
 ## `commutator_bench --model-mpi` (count-only cost model)
 
+Imbalance = max / mean load - 1 per term, from the work items' cost formulas
+(`commutator/detail/work_items.h`). "ladder with row blocks" is the map the code uses: since D2c
+a contiguous cost-balanced cut of the global row sequence (it was LPT over row blocks: 2.5 / 9.0 /
+15.3 % at emax 8 and 1.6 / 8.2 / 16.7 % at emax 12 for 22 / 64 / 256 ranks). Output at a2ce18e:
+
 ```
+  In general, for best performance with OpenMP 4.0 or better set OMP_PROC_BIND=spread and OMP_PLACES=threads
+  For best performance with OpenMP 3.1 set OMP_PROC_BIND=true
+  For unit testing set OMP_PROC_BIND=false
 emax 8: 108 two-body channels (103 non-empty), max N 648, Z2 0.06 GB
   ladder, plan 2 N^3         sum 6.283e+09  largest   8.7 %  imbalance %: 2:0.0 4:0.0 22:90.5 64:454.3 256:2117.2
   ladder, 2 N^2 (kpp+khh)    sum 5.841e+09  largest   8.7 %  imbalance %: 2:0.0 4:0.0 22:91.7 64:457.6 256:2130.5
-  ladder with row blocks (implementation weight), imbalance %: 2:0.0 4:0.0 22:2.5 64:9.0 256:15.3
+  ladder with row blocks (implementation weight), imbalance %: 2:0.0 4:0.0 22:0.2 64:0.7 256:3.3
   comm122 (whole channels)   sum 4.452e+07  largest   6.2 %  imbalance %: 2:0.0 4:0.0 22:35.6 64:294.6 256:1478.2
   ph 4 Ncc^2 nk (whole)      sum 2.913e+09  largest   5.8 %  imbalance %: 2:0.0 4:0.1 22:27.1 64:269.7 256:1378.7
 emax 10: 132 two-body channels (127 non-empty), max N 1341, Z2 0.29 GB
   ladder, plan 2 N^3         sum 6.811e+10  largest   7.1 %  imbalance %: 2:0.0 4:0.0 22:55.8 64:353.2 256:1712.7
   ladder, 2 N^2 (kpp+khh)    sum 6.527e+10  largest   7.1 %  imbalance %: 2:0.0 4:0.0 22:56.5 64:355.3 256:1721.1
-  ladder with row blocks (implementation weight), imbalance %: 2:0.0 4:0.0 22:2.0 64:7.6 256:18.5
+  ladder with row blocks (implementation weight), imbalance %: 2:0.0 4:0.0 22:0.1 64:0.3 256:1.1
   comm122 (whole channels)   sum 2.737e+08  largest   5.1 %  imbalance %: 2:0.0 4:0.0 22:12.4 64:227.1 256:1208.4
   ph 4 Ncc^2 nk (whole)      sum 1.857e+10  largest   4.7 %  imbalance %: 2:0.0 4:0.0 22:3.8 64:199.3 256:1097.3
 emax 12: 156 two-body channels (151 non-empty), max N 2483, Z2 1.18 GB
   ladder, plan 2 N^3         sum 5.093e+11  largest   6.0 %  imbalance %: 2:0.0 4:0.0 22:32.3 64:284.7 256:1438.9
   ladder, 2 N^2 (kpp+khh)    sum 4.958e+11  largest   6.0 %  imbalance %: 2:0.0 4:0.0 22:32.7 64:286.0 256:1444.0
-  ladder with row blocks (implementation weight), imbalance %: 2:0.0 4:0.0 22:1.6 64:8.2 256:16.7
+  ladder with row blocks (implementation weight), imbalance %: 2:0.0 4:0.0 22:0.0 64:0.1 256:0.6
   comm122 (whole channels)   sum 1.271e+09  largest   4.4 %  imbalance %: 2:0.0 4:0.0 22:0.4 64:180.5 256:1022.1
   ph 4 Ncc^2 nk (whole)      sum 8.801e+10  largest   3.9 %  imbalance %: 2:0.0 4:0.0 22:5.0 64:150.9 256:903.4
 ```
 
-## Hand-off
+## Hand-off (2026-11-17, M12b lead, run 3; draft before the 02:45 pause)
 
+**State.** Phase 1 is complete on `feature/m12b-mpi-2` (merge candidate a2ce18e: ci.sh
+dev-openmp and dev-serial PASS, lint clean, slow IT-11 2/4 ranks 385 s / 191 s instead of
+2406 s / 341 s at load 10-33). On top (6ed3c14): D7 (`basis::ThreeBodyDistribution`, distributed
+`op::ThreeBody`, collective `ImsrgppNorm`, `GatherToRoot`) and D8 (three-body generator as a device
+kernel over the model space's rows; gathered distributed eta3 = serial bitwise on 2/4 ranks).
+An Opus review of D7/D8 found no blocker; its fixes (below) are the next task.
+
+**Acceptance against the cost model (phase 1).** Term weights calibrated on the 1 x 16 run at
+emax 8: a ph cost unit takes 2.9x the time of a ladder unit (15.0 ms / 2.91e9 vs 10.3 ms /
+5.84e9), so the ph term is 59 % (emax 8), 45 % (emax 10) and 34 % (emax 12) of the IMSRG(2) time.
+Since the ladder is balanced to <= 3.3 %, the total compute imbalance is about ph share x ph
+imbalance:
+
+| emax | 22 ranks | 64 ranks | 256 ranks |
+|---|---|---|---|
+| 8 | 16 % | 160 % | 820 % |
+| 10 | 1.7 % | 90 % | 500 % |
+| 12 | 1.7 % | 52 % | 310 % |
+
+So the 10 % goal holds at 22 ranks for emax 10-12 only. Memory is replicated in phase 1 (no
+memory distribution). Communication: the combine moves about 2 x Z2 per rank per commutator
+(emax 12: 2.4 GB, 0.1 s at 25 GB/s) and does not shrink with P; at this machine's measured rate
+(about 1.4 s per emax-12 IMSRG(2) commutator on one 16-thread node, extrapolated from emax 8) it
+equals the compute at about 15 nodes, at the plan's 5e10 multiply-adds/s per node at about 100.
+N7 steps: phase 1 computes all N7 terms on rank 0, so the N7 criteria need phase 2 (plan §6.2
+model: 2.8 s communication vs 210 s compute per step at 22 ranks, 1.3 s vs 18 s at 256; not yet
+measured). On one node more ranks at fixed ranks x threads are slower (above).
+
+**Next steps, in order.**
+1. Opus review fixes of D7/D8: reject distributed three-body parts on every rank in
+   `Commutator()` and in `CheckReplicatedSetup`/`BroadcastOperator` until D10/D11 (today the
+   rank-0 N7 path would throw on rank 0 only and the others hang in the combine); check the
+   `GatherToRoot` int counts and the root's displacement total on every rank before the
+   collective; validate the partition against the kept space in `WithThreeBodyDistribution`;
+   tests for i < j get/set values, a rank without rows, the distribution drop in
+   `WithReference*` and the dump guard; a D8 case whose core orbits are not the lowest indices
+   (the -v branch and the negative floor); `SyncToHost` before host reads in the D8 test; docs of
+   `generator.h` (Hermitian H3, device kernel, complexity); `OneBodyDiagonal` -> snake_case.
+2. Phase-1 balance (M12b-Q3, Q18): (a) joint cut: assign ph and comm122 first, then cut the
+   ladder rows with per-rank capacities (target minus the other loads) using calibrated term
+   weights; this absorbs the ph imbalance while the largest ph channel (3.9 % of the ph work at
+   emax 12) stays below the mean per-rank load, i.e. up to about 75 ranks at emax 12; (b) ph row
+   panels for more ranks: each rank computes the W rows of its panel and the transposed panel the
+   combine `W -/+ W^T` needs (about 2x the panel's GEMM, no communication), then the inverse mask
+   per (J', row) (review note m6).
+3. Review note M2 before D9/D10: simulate the lockstep round schedule (round time = slowest
+   rank, summed over rounds) in D12 / `n7_bench --model-mpi`; cut batches by cost, not bytes;
+   calibrate line weights on measured per-batch times (C14's model); exchange `TransposeOut` once
+   per commutator (foreign rows accumulated locally, one `Alltoallv` at the end); send X3/Y3
+   halos in bulk when memory allows (2.6 GB per operand at 22 ranks), else prefetch round r+1
+   with a non-blocking exchange during round r.
+4. D9 (`HaloPlan`, `ExchangeHalo`, reverse plan) once brief C's C6 `PlanBatches` is in develop;
+   Opus review. D10 step A (replicated storage, partitioned lines) needs C11 (`RunN7Batch` with a
+   RowSet); step B with halos. D11 (config key `[parallel] three_body_distribution`, triples
+   over an OwnershipMap of bra triples, IT-11 N7 with distributed storage), D12 (phase-2 model
+   and measurements).
+5. m5: rank 0 broadcasts the NAT occupations once C13 lands (`CheckReplicatedSetup` throws on a
+   mismatch until then).
 
 ## Particle-hole inverse transform: pair skip and J' trim (2026-11-17)
 
