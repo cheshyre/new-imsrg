@@ -86,6 +86,27 @@ struct ChannelItems {
 /// Precondition: `num_parts >= 1`. Complexity O(R + P log R).
 LadderItems LadderWorkItems(const WorkSizes& sizes, std::int32_t num_parts);
 
+/// The same contiguous cut with unequal per-rank capacities: part r = 0..P-1
+/// (P = `capacity.size()`) receives the global rows between the boundaries
+/// nearest to T C_r / C_P and T C_{r+1} / C_P, where C_r = capacity_0 + ... +
+/// capacity_{r-1} (ties: lower boundary, clamped non-decreasing, cut_0 = 0,
+/// cut_P = R). Only the ratios of the capacities matter; a rank with capacity
+/// 0 gets no rows. `LadderWorkItems(sizes, P)` is the case of P equal
+/// capacities (bitwise the same cuts). If the capacities sum to 0 (or the
+/// ladder is empty) the cut is the equal one. Hence every rank's load is within
+/// the largest row cost of T capacity_r / C_P. Preconditions: P >= 1, every
+/// capacity finite and >= 0 (IMSRG_CHECK). Complexity O(R + P log R).
+LadderItems LadderWorkItems(const WorkSizes& sizes,
+                            const std::vector<double>& capacity);
+
+/// Weight of one comm122 cost unit (`Comm122WorkItems`) in ladder cost units
+/// (`LadderWorkItems`), calibrated by wall time on one rank (see work_items.cc
+/// for machine, date and method).
+extern const double kComm122WeightInLadderUnits;
+/// Weight of one particle-hole cost unit (`PhWorkItems`) in ladder cost
+/// units, calibrated the same way.
+extern const double kPhWeightInLadderUnits;
+
 /// comm122 items: one per channel with N_c > 0 and lifted_c > 0, cost N_c
 /// lifted_c + N_c^2 / 2. O(channels).
 ChannelItems Comm122WorkItems(const WorkSizes& sizes);
@@ -94,11 +115,21 @@ ChannelItems Comm122WorkItems(const WorkSizes& sizes);
 /// Ncc^2 nk. O(cc channels).
 ChannelItems PhWorkItems(const WorkSizes& sizes);
 
+/// The ladder items of the joint cut (the rule is documented at
+/// `WorkAssignment::Build`) for the already built comm122 and particle-hole
+/// maps of the same number of ranks P: with one rank `LadderWorkItems(sizes,
+/// 1)`, otherwise the contiguous cut with the capacities t - other_r.
+/// Precondition: equal `num_ranks()` (IMSRG_CHECK). Complexity O(R + P log R).
+LadderItems JointLadderItems(const WorkSizes& sizes,
+                             const comm::OwnershipMap& comm122_map,
+                             const comm::OwnershipMap& ph_map);
+
 /// The work of one part (rank) of `num_parts`: three `OwnershipMap`s (one per
 /// term) and the owned items. The ladder map is the contiguous row cut of
 /// `LadderWorkItems` (`OwnershipMap::FromOwners`); the comm122 and
 /// particle-hole maps are `OwnershipMap::Greedy` (LPT) over whole channels.
-/// Value type.
+/// For more than one part the ladder cut is joint with the other two terms
+/// (see `Build`). Value type.
 class WorkAssignment {
  public:
   /// The assignment of a single part (owns nothing: no items).
@@ -110,8 +141,20 @@ class WorkAssignment {
   WorkAssignment& operator=(WorkAssignment&&) = default;
 
   /// Builds the assignment of `part` of `num_parts`. Deterministic: every part
-  /// builds the same maps. Precondition: 0 <= part < num_parts (IMSRG_CHECK).
-  /// Complexity O(R + items log items) with R the ladder rows.
+  /// builds the same maps. For `num_parts > 1` the rule is: (1) the comm122
+  /// and particle-hole maps are built first (LPT over whole channels); (2)
+  /// other_r = w_122 load_122(r) + w_ph load_ph(r) with the calibrated weights
+  /// `kComm122WeightInLadderUnits`, `kPhWeightInLadderUnits` (ladder units);
+  /// (3) with the ladder total T the target is t = (T + sum other) / P and the
+  /// capacity of rank r is max(0, t - other_r), scaled so that they sum to T
+  /// (the scaling is the identity when no rank is above t); (4) the global
+  /// ladder row sequence is cut contiguously at the cumulative capacities
+  /// (`LadderWorkItems` with capacities). Hence on every rank with other_r <=
+  /// t (and no clamped rank) the calibrated total load other_r + ladder_r is
+  /// within the largest ladder row cost of t. One part is the plain
+  /// assignment: everything owned, the ladder cut unchanged. Precondition: 0 <=
+  /// part < num_parts (IMSRG_CHECK). Complexity O(R + items log items) with R
+  /// the ladder rows.
   static WorkAssignment Build(const WorkSizes& sizes, std::int32_t part,
                               std::int32_t num_parts);
 

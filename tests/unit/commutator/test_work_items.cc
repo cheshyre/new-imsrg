@@ -92,6 +92,16 @@ double RowCost(const WorkSizes& s, std::size_t c) {
   return 2.0 * s.num_kets[c] * (s.k_pp[c] + s.k_hh[c]);
 }
 
+/// The LPT map of the comm122 items on `parts` ranks.
+comm::OwnershipMap Comm122Map(const WorkSizes& s, std::int32_t parts) {
+  return comm::OwnershipMap::Greedy(Comm122WorkItems(s).cost, parts);
+}
+
+/// The LPT map of the particle-hole items on `parts` ranks.
+comm::OwnershipMap PhMap(const WorkSizes& s, std::int32_t parts) {
+  return comm::OwnershipMap::Greedy(PhWorkItems(s).cost, parts);
+}
+
 /// Checks the contiguous cost-balanced cut of `LadderWorkItems(s, parts)`.
 void ExpectContiguousCut(const WorkSizes& s, std::int32_t parts) {
   SCOPED_TRACE(parts);
@@ -153,12 +163,29 @@ void ExpectContiguousCut(const WorkSizes& s, std::int32_t parts) {
                 s.num_kets[static_cast<std::size_t>(items.blocks[i].channel)]);
     }
   }
-  // The assignment's map agrees with the owners.
+  // Equal capacities (any common scale that is a power of two) are the equal
+  // cut, bitwise.
+  for (const double cap : {1.0, 8.0}) {
+    const LadderItems eq = LadderWorkItems(
+        s, std::vector<double>(static_cast<std::size_t>(parts), cap));
+    EXPECT_TRUE(eq.blocks == items.blocks);
+    EXPECT_EQ(eq.owner, items.owner);
+    EXPECT_EQ(eq.cost, items.cost);
+  }
+  // The assignment's map agrees with the joint cut's owners (which are the
+  // equal cut's owners for one part).
   const WorkAssignment a = WorkAssignment::Build(s, 0, parts);
-  ASSERT_EQ(a.ladder_map().num_items(), static_cast<std::int32_t>(nb));
-  for (std::size_t i = 0; i < nb; ++i)
+  const LadderItems joint =
+      JointLadderItems(s, Comm122Map(s, parts), PhMap(s, parts));
+  ASSERT_EQ(a.ladder_map().num_items(),
+            static_cast<std::int32_t>(joint.cost.size()));
+  for (std::size_t i = 0; i < joint.owner.size(); ++i)
     EXPECT_EQ(a.ladder_map().owner(static_cast<std::int32_t>(i)),
-              items.owner[i]);
+              joint.owner[i]);
+  if (parts == 1) {
+    EXPECT_TRUE(joint.blocks == items.blocks);
+    EXPECT_EQ(joint.owner, items.owner);
+  }
 }
 
 TEST(commutator_work_items, ladder_cut_synthetic) {
@@ -201,7 +228,8 @@ TEST(commutator_work_items, ladder_cut_model_spaces) {
 /// All three terms' item lists of the parts must be disjoint and complete.
 void ExpectPartition(const WorkSizes& s, std::int32_t num_parts) {
   SCOPED_TRACE(num_parts);
-  const LadderItems lad = LadderWorkItems(s, num_parts);
+  const LadderItems lad =
+      JointLadderItems(s, Comm122Map(s, num_parts), PhMap(s, num_parts));
   const ChannelItems c122 = Comm122WorkItems(s);
   const ChannelItems ph = PhWorkItems(s);
   std::vector<int> lad_count(lad.blocks.size(), 0);
@@ -262,6 +290,113 @@ TEST(commutator_work_items, assignments_partition_all_items) {
     const WorkSizes s = ComputeWorkSizes(*MakeSpace(c));
     for (const std::int32_t parts : {1, 2, 3, 4}) ExpectPartition(s, parts);
   }
+}
+
+/// Checks the joint cut for `parts` ranks: the blocks tile every eligible
+/// channel's rows exactly in ascending order, owners ascend (one contiguous
+/// segment per rank), and the ladder load of each rank is within one largest
+/// row cost of its capacity; where no rank is above the target (no clamping)
+/// the calibrated total of every rank is within that of the target.
+void ExpectJointCut(const WorkSizes& s, std::int32_t parts) {
+  SCOPED_TRACE(parts);
+  const comm::OwnershipMap m122 = Comm122Map(s, parts);
+  const comm::OwnershipMap mph = PhMap(s, parts);
+  const LadderItems items = JointLadderItems(s, m122, mph);
+  std::vector<std::int32_t> next_row(s.num_kets.size(), 0);
+  std::int32_t last_channel = -1;
+  double total = 0.0, max_row = 0.0;
+  std::vector<double> load(static_cast<std::size_t>(parts), 0.0);
+  for (std::size_t i = 0; i < items.blocks.size(); ++i) {
+    const RowBlock& b = items.blocks[i];
+    const auto c = static_cast<std::size_t>(b.channel);
+    ASSERT_GE(b.channel, last_channel);
+    last_channel = b.channel;
+    EXPECT_EQ(b.row_begin, next_row[c]);
+    ASSERT_GT(b.row_end, b.row_begin);
+    next_row[c] = b.row_end;
+    if (i > 0) EXPECT_LE(items.owner[i - 1], items.owner[i]);
+    load[static_cast<std::size_t>(items.owner[i])] += items.cost[i];
+    total += items.cost[i];
+  }
+  for (std::size_t c = 0; c < s.num_kets.size(); ++c) {
+    const bool eligible = s.num_kets[c] > 0 && s.k_pp[c] + s.k_hh[c] > 0;
+    EXPECT_EQ(next_row[c], eligible ? s.num_kets[c] : 0);
+    if (eligible) max_row = std::max(max_row, RowCost(s, c));
+  }
+  if (parts == 1) return;
+  std::vector<double> other(static_cast<std::size_t>(parts), 0.0);
+  double other_sum = 0.0;
+  for (std::int32_t r = 0; r < parts; ++r) {
+    const auto ri = static_cast<std::size_t>(r);
+    other[ri] = kComm122WeightInLadderUnits * m122.load(r) +
+                kPhWeightInLadderUnits * mph.load(r);
+    other_sum += other[ri];
+  }
+  const double target = (total + other_sum) / parts;
+  double cap_sum = 0.0;
+  bool clamped = false;
+  for (const double o : other) {
+    cap_sum += std::max(0.0, target - o);
+    clamped = clamped || o > target;
+  }
+  for (std::int32_t r = 0; r < parts; ++r) {
+    const auto ri = static_cast<std::size_t>(r);
+    const double cap = std::max(0.0, target - other[ri]) * total / cap_sum;
+    EXPECT_LE(std::abs(load[ri] - cap), max_row) << "rank " << r;
+    if (!clamped)
+      EXPECT_LE(std::abs(other[ri] + load[ri] - target), max_row)
+          << "rank " << r;
+  }
+}
+
+TEST(commutator_work_items, joint_cut_synthetic_and_model_spaces) {
+  WorkSizes syn;
+  syn.num_kets = {5, 0, 3, 7, 2, 1};
+  syn.k_pp = {4, 9, 0, 1, 0, 6};
+  syn.k_hh = {1, 9, 0, 2, 0, 0};
+  syn.lifted = {3, 0, 2, 4, 1, 1};
+  syn.ncc = {2, 3, 0, 1};
+  syn.nk = {4, 2, 5, 0};
+  for (const std::int32_t parts : {1, 2, 3, 4, 7, 22, 64}) {
+    ExpectJointCut(syn, parts);
+    ExpectPartition(syn, parts);
+  }
+  const SpaceCase cases[] = {{"He4_emax2", 2, "He4", false},
+                             {"O16_emax4", 4, "O16", false},
+                             {"O16_emax6", 6, "O16", false}};
+  for (const SpaceCase& c : cases) {
+    SCOPED_TRACE(c.label);
+    const WorkSizes s = ComputeWorkSizes(*MakeSpace(c));
+    for (const std::int32_t parts : {1, 2, 3, 4, 7, 22, 64}) {
+      ExpectJointCut(s, parts);
+      ExpectPartition(s, parts);
+    }
+  }
+}
+
+TEST(commutator_work_items, unequal_capacities_cut) {
+  WorkSizes s;
+  s.num_kets = {5, 3, 7};
+  s.k_pp = {4, 1, 1};
+  s.k_hh = {1, 0, 2};
+  s.lifted.assign(3, 0);
+  // Row costs 50 (x5), 6 (x3), 42 (x7); T = 562. Capacities 1 : 0 : 3 give
+  // rank 0 about T / 4, rank 1 nothing, rank 2 the rest.
+  const LadderItems li = LadderWorkItems(s, std::vector<double>{1.0, 0.0, 3.0});
+  double load[3] = {0.0, 0.0, 0.0};
+  for (std::size_t i = 0; i < li.cost.size(); ++i)
+    load[li.owner[i]] += li.cost[i];
+  EXPECT_EQ(load[1], 0.0);
+  EXPECT_LE(std::abs(load[0] - 562.0 / 4.0), 50.0);
+  EXPECT_EQ(load[0] + load[2], 562.0);
+  EXPECT_THROW(LadderWorkItems(s, std::vector<double>{}), InvariantError);
+  EXPECT_THROW(LadderWorkItems(s, std::vector<double>{1.0, -1.0}),
+               InvariantError);
+  // All-zero capacities fall back to the equal cut.
+  const LadderItems zero = LadderWorkItems(s, std::vector<double>{0.0, 0.0});
+  const LadderItems equal = LadderWorkItems(s, 2);
+  EXPECT_EQ(zero.owner, equal.owner);
+  EXPECT_TRUE(zero.blocks == equal.blocks);
 }
 
 TEST(commutator_work_items, invalid_part_throws) {
