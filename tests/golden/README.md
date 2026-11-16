@@ -41,9 +41,9 @@ for how the tests use them and §2 for the tolerances.
   `e2e/IT-2/hunter_gatherer/*` and `e2e/IT-10/*` (E0 changes, `e2e/README.md`), new `e2e/IT-15/*_smax10`; every
   other golden keeps its old `source` string because its numbers are unchanged (checked, `design/30` section 6,
   D47-2).
-  **Version stamps in the files (all four are equivalent for the numbers they hold, checked by regenerating):**
+  **Version stamps in the files (all five are equivalent for the numbers they hold, checked by regenerating):**
   `cb9d11ba30f579d4` (D35 only: `hamiltonian`, `hf`, `operator`, `factorized`, `e2e/IT-1..IT-7`, `IT-8/emax2`,
-  `IT-14`), `5fdd2b73265417f2` (D35 plus the imsrg++ pieces added later: `e2e/IT-8/He4_emax2`, `IT-8/emax3`, old
+  `IT-14`), `5fdd2b73265417f2` (D35 plus the imsrg++ pieces added later: old
   `IT-15`, `imsrg3`, `n7`), `0c7af4dd0112f621` (D47/D48 patch: `IT-2/hunter_gatherer`, `IT-10`, `IT-15/*_smax10`,
   and the regenerated `IT-9/He4_emax2`, `IT-9/O16_emax2` with `Operators=Rp2`) and `a908abab2eded439` (the same plus
   the divergence guard of the D48 hunk: `IT-15/*_smax10_eta`, `IT-15/*_hg`; a rerun of the IT-2/IT-10 hunter-gatherer
@@ -53,7 +53,7 @@ for how the tests use them and §2 for the tolerances.
   -0.05249001, O16 emax 3 -0.53867396 -> -0.54068122 MeV; no other number changes, same steps 192 / 154); every golden
   of the earlier stamps keeps its numbers (the hunk touches only the triples). The IT-9 emax 3 goldens still come from
   the pristine build.
-  Goldens not listed here (V2, V3_NO2B, random_H, commutator, basis, IT-9 emax 3, IT-8/emax2 divergent runs) still
+  Goldens not listed here (V2, V3_NO2B, random_H, commutator, basis, IT-9 emax 3) still
   come from the pristine build.
 * **Default build of the generation scripts (D35).** Every `tools/reference/gen_golden_*.sh` that runs
   `refharness` or `imsrg++` now defaults to the patched build (`harness-build-d35/refharness`,

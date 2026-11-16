@@ -1005,7 +1005,7 @@ the orchestrator uses `O4` and up).
   magnus.cc), so this is the transformation order. The `BchProduct` itself keeps the imsrg++ truncation
   (no -1/24 term), so the combined omega is correct to the BCH truncation only.
 * **IT3-Q9** (2026-11-16, run 3 brief A part 3) - No IT golden has a split Omega stack in the
-  perturbative triples (IT-8 is a single Omega), so the fix is validated by the BCH-level consistency
+  perturbative triples (IT-8 has split Omega stacks; He4 emax 2 has 3 Omegas), so the fix is validated by the BCH-level consistency
   test only, not by an end-to-end imsrg++ comparison (imsrg++ gives the old, inconsistent order).
   Say if a split-flow end-to-end triples test (split vs single Omega energy) is wanted.
   **Correction to the owner's premise "no change for IT-8 (single Omega)":** IT-8's Magnus flows
@@ -1018,7 +1018,7 @@ the orchestrator uses `O4` and up).
 * **IT3-Q1** (2026-11-16, run 3, brief A part 1) - The D35 patch of imsrg-devel now carries the D47 and D48 hunks
   in the same file (version stamps `0c7af4dd0112f621`, after the review fix `a908abab2eded439`); goldens whose
   numbers did not change keep their old stamps on purpose, to avoid churn: `cb9d11ba30f579d4` (IT-1..IT-7, IT-14,
-  hamiltonian, hf, ...) and `5fdd2b73265417f2` (IT-8/He4_emax2, IT-8/emax3, old IT-15, imsrg3, n7). All are listed in
+  hamiltonian, hf, ...) and `5fdd2b73265417f2` (old IT-15, imsrg3, n7; IT-8/He4_emax2 and IT-8/emax3 now carry `3b0ff5eed6806a72`, IT3-Q9). All are listed in
   `tests/golden/README.md` as equivalent. **Assumed meanwhile:** fine. Alternative: regenerate every golden once so
   that all carry the newest stamp.
 * **IT3-Q2** (2026-11-16, run 3, D48; extended after the review) - After the final gather `MagnusSolver` replaces H(s)
@@ -1042,3 +1042,10 @@ the orchestrator uses `O4` and up).
   interactions and other inputs; checkpoints and stored Omegas are written as text or gzip.
   Alternative: an additional double-precision binary variant for checkpoints (for example a
   `.bin64` suffix or a header token `prec=64`, which jIMSRG would not read). Say which.
+* **IT3-Q10** (2026-11-16, run 3 follow-ups) - `ode_tolerance` has no separately testable double behaviour (it only enters the
+  dopri5 step-size controller), so `OdeFlow.EtaCriterionIsADouble` covers `eta_criterion` for rk4 and dopri5 only.
+  **Assumed:** enough; D47-2 states ode_tolerance as double by construction.
+* **IT3-Q11** (2026-11-16, run 3 follow-ups) - The IT-8/emax2 golden carries stamp `cb9d11ba30f579d4` (patched build), so the
+  `tests/golden/README.md` "pristine" list no longer names it. **Assumed:** the divergent runs of IT-8/emax2 need no separate entry.
+* **IT3-Q12** (2026-11-16, run 3 follow-ups) - The Ctrl-C children restore the default SIGINT handler (a `&` job of a
+  non-interactive shell starts them with SIGINT ignored). **Assumed:** this matches a real terminal Ctrl-C, which is what the tests mean to cover.
