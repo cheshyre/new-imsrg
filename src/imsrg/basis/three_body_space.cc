@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <tuple>
+#include <utility>
 
 #include "imsrg/base/assert.h"
 
@@ -65,6 +66,39 @@ ThreeBodySpace::ThreeBodySpace(const ThreeBodyChannels& channels,
     num_rows += dim;
     channels_.push_back(kc);
   }
+}
+
+ThreeBodySpace::ThreeBodySpace(std::vector<KeptChannel3> channels,
+                               std::vector<OrbitTriple> triples,
+                               std::vector<std::int32_t> row_two_jab)
+    : channels_(std::move(channels)),
+      triples_(std::move(triples)),
+      row_two_jab_(std::move(row_two_jab)) {
+  std::int64_t rows = 0;
+  std::int32_t next_triple = 0;
+  row_triple_.assign(row_two_jab_.size(), -1);
+  for (const KeptChannel3& kc : channels_) {
+    IMSRG_CHECK(kc.row_offset == rows && kc.triple_begin.value() == next_triple,
+                "ThreeBodySpace: inconsistent channel offsets");
+    for (std::int32_t t = kc.triple_begin.value(); t < kc.triple_end.value();
+         ++t) {
+      const OrbitTriple& tr = triples_[static_cast<std::size_t>(t)];
+      IMSRG_CHECK(tr.row_begin.value() >= 0 &&
+                      tr.row_begin.value() <= tr.row_end.value() &&
+                      tr.row_end.value() <= kc.dim,
+                  "ThreeBodySpace: triple rows outside the channel");
+      for (std::int32_t r = tr.row_begin.value(); r < tr.row_end.value();
+           ++r) {
+        row_triple_[static_cast<std::size_t>(kc.row_offset + r)] = t;
+      }
+    }
+    rows += kc.dim;
+    next_triple = kc.triple_end.value();
+  }
+  IMSRG_CHECK(rows == static_cast<std::int64_t>(row_two_jab_.size()) &&
+                  next_triple == static_cast<std::int32_t>(triples_.size()),
+              "ThreeBodySpace: parts do not add up");
+  row_ket_.assign(row_two_jab_.size(), Ket3Index{-1});
 }
 
 const KeptChannel3& ThreeBodySpace::channel(Channel3Index ch) const {
