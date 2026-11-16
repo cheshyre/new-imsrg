@@ -216,9 +216,9 @@ TEST(commutator_general, antisymmetry_and_bilinearity) {
     X.set_hermiticity(Hermiticity::kNonHermitian);
     Y.set_hermiticity(Hermiticity::kNonHermitian);
     const Operator Z = commutator::Commutator(X, Y, CommutatorOptions{}, ws);
-    Operator Zswap = commutator::Commutator(Y, X, CommutatorOptions{}, ws);
-    Zswap *= -1.0;
-    const double danti = RelativeDeviation(Zswap, Z);
+    Operator Z_swap = commutator::Commutator(Y, X, CommutatorOptions{}, ws);
+    Z_swap *= -1.0;
+    const double danti = RelativeDeviation(Z_swap, Z);
     worst_anti = std::max(worst_anti, danti);
     EXPECT_LE(danti, kGeneralTol) << sc.label;
 

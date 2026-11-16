@@ -33,6 +33,9 @@ if [ -z "$tidy" ]; then
   fi
 fi
 if [ -z "$tidy" ]; then echo "lint: clang-tidy not found (brew install llvm)"; exit 2; fi
+# The physics-symbol patterns of .clang-tidy must match tools/physics_symbols.txt (D50).
+"${IMSRG_VENV}/bin/python" "$script_dir/gen_physics_symbols.py" --check --repo-root "$repo_root" \
+  || python3 "$script_dir/gen_physics_symbols.py" --check --repo-root "$repo_root" || exit 2
 jobs=${IMSRG_LINT_JOBS:-$(imsrg_ncpu)}
 
 if [ $# -gt 0 ]; then

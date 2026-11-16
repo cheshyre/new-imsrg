@@ -131,14 +131,15 @@ TEST(LinalgGemm, ZeroSized) {
 
 TEST(LinalgGemm, SubViewsWithLargerLd) {
   std::mt19937_64 rng(5);
-  Matrix<double> bigA = RandomMatrix<double>(rng, 10, 9);
-  Matrix<double> bigB = RandomMatrix<double>(rng, 11, 8);
-  Matrix<double> bigC = RandomMatrix<double>(rng, 12, 10);
-  // A: 4x5 at (2,1) of bigA; B: 5x3 at (3,2) of bigB; C: 4x3 at (5,4) of bigC.
-  MatrixView<const double> A{&bigA(2, 1), 4, 5, 10};
-  MatrixView<const double> B{&bigB(3, 2), 5, 3, 11};
-  MatrixView<double> C{&bigC(5, 4), 4, 3, 12};
-  Matrix<double> before = bigC;
+  Matrix<double> A_big = RandomMatrix<double>(rng, 10, 9);
+  Matrix<double> B_big = RandomMatrix<double>(rng, 11, 8);
+  Matrix<double> C_big = RandomMatrix<double>(rng, 12, 10);
+  // A: 4x5 at (2,1) of A_big; B: 5x3 at (3,2) of B_big; C: 4x3 at (5,4) of
+  // C_big.
+  MatrixView<const double> A{&A_big(2, 1), 4, 5, 10};
+  MatrixView<const double> B{&B_big(3, 2), 5, 3, 11};
+  MatrixView<double> C{&C_big(5, 4), 4, 3, 12};
+  Matrix<double> before = C_big;
   Matrix<double> ref =
       Naive<double>(1.3, A, Op::kNoTrans, B, Op::kNoTrans, 0.7, C);
   Gemm(1.3, A, Op::kNoTrans, B, Op::kNoTrans, 0.7, C);
@@ -146,9 +147,9 @@ TEST(LinalgGemm, SubViewsWithLargerLd) {
     for (std::int64_t i = 0; i < 12; ++i) {
       const bool inside = i >= 5 && i < 9 && j >= 4 && j < 7;
       if (inside)
-        EXPECT_NEAR(bigC(i, j), ref(i - 5, j - 4), 1.0e-12);
+        EXPECT_NEAR(C_big(i, j), ref(i - 5, j - 4), 1.0e-12);
       else
-        EXPECT_EQ(bigC(i, j), before(i, j));
+        EXPECT_EQ(C_big(i, j), before(i, j));
     }
 }
 
@@ -167,9 +168,9 @@ TEST(LinalgGemm, ShapeErrorsThrow) {
   EXPECT_THROW(Gemm(1.0, A.const_view(), Op::kNoTrans, B.const_view(),
                     Op::kNoTrans, 0.0, C.view()),
                imsrg::InvariantError);
-  Matrix<double> B2(4, 2), Cbad(2, 2);
+  Matrix<double> B2(4, 2), C_bad(2, 2);
   EXPECT_THROW(Gemm(1.0, A.const_view(), Op::kNoTrans, B2.const_view(),
-                    Op::kNoTrans, 0.0, Cbad.view()),
+                    Op::kNoTrans, 0.0, C_bad.view()),
                imsrg::InvariantError);
   MatrixView<const double> badld{A.view().data, 3, 4, 2};
   EXPECT_THROW(Gemm(1.0, badld, Op::kNoTrans, B2.const_view(), Op::kNoTrans,

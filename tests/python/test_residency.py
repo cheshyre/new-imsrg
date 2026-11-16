@@ -30,9 +30,22 @@ def op(o16_emax2):
 
 
 def test_default_policy_matches_the_build():
-    assert imsrg.residency_policy() == imsrg.ResidencyPolicy.Auto
-    # OpenMP/Serial: the host mirror aliases the device data, nothing to enforce.
-    assert imsrg.residency_enforced() == (imsrg.Runtime.execution_space() in ("Cuda", "HIP", "SYCL"))
+    # The suite runs under IMSRG_RESIDENCY=strict (tools/ci.sh, D51): set the user default
+    # explicitly so that the Auto policy stays tested.
+    with imsrg.residency_policy_scope(imsrg.ResidencyPolicy.Auto):
+        assert imsrg.residency_policy() == imsrg.ResidencyPolicy.Auto
+        # OpenMP/Serial: the host mirror aliases the device data, nothing to enforce.
+        assert imsrg.residency_enforced() == (imsrg.Runtime.execution_space() in ("Cuda", "HIP", "SYCL"))
+
+
+def test_environment_selects_the_initial_policy():
+    code = "import imsrg; print(imsrg.residency_policy().name)"
+    root = str(Path(imsrg.__file__).resolve().parent.parent)
+    for value, expect in (("strict", "Strict"), ("implicit", "Implicit"), ("", "Auto")):
+        env = dict(os.environ, IMSRG_RESIDENCY=value, PYTHONPATH=root)
+        out = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=120)
+        assert out.returncode == 0, out.stderr
+        assert out.stdout.strip() == expect
 
 
 def test_initial_states(o16_emax2, op):
@@ -177,11 +190,12 @@ def test_edit_context(strict, op):
 
 
 def test_implicit_policy_syncs_by_itself(op):
+    before = imsrg.residency_policy()
     with imsrg.residency_policy_scope(imsrg.ResidencyPolicy.Implicit):
         assert not imsrg.residency_enforced()
         assert op.one_body.shape == (12, 12)
         assert op.residency == Residency.Both
-    assert imsrg.residency_policy() == imsrg.ResidencyPolicy.Auto
+    assert imsrg.residency_policy() == before
 
 
 def test_writers_do_not_need_a_sync(strict, tmp_path, o16_emax2):

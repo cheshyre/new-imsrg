@@ -32,11 +32,11 @@ TEST(LinalgSolve, RandomSystems) {
       for (int j = 0; j < nrhs; ++j)
         for (int i = 0; i < n; ++i) B(i, j) = d(rng);
       Matrix<double> X = B;
-      Matrix<double> Acopy = A;
+      Matrix<double> A_copy = A;
       Solve(A.const_view(), X.view());
       for (int j = 0; j < n; ++j)
         for (int i = 0; i < n; ++i)
-          ASSERT_EQ(A(i, j), Acopy(i, j));  // A untouched
+          ASSERT_EQ(A(i, j), A_copy(i, j));  // A untouched
       Matrix<double> R(n, nrhs);
       Gemm(1.0, A.const_view(), Op::kNoTrans, X.const_view(), Op::kNoTrans, 0.0,
            R.view());

@@ -134,18 +134,18 @@ TEST(commutator_robustness, wrong_z_hermiticity_throws) {
   const Operator Y =
       imsrg::testing::RandomOperator(ms, Hermiticity::kHermitian, 12, 2);
   // [A, H] is Hermitian, so an anti-Hermitian Z is wrong.
-  Operator Zwrong(ms, OperatorSpec::Scalar(2, Hermiticity::kAntiHermitian));
+  Operator Z_wrong(ms, OperatorSpec::Scalar(2, Hermiticity::kAntiHermitian));
   for (const auto& t : AllTerms())
-    EXPECT_THROW(t.fast(X, Y, Zwrong, ws), InvariantError) << t.name;
+    EXPECT_THROW(t.fast(X, Y, Z_wrong, ws), InvariantError) << t.name;
   // [A, A] is anti-Hermitian, so a Hermitian Z is wrong.
   const Operator X2 =
       imsrg::testing::RandomOperator(ms, Hermiticity::kAntiHermitian, 13, 2);
-  Operator Zwrong2(ms, OperatorSpec::Scalar(2, Hermiticity::kHermitian));
+  Operator Z_wrong2(ms, OperatorSpec::Scalar(2, Hermiticity::kHermitian));
   for (const auto& t : AllTerms())
-    EXPECT_THROW(t.fast(X, X2, Zwrong2, ws), InvariantError) << t.name;
+    EXPECT_THROW(t.fast(X, X2, Z_wrong2, ws), InvariantError) << t.name;
   // The right hermiticity is accepted.
-  Operator Zok(ms, OperatorSpec::Scalar(2, Hermiticity::kHermitian));
-  EXPECT_NO_THROW(commutator::terms::Comm122ss(X, Y, Zok, ws));
+  Operator Z_ok(ms, OperatorSpec::Scalar(2, Hermiticity::kHermitian));
+  EXPECT_NO_THROW(commutator::terms::Comm122ss(X, Y, Z_ok, ws));
 }
 
 // Z may not alias X or Y.
