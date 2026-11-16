@@ -43,7 +43,7 @@ IMSRG_INLINE_FUNCTION RowOcc RowOccupation(const detail::N7Views& v,
 void Comm330ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                const ThreeBodyContext& ctx) {
   const detail::N7Views v = detail::PrepareN7("Comm330ss", X, Y, Z, ctx);
-  if (v.x3.data == nullptr || v.y3.data == nullptr) return;
+  if (v.x3.local == nullptr || v.y3.local == nullptr) return;
   // The scalar part of an anti-Hermitian Z vanishes (the sum below cancels
   // pairwise); skip it to keep Z0 exactly zero.
   if (Z.hermiticity() == Hermiticity::kAntiHermitian) return;

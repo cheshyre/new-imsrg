@@ -86,6 +86,8 @@ ThreeBodyOutView ThreeBodyOut(const char* term, op::Operator& Z,
       std::string(term) + ": Z's three-body layout differs from the context's");
   ThreeBodyOutView v;
   v.data = t.device_data();
+  v.row_off = t.packed() ? impl.row_off_packed.device_data()
+                         : impl.row_off_dense.device_data();
   v.packed = t.packed() ? 1 : 0;
   v.zero_diagonal = t.hermiticity() == Hermiticity::kAntiHermitian ? 1 : 0;
   return v;

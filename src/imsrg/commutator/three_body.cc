@@ -170,10 +170,19 @@ void InitKeptChannelTables(ThreeBodyContext::Impl& im,
   im.ch_triple_begin = Upload(c_tb, "commutator::comm223_ch_triple_begin");
   im.ch_triple_end = Upload(c_te, "commutator::comm223_ch_triple_end");
   im.ch_row_offset = Upload(c_row, "commutator::comm223_ch_row_offset");
-  im.ch_packed_offset =
-      Upload(im.packed_offset_host, "commutator::comm223_ch_packed_offset");
-  im.ch_dense_offset =
-      Upload(im.dense_offset_host, "commutator::comm223_ch_dense_offset");
+  std::vector<std::int64_t> rp(static_cast<std::size_t>(space.NumRows()));
+  std::vector<std::int64_t> rd(rp.size());
+  for (std::size_t c = 0; c < nc; ++c) {
+    const std::int64_t n = c_dim[c];
+    for (std::int64_t k = 0; k < n; ++k) {
+      const auto f = static_cast<std::size_t>(c_row[c] + k);
+      rp[f] =
+          im.packed_offset_host[c] + op::ThreeBody::PackedIndex(n, k, k) - k;
+      rd[f] = im.dense_offset_host[c] + k * n;
+    }
+  }
+  im.row_off_packed = Upload(rp, "commutator::n7_row_off_packed");
+  im.row_off_dense = Upload(rd, "commutator::n7_row_off_dense");
   kh.c_tb = std::move(c_tb);
   kh.c_te = std::move(c_te);
 }
@@ -467,8 +476,8 @@ std::int64_t TableBytesOf(const ThreeBodyContext::Impl& im,
   return DeviceTablesBytes(ms3) + im.sixj.size_bytes() + im.pair_third.Bytes() +
          BufferBytes(im.ch_two_j) + BufferBytes(im.ch_dim) +
          BufferBytes(im.ch_triple_begin) + BufferBytes(im.ch_triple_end) +
-         BufferBytes(im.ch_row_offset) + BufferBytes(im.ch_packed_offset) +
-         BufferBytes(im.ch_dense_offset) + BufferBytes(im.tr_a) +
+         BufferBytes(im.ch_row_offset) + BufferBytes(im.row_off_packed) +
+         BufferBytes(im.row_off_dense) + BufferBytes(im.tr_a) +
          BufferBytes(im.tr_b) + BufferBytes(im.tr_c) +
          BufferBytes(im.tr_channel) + BufferBytes(im.tr_row_begin) +
          BufferBytes(im.tr_row_end) + BufferBytes(im.tr_sym) +
@@ -507,8 +516,6 @@ detail::TileViews ThreeBodyContext::Impl::Views() const {
   v.sp.ch_row_offset = ch_row_offset.device_data();
   v.sp.ch_triple_begin = ch_triple_begin.device_data();
   v.sp.ch_triple_end = ch_triple_end.device_data();
-  v.sp.ch_packed_offset = ch_packed_offset.device_data();
-  v.sp.ch_dense_offset = ch_dense_offset.device_data();
   v.sp.tr_a = tr_a.device_data();
   v.sp.tr_b = tr_b.device_data();
   v.sp.tr_c = tr_c.device_data();
@@ -575,7 +582,11 @@ detail::N7Views ThreeBodyContext::Impl::N7(const op::Operator* X,
     }
     if (op->three_body().has_value()) {
       const op::ThreeBody& t = *op->three_body();
-      v3.data = t.device_data();
+      v3.local = t.device_data();
+      v3.halo = nullptr;
+      v3.row_buf = nullptr;
+      v3.row_off = t.packed() ? row_off_packed.device_data()
+                              : row_off_dense.device_data();
       v3.packed = t.packed() ? 1 : 0;
       v3.sign = t.hermiticity() == Hermiticity::kAntiHermitian ? -1 : 1;
     }
@@ -638,6 +649,8 @@ void detail::AddComm223(const op::Operator& X, const op::Operator& Y,
   v.x2 = X.two_body().matrix().buffer().device_data();
   v.y2 = Y.two_body().matrix().buffer().device_data();
   v.z = z.device_data();
+  v.z_row_off = z.packed() ? impl.row_off_packed.device_data()
+                           : impl.row_off_dense.device_data();
   v.zero_diagonal = h == Hermiticity::kAntiHermitian ? 1 : 0;
   if (z.packed()) {
     detail::RunComm223Tiles(v, detail::TileMode::kLowerPacked,

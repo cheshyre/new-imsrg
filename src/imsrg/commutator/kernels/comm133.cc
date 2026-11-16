@@ -32,7 +32,7 @@ IMSRG_INLINE_FUNCTION double OneBodyOnThreeBody(
     const detail::N7Views& v, const double* x1,
     const detail::ThreeBodyPartView& y3, int two_j, int p, int q, int r,
     int jpq, int s, int t, int u, int jst) noexcept {
-  if (x1 == nullptr || y3.data == nullptr) return 0.0;
+  if (x1 == nullptr || y3.local == nullptr) return 0.0;
   const int n = v.norb;
   double sum = 0.0;
   for (int k = v.ob_ch.offsets[p]; k < v.ob_ch.offsets[p + 1]; ++k) {
@@ -93,7 +93,7 @@ void Comm133ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   const detail::N7Views v = detail::PrepareN7("Comm133ss", X, Y, Z, ctx);
   const detail::ThreeBodyOutView out =
       detail::ThreeBodyOut("Comm133ss", Z, ctx);
-  if (v.x3.data == nullptr && v.y3.data == nullptr) return;
+  if (v.x3.local == nullptr && v.y3.local == nullptr) return;
   const exec::Index nrows = static_cast<exec::Index>(
       ctx.model_space_ptr()->three_body_space()->NumRows());
   exec::ParallelFor(
@@ -121,12 +121,7 @@ void Comm133ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                                               jpq, s, t, u, jst) -
                            OneBodyOnThreeBody(v, v.y1, v.x3, two_j, p, q, rr,
                                               jpq, s, t, u, jst);
-          const std::int64_t idx = out.packed != 0
-                                       ? v.sp.ch_packed_offset[ch] +
-                                             op::ThreeBody::PackedIndex(n, i, j)
-                                       : v.sp.ch_dense_offset[ch] + i +
-                                             static_cast<std::int64_t>(j) * n;
-          out.data[idx] += z;
+          out.data[detail::ThreeBodyOutIndex(out, base, i, j)] += z;
         }
       });
   exec::Fence("commutator::comm133ss");
