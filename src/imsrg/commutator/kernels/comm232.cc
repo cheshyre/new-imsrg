@@ -223,14 +223,14 @@ static_assert(std::is_trivially_copyable_v<Column>);
 /// Two half sums of one column (`HalfSumsColumn`).
 struct HalfSums {
   double first = 0.0;   ///< F[A, B] (or F[A^T, B^T]).
-  double second = 0.0;  ///< F[C, D] (or F[C^T, D^T]); 0 unless kPair.
+  double second = 0.0;  ///< F[C, D] (or F[C^T, D^T]); 0 unless Fused.
 };
 static_assert(std::is_trivially_copyable_v<HalfSums>);
 
 /// The creator-side half sum F[A, B](p, q; r s) at pair J restricted to one
 /// column `col` = ((r s) J, c) of W(B) (`w`, a W block of the batch;
 /// `trans` != 0 evaluates F[A^T, B^T] with `w` the block of B^T, the sign
-/// of which the caller applies), and for `kPair` likewise F[C, D] with C =
+/// of which the caller applies), and for `Fused` likewise F[C, D] with C =
 /// `c2` and W(D) = `u` in the same loops (C shares the two-body tables of A,
 /// `u` the layout of `w`), so the rows, the 6j and the table reads are
 /// shared; each sum's arithmetic is the same as alone. J3 and c are fixed
@@ -238,9 +238,9 @@ static_assert(std::is_trivially_copyable_v<HalfSums>);
 /// J') and triangle(J', j_q, J3), and per J' over the rows ((a b) J' q) of
 /// the visited classes (by n_c). The arithmetic per J' is that of the
 /// element-wise pair-third kernel this replaces. Preconditions: A and `w`
-/// (for `kPair` also C and `u`) are present. Cost O(J'-range * visited rows
+/// (for `Fused` also C and `u`) are present. Cost O(J'-range * visited rows
 /// of the block (q, J')).
-template <bool kPair>
+template <bool Fused>
 IMSRG_INLINE_FUNCTION HalfSums
 HalfSumsColumn(const detail::N7Views& v, const detail::Comm232TablesView& tab,
                const detail::TwoBodyView& a2, const double* w,
@@ -297,7 +297,7 @@ HalfSumsColumn(const detail::N7Views& v, const detail::Comm232TablesView& tab,
         Phase((jq + jc) / 2 + J + Jp) * xf * v.sj.Hat(Jp) / v.sj.Hat(J);
     double acc_hh = 0.0;
     double acc_pp = 0.0;
-    if constexpr (kPair) {
+    if constexpr (Fused) {
       const double* yb = c2.data + c2.block_offset[ch2];
       double acc2_hh = 0.0;
       double acc2_pp = 0.0;
