@@ -99,6 +99,18 @@ class ThreeBodySpace {
                  const SingleParticleBasis& basis, const Reference& ref,
                  const ThreeBodyCuts& cuts);
 
+  /// Assembles a reduced space from explicit parts (used by enumerations that
+  /// never materialize the full `ThreeBodyChannels`, e.g. the perturbative
+  /// triples). `channels` (with `row_offset`, `dim`, `triple_begin` and
+  /// `triple_end` filled consistently, rows and triples in channel order),
+  /// `triples` and the doubled `row_two_jab` per flat row must follow the
+  /// index conventions of the file comment (IMSRG_CHECK on the consistency of
+  /// the offsets and ranges). `row_ket(r)` of such a space is the invalid index
+  /// -1 (there is no global ket list). O(rows + triples).
+  ThreeBodySpace(std::vector<KeptChannel3> channels,
+                 std::vector<OrbitTriple> triples,
+                 std::vector<std::int32_t> row_two_jab);
+
   ThreeBodySpace(const ThreeBodySpace&) = default;
   ThreeBodySpace& operator=(const ThreeBodySpace&) = default;
   ThreeBodySpace(ThreeBodySpace&&) = default;

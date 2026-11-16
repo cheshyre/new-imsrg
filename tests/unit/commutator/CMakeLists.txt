@@ -24,6 +24,14 @@ imsrg_add_test(NAME commutator_comm223
 target_compile_definitions(commutator_comm223 PRIVATE
   IMSRG_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/tests/golden")
 
+# The perturbative triples on the reduced TriplesContext against the full
+# ThreeBodyContext path (M10-Q46, plan section 3.11).
+imsrg_add_test(NAME commutator_triples_context
+  SOURCES test_triples_context.cc ${_imsrg_exec_main}
+  DEPS commutator operator
+  LABELS unit
+  NO_GTEST_MAIN)
+
 # Row-restricted [2,2]->3 (work items from a RowSet): partition invariance,
 # bitwise.
 imsrg_add_test(NAME commutator_comm223_rows

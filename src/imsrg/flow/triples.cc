@@ -10,8 +10,8 @@
 #include "imsrg/base/assert.h"
 #include "imsrg/basis/model_space.h"
 #include "imsrg/basis/three_body_channels.h"
-#include "imsrg/basis/three_body_space.h"
 #include "imsrg/commutator/three_body.h"
+#include "imsrg/commutator/triples.h"
 
 namespace imsrg::flow {
 
@@ -54,14 +54,15 @@ TriplesResult PerturbativeTriples(MagnusSolver& solver,
   cuts.emax_3body = -1;
   cuts.de3max = options.de3max;
   cuts.occnat3_cut = options.occnat3_cut;
-  const std::shared_ptr<const basis::ModelSpace> ms3 = ms->WithThreeBody(cuts);
-  const commutator::ThreeBodyContext ctx(ms3);
+  // The reduced context holds only the hhh/ppp triples of the channels with an
+  // hhh triple (M10-Q46); the full three-body space is never built.
+  const commutator::TriplesContext ctx(ms, cuts);
 
   TriplesResult result;
   result.de =
       commutator::PerturbativeTriplesEnergy(omega, htilde, epsilon, ctx);
-  result.kept_rows = ms3->three_body_space()->NumRows();
-  result.total_kets = ms3->three_body()->SumChannelKets();
+  result.kept_rows = ctx.Counts().rows;
+  result.total_kets = ctx.Counts().rows_before_cuts;
   return result;
 }
 

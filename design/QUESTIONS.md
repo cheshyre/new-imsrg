@@ -1117,3 +1117,12 @@ the orchestrator uses `O4` and up).
   Omega of norm 0.3, not a flow-produced Omega. **Assumed:** acceptable; a flow-produced Omega
   (`refharness flow` writes none) needs a harness hook. The imsrg++ `BCH_Transform` stops at the default thresholds,
   so the golden contains truncation error of that order.
+* **M10-Q75** (2026-11-17, C12 triples) - `TriplesResult::kept_rows` / `total_kets` after the move of the perturbative
+  triples to the reduced `commutator::TriplesContext` (M10-Q46). The full three-body space is no longer built, so the
+  old meanings (all kept rows of the space; all channel kets before the cuts) cannot be counted cheaply. Nothing
+  compares them (only the driver log line "3-body states kept: X out of Y"). **Assumed:** `kept_rows` = kets of the
+  triples the context holds (hhh/ppp triples of the channels with an hhh triple, after the dE3max/OccNat3 cuts),
+  `total_kets` = the same triples' kets before those cuts. Both are documented in `flow/triples.h`; the log text
+  in `driver/run.cc` (not touched, another worker) still reads "out of", which stays correct. Also: the leg/group
+  table builders of `ThreeBodyContext::Impl` (three_body.cc) are duplicated in `commutator/triples.cc` because
+  three_body.cc was outside this task's files; a later cleanup can factor them into one internal header.

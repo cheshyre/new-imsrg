@@ -5,6 +5,7 @@
 //
 //   n7_bench --emax E [--e3max M] [--reference R] [--reps N] [--herm XY]
 //            [--terms LIST] [--checksum] [--seed S] [--count-only]
+//            [--triples]
 //
 // Operands X, Y = RandomThreeBodyOperator(ctx, h, S) and (ctx, h, S + 1) on
 // MakeThreeBodySpace(E, R, {e3max = M}); `--herm` gives the hermiticities of X
@@ -22,6 +23,15 @@
 // exact counts of the kept space (rows, triples, pair-third states, packed
 // size) and the per-term multiply-add totals of `commutator::N7CostModel`
 // with the time at two sustained rates and the memory of six operators.
+//
+// `--triples` runs the perturbative triples on the reduced
+// `commutator::TriplesContext` instead of the N7 terms (no three-body space,
+// so any emax is possible with `--count-only`): `--count-only` builds the
+// context but no operator and runs no kernel, and prints its channels,
+// triples (hhh, ppp), kept rows, pair-third states, the context bytes and the
+// multiply-adds of the tiles; without it two random IMSRG(2) operands
+// (`--herm`, `--seed`) are made and `PerturbativeTriplesEnergy` is timed
+// (`--reps`; emax <= 3 only by the project rules).
 
 #include <algorithm>
 #include <chrono>
@@ -47,11 +57,13 @@
 #include "imsrg/commutator/n7_cost.h"
 #include "imsrg/commutator/options.h"
 #include "imsrg/commutator/three_body.h"
+#include "imsrg/commutator/triples.h"
 #include "imsrg/commutator/workspace.h"
 #include "imsrg/exec/kokkos_backend.h"
 #include "imsrg/exec/runtime.h"
 #include "imsrg/operator/operator.h"
 #include "imsrg/operator/operator_spec.h"
+#include "imsrg/operator/random_operator.h"
 #include "tests/support/three_body_test_support.h"
 
 #ifndef IMSRG_BENCH_GIT_HASH
@@ -68,6 +80,7 @@ using imsrg::Hermiticity;
 constexpr char kUsage[] =
     "usage: n7_bench --emax E [--e3max M] [--reference R] [--reps N]\n"
     "                [--herm XY] [--terms LIST] [--checksum] [--seed S]\n"
+    "                [--count-only] [--triples]\n"
     "  XY: two letters of H, A, N (default AH); LIST: comma separated of\n"
     "  133,330,223,232,331,231,132,full\n";
 
@@ -80,6 +93,7 @@ struct Options {
   std::string terms = "133,330,223,232,331,231,132,full";
   bool checksum = false;
   bool count_only = false;
+  bool triples = false;
   std::uint64_t seed = 1;
 };
 
@@ -117,6 +131,8 @@ Options ParseOptions(int argc, char** argv) {
         o.checksum = true;
       } else if (a == "--count-only") {
         o.count_only = true;
+      } else if (a == "--triples") {
+        o.triples = true;
       } else if (a == "--seed") {
         o.seed = std::stoull(value());
       } else {
@@ -357,6 +373,66 @@ void Run(const Options& o) {
   }
 }
 
+/// `--triples`: the perturbative triples on the reduced `TriplesContext`.
+void RunTriples(const Options& o) {
+  imsrg::basis::ThreeBodyCuts cuts;
+  cuts.e3max = o.e3max;
+  const auto t0 = Clock::now();
+  const auto ms = imsrg::basis::ModelSpace::FromNames(
+      imsrg::basis::BasisTruncation{o.emax}, 16.0, o.reference, o.reference);
+  const double space_ms = ElapsedMs(t0);
+  const auto t1 = Clock::now();
+  const cm::TriplesContext ctx(ms, cuts);
+  imsrg::exec::Fence("n7_bench triples context");
+  const double ctx_ms = ElapsedMs(t1);
+  const cm::TriplesCounts& c = ctx.Counts();
+  std::printf("# n7_bench --triples%s git %s\n",
+              o.count_only ? " --count-only" : "", IMSRG_BENCH_GIT_HASH);
+  std::printf("emax %d e3max %d reference %s\n", o.emax, o.e3max,
+              o.reference.c_str());
+  std::printf("space_build_ms %.0f context_build_ms %.0f\n", space_ms, ctx_ms);
+  std::printf("channels %" PRId64 " triples %" PRId64 " hhh %" PRId64
+              " ppp %" PRId64 "\n",
+              c.channels, c.triples, c.triples_hhh, c.triples_ppp);
+  std::printf("rows %" PRId64 " rows_before_cuts %" PRId64 " states %" PRId64
+              "\n",
+              c.rows, c.rows_before_cuts, c.states);
+  std::printf("context_bytes %" PRId64
+              " context_GB %.3f scratch_per_team %" PRId64 "\n",
+              ctx.TableBytes(), ctx.TableBytes() / 1.0e9,
+              ctx.ScratchBytesPerTeam());
+  const auto t2 = Clock::now();
+  const cm::TriplesWork work = ctx.TileWork();
+  std::printf("tile_multiply_adds %.3e (W %.3e epilogue %.3e) count_ms %.0f\n",
+              work.Total(), work.w, work.epilogue, ElapsedMs(t2));
+  if (o.count_only) return;
+  const op::Operator x = imsrg::op::RandomOperator(
+      ms, op::OperatorSpec::Scalar(2, HermFromLetter(o.herm[0])),
+      imsrg::op::RandomOperatorOptions{.seed = o.seed});
+  const op::Operator y = imsrg::op::RandomOperator(
+      ms, op::OperatorSpec::Scalar(2, HermFromLetter(o.herm[1])),
+      imsrg::op::RandomOperatorOptions{.seed = o.seed + 1});
+  std::vector<double> eps(static_cast<std::size_t>(ms->num_orbits()));
+  const auto occ = ms->reference().occupations();
+  for (std::size_t i = 0; i < eps.size(); ++i) {
+    eps[i] = (occ[i] > 0.5 ? -30.0 : 10.0) + 2.0 * ms->basis().orbits()[i].e() +
+             0.1 * static_cast<double>(i % 7);
+  }
+  double e = cm::PerturbativeTriplesEnergy(x, y, eps, ctx);  // warm-up
+  double best = std::numeric_limits<double>::max();
+  double sum = 0.0;
+  for (int r = 0; r < o.reps; ++r) {
+    const auto t = Clock::now();
+    e = cm::PerturbativeTriplesEnergy(x, y, eps, ctx);
+    imsrg::exec::Fence("n7_bench triples");
+    const double ms_r = ElapsedMs(t);
+    best = std::min(best, ms_r);
+    sum += ms_r;
+  }
+  std::printf("triples %c%c energy %.17g best_ms %.3f mean_ms %.3f\n",
+              o.herm[0], o.herm[1], e, best, sum / o.reps);
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -369,7 +445,9 @@ int main(int argc, char** argv) {
   }
   try {
     imsrg::exec::Runtime runtime(argc, argv);
-    if (o.count_only) {
+    if (o.triples) {
+      RunTriples(o);
+    } else if (o.count_only) {
       RunCountOnly(o);
     } else {
       Run(o);

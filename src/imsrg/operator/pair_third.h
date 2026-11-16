@@ -141,10 +141,13 @@ class PairThirdSpace {
  public:
   /// Builds the states and the maps. Cost O(states * J range).
   /// Preconditions: `sixj.emax() >= basis.emax()` (IMSRG_CHECK) and `space`
-  /// was built over `basis`.
+  /// was built over `basis`. With `build_e` false the E map is not built
+  /// (`e_map()` is empty and the `e` view null; R, the states and all
+  /// indices are identical): the [2,2]->3 tiles and the perturbative triples
+  /// read R only, and E is the largest table of a big space.
   PairThirdSpace(const basis::ThreeBodySpace& space,
                  const basis::SingleParticleBasis& basis,
-                 const angmom::SixJ3Table& sixj);
+                 const angmom::SixJ3Table& sixj, bool build_e = true);
 
   PairThirdSpace(const PairThirdSpace&) = default;
   PairThirdSpace& operator=(const PairThirdSpace&) = default;
