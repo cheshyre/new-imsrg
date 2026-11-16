@@ -95,8 +95,14 @@ Layout, as A. Tichai's reader (`binary_to_vector`, `#define BINARYHEADERSIZE 255
 * **Precision:** binary32 keeps about 7 digits, so a `.bin` file does not round-trip our doubles.
   Until the owner decides otherwise (QUESTIONS O4), `.bin` is for interactions and other inputs;
   checkpoints and stored Omegas use the text or gzip variant (`%.17g`, bit for bit).
-* The same 255-byte rule gives our ME2J reader (and a later ME3J reader) imsrg++'s `.me2j.bin`
-  path for free; that reader path is a small follow-up task.
+* **Implemented for ME2J:** `io::ReadMe2j` (`src/imsrg/io/me2j.cc`, `BinaryInput`) reads
+  `.me2j.bin` (dispatch on the file suffix `.bin`; gzip stays detected by content). Checks there:
+  the file size must be exactly 255 + 4n bytes with n = `Me2jValueCount` of the file's own
+  truncation (also when only an emax prefix is read; stricter than the n-at-least rule above, a longer or shorter file is an
+  `InputError`), 64-bit sizes, chunked reads of 2^20 floats, every read checked with the file name
+  and byte offset in the message; the header is not interpreted. Tests: `Me2jBinary*` in
+  `tests/unit/io/test_me2j.cc`. `tools/reference/me2j_text_to_bin.py` converts a text or gzip
+  me2j to this form. The ME3J reader is still to do.
 
 ## 4. ME1J
 
@@ -198,7 +204,8 @@ for p in basis:
   stored Omega and transforms a list of operators; `[checkpoint]` (interval, directory) writes H(s),
   the Omega stack and the solver state (s, step, stage, ds, gather count) and restarts from them.
 * **J-range safety (D55):** the rules and tests of §8 are part of the acceptance.
-* Binary `.bin`: specified in §3.1 (D57); open: whether checkpoints need a double-precision
+* Binary `.bin`: specified in §3.1 (D57); the ME2J reader is done (§3.1), the ME3J reader and the
+  writers are open; also open: whether checkpoints need a double-precision
   binary variant (QUESTIONS O4).
 
 ## 8. J-range safety (owner requirement, D55)
