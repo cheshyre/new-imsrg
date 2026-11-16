@@ -370,14 +370,10 @@ void TwoStage(const std::string& method, const char* gdir, const char* tag,
                   r.results["imsrg"]["num_gathers"].number);
       EXPECT_NEAR(r.flow.at(o2, "E0"), gold[g2].e0, 1.0e-6);
       EXPECT_EQ(r.flow.at(o2, "E0"), stages.items[0]["e0"].number);
-      // Gathers: the "gathering Omega." lines of the imsrg++ log.
-      std::ifstream log(GoldenFile(std::string(gdir) + "/stdout.log"));
-      int gathers_gold = 0;
-      for (std::string line; std::getline(log, line);)
-        if (line.find("gathering Omega") != std::string::npos) ++gathers_gold;
-      EXPECT_EQ(static_cast<int>(r.results["imsrg"]["num_gathers"].number),
-                gathers_gold);
-      EXPECT_EQ(gathers_gold, 84);
+      // Gathers: 84 is the number of "gathering Omega." lines of the patched
+      // imsrg++ log at generation (commit fd5e0a8); the log itself is
+      // gitignored (`*.log`), so the count is stated here.
+      EXPECT_EQ(static_cast<int>(r.results["imsrg"]["num_gathers"].number), 84);
     }
     // The flow file, both stages, row by row.
     if (sc.rows) {

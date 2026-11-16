@@ -15,7 +15,7 @@
 #        the defaults are the D35 patched build (see tests/golden/README.md); the pristine build is
 #        selected by setting these variables to its paths.
 # Run directories (outside the repo): ${IMSRG_REFERENCE_RUNS}/<job>/ (default ${IMSRG_REFERENCE_ROOT}/runs-d35/e2e/)
-# Results (committed, small): tests/golden/e2e/<job>/{result.json,flow.dat,int*.snt,stdout.log}
+# Results (committed, small): tests/golden/e2e/<job>/{result.json,flow.dat,int*.snt} (stdout.log is copied too but gitignored, `*.log`)
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "${HERE}/../.." && pwd)"
