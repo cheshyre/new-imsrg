@@ -130,10 +130,10 @@ struct GroupHost {
 };
 
 /// Builds the two-body block offsets, the kept-space channel tables and the
-/// triple tables of `im` (`ImplT` is `ThreeBodyContext::Impl`); returns host
-/// copies of the channel and triple ranges.
-template <class ImplT>
-KeptHost InitKeptSpace(ImplT& im, const basis::ModelSpace& ms3) {
+/// triple tables of `im`; returns host copies of the channel and triple
+/// ranges.
+KeptHost InitKeptSpace(ThreeBodyContext::Impl& im,
+                       const basis::ModelSpace& ms3) {
   const basis::ThreeBodySpace& space = *ms3.three_body_space();
   // Two-body block offsets as op::TwoBody stores a scalar operator.
   const auto& tbc = ms3.two_body();
@@ -202,8 +202,7 @@ KeptHost InitKeptSpace(ImplT& im, const basis::ModelSpace& ms3) {
 
 /// Builds the N7 tables of `im`: 2 Jab and triple per flat kept row, the
 /// two-body block offsets, the one-body channel CSR and the comm232 tables.
-template <class ImplT>
-void InitN7Tables(ImplT& im, const basis::ModelSpace& ms3) {
+void InitN7Tables(ThreeBodyContext::Impl& im, const basis::ModelSpace& ms3) {
   const basis::ThreeBodySpace& space = *ms3.three_body_space();
   // N7 im.tables: 2 Jab and triple per flat kept row, two-body block offsets,
   // one-body channel CSR (orbits with equal (l, 2j, 2tz)).
@@ -235,8 +234,8 @@ void InitN7Tables(ImplT& im, const basis::ModelSpace& ms3) {
 
 /// Builds the orbit groups by (parity, 2tz), sorted by (2j, index), with the j
 /// blocks.
-template <class ImplT>
-GroupHost InitOrbitGroups(ImplT& im, const basis::ModelSpace& ms3) {
+GroupHost InitOrbitGroups(ThreeBodyContext::Impl& im,
+                          const basis::ModelSpace& ms3) {
   const auto orbits = ms3.basis().orbits();
   // Orbit groups by (parity, 2tz), sorted by (2j, index), with the j blocks.
   im.nj = ms3.basis().emax() + 1;
@@ -276,8 +275,7 @@ GroupHost InitOrbitGroups(ImplT& im, const basis::ModelSpace& ms3) {
 
 /// Builds the leg tables of `im`: per (third o, J, grouped position of a) the
 /// local ket index and factor, and the leg ranges.
-template <class ImplT>
-void InitLegTables(ImplT& im, const basis::ModelSpace& ms3,
+void InitLegTables(ThreeBodyContext::Impl& im, const basis::ModelSpace& ms3,
                    const GroupHost& gh) {
   const auto orbits = ms3.basis().orbits();
   const auto& tbc = ms3.two_body();
@@ -333,8 +331,7 @@ void InitLegTables(ImplT& im, const basis::ModelSpace& ms3,
 }
 
 /// Builds, per pair-third state, the two-body bases of its pair (p, q) at Jpq.
-template <class ImplT>
-void InitStateBases(ImplT& im, const basis::ModelSpace& ms3) {
+void InitStateBases(ThreeBodyContext::Impl& im, const basis::ModelSpace& ms3) {
   const auto& tbc = ms3.two_body();
   const op::PairThirdView pv = im.pair_third.host_view();
   // Per pair-third state: the two-body bases of its pair (p, q) at Jpq.
@@ -366,8 +363,7 @@ void InitStateBases(ImplT& im, const basis::ModelSpace& ms3) {
 /// Builds the tile extents and the work orders of `im`. Estimated work of bra
 /// triple t: m_t times the summed m of its ket triples (m = pair-third
 /// states).
-template <class ImplT>
-void InitWorkOrders(ImplT& im, const basis::ModelSpace& ms3,
+void InitWorkOrders(ThreeBodyContext::Impl& im, const basis::ModelSpace& ms3,
                     const KeptHost& kh) {
   const op::PairThirdView pv = im.pair_third.host_view();
   const std::size_t nt = kh.t_a.size();
@@ -435,8 +431,8 @@ void InitWorkOrders(ImplT& im, const basis::ModelSpace& ms3,
 }
 
 /// Returns the device bytes of the tables of `im` (excluding the scratch).
-template <class ImplT>
-std::int64_t TableBytesOf(const ImplT& im, const basis::ModelSpace& ms3) {
+std::int64_t TableBytesOf(const ThreeBodyContext::Impl& im,
+                          const basis::ModelSpace& ms3) {
   return DeviceTablesBytes(ms3) + im.sixj.size_bytes() + im.pair_third.Bytes() +
          BufferBytes(im.ch_two_j) + BufferBytes(im.ch_dim) +
          BufferBytes(im.ch_triple_begin) + BufferBytes(im.ch_triple_end) +
