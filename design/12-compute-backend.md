@@ -113,18 +113,39 @@ none computes a symbol inside a hot loop, and no table is a lazy cache.
 
 ## 6. MPI design (`imsrg::comm`)
 
-* `Communicator` wraps an `MPI_Comm` (or a serial stub with size 1). Methods:
-  `allreduce_sum(span<double>)`, `broadcast`, `alltoallv`, `barrier`, `rank()`, `size()`.
-* **Phase 1 (replicated data, distributed work)**: every rank holds the full 1B and 2B
-  operators. Expensive terms partition their *outer channel loop* with an `OwnershipMap`
-  (greedy by estimated cost, deterministic). Each rank computes its share into Z, and an
-  `allreduce_sum` over Z's buffers combines them. This is simple, deterministic, and enough for
-  IMSRG(2) up to emax ≈ 12–14 on CPU nodes.
-* **Phase 2 (distributed 3B data)**: 3B blocks are owned by ranks (by 3B channel), and
-  `ThreeBody` knows its local blocks. Terms that are channel-local in 3B (most of [2,3]→3,
-  [3,3]→3 pp/hh, [2,2]→3) run without communication. Terms producing 1B/2B outputs reduce with
-  `allreduce`. Terms that need recoupled (ph-type) 3B access use `alltoallv` exchanges of
-  recoupled blocks.
+* `Communicator` (`comm/communicator.h`) wraps an `MPI_Comm` (or a serial stub with size 1).
+  `comm/ownership_map.h` assigns channels to ranks (`OwnershipMap::Greedy`: LPT by estimated
+  cost, deterministic).
+* **Phase 1 (implemented; replicated data, distributed work; D59)**: every rank holds the full
+  1B and 2B operators and runs the whole pipeline.
+  * Work split (`commutator/detail/work_items.h`, `AssignWork`): the ladder terms (pp/hh,
+    including 221) by a contiguous cost-balanced cut of the global row sequence; comm122 and the
+    particle-hole term by whole channels with LPT; the cheap terms 110/220/111/121 and all N7
+    terms on rank 0; 3f2 replicated.
+  * Combine (`commutator/commutator.cc`, single exit of `Commutator()`): `ReduceBcastSum` of
+    Z0-Z2 (reduce to rank 0, then broadcast; the bits are identical on every rank by
+    construction; no `Allreduce`) and a broadcast of Z3. Span collectives are chunked at 2^30
+    elements.
+  * Driver (`driver/pipeline/mpi_sync.h`): `CheckReplicatedSetup` (occupations, 2B ket counts,
+    3B presence, thread count; throws on every rank), then rank 0 broadcasts H and the
+    transformed operators. Only rank 0 writes files and info logs. `main` calls
+    `Environment::Abort` on an exception.
+  * Collective rules (M4): norms and gathers of distributed operators are collectives, so every
+    rank calls them. No collective inside rank-0-only code. Compute every reported value before
+    any `is_root()` branch.
+  * Equal `OMP_NUM_THREADS` on all ranks (checked): bitwise identical results across ranks need
+    the same reduction order inside a rank.
+  * Results agree with one rank within max|d| <= 1e-12 max(1, max|ref|), with identical step
+    counts. Tests run 1, 2 and 4 ranks at small emax.
+  * Limit: the particle-hole term goes by whole cc channels, so large imbalance at many ranks
+    (M12b-Q3). On one node more ranks at fixed ranks x threads are slower
+    (`design/benchmarks/mpi-scaling.md`); MPI is for several nodes.
+* **Phase 2 (planned; distributed 3B data)**: rows of the 3B operators are distributed with the
+  C1 row partition; halos move in lockstep `Alltoallv` rounds. `ThreeBodyDistribution` lives on
+  the model space (new edge `basis -> comm`). Terms that are row-local run without
+  communication. Review note M2: a round takes the time of the slowest rank, summed over the
+  rounds, so cut batches by cost (not bytes), exchange `TransposeOut` once per commutator, and
+  send halos in bulk or prefetch them.
 * Determinism: reductions use a fixed order so results do not depend on rank count beyond
   floating-point reassociation. Tests run with 1, 2 and 4 ranks at emax ≤ 3 and compare.
 * The MPI tests run locally with `mpirun -n 2/4` (Open MPI from Homebrew).
