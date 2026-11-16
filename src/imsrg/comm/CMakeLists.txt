@@ -1,6 +1,6 @@
 # comm: MPI facade (Communicator, Environment) with a serial stub (design/10 section 2, layer 0).
 # mpi.h is included only by the .cc files of this module; the public headers are MPI-free.
-set(_imsrg_comm_sources environment.cc)
+set(_imsrg_comm_sources environment.cc ownership_map.cc detail/chunks.cc)
 if(IMSRG_ENABLE_MPI)
   list(APPEND _imsrg_comm_sources communicator_mpi.cc)
   set(_imsrg_comm_private_libs MPI::MPI_CXX)
