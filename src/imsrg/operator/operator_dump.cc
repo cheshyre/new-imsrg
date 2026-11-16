@@ -823,6 +823,11 @@ Operator ReadOperatorDump(std::istream& in, std::string_view name,
                           std::shared_ptr<const basis::ModelSpace> ms,
                           const OperatorDumpReadOptions& options) {
   IMSRG_CHECK(ms != nullptr);
+  if (ms->three_body_distribution() != nullptr) {
+    throw InputError(std::string(name) +
+                     ":0: cannot read an operator dump into a model space "
+                     "with distributed three-body rows");
+  }
   LineReader r(in, name);
   const ParsedHeader ph = ParseHeader(r);
   const OperatorDumpHeader& hd = ph.header;
@@ -867,6 +872,11 @@ Operator ReadOperatorDump(const std::filesystem::path& path,
 
 void WriteOperatorDump(std::ostream& out, const Operator& op,
                        const OperatorDumpWriteOptions& options) {
+  if (op.three_body() && op.three_body()->distributed()) {
+    throw InputError(
+        "WriteOperatorDump: the three-body part is distributed; gather it with "
+        "op::GatherToRoot first");
+  }
   WriteDumpHeader(out, op, options);
   WriteOneBody(out, op, op.model_space().num_orbits());
   WriteTwoBody(out, op);

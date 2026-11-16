@@ -52,7 +52,11 @@ Layer 1  linalg      Matrix views, BlockSparseMatrix storage, gemm/grouped_gemm,
                      immutable precomputed tables (device-copyable)               deps: base, exec
 Layer 2  basis       Orbit, SingleParticleBasis, Nucleus/shell names, Reference (occupations),
                      Partition (core/valence/qspace), TwoBodyChannels, ThreeBodyChannels,
-                     ParticleHoleChannels (Pandya maps), ModelSpace bundle        deps: base, exec, angmom
+                     ParticleHoleChannels (Pandya maps), ModelSpace bundle        deps: base, exec, angmom, comm
+                     (comm only for `ThreeBodyDistribution`, the row partition + communicator a
+                     ModelSpace carries so that all 3B operators of a model space share one RowSet;
+                     the alternative `operator -> comm` would let operators of one space disagree,
+                     M12b-Q1)
 Layer 3  operator    OperatorSpec, OneBody, TwoBody, ThreeBody, Operator, arithmetic, norms,
                      normal ordering, unitary basis transformation, OperatorDump (text format)
                                                                                   deps: basis, linalg, angmom, exec, base

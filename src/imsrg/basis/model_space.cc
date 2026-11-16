@@ -3,9 +3,12 @@
 
 #include "imsrg/basis/model_space.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "imsrg/base/error.h"
 #include "imsrg/basis/nucleus.h"
@@ -14,6 +17,49 @@
 namespace imsrg::basis {
 
 namespace {
+
+bool SameRows(const RowSet& a, const RowSet& b) {
+  const auto ra = a.ranges();
+  const auto rb = b.ranges();
+  if (ra.size() != rb.size()) return false;
+  for (std::size_t i = 0; i < ra.size(); ++i) {
+    if (ra[i].channel != rb[i].channel ||
+        ra[i].triple_begin != rb[i].triple_begin ||
+        ra[i].triple_end != rb[i].triple_end ||
+        ra[i].row_begin != rb[i].row_begin || ra[i].row_end != rb[i].row_end) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool SameDistribution(const ThreeBodyDistribution* a,
+                      const ThreeBodyDistribution* b) {
+  if (a == nullptr || b == nullptr) return a == b;
+  if (a->comm.rank() != b->comm.rank() || a->comm.size() != b->comm.size()) {
+    return false;
+  }
+  if (a->partition == b->partition) return true;
+  if (a->partition->num_parts() != b->partition->num_parts()) return false;
+  for (std::int32_t p = 0; p < a->partition->num_parts(); ++p) {
+    if (!SameRows(a->partition->part(p), b->partition->part(p))) return false;
+  }
+  return true;
+}
+
+/// The shared empty row set of a model space without three-body space.
+std::shared_ptr<const RowSet> EmptyRows() {
+  static const auto* const kEmpty =
+      new std::shared_ptr<const RowSet>(std::make_shared<const RowSet>());
+  return *kEmpty;
+}
+
+/// Whole rows of `space` (the empty set if null).
+std::shared_ptr<const RowSet> WholeRows(const ThreeBodySpace* space) {
+  return space == nullptr
+             ? EmptyRows()
+             : std::make_shared<const RowSet>(RowSet::Whole(*space));
+}
 
 void CheckSizes(const SingleParticleBasis& basis, const Reference& reference,
                 const Partition& partition) {
@@ -29,6 +75,8 @@ void CheckSizes(const SingleParticleBasis& basis, const Reference& reference,
 }
 
 }  // namespace
+
+ModelSpace::ModelSpace() : three_body_rows_(EmptyRows()) {}
 
 std::shared_ptr<const ModelSpace> ModelSpace::Create(SingleParticleBasis basis,
                                                      Reference reference,
@@ -83,6 +131,7 @@ std::shared_ptr<const ModelSpace> ModelSpace::WithReferenceAndPartition(
   if (three_body_ != nullptr) {
     ms->three_body_space_ = std::make_shared<const ThreeBodySpace>(
         *three_body_, *basis_, *ms->reference_, three_body_->cuts());
+    ms->three_body_rows_ = WholeRows(ms->three_body_space_.get());
   }
   return ms;
 }
@@ -93,6 +142,64 @@ std::shared_ptr<const ModelSpace> ModelSpace::WithThreeBody(
   ms->three_body_ = std::make_shared<const ThreeBodyChannels>(*basis_, cuts);
   ms->three_body_space_ = std::make_shared<const ThreeBodySpace>(
       *ms->three_body_, *basis_, *reference_, ms->three_body_->cuts());
+  ms->three_body_distribution_.reset();
+  ms->three_body_rows_ = WholeRows(ms->three_body_space_.get());
+  return ms;
+}
+
+std::shared_ptr<const ModelSpace> ModelSpace::WithThreeBodyDistribution(
+    ThreeBodyDistribution d) const {
+  if (three_body_space_ == nullptr) {
+    throw InputError(
+        "ModelSpace::WithThreeBodyDistribution: the model space has no "
+        "three-body space");
+  }
+  if (d.partition == nullptr) {
+    throw InputError(
+        "ModelSpace::WithThreeBodyDistribution: null row partition");
+  }
+  if (d.partition->num_parts() != d.comm.size()) {
+    throw InputError(
+        "ModelSpace::WithThreeBodyDistribution: the partition has " +
+        std::to_string(d.partition->num_parts()) +
+        " parts but the communicator has " + std::to_string(d.comm.size()) +
+        " ranks");
+  }
+  // The partition must cover THIS space's kept rows exactly once: all parts'
+  // ranges together are valid (FromRanges: channels, triple alignment, no
+  // overlap) and their row counts sum to the space's row count. The check is
+  // local and identical on every rank (same partition), so all ranks throw
+  // together.
+  {
+    std::vector<RowRange> all;
+    for (std::int32_t p = 0; p < d.partition->num_parts(); ++p) {
+      const auto r = d.partition->part(p).ranges();
+      all.insert(all.end(), r.begin(), r.end());
+    }
+    const RowSet covered =
+        RowSet::FromRanges(*three_body_space_, std::move(all));
+    if (covered.NumRows() != RowSet::Whole(*three_body_space_).NumRows()) {
+      throw InputError(
+          "ModelSpace::WithThreeBodyDistribution: the partition does not "
+          "cover the model space's kept three-body rows (" +
+          std::to_string(covered.NumRows()) + " rows in the parts, " +
+          std::to_string(RowSet::Whole(*three_body_space_).NumRows()) +
+          " in the space)");
+    }
+  }
+  std::shared_ptr<ModelSpace> ms(new ModelSpace(*this));
+  ms->three_body_rows_ =
+      std::make_shared<const RowSet>(d.partition->part(d.comm.rank()));
+  ms->three_body_distribution_ =
+      std::make_shared<const ThreeBodyDistribution>(std::move(d));
+  return ms;
+}
+
+std::shared_ptr<const ModelSpace> ModelSpace::WithoutThreeBodyDistribution()
+    const {
+  std::shared_ptr<ModelSpace> ms(new ModelSpace(*this));
+  ms->three_body_distribution_.reset();
+  ms->three_body_rows_ = WholeRows(three_body_space_.get());
   return ms;
 }
 
@@ -101,7 +208,10 @@ bool operator==(const ModelSpace& a, const ModelSpace& b) noexcept {
   const bool same_3b = (a.three_body_ == nullptr && b.three_body_ == nullptr) ||
                        (a.three_body_ != nullptr && b.three_body_ != nullptr &&
                         a.three_body_->cuts() == b.three_body_->cuts());
-  return same_3b && *a.basis_ == *b.basis_ && *a.reference_ == *b.reference_ &&
+  return same_3b &&
+         SameDistribution(a.three_body_distribution_.get(),
+                          b.three_body_distribution_.get()) &&
+         *a.basis_ == *b.basis_ && *a.reference_ == *b.reference_ &&
          *a.partition_ == *b.partition_;
 }
 

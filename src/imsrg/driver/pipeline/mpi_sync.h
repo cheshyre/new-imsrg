@@ -17,7 +17,10 @@ namespace imsrg::driver::pipeline {
 /// throws `RuntimeError` on every rank if not. Compared: a 64-bit FNV-1a hash
 /// of the orbit quantum numbers and the reference occupations (bits of the
 /// doubles), the number of orbits, a hash of the two-body channel ket counts,
-/// whether a three-body space exists, and `concurrency` (the thread count of
+/// whether a three-body space exists, whether the three-body rows are
+/// distributed (any rank with a distribution: every rank throws, the
+/// replicated pipeline does not support distributed three-body parts until
+/// D10/D11), and `concurrency` (the thread count of
 /// the default execution space: Kokkos reductions are deterministic only for
 /// a fixed thread count, and a last-bit difference in a norm can make one rank
 /// run one more commutator and hang in a collective). The decision uses the

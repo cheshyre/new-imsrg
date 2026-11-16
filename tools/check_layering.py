@@ -33,7 +33,7 @@ ALLOWED_DEPS: Dict[str, List[str]] = {
     "comm": ["base"],
     "linalg": ["base", "exec"],
     "angmom": ["base", "exec"],
-    "basis": ["base", "exec", "angmom"],
+    "basis": ["base", "exec", "angmom", "comm"],  # comm: ThreeBodyDistribution (M12b-Q1)
     "operator": ["basis", "linalg", "angmom", "exec", "base"],
     "io": ["operator", "basis", "base"],
     "opslib": ["operator", "basis", "angmom"],

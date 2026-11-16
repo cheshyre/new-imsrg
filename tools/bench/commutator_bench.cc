@@ -234,6 +234,37 @@ void ModelMpiRow(int emax) {
   PrintTermRow("comm122 (whole channels)", wi::Comm122WorkItems(s).cost, kRanks,
                5);
   PrintTermRow("ph 4 Ncc^2 nk (whole)", wi::PhWorkItems(s).cost, kRanks, 5);
+  // Total of the assignment: ladder + w_122 comm122 + w_ph ph loads
+  // (calibrated weights in ladder units), max over ranks over the mean; the
+  // real (joint) cut, then the old equal ladder cut for comparison.
+  for (const bool joint : {true, false}) {
+    std::printf("  %-26s w_122 %.1f  w_ph %.1f  imbalance %%:",
+                joint ? "total, calibrated weights" : "total, equal ladder cut",
+                wi::kComm122WeightInLadderUnits, wi::kPhWeightInLadderUnits);
+    for (const int r : kRanks) {
+      const wi::WorkAssignment a = wi::WorkAssignment::Build(s, 0, r);
+      std::vector<double> ladder(static_cast<std::size_t>(r), 0.0);
+      if (joint) {
+        for (int p = 0; p < r; ++p)
+          ladder[static_cast<std::size_t>(p)] = a.ladder_map().load(p);
+      } else {
+        const wi::LadderItems eq = wi::LadderWorkItems(s, r);
+        for (std::size_t i = 0; i < eq.cost.size(); ++i)
+          ladder[static_cast<std::size_t>(eq.owner[i])] += eq.cost[i];
+      }
+      double mx = 0.0, sum = 0.0;
+      for (int p = 0; p < r; ++p) {
+        const double t =
+            ladder[static_cast<std::size_t>(p)] +
+            wi::kComm122WeightInLadderUnits * a.comm122_map().load(p) +
+            wi::kPhWeightInLadderUnits * a.ph_map().load(p);
+        mx = t > mx ? t : mx;
+        sum += t;
+      }
+      std::printf(" %d:%.1f", r, 100.0 * (mx / (sum / r) - 1.0));
+    }
+    std::printf("\n");
+  }
 }
 
 /// Runs `ModelMpiRow` for emax 8, 10 and 12.
