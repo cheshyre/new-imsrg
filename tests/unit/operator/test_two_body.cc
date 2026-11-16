@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-only
 // Copyright 2026 The imsrg authors
 
 // Tests of TwoBody: block layout, orbit-based accessors with exchange phases,

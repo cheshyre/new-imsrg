@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-only
 // Copyright 2026 The imsrg authors
 
 // IMSRG(3)-N7 terms, part 4: the full commutator with the N7 term set

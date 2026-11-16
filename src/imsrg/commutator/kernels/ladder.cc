@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-only
 // Copyright 2026 The imsrg authors
 
 // Ladder (pp/hh) terms: comm222_pp_hhss, comm221ss and their fusion (design/12

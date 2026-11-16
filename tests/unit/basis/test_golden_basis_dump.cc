@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-only
 // Copyright 2026 The imsrg authors
 
 // Self-consistency of the golden basis files (imsrg-basis-dump v1) through the

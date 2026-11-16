@@ -3,7 +3,7 @@
 #
 # Runs, timing each step: submodules (init if missing) -> configure (preset, -DIMSRG_WERROR=ON)
 # -> build -> unit tests -> integration tests (only if the input data exist) -> MPI tests (only
-# if MPI is enabled) -> layering check -> clang-format and cpplint (our sources only). Tests
+# if MPI is enabled) -> layering check -> clang-format, cpplint and the license-header check (our sources only). Tests
 # labeled `slow` never run here. The last line is exactly `CI PASS <preset>` or `CI FAIL <preset>: <step>`, and
 # the exit status is nonzero on failure. Works from any worktree: it checks the checkout that
 # contains this script. Needs no network once the submodules are checked out. The layering and
@@ -204,6 +204,22 @@ step_cpplint() {
   echo "cpplint: no findings"
 }
 
+# Every tracked .h/.cc of ours (not extern/, not tests/golden/) carries the SPDX identifier
+# `GPL-3.0-only` in its first 5 lines (owner decision D46; design/17 section 2.A).
+step_license() {
+  local bad n=0 f
+  bad=$(git -C "$repo_root" ls-files -z -- '*.h' '*.cc' ':!extern' ':!tests/golden' \
+    | while IFS= read -r -d '' f; do
+        head -n 5 "$repo_root/$f" | grep -q 'SPDX-License-Identifier: GPL-3.0-only' || echo "$f"
+      done)
+  if [ -n "$bad" ]; then
+    echo "$bad"; n=$(echo "$bad" | wc -l | tr -d ' ')
+    echo "license headers: $n files lack 'SPDX-License-Identifier: GPL-3.0-only' in the first 5 lines"
+    return 1
+  fi
+  echo "license headers: all present"
+}
+
 run_step submodules step_submodules
 if ! ls "$IMSRG_DEPS_PREFIX"/kokkos-*/lib*/cmake/Kokkos/KokkosConfig.cmake >/dev/null 2>&1; then
   echo "[ci] note: no Kokkos install in $IMSRG_DEPS_PREFIX; CMake builds extern/kokkos in-tree" \
@@ -239,4 +255,5 @@ esac
 run_step layering step_layering
 run_step clang-format step_format
 run_step cpplint step_cpplint
+run_step "license headers" step_license
 finish PASS
