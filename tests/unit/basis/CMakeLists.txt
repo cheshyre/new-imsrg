@@ -32,6 +32,12 @@ imsrg_add_test(NAME basis_three_body_space
   DEPS basis
   LABELS unit)
 
+# Row ranges, row sets and balanced row partitions of the kept three-body space.
+imsrg_add_test(NAME basis_three_body_rows
+  SOURCES test_three_body_rows.cc
+  DEPS basis
+  LABELS unit)
+
 # The golden-file parser (a test helper), its self-test, and the record-by-record comparison of
 # the basis bookkeeping with every golden file (test_golden_basis.cc).
 imsrg_add_test(NAME basis_golden_dump

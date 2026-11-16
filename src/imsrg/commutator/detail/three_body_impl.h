@@ -43,10 +43,14 @@ struct ThreeBodyContext::Impl {
   /// Kept canonical space (see `detail::Space3View`).
   exec::DeviceBuffer<std::int32_t> ch_two_j, ch_dim, ch_triple_begin,
       ch_triple_end;
-  exec::DeviceBuffer<std::int64_t> ch_row_offset, ch_packed_offset,
-      ch_dense_offset;
+  exec::DeviceBuffer<std::int64_t> ch_row_offset;
   std::vector<std::int64_t> packed_offset_host;  ///< `op::ThreeBody` packed.
   std::vector<std::int64_t> dense_offset_host;   ///< `op::ThreeBody` dense.
+  /// Per flat kept row f (row k of channel ch): start of the stored row in
+  /// the `op::ThreeBody` buffer minus the column index of its first element
+  /// (see `detail::ThreeBodyPartView`): packed `block_offset(ch) +
+  /// PackedIndex(n, k, k) - k`, dense `block_offset_dense(ch) + k n`.
+  exec::DeviceBuffer<std::int64_t> row_off_packed, row_off_dense;
   exec::DeviceBuffer<std::int32_t> tr_a, tr_b, tr_c, tr_channel, tr_row_begin,
       tr_row_end, tr_sym;
 

@@ -14,6 +14,7 @@ imsrg_add_module(NAME basis
     particle_hole_channels.cc
     three_body_channels.cc
     three_body_space.cc
+    three_body_rows.cc
     model_space.cc
     device_tables.cc
   DEPS base exec)

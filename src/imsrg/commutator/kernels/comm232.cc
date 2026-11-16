@@ -143,7 +143,7 @@ IMSRG_INLINE_FUNCTION double HalfSumReference(
     const detail::N7Views& v, const detail::TwoBodyView& a2,
     const detail::ThreeBodyPartView& b3, int trans, int p, int q, int r, int s,
     int J) noexcept {
-  if (a2.data == nullptr || b3.data == nullptr) return 0.0;
+  if (a2.data == nullptr || b3.local == nullptr) return 0.0;
   const basis::TwoBodyTableView& tb = a2.tb;
   const int jp = v.ob.j2[p];
   const int jq = v.ob.j2[q];
@@ -755,7 +755,7 @@ void Comm232ssReference(const op::Operator& X, const op::Operator& Y,
                         op::Operator& Z, const ThreeBodyContext& ctx) {
   const N7Views v = PrepareN7("Comm232ss", X, Y, Z, ctx);
   const TwoBodyOutView out = TwoBodyOut("Comm232ss", Z, ctx);
-  if (v.x3.data == nullptr && v.y3.data == nullptr) return;
+  if (v.x3.local == nullptr && v.y3.local == nullptr) return;
   const std::int64_t total = Z.two_body().matrix().total_size();
   const basis::TwoBodyTableView tb = v.x2.tb;
   exec::ParallelFor(
@@ -790,8 +790,8 @@ void Comm232ssPairThird(const op::Operator& X, const op::Operator& Y,
   const N7Views v = PrepareN7("Comm232ss", X, Y, Z, ctx);
   const TwoBodyOutView out = TwoBodyOut("Comm232ss", Z, ctx);
   // [X2, Y3] needs X2 and Y3, [Y2, X3] needs Y2 and X3.
-  const bool xy = v.x2.data != nullptr && v.y3.data != nullptr;
-  const bool yx = v.y2.data != nullptr && v.x3.data != nullptr;
+  const bool xy = v.x2.data != nullptr && v.y3.local != nullptr;
+  const bool yx = v.y2.data != nullptr && v.x3.local != nullptr;
   if (!xy && !yx) return;
   const ThreeBodyContext::Impl& impl = ctx.impl();
   const Comm232Tables& tables = impl.comm232;

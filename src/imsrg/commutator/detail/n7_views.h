@@ -38,13 +38,25 @@ namespace imsrg::commutator::detail {
 /// handle (2 emax + 2 <= 32 up to emax 15).
 inline constexpr int kMaxKetTerms = 32;
 
-/// The three-body part of an operand or of Z: layout-A blocks (offsets in
-/// `Space3View::ch_packed_offset` / `ch_dense_offset`). `data == nullptr`
+/// The three-body part of an operand: layout-A rows addressed through
+/// per-row offsets (design: basis/three_body_rows.h). Row k of channel ch is
+/// the stored segment z(m, k) (packed: m >= k, dense: all m); with the flat
+/// kept row f = `Space3View::ch_row_offset[ch] + k` it starts at
+/// `buf[row_off[f]]` such that z(m, k) = `buf[row_off[f] + m]` (the offset
+/// absorbs the packed start; it may be negative). `local == nullptr`
 /// represents a missing part, which reads as zero.
 struct ThreeBodyPartView {
-  const double* data = nullptr;  ///< Device data of `op::ThreeBody`, or null.
-  std::int32_t packed = 1;       ///< 1: packed lower triangle, 0: dense blocks.
-  std::int32_t sign = 1;  ///< Packed: element (i, j), i < j, is sign (j, i).
+  /// The operand's rows (serial: the whole `op::ThreeBody` buffer), or null.
+  const double* local = nullptr;
+  /// Rows fetched from other ranks for a batch (M12b); null in serial.
+  const double* halo = nullptr;
+  /// Per flat kept row f: z(m, k) of that row is `buf[row_off[f] + m]`.
+  const std::int64_t* row_off = nullptr;
+  /// Per flat kept row: 0 local, 1 halo (-1 not resident). May be null when
+  /// `halo` is null (it is never read then).
+  const std::int8_t* row_buf = nullptr;
+  std::int32_t packed = 1;  ///< 1: packed lower triangle, 0: dense blocks.
+  std::int32_t sign = 1;    ///< Packed: element (i, j), i < j, is sign (j, i).
 };
 static_assert(std::is_trivially_copyable_v<ThreeBodyPartView>);
 
@@ -66,13 +78,23 @@ struct N7Views {
 };
 static_assert(std::is_trivially_copyable_v<N7Views>);
 
-/// The output blocks of a term that writes Z's three-body part.
+/// The output rows of a term that writes Z's three-body part.
 struct ThreeBodyOutView {
-  double* data = nullptr;   ///< Device data of Z's `op::ThreeBody`.
+  double* data = nullptr;  ///< Device data of Z's `op::ThreeBody`.
+  /// Per flat kept row f: element (i, j) of channel ch (f = `ch_row_offset
+  /// [ch]`) is `data[row_off[f + j] + i]` (i >= j if packed).
+  const std::int64_t* row_off = nullptr;
   std::int32_t packed = 1;  ///< 1: packed lower triangle (i >= j), 0: dense.
   std::int32_t zero_diagonal = 0;  ///< 1: anti-Hermitian Z, diagonal is 0.
 };
 static_assert(std::is_trivially_copyable_v<ThreeBodyOutView>);
+
+/// Index into `out.data` of element (i, j) (channel-local rows; i >= j if
+/// packed) of the channel whose first flat kept row is `ch_row0`. O(1).
+IMSRG_INLINE_FUNCTION std::int64_t ThreeBodyOutIndex(
+    const ThreeBodyOutView& out, std::int64_t ch_row0, int i, int j) noexcept {
+  return out.row_off[ch_row0 + j] + i;
+}
 
 /// One-body element (p, q) of a dense column-major n x n block, 0 for a null
 /// block. O(1).
@@ -82,21 +104,24 @@ IMSRG_INLINE_FUNCTION double OneBodyElement(const double* d, int n, int p,
 }
 
 /// Element (i, j) (channel-local rows) of channel `ch` of a three-body part,
-/// with the mirror sign for i < j in packed mode. O(1).
+/// with the mirror sign for i < j in packed mode. Rows living in the halo
+/// buffer are read from there (the halo test comes first, so serial code
+/// never reads `row_buf`). O(1).
 IMSRG_INLINE_FUNCTION double ThreeBodyLocal(const ThreeBodyPartView& t,
                                             const Space3View& sp, int ch, int i,
                                             int j) noexcept {
-  if (t.data == nullptr) return 0.0;
-  const std::int64_t n = sp.ch_dim[ch];
-  if (t.packed != 0) {
-    if (i >= j) {
-      return t
-          .data[sp.ch_packed_offset[ch] + op::ThreeBody::PackedIndex(n, i, j)];
-    }
-    return t.sign * t.data[sp.ch_packed_offset[ch] +
-                           op::ThreeBody::PackedIndex(n, j, i)];
+  if (t.local == nullptr) return 0.0;
+  const std::int64_t f = sp.ch_row_offset[ch];
+  if (t.packed != 0 && i < j) {
+    const std::int64_t r = f + i;
+    const double* buf =
+        (t.halo == nullptr || t.row_buf[r] == 0) ? t.local : t.halo;
+    return t.sign * buf[t.row_off[r] + j];
   }
-  return t.data[sp.ch_dense_offset[ch] + i + j * n];
+  const std::int64_t r = f + j;
+  const double* buf =
+      (t.halo == nullptr || t.row_buf[r] == 0) ? t.local : t.halo;
+  return buf[t.row_off[r] + i];
 }
 
 /// Channel of the three-body kets with orbits (a, b, c) and total 2J, or -1
@@ -160,7 +185,7 @@ IMSRG_INLINE_FUNCTION double ThreeBodyElement(const N7Views& v,
                                               int two_j, int a, int b, int c,
                                               int jab, int d, int e, int f,
                                               int jde) noexcept {
-  if (t.data == nullptr) return 0.0;
+  if (t.local == nullptr) return 0.0;
   const int ch = Channel3Of(v, two_j, a, b, c);
   if (ch < 0 || ch != Channel3Of(v, two_j, d, e, f)) return 0.0;
   if (v.sp.ch_dim[ch] == 0) return 0.0;

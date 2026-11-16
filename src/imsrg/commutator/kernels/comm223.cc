@@ -443,13 +443,11 @@ IMSRG_INLINE_FUNCTION void TeamTiles(const Member& team, const TileViews& v,
           tile);
       Kokkos::single(Kokkos::PerTeam(team), [&]() { acc += factor * tile; });
     } else {
-      const std::int64_t n_dim = v.sp.ch_dim[c];
       const std::int64_t rb = v.sp.tr_row_begin[T];
       const std::int64_t cb = v.sp.tr_row_begin[tp];
       const bool diagonal = tp == T;
       const bool packed = mode == TileMode::kLowerPacked;
-      const std::int64_t off =
-          packed ? v.sp.ch_packed_offset[c] : v.sp.ch_dense_offset[c];
+      const std::int64_t f = v.sp.ch_row_offset[c];
       Kokkos::parallel_for(
           Kokkos::TeamThreadRange(team, kp), [&](const std::int32_t kc) {
             const double* uc = sc.u + static_cast<std::int64_t>(kc) * m;
@@ -468,8 +466,7 @@ IMSRG_INLINE_FUNCTION void TeamTiles(const Member& team, const TileViews& v,
                   const std::int64_t i = rb + k;
                   // Each stored element belongs to exactly one tile entry, so
                   // the accumulation is race-free.
-                  v.z[off + (packed ? op::ThreeBody::PackedIndex(n_dim, i, j)
-                                    : i + j * n_dim)] += zv;
+                  v.z[v.z_row_off[f + j] + i] += zv;
                 });
           });
     }

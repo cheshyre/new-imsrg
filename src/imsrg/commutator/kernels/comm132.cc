@@ -27,7 +27,7 @@ void Comm132ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                const ThreeBodyContext& ctx) {
   const detail::N7Views v = detail::PrepareN7("Comm132ss", X, Y, Z, ctx);
   const detail::TwoBodyOutView out = detail::TwoBodyOut("Comm132ss", Z, ctx);
-  if (v.x3.data == nullptr && v.y3.data == nullptr) return;
+  if (v.x3.local == nullptr && v.y3.local == nullptr) return;
   const std::int64_t total = Z.two_body().matrix().total_size();
   const basis::TwoBodyTableView tb = v.x2.tb;
   exec::ParallelFor(
