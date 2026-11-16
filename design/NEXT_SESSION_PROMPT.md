@@ -18,7 +18,8 @@ This prompt starts the third run. (The prompts of runs 1 and 2 are in the git hi
    `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`; `"autoCompactWindow": 800000` for the orchestrator). Pick a
    permission mode that does not stall.
 2. **Launch right after a reset of your 5-hour usage window** (resets at 13:00, 18:00, 23:00, 04:00
-   JST; runs 1 and 2 each hit the limit several times) and give the wrap-up deadline in your message.
+   JST). The run follows the usage schedule below (D56): conservative (at most 50 % of each window)
+   until 20:00 JST, then normal until the wrap-up at 07:00 JST.
 3. After the run (not before): re-sync the main checkout, whose files do not follow `develop` when
    runs advance it from worktrees (`git -C /Users/cheshyre/Downloads/new-imsrg reset --hard` when it
    has no local edits of yours), and regenerate its `build/golden-generated`
@@ -52,6 +53,31 @@ And from the interview of 2026-11-15 (verbatim): "Follow the Google style guide:
 https://google.github.io/styleguide/cppguide.html Use clang-format to implement many of the basic
 formatting things automatically. Use cpp-lint to lint the code as well (but do not blindly follow the
 linter)."
+
+## Usage schedule for this run (owner, 2026-11-16, D56)
+
+Verbatim: "Modify the next session prompt to run conservatively (not consuming more than 50% of usage)
+until 8pm and then running as normal until 7am."
+
+* **Until 20:00 JST (conservative phase):** the run uses at most **50 % of each 5-hour usage window**
+  (`get_usage`; windows reset at 13:00, 18:00, 23:00, 04:00 JST), leaving the rest to the owner.
+  Check `get_usage` before launching any agent and about every 30 minutes. Run at most one lead with
+  one or two Sonnet/Haiku workers, or two Sonnet implementers without a lead; start an Opus lead in
+  this phase only if the current window is below 25 % and its task is small. At about 45 % start
+  nothing new; at 50 % have the running agents stop at their next safe point (a WIP commit), stop
+  them, and resume them with `SendMessage` at 20:00 or after the 18:00 reset, whichever comes first
+  (the 50 % cap applies again in the new window until 20:00). Work for this phase: the preflight,
+  brief A (interview tasks) with Sonnet implementers, and the out-of-repository preparation (N7 and
+  M12b plans, the patched-reference changes of brief A).
+* **From 20:00 JST (normal phase):** normal pacing as in runs 1 and 2: up to 3 leads, each window
+  used fully, stopped agents resumed with `SendMessage` after the 23:00 and 04:00 resets. Start MS2
+  (alone) at 20:00 once brief A is merged; then N7 performance in parallel with M12b phase 1. A run
+  that starts after 20:00 is in the normal phase from the start.
+* **Wrap-up at 07:00 JST:** all merges, CI, `STATUS.md`, `QUESTIONS.md`, the report and the prompts
+  are done by 07:00. Leads deliver their final reports by **06:00 JST** and keep working until then;
+  write a draft report early as insurance.
+* Every brief states the phase it starts in (with the 50 % rule if before 20:00), the 06:00 report
+  time and the 07:00 wrap-up.
 
 The owner's binding decisions are in `design/00-requirements-and-decisions.md` §2–5 (**D1–D54**) and
 in the answers in `design/QUESTIONS.md`. The most important:
@@ -152,9 +178,9 @@ in the answers in `design/QUESTIONS.md`. The most important:
 
 1. Preflight (above).
 2. **Interview tasks** (brief A; small, Sonnet implementers, one Opus review of the numerics, D42
-   for the goldens).
+   for the goldens). Runs in the conservative phase (≤ 50 % of each window until 20:00 JST).
 3. **MS2 structural style pass** (brief B), **alone** and time-boxed (about 3 h; it touches most
-   files). Meanwhile prepare outside the repository: the N7-performance and M12b implementation plans
+   files); starts at 20:00 JST, when the normal phase begins, once brief A is merged. Meanwhile prepare outside the repository: the N7-performance and M12b implementation plans
    (`new-imsrg-reference/plans/`), read-only reviews, the patched-reference changes.
 4. **N7 performance** (brief C) **in parallel with M12b phase 1** (brief D, IMSRG(2) by channel
    blocks): distribution-ready row tiling, triples at emax ≥ 8, `occ_nat3_cut`.
@@ -174,9 +200,10 @@ in the answers in `design/QUESTIONS.md`. The most important:
 * **Pace with `get_usage`:** check the usage windows before starting a big task; a stopped Opus lead
   that resumes reloads its whole context, so start long leads right after a reset and avoid
   launching new leads in the last minutes of a window. When agents stop on a limit, resume each with
-  `SendMessage` after the reset; do not start new agents for the same work. The owner sets a wrap-up
-  deadline and wants the whole window used: state it unambiguously in every brief ("keep working;
-  your final report is due by 07:00").
+  `SendMessage` after the reset; do not start new agents for the same work. This run follows the
+  usage schedule above (D56): conservative until 20:00 JST, then the whole time used until the 07:00
+  wrap-up; state it unambiguously in every brief ("keep working; your final report is due by 06:00
+  JST").
 * **Timing-sensitive tests must tolerate load**: repeat the timed action, allow retries, and run
   candidate tests 100x under `ctest -j 18` before merging them.
 * **Prepare outside the repository during exclusive tasks** (MS2 this time): reference builds and
@@ -228,7 +255,9 @@ in the answers in `design/QUESTIONS.md`. The most important:
 > `IMSRG_RESIDENCY=strict`. (5) **D50:** clang-tidy's variable ignore pattern becomes a curated
 > physics-symbol list (`tools/lint.sh` clean; no renames). Acceptance: `tools/ci.sh dev-openmp` PASS,
 > `ctest -L slow` PASS, an Opus review of (1)–(3), golden commits with reason and old/new numbers.
-> Report ≤ 250 words, due by the wrap-up deadline minus 1 h; keep working until then.
+> This task starts in the **conservative phase**: at most two Sonnet workers at a time, and the
+> orchestrator may stop and later resume you to keep usage at or below 50 % of each 5-hour window
+> until 20:00 JST. Report ≤ 250 words when done, at the latest by 06:00 JST.
 
 ## Brief B — MS2 structural style pass (ready to use; runs alone)
 
@@ -302,7 +331,13 @@ in the answers in `design/QUESTIONS.md`. The most important:
 > ME3JP; the binary `.bin` variant waits for the owner's header specification, so keep the record
 > enumeration separate from the value I/O); the evolved H by default; storing the Omega stack and a
 > `run.task = "transform"`; checkpoint/restart from these files plus a solver-state file. Write a
-> full brief from §7 of the specification when the time comes.
+> full brief from §7 of the specification when the time comes. **Non-negotiable (owner, D55):** the
+> J-range rules and tests of `19-mexj-formats.md` §8 go into that brief verbatim: per-record J ranges
+> from one function and stored in the lookup table, exactly 0.0 outside them before any offset is
+> computed, `IMSRG_CHECK` on every offset, sentinel-value tests against an independent oracle for
+> all J in the union of both sides' ranges and all orbit orderings (with the owner's emax-2 example
+> and the last record of a file), the same tests under the `asan` preset, and an Opus review that
+> reports on these rules.
 
 ## Brief G — M12a follow-ups (filler)
 

@@ -22,6 +22,14 @@ uses a static incrementing seed, so its results depend on call order. Our genera
 requested Hermiticity and the symmetries of the channel structure. The same operator is written
 as an OperatorDump so imsrg-devel can read it (§3).
 
+**File readers with random access (owner, D55).** Readers whose getters compute offsets into a
+record's block (ME2JP, ME3JP; `19-mexj-formats.md` §8) are tested with **sentinel files**: an
+independent writer in the test gives every stored entry a unique nonzero value, and the getter
+must return it for every stored entry and exactly 0.0 for every other J in the union of both
+sides' coupling ranges, for all orbit orderings, including the last record of a file; the same
+tests run under the `asan` preset before the merge. Zero or physics-valued files cannot detect an
+off-range read.
+
 ## 2. Tolerances *(owner-approved split, 2026-11-11)*
 
 Deterministic **unit-level** checks stay tight: both codes do the same arithmetic, so a looser

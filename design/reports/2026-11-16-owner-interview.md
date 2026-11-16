@@ -24,6 +24,8 @@ prompt is `design/NEXT_SESSION_PROMPT.md`.
 | Run-3 order | Interview tasks → MS2 structural pass (alone) → N7 performance (row tiling, triples ≥ 8, `occ_nat3_cut`) ∥ M12b phase 1 → M12b phase 2 → M15 tensor operators → M16 formats; M12a follow-ups and Python hooks as filler; M13 last; M14 after M12b (CUDA+HIP builds, NVIDIA tuning first) | D53 |
 | Tensor operators | First milestone covers E2/electric multipoles, M1, Gamow–Teller/Fermi and 0νββ; Magnus transformation only (no ODE flow of tensors); validation against the patched imsrg++ and an m-scheme brute force for tensors | D53 |
 | ME1J/ME2JP/ME3JP | pn-resolved ME2J/ME3J (verified from the owner's jIMSRG readers); unnormalized antisymmetrized values; readers and writers; text and gzip, binary `.bin` prepared (spec pending); evolved H by default, others on request; main uses: stored Omega with a `transform` task and checkpoint/restart; after tensor operators (owner override: me2jp/me3jp before checkpoint/restart as a separate item) | D54 |
+| J-range safety | The new ME2JP/ME3JP getters take each record's J ranges from one function and the lookup table, return exactly 0.0 outside them, check every offset, and are accepted only with sentinel-value tests against an independent oracle, an `asan` run and an Opus review of these rules (after the owner confirmed the jIMSRG `std::max` finding) | D55 (`19` §8) |
+| Run-3 schedule | Conservative until 20:00 JST (at most 50 % of each 5-hour usage window), then normal pacing; lead reports by 06:00, wrap-up 07:00 JST | D56 |
 | Process | Run-2 process kept: ≤ 3 leads, Sonnet-heavy, usage pacing, out-of-repo preparation during exclusive tasks, Opus review per numerics merge, `slow` suite before numerics merges, scripted goldens, run-2 report format, interview after every run | D53 (D42) |
 | Low-impact batches | M7-Q10/Q11, M8-Q11, M8-Q12, M8-Q20..Q22, M8-Q30..Q33, M8-Q51/Q52, M10-Q1, Q3, Q21, Q22, Q43..Q45, Q63..Q67, M11-Q10, Q12, Q16, M12-Q1..Q4 confirmed as assumed; M12-Q5 deferred to the cluster builds | QUESTIONS |
 
@@ -73,8 +75,9 @@ prompt is `design/NEXT_SESSION_PROMPT.md`.
    and the merge of this interview). With no local edits: `git -C
    /Users/cheshyre/Downloads/new-imsrg reset --hard`; then `tools/reference/gen_golden_generated.sh`
    there if you run the tests in it.
-2. Launch run 3 right after a usage reset, in the app's worktree, with a wrap-up deadline
-   (`NEXT_SESSION_PROMPT.md`).
+2. Launch run 3 right after a usage reset, in the app's worktree (`NEXT_SESSION_PROMPT.md`). It runs
+   conservatively (at most 50 % of each 5-hour window) until 20:00 JST and normally until the 07:00
+   JST wrap-up (D56).
 3. Later: the binary ME2JP/ME3JP header specification; sample ME1J/ME2JP/ME3JP files from jIMSRG would
    make good goldens; the full N2LO 3N file.
 4. Optional, in jIMSRG: `ME2JPFile::Get2BMatrixElement` computes `jj_max` with `std::max` where the
