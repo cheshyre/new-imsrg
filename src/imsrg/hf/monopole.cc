@@ -165,10 +165,9 @@ Monopole3B::Monopole3B(const op::Operator& H, const op::No2bThreeBody& v3,
                 v += v3.get_pn(oa, oc, oi, ob, od, oj, J);
               if (v == 0.0) continue;
               keys_.push_back(
-                  {static_cast<std::uint16_t>(i), static_cast<std::uint16_t>(j),
-                   static_cast<std::uint16_t>(a), static_cast<std::uint16_t>(b),
-                   static_cast<std::uint16_t>(c),
-                   static_cast<std::uint16_t>(d)});
+                  {static_cast<std::int16_t>(i), static_cast<std::int16_t>(j),
+                   static_cast<std::int16_t>(a), static_cast<std::int16_t>(b),
+                   static_cast<std::int16_t>(c), static_cast<std::int16_t>(d)});
               values_.push_back(v / static_cast<double>(oi.j2.twice + 1));
             }
           }

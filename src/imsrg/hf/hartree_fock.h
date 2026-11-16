@@ -27,7 +27,7 @@
 namespace imsrg::hf {
 
 /// How successive densities are combined.
-enum class Mixing : std::uint8_t {
+enum class Mixing : std::int8_t {
   kLinear,  ///< imsrg++ scheme: rho <- (1 - w) rho_new + w rho_old with w =
             ///< `density_mixing`.
   kDiis     ///< Pulay DIIS on the Fock matrix (no density mixing).

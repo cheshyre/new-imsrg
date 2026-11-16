@@ -70,7 +70,7 @@ struct FlowStatus {
 };
 
 /// Why `solve` stopped.
-enum class StopReason : std::uint8_t {
+enum class StopReason : std::int8_t {
   kConverged,    ///< ||eta|| < eta_criterion.
   kSmaxReached,  ///< s >= smax.
   kDiverged      ///< ||eta|| > 1e12, |E0| > 1e9 or a NaN/inf norm or energy

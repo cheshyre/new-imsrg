@@ -230,7 +230,7 @@ IMSRG_INLINE_FUNCTION constexpr bool IsHalfInteger(TwoJ j) noexcept {
 
 /// Parity of a state, (-1)^l for an orbit. Combining parities multiplies them
 /// (`operator*`).
-enum class Parity : std::uint8_t { kEven = 0, kOdd = 1 };
+enum class Parity : std::int8_t { kEven = 0, kOdd = 1 };
 
 /// Parity (-1)^l of orbital angular momentum l (l >= 0).
 IMSRG_INLINE_FUNCTION constexpr Parity ParityOfL(std::int32_t l) noexcept {
@@ -238,8 +238,8 @@ IMSRG_INLINE_FUNCTION constexpr Parity ParityOfL(std::int32_t l) noexcept {
 }
 /// Product of two parities.
 IMSRG_INLINE_FUNCTION constexpr Parity operator*(Parity a, Parity b) noexcept {
-  return static_cast<Parity>(static_cast<std::uint8_t>(a) ^
-                             static_cast<std::uint8_t>(b));
+  return static_cast<Parity>(static_cast<std::int8_t>(a) ^
+                             static_cast<std::int8_t>(b));
 }
 /// +1 for even, -1 for odd parity.
 IMSRG_INLINE_FUNCTION constexpr std::int32_t Sign(Parity p) noexcept {
@@ -247,7 +247,7 @@ IMSRG_INLINE_FUNCTION constexpr std::int32_t Sign(Parity p) noexcept {
 }
 
 /// Hermiticity of an operator: O^dagger = O, O^dagger = -O, or neither.
-enum class Hermiticity : std::uint8_t {
+enum class Hermiticity : std::int8_t {
   kHermitian,
   kAntiHermitian,
   kNonHermitian

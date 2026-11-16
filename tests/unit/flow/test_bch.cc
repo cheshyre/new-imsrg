@@ -435,8 +435,9 @@ TEST(flow_bch, SplitStackCombinationFollowsTransformationOrder) {
   Workspace ws(ms);
   const Operator H0 = RandOp(ms, Hermiticity::kHermitian, 71, 1, 5.0);
   std::vector<Operator> stack;
-  for (std::uint64_t k = 0; k < 3; ++k) {
-    stack.push_back(RandOp(ms, Hermiticity::kAntiHermitian, 72 + k, 1, 0.15));
+  for (int k = 0; k < 3; ++k) {
+    stack.push_back(RandOp(ms, Hermiticity::kAntiHermitian,
+                           static_cast<std::uint64_t>(72 + k), 1, 0.15));
   }
   Operator h0 = H0;
   Dense u = Identity(OneBodyDense(h0).n);
