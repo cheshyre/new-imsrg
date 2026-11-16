@@ -245,8 +245,8 @@ Weights in ladder units, w = (t_term / units_term) / (t_ladder / units_ladder):
 | 8 | **51.1** | **2.89** | 59 / 2.9 (emax 6: 44 / 3.0) |
 | 6 | 42.1 | 2.51 | |
 
-Using the mean instead of the minimum times at emax 8 changes the weights by less than 1 % (w_122
-50.9-51.5 over the five invocations, w_ph 2.88-2.90). The emax 6 weights are lower because the
+Per invocation (its own minima, or its means) the emax 8 weights scatter by about 1-2 % (w_122
+50.9-52.3 and w_ph 2.86-2.91 over the five invocations). The emax 6 weights are lower because the
 smaller problem is not in the asymptotic regime (comm122 is bandwidth- and overhead-bound there);
 the cut matters at emax 8 and above, where w_122 = 51 and w_ph = 2.89 apply.
 
