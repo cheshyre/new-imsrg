@@ -10,9 +10,11 @@
 /// without MPI (`IMSRG_ENABLE_MPI=OFF`) only the serial communicator exists and
 /// every collective is a local copy.
 ///
-/// Reductions use MPI's reduction order: results are identical on all ranks,
-/// but they are invariant under the rank count only up to floating-point
-/// reassociation (design/12 section 6). All collectives must be called by every
+/// Reductions use MPI's reduction order. `Allreduce*` is not guaranteed to
+/// give bitwise-identical results on all ranks (design decision M12b-Q2); only
+/// `ReduceBcastSum` (reduce to rank 0, then broadcast) is. Results are
+/// invariant under the rank count only up to floating-point reassociation
+/// (design/12 section 6). All collectives must be called by every
 /// rank of the communicator in the same order. Span collectives split
 /// messages longer than 2^30 elements into consecutive chunks (one MPI call
 /// each, same order on all ranks); `Alltoallv` does not. MPI failures are

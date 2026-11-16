@@ -52,7 +52,7 @@ and note it in STATUS.md, but do not block on it.
 | Transformed scalar operators (e.g. Rp2) | 1e-4 fm² |
 | IMSRG(3) variants at emax 2/3: N7 and 3f2 E0 | 1e-3 MeV |
 | Perturbative triples energy (end to end) | 1e-4 MeV (like MBPT; owner, 2026-11-15, D34) |
-| MPI rank-count invariance | 1e-10 relative |
+| MPI rank-count invariance | max\|d\| <= 1e-12 * max(1, max\|ref\|) over the results.json numbers and the `.snt` elements, identical step counts, identical bits of H(s) on all ranks after every step (the form of all MPI tests; M12b) |
 
 IMSRG(3) single terms follow the same 1e-10 rule, against imsrg-devel where it is correct and
 against the brute-force m-scheme reference where it is not (owner, 2026-11-15, D34).
@@ -128,7 +128,7 @@ file3e1max=6 file3e2max=12 file3e3max=18`. **Never emax > 6. IMSRG(3) only at em
 | IT-8 | Perturbative triples, O16, emax 2 and 3, 2N | E0, triples energy |
 | IT-9 | IMSRG(3)-N7 Magnus, He4 and O16, emax 2 (3 under `slow`) | E0; ⟨Rp2⟩ transformed with the IMSRG(3) commutators at emax 2 (D49, M10-Q61; golden `IT-9/*_emax2/intRp2.snt` from the patched `imsrg++ Operators=Rp2`, 1e-6 fm²) |
 | IT-10 | IMSRG(3f2) Magnus (owner's recipe, D32: hunter-gatherer, `omega_norm_max` 0.1, 1b intermediates on, 2b off), O16, emax 2 and 3 (golden data from `refharness flow --factorized`, regenerated with the recipe; imsrg++ has no executable switch) | E0 |
-| IT-11 | IT-2 with `mpirun -n 2` and `-n 4` | identical to IT-2 within 1e-10 relative |
+| IT-11 | `driver::Run` on 2 and 4 ranks against the serial run (own reference, not the goldens). Fast cases: Magnus He4 emax 2 and O16 emax 3, hunter-gatherer He4, IMSRG(3f2) He4, `flow_rk4` He4, p-shell `.snt` He4; slow cases (N7 and triples, ranks x threads fill the machine): N7 He4 emax 2 (2 ranks only), N7 O16 emax 2, perturbative triples He4 emax 2, O16 emax 3 N7 first steps (2 ranks only). Plus a step-identity test (IMSRG(2) and N7, He4 emax 2) | max\|d\| <= 1e-12 * max(1, max\|ref\|) over the results.json numbers and `.snt` elements, identical step counts, identical bits of H(s) across ranks after every step |
 | IT-12 | IT-2 driven through legacy `key=value` arguments vs TOML config | identical results |
 | IT-14 | ODE flow methods `flow_rk4` and `flow` (adaptive dopri5) with `Operators=Rp2` flowing alongside H: He4 emax 2, O16 emax 3 and 4, 2N only (goldens from the patched `imsrg++`, D42) | step and flow-line counts identical (the flow file of `flow` has one line per right-hand-side evaluation), every line within 5e-8 (printing precision), E0 within 1e-6 (acceptance 1e-3), Rp2 within 1e-6; O16 emax 4 under `slow` |
 | IT-15 | two decoupling stages with an ODE method: `flow_rk4` and `flow` with the p-shell valence space, He4 emax 2, 2N only (O16 emax 2 diverges in IMSRG(2); goldens from the patched `imsrg++`, D42); `_smax10` variants (smax 10, stage 1 stops at smax: stage 2 over [s1, s1 + smax] for RK4, `flow` and Magnus, D47), `magnus_smax10_eta` (stage 1 converges, tells s1 + smax from 2 smax apart) and `hg` (two-stage hunter-gatherer, stage 2 from the rebuilt H, D48) | `flow_rk4`: per-stage step counts (196, 96) identical, flow file within 1e-6 (measured 1e-7), E0 and the `.snt` elements within 1e-3 (measured 4e-9); `flow`: imsrg++ restarts s at 0 in stage 2 (M8-Q40), so only E0 and the `.snt` elements are compared |

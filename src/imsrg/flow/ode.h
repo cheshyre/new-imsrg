@@ -114,6 +114,9 @@ class OdeSolver {
   ///
   /// The stop reason is `kConverged` if the final ||eta|| < eta_criterion,
   /// `kSmaxReached` otherwise, `kDiverged` as for Magnus.
+  ///
+  /// Collective over the Workspace communicator: every rank calls it with
+  /// identical inputs.
   SolveResult Solve(const StatusCallback& on_status = {});
 
   /// H(s); during `Solve` (inside a status callback) the Hamiltonian that line

@@ -283,37 +283,49 @@ void RunCase(const char* name, const std::string& nucleus, int emax,
   if (world.AllreduceMax(ok ? std::int64_t{0} : std::int64_t{1}) != 0) return;
   world.Barrier();
 
+  // Rank 0 compares; every way out of this block (failed run, exception)
+  // is turned into a flag that all ranks agree on before the final barrier.
+  std::int64_t root_failed = 0;
   if (world.is_root()) {
-    const fs::path sdir = base / "serial";
-    const RunConfig scfg = Load(Toml(sdir, nucleus, emax, tables));
-    const auto t1 = std::chrono::steady_clock::now();
-    ASSERT_TRUE(TryRun(scfg, Communicator::Serial(), 0));
-    const double wall_serial = WallSince(t1);
-
-    const fs::path m0 = base / "mpi" / "rank0";
-    const Json got = ParseJson(Slurp(m0 / "results.json"));
-    const Json ref = ParseJson(Slurp(sdir / "results.json"));
-    Deviation dev;
-    dev.dir_a = m0.string();
-    dev.dir_ref = sdir.string();
-    CompareJson(got, ref, "results", "", dev);
-    for (const auto& m : dev.mismatches) ADD_FAILURE() << name << ": " << m;
-    EXPECT_LE(dev.max_rel, kTol) << name << ": worst " << dev.worst;
-    EXPECT_GT(dev.numbers, 5u);
-    std::size_t nsnt = 0;
-    const double snt_dev = CompareSntFiles(m0, sdir, nsnt);
-    for (int r = 1; r < world.size(); ++r) {
-      EXPECT_EQ(CountFiles(base / "mpi" / ("rank" + std::to_string(r))), 0u)
-          << "files written by rank " << r;
+    try {
+      const fs::path sdir = base / "serial";
+      const RunConfig scfg = Load(Toml(sdir, nucleus, emax, tables));
+      const auto t1 = std::chrono::steady_clock::now();
+      if (!TryRun(scfg, Communicator::Serial(), 0)) {
+        root_failed = 1;
+      } else {
+        const double wall_serial = WallSince(t1);
+        const fs::path m0 = base / "mpi" / "rank0";
+        const Json got = ParseJson(Slurp(m0 / "results.json"));
+        const Json ref = ParseJson(Slurp(sdir / "results.json"));
+        Deviation dev;
+        dev.dir_a = m0.string();
+        dev.dir_ref = sdir.string();
+        CompareJson(got, ref, "results", "", dev);
+        for (const auto& m : dev.mismatches) ADD_FAILURE() << name << ": " << m;
+        EXPECT_LE(dev.max_rel, kTol) << name << ": worst " << dev.worst;
+        EXPECT_GT(dev.numbers, 5u);
+        std::size_t nsnt = 0;
+        const double snt_dev = CompareSntFiles(m0, sdir, nsnt);
+        for (int r = 1; r < world.size(); ++r) {
+          EXPECT_EQ(CountFiles(base / "mpi" / ("rank" + std::to_string(r))), 0u)
+              << "files written by rank " << r;
+        }
+        const std::int64_t sm = TotalSteps(got), ss = TotalSteps(ref);
+        EXPECT_EQ(sm, ss) << name << ": steps";
+        std::printf("[IT-11] %-22s ranks %d  steps %" PRId64 "/%" PRId64
+                    "  numbers %zu  max dev %.2e "
+                    "(%s)  snt %zu files dev %.2e  wall mpi %.1f s serial "
+                    "%.1f s\n",
+                    name, world.size(), sm, ss, dev.numbers, dev.max_rel,
+                    dev.worst.c_str(), nsnt, snt_dev, wall_mpi, wall_serial);
+      }
+    } catch (const std::exception& e) {
+      ADD_FAILURE() << name << ": rank 0 comparison failed: " << e.what();
+      root_failed = 1;
     }
-    const std::int64_t sm = TotalSteps(got), ss = TotalSteps(ref);
-    EXPECT_EQ(sm, ss) << name << ": steps";
-    std::printf("[IT-11] %-22s ranks %d  steps %" PRId64 "/%" PRId64
-                "  numbers %zu  max dev %.2e "
-                "(%s)  snt %zu files dev %.2e  wall mpi %.1f s serial %.1f s\n",
-                name, world.size(), sm, ss, dev.numbers, dev.max_rel,
-                dev.worst.c_str(), nsnt, snt_dev, wall_mpi, wall_serial);
   }
+  world.AllreduceMax(root_failed);  // all ranks leave together
   world.Barrier();
 }
 

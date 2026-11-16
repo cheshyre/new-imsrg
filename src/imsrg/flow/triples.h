@@ -59,7 +59,8 @@ op::Operator CombineOmegaStack(const std::vector<op::Operator>& omegas,
 /// `Solve`, an IMSRG(2) Hamiltonian (no 3B part), scalar number-conserving
 /// operators, an initialized exec::Runtime. Complexity: the Omega product and
 /// transform (a few dozen commutators), the 3B space enumeration, and the
-/// triples kernel.
+/// triples kernel. Collective over the Workspace communicator: every rank calls
+/// it with identical inputs.
 TriplesResult PerturbativeTriples(MagnusSolver& solver,
                                   const TriplesOptions& options = {});
 
