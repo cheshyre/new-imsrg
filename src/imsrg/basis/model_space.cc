@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "imsrg/base/error.h"
 #include "imsrg/basis/nucleus.h"
@@ -163,6 +164,28 @@ std::shared_ptr<const ModelSpace> ModelSpace::WithThreeBodyDistribution(
         std::to_string(d.partition->num_parts()) +
         " parts but the communicator has " + std::to_string(d.comm.size()) +
         " ranks");
+  }
+  // The partition must cover THIS space's kept rows exactly once: all parts'
+  // ranges together are valid (FromRanges: channels, triple alignment, no
+  // overlap) and their row counts sum to the space's row count. The check is
+  // local and identical on every rank (same partition), so all ranks throw
+  // together.
+  {
+    std::vector<RowRange> all;
+    for (std::int32_t p = 0; p < d.partition->num_parts(); ++p) {
+      const auto r = d.partition->part(p).ranges();
+      all.insert(all.end(), r.begin(), r.end());
+    }
+    const RowSet covered =
+        RowSet::FromRanges(*three_body_space_, std::move(all));
+    if (covered.NumRows() != RowSet::Whole(*three_body_space_).NumRows()) {
+      throw InputError(
+          "ModelSpace::WithThreeBodyDistribution: the partition does not "
+          "cover the model space's kept three-body rows (" +
+          std::to_string(covered.NumRows()) + " rows in the parts, " +
+          std::to_string(RowSet::Whole(*three_body_space_).NumRows()) +
+          " in the space)");
+    }
   }
   std::shared_ptr<ModelSpace> ms(new ModelSpace(*this));
   ms->three_body_rows_ =

@@ -142,8 +142,12 @@ class ModelSpace {
   /// `WithReference`/`WithReferenceAndPartition` of a distributed space drop
   /// the distribution (the kept space depends on the reference, so the
   /// partition would no longer cover it): distribute the derived space again.
+  /// Collective in spirit: every rank must pass the same partition (the
+  /// validation is local and deterministic, so all ranks throw together).
   /// @throws InputError if there is no three-body space, the partition is
-  ///         null, or `partition->num_parts() != comm.size()`.
+  ///         null, `partition->num_parts() != comm.size()`, or the parts'
+  ///         ranges are not valid for this space's kept three-body rows or do
+  ///         not cover them exactly once (row counts differ).
   std::shared_ptr<const ModelSpace> WithThreeBodyDistribution(
       ThreeBodyDistribution d) const;
 
