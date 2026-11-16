@@ -104,6 +104,31 @@ Layout, as A. Tichai's reader (`binary_to_vector`, `#define BINARYHEADERSIZE 255
   `tests/unit/io/test_me2j.cc`. `tools/reference/me2j_text_to_bin.py` converts a text or gzip
   me2j to this form. The ME3J reader is still to do.
 
+**Verification note (2026-11-17, passed): imsrg++ reads a `.me2j.bin` written by our rule.** Input
+`VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz` (`file2e1max=14 file2e2max=28 file2lmax=14
+hw=16`), converted with `python3 tools/reference/me2j_text_to_bin.py <in>.gz $TMP/vnn_emax14.me2j.bin`
+(168 066 656 floats, 672 266 879 bytes = 255 + 4n, 16 s; deleted afterwards). Reference harness
+(imsrg++ with the D35 patch, `harness-build-d35/refharness`) at emax 2, He4, 2N only, text/gzip against
+`.bin`:
+
+```
+refharness hf emax=2 reference=He4 valence_space=He4 hw=16 2bme=<file> file2e1max=14 file2e2max=28 \
+    file2lmax=14 dump_hno=true out=<dir>
+refharness dump-hamiltonian emax=2 reference=He4 valence_space=He4 hw=16 2bme=<file> file2e1max=14 \
+    file2e2max=28 file2lmax=14 out=<dir>
+```
+
+imsrg++ printed `n_elem = 168066656` for the `.bin`, i.e. it took the `.bin` branch (`ReadWrite.cc:687-717`)
+and counted 255 + 4n. Compared: `hf.json` (EHF -22.989701746458095, e1hf 49.5435562546038, e2hf
+-72.5332580010619) and the dumps `V2.dump` (1596 two-body elements), `T.dump`, `H.dump`, `HNO.dump`:
+**identical in every token** (max difference 0). That is expected, not a coincidence of tolerance:
+imsrg++'s text path also parses the values into `float` (`ReadWrite.cc:882`), so text and `.bin`
+reach the same float32 values. Our reader, `imsrg method=HF emax=2 reference=He4 valence_space=He4 hw=16
+2bme=<file> file2e1max=14 file2e2max=28 file2lmax=14 intfile=<out>` (release build, text/gzip against
+`.bin`): identical log and `results.json` (e_hf -22.989701746458117, e2 -72.53325800106191; 2e-14 from
+imsrg++'s value, double-precision HF arithmetic). Not checked: the ME3J `.bin` (reader not written),
+emax above 2 (the reading code is the same; the emax-2 prefix of the file is what is read).
+
 ## 4. ME1J
 
 ```

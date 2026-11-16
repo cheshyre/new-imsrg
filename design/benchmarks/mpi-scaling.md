@@ -284,7 +284,7 @@ rank-scaling table (1 x 16, 2 x 8, 4 x 4) was not repeated; no code was changed.
 
 ### Rank-scaling table repeated on the quiet machine (05:29 JST, git a88f835)
 
-The 1 x 16, 2 x 8, 4 x 4 table above was repeated at 05:29-05:35 JST on the idle machine (Apple M5 Pro,
+The 1 x 16, 2 x 8, 4 x 4 table above was repeated at 05:29-05:31 JST on the idle machine (Apple M5 Pro,
 18 cores, nothing else running; `release-openmp` with `-DIMSRG_BUILD_BENCH=ON`, bench = develop
 a88f835, no code changes). Best of 5 invocations of 5 repetitions each (the invocation with the
 smallest full commutator; its term rows are shown). `sysctl -n vm.loadavg` is read by the script

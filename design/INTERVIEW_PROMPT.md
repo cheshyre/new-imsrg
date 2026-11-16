@@ -70,9 +70,9 @@ Format: **id** - summary; *assumption taken*; what an answer changes.
 **A. Owner actions and facts (ask first)**
 * **Main checkout:** was it re-synced (`git -C /Users/cheshyre/Downloads/new-imsrg reset --hard` when it
   has no local edits) and `tools/reference/gen_golden_generated.sh` run there? (QUESTIONS O1/O3.)
-* **Optional end-to-end check of D57:** does imsrg++ read a `.me2j.bin` written by our rule (255-byte
-  header, float32)? A. Tichai's reader was the source of the rule. Our reader is merged; the
-  converter `tools/reference/me2j_text_to_bin.py` and the refharness make the check easy.
+* **End-to-end check of D57: done (2026-11-17, no owner action).** imsrg++ (refharness) reads a
+  `.me2j.bin` written by `tools/reference/me2j_text_to_bin.py` and gives bit-identical HF energy and
+  dumps to the text file at emax 2; our `imsrg` binary does the same (`19-mexj-formats.md` section 3.1).
 * **Full N2LO 3N file** (D33): available yet? It would give full-flow goldens for IT-4/IT-5/IT-9.
 
 **B. Flow and IMSRG(3) (IT3; high impact, focused questions)**

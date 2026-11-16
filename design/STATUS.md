@@ -71,8 +71,8 @@
   the 3N test input until the owner provides a full N2LO file (D33).
 * **Blocking questions:** none. Open questions of run 3 (IT3-Q1..Q12, O4, MS2-Q1..Q4, M15-Q1..Q5,
   M12b-Q1..Q19, M10-Q70..Q79) are in `QUESTIONS.md` under "Added during run 3", with their
-  assumptions, for the interview. Owner-side open items: the full N2LO 3N file (D33), a check that
-  imsrg++ reads our `.bin` rule (D57).
+  assumptions, for the interview. Owner-side open item: the full N2LO 3N file (D33). The check that
+  imsrg++ reads our `.bin` rule (D57) is done (2026-11-17, passed; `19-mexj-formats.md` section 3.1).
 
 ## Log (append one entry per merged branch)
 
