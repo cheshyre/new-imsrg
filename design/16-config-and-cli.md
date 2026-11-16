@@ -137,13 +137,13 @@ Generator enum: `white`, `atan`, `imaginary_time`, `wegner`, `qtransfer_atan`, `
 
 | key | type | default | meaning |
 |---|---|---|---|
-| `smax` | double > 0 | `200.0` | max flow parameter per stage (Magnus: doubled for stage 2, kept; see Q12). |
+| `smax` | double > 0 | `200.0` | max flow parameter per stage (Magnus: doubled for stage 2, kept; see Q12). **To change (owner, D47):** stage 2 integrates [s1, s1 + smax] for every method. |
 | `dsmax` | double > 0 | `0.5` | max step size. |
 | `ds_0` | double > 0 | `0.5` | initial step; used only by `magnus_backoff`/flow methods and as the gate of the imaginary-time/Wegner rule (Q2). |
 | `domega` | double > 0 | `0.1` | max `\|\|eta ds\|\|`. |
 | `omega_norm_max` | double > 0 | `0.25` | norm at which Omega is split. |
-| `eta_criterion` | double > 0 | `1e-6` | convergence threshold on `\|\|eta\|\|` (old code stored this as `float`; now double). |
-| `ode_tolerance` | double > 0 | `1e-6` | absolute and relative tolerance of the adaptive `flow` method (odeint dopri5; rounded to float as imsrg++). |
+| `eta_criterion` | double > 0 | `1e-6` | convergence threshold on `\|\|eta\|\|` (old code stored this as `float`; the solver still rounds it through float, quirk P7: **to change to double, owner D47**). |
+| `ode_tolerance` | double > 0 | `1e-6` | absolute and relative tolerance of the adaptive `flow` method (odeint dopri5; rounded to float as imsrg++: **to change to double, owner D47**). |
 
 `[imsrg.omega]`
 
@@ -165,7 +165,7 @@ Generator enum: `white`, `atan`, `imaginary_time`, `wegner`, `qtransfer_atan`, `
 
 Whole table absent or all-default = IMSRG(2). Non-default keys without `in_flow` or `at_end` are errors in TOML (except `factorized`, which works with IMSRG(2) storage).
 
-**Implemented (run 2, M10 step 3):** `in_flow = true` with `variant = "n7"` (legacy `IMSRG3=true imsrg3_n7=true`), Magnus method only (V-46): the IMSRG model space gets the three-body space (`e3max` = effective `basis.e3max`, `de3max`; `emax_3body` = `emax`), H is promoted to particle rank 3 with a zero three-body part (a NO2B 3N input stays at rank-2 normal ordering), the commutators use the seven N7 terms, `threebody_threshold` and `only_2b_eta` are honoured, and the single-reference generators get the three-body part of imsrg++ (`white`, `atan`, ...; shell-model generators with IMSRG(3) are `NotImplementedError`). The residual three-body part of H and of transformed operators is dropped before output. **Still E-PLANNED:** `variant = "full"` / `"mp4"`, `at_end`, `only_2b_omega`, `no_qqq`, `occ_nat3_cut` with IMSRG(3), and `imsrg.perturbative_triples` together with `in_flow`.
+**Implemented (run 2, M10 step 3):** `in_flow = true` with `variant = "n7"` (legacy `IMSRG3=true imsrg3_n7=true`), Magnus method only (V-46): the IMSRG model space gets the three-body space (`e3max` = effective `basis.e3max`, `de3max`; `emax_3body` = `emax`), H is promoted to particle rank 3 with a zero three-body part (a NO2B 3N input stays at rank-2 normal ordering), the commutators use the seven N7 terms, `threebody_threshold` and `only_2b_eta` are honoured, and the single-reference generators get the three-body part of imsrg++ (`white`, `atan`, ...; shell-model generators with IMSRG(3) are `NotImplementedError`). The residual three-body part of H and of transformed operators is dropped before output. **Still E-PLANNED:** `variant = "full"` / `"mp4"`, `at_end`, `only_2b_omega`, `no_qqq`, `occ_nat3_cut` with IMSRG(3), and `imsrg.perturbative_triples` together with `in_flow`. **Owner, 2026-11-16 (D49):** production needs `occ_nat3_cut` (run 3: the driver passes the NAT occupations into the three-body space); the others stay E-PLANNED.
 
 | key | type | default | meaning |
 |---|---|---|---|
@@ -202,6 +202,7 @@ Old `OperatorsRPA`/`OperatorsTDA`: not supported (no schema key).
 | `flow_file` | opt path | `<directory>/<stem>.flow` | flow table. |
 | `valence_file_format` | enum `tokyo`, `nushellx`, `antoine` (PL, old code marks it buggy) | `tokyo` | format of the valence-space interaction/operator files. |
 | `write_omega` | bool | `false` | write Omega operators (and occupations, coefficient matrix) next to the interaction. |
+| `me2jp`, `me2jp_operators`, `omega` | planned (D54) | — | ME1J/ME2JP/ME3JP outputs of `19-mexj-formats.md`: the evolved H by default when `me2jp = true` (ME3JP when H has a 3B part), further scalar operators by name, the Omega stack (`omega = "me2jp"`) for a later `run.task = "transform"`; text, `.gz`, later `.bin`. Checkpoint/restart (`[checkpoint]`) uses the same files. E-PLANNED until the milestone after tensor operators. |
 | `write_ho_ops`, `write_hf_ops` | bool | `false` | write operators before the HF transformation / before the IMSRG flow (PL). |
 | `spwf` | array of strings | `[]` | orbits whose HF/NAT single-particle wave functions are written; `"valence"` = all valence orbits. |
 
@@ -591,9 +592,9 @@ Default = keep numerics; "fix" = behaviour changed deliberately. "Legacy" column
 | Q9 | second stage condition is the string compare `valence_space != reference` (R03 1.3) | fix | stage 2 runs iff `steps=2` and valence orbits exist | `nsteps=2` without valence orbits -> warning, stage skipped (old ran a useless stage) |
 | Q10 | `perturbative_triples` runs after stage 1, only for magnus; solver flag unused | keep | requires `method="magnus"` | warning if other method (old: silently ignored) |
 | Q11 | `imsrg3_at_end` replays Omega on `HNO` which has no 3N unless `IMSRG3=true` (P11) | keep numerics, document | `at_end` without `in_flow`: warning "input 3N is not included at IMSRG(3) level" | same warning. **HUMAN**: probably should normal order 3N at rank 3 whenever `at_end` is set |
-| Q12 | Magnus `smax` doubled for stage 2 (flow methods not) | keep | documented | -- |
+| Q12 | Magnus `smax` doubled for stage 2 (flow methods not) | **changed (owner, 2026-11-16, D47):** stage 2 integrates [s1, s1 + smax] for every method | documented | same |
 | Q13 | `OccNat3Cut>0` (or `basis=NAT`) triggers natural-orbital computation even with `basis=HF` (P16) | keep, make explicit | derived internally; `occ_nat3_cut` requires 3N-related IMSRG(3) or perturbative triples | same |
-| Q14 | `eta_criterion`, `ode_tolerance` pass through `float` | fix (double); effect on thresholds ~1e-8 relative | -- | -- |
+| Q14 | `eta_criterion`, `ode_tolerance` pass through `float` | fix (double); effect on thresholds ~1e-8 relative; not yet applied in the solver (M8-Q41), **owner 2026-11-16 (D47): apply it** | -- | -- |
 | Q15 | `NSmagnus`/`brueckner*` overwrite `omega_norm_max` | keep | n/a | override + warning if user value differs |
 | Q16 | `write_omega` writes nothing without `scratch` | fix | always writes | same |
 | Q17 | imsrg++ has no HF-accelerator key: it always uses linear density mixing (D37) | add `hartree_fock.mixing` | default `diis` | default `linear` (absent key); an explicit `--set hartree_fock.mixing=diis` is honoured |

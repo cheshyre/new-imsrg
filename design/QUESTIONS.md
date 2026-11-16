@@ -408,6 +408,10 @@ further design decisions (D30–D42 in `00-requirements-and-decisions.md`; repor
   correspondence with imsrg++ and the literature. **Assumed meanwhile:** they keep their capitals;
   documented as exception 6 in design/17 section 3; `.clang-tidy` accepts any variable name with a
   capital. Reversible by a clang-tidy run if the owner prefers strict snake_case.
+  **Answer (owner, 2026-11-16):** keep the physics capitals (exception 6), but tighten the
+  clang-tidy check: the ignore pattern (today any name containing a capital, which also lets
+  camelCase names through) becomes a curated physics-symbol list (X, Y, Z, H, J, Jp, Tz, hw_MeV,
+  twoJ, ... as names or name parts). A small run-3 task, no renames (D50).
 * **MS-Q2** (2026-11-15, MS Google style) - The guide lets accessors and mutators keep variable-style
   names. **Assumed meanwhile:** an accessor is a const method returning a property or part of the
   object, possibly selected by an index or key (`num_orbits()`, `orbit(i)`, `spec()`,
@@ -415,19 +419,34 @@ further design decisions (D30–D42 in `00-requirements-and-decisions.md`; repor
   PascalCase (static factories too: `ModelSpace::FromNames`). The 199-name allowlist is in
   `.clang-tidy` (design/17 section 3 item 7). Alternative: PascalCase for all methods (would collide
   with type names such as `Orbit`, `Channel`, `Reference`, `Partition`, `ModelSpace`).
+  **Answer (owner, 2026-11-16):** keep the rule as applied in run 2: accessors and `set_*` mutators
+  snake_case, every other method PascalCase, allowlist in `.clang-tidy` (D50).
 * **MS-Q3** (2026-11-15, MS Google style) - Header guards outside `src/` use cpplint's fallback, the
   path from the repository root without the `IMSRG_` prefix (`TESTS_UNIT_HF_HF_TEST_SUPPORT_H_`,
   `PYTHON_SRC_BINDINGS_H_`). **Assumed meanwhile:** fine (unique, and what the blocking cpplint step
   accepts); an `IMSRG_` prefix there would need NOLINTs or extra CPPLINT.cfg files.
+  **Answer (owner, 2026-11-16):** confirmed as assumed (engineering batch).
 * **MS-Q4** (2026-11-15, MS Google style) - `AUTHORS` lists the owner (taken from the git history) as
   the copyright holder named by "Copyright 2026 The imsrg authors"; the SPDX line says
   `GPL-3.0-or-later` as written in design/17 section 2.A (LICENSE is the GPL-3.0 text). **Assumed
   meanwhile:** as written; please confirm the holder list and "or later".
+  **Answer (owner, 2026-11-16):** GPL-3.0-only, not "or later"; the holder list stays as written
+  (AUTHORS). Every SPDX line becomes `// SPDX-License-Identifier: GPL-3.0-only` (D46, amends
+  D17/D38); still compatible with imsrg++ (GPL-2.0-or-later). Implemented during the interview at
+  the owner's request: `feature/license-gpl3-only` merged into `develop` (6bcca88; `tools/ci.sh
+  dev-openmp` PASS, new step `license headers`).
 * **MS-Q5** (2026-11-15, MS Google style) - Structural items not converted (design/17 section 6):
   inline functions over ~10 lines in headers (device-code lookups, templates, header-only test
   helpers), the 36 structs with member functions, functions over ~40 lines, unsigned types.
   **Assumed meanwhile:** guidelines for new code, not worth a churn of the existing code; device
   lookups stay inline for performance. Schedule a cleanup task if wanted.
+  **Answer (owner, 2026-11-16):** scheduled task with priority: a full structural pass in run 3,
+  ahead of tensor operators. Structs with member functions that hold invariants become classes,
+  unsigned types become signed except sizes and bit patterns, functions over about 40 lines are
+  split, long inline functions in headers move to `.cc` files (device-code lookups and templates
+  excepted); results bitwise identical (D50). Placement (owner, same interview): first in run 3,
+  right after the small interview tasks, alone and time-boxed, with the N7 and MPI work prepared
+  outside the repository meanwhile (D53).
 * **O3** (2026-11-15, orchestrator) — **Run 2 started in an app worktree again, not in the main
   checkout (D31 not met).** The desktop app opened the session in
   `.claude/worktrees/imsrg-rewrite-run-2-36094d` (branch `claude/imsrg-rewrite-run-2-36094d`, at
@@ -444,6 +463,12 @@ further design decisions (D30–D42 in `00-requirements-and-decisions.md`; repor
   has no local edits, else `read-tree -m -u <old> develop`). **Assumed meanwhile:** acceptable, as in
   run 1. To start a run in the main checkout, the session has to be opened there without a
   worktree (app setting).
+  **Answer (owner, 2026-11-16):** the main checkout was synced and `build/golden-generated`
+  regenerated after run 2 ("Already done"). Runs start in an app worktree from now on: the staging
+  procedure (merge on the worktree branch, then `tools/ci.sh dev-openmp && git update-ref
+  refs/heads/develop <new> <old>`, chained to the exit codes, with `ctest -L slow` for numerics
+  merges) is the standard, not a fallback (D44, amends D31). The owner re-syncs the main checkout
+  after each run (owner action in every run report).
 
 ### M8-Q10 (hunter-gatherer, `H(s)` after the final gather)
 imsrg++ `GatherOmega` rebuilds `H_saved` from `H_0` through the gathered Omega but leaves `H(s)`
@@ -453,6 +478,16 @@ first eta comes from the pre-gather `H(s)`. **Assumed:** copy imsrg++ (orchestra
 the IT-10 and `IT-2/hunter_gatherer` goldens depend on it. A cleaner variant (re-evaluate `H(s)` from
 the gatherer, or gather before the next stage) would be an option with a deviation entry.
 
+**Answer (owner, 2026-11-16):** after the final gather of a hunter-gatherer solve, H(s) becomes the
+H rebuilt from H0 with the gathered Omega (`h_ = h_saved_`), so E0 and every transformed operator
+come from the one gathered Omega, which is what hunter-gatherer exists for in 3f2 (D32). Measured
+during the interview (patch on `develop` c2fef30): ΔE0 = -13.4 keV (IT-10 O16 emax 2, 24 gathers),
++2.8 keV (IT-10 He4 emax 2, 8), -43 keV (IT-2 hunter-gatherer O16 emax 4, omega_norm_max 0.25, 8
+gathers), -22 keV (0.1, 21 gathers), -8.1 keV (He4 emax 2, 7 gathers); step and gather counts and
+the trajectories are unchanged. The rebuilt H is not flowed further; stage 2 starts from it. The D35
+patch of imsrg-devel gets the same change, the IT-10 and hunter-gatherer goldens are regenerated
+through `tools/reference` (D42), and the deviation goes into `30` section 6 (D48).
+
 ### M8-Q11 (hunter-gatherer, gather count and `set_generator`)
 `SolveResult::num_gathers` counts the loop gathers plus the final gather (as the `gathering Omega.`
 log lines of imsrg++; the goldens' `n_gathers`). A gather inside `set_generator` (hunter non-zero,
@@ -460,6 +495,8 @@ which cannot happen after a hunter-gatherer `Solve`) is counted in `MagnusSolver
 `results.json` has `imsrg.num_gathers` (solver total) and `imsrg.stages[].num_gathers`.
 `imsrg.omega.hunter_gatherer` is rejected nowhere any more; `imsrg.omega.storage = scratch/discard`
 with hunter-gatherer is unchanged (not implemented either way).
+
+**Answer (owner, 2026-11-16):** confirmed as assumed (config/Python batch).
 
 ### M8-Q12 (flow fixes: ds with `magnus_adaptive = false`, divergence on NaN)
 (1) imsrg++'s member `ds` is set by `SetDs(ds_0)` and capped by `SetDsmax`; with `magnus_adaptive = false`
@@ -470,6 +507,8 @@ unlike imsrg++ (`FlowingOps[0] *= 1.0/0.0`) H is left as it is. (3) `denominator
 rejected by `ComputeGenerator` with `InputError` (0 would disable the floor and give inf/NaN).
 (4) `imsrg.omega.storage = scratch|discard` is `Phase::kPlanned` in the enum table (E-PLANNED at
 validation); the round-trip tests use `memory`.
+
+**Answer (owner, 2026-11-16):** confirmed as assumed (low-impact numerics batch).
 * **M8-Q20** (2026-11-15, M8 D35 task) - D35 asks that "wherever the code computes a charge radius" the
   Rso contribution is added. The code has no charge-radius computation yet (design/16 section 6 assigns
   `PROTON_RCH2`, `NEUTRON_RCH2`, `DARWIN_FOLDY` to the output stage), so only the catalog operator `Rso`
@@ -478,6 +517,7 @@ validation); the round-trip tests use `memory`.
   output-stage task implements it that way. Not blocking.
   **Resolved (run 2, M8 charge-radius task):** implemented in `driver/pipeline/charge_radius.h`, written to
   `results.json` as `charge_radius` (schema version 3), see design/13 section 8 and M8-Q50..Q52.
+  **Answer (owner, 2026-11-16):** confirmed as implemented (see M8-Q50..Q52).
 * **M8-Q21** (2026-11-15, M8 D35 task) - The gitignored emax-4 dumps in `build/golden-generated` (read
   through `IMSRG_GENERATED_GOLDEN_DIR` by `opslib_golden`, `hf_*`, `io_*` emax-4 tests) must come from the
   patched build too; with dumps from the pristine build `Emax4TrelAndRp2` fails (Rp2 differs by 0.063).
@@ -487,29 +527,37 @@ validation); the round-trip tests use `memory`.
   **Resolved (2026-11-15, M8 review follow-up):** every `gen_golden_*.sh` now defaults to the patched
   harness, so `tools/reference/gen_golden_generated.sh` alone regenerates `build/golden-generated` with
   the right build; each checkout runs it once (`tests/golden/README.md`).
+  **Answer (owner, 2026-11-16):** confirmed (resolved).
 * **M8-Q22** (2026-11-15, M8 D35 task) - `tools/reference/refharness.cpp` and `gen_golden_flow.sh` were
   edited (a few lines each: `IMSRG_REFERENCE_SHA_FILE`, `IMSRG_GOLDEN_E2E_OUT`, `FLOW_JOBS`); the
   hunter-gatherer task edits the same two files, so the merge may need a manual resolution of
   neighbouring hunks. **Assumed meanwhile:** the orchestrator resolves it (both changes are independent). **Resolved at the merge (orchestrator, 2026-11-15):** `gen_golden_flow.sh` taken from the hunter-gatherer branch, which already contains the D35 overrides; `refharness.cpp` merged automatically.
+  **Answer (owner, 2026-11-16):** confirmed (resolved).
 * **M8-Q30** (2026-11-15, M8 config/driver task) - Relative paths (D37): a TOML *file*'s values resolve
   against the file's directory, but the **default** `output.directory = "output"` (no key in the file)
   and `--set` values resolve against the working directory. Alternative: default relative to the config
   directory too. **Assumed meanwhile:** working directory (an output default is not a path "in the
   config"); implemented in `LoadConfig` and documented in design/16 1.8. The TOML examples name their
   inputs without a directory, so they run from a directory that holds the data (`examples/config/README.md`).
+  **Answer (owner, 2026-11-16):** confirmed as assumed (config/Python batch).
 * **M8-Q31** (2026-11-15, M8 config/driver task) - `results.json` schema version: the layout was
   already new in run 2 (nothing released), so `schema_version = 1` covers the table as documented,
   including `e_mp2`, `imsrg.num_gathers` and the NAT-basis meaning of `e_reference`/`e_mp2`. **Assumed:**
   bump to 2 only for the first change after a release; the table test fails on any undocumented key.
+  **Answer (owner, 2026-11-16):** confirmed with the policy as practised: `schema_version` is bumped
+  on every documented schema change (1 to 2 to 3 in run 2), each with a changelog entry in `16`; the
+  table test fails on any undocumented key (config/Python batch).
 * **M8-Q32** (2026-11-15, M8 config/driver task) - `hartree_fock.mixing = "diis"` (the new TOML default)
   stops at the same HF tolerance with fewer iterations but changes E_HF at the 1e-8 MeV level and may
   change flow step counts relative to imsrg++. **Assumed:** the integration tests that reproduce
   imsrg++ step counts (IT-2..IT-7, IT-12, hunter-gatherer) set `mixing = "linear"` explicitly; legacy
   command lines get `linear` automatically.
+  **Answer (owner, 2026-11-16):** confirmed as assumed (low-impact numerics batch).
 * **M8-Q33** (2026-11-15, M8 config/driver task) - NAT basis in the driver covers `natural_orbitals`
   defaults only: `use_occupations = true` and `order = "energy"` are `E-PLANNED` (M9-Q3, D36). The NAT
   reference occupations are those of the HF solution (closed shells; ensemble references untested).
   New `hf::SolutionInBasis` is the public API replacing the test-only `hf::detail` coupling (M9-Q1).
+  **Answer (owner, 2026-11-16):** confirmed as assumed (config/Python batch).
 
 ### M8-Q40 (F2b: deviations of the ODE flow methods from imsrg++)
 (1) imsrg++'s adaptive `flow` method integrates a COPY of the solver (`auto system = *this;`,
@@ -526,49 +574,82 @@ that is always zero). (5) Tensor operators and operators that are not number con
 `shell-model-atan` denominator-cutoff switch (1e-6 after ||eta|| < 1): a no-op there because the
 default cutoff is already 1e-6; `flow_rk4` reproduces the 1.0 -> 1e-6 switch.
 
+**Answer (owner, 2026-11-16):** items (1) continuing s, (2) the divergence guard, (4) the
+ConfigError for hunter-gatherer with a flow method and (7) no shell-model-atan switch in the Magnus
+path are confirmed. In addition, stage 2 integrates [s1, s1 + smax] for every method (Magnus,
+`flow_rk4`, `flow`): this replaces imsrg++'s doubled Magnus smax and fixes the empty `flow_rk4`
+stage 2 when stage 1 reached smax (D47). Goldens stay where stage 2 converges before its end; a case
+that stops at smax (check IT-15 RK4) is regenerated from the patched reference with the reason and
+old/new numbers (D42).
+
 ### M8-Q41 (F2b: `ode_tolerance` as float)
 The tolerance is rounded to float (`static_cast<double>(static_cast<float>(tol))`) like imsrg++'s
 `SetODETolerance(float)`, so 1e-6 is 9.99999997e-7; the goldens' step counts depend on it only at
 round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as for `eta_criterion`
 (quirk P7). One line to change if the owner prefers double.
+
+**Answer (owner, 2026-11-16):** double for both `eta_criterion` and `ode_tolerance`, as `16` Q14
+designed (quirk P7 dropped). The thresholds move by 3e-9 relative; if a golden step count flips, the
+D35 patch of imsrg-devel gets the same change and the golden is regenerated with the reason and
+old/new numbers (D42) (D47).
 * **M10-Q20** (2026-11-15, M10 3f2) - Only the topologies with one-body intermediates of the
   factorized double commutator are implemented (the D32 recipe). `FactorizedOptions::
   two_body_intermediates` / `[imsrg3] factorized_2b_intermediates = true` throw NotImplementedError /
   E-PLANNED. **Assumed meanwhile:** the 2b topologies (imsrg++ `comm223_231_chi2b`,
   `comm223_232_chi2b`, Pandya-transformed intermediates, about 25 two-body operators of memory) are
   needed only if the owner wants the imsrg++ default (both on). Say if they should be scheduled.
+  **Answer (owner, 2026-11-16):** not needed now. The 2b topologies stay E-PLANNED; the D32 recipe
+  (1b intermediates on, 2b off) remains the production 3f2 definition (D49).
 * **M10-Q21** (2026-11-15, M10 3f2) - `[imsrg3] factorized` together with `in_flow`/`at_end` is an
   error (V-57: the correction would double count the explicit 3-body terms); imsrg++ does not forbid
   it. Also V-56 (sub-switches without `factorized`). **Assumed meanwhile:** errors; reversible.
+  **Answer (owner, 2026-11-16):** confirmed as assumed (low-impact numerics batch).
 * **M10-Q22** (2026-11-15, M10 3f2) - The factorized correction requires an anti-Hermitian eta
   (NotImplementedError otherwise): imsrg++'s `Eta_matrix_nnnn` sign is commented "SRS this is a guess
   to fix bug for herm,herm case", so a Hermitian eta is not validated there either. Every BCH use
   has an anti-Hermitian Omega. **Assumed meanwhile:** fine.
+  **Answer (owner, 2026-11-16):** confirmed as assumed (low-impact numerics batch).
 * **M10-Q23** (2026-11-15, M10 3f2) - imsrg++ applies the 3f2 correction to every BCH call once
   `SetUseFactorizedCorrection` is on, including the transformation of other operators (`Rp2` etc.)
   and the hunter-gatherer `H_saved` rebuild; `BchOptions::factorized` does the same (the solver passes
   one `BchOptions` to all its BCH calls). **Assumed meanwhile:** intended (it is what the IT-10
   goldens contain for H); say if operators should be transformed without the correction.
+  **Answer (owner, 2026-11-16):** keep as implemented: the 3f2 correction applies to every BCH call,
+  the transformation of observables and the hunter-gatherer rebuild included (D49).
 * **M10-Q1** (2026-11-15, M10 layout benchmark) - The emax rule (IMSRG(3) only at emax 2 and 3) was
   read as covering operators and kernels, not basis bookkeeping: the layout memory at the production
   target (emax 10-12) comes from `imsrg3_layout_bench --count-only`, which enumerates kets and triples
   only (no operator, no 6j table; 30-50 ms at emax 12). **Assumed meanwhile:** allowed, like the me2j
   value count at emax 14. Alternative: extrapolate the emax-2/3 counts with a fitted power law.
+  **Answer (owner, 2026-11-16):** confirmed as assumed (engineering batch).
 * **M10-Q2** (2026-11-15, M10 layout benchmark) - The memory gate of the layout decision assumes 4
   nodes x 256 GB with at most 50 % for the 3B operators of an N7 Magnus step (about six operators plus
   scratch). Which E3max/dE3max does the owner use at emax 10-12, and how much node memory? At E3max
   14 layout A needs 38-40 GB per operator (packed), at E3max 16 without a dE3max cut 157-177 GB,
   with dE3max 8 only 4.4 GB (`design/benchmarks/imsrg3-layout.md` section 4). **Assumed meanwhile:**
   the gate above; the layout choice (A) holds for every case, only the node count changes.
+  **Answer (owner, 2026-11-16):** "E3max 16, no dE3max is a good starting point, but for the 3-body
+  part we want to scale to large numbers of nodes." Node memory: "256 GB or less (sometimes only 100
+  GB). Three-body operators will be very heavily distributed." Restated and confirmed ("Correct, and
+  keep 50% headroom"): production starts at emax 10-12 with E3max 16 and no dE3max (about 177 GB per
+  packed layout-A operator at emax 12, about 1.06 TB for the six operators of an N7 step);
+  three-body operators may use at most 50 % of a node's memory, so an N7 step at emax 12 needs at
+  least 22 nodes of 100 GB (9 of 256 GB). MPI phase 2 must split single channels across ranks (the
+  largest channel, 46,188 kets, holds about 8.5 GB packed per operator, about 51 GB for six), so a
+  row-wise, cost-balanced (Hagen-Nam-type) distribution is the baseline and whole-channel ownership
+  only the comparison; the N7 kernels are tiled over row ranges of distributed blocks; scaling is
+  judged by cost model at 22 to 100+ nodes (D45).
 * **M10-Q3** (2026-11-15, M10 layout benchmark) - Layout A is chosen with **packed** channel blocks
   (upper triangle, as imsrg++), which halves the memory; unpacking a channel for GEMM-type terms cost
   4 % of a [2,2]->3 evaluation at emax 3 (0.40 of 9 ms). **Assumed meanwhile:** packed storage, dense
   scratch per channel inside kernels. Alternative: dense blocks (simpler kernels, twice the memory).
+  **Answer (owner, 2026-11-16):** confirmed as assumed (engineering batch).
 * **M7-Q10** (2026-11-15, M7 general paths) - The general (NonHermitian) paths are chosen by the
   hermiticity FLAG of X or Y, not by inspecting the data: an operator flagged NonHermitian but
   holding Hermitian data gives the same numbers as the symmetric paths (tested, 4e-16) at higher
   cost (about 2x ladder flops and 4x particle-hole flops; the Pandya scratch grows by at most
   4/3, allocated on first use; the ladders need no extra memory). **Assumed meanwhile:** callers who know the symmetry set the flag (the flow does).
+  **Answer (owner, 2026-11-16):** confirmed as assumed (low-impact numerics batch).
 * **M7-Q11** (2026-11-15, M7 general paths) - The brief asked to test `commutator_ref` for general
   operators against a dense (m-scheme) brute force if the reference did not support them. It does:
   every term is bilinear, the reference matches imsrg++ goldens and the symmetry-based fast kernels
@@ -576,6 +657,9 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   `commutator_ref_properties.general_by_general_bilinearity` shows the reference respects the
   bilinear decomposition for general X and Y. **Assumed meanwhile:** that is sufficient; a true
   m-scheme brute force stays on the M10 list (needed there for 3B anyway, design/30 section 1).
+  **Answer (owner, 2026-11-16):** confirmed; resolved since by the m-scheme brute force of M10
+  (`commutator_ref::mscheme`), which checks the IMSRG(2) reference terms to 1.2e-15 (low-impact
+  numerics batch).
 * **M11-Q10** (2026-11-15, M11 python phase 2) - The brief asks for a commutator that accepts general
   (non-Hermitian) operators, but `commutator::Commutator` of this core still throws
   `NotImplementedError` for a `NonHermitian` X or Y (the symmetry tricks of the kernels need Hermitian
@@ -584,23 +668,32 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   general operators as soon as the core does, no binding change needed. **Resolved at the merge
   (orchestrator, 2026-11-15):** the core gained the general paths (`feature/m7-general-commutator`);
   `test_non_hermitian_operands` now checks a general operand end to end (general Z, antisymmetry).
+  **Answer (owner, 2026-11-16):** confirmed (resolved at the merge).
 * **M11-Q11** (2026-11-15, M11 python phase 2) - D29 says a stale host view raises `StaleHostError`.
   On Serial/OpenMP builds the host mirror aliases the device data, and 23 existing tests (names fixed)
   read views of library results directly. **Assumed meanwhile:** the state machine is always tracked,
   but the default policy `Auto` raises only where the memory is not host accessible (GPU); `Strict`
   (`with imsrg.strict_residency():` or `IMSRG_RESIDENCY=strict`) raises everywhere, so scripts can be
   tested for portability to GPU nodes; `Implicit` never raises. Say if the default should be `Strict`.
+  **Answer (owner, 2026-11-16):** `Auto` stays the user default (CPU scripts need no sync calls; GPU
+  builds raise as D29 says), but the library and the tests must stay GPU-portable: the 23 tests and
+  the examples gain explicit `sync_to_host()` calls, and `tools/ci.sh` runs the Python suite under
+  `IMSRG_RESIDENCY=strict` (run-3 task) (D51).
 * **M11-Q12** (2026-11-15, M11 python phase 2) - Force-finalize (answer to M11-Q1): `Runtime.finalize(force=True)`
   and the exit hook now free the device data of every live operator and solver (later use raises
   `StaleHostError`), but refuse (all or nothing) while numpy views of an operator are alive, because
   freeing under a view would leave it dangling. **Assumed meanwhile:** at exit a global view then blocks
   finalization as before (Kokkos is left to process exit).
+  **Answer (owner, 2026-11-16):** confirmed as assumed (config/Python batch).
 * **M11-Q13** (2026-11-15, M11 python phase 2) - Solver observers: the C++ solvers have no stop request
   from a status callback, so `solve(on_status)` cannot stop on a returned `True` (design/18 2.7); an
   exception raised by the callback aborts the solve at a step boundary and is re-raised. Python
   generator callbacks (`GeneratorFn`) are not bound (needs a C++ hook in `flow`). **Assumed meanwhile:**
   exception-based early exit is enough for the owner's group; a stop flag/generator hook would be a
   `flow` API addition.
+  **Answer (owner, 2026-11-16):** run-3 filler task: a stop request from status callbacks (returning
+  True stops at a step boundary) and a C++ generator hook in `flow` so that Python generator
+  callbacks can be bound (D51).
 * **M11-Q14** (2026-11-15, M11 python phase 2) - API shape: the bound surface follows the C++ modules
   (`imsrg.io.read_me2j`, `hf.solve(h, v3, mixing=...)`, `HFResult`, `flow.MagnusSolver`/`OdeSolver`,
   `commutators.commutator(terms=...)`, `pipeline.run(config) -> RunResult` over `results.json`) rather
@@ -608,6 +701,8 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   which the existing phase-1 names (`ModelSpace(emax, reference, ...)`) already departed from. Names stay
   snake_case, enum members CamelCase as in phase 1. **Assumed meanwhile:** fine; also bound `opslib`
   (`t_rel`, `rp2`, `h_cm`, ...) because a scripted pipeline needs them.
+  **Answer (owner, 2026-11-16):** keep the module-shaped API (and the `opslib` bindings); design/18
+  is rewritten to describe the bound surface. No binding churn (D51).
 * **M10-Q40** (2026-11-15, M10 triples driver) - imsrg++ `CalculatePerturbativeTriples`
   (IMSRGSolver.cc:1186) combines a split Omega stack as `omega = BCH_Product(omega, Omega[n])`, i.e.
   e^omega = e^{Omega_0} e^{Omega_n}, while the transformation of H is e^{Omega_n} ... e^{Omega_0} H
@@ -617,6 +712,10 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   (`flow::PerturbativeTriples` uses `BchProduct(omega, Omega_n)`). Alternative: `BchProduct(Omega_n,
   omega)`, consistent with the transform order; say if wanted (a fix would be an old-code bug entry
   in design/30 section 6).
+  **Answer (owner, 2026-11-16):** fix it: combine the stack in transformation order, `omega =
+  BchProduct(Omega_n, omega)` (e^omega = e^{Omega_n} ... e^{Omega_0}, the unitary that generated H).
+  No change for IT-8 (single Omega); old-code bug entry in `30` section 6 and a split-stack
+  consistency test (D49).
 * **M10-Q41** (2026-11-15, M10 T5 production comm223) - The production `commutator::Comm223`
   gathers the two-body legs per tile (no global gather tables, as the layout review asked) and is
   1.7x slower than the prototype K1 at O16 emax 3 E3max 9 (15.3 vs 9.0 ms, 18 threads): W sums 6.8 ms
@@ -626,27 +725,38 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   measured (IMSRG(3) only at emax 2-3). If it matters: one team per block of bra triples sharing
   thirds (ket legs reused; deviates from "one team per bra triple"), or a ket cache keyed by
   (pair, J). **Assumed meanwhile:** one team per bra triple, as briefed.
+  **Answer (owner, 2026-11-16):** allowed: timing-only kernel benchmarks (Comm223, comm232 tiles) at
+  emax 4-6, with an E3max that keeps one operator under about 8 GB (checked first with
+  `--count-only`), never in CI and no full flows; an exception to AGENTS.md rule 3 like D40's emax-8
+  IMSRG(2) benchmarks (D52). Team layout (one team per bra triple vs blocks sharing thirds) is
+  decided from those measurements in the N7 task.
 * **M10-Q42** (2026-11-15, M10 T5) - Locality at emax 12, not measurable today: (1) the dense
   `angmom::SixJ3Table` holds nj^3 nJ^2 nJ3 doubles, 451 MB at emax 12 (360 KB at emax 3), and W
   reads one 6j per j block at stride c2 (2.7 MB at emax 12), a cache line per value; a per-tile
   transposed 6j slice in scratch (or a symmetry-reduced table) would fix both. (2) Bra legs are rows
   of column-major two-body blocks (stride n per element; cached per third w, 4 slots). **Assumed
   meanwhile:** as is; worth a timing-only run at emax 4-6 if the owner allows one.
+  **Answer (owner, 2026-11-16):** the locality measurements (per-tile transposed 6j slices or a
+  symmetry-reduced table, bra-leg rows) go into the timing-only emax 4-6 runs allowed under M10-Q41
+  (D52).
 * **M10-Q43** (2026-11-15, M10 T5) - imsrg++ `comm223ss` returns early (Z3 unchanged) when
   ||X2|| ||Y2|| < 1e-6 outside the first `scalar3b_transform` pass (IMSRG3Commutators.cc:5020);
   `Comm223` always computes (documented in three_body.h). Results differ only when that product is
   tiny but nonzero. **Assumed meanwhile:** not reproduced; one line to add if wanted.
+  **Answer (owner, 2026-11-16):** confirmed as assumed (low-impact numerics batch).
 * **M10-Q44** (2026-11-15, M10 T5) - kernels/comm223.cc uses Kokkos directly (TeamPolicy with
   dynamic schedule, chunk 1, AUTO team size and vector length, level-0 or level-1 scratch, nested
   TeamThreadRange/ThreadVectorRange reductions, a Sum reducer): `exec::TeamFor` has no schedule,
   scratch level, or reducer (design/12 section 2). **Assumed meanwhile:** direct Kokkos inside the
   kernel TU (public headers stay Kokkos-free); add `exec::TeamFor`/`TeamReduce` options when the
   next team kernels ([2,3]->3, [3,3]->2) arrive.
+  **Answer (owner, 2026-11-16):** confirmed as assumed (engineering batch).
 * **M10-Q45** (2026-11-15, M10 T5) - Additive API beyond the brief: `ThreeBodyContext::
   ScratchBytesPerTeam()` (reported by the benchmark) and `impl()` (the internal tables, a
   `detail::` type for tests and the benchmark). **Assumed meanwhile:** kept; both removable. The
   context also holds `op::PairThirdSpace`'s E map (1.1 MB of its 4.2 MB at O16 emax 3 E3max 9),
   which these kernels never read; PairThirdSpace has no option to skip it.
+  **Answer (owner, 2026-11-16):** confirmed as assumed (engineering batch).
 * **M10-Q46** (2026-11-15, M10 triples lead) - The perturbative triples use E3max = 3 emax, as
   imsrg++ (`IMSRGSolver.cc:1201-1209`), so without a dE3max cut the triples' kept space, its R map
   and the (unused) E map grow like the full canonical space: harmless at emax <= 3 (He4 emax 2:
@@ -654,37 +764,60 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   would need tens of GB. **Assumed meanwhile:** as imsrg++ (the triples are a post-processing step
   and `imsrg3.de3max` bounds the space). Follow-up if triples at emax >= 8 are wanted: build R per
   tile inside the kernel (it is a few 6j products per entry) and skip E for the triples context.
+  **Answer (owner, 2026-11-16):** yes, perturbative triples are wanted at emax 8 and above, in run 3
+  alongside the N7 performance work: build R per tile inside the kernel, skip the E map for the
+  triples context, and touch only the ppp/hhh blocks the triples need; memory judged by counting
+  (emax rule) (D49).
 * **M10-Q60** (2026-11-16, M10 step 3) - The three-body generator copies imsrg++ exactly: Delta3 is
   the one-body diagonal only (no Epstein-Nesbet terms) and, unlike the one- and two-body
   denominators, it has NO floor (`Get3bDenominator`, Generator.cc:231-239) and no
   `denominator_delta`; a vanishing Delta3 gives inf/NaN with white. **Assumed meanwhile:** as
   imsrg++ (the 2B floor deviation D21 is not extended to 3B). Floor it if a flow hits it.
+  **Answer (owner, 2026-11-16):** floor Delta3 like the one- and two-body denominators: the
+  sign-keeping floor with `denominator_cutoff` (D21); no `denominator_delta` in the three-body part.
+  No golden changes (IT-9's ppp-hhh Delta3 are tens of MeV); deviation entry in `30` section 6 and a
+  unit test with a vanishing Delta3 (D49).
 * **M10-Q61** (2026-11-16, M10 step 3) - With IMSRG(3) the final H and transformed operators have
   their residual three-body part dropped before the valence-space/operator output (imsrg++.cc:1177,
   1256 do the same after renormal ordering). Operators are transformed with the IMSRG(3) commutator
   as in imsrg++ (rank-3 result, 3B part dropped), which for a rank-2 operator adds the terms that
   need Omega_3. **Assumed meanwhile:** as imsrg++; not validated against an imsrg++ operator golden
   (IT-9 has none).
+  **Answer (owner, 2026-11-16):** keep the imsrg++ semantics (residual 3B part dropped before output
+  after renormal ordering; rank-2 operators transformed with the IMSRG(3) commutator, Omega_3 terms
+  included) and add an Rp2 operator golden for IT-9 (He4 and O16, emax 2) from the patched reference
+  to validate the operator path (D49).
 * **M10-Q62** (2026-11-16, M10 step 3) - `imsrg3.occ_nat3_cut` with IMSRG(3), `variant = "full"` and
   `"mp4"`, `at_end`, `only_2b_omega` stay E-PLANNED: the cut needs the NAT occupations in the
   three-body space (`ThreeBodyCuts::natural_occupations`) which the driver does not pass yet.
+  **Answer (owner, 2026-11-16):** production needs `imsrg3.occ_nat3_cut`: the driver passes the NAT
+  occupations into the three-body space, the cut drops kets at enumeration (D34), and the cut path
+  is validated against the m-scheme brute force with the cut. `variant = "full"`/`"mp4"`, `at_end`
+  and `only_2b_omega` stay E-PLANNED (D49).
 * **M10-Q63** (2026-11-16, M10 step 3 lead) - `comm232ss` processes its pair-third intermediate
   blocks in batches of channels under a 512 MiB budget, but never splits a channel (one block set
   is ~33 GB at emax 12 / E3max 14) and every batch visits every Z2 element (Opus review findings
   2-3). **Assumed meanwhile:** fine at emax <= 3 (60 ms at O16 emax 3); tile by column ranges and
   clamp J3 per batch before production runs (design/14 section 1.1, next steps).
+  **Answer (owner, 2026-11-16):** confirmed; resolved by the comm232 follow-up 47aa8b2 (column tiles
+  split channels, tables in `ThreeBodyContext`) (engineering batch).
 * **M10-Q64** (2026-11-16, M10 step 3 lead) - `comm232ss` rebuilds its sorted pair-third tables on
   every call (0.2 ms at emax 2, 3 ms at emax 3); they depend only on the model space. **Assumed
   meanwhile:** per call; move them into `ThreeBodyContext` with the next kernel pass.
+  **Answer (owner, 2026-11-16):** confirmed; resolved by the comm232 follow-up 47aa8b2 (column tiles
+  split channels, tables in `ThreeBodyContext`) (engineering batch).
 * **M10-Q65** (2026-11-16, M10 step 3 lead) - The comm232ss kernels (like comm223) call Kokkos
   policies (dynamic range, team) directly instead of the `exec` facade. **Assumed meanwhile:**
   accepted in kernel TUs (design/12 section 5 allows Kokkos there); extend the facade when a second
   backend needs it.
+  **Answer (owner, 2026-11-16):** confirmed as assumed (engineering batch).
 * **M10-Q66** (2026-11-16, M10 step 3 lead) - A `commutator::Workspace` on a model space with a
   three-body space always builds a `ThreeBodyContext` (6j table, pair-third maps), also when only
   IMSRG(2) terms are used on it. **Assumed meanwhile:** fine (no lazy caches, D10; cheap at emax
   <= 3); an explicit `Workspace` option could skip it if an IMSRG(2) flow on a three-body space
   appears.
+  **Answer (owner, 2026-11-16):** confirmed; the explicit lazy-context option goes into the run-3 N7
+  performance task (engineering batch).
 * **M10-Q67** (2026-11-16, M10 step 3 lead; Python, not N7) - `tests/python/test_flow.py::
   test_solve_releases_the_gil` failed on `tools/ci.sh dev-serial` (ticks 7 for a 45 ms solve; it
   passes on dev-openmp): the emax-1 Magnus solve is short on the Serial backend and part of it runs
@@ -692,6 +825,7 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   meanwhile:** the bound now scales with the measured solve time (`ticks > max(2, min(20,
   elapsed_ms / 10))`, still failing if the GIL is held throughout); the M11 owner may prefer a
   longer solve or a measurement of the GIL-free fraction.
+  **Answer (owner, 2026-11-16):** confirmed as assumed (engineering batch).
 * **M8-Q50** (2026-11-15, M8 charge radius / two-stage ODE task) - (1) The charge radius needs `Rso`; if it was
   not requested the driver adds it as one more operator that flows alongside H (ODE methods) or is replayed
   with the Omega stack (Magnus). For the adaptive `flow` method the error norm of the step control includes
@@ -705,35 +839,44 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   reaches smax = 200). **Assumed/implemented:** for `imsrg.method = "flow"` stage 2 gets `smax_2 = s_after_stage_1
   + smax` (the equation is autonomous). `flow_rk4` keeps imsrg++'s behaviour (continuing s, same smax). Matches
   the golden `IT-15/He4_emax2_pshell_flow` (E0 3.5e-9, `.snt` 4e-9).
+  **Answer (owner, 2026-11-16):** keep every flowing operator in the error norm of the adaptive
+  `flow` method, as imsrg++ (the ODE tolerance also controls the accuracy of the observables). Item
+  (2) is superseded by D47: stage 2 integrates [s1, s1 + smax] for every method (D47).
 * **M8-Q51** (2026-11-15, M8 charge radius) - The charge radius is produced only for the plain `Rp2` operator,
   not for `Rp2Z_<Z>`/`Rp2AZ_<A>_<Z>` (those would need their own Z, A and an Rso with that Z) and not for
   `run.task = "hf"` (no operators are evaluated there). `Rch` is `null` when `Rch2 < 0`; imsrg++'s HF printout
   returns 0 for `|Rp2| < 1e-6` (not copied). N/Z uses the mass number of the Rp2 operator (`basis.mass_number`),
   imsrg++ uses the target mass of the model space (the same number unless `A` is overridden). **Assumed meanwhile:**
   as stated; trivial to extend.
+  **Answer (owner, 2026-11-16):** confirmed as assumed.
 * **M8-Q52** (2026-11-15, M8 charge radius) - The pristine imsrg++ prints a charge radius only for non-Magnus
   methods ("HF charge radius" and "IMSRG charge radius", `imsrg++.cc:845,1367`), so the IT-6 (Magnus) golden has no
   imsrg++ radius to compare with. The validation uses the pristine build on `flow_RK4`/`flow` runs (He4 emax 2,
   O16 emax 3: agreement 2e-9 fm HF, within the 6 printed decimals after the flow); the Magnus radius uses the same
   code path with the replayed operators. **Assumed meanwhile:** sufficient; no Magnus-path radius number from
   imsrg++ exists.
+  **Answer (owner, 2026-11-16):** confirmed: sufficient.
 * **M11-Q15** (2026-11-16, M11 python hardening) - Ctrl-C: the solvers poll Python signals at every status
   line (a step boundary) and raise `KeyboardInterrupt`; the pipeline driver (`driver::Run`) has no
   cancellation hook, so `pipeline.run` lets Ctrl-C stop the process (SIGINT default action) while the run
   is in progress instead of ignoring it. **Assumed meanwhile:** fine for scripts; a cancel flag in
   `driver::Run` would allow a clean `KeyboardInterrupt`.
+  **Answer (owner, 2026-11-16):** run-3 filler task: a cancel flag in `driver::Run`, so that
+  `pipeline.run` raises `KeyboardInterrupt` cleanly at a step boundary (D51).
 * **M11-Q16** (2026-11-16, M11 python hardening) - `SymmetryError` and `ConvergenceError` exist as classes
   (design/18): `ConvergenceError` is raised by `pipeline.run` on divergence and by
   `hf.solve(raise_on_failure=True)` (default False, so existing results stay reportable); `SymmetryError` is
   reserved until tensor operators exist. A missing file raises `InputFileNotFoundError` (an `InputError`
   and a `FileNotFoundError`), malformed content `FileFormatError`, operands on different model spaces
   `ModelSpaceError`. **Assumed meanwhile:** as described.
+  **Answer (owner, 2026-11-16):** confirmed as assumed (config/Python batch).
 
 * **M12-Q1** (2026-11-15, M12a get_pn) - M6-Q4 is resolved for the orbit scan and the CGs
   (dense (n, l, 2j) table, tabulated isospin CGs, bitwise identical). In a release build `get_pn`
   on calls passing the cheap filters drops from 183 to 65 ns; the remainder is the six
   `channel.states.find` hash lookups in `get_isospin`. **Assumed:** left as is (no layout change
   was allowed); a dense per-channel state table would remove it if HF-with-3N profiles still show it.
+  **Answer (owner, 2026-11-16):** confirmed as assumed (engineering batch).
 
 * **M12-Q2** (2026-11-15, M12a norms) - `TwoBodyNorm` now relies on `BlockSparseMatrix` blocks
   being contiguous and in storage order (IMSRG_CHECKed). **Assumed:** that stays the layout. Per call
@@ -741,6 +884,7 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   reduction is about as fast as 84 small ones (0.73 vs 0.68 ms at emax 6), the gain is at > 1
   thread (1.73 -> 0.17 ms at 6 threads). Caching the buffers on the operator would remove the
   allocation if it matters.
+  **Answer (owner, 2026-11-16):** confirmed as assumed (engineering batch).
 
 * **M12-Q3** (2026-11-15, M12a ladder) - `tests/python/test_flow.py::test_solve_releases_the_gil`
   fails in dev-serial already at 7f92c7e (before the ladder change; repeatably, 5-6 ticks vs the
@@ -760,6 +904,7 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   GIL-holding C loop calling `list.append` 3e6 times gives no intermediate count; a GIL-releasing
   loop gives ~47 of 50). The check needs a single main-thread wake-up during the solve (smax 40,
   88 steps): 25/25 passes at normal load and 25/25 with 40-64 busy processes.
+  **Answer (owner, 2026-11-16):** confirmed (resolved by the list.append test).
 
 * **M12-Q4** (2026-11-16, M12a ladder-direct) - Direct channels (contiguous listed kets, all weights
   exactly 1.0) skip the gather and the gemm reads X and Y in place with leading dimension N. The
@@ -770,6 +915,7 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   exact; review note). Benchmark checksums (emax 2, 4;
   T 1, 4) are bitwise identical to before; the ladder scratch of O16 shrank from 3.75x to 2.0x of
   a two-body operator at emax 6. No open decision.
+  **Answer (owner, 2026-11-16):** confirmed as assumed (engineering batch).
 
 * **M12-Q5** (2026-11-16, M12a lead) - `linalg::GroupedGemm` runs its problems concurrently on the
   host threads only with Accelerate (one BLAS call per item; measured faster at emax 8 and
@@ -778,3 +924,42 @@ round-off, but design/16 Q14 ("fix: double") is NOT applied to the ODE path, as 
   **Assumed meanwhile:** other BLAS libraries keep the sequential loop; enabling them needs
   single-threaded calls per item (MKL `mkl_set_num_threads_local(1)`, OpenBLAS built with OpenMP or
   `OPENBLAS_NUM_THREADS=1`) and a determinism check, to be decided with the cluster builds (M12b/M14).
+  **Answer (owner, 2026-11-16):** deferred to the cluster builds (M12b/M14): concurrent
+  `GroupedGemm` with OpenBLAS/MKL needs single-threaded calls per item and a determinism check;
+  until then they keep the sequential loop.
+
+## Owner interview 2026-11-16
+
+Every entry above now has an answer (the low-impact ones confirmed in batches). The interview also
+settled the decisions for run 3 and later: D44–D54 in `00-requirements-and-decisions.md`, report
+`design/reports/2026-11-16-owner-interview.md`. Answers given outside the question ids:
+
+* **Run-3 order and design topics** (multiple choice; D50, D52, D53): the structural style pass
+  first in run 3, alone and time-boxed; then N7 performance with distribution-ready row tiling,
+  triples at emax ≥ 8 and `occ_nat3_cut`, in parallel with M12b phase 1; M12b phase 2; tensor
+  operators (E2 and other electric multipoles, M1, Gamow–Teller/Fermi, 0νββ; Magnus transformation
+  only); M12a follow-ups and the Python hooks as filler; M13 last. 3B distribution accepted by cost
+  model at ≤ 10 % imbalance with communication below compute at ~25 GB/s per node; clusters with
+  InfiniBand + Slurm and Slingshot + Slurm (Cray). GPU: CUDA and HIP builds, tuning on NVIDIA first.
+  IMSRG(2) single-commutator benchmarks at emax 10–12 allowed. Process and report format kept. The
+  full N2LO 3N file is not available yet (D33 unchanged).
+* **Extension after tensor operators:** me2jp/me3jp (not checkpoint/restart as proposed). Verbatim:
+  "I provide sample code in a second." and "Wait until I have provided the me2jp and me3jp files and
+  you have worked through the spec. THen write it up."
+* **ME2JP/ME3JP specification** (the owner sent `jIMSRG-develop/jimsrg/files/formats.zip`; worked out
+  in `19-mexj-formats.md`, D54). Verbatim: "The ME2JP and ME3JP formats are implemented in this
+  directory. Check that the ME2JP is a straight forward extension of ME2J from NLJJ to NLJJT. ME3JP is
+  analogous but for full three-body angular momentum coupling." Normalization: unnormalized, as
+  ME2J/ME3J (confirmed). Scope: "Readers and writers. Keep in mind as a todo that there is also a
+  binary version of these files where the header is stored as a fixed set of characters. I am
+  figuring out the exact specification here. For now, prepare for a binary implementation
+  (me2jp.bin, me3jp.bin)." File variants: "See previous response." Contents: "The evolved H by
+  default, other operators optionally. me2jp and me3jp will be most useful for checkpointing the code
+  and storing the Magnus operators for efficient evaluation of a large amount of extra operators."
+  On the restated summary: "Correct except that gzip should be implemented for me2jp and me3jp as
+  well. This goes after tensor ops."
+
+## Added during run 3
+
+Run 3 appends its questions below (ids per brief, e.g. `M10-Q70..Q79`, `M12b-Q1..Q9`, `MS2-Q1..Q9`;
+the orchestrator uses `O4` and up).

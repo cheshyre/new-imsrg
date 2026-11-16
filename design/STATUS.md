@@ -2,15 +2,17 @@
 
 ## Current state (keep this section up to date)
 
-* **Phase:** **run 2 ended** 2026-11-16 ~07:30 JST (started 2026-11-15 13:50; report
-  `design/reports/2026-11-15-run2.md`). Next: the owner interview (agenda `design/INTERVIEW_PROMPT.md`),
-  then run 3 (`design/NEXT_SESSION_PROMPT.md`). Run 1 ended 2026-11-12 ~08:45 JST (report
+* **Phase:** **owner interview after run 2 done** (2026-11-16, D44–D54, report
+  `design/reports/2026-11-16-owner-interview.md`); every run-2 question is answered. Next: **run 3**
+  (`design/NEXT_SESSION_PROMPT.md`, order D53). Run 2 ended 2026-11-16 ~07:30 JST (started
+  2026-11-15 13:50; report `design/reports/2026-11-15-run2.md`). Run 1 ended 2026-11-12 ~08:45 JST (report
   `design/reports/2026-11-12-overnight.md`); the owner interviews of 2026-11-13 (D25–D29) and
   2026-11-15 (D30–D42, `design/reports/2026-11-15-owner-interview.md`) answered every run-1 question.
-* **Integration branch:** `develop` (local). Run 2 again ran in an app worktree, so `develop` was
-  advanced from the staging branch `claude/imsrg-rewrite-run-2-36094d` with `tools/ci.sh dev-openmp
-  [&& ctest -L slow] && git update-ref refs/heads/develop <new> <old>` (QUESTIONS O1, O3). **The main
-  checkout's files do not follow; sync it before committing there (O3).**
+* **Integration branch:** `develop` (local). Runs and interviews start in app worktrees and advance
+  `develop` with `tools/ci.sh dev-openmp [&& ctest -L slow] && git update-ref refs/heads/develop
+  <new> <old>` (standard since D44; QUESTIONS O1, O3). **The main checkout's files do not follow;
+  the owner re-syncs it after each run** (it was synced after run 2; the 2026-11-16 interview moved
+  `develop` twice since).
 * **Code style:** Google C++ Style Guide since the MS merge (D38, `17-code-style.md`): `.h`/`.cc`,
   PascalCase functions, `kName` constants and enumerators, 80 columns, blocking cpplint step in
   `tools/ci.sh`, clang-tidy naming check `tools/lint.sh`; exceptions and allowlists in `17` §3.
@@ -20,7 +22,8 @@
   decision D43 (layout A); general (non-Hermitian) IMSRG(2) commutator and full-precision 1/√2 (D36);
   M11 phase 2 Python bindings and their hardening; M10 step 2 (3B storage, `Comm223`, perturbative
   triples); charge radius with Rso and a two-stage ODE test; M10 step 3 IMSRG(3)-N7 with the comm232
-  batching follow-up; robust Ctrl-C tests; M12a single-node performance.
+  batching follow-up; robust Ctrl-C tests; M12a single-node performance. Interview 2026-11-16:
+  license GPL-3.0-only (D46, `license headers` CI step) and the decision/plan documents.
 * **End to end:** `imsrg` reproduces imsrg-devel (the D35-patched build) for IT-1 … IT-10 (IT-4/IT-5
   at smax 10; IT-8 He4 emax 2 / O16 emax 3; IT-9 emax 2 and 3; IT-10 3f2), IT-12, IT-14 (ODE methods),
   IT-15 (two-stage ODE) and the hunter-gatherer cases: same step counts, |ΔE0| ≤ 3.8e-10 MeV for
@@ -30,9 +33,11 @@
   O16 emax-8 flow 3.1–3.7× (59.8 s vs 187.8 s at 6 threads); peak memory of that flow 1.1 GB vs
   2.3–2.6 GB; production `Comm223` 15.2 ms vs imsrg++ 482 ms (O16 emax 3, 18 threads); IT-9 2–3×
   faster than imsrg++; 3f2 step 1.10× a plain hunter-gatherer step.
-* **Not started / next:** N7 performance (comm232 tiling, tiled 133/132/231/331), M12b MPI (D14/D40,
-  Hagen–Nam evaluation), tensor operators (D39, first extension after IMSRG(3)), 3f2 2b intermediates
-  (E-PLANNED), M13, M14 (GPU after M12). No unmerged branch holds unique work; `tmp/m12a-bench-base`
+* **Not started / next (D53):** the interview tasks (D47–D49, D51, D50 clang-tidy pattern), the MS2
+  structural style pass (alone), N7 performance with row tiling, triples at emax ≥ 8 and
+  `occ_nat3_cut` in parallel with M12b phase 1, M12b phase 2 (row-wise 3B distribution, D45), M15
+  tensor operators, M16 ME1J/ME2JP/ME3JP with stored Omega and checkpoint/restart (D54,
+  `19-mexj-formats.md`), M13, M14 (GPU after M12b). 3f2 2b intermediates stay E-PLANNED. No unmerged branch holds unique work; `tmp/m12a-bench-base`
   (scratch) and run 1's empty `feature/m10-layout-benchmark` (checked out in a stale worktree) can go.
 * **Interruptions:** run 1: 5-hour usage limit 01:30–02:30 and 04:15–07:30 JST. Run 2: limit reached
   ~16:35, ~21:15 and ~01:30 JST (resets 18:00, 23:00, 04:00); agents resumed with `SendMessage`;
@@ -47,10 +52,9 @@
 * **Inputs:** me2j test file = 168,066,656 values (e1max 14, e2max 28, lmax 14); NO2B test file =
   32,685,840 floats (6, 12, 18; single precision) holding only the cE contact term (M1-Q1); it stays
   the 3N test input until the owner provides a full N2LO file (D33).
-* **Blocking questions:** none. Open (run 2, under "Added during run 2" in `QUESTIONS.md`, all with
-  assumptions): MS-Q1..Q5, O3, M7-Q10..Q11, M8-Q10..Q12, M8-Q20..Q22, M8-Q30..Q33, M8-Q40..Q41,
-  M8-Q50..Q52, M10-Q1..Q3, M10-Q20..Q23, M10-Q40..Q46, M10-Q60..Q67, M11-Q10..Q16 (Q10 resolved),
-  M12-Q1..Q5; the interview agenda groups them (`INTERVIEW_PROMPT.md`).
+* **Blocking questions:** none. All questions of run 2 were answered on 2026-11-16 (D44–D54; M12-Q5
+  deferred to the cluster builds); run 3 appends under "Added during run 3" in `QUESTIONS.md`.
+  Owner-side open items: the binary ME2JP/ME3JP header, the full N2LO 3N file (D33).
 
 ## Log (append one entry per merged branch)
 
@@ -97,3 +101,4 @@
 | 2026-11-16 05:37 | feature/m12a-perf → develop | **M12a, single-node CPU performance (D40)**: contiguous 6j rows and a pair table for the Pandya ph term (the stored sparse Pandya maps of `12` §4.2 were not built: ~6 operators of memory for little extra gain), a new YK GEMM shape, Workspace scratch 10.4× → 5.5× a two-body operator (emax 8: 558 → 288 MB), per-channel norm reductions, faster `No2bThreeBody::get_pn`, concurrent GroupedGemm with Accelerate; report `design/benchmarks/imsrg2-performance.md`. Merge: the GIL-release test conflict resolved in favour of M12a's load-independent rewrite (M12-Q3 supersedes the relaxation of M10-Q67) | Full commutator ms, develop → now / imsrg++: emax 4 1 thr 6.71 → 1.16 / 5.21, 6 thr 2.18 → 0.65 / 1.53; emax 6 1 thr 100 → 18.2 / 70.6, 6 thr 24.9 → 5.1 / 15.2, 18 thr 3.9 / 9.5; emax 8 1 thr 866 → 169 / 671, 6 thr 199 → 49 / 155, 18 thr 31 / 95. Full O16 IMSRG(2) flow (same steps and E0): emax 8 59.8 s vs 187.8 s (6 thr), 40.5 s vs 148.8 s (18 thr); emax 6 7.9 s vs 24.3 s (6 thr). With imsrg++'s OpenBLAS still 2.0–2.6× faster at emax 6–8. Peak flow RSS emax 8 1097 MiB vs 2306–2551 MiB. IT step counts unchanged; the only bitwise change is round-off in the emax-2 [A,H] result (new GEMM shape). dev-openmp + dev-serial + slow PASS (lead); dev-openmp + slow (incl. IT-9 emax 3) PASS on the merge | emax 4 at 18 threads only 1.1× imsrg++ (launch overhead). M12-Q1..Q5. Next: dsyr2k for the Hermitian ladder, BCH temporaries reused across steps, lower launch overhead at small emax, then M12b. Scratch branch `tmp/m12a-bench-base` can be deleted |
 | 2026-11-16 06:22 | feature/run2-handoff-docs → develop | **End-of-run documents of run 2**: final report `design/reports/2026-11-15-run2.md` (run-1 format: summary, owner actions, validation table, performance, old-code bugs, deviations, next steps), `design/NEXT_SESSION_PROMPT.md` for run 3 (state, plan, lessons, briefs for the N7 performance follow-up, M12a follow-up and M12b), `design/INTERVIEW_PROMPT.md` (agenda for the owner interview after run 2: every open run-2 question by topic, decisions, owner actions); the orchestrator rewrote the current-state section of this file and corrected the M12a speedups in the report and prompts at the merge | ci.sh dev-openmp PASS on the merge (documentation only) | Owner: interview (D42), then run 3 |
 | 2026-11-16 11:25 | feature/license-gpl3-only → develop | **License GPL-3.0-only** (owner, D46, interview of 2026-11-16, MS-Q4): every SPDX line of the 417 tracked `.h`/`.cc` files reads `GPL-3.0-only` (was `GPL-3.0-or-later`); `AGENTS.md` and `17` §2 updated; new `tools/ci.sh` step `license headers` fails on any tracked `.h`/`.cc` (outside `extern/`, `tests/golden/`) without that line in its first 5 lines (Python/CMake files carry no SPDX line). Still compatible with imsrg++ (GPL-2.0-or-later) | ci.sh dev-openmp PASS on the branch (196 s, worker) and on the merge | Interview branch `feature/owner-answers-2026-11-16` follows |
+| 2026-11-16 12:20 | feature/owner-answers-2026-11-16 → develop | **Owner interview after run 2** (`design/reports/2026-11-16-owner-interview.md`): answers to all 57 questions of run 2 in `QUESTIONS.md` (free text verbatim), decisions **D44–D54** in `00` (worktree start, N7 target E3max 16 with row-wise 3B distribution, GPL-3.0-only, flow numerics, hunter-gatherer H(s), IMSRG(3)/3f2 details, style follow-ups, Python, benchmark exceptions, run-3 order and tensor scope, ME1J/ME2JP/ME3JP), the format specification `19-mexj-formats.md`, updates of `13`, `14`, `16`, `17`, `18`, `20`, `30`, `40`, `41`, AGENTS.md rule 3, the run-3 prompt with briefs A–G | ci.sh dev-openmp PASS on the merge (docs only) | Run 3 per D53; owner: re-sync the main checkout, binary ME2JP/ME3JP header spec |

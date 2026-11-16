@@ -7,6 +7,14 @@
 Status: proposal. Scope: `imsrg._core` (nanobind extension) and the pure-Python package `imsrg`.
 Old reference: `imsrg-devel/src/pyIMSRG.cc` (pybind11, 961 lines, ~150 individually exposed commutator terms, `arma::mat` as an opaque class, no numpy, no GIL release).
 
+> **Status (owner, 2026-11-16, D51, M11-Q14):** the bound API follows the C++ modules
+> (`imsrg.io.read_me2j`, `hf.solve`, `flow.MagnusSolver`/`OdeSolver`, `commutators.commutator`,
+> `pipeline.run` -> `RunResult`, `opslib`); sections 8 and 9 describe it. The dataclass tree of
+> section 2 is superseded and this document is to be rewritten to the bound surface (a run-3
+> task). Planned additions (run-3 filler): a stop request from status callbacks, Python generator
+> callbacks through a C++ hook in `flow`, and a cancel flag in `driver::Run` so that
+> `pipeline.run` raises `KeyboardInterrupt` cleanly (M11-Q13, M11-Q15).
+
 ## 1. Goals, non-goals, design rules
 
 ### 1.1 Goals
@@ -390,6 +398,11 @@ solver = flow.Solver(h, options=opts, generator=white)
 - Kokkos is run in the process-wide execution space; two Python threads launching Kokkos kernels in the same instance serialise through the stream. The supported production concurrency model is "one Python thread drives the library, Kokkos/OpenMP parallelises inside".
 
 ### 4.2 Host/device residency
+**Policy decided (owner, 2026-11-16, D51, M11-Q11):** the default `Auto` raises `StaleHostError`
+only where memory is not host accessible (GPU builds); `Strict` (`imsrg.strict_residency()` or
+`IMSRG_RESIDENCY=strict`) raises everywhere and is what `tools/ci.sh` uses for the Python suite,
+so the tests and examples sync explicitly; `Implicit` never raises.
+
 As defined in 2.2: operator state `{HOST_CURRENT, DEVICE_CURRENT, BOTH}`; read-only views of the host mirror; `StaleHostError` instead of implicit sync; automatic host->device push before any compute call if a writable view was handed out. Additional rules:
 - `Operator.copy()` copies the device side (device-to-device) when device is current, otherwise the host side; the copy inherits the state.
 - `io.read_*` return operators `HOST_CURRENT` (filled on host, pushed lazily); `io.write_*` and `__repr__`/`norm` on a `DEVICE_CURRENT` operator reduce on device and do not require sync (`norm` is a device reduction; `write_*` performs an internal temporary sync with no state change).

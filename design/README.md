@@ -6,7 +6,7 @@ Reading order for a new agent or developer:
 |------|---------|
 | `../AGENTS.md` | Golden rules, build commands, conventions (read first) |
 | `STATUS.md` | Current state and progress log |
-| `00-requirements-and-decisions.md` | Requirements, scope and priorities, decision log (D1–D42) |
+| `00-requirements-and-decisions.md` | Requirements, scope and priorities, decision log (D1–D54) |
 | `10-architecture.md` | Repository layout, module DAG, core types, runtime, header policy |
 | `12-compute-backend.md` | Kokkos facade, linalg, kernel strategy, device-code rules, MPI plan |
 | `13-physics-modules.md` | Per-module specification and what must match imsrg++ |
@@ -15,6 +15,7 @@ Reading order for a new agent or developer:
 | `16-config-and-cli.md` | TOML schema, legacy `key=value` mapping of every old parameter, operator-name grammar |
 | `17-code-style.md` | Google C++ Style Guide adoption (D38): measured changes, exceptions, clang-format/cpplint/clang-tidy setup, run-2 conversion plan |
 | `18-python-api.md` | nanobind Python API plan and the mapping from the old pyIMSRG |
+| `19-mexj-formats.md` | The owner's ME1J/ME2JP/ME3JP formats (pn-resolved ME2J/ME3J; D54): specification and implementation plan |
 | `20-build-and-tooling.md` | Dependencies, CMake structure, presets, scripts, reference build, Makefile |
 | `30-testing-and-validation.md` | Test layers, tolerances, golden data, integration test matrix, deviation log |
 | `40-roadmap.md` | Milestones M0–M15 (incl. MS style conversion, M12a/M12b) with acceptance criteria and agent roles |
@@ -22,8 +23,8 @@ Reading order for a new agent or developer:
 | `QUESTIONS.md` | Open questions for the project owner (append, never block) |
 | `NEXT_SESSION_PROMPT.md` | The prompt that starts the next unsupervised implementation run |
 | `INTERVIEW_PROMPT.md` | The prompt for an interactive session that answers the open questions and interviews the owner |
-| `reports/` | Reports of the unsupervised runs (e.g. `2026-11-12-overnight.md`) and owner interviews (`2026-11-15-owner-interview.md`) |
-| `benchmarks/` | Benchmark results (`imsrg2-commutators.md`; `imsrg3-layout.md`, the IMSRG(3) layout decision D43) |
+| `reports/` | Reports of the unsupervised runs (e.g. `2026-11-12-overnight.md`) and owner interviews (`2026-11-15-owner-interview.md`, `2026-11-16-owner-interview.md`) |
+| `benchmarks/` | Benchmark results (`imsrg2-commutators.md`, `imsrg2-performance.md`; `imsrg3-layout.md`, the IMSRG(3) layout decision D43) |
 | `claude-settings.proposed.json` | Proposed Claude Code settings for the unattended run (owner installs) |
 | `reference/01..05-*.md` | Detailed analyses of imsrg-devel with file:line citations (feature checklists) |
 

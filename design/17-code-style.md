@@ -104,7 +104,10 @@ unindented namespaces and access specifiers (clang-format Google base); project 
    `A`/`Z` for nucleon numbers, `J`, `Jp`, `Tz`, `hw_MeV`, `twoJ`), as in imsrg++ and the
    literature; lower-casing them would merge distinct quantities (`j` and `J`) and break the
    element-by-element comparison with imsrg++. The naming check accepts any name with a capital
-   for these kinds; everything else follows the guide.
+   for these kinds; everything else follows the guide. **To tighten (owner, 2026-11-16, D50):** the
+   ignore pattern also lets camelCase names through, so it becomes a curated list of physics
+   symbols (as whole names or name parts: `X`, `Y`, `Z`, `H`, `A`, `N`, `J`, `Jp`, `Tz`, `hw_MeV`,
+   `twoJ`, ...), built from the names in the code today; no renames.
 7. **Accessors** *(run 2, MS-Q2)*: the guide lets accessors and mutators be named like variables.
    Here an accessor is a const method that returns a property or a part of the object without
    side effects, possibly selected by an index or key (`num_orbits()`, `orbit(i)`, `channel(c)`,
@@ -236,3 +239,12 @@ inline functions longer than ~10 lines in headers (the remaining ones are device
 templates or header-only test helpers; moving the former out of line could cost performance),
 the review of the 36 structs that have member functions, functions longer than ~40 lines, the
 review of unsigned types, and descriptive wording of the remaining imperative function comments.
+
+**Owner, 2026-11-16 (MS-Q5, D50): the structural pass is scheduled with priority, first in run 3,
+alone and time-boxed** (like MS): structs that hold invariants become classes (private data,
+accessors; passive structs stay), unsigned types become signed except sizes and bit patterns,
+functions over about 40 lines are split, long inline functions in headers move to `.cc` files
+(device-code lookups and templates excepted, with a measured reason where performance argues for
+inline), imperative function comments become descriptive; one commit per item, bitwise-identical
+results, `tools/ci.sh` after each. Header guards outside `src/` stay as they are (MS-Q3). The
+license line is `GPL-3.0-only` since the interview (D46).
