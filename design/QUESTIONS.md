@@ -972,16 +972,20 @@ settled the decisions for run 3 and later: D44–D54 in `00-requirements-and-dec
 Run 3 appends its questions below (ids per brief, e.g. `M10-Q70..Q79`, `M12b-Q1..Q9`, `MS2-Q1..Q9`;
 the orchestrator uses `O4` and up).
 
-* **IT3-Q1** (2026-11-16, run 3, brief A part 1) - The D35 patch of imsrg-devel now carries the D47 and D48
-  hunks in the same file (one version stamp, `...+d35-patch:0c7af4dd0112f621`); goldens whose numbers did not
-  change (IT-1..IT-8, IT-14, IT-15 old jobs, IT-9 emax 3) keep their old `source` string `...cb9d11ba30f579d4`
-  on purpose, to avoid churn. **Assumed meanwhile:** fine (the string is informational; `tests/golden/README.md`
-  says so). Alternative: regenerate every golden once so that all carry the new stamp.
-* **IT3-Q2** (2026-11-16, run 3, D48) - After the final gather `MagnusSolver` replaces H(s) but not eta(s):
-  `SolveResult::norm_eta` and the stage-2 start (`Solve` recomputes eta from H) therefore see the rebuilt H only
-  from stage 2 on, as in the patched imsrg++ (`FlowingOps[0] = H_saved`, Eta untouched); after a divergence H is
-  not rebuilt. **Assumed meanwhile:** fine, trajectories and counts unchanged. Alternative: recompute eta and
-  report its norm after the rebuild.
+* **IT3-Q1** (2026-11-16, run 3, brief A part 1) - The D35 patch of imsrg-devel now carries the D47 and D48 hunks
+  in the same file (version stamps `0c7af4dd0112f621`, after the review fix `a908abab2eded439`); goldens whose
+  numbers did not change keep their old stamps on purpose, to avoid churn: `cb9d11ba30f579d4` (IT-1..IT-7, IT-14,
+  hamiltonian, hf, ...) and `5fdd2b73265417f2` (IT-8/He4_emax2, IT-8/emax3, old IT-15, imsrg3, n7). All are listed in
+  `tests/golden/README.md` as equivalent. **Assumed meanwhile:** fine. Alternative: regenerate every golden once so
+  that all carry the newest stamp.
+* **IT3-Q2** (2026-11-16, run 3, D48; extended after the review) - After the final gather `MagnusSolver` replaces H(s)
+  and now also recomputes eta(s) from it (the patched imsrg++ leaves Eta untouched, which no output shows). The
+  flow does NOT continue: measured ||eta(rebuilt H)|| = 1.8e-3 (He4 emax 2, omax 0.1), 4.8e-3 (O16 emax 4, omax
+  0.25), 2.5e-3 (O16 emax 4, omax 0.1), i.e. 2000-5000 times eta_criterion = 1e-6, where the loop had stopped on
+  the hunter-step H (9.6e-7); E0 of the rebuilt H is 8-43 keV away from the last hunter-step line. A warning is
+  logged, `norm_eta` of the stage and `eta()` describe the rebuilt H, and the flow log gets one extra row for it
+  (istep = steps + 1, same s). **Owner to decide** whether the flow should instead continue until the rebuilt H
+  converges (changes step counts and the goldens).
 * **IT3-Q3** (2026-11-16, run 3, D47) - The adaptive `flow` method of the patched imsrg++ still restarts s at 0 in
   stage 2 (it integrates a copy of the solver), so for `flow` the reference flow file ends at s = smax while ours
   ends at s1 + smax; the range LENGTH is the same, only the final quantities are compared
