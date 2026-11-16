@@ -23,7 +23,9 @@
 #include "imsrg/base/error.h"
 #include "imsrg/base/types.h"
 #include "imsrg/basis/three_body_channels.h"
+#include "imsrg/basis/three_body_space.h"
 #include "imsrg/commutator/detail/comm232.h"
+#include "imsrg/commutator/detail/n7_terms.h"
 #include "imsrg/commutator/detail/three_body_impl.h"
 #include "imsrg/commutator/imsrg3.h"
 #include "imsrg/commutator/options.h"
@@ -31,6 +33,7 @@
 #include "imsrg/operator/norms.h"
 #include "imsrg/operator/operator.h"
 #include "imsrg/operator/operator_spec.h"
+#include "imsrg/operator/pair_third.h"
 #include "imsrg/operator/random_operator.h"
 #include "tests/support/commutator_test_support.h"
 #include "tests/support/three_body_test_support.h"
@@ -246,14 +249,13 @@ TEST(N7Comm232, PairThirdMatchesReference) {
   }
 }
 
-// Column batching: a budget of one byte (one column per batch) gives the
-// result of the default budget (one batch at emax 2).
+// Batching: a budget of one byte (one triple per batch) gives the result of
+// the default budget (one batch at emax 2).
 TEST(N7Comm232, BatchesAgree) {
   const N7Inputs in = GoldenN7Inputs(2, "O16", 6);
   op::Operator one = testing::ZeroN7Output(in.x, in.y, in.ms3);
   op::Operator many = testing::ZeroN7Output(in.x, in.y, in.ms3);
-  detail::Comm232ssPairThird(in.x, in.y, one, *in.ctx,
-                             detail::kComm232MaxBlockBytes);
+  detail::Comm232ssPairThird(in.x, in.y, one, *in.ctx, detail::kN7BatchBytes);
   detail::Comm232ssPairThird(in.x, in.y, many, *in.ctx, 1);
   EXPECT_GT(op::TwoBodyNorm(one), 1.0);
   EXPECT_LE(TwoBodyDeviation(many, one), 1.0e-13);
@@ -261,27 +263,34 @@ TEST(N7Comm232, BatchesAgree) {
   for (N7Inputs& c : BruteForceCases()) {
     op::Operator a = testing::ZeroN7Output(c.x, c.y, c.ms3);
     op::Operator b = testing::ZeroN7Output(c.x, c.y, c.ms3);
-    detail::Comm232ssPairThird(c.x, c.y, a, *c.ctx,
-                               detail::kComm232MaxBlockBytes);
+    detail::Comm232ssPairThird(c.x, c.y, a, *c.ctx, detail::kN7BatchBytes);
     detail::Comm232ssPairThird(c.x, c.y, b, *c.ctx, 1);
     EXPECT_LE(TwoBodyDeviation(b, a), 1.0e-13) << c.ms3->reference().name();
   }
 }
 
-// A tiny scratch budget (1/40 of one block set) splits the largest channels
-// over several column tiles and runs dozens of batches; the result matches
-// the element-wise reference (emax 2) and, with one column per batch
-// (budget 1 byte), the brute force (emax 1, non-Hermitian cases included).
+// A tiny scratch budget (1/40 of the H and W blocks of one operand block)
+// splits the largest channels over several tiles and runs dozens of
+// batches; the result matches the element-wise reference (emax 2) and, with
+// one triple per batch (budget 1 byte), the brute force (emax 1,
+// non-Hermitian cases included).
 TEST(N7Comm232, TinyBudgetSplitsChannels) {
   for (const char* ref : {"He4", "O16"}) {
     const N7Inputs in = GoldenN7Inputs(2, ref, 6);
-    const std::vector<std::int64_t>& w_off = in.ctx->impl().comm232.w_off_host;
+    // Doubles of H (S x rows) and W (S x S) of a channel with S pair-third
+    // states, per operand block.
+    const basis::ThreeBodySpace& space = *in.ms3->three_body_space();
+    const op::PairThirdSpace& pt = in.ctx->impl().pair_third;
     std::int64_t largest = 0;
-    for (std::size_t ch = 0; ch + 1 < w_off.size(); ++ch) {
-      largest = std::max(largest, w_off[ch + 1] - w_off[ch]);
+    std::int64_t total = 0;
+    for (std::int32_t ch = 0; ch < space.num_channels(); ++ch) {
+      const std::int64_t s = pt.num_states(Channel3Index{ch});
+      const std::int64_t k = space.channel(Channel3Index{ch}).dim;
+      largest = std::max(largest, s * (k + s));
+      total += s * (k + s);
     }
-    const std::int64_t per_set = w_off.back() / 40;  // doubles per block set
-    ASSERT_LT(per_set, largest);  // the largest channel is split
+    const std::int64_t per_set = total / 40;  // doubles per operand block
+    ASSERT_LT(per_set, largest);              // the largest channel is split
     // X3 and Y3 have definite hermiticity: two block sets.
     const auto bytes = per_set * 2 * static_cast<std::int64_t>(sizeof(double));
     op::Operator tiled = testing::ZeroN7Output(in.x, in.y, in.ms3);

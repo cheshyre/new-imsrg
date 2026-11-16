@@ -26,77 +26,54 @@
 
 namespace imsrg::commutator::detail {
 
-/// Scratch budget of `terms::Comm232ss` for the pair-third blocks (bytes, all
-/// block sets of one batch together): 512 MiB, so emax 3 at E3max 9 runs in
-/// one batch (two block sets for an anti-Hermitian X and a Hermitian Y:
-/// 365 MB for O16, 505 MB for He4; 8.8 MB for O16 at emax 2, E3max 6).
-inline constexpr std::int64_t kComm232MaxBlockBytes = std::int64_t{1} << 29;
-
-/// Number of occupation classes of a pair (kernels/comm232.cc `PairClass`):
+/// Number of occupation classes of a pair (detail/n7_batch.h `PairClass`):
 /// hh-only, mixed, pp-only, inactive.
 inline constexpr std::int32_t kComm232Classes = 4;
 
 /// Device view of `Comm232Tables`: the pair-third states of the context's
-/// kept space (`op::PairThirdSpace`) in the order of the comm232ss pair-third
-/// path, per channel sorted by (third r, Jpq, occupation class of the pair,
-/// p, q). "Sorted index" t: the position in that order, flat over the
-/// channels (channel ch owns [ch_begin[ch], ch_begin[ch + 1]), the flat
-/// range of its states in `op::PairThirdSpace`). Block b = (ch norb + r) nj +
-/// Jpq holds the states of channel ch with third r and pair J Jpq; its class
-/// k starts at blk[kComm232Classes b + k] and the block ends at
-/// blk[kComm232Classes (b + 1)]. The active rows (classes 0..2) of a channel
-/// have compact indices 0..A_ch - 1 in sorted order; those of block b start
-/// at arow0[b]. W blocks: channel ch's dense column-major A_ch x S_ch block of
-/// active rows sits at w_off[ch] of a buffer holding all channels, so column
-/// t (a sorted index) starts at w_off[ch] + (t - ch_begin[ch]) A_ch and the
-/// columns of all channels are consecutive in t. Raw device pointers;
-/// trivially copyable, captured by value.
+/// kept space (`op::PairThirdSpace`) in the row order of the pair-third
+/// intermediates H and W (detail/n7_batch.h), per channel sorted by (third
+/// r, Jpq, occupation class of the pair, p, q). "Sorted index" t: the
+/// position in that order, flat over the channels (channel ch owns
+/// [ch_begin[ch], ch_begin[ch + 1]), the flat range of its states in
+/// `op::PairThirdSpace`). Block b = (ch norb + r) nj + Jpq holds the states
+/// of channel ch with third r and pair J Jpq; its class k starts at
+/// blk[kComm232Classes b + k] and the block ends at blk[kComm232Classes (b +
+/// 1)], so the rows of a block and of a class range are contiguous. Raw
+/// device pointers; trivially copyable, captured by value.
 struct Comm232TablesView {
-  const std::int32_t* blk = nullptr;        ///< kComm232Classes nblocks + 1.
-  const std::int32_t* arow0 = nullptr;      ///< Per block.
-  const std::int32_t* ch_begin = nullptr;   ///< num_channels + 1 entries.
-  const std::int32_t* ch_active = nullptr;  ///< A_ch per channel.
-  /// Active rows of all channels in compact order (channel ch from
-  /// act_begin[ch]): the sorted index of each.
-  const std::int32_t* act_row = nullptr;
-  const std::int32_t* act_begin = nullptr;  ///< num_channels entries.
-  const std::int32_t* orig = nullptr;       ///< Sorted -> PairThirdSpace flat.
-  const std::int32_t* key = nullptr;    ///< p norb + q of the pair (p <= q).
-  const std::int32_t* local = nullptr;  ///< Local index of (p, q) at Jpq.
-  const double* occ_hh = nullptr;       ///< w n_p n_q, w = 1/sqrt 2 for p == q.
-  const double* occ_pp = nullptr;       ///< w nbar_p nbar_q.
-  const std::int64_t* w_off = nullptr;  ///< num_channels + 1 entries.
-  std::int32_t norb = 0;                ///< Orbits of the basis.
-  std::int32_t nj = 0;                  ///< Two-body J values (max J + 1).
-  std::int32_t num_channels = 0;        ///< Three-body channels.
+  const std::int32_t* blk = nullptr;       ///< kComm232Classes nblocks + 1.
+  const std::int32_t* ch_begin = nullptr;  ///< num_channels + 1 entries.
+  const std::int32_t* orig = nullptr;      ///< Sorted -> PairThirdSpace flat.
+  const std::int32_t* key = nullptr;       ///< p norb + q of the pair (p <= q).
+  const std::int32_t* local = nullptr;     ///< Local index of (p, q) at Jpq.
+  const double* occ_hh = nullptr;  ///< w n_p n_q, w = 1/sqrt 2 for p == q.
+  const double* occ_pp = nullptr;  ///< w nbar_p nbar_q.
+  std::int32_t norb = 0;           ///< Orbits of the basis.
+  std::int32_t nj = 0;             ///< Two-body J values (max J + 1).
+  std::int32_t num_channels = 0;   ///< Three-body channels.
 };
 static_assert(std::is_trivially_copyable_v<Comm232TablesView>);
 
 /// The sorted pair-third tables of comm232ss (see `Comm232TablesView`) in
-/// device buffers, with the host copies the batching needs. Built once per
+/// device buffers, with host copies for host code and tests. Built once per
 /// `ThreeBodyContext` (`ThreeBodyContext::Impl::comm232`); read-only
 /// afterwards. Value type (copies are deep).
 struct Comm232Tables {
   exec::DeviceBuffer<std::int32_t> blk;
-  exec::DeviceBuffer<std::int32_t> arow0;
   exec::DeviceBuffer<std::int32_t> ch_begin;
-  exec::DeviceBuffer<std::int32_t> ch_active;
-  exec::DeviceBuffer<std::int32_t> act_row;
-  exec::DeviceBuffer<std::int32_t> act_begin;
   exec::DeviceBuffer<std::int32_t> orig;
   exec::DeviceBuffer<std::int32_t> key;
   exec::DeviceBuffer<std::int32_t> local;
   exec::DeviceBuffer<double> occ_hh;
   exec::DeviceBuffer<double> occ_pp;
-  exec::DeviceBuffer<std::int64_t> w_off;
-  std::vector<std::int64_t> w_off_host;      ///< Host copy of w_off.
-  std::vector<std::int32_t> ch_begin_host;   ///< Host copy of ch_begin.
-  std::vector<std::int32_t> ch_active_host;  ///< Host copy of ch_active.
-  std::vector<std::int32_t> ch_two_j_host;   ///< 2 J3 per channel.
-  std::vector<std::int32_t> third_host;      ///< Third orbit per sorted t.
-  std::int32_t norb = 0;                     ///< Orbits of the basis.
-  std::int32_t nj = 0;                       ///< Two-body J values.
-  std::int32_t max_two_jc = 0;               ///< Largest 2j of an orbit.
+  std::vector<std::int32_t> ch_begin_host;  ///< Host copy of ch_begin.
+  /// Number of active states per channel (pair class 0..2: n_p n_q != 0 or
+  /// nbar_p nbar_q != 0).
+  std::vector<std::int32_t> ch_active_host;
+  std::vector<std::int32_t> third_host;  ///< Third orbit per sorted t.
+  std::int32_t norb = 0;                 ///< Orbits of the basis.
+  std::int32_t nj = 0;                   ///< Two-body J values.
 
   /// The device view (pointers valid while *this lives unchanged). O(1).
   Comm232TablesView View() const noexcept;

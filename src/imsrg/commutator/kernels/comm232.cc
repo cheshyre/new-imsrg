@@ -561,17 +561,12 @@ namespace detail {
 Comm232TablesView Comm232Tables::View() const noexcept {
   Comm232TablesView t;
   t.blk = blk.device_data();
-  t.arow0 = arow0.device_data();
   t.ch_begin = ch_begin.device_data();
-  t.ch_active = ch_active.device_data();
-  t.act_row = act_row.device_data();
-  t.act_begin = act_begin.device_data();
   t.orig = orig.device_data();
   t.key = key.device_data();
   t.local = local.device_data();
   t.occ_hh = occ_hh.device_data();
   t.occ_pp = occ_pp.device_data();
-  t.w_off = w_off.device_data();
   t.norb = norb;
   t.nj = nj;
   t.num_channels = static_cast<std::int32_t>(ch_active_host.size());
@@ -579,11 +574,9 @@ Comm232TablesView Comm232Tables::View() const noexcept {
 }
 
 std::int64_t Comm232Tables::Bytes() const noexcept {
-  return BufferBytes(blk) + BufferBytes(arow0) + BufferBytes(ch_begin) +
-         BufferBytes(ch_active) + BufferBytes(act_row) +
-         BufferBytes(act_begin) + BufferBytes(orig) + BufferBytes(key) +
-         BufferBytes(local) + BufferBytes(occ_hh) + BufferBytes(occ_pp) +
-         BufferBytes(w_off);
+  return BufferBytes(blk) + BufferBytes(ch_begin) + BufferBytes(orig) +
+         BufferBytes(key) + BufferBytes(local) + BufferBytes(occ_hh) +
+         BufferBytes(occ_pp);
 }
 
 Comm232Tables BuildComm232Tables(const op::PairThirdSpace& pair_third,
@@ -659,57 +652,29 @@ Comm232Tables BuildComm232Tables(const op::PairThirdSpace& pair_third,
   // blocks, and classes within a block, follow the sorted order).
   std::vector<std::int32_t> blk(count.size(), 0);
   std::exclusive_scan(count.begin(), count.end(), blk.begin(), 0);
-  // Compact active rows per channel.
-  std::vector<std::int32_t> arow0(nblocks, 0);
+  // Active states (classes 0..2) per channel.
   std::vector<std::int32_t> ch_active(at(nch), 0);
-  std::vector<std::int32_t> act_begin(at(nch), 0);
-  std::vector<std::int32_t> act_row;
-  act_row.reserve(ns);
-  std::vector<std::int64_t> w_off(at(nch) + 1, 0);
   const std::size_t blocks_per_channel = block_of(1, 0, 0);
   for (int ch = 0; ch < nch; ++ch) {
-    act_begin[at(ch)] = static_cast<std::int32_t>(act_row.size());
-    std::int32_t active = 0;
     for (std::size_t b = at(ch) * blocks_per_channel;
          b < at(ch + 1) * blocks_per_channel; ++b) {
-      arow0[b] = active;
-      for (std::int32_t t = blk[kComm232Classes * b];
-           t < blk[kComm232Classes * b + 3]; ++t) {
-        act_row.push_back(t);
-        ++active;
-      }
+      ch_active[at(ch)] +=
+          blk[kComm232Classes * b + 3] - blk[kComm232Classes * b];
     }
-    ch_active[at(ch)] = active;
-    w_off[at(ch) + 1] =
-        w_off[at(ch)] + static_cast<std::int64_t>(active) *
-                            (ch_begin[at(ch) + 1] - ch_begin[at(ch)]);
-  }
-  std::vector<std::int32_t> ch_two_j(at(nch), 0);
-  const basis::ThreeBodySpace& space = *ms3.three_body_space();
-  for (int ch = 0; ch < nch; ++ch) {
-    ch_two_j[at(ch)] = space.channel(Channel3Index{ch}).two_j.twice;
   }
   Comm232Tables t;
   t.blk = ToDevice(blk, "commutator::comm232_blk");
-  t.arow0 = ToDevice(arow0, "commutator::comm232_arow0");
   t.ch_begin = ToDevice(ch_begin, "commutator::comm232_ch_begin");
-  t.ch_active = ToDevice(ch_active, "commutator::comm232_ch_active");
-  t.act_row = ToDevice(act_row, "commutator::comm232_act_row");
-  t.act_begin = ToDevice(act_begin, "commutator::comm232_act_begin");
   t.orig = ToDevice(orig, "commutator::comm232_orig");
   t.key = ToDevice(key, "commutator::comm232_key");
   t.local = ToDevice(local, "commutator::comm232_local");
   t.occ_hh = ToDevice(occ_hh, "commutator::comm232_occ_hh");
   t.occ_pp = ToDevice(occ_pp, "commutator::comm232_occ_pp");
-  t.w_off = ToDevice(w_off, "commutator::comm232_w_off");
-  t.w_off_host = std::move(w_off);
   t.ch_begin_host = std::move(ch_begin);
   t.ch_active_host = std::move(ch_active);
-  t.ch_two_j_host = std::move(ch_two_j);
   t.third_host = std::move(third);
   t.norb = norb;
   t.nj = nj;
-  t.max_two_jc = ms3.basis().max_j2().twice;
   return t;
 }
 
