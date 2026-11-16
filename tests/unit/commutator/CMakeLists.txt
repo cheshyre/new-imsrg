@@ -39,3 +39,11 @@ foreach(_t n7 n7_133_132 n7_231_331 n7_232 n7_full)
   target_compile_definitions(commutator_${_t} PRIVATE
     IMSRG_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/tests/golden")
 endforeach()
+
+# Counting and cost model of the tiled N7 terms (n7_cost.h) against the real
+# pair-third space at emax 2-3.
+imsrg_add_test(NAME commutator_n7_cost
+  SOURCES test_n7_cost.cc ${_imsrg_exec_main} "${PROJECT_SOURCE_DIR}/tests/support/three_body_test_support.cc"
+  DEPS commutator operator
+  LABELS unit
+  NO_GTEST_MAIN)
