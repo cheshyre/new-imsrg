@@ -430,6 +430,7 @@ void RunN7(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
     // One TransposeOut value buffer for all batches, grown on demand (every
     // value of a batch is written by Comm133Batch before it is read).
     exec::DeviceBuffer<double> tout_data;
+    Comm133Cache c133;
     ForEachN7Batch(
         v, ctx, rows, budget_bytes, needs, [&](const N7BatchInputs& in) {
           if (do133) {
@@ -446,7 +447,7 @@ void RunN7(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
             TransposeOut tout;
             tout.data = tout_data.device_data();
             tout.line_off = line_off.device_data();
-            Comm133Batch(in, z3, tout);
+            Comm133Batch(in, z3, tout, c133);
             AddTransposeOut(in, tout, z3);
           }
           if (do232) Comm232Batch(WithoutParts(in, drop232_x3, drop232_y3), z2);

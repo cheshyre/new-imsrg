@@ -264,6 +264,17 @@ int MaxOneBodyChannel(const ThreeBodyContext& ctx) {
   return n1max;
 }
 
+/// The slot table of the tile channels `channels` (in tile order), kept
+/// across the batches of a call while the channel list does not change.
+struct SlotCacheEntry {
+  bool valid = false;
+  bool has_hy = false;
+  bool has_hx = false;
+  std::vector<std::int32_t> channels;
+  exec::DeviceBuffer<std::int32_t> rows;
+  exec::DeviceBuffer<double> coef;  ///< [bra | ket], 2 entries each.
+};
+
 /// Uploads the three tables of `o` as one device buffer [line0 | elem0 |
 /// slot0] (num_tiles + 1 entries each).
 exec::DeviceBuffer<std::int64_t> UploadOffsets(const BatchOffsets& o) {
@@ -464,14 +475,26 @@ std::vector<std::int64_t> TransposeOutOffsets(const LineBatch& plan) {
 
 }  // namespace
 
+struct Comm133Cache::Impl {
+  int n1max = 0;  ///< 0: not yet computed.
+  SlotCacheEntry slots;
+};
+
+Comm133Cache::Comm133Cache() : impl_(std::make_unique<Impl>()) {}
+Comm133Cache::~Comm133Cache() = default;
+Comm133Cache::Comm133Cache(Comm133Cache&&) noexcept = default;
+Comm133Cache& Comm133Cache::operator=(Comm133Cache&&) noexcept = default;
+
 void Comm133Batch(const N7BatchInputs& in, const ThreeBodyOutView& z3,
-                  const TransposeOut& tout) {
+                  const TransposeOut& tout, Comm133Cache& cache) {
   IMSRG_CHECK(in.plan != nullptr && in.ctx != nullptr,
               "Comm133Batch: the batch inputs need the host plan and context");
   IMSRG_CHECK(z3.packed != 0, "Comm133Batch: packed Z only");
   const LineBatch& plan = *in.plan;
   if (plan.tiles.empty()) return;
-  const int n1max = MaxOneBodyChannel(*in.ctx);
+  Comm133Cache::Impl& ci = cache.impl();
+  if (ci.n1max == 0) ci.n1max = MaxOneBodyChannel(*in.ctx);
+  const int n1max = ci.n1max;
   // A term needs its one-body part and the other operand's H block.
   const bool has_hy = in.v.x1 != nullptr && in.hy != nullptr;
   const bool has_hx = in.v.y1 != nullptr && in.hx != nullptr;
@@ -487,16 +510,32 @@ void Comm133Batch(const N7BatchInputs& in, const ThreeBodyOutView& z3,
   const exec::DeviceBuffer<std::int64_t> off = UploadOffsets(o);
   const std::size_t nt1 = o.line0.size();
   const auto entries = static_cast<std::size_t>(o.slot0.back());
-  exec::DeviceBuffer<std::int32_t> rows(entries, "commutator::comm133_slots");
-  exec::DeviceBuffer<double> coef(4 * entries, "commutator::comm133_coef");
+  // The slot table of a channel does not depend on the batch's row range:
+  // rebuild it only if the tile channels (or the term set) changed.
+  SlotCacheEntry& sc = ci.slots;
+  std::vector<std::int32_t> chans;
+  chans.reserve(plan.tiles.size());
+  for (const LineTile& t : plan.tiles) chans.push_back(t.channel);
+  const bool rebuild = !sc.valid || sc.has_hy != has_hy ||
+                       sc.has_hx != has_hx || sc.channels != chans;
+  if (rebuild) {
+    sc.valid = false;
+    sc.rows = exec::DeviceBuffer<std::int32_t>(entries,
+                                               "commutator::comm133_slots");
+    sc.coef =
+        exec::DeviceBuffer<double>(4 * entries, "commutator::comm133_coef");
+    sc.channels = chans;
+    sc.has_hy = has_hy;
+    sc.has_hx = has_hx;
+  }
   Comm133Args a;
   a.sp = in.v.sp;
   a.batch = in.batch;
   a.z3 = z3;
   a.tout = tout;
-  a.st.s = rows.device_data();
-  a.st.bra = coef.device_data();
-  a.st.ket = coef.device_data() + 2 * entries;
+  a.st.s = sc.rows.device_data();
+  a.st.bra = sc.coef.device_data();
+  a.st.ket = sc.coef.device_data() + 2 * entries;
   a.ch_num_states = in.pt.ch_num_states;
   // A missing block is replaced by the present one (coefficients 0).
   a.hy = has_hy ? in.hy : in.hx;
@@ -507,7 +546,10 @@ void Comm133Batch(const N7BatchInputs& in, const ThreeBodyOutView& z3,
   a.elem0 = off.device_data() + nt1;
   a.slot0 = off.device_data() + 2 * nt1;
   a.n1max = n1max;
-  BuildSlots(in, a.slot0, n1max, o.slot0.back(), has_hy, has_hx, a.st);
+  if (rebuild) {
+    BuildSlots(in, a.slot0, n1max, o.slot0.back(), has_hy, has_hx, a.st);
+    sc.valid = true;
+  }
   RunLines(a, o.elem0.back());
   exec::Fence("commutator::comm133_batch");
 }
@@ -569,6 +611,7 @@ void Comm133Rows(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   // One TransposeOut value buffer for all batches, grown on demand (every
   // value of a batch is written by Comm133Batch before it is read).
   exec::DeviceBuffer<double> tout_data;
+  Comm133Cache cache;
   ForEachN7Batch(v, ctx, rows, budget_bytes, N7Needs{true, false},
                  [&](const N7BatchInputs& in) {
                    const std::vector<std::int64_t> off =
@@ -584,7 +627,7 @@ void Comm133Rows(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                    TransposeOut tout;
                    tout.data = tout_data.device_data();
                    tout.line_off = line_off.device_data();
-                   Comm133Batch(in, out, tout);
+                   Comm133Batch(in, out, tout, cache);
                    AddTransposeOut(in, tout, out);
                  });
 }
