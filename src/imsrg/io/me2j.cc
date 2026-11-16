@@ -4,9 +4,11 @@
 #include "imsrg/io/me2j.h"
 
 #include <algorithm>
+#include <bit>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <fstream>
 #include <memory>
 #include <optional>
 #include <string>
@@ -181,28 +183,112 @@ void CheckNoExtraValues(TextInput& in, const std::filesystem::path& path,
   }
 }
 
-/// Reads every record of the file prefix into `tb` and returns the number of
-/// values consumed; `expected` is only used for the truncation message.
-std::int64_t ReadRecords(TextInput& in, const std::filesystem::path& path,
-                         const Resolved& r, const std::vector<FileOrbit>& orbs,
-                         const std::vector<PnOrbit>& pn, op::TwoBody& tb,
-                         std::int64_t expected) {
-  std::int64_t read = 0;
+/// Size in bytes of the uninterpreted header of a `.bin` file (D57; imsrg++
+/// `BINARYHEADERSIZE`, `ReadWrite.cc:30`).
+constexpr std::int64_t kBinaryHeaderBytes = 255;
+/// Floats per read of a `.bin` file (4 MiB chunks; the file is never held
+/// whole).
+constexpr std::size_t kBinaryChunkFloats = std::size_t{1} << 20;
 
-  const auto next = [&]() {
-    float v = 0.0F;
-    if (!in.NextFloat(v)) {
-      throw InputError("'" + path.string() + "': data ended after " +
-                       std::to_string(read) + " values; " +
-                       std::to_string(expected) +
-                       " are needed for the given file truncation (check "
-                       "file2e1max, file2e2max "
-                       "and file2lmax)");
+static_assert(sizeof(float) == 4, "me2j .bin files hold 4-byte floats");
+static_assert(std::endian::native == std::endian::little,
+              "me2j .bin files are little-endian; byte swapping is not "
+              "implemented");
+
+/// True if `path` names a binary me2j file (suffix `.bin`).
+bool IsBinaryPath(const std::filesystem::path& path) {
+  return path.extension() == ".bin";
+}
+
+/// A chunked reader of the binary32 values of a `.bin` file, after its
+/// 255-byte header. Every read is checked; failures throw `InputError` naming
+/// the file and the byte offset.
+class BinaryInput {
+ public:
+  /// Opens `path` and checks that its size is exactly 255 + 4 *
+  /// `expected_values` (64-bit arithmetic), then skips the header.
+  /// @throws InputError if the file cannot be opened or has another size.
+  BinaryInput(const std::filesystem::path& path, std::int64_t expected_values)
+      : path_(path), buffer_(kBinaryChunkFloats) {
+    std::error_code ec;
+    const std::uintmax_t size = std::filesystem::file_size(path, ec);
+    if (ec) {
+      throw InputError(
+          "'" + path.string() +
+          "': cannot determine the size of the binary file: " + ec.message());
     }
-    ++read;
-    return static_cast<double>(v);
-  };
+    const std::int64_t expected_size = kBinaryHeaderBytes + 4 * expected_values;
+    if (size != static_cast<std::uintmax_t>(expected_size)) {
+      throw InputError(
+          "'" + path.string() + "': binary me2j file has " +
+          std::to_string(size) + " bytes but " + std::to_string(expected_size) +
+          " (= 255 header bytes + 4 * " + std::to_string(expected_values) +
+          " values) are expected for the given file truncation; check "
+          "file2e1max, file2e2max and file2lmax");
+    }
+    in_.open(path, std::ios::binary);
+    if (!in_) throw InputError("'" + path.string() + "': cannot open file");
+    in_.seekg(kBinaryHeaderBytes);
+    if (!in_) {
+      throw InputError("'" + path.string() +
+                       "': cannot skip the 255-byte header");
+    }
+    offset_ = kBinaryHeaderBytes;
+    total_floats_ = expected_values;
+  }
 
+  /// The next value widened to double. @throws InputError on a short read.
+  double Next() {
+    if (pos_ == have_) Refill();
+    return static_cast<double>(buffer_[pos_++]);
+  }
+
+ private:
+  void Refill() {
+    const std::int64_t remaining =
+        total_floats_ - (offset_ - kBinaryHeaderBytes) / 4;
+    const std::size_t want = static_cast<std::size_t>(
+        std::min<std::int64_t>(remaining, std::int64_t(kBinaryChunkFloats)));
+    if (want == 0) {
+      throw InputError("'" + path_.string() +
+                       "': read past the end at offset " +
+                       std::to_string(offset_));
+    }
+    in_.read(reinterpret_cast<char*>(buffer_.data()),
+             static_cast<std::streamsize>(4 * want));
+    if (!in_ || static_cast<std::size_t>(in_.gcount()) != 4 * want) {
+      throw InputError(
+          "'" + path_.string() + "': short or failed read at offset " +
+          std::to_string(offset_) + " (wanted " + std::to_string(4 * want) +
+          " bytes, got " + std::to_string(in_.gcount()) + ")");
+    }
+    offset_ += static_cast<std::int64_t>(4 * want);
+    have_ = want;
+    pos_ = 0;
+  }
+
+  std::filesystem::path path_;
+  std::ifstream in_;
+  std::vector<float> buffer_;
+  std::size_t pos_ = 0;
+  std::size_t have_ = 0;
+  std::int64_t offset_ = 0;
+  std::int64_t total_floats_ = 0;
+};
+
+/// Reads every record of the file prefix into `tb` and returns the number of
+/// values consumed; `next_value()` returns the next value (widened) and throws
+/// at the end of the data.
+template <class NextValue>
+std::int64_t ReadRecordsFrom(NextValue&& next_value, const Resolved& r,
+                             const std::vector<FileOrbit>& orbs,
+                             const std::vector<PnOrbit>& pn, op::TwoBody& tb) {
+  std::int64_t read = 0;
+  const auto next = [&]() {
+    const double v = next_value();
+    ++read;
+    return v;
+  };
   ForEachRecord(orbs, r.e2max,
                 [&](std::size_t i1, std::size_t i2, std::size_t i3,
                     std::size_t i4, std::int32_t J) {
@@ -216,6 +302,28 @@ std::int64_t ReadRecords(TextInput& in, const std::filesystem::path& path,
                               i4, J, rv);
                 });
   return read;
+}
+
+/// Reads the records of a text/gzip file; `expected` is only used for the
+/// truncation message.
+std::int64_t ReadRecords(TextInput& in, const std::filesystem::path& path,
+                         const Resolved& r, const std::vector<FileOrbit>& orbs,
+                         const std::vector<PnOrbit>& pn, op::TwoBody& tb,
+                         std::int64_t expected) {
+  std::int64_t consumed = 0;
+  const auto next_value = [&]() {
+    float v = 0.0F;
+    if (!in.NextFloat(v)) {
+      throw InputError("'" + path.string() + "': data ended after " +
+                       std::to_string(consumed) + " values; " +
+                       std::to_string(expected) +
+                       " are needed for the given file truncation (check "
+                       "file2e1max, file2e2max and file2lmax)");
+    }
+    ++consumed;
+    return static_cast<double>(v);
+  };
+  return ReadRecordsFrom(next_value, r, orbs, pn, tb);
 }
 
 }  // namespace
@@ -245,14 +353,20 @@ op::Operator ReadMe2j(const std::filesystem::path& path,
   op::Operator H(ms, op::OperatorSpec::Scalar(2, Hermiticity::kHermitian));
   op::TwoBody& tb = H.two_body();
 
-  TextInput in(path);
-  in.SkipLine();  // header line
-
   const std::int64_t expected = CountValues(r, emax_read);
-  const std::int64_t read = ReadRecords(in, path, r, orbs, pn, tb, expected);
-
-  if (options.read_whole_file) {
-    CheckNoExtraValues(in, path, read, expected);
+  std::int64_t read = 0;
+  if (IsBinaryPath(path)) {
+    // The size must match the whole file's truncation, even when only a prefix
+    // is read.
+    BinaryInput bin(path, CountValues(r, r.e1max));
+    read = ReadRecordsFrom([&]() { return bin.Next(); }, r, orbs, pn, tb);
+  } else {
+    TextInput in(path);
+    in.SkipLine();  // header line
+    read = ReadRecords(in, path, r, orbs, pn, tb, expected);
+    if (options.read_whole_file) {
+      CheckNoExtraValues(in, path, read, expected);
+    }
   }
 
   if (report != nullptr) {

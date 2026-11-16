@@ -53,7 +53,8 @@ struct Me2jReadReport {
   double seconds = 0.0;  ///< Wall time of the read, including file open.
 };
 
-/// Reads a Darmstadt me2j file (plain or gzip, detected by content) into a new
+/// Reads a Darmstadt me2j file (plain or gzip, detected by content; or binary
+/// when the path ends in `.bin`, see below) into a new
 /// Hermitian scalar two-body operator on `ms` (`particle_rank` 2, zero- and
 /// one-body parts zero).
 ///
@@ -75,7 +76,15 @@ struct Me2jReadReport {
 /// orbit), which is a small fraction of a big file. With `read_whole_file` the
 /// whole file is consumed and its value count checked. Complexity: O(values
 /// read) with ~1 ns/byte parsing.
-/// @throws InputError if the file cannot be opened; if the data ends before the
+///
+/// Binary files (`name.me2j.bin`, D57, `design/19-mexj-formats.md` 3.1): 255
+/// header bytes, not interpreted, then the same values in the same order as
+/// native little-endian IEEE-754 binary32, read in chunks of 2^20 floats. The
+/// file size must be exactly 255 + 4 * `Me2jValueCount(options.file)` bytes
+/// (64-bit arithmetic) even when only a prefix is read; each read is checked.
+/// @throws InputError if the file cannot be opened; for a `.bin` file, if its
+///         size is not 255 + 4n or a read is short or fails (the message names
+///         the file and the byte offset); if the data ends before the
 ///         required values are complete; if a token is not a number; or, with
 ///         `read_whole_file`, if the number of values differs from
 ///         `Me2jValueCount(options.file)` (the message states expected and
