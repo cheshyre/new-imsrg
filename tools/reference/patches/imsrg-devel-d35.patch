@@ -1,7 +1,8 @@
 # imsrg-devel-d35.patch -- patch against imsrg-devel src/ (apply with `patch -p1` from the directory
 # that contains src/; tools/reference/build_imsrg_devel.sh `patched` does this on a private copy).
 #
-# What: two quirks of imsrg++ are removed in imsrg_util.cc.
+# What: two quirks of imsrg++ are removed in imsrg_util.cc (D35), and three flow semantics are
+# changed in IMSRGSolver.{hh,cc} and imsrg++.cc (D47, D48; hunks at the end).
 #   1. TCM_Op: the two-body part no longer drops entries with |p1p2/A| <= 1e-7, so
 #      Trel = T - Tcm (and thus the bare H) keeps every entry (measured effect <= 2.4e-15 MeV).
 #   2. Rp2_corrected_Op (operator "Rp2"): no longer adds 1/Z * RpSpinOrbitCorrection; that term is the
@@ -10,6 +11,17 @@
 #   compatibility switches; the e2e/hamiltonian/HF goldens are regenerated from this patched build
 #   so that the integration tests keep ~1e-10 MeV agreement and identical step counts (D42: only via
 #   the scripted tools/reference commands).
+#   3. (D48) IMSRGSolver::Solve: after the final GatherOmega of the hunter-gatherer, H(s) :=
+#      H_saved = exp(Omega_gathered) H_0 exp(-Omega_gathered), so E0 and every transformed operator
+#      come from one Omega and a second stage starts from it (imsrg++ left H(s) at the last hunter
+#      step, inconsistent with the gathered Omega by up to tens of keV); not after a divergence. refharness (rh_flow.cpp)
+#      repeats this line after its own final GatherOmega.
+#   4. (D47) imsrg++.cc: stage 2 integrates [s1, s1 + smax] for every method (`smax += s`), instead
+#      of doubling smax for Magnus only (which left flow_RK4 stage 2 empty after a stage 1 that
+#      reached smax). The adaptive `flow` method keeps s = 0 (it integrates a copy of the solver),
+#      so its range [0, smax] is the same length.
+#   5. (D47) IMSRGSolver: SetEtaCriterion / SetODETolerance and the ODE tolerance members take
+#      double instead of float (quirk P7).
 # Everything else in imsrg-devel is untouched.
 --- a/src/imsrg_util/imsrg_util.cc
 +++ b/src/imsrg_util/imsrg_util.cc
@@ -38,3 +50,53 @@
   }
  
   Operator Rn2_corrected_Op(ModelSpace& modelspace, int A, int Z)
+--- a/src/IMSRGSolver.cc
++++ b/src/IMSRGSolver.cc
+@@ -236,6 +236,11 @@
+   if (hunter_gatherer)
+   {
+     GatherOmega();
++    // D48: H(s) becomes the rebuilt H_saved = exp(Omega) H_0 exp(-Omega) with the gathered Omega
++    // (imsrg++ leaves H(s) as the last hunter step produced it). Not after a divergence (the
++    // guard of Solve_magnus_euler), which keeps its marker.
++    if (not (Eta.Norm() > 1e12 or std::abs(Elast) > 1e9))
++      FlowingOps[0] = H_saved;
+   }
+ }
+ 
+--- a/src/IMSRGSolver.hh
++++ b/src/IMSRGSolver.hh
+@@ -121,8 +121,8 @@
+   void SetGenerator(std::string g);
+   void SetDenominatorPartitioning(std::string dp);
+   void SetOmegaNormMax(double x){omega_norm_max = x;};
+-  void SetODETolerance(float x){ode_e_abs=x;ode_e_rel=x;};
+-  void SetEtaCriterion(float x){eta_criterion = x;};
++  void SetODETolerance(double x){ode_e_abs=x;ode_e_rel=x;};
++  void SetEtaCriterion(double x){eta_criterion = x;};
+   void SetMagnusAdaptive(bool b=true){magnus_adaptive = b;};
+   void SetHunterGatherer(bool b=true){hunter_gatherer = b;};
+   void SetPerturbativeTriples(bool b=true){perturbative_triples = b;};
+@@ -195,8 +195,8 @@
+   std::vector<double> eta1;
+   std::vector<double> eta2;
+   std::string ode_mode;
+-  float ode_e_abs;
+-  float ode_e_rel;
++  double ode_e_abs;
++  double ode_e_rel;
+ 
+ 
+ //  void operator()( const vector<Operator>& x, vector<Operator>& dxdt, const double t);
+--- a/src/imsrg++.cc
++++ b/src/imsrg++.cc
+@@ -1121,7 +1121,8 @@
+ 
+   if (nsteps > 1 and valence_space != reference) // two-step decoupling, do core first
+   {
+-    if (method == "magnus") smax *= 2;
++    // D47: stage 2 integrates [s1, s1 + smax] for every method (imsrg++: smax doubled for magnus only).
++    smax += imsrgsolver.s;
+ 
+     imsrgsolver.SetGenerator(valence_generator);
+     std::cout << "Setting generator to " << valence_generator << std::endl;

@@ -196,7 +196,7 @@ to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9. In the driver (run 2): IT
 
 * **As implemented (F2b, `flow/ode.{h,cc}`, `OdeSolver`):** `flow_rk4` and `flow` integrate
   dH/ds = [eta(H), H] with the requested operators flowing alongside (`dO/ds = [eta, O]`; the driver
-  builds them before the flow, imsrg++.cc:1074, and smax is doubled for stage 2 only for Magnus).
+  builds them before the flow, imsrg++.cc:1074, and stage 2 integrates [s1, s1 + smax] for every method, D47).
   `flow_rk4` is imsrg++ `Solve_flow_RK4` (ds = min(dsmax, smax - s), eta recomputed at every stage,
   `shell-model-atan` cutoff 1.0 until ||eta|| < 1); `flow` is boost odeint 1.92 `integrate_adaptive`
   with `make_controlled<runge_kutta_dopri5>` reimplemented step by step (6 right-hand-side
@@ -204,8 +204,8 @@ to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9. In the driver (run 2): IT
   imsrg++'s error norm: sum over the state's operators of `||(|xerr|)/(eps_abs + eps_rel(|x| +
   |dt||dxdt|))||` (zero-body excluded), built from the element-wise operations of
   `operator/elementwise.h` (abs, divide, add a scalar to every element: NOT `operator+=(Operator&,
-  double)`, which touches E0 only). `ode_tolerance` is rounded to float as in imsrg++ (**to change
-  (D47):** `eta_criterion` and `ode_tolerance` become doubles). As in imsrg++,
+  double)`, which touches E0 only). `eta_criterion` and `ode_tolerance` are doubles (D47; imsrg++
+  rounds both through float, quirk P7). As in imsrg++,
   after ||eta|| < eta_criterion dxdt = 0 and the integration runs on to smax. The status callback of
   `flow` fires for every right-hand-side evaluation, like the imsrg++ flow file; the flow log's E_MP2
   evaluates the H of that line. Deviations: M8-Q40. Goldens: `tests/golden/e2e/IT-14`. Every flowing
@@ -227,17 +227,18 @@ to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9. In the driver (run 2): IT
   semantics (decision of the orchestrator, flow review item 3): the stack is `{gatherer, hunter}`;
   `GatherOmega` with a one-entry stack appends a zero hunter, else `gatherer = BchProduct(hunter,
   gatherer)` if `‖hunter‖ > 1e-12`, then zeroes the hunter and rebuilds `H_saved` from `H_0` through
-  the gatherer; **`H(s)` is left untouched**, and `Solve` gathers once more after the loop (also
-  `set_generator` gathers if the hunter is non-zero). `SolveResult::num_gathers` counts them as the
+  the gatherer; a gather inside the loop leaves `H(s)` untouched, and `Solve` gathers once more after
+  the loop (also `set_generator` gathers if the hunter is non-zero) and then, unless the flow
+  diverged, **sets `H(s) = H_saved`** (D48, below). `SolveResult::num_gathers` counts them as the
   `gathering Omega.` lines of imsrg++ (loop gathers + the final one); `results.json` carries
-  `num_gathers` per stage and in total. Consequence: `H(s)` differs from `Transform(H_0)` at the BCH
-  truncation level (unit test `HunterGathererDocumentsImsrgSemantics`; the replay test holds for the
-  split stack only). Goldens: `tests/golden/e2e/IT-2/hunter_gatherer`. A **prerequisite of
-  IMSRG(3f2)** (D32). **To change (owner, D48, M8-Q10):** after the final gather H(s) becomes the
-  rebuilt `H_saved` (H(s) = e^Ω H0 e^−Ω with the gathered Ω), so E0 and every transformed operator
-  come from one Ω and stage 2 starts from it; measured ΔE0 −13.4 keV (IT-10 O16 emax 2), +2.8 keV
-  (He4 emax 2), −43 / −22 keV (IT-2 hunter-gatherer O16 emax 4, 0.25 / 0.1), −8.1 keV (He4 emax 2),
-  steps and gathers unchanged; the D35 patch gets the same change and the goldens are regenerated.
+  `num_gathers` per stage and in total. Goldens: `tests/golden/e2e/IT-2/hunter_gatherer`, `IT-10`. A
+  **prerequisite of IMSRG(3f2)** (D32). **D48 (owner, M8-Q10; imsrg++ deviation, `30` §6 row
+  D48-1):** after the final gather H(s) is the rebuilt `H_saved` (H(s) = e^Ω H0 e^−Ω with the
+  gathered Ω), so E0 and every transformed operator come from one Ω and stage 2 starts from it
+  (imsrg++ leaves H(s) at the last hunter step, up to tens of keV away). Unit test
+  `MagnusSolver.HunterGathererHamiltonianIsRebuiltWithGatheredOmega` checks `H(s) == Transform(H0)`;
+  the D35 patch of imsrg-devel and `refharness flow` carry the same line and the hunter-gatherer
+  goldens were regenerated from them (ΔE0 vs the old goldens in the commit message).
 * IMSRG(3f2) (`BchOptions::factorized`, M10 3f2): `BchTransform` adds F(Omega, nested_{i-2}) to
   every nested term from the second on (before the series update and the epsilon test);
   `BchProduct` adds F(X, Y)/12 to the 1/12 term and F(Y, N_{k-2}) (N_0 = X) to N_k for k >= 2, as
@@ -257,8 +258,9 @@ to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9. In the driver (run 2): IT
   (IMSRG(3) generator) gets the same sign-keeping floor, without `denominator_delta` (owner,
   M10-Q60, D49).
 * Two-step decoupling: the core generator first, then the valence generator, with a new Omega.
-  imsrg++ doubles `smax` for the second Magnus stage, and its `flow_RK4` stage 2 runs only to the
-  same smax. **To change (owner, D47):** stage 2 integrates [s1, s1 + smax] for every method.
+  **D47 (owner):** s continues across the stages and stage 2 integrates [s1, s1 + smax] for every
+  method. imsrg++ doubles `smax` for the second Magnus stage only, so its `flow_RK4` stage 2 is
+  empty after a stage 1 that reached smax (`30` §6 row D47-1).
 * Convergence: `‖η‖ < eta_criterion` or `s ≥ smax`.
 * Flow log: CSV with a header (s, E0, ‖η‖, ‖Ω‖, ds, MP2 estimate, wall time) plus the same
   lines to stdout. The integration tests parse the CSV.

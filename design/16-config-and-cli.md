@@ -137,13 +137,13 @@ Generator enum: `white`, `atan`, `imaginary_time`, `wegner`, `qtransfer_atan`, `
 
 | key | type | default | meaning |
 |---|---|---|---|
-| `smax` | double > 0 | `200.0` | max flow parameter per stage (Magnus: doubled for stage 2, kept; see Q12). **To change (owner, D47):** stage 2 integrates [s1, s1 + smax] for every method. |
+| `smax` | double > 0 | `200.0` | max flow parameter per stage: s continues across the stages and stage 2 integrates [s1, s1 + smax] for every method (owner, D47; imsrg++ doubled it for Magnus stage 2 only, Q12). |
 | `dsmax` | double > 0 | `0.5` | max step size. |
 | `ds_0` | double > 0 | `0.5` | initial step; used only by `magnus_backoff`/flow methods and as the gate of the imaginary-time/Wegner rule (Q2). |
 | `domega` | double > 0 | `0.1` | max `\|\|eta ds\|\|`. |
 | `omega_norm_max` | double > 0 | `0.25` | norm at which Omega is split. |
-| `eta_criterion` | double > 0 | `1e-6` | convergence threshold on `\|\|eta\|\|` (old code stored this as `float`; the solver still rounds it through float, quirk P7: **to change to double, owner D47**). |
-| `ode_tolerance` | double > 0 | `1e-6` | absolute and relative tolerance of the adaptive `flow` method (odeint dopri5; rounded to float as imsrg++: **to change to double, owner D47**). |
+| `eta_criterion` | double > 0 | `1e-6` | convergence threshold on `\|\|eta\|\|` (old code stored this as `float`; double end to end since D47, quirk P7 dropped). |
+| `ode_tolerance` | double > 0 | `1e-6` | absolute and relative tolerance of the adaptive `flow` method (odeint dopri5; double since D47, imsrg++ rounds it to float). |
 
 `[imsrg.omega]`
 
@@ -240,7 +240,7 @@ first column of this table and compares it with the keys of a real run, so the t
 | `imsrg.stages[].num_gathers` | int | per stage | gathers in this stage. |
 | `imsrg.stages[].s` | number | per stage | final flow parameter. |
 | `imsrg.stages[].e0` | number | per stage | E0 at the end of the stage. |
-| `imsrg.stages[].norm_eta` | number | per stage | norm of the generator at the end. |
+| `imsrg.stages[].norm_eta` | number | per stage | norm of the generator at the end; for a hunter-gatherer stage that of the H rebuilt with the gathered Omega (D48: 1e-3 where the flow stopped at 1e-6, a warning is logged; the flow does not continue). |
 | `imsrg.stages[].stop` | string | per stage | `converged`, `smax` or `diverged`. |
 | `imsrg.perturbative_triples` | object | `imsrg.perturbative_triples = true` | the perturbative-triples correction after stage 1 (imsrg++ `Perturbative triples:` line). *(added in version 2)* |
 | `imsrg.perturbative_triples.de` | number | with `imsrg.perturbative_triples` | the energy correction dE, MeV. |
@@ -268,7 +268,8 @@ norm_eta_2b, norm_eta, norm_omega_1b, norm_omega_2b, norm_omega, num_omegas, E_M
 `E_MP2` is the MBPT(2) correlation energy of the current Hamiltonian H(s), as in imsrg++'s flow
 file (`E(MP2)` column); it costs one MP2 evaluation per step. With `imsrg3.in_flow` the columns
 `norm_eta_3b` (after `norm_eta_2b`) and `norm_omega_3b` (after `norm_omega_2b`) are added; the other
-runs keep the columns above.
+runs keep the columns above. A hunter-gatherer stage ends with one more row (`istep` = steps + 1, `ds` = 0, same
+`s`) for the H rebuilt with the gathered Omega, so the file ends with the reported E0 (D48).
 
 Changelog (newest first):
 
@@ -592,9 +593,9 @@ Default = keep numerics; "fix" = behaviour changed deliberately. "Legacy" column
 | Q9 | second stage condition is the string compare `valence_space != reference` (R03 1.3) | fix | stage 2 runs iff `steps=2` and valence orbits exist | `nsteps=2` without valence orbits -> warning, stage skipped (old ran a useless stage) |
 | Q10 | `perturbative_triples` runs after stage 1, only for magnus; solver flag unused | keep | requires `method="magnus"` | warning if other method (old: silently ignored) |
 | Q11 | `imsrg3_at_end` replays Omega on `HNO` which has no 3N unless `IMSRG3=true` (P11) | keep numerics, document | `at_end` without `in_flow`: warning "input 3N is not included at IMSRG(3) level" | same warning. **HUMAN**: probably should normal order 3N at rank 3 whenever `at_end` is set |
-| Q12 | Magnus `smax` doubled for stage 2 (flow methods not) | **changed (owner, 2026-11-16, D47):** stage 2 integrates [s1, s1 + smax] for every method | documented | same |
+| Q12 | Magnus `smax` doubled for stage 2 (flow methods not) | **changed (owner, 2026-11-16, D47), implemented:** stage 2 integrates [s1, s1 + smax] for every method | documented | same |
 | Q13 | `OccNat3Cut>0` (or `basis=NAT`) triggers natural-orbital computation even with `basis=HF` (P16) | keep, make explicit | derived internally; `occ_nat3_cut` requires 3N-related IMSRG(3) or perturbative triples | same |
-| Q14 | `eta_criterion`, `ode_tolerance` pass through `float` | fix (double); effect on thresholds ~1e-8 relative; not yet applied in the solver (M8-Q41), **owner 2026-11-16 (D47): apply it** | -- | -- |
+| Q14 | `eta_criterion`, `ode_tolerance` pass through `float` | fix (double); effect on thresholds ~1e-8 relative; applied in the solver and in the D35 patch of the reference (D47) | -- | -- |
 | Q15 | `NSmagnus`/`brueckner*` overwrite `omega_norm_max` | keep | n/a | override + warning if user value differs |
 | Q16 | `write_omega` writes nothing without `scratch` | fix | always writes | same |
 | Q17 | imsrg++ has no HF-accelerator key: it always uses linear density mixing (D37) | add `hartree_fock.mixing` | default `diis` | default `linear` (absent key); an explicit `--set hartree_fock.mixing=diis` is honoured |

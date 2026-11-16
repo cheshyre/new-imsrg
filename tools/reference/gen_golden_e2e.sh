@@ -44,12 +44,20 @@ N=(3bme="${F3}" 3bme_type=no2b file3e1max=6 file3e2max=12 file3e3max=18)
 # decoupling stages (core atan, then the valence-space generator); the golden holds the flow file of
 # both stages, the final E0 and the valence-space .snt. The adaptive `flow` variant restarts s at 0 in
 # stage 2 (M8-Q40): compared by its final quantities only.
+# IT-15 *_smax10_eta (D47): smax=10 eta_criterion=0.014, so that stage 1 CONVERGES at s = 7.399 and stage 2 ends at
+# s1 + smax = 17.399 (the doubled smax of pristine imsrg++ would run to 20): the only job that tells the two Magnus rules apart.
+# IT-15/He4_emax2_pshell_hg (D48): two-stage hunter-gatherer, stage 2 starts from the H rebuilt with the gathered Omega.
+# IT-15 *_smax10 (D47): smax=10, so that stage 1 stops at smax and stage 2 integrates [s1, s1 + smax] for every
+# method (the D35 patch; pristine imsrg++ leaves the flow_RK4 stage 2 empty, doubles smax for Magnus only).
 declare -a JOBS=(IT-1 IT-2 IT-3 IT-4 IT-4/smax10 IT-5 IT-5/smax10 IT-6 IT-7 IT-8/emax2
                  IT-8/He4_emax2 IT-9/He4_emax2 IT-9/O16_emax2
                  IT-8/emax3 IT-9/He4_emax3 IT-9/O16_emax3
                  IT-14/He4_emax2_rk4 IT-14/He4_emax2_flow IT-14/O16_emax3_rk4
                  IT-14/O16_emax3_flow IT-14/O16_emax4_rk4 IT-14/O16_emax4_flow
-                 IT-15/He4_emax2_pshell_rk4 IT-15/He4_emax2_pshell_flow)
+                 IT-15/He4_emax2_pshell_rk4 IT-15/He4_emax2_pshell_flow
+                 IT-15/He4_emax2_pshell_rk4_smax10 IT-15/He4_emax2_pshell_flow_smax10
+                 IT-15/He4_emax2_pshell_magnus_smax10
+                 IT-15/He4_emax2_pshell_magnus_smax10_eta IT-15/He4_emax2_pshell_hg)
 job_args() {
   case "$1" in
     IT-1) echo emax=4 reference=O16 valence_space=O16 method=MP3 ;;
@@ -64,8 +72,8 @@ job_args() {
     IT-8/emax2) echo emax=2 reference=O16 valence_space=O16 method=magnus perturbative_triples=true ;;
     IT-8/He4_emax2) echo emax=2 reference=He4 valence_space=He4 method=magnus perturbative_triples=true ;;
     IT-8/emax3) echo emax=3 reference=O16 valence_space=O16 method=magnus perturbative_triples=true ;;
-    IT-9/He4_emax2) echo emax=2 IMSRG3=true imsrg3_n7=true method=magnus reference=He4 valence_space=He4 ;;
-    IT-9/O16_emax2) echo emax=2 IMSRG3=true imsrg3_n7=true method=magnus reference=O16 valence_space=O16 ;;
+    IT-9/He4_emax2) echo emax=2 IMSRG3=true imsrg3_n7=true method=magnus reference=He4 valence_space=He4 Operators=Rp2 ;;
+    IT-9/O16_emax2) echo emax=2 IMSRG3=true imsrg3_n7=true method=magnus reference=O16 valence_space=O16 Operators=Rp2 ;;
     IT-9/He4_emax3) echo emax=3 IMSRG3=true imsrg3_n7=true method=magnus reference=He4 valence_space=He4 ;;
     IT-9/O16_emax3) echo emax=3 IMSRG3=true imsrg3_n7=true method=magnus reference=O16 valence_space=O16 ;;
     IT-14/He4_emax2_rk4) echo emax=2 reference=He4 valence_space=He4 method=flow_RK4 Operators=Rp2 ;;
@@ -76,6 +84,11 @@ job_args() {
     IT-14/O16_emax4_flow) echo emax=4 reference=O16 valence_space=O16 method=flow Operators=Rp2 ;;
     IT-15/He4_emax2_pshell_rk4) echo emax=2 reference=He4 valence_space=p-shell method=flow_RK4 ;;
     IT-15/He4_emax2_pshell_flow) echo emax=2 reference=He4 valence_space=p-shell method=flow ;;
+    IT-15/He4_emax2_pshell_rk4_smax10) echo emax=2 reference=He4 valence_space=p-shell method=flow_RK4 smax=10 ;;
+    IT-15/He4_emax2_pshell_flow_smax10) echo emax=2 reference=He4 valence_space=p-shell method=flow smax=10 ;;
+    IT-15/He4_emax2_pshell_magnus_smax10) echo emax=2 reference=He4 valence_space=p-shell method=magnus smax=10 ;;
+    IT-15/He4_emax2_pshell_magnus_smax10_eta) echo emax=2 reference=He4 valence_space=p-shell method=magnus smax=10 eta_criterion=0.014 ;;
+    IT-15/He4_emax2_pshell_hg) echo emax=2 reference=He4 valence_space=p-shell method=magnus hunter_gatherer=true omega_norm_max=0.1 ;;
   esac
 }
 

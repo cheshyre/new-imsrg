@@ -45,6 +45,17 @@ std::vector<Row> GoldenRows(const FlowTable& t) {
   return rows;
 }
 
+/// The flow log of a hunter-gatherer stage ends with one row for the H rebuilt
+/// with the gathered Omega (same s as the row before, D48); removes it and
+/// returns it, so the rest can be compared with the in-loop golden trajectory.
+Row PopRebuiltRow(std::vector<Row>& rows) {
+  EXPECT_GE(rows.size(), 2u);
+  const Row rebuilt = rows.back();
+  rows.pop_back();
+  EXPECT_EQ(rebuilt.s, rows.back().s);
+  return rebuilt;
+}
+
 /// Compares a flow with the golden trajectory row by row and prints the
 /// maximal deviations (observed: 1e-13 or better).
 void CompareTrajectory(const char* tag, const std::vector<Row>& got,
@@ -104,6 +115,9 @@ TEST(HunterGatherer, He4Emax2SolverMatchesGolden) {
     got.push_back({st.s, st.e0, st.norm_eta, st.norm_omega});
   });
 
+  const Row rebuilt = PopRebuiltRow(got);
+  EXPECT_EQ(rebuilt.e0, r.e0);
+  EXPECT_EQ(rebuilt.norm_eta, r.norm_eta);
   const Json gold = ParseJson(Slurp(HgGolden(dir + "result.json")));
   const double e0_gold = gold["E0"].number;
   std::printf(
@@ -155,10 +169,17 @@ void RunO16(const std::string& golden_dir, const std::string& omax,
   EXPECT_EQ(static_cast<int>(r.results["imsrg"]["num_gathers"].number),
             static_cast<int>(gold["n_gathers"].number));
   EXPECT_NEAR(e0, gold["E0"].number, 1.0e-9);
-  EXPECT_LT(stage["norm_eta"].number, 1.0e-6);
+  // D48: eta is that of the rebuilt H (1e-3 here, not < eta_criterion); the
+  // flow log ends with the rebuilt row, whose E0 is the reported one.
+  EXPECT_EQ(stage["norm_eta"].number,
+            r.flow.at(r.flow.rows.size() - 1, "norm_eta"));
+  EXPECT_GT(stage["norm_eta"].number, 1.0e-6);
+  EXPECT_EQ(r.flow.at(r.flow.rows.size() - 1, "E0"), e0);
   EXPECT_EQ(static_cast<int>(r.results["imsrg"]["num_omegas"].number), 2);
+  std::vector<Row> rows = GoldenRows(r.flow);
+  PopRebuiltRow(rows);
   CompareTrajectory(
-      tag, GoldenRows(r.flow),
+      tag, rows,
       GoldenRows(ReadFlow(HgGolden(golden_dir + "/trajectory.csv"))));
 }
 

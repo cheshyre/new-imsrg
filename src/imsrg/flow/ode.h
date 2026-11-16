@@ -52,7 +52,8 @@ double ScaledStateError(const std::vector<op::Operator>& x_err,
 ///
 /// Differences from imsrg++ (design/QUESTIONS M8-Q40): (a) the flow parameter
 /// continues in a second stage (imsrg++'s odeint path integrates a copy of the
-/// solver, so its `s` and `ds` never advance and stage 2 restarts at s = 0);
+/// solver, so its `s` and `ds` never advance and stage 2 restarts at s = 0, the
+/// same range length as the [s1, s1 + smax] of D47);
 /// (b) non-finite or runaway ||eta|| / E0 ends the solve as `kDiverged` (the
 /// odeint path of imsrg++ has no such guard).
 class OdeSolver {
@@ -63,9 +64,9 @@ class OdeSolver {
   /// Sets up the solver for H0 (scalar, Hermitian, particle_rank 2, normal
   /// ordered; copied) and the operators that flow with it (scalar, number
   /// conserving; copied and promoted to particle_rank 2). `ode_tolerance` is
-  /// the absolute and relative odeint tolerance of `kDopri5`; as in imsrg++
-  /// (`SetODETolerance(float)`) it is rounded to float. Builds the commutator
-  /// workspace (needs an initialized exec::Runtime).
+  /// the absolute and relative odeint tolerance of `kDopri5`, used as a
+  /// double (D47; imsrg++ `SetODETolerance(float)` rounds it). Builds the
+  /// commutator workspace (needs an initialized exec::Runtime).
   /// @throws InputError for invalid step options (see `ValidateSolverOptions`),
   ///   `solver.hunter_gatherer`, ode_tolerance <= 0, or an operator that is not
   ///   a scalar number-conserving one.
@@ -88,7 +89,7 @@ class OdeSolver {
   /// Integrates from the current s to smax (or until converged, `kRk4`).
   ///
   /// `kRk4` (Solve_flow_RK4): eta = gen(H); loop while s < smax: stop if
-  /// ||eta|| < eta_criterion (compared as a float, P7); ds = min(dsmax, smax -
+  /// ||eta|| < eta_criterion (a double, D47); ds = min(dsmax, smax -
   /// s); classical RK4 on every operator with K_j = [eta_j, X_j], eta_j =
   /// gen(X_0 at stage j) (stage times s, s + ds/2, s + ds/2, s + ds), then
   /// X += ds/6 (K1 + 2 K2 + 2 K3 + K4) and eta = gen(H). For the

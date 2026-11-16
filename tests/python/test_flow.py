@@ -217,6 +217,9 @@ def test_hunter_gatherer_he4_matches_imsrgpp(golden, he4_emax2):
     assert r.e0 == pytest.approx(gold["E0"], abs=1e-9)
     assert len(s.omegas) == 2 and s.omegas[-1].norm() == 0.0  # {gatherer, zero hunter}
     assert s.omegas[0].norm() == pytest.approx(gold["norm_omega_gathered"], abs=1e-6)
+    # D48: one more status row for the H rebuilt with the gathered Omega.
+    rebuilt = got.pop()
+    assert rebuilt[0] == got[-1][0] and rebuilt[1] == r.e0 and rebuilt[2] == r.norm_eta
     assert len(got) == len(rows)
     for g, row in zip(got, rows):
         for val, key in zip(g, ("s", "E0", "norm_eta", "norm_omega")):

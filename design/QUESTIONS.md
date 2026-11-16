@@ -1013,3 +1013,23 @@ the orchestrator uses `O4` and up).
   -2.0e-3 MeV (O16 emax 3). Applied per D49 (old-code bug fix, reversible); no compatibility switch
   (D35); the IT-8 goldens are to be regenerated from the patched reference (D42). Until then the
   `driver_triples` IT-8 tests fail against the old goldens, by design.
+* **IT3-Q1** (2026-11-16, run 3, brief A part 1) - The D35 patch of imsrg-devel now carries the D47 and D48 hunks
+  in the same file (version stamps `0c7af4dd0112f621`, after the review fix `a908abab2eded439`); goldens whose
+  numbers did not change keep their old stamps on purpose, to avoid churn: `cb9d11ba30f579d4` (IT-1..IT-7, IT-14,
+  hamiltonian, hf, ...) and `5fdd2b73265417f2` (IT-8/He4_emax2, IT-8/emax3, old IT-15, imsrg3, n7). All are listed in
+  `tests/golden/README.md` as equivalent. **Assumed meanwhile:** fine. Alternative: regenerate every golden once so
+  that all carry the newest stamp.
+* **IT3-Q2** (2026-11-16, run 3, D48; extended after the review) - After the final gather `MagnusSolver` replaces H(s)
+  and now also recomputes eta(s) from it (the patched imsrg++ leaves Eta untouched, which no output shows). The
+  flow does NOT continue: measured ||eta(rebuilt H)|| = 1.8e-3 (He4 emax 2, omax 0.1), 4.8e-3 (O16 emax 4, omax
+  0.25), 2.5e-3 (O16 emax 4, omax 0.1), i.e. 2000-5000 times eta_criterion = 1e-6, where the loop had stopped on
+  the hunter-step H (9.6e-7); E0 of the rebuilt H is 8-43 keV away from the last hunter-step line. A warning is
+  logged, `norm_eta` of the stage and `eta()` describe the rebuilt H, and the flow log gets one extra row for it
+  (istep = steps + 1, same s). **Owner to decide** whether the flow should instead continue until the rebuilt H
+  converges (changes step counts and the goldens).
+* **IT3-Q3** (2026-11-16, run 3, D47) - The adaptive `flow` method of the patched imsrg++ still restarts s at 0 in
+  stage 2 (it integrates a copy of the solver), so for `flow` the reference flow file ends at s = smax while ours
+  ends at s1 + smax; the range LENGTH is the same, only the final quantities are compared
+  (`FlowMethods.StageTwoRangeAdaptiveSmax10`). Also: `tools/ci.sh` started from a background job of a
+  non-interactive shell fails `test_ctrl_c_*` of `tests/python/test_threading.py` (background jobs ignore SIGINT);
+  run it in the foreground. **Assumed meanwhile:** no change.

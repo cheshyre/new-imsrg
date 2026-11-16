@@ -17,10 +17,10 @@ namespace imsrg::driver {
 /// Hamiltonian preparation (model space, interaction, HF, normal ordering), the
 /// IMSRG(2) Magnus flow (stage 1 with `imsrg.generator.core`; with a valence
 /// space and `imsrg.steps = 2` stage 2 with `imsrg.generator.valence`, a new
-/// Omega and smax doubled, as imsrg++), re-normal ordering w.r.t. the core for
-/// ensemble references, the transformation of `operators.list`, and the outputs
-/// in `output.directory`: `results.json` (E_ref, HF parts, per-stage step
-/// counts and final values, E0, operator values), the flow CSV at
+/// Omega, integrating [s1, s1 + smax], D47), re-normal ordering w.r.t. the core
+/// for ensemble references, the transformation of `operators.list`, and the
+/// outputs in `output.directory`: `results.json` (E_ref, HF parts, per-stage
+/// step counts and final values, E0, operator values), the flow CSV at
 /// `output.flow_file` (one %.17g line per step: stage, istep, s, ds, E0, norms
 /// of H, eta and the current Omega, Omega count, wall time), the valence-space
 /// interaction `<stem>.snt` (tokyo; `.int`/`.sp` for nushellx) and one
