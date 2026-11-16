@@ -96,6 +96,26 @@ void CheckTermSet(const op::Operator& X, const op::Operator& Y,
   }
 }
 
+/// Throws unless the three-body parts involved are replicated: the phase-1
+/// commutator runs the N7 terms on rank 0 with whole three-body operators and
+/// broadcasts Z3 assuming equal buffer sizes, so a model space with a
+/// three-body row distribution would hang or corrupt (D7; supported by the
+/// distributed commutator of D10/D11). The condition depends only on the
+/// replicated model space and the operands' structure, hence every rank
+/// throws together.
+void CheckThreeBodyReplicated(const op::Operator& X, const op::Operator& Y,
+                              const op::Operator& Z, const TermMask m3,
+                              const Workspace& ws) {
+  if (ws.model_space().three_body_distribution() == nullptr) return;
+  if (m3.empty() && !X.three_body().has_value() &&
+      !Y.three_body().has_value() && !Z.three_body().has_value())
+    return;
+  throw NotImplementedError(
+      "commutator: three-body parts on a model space with a distributed "
+      "three-body row partition are not supported until the distributed "
+      "commutator (tasks D10/D11); use a replicated model space");
+}
+
 /// Sets Z to zero with the spec of [X, Y] (rank 3 if `imsrg3`), reusing its
 /// storage when it already has that spec on the workspace's model space.
 void PrepareOutput(const op::Operator& X, const op::Operator& Y, bool imsrg3,
@@ -174,6 +194,7 @@ void Commutator(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   const TermMask m = opts.terms;
   const TermMask m3 = m.ThreeBodyTerms();
   const bool imsrg3 = !m3.empty();
+  CheckThreeBodyReplicated(X, Y, Z, m3, ws);
   CheckTermSet(X, Y, m3, ws);
   PrepareOutput(X, Y, imsrg3, ws, Z);
 

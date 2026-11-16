@@ -46,10 +46,12 @@ class Fnv1a {
 void CheckReplicatedSetup(const basis::ModelSpace& ms,
                           const comm::Communicator& comm, int concurrency) {
   if (comm.is_serial()) return;
-  static const char* const kNames[] = {
-      "orbits and occupations", "number of orbits",
-      "two-body channel ket counts", "three-body space presence",
-      "thread count"};
+  static const char* const kNames[] = {"orbits and occupations",
+                                       "number of orbits",
+                                       "two-body channel ket counts",
+                                       "three-body space presence",
+                                       "thread count",
+                                       "three-body distribution present"};
   Fnv1a orbits;
   const auto& basis = ms.basis();
   const auto occ = ms.reference().occupations();
@@ -65,9 +67,12 @@ void CheckReplicatedSetup(const basis::ModelSpace& ms,
   kets.AddSigned(two_body.num_channels());
   for (const auto& ch : two_body.channels()) kets.AddSigned(ch.num_kets);
   std::vector<std::int64_t> local = {
-      orbits.value(), static_cast<std::int64_t>(ms.num_orbits()), kets.value(),
+      orbits.value(),
+      static_cast<std::int64_t>(ms.num_orbits()),
+      kets.value(),
       ms.three_body_space() != nullptr ? 1 : 0,
-      static_cast<std::int64_t>(concurrency)};
+      static_cast<std::int64_t>(concurrency),
+      ms.three_body_distribution() != nullptr ? 1 : 0};
   std::vector<std::int64_t> hi = local, lo = local;
   comm.AllreduceMax(std::span<std::int64_t>(hi));
   comm.AllreduceMin(std::span<std::int64_t>(lo));
@@ -77,6 +82,13 @@ void CheckReplicatedSetup(const basis::ModelSpace& ms,
       if (!what.empty()) what += ", ";
       what += kNames[i];
     }
+  }
+  if (hi.back() != 0) {
+    // Any rank with a distributed three-body part: every rank throws.
+    throw RuntimeError(
+        "distributed three-body parts are not supported by the replicated "
+        "pipeline until the distributed commutator (tasks D10/D11); rank " +
+        std::to_string(comm.rank()) + " of " + std::to_string(comm.size()));
   }
   if (!what.empty()) {
     throw RuntimeError(

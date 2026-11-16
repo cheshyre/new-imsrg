@@ -58,3 +58,12 @@ foreach(_ranks 2 4)
     DEPS commutator commutator_ref operator flow comm
     LABELS mpi MPI_RANKS ${_ranks} NO_GTEST_MAIN TIMEOUT 600)
 endforeach()
+
+# A commutator on a model space with distributed three-body rows is refused on
+# every rank (M12b review fix, until D10/D11): 2 and 4 ranks.
+foreach(_ranks 2 4)
+  imsrg_add_test(NAME commutator_mpi_distributed_3b_${_ranks}ranks
+    SOURCES test_mpi_distributed_three_body.cc ${PROJECT_SOURCE_DIR}/tests/support/mpi_test_main.cc
+    DEPS commutator operator comm
+    LABELS mpi MPI_RANKS ${_ranks} NO_GTEST_MAIN TIMEOUT 300)
+endforeach()

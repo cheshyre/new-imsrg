@@ -7,6 +7,7 @@
 // is left in a collective). Run as `driver_mpi_check_2ranks` and
 // `driver_mpi_check_4ranks`.
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -15,6 +16,8 @@
 
 #include "imsrg/base/error.h"
 #include "imsrg/basis/model_space.h"
+#include "imsrg/basis/three_body_distribution.h"
+#include "imsrg/basis/three_body_rows.h"
 #include "imsrg/comm/communicator.h"
 #include "imsrg/driver/pipeline/mpi_sync.h"
 #include "tests/support/mpi_test_main.h"
@@ -66,6 +69,33 @@ TEST(ReplicatedCheck, RankDependentThreadCountThrowsEverywhere) {
   EXPECT_EQ(CountThrowing(*ms, 2 + world.rank(), msg), world.size());
   EXPECT_NE(msg.find("thread count"), std::string::npos) << msg;
   EXPECT_EQ(msg.find("occupations"), std::string::npos) << msg;
+}
+
+// A distributed three-body row partition on ANY rank makes every rank throw
+// (the replicated pipeline broadcasts whole operators; D10/D11 lift this).
+TEST(ReplicatedCheck, DistributedThreeBodyThrowsEverywhere) {
+  const Communicator& world = TestWorld();
+  const auto plain =
+      Space("He4")->WithThreeBody(basis::ThreeBodyCuts{.e3max = 4});
+  const basis::ThreeBodySpace& s = *plain->three_body_space();
+  basis::LineWeights w;
+  w.compute.assign(static_cast<std::size_t>(s.num_triples()), 1.0);
+  w.memory = w.compute;
+  auto part = std::make_shared<const basis::RowPartition>(
+      basis::RowPartition::Balanced(s, w, world.size()));
+  const auto dist = plain->WithThreeBodyDistribution({part, world});
+  std::string msg;
+  // Every rank distributed.
+  EXPECT_EQ(CountThrowing(*dist, 3, msg), world.size());
+  EXPECT_NE(msg.find("distributed three-body"), std::string::npos) << msg;
+  // Only rank 0 distributed: still every rank throws.
+  msg.clear();
+  EXPECT_EQ(CountThrowing(world.rank() == 0 ? *dist : *plain, 3, msg),
+            world.size());
+  EXPECT_NE(msg.find("distributed three-body"), std::string::npos) << msg;
+  // None distributed: passes.
+  msg.clear();
+  EXPECT_EQ(CountThrowing(*plain, 3, msg), 0) << msg;
 }
 
 TEST(ReplicatedCheck, RuntimeConcurrencyOverloadPassesOnEqualRanks) {
