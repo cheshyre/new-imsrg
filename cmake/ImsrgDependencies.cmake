@@ -83,12 +83,13 @@ if(IMSRG_ENABLE_MPI)
   if(NOT MPI_CXX_FOUND)
     message(FATAL_ERROR "IMSRG_ENABLE_MPI=ON, but no MPI C++ library was found")
   endif()
-  # Open MPI refuses to start more ranks than there are cores unless told otherwise (MPICH-style
-  # launchers do not know the flag, hence the check).
+  # Open MPI refuses to start more ranks than there are cores unless told otherwise, and binds each
+  # rank to one core by default, which would serialize its OpenMP threads (MPICH-style launchers do
+  # not know these flags, hence the check).
   execute_process(COMMAND "${MPIEXEC_EXECUTABLE}" --version
                   OUTPUT_VARIABLE _imsrg_mpiexec_version ERROR_QUIET TIMEOUT 20)
   if(_imsrg_mpiexec_version MATCHES "Open MPI|OpenRTE")
-    set(_imsrg_mpiexec_default "--oversubscribe")
+    set(_imsrg_mpiexec_default "--oversubscribe --bind-to none")
   else()
     set(_imsrg_mpiexec_default "")
   endif()
