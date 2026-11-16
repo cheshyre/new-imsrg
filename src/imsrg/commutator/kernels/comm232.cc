@@ -493,6 +493,15 @@ WorkView ViewOf(const WorkBuffers& b, const WorkList& w) {
   return v;
 }
 
+/// The four half sums of a work item over the columns of its key.
+struct ItemSums {
+  double f1y = 0.0;  ///< F[X2, Y3](p, q; key).
+  double f2y = 0.0;  ///< F[X2, Y3](q, p; key).
+  double f1x = 0.0;  ///< F[Y2, X3](p, q; key).
+  double f2x = 0.0;  ///< F[Y2, X3](q, p; key).
+};
+static_assert(std::is_trivially_copyable_v<ItemSums>);
+
 /// Kernel of one pass over the work list of a batch (file comment; a
 /// functor rather than a lambda, so the launch may sit in a function of
 /// this TU's unnamed namespace: nvcc restricts the enclosing functions of
@@ -518,20 +527,11 @@ struct PassFunctor {
   double sy = 1.0;     ///< Sign of wy (transposed pass).
   int transposed = 0;  ///< 0: direct pass, 1: transposed pass.
 
-  IMSRG_FUNCTION void operator()(const exec::Index idx) const {
-    const int k = detail::FindBlock(work.key_item, work.num_keys, idx);
-    const std::int32_t* key = work.key + kKeyFields * std::int64_t{k};
-    const int J = key[2];
-    const int ch2 = key[3];
-    const basis::TwoBodyTableView& tb = v.x2.tb;
-    const int o = static_cast<int>(idx - work.key_item[k]);
-    const int ket = tb.channel_kets[tb.channel_ket_offset[ch2] + o];
-    const int p = tb.ket_p[ket];
-    const int q = tb.ket_q[ket];
-    double f1y = 0.0;  // F[X2, Y3](p, q; key) over the key's columns
-    double f2y = 0.0;  // F[X2, Y3](q, p; key)
-    double f1x = 0.0;  // F[Y2, X3](p, q; key)
-    double f2x = 0.0;  // F[Y2, X3](q, p; key)
+  /// The half sums of the creator-side pair (p, q) over the columns of key
+  /// `k` (pair J `J`), summed over the columns in entry order. Cost O(2
+  /// entries HalfSumsColumn).
+  IMSRG_FUNCTION ItemSums SumColumns(int k, int p, int q, int J) const {
+    ItemSums s;
     for (int e = work.key_entry[k]; e < work.key_entry[k + 1]; ++e) {
       Column col;
       col.ch3 = work.entry[kEntryFields * std::int64_t{e}];
@@ -543,32 +543,46 @@ struct PassFunctor {
                                                 transposed, p, q, J, col);
         const HalfSums b = HalfSumsColumn<true>(v, tab, v.x2, wy, v.y2, wx,
                                                 transposed, q, p, J, col);
-        f1y += a.first;
-        f2y += b.first;
-        f1x += a.second;
-        f2x += b.second;
+        s.f1y += a.first;
+        s.f2y += b.first;
+        s.f1x += a.second;
+        s.f2x += b.second;
       } else if (wy != nullptr) {
-        f1y += HalfSumsColumn<false>(v, tab, v.x2, wy, v.x2, wy, transposed, p,
-                                     q, J, col)
-                   .first;
-        f2y += HalfSumsColumn<false>(v, tab, v.x2, wy, v.x2, wy, transposed, q,
-                                     p, J, col)
-                   .first;
+        s.f1y += HalfSumsColumn<false>(v, tab, v.x2, wy, v.x2, wy, transposed,
+                                       p, q, J, col)
+                     .first;
+        s.f2y += HalfSumsColumn<false>(v, tab, v.x2, wy, v.x2, wy, transposed,
+                                       q, p, J, col)
+                     .first;
       } else {
-        f1x += HalfSumsColumn<false>(v, tab, v.y2, wx, v.y2, wx, transposed, p,
-                                     q, J, col)
-                   .first;
-        f2x += HalfSumsColumn<false>(v, tab, v.y2, wx, v.y2, wx, transposed, q,
-                                     p, J, col)
-                   .first;
+        s.f1x += HalfSumsColumn<false>(v, tab, v.y2, wx, v.y2, wx, transposed,
+                                       p, q, J, col)
+                     .first;
+        s.f2x += HalfSumsColumn<false>(v, tab, v.y2, wx, v.y2, wx, transposed,
+                                       q, p, J, col)
+                     .first;
       }
     }
+    return s;
+  }
+
+  IMSRG_FUNCTION void operator()(const exec::Index idx) const {
+    const int k = detail::FindBlock(work.key_item, work.num_keys, idx);
+    const std::int32_t* key = work.key + kKeyFields * std::int64_t{k};
+    const int J = key[2];
+    const int ch2 = key[3];
+    const basis::TwoBodyTableView& tb = v.x2.tb;
+    const int o = static_cast<int>(idx - work.key_item[k]);
+    const int ket = tb.channel_kets[tb.channel_ket_offset[ch2] + o];
+    const int p = tb.ket_p[ket];
+    const int q = tb.ket_q[ket];
+    const ItemSums s = SumColumns(k, p, q, J);
     const int p_pq = Phase((v.ob.j2[p] + v.ob.j2[q]) / 2 - J);
     const double gy = transposed != 0 ? -sy : 1.0;
     const double gx = transposed != 0 ? -sx : 1.0;
     double z = 0.0;
-    if (wy != nullptr) z += gy * (f1y - p_pq * f2y);
-    if (wx != nullptr) z -= gx * (f1x - p_pq * f2x);
+    if (wy != nullptr) z += gy * (s.f1y - p_pq * s.f2y);
+    if (wx != nullptr) z -= gx * (s.f1x - p_pq * s.f2x);
     z *= kSign;
     if (p == q) z /= constants::kSqrt2;
     if (key[0] == key[1]) z /= constants::kSqrt2;
