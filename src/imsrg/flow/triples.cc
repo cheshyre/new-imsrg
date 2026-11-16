@@ -54,6 +54,7 @@ TriplesResult PerturbativeTriples(MagnusSolver& solver,
   cuts.emax_3body = -1;
   cuts.de3max = options.de3max;
   cuts.occnat3_cut = options.occnat3_cut;
+  cuts.natural_occupations = options.natural_occupations;
   // The reduced context holds only the hhh/ppp triples of the channels with an
   // hhh triple (M10-Q46); the full three-body space is never built.
   const commutator::TriplesContext ctx(ms, cuts);

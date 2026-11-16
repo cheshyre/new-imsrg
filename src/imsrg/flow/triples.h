@@ -25,6 +25,9 @@ struct TriplesOptions {
   double de3max = std::numeric_limits<double>::infinity();
   /// Smallest prod n_i (1 - n_i) of a kept ket; negative = no cut.
   double occnat3_cut = -1.0;
+  /// Natural occupations n_i, one per orbit, used by the OccNat3 cut; empty =
+  /// the reference occupations (1 for holes, 0 for particles).
+  std::vector<double> natural_occupations{};
 };
 
 /// Result of `PerturbativeTriples`.
