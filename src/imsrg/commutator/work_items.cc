@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <span>
 #include <utility>
+#include <vector>
 
 #include "imsrg/base/assert.h"
 #include "imsrg/basis/particle_hole_channels.h"
