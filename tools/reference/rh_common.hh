@@ -160,5 +160,8 @@ int cmd_bch(const Args& a);
 int cmd_normal_order(const Args& a);
 int cmd_basis_transform(const Args& a);
 int cmd_write_valence(const Args& a);
+int cmd_dump_tensor(const Args& a);
+int cmd_commutator_tensor(const Args& a);
+int cmd_bch_tensor(const Args& a);
 
 }  // namespace rh
