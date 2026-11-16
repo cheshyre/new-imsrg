@@ -9,6 +9,7 @@
 #include <numeric>
 #include <queue>
 #include <utility>
+#include <vector>
 
 #include "imsrg/base/assert.h"
 #include "imsrg/base/error.h"

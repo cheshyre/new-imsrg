@@ -4,6 +4,7 @@
 #include "imsrg/comm/detail/chunks.h"
 
 #include <algorithm>
+#include <vector>
 
 #include "imsrg/base/assert.h"
 
