@@ -1,6 +1,6 @@
 # IMSRG(3)-N7 performance: row tiling, fused driver, triples context (run 3, brief C)
 
-Status: **draft** (2026-11-17 02:25 JST), branch `feature/m10-n7-perf-2`. Design: `design/14-imsrg3-plan.md`
+Status: 2026-11-17 03:20 JST, branch `feature/m10-n7-perf-2`. Design: `design/14-imsrg3-plan.md`
 section 6; plan (outside the repository): `new-imsrg-reference/plans/m10-n7-perf-plan.md`. Timing runs
 follow D52 (timing only, emax 4-6, one operator below ~8 GB, never in CI); counts come from
 `n7_bench --count-only` (no operator).
@@ -45,18 +45,36 @@ Comparisons use max|dZ| <= 1e-12 max(1, max|Z|) (review fix M3); measured worst 
 
 `tools/ci.sh dev-openmp` and `dev-serial` PASS; `tools/lint.sh` clean (e1aff9e).
 
-## 3. Timings before/after (O16, AH operands, best of 5, ms)
+## 3. Timings before/after (O16, AH operands, ms)
 
-"Before" = develop e739622 + n7_bench (binary kept in worktree `agent-a9d112cd8777f9b77`),
-measured by the first lead at load 8-11, **to be repeated at load <= 6**. "After" = this branch,
-**pending** (the machine was loaded by the parallel team's builds, load 12-22, at 02:15).
+Measured 2026-11-17 02:55-03:15 on the quiet machine (18 threads, `OMP_PROC_BIND=false`,
+`VECLIB_MAXIMUM_THREADS=1`, release-openmp). "Before" = develop e739622 + n7_bench (binary in worktree
+`agent-a9d112cd8777f9b77`); "after" = a5b1987. Each entry is the best of 5 repetitions after a
+warm-up; emax 3 and 4: the better of two interleaved before/after pairs; emax 5: one pair. Every
+run started at a 1-minute load below 6 (the load rises to 9-20 during an 18-thread run itself).
 
-| emax / E3max | 133 | 330 | 223 | 232 | 331 | 231 | 132 | full N7 | load |
-|---|---|---|---|---|---|---|---|---|---|
-| 3 / 9 before | 141 | 0.37 | 15.9 | 54.5 | 31.2 | 2.7 | 5.9 | 258 | 8-11 |
-| 3 / 9 after | | | | | | | | | |
-| 4 / 12 before | 4282 | 5.2 | 280 | 1239 | 374 | 9.5 | 60 | 6269 | 8-11 |
-| 4 / 12 after | | | | | | | | | |
+| emax / E3max | variant | 133 | 330 | 223 | 232 | 331 | 231 | 132 | full N7 | start load |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 3 / 9 | before | 141.2 | 0.36 | 16.0 | 54.1 | 31.1 | 2.70 | 5.93 | 255.1 | 2.2-2.5 |
+| 3 / 9 | after | 28.1 | 0.55 | 15.9 | 75.5 | 27.0 | 63.5 | 64.4 | **104.8** | 2.2-2.5 |
+| 4 / 12 | before | 4306 | 5.31 | 282.0 | 1228 | 378.8 | 9.74 | 59.4 | 6289 | 5.6-5.9 |
+| 4 / 12 | after | 311.9 | 8.27 | 269.2 | 642.4 | 344.5 | 550.8 | 562.9 | **1147** | 4.1-5.9 |
+| 5 / 12 | before | 32481 | 33.9 | 1868 | 10662 | 1002 | 38.9 | 412.9 | 46629 | 6.0 |
+| 5 / 12 | after | 1705 | 47.6 | 1826 | 3170 | 1961 | 2623 | 2654 | **6218** | 5.7 |
+
+* **Full N7 commutator** (the production path, `Commutator()` with `TermMask::Imsrg3N7()`,
+  including the IMSRG(2) terms): 2.4x faster at emax 3, 5.5x at emax 4, 7.5x at emax 5. Counted
+  multiply-adds per second (section 4 totals over the full time): 6.3e9 / 1.3e10 / 1.7e10 after,
+  2.6e9 / 2.3e9 / 2.3e9 before.
+* **Single-term calls** (`terms::Comm*ss`) rebuild the intermediates they need (M10-Q73): 231 and
+  132 now contain a full H + W build (about 0.55 s at emax 4, 2.6 s at emax 5) and are slower
+  than their element-wise predecessors; 331 contains the H build. In the fused driver H and W are
+  built once per batch and shared, which is where the speed-up comes from (133 alone is 14x / 19x
+  faster at emax 4 / 5).
+* 223 is unchanged (bitwise; C3 only changed its work items). 330 is ~1.5x slower per call (per-line
+  tile lookup), negligible in the total.
+* emax 6 was not timed (a full N7 commutator holds about 12-14 GB there; the before path would take
+  minutes per repetition).
 
 ## 4. Cost model (O16, multiply-adds per N7 commutator with 3B parts in X and Y)
 
@@ -91,19 +109,26 @@ peak): a follow-up.
 
 Pending: `n7_bench --partition P` (plan section 3.13) is not implemented yet.
 
-## 7. Hand-off (open items, in priority order)
+## 7. Review and hand-off
 
-1. Timings of section 3 (load <= 6, interleaved before/after, emax 3-5; emax 6 per term).
-2. Review findings (Opus review of e739622..e1aff9e, no blocker): (a) partition helper should
-   check output ownership (`OnlyRowsNonzero`) for every term, not only 223; (b) masked check with
-   one batch per part (a read of another batch's lines in the same part is not caught today);
-   (c) 133 rebuilds its slot table over whole channels per batch and copies `ob_offsets` to the
-   host per batch (performance at emax 12); (d) batch buffers sized from per-batch maxima of H and
-   W separately and TransposeOut not counted in the budget; (e) `CommutatorOptions::
-   imsrg3_batch_bytes` not added (the budget is `kN7BatchBytes`; plumbing needs a signature change
-   that conflicts with M12b); (f) `test_triples_context` uses 1e-14 relative instead of the M3 form;
-   (g) `three_body.cc` reinterprets an int32 buffer as `TileWorkItem*`; (h) group/leg table
-   builders duplicated in `triples.cc`; (i) `row_mask.h` doc vs `SyncToHost`; (j) the
-   occ_nat3_cut driver test should assert the kept-row count.
-3. `occ_nat3_cut` for the perturbative triples (E-PLANNED kept; C12 now provides the context).
-4. C4 (exec `TeamFor`/`TeamReduce`), C15 (223 locality), `n7_bench --partition`.
+Opus review of e739622..e1aff9e: no blocker. Fixed since (a5b1987): output ownership checked for
+every term (`PartitionChecks::ownership`; 133 bra side per part with the transpose outputs kept
+apart), masked check per single-triple batch (`PartitionChecks::per_batch`), the 133 slot table and
+one-body channel size cached per call (`Comm133Cache`; per-batch work proportional to the batch,
+checksums identical), the budget documented (it bounds H + W of one batch; allocation max(H) +
+max(W), plus TransposeOut and slot tables), `DeviceBuffer<TileWorkItem>` instead of an int32
+reinterpretation, the triples test in the M3 form with a fractional case, the OccNat3 driver test
+asserting fewer kept rows. `imsrg3.occ_nat3_cut` also works with the perturbative triples (C13b;
+`results.json` gained `perturbative_triples.kept_kets`/`total_kets`).
+
+Open items, in priority order:
+1. `CommutatorOptions::imsrg3_batch_bytes` after the M12b merge (M10-Q74).
+2. C4 (exec `TeamFor`/`TeamReduce`, M10-Q44/Q65/Q77) and C15 (223 locality, M10-Q41/Q42; needs
+   quiet-machine timings at emax 4-6).
+3. `n7_bench --partition P` and the simulated-partition table (section 6).
+4. The H build looks like the least efficient piece: estimated from the single-term times at
+   emax 4 (331 = H + contraction, 231 = H + W + contraction), H runs at about 4e9 multiply-adds/s
+   and W at about 1.7e10. `BuildH` reads B through `ThreeBodyLocal` once per E-row entry; a tiled
+   H build (load the tile's rows into scratch first) is the next kernel optimization to try.
+5. Factor the group/leg table builders duplicated in `commutator/triples.cc` (M10-Q75 note); the
+   `TriplesContext` build at emax 12 takes ~150 s and 4.4 GB on the host.
