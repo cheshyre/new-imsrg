@@ -1049,3 +1049,39 @@ the orchestrator uses `O4` and up).
   `tests/golden/README.md` "pristine" list no longer names it. **Assumed:** the divergent runs of IT-8/emax2 need no separate entry.
 * **IT3-Q12** (2026-11-16, run 3 follow-ups) - The Ctrl-C children restore the default SIGINT handler (a `&` job of a
   non-interactive shell starts them with SIGINT ignored). **Assumed:** this matches a real terminal Ctrl-C, which is what the tests mean to cover.
+* **MS2-Q1** (2026-11-16, run 3, MS2 item 1, D50) - Structs with member functions: 12 became classes
+  (Python wrappers `PyModelSpace`, `PyOperator`, `PyMagnus`, `PyOde`; the driver helpers
+  `LineWriter`, `KeyCollector`, `SchemaLists`; the angmom views `SixJView`, `NineJLSjjView`,
+  `MoshinskyView`, `SixJ3View`, still trivially copyable; the bench's `TriplesBody`). **Kept as
+  structs:** passive aggregates whose functions are comparisons or derived values (`*Config`,
+  `Orbit`, `Nucleus`, `OperatorSpec`, `Ket`, ...), pimpl `Impl` structs (the owning class holds the
+  invariant), kernel functors and data-less guards, and - deliberately - the device views and kernel
+  data bundles that are aggregate-initialized at many sites or filled field by field by one builder
+  (`linalg::MatrixView`, `commutator::detail::TwoBodyView`, `basis::TwoBodyTableView`,
+  `KetSubsetTableView`, `OrbitGroupsView`, `PandyaData`, `LadderData`, `LiftedData`,
+  `Comm232Tables`): converting them touches ~150 sites, most in kernels that the N7 row tiling (brief
+  C) and M12b are about to restructure. **Assumed:** they stay structs for now; alternative: convert
+  them inside the N7/M12b work (private data, a builder that is a static member).
+* **MS2-Q2** (2026-11-16, run 3, MS2 item 2) - Unsigned -> signed: the 14 scoped enums with
+  `std::uint8_t` underlying types now use `std::int8_t` (no arithmetic on them; done so that unsigned
+  types appear only where the rule allows them), the NO2B monopole orbit indices are `std::int16_t`.
+  **Kept unsigned:** bit patterns (`base/half.h`, `TermMask`, m-scheme masks, hash keys,
+  `bit_cast` checks), RNG seeds and LCG/SplitMix state (modular arithmetic), zlib and `isspace`
+  interfaces, file sizes, `size_t` sizes, the `DeviceBuffer<std::uint8_t/uint16_t>` instantiations
+  and the `unsigned __int128` factorial of `moshinsky_test.cc` (needs the full 128-bit range).
+  **Assumed:** enums count as "not a bit pattern"; say if unsigned underlying types should be allowed
+  again (a one-line revert per enum).
+* **MS2-Q3** (2026-11-16, run 3, MS2 baseline) - The perturbative-triples energy is not bitwise
+  reproducible from run to run at a fixed thread count: IT-8 He4 emax 2 gave dE =
+  -0.052490010312560093 and ...086 in two runs of the same binary (1-2 ulp), so its reduction order
+  is nondeterministic (all other integration outputs were bitwise reproducible). The MS2 comparison
+  checks it to 13 digits. **Assumed:** harmless (far below every tolerance); the N7 lead may want a
+  deterministic reduction when the triples are tiled (D45 distribution).
+* **MS2-Q4** (2026-11-16, run 3, MS2 baseline) - Two sources of cross-build noise in test output:
+  (a) 53 parameterized tests (`basis_reference.Setups/PartitionGolden...`) embed the raw bytes of
+  their parameter object, including heap pointers, in the test name, so `ctest -N` changes with every
+  rebuild (a `PrintTo` or a name generator would fix it); (b) the generated emax-4 goldens
+  (`tools/reference/gen_golden_generated.sh`) differ in the last bits between generations
+  (`HfHnoReference.Emax4TwoPlusThreeNucleon` prints max|dHNO| 1.4e-13 in one worktree, 8.5e-14 in
+  another), i.e. the reference harness's emax-4 HF/HNO output is not bitwise reproducible.
+  **Assumed:** both harmless; not changed by MS2.
