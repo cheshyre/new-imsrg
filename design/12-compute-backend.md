@@ -25,7 +25,9 @@ Kernels use a restricted vocabulary, so a future port has to replace only the fa
 | `exec::HostParallelForDynamic(name, n, f)` (`exec/host_parallel.h`, no Kokkos in the header) | host-space `RangePolicy`, `Schedule<Dynamic>`, chunk 1 | Plain host code per item (e.g. one BLAS call); `f` must not throw. |
 | `exec::ParallelForMd(name, n0, n1, f)` | `MDRangePolicy<Rank<2>>` | |
 | `exec::ParallelReduce(name, n, f, result)`, `exec::ParallelReduceMax(...)` | `Kokkos::parallel_reduce` | Sum and max reducers. |
-| `exec::TeamFor(name, league, team, scratch_bytes, f)` | `TeamPolicy` with scratch | For ragged channel loops; `f` runs on every team thread. |
+| `exec::TeamFor(name, league, TeamOptions, f)` | `TeamPolicy` (+ scratch) | Team launch; `f(member)` runs on every team thread. `TeamOptions{schedule (kStatic/kDynamic, chunk 1), team_size, vector_length (<= 0: AUTO), level (kAuto/kLevel0/kLevel1), scratch_bytes}`. Asynchronous. The old `TeamFor(name, league, team, scratch_bytes, f)` overload forwards to it (static schedule). Used by `comm223` (dynamic). |
+| `exec::TeamReduce(name, league, TeamOptions, f, double& sum)` | `parallel_reduce` over a `TeamPolicy` | `f(member, double& partial)`; blocking. With `kDynamic` the reduction order, hence the floating-point sum, may vary run to run. |
+| `exec::TeamMember`, `TeamScratchMax(level)`, `ResolveScratchLevel(opts)` | `member_type`, `scratch_size_max` | One member type for both schedules (static_assert). `kAuto` uses level 0 if `scratch_bytes` fits `TeamScratchMax(0)`, else level 1; `IMSRG_CHECK` that it fits level 1. Nested `TeamThreadRange`/`ThreadVectorRange`/`single` stay Kokkos. |
 | `exec::Fence` | Kokkos equivalent | |
 
 The **mandatory backends** are Serial and OpenMP, both tested on the dev machine. CUDA and HIP
