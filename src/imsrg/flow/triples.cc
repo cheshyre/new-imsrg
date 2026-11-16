@@ -31,8 +31,8 @@ TriplesResult PerturbativeTriples(MagnusSolver& solver,
                                   const TriplesOptions& options) {
   const std::vector<op::Operator>& omegas = solver.omegas();
   // Transformation order (D49, M10-Q40): not imsrg++'s BchProduct(omega, n).
-  const op::Operator omega = CombineOmegaStack(
-      omegas, solver.bch_options(), solver.workspace());
+  const op::Operator omega =
+      CombineOmegaStack(omegas, solver.bch_options(), solver.workspace());
 
   BchOptions skip = solver.bch_options();
   skip.skip_first_commutator = true;
