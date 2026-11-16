@@ -176,6 +176,10 @@ Options ParseOptions(int argc, char** argv) {
   if (o.herm.size() != 2) throw std::runtime_error("--herm needs two letters");
   HermFromLetter(o.herm[0]);
   HermFromLetter(o.herm[1]);
+  // RunN7 keeps a dense (non-Hermitian) Z3 on the element-wise 133 path,
+  // which needs the whole space: no partitions with an N operand.
+  if (o.partition >= 2 && (o.herm[0] == 'N' || o.herm[1] == 'N'))
+    throw std::runtime_error("--partition P >= 2 needs H or A operands");
   return o;
 }
 
@@ -476,7 +480,10 @@ void RunPartition(const Options& o, const op::Operator& x,
   double max_ref = 0.0;
   bool bitwise = a.size() == b.size();
   for (std::size_t i = 0; i < a.size() && i < b.size(); ++i) {
-    max_diff = std::max(max_diff, std::abs(a[i] - b[i]));
+    // A NaN anywhere makes the deviation infinite (std::max would drop it).
+    const double d = std::abs(a[i] - b[i]);
+    max_diff = std::isnan(d) ? std::numeric_limits<double>::infinity()
+                             : std::max(max_diff, d);
     max_ref = std::max(max_ref, std::abs(b[i]));
     bitwise = bitwise && std::memcmp(&a[i], &b[i], sizeof(double)) == 0;
   }
