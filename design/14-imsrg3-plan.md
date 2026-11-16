@@ -280,3 +280,80 @@ layout.
   {e3max, de3max, occnat3_cut, threebody_threshold}.
 * `Workspace` owns per-thread and per-team scratch sized from the 3B channel extents. It is
   never allocated inside kernels.
+
+## 6. N7 row tiling (run 3, brief C, `feature/m10-n7-perf`)
+
+Goal (D45, D53): every N7 kernel works on **line tiles**, so that the M12b row distribution of the
+three-body blocks needs no kernel change, without changing results. The full plan (tasks C1-C16,
+cost model, M12b interface) lives outside the repository
+(`new-imsrg-reference/plans/m10-n7-perf-plan.md`); this section is the binding summary, including
+the fixes of the plan review (B1, M1, M3).
+
+### 6.1 Rows, lines, tiles (`basis/three_body_rows.h`, C1)
+* **Row k** of a channel block (dimension n) is its k-th stored segment: packed z(m, k), m >= k,
+  at `PackedIndex(n, k, k)` (length n - k); dense column k (length n). The storage format, dumps
+  and Python views do not change (M10-Q70); `RowSet::Whole` reproduces today's offsets.
+* **Line k** = the matrix row k = row k plus its transpose part (z(k, m') stored in rows m' < k):
+  the unit of work. A stored element (i, j) is *on the lines* of a set S iff row i or row j of
+  its channel is in S (both storage modes).
+* A **tile** holds whole triples of one channel (all maps and tile kernels are block-diagonal in
+  triples); a `RowSet` is a sorted list of disjoint tiles (one rank's share); a `RowPartition`
+  covers the space once (`Whole`; `Balanced`: per-channel zipper fold of the triples balancing
+  compute and memory, then a midpoint cut of the concatenated sequences, at most two ranges per
+  channel and part; `WholeChannels`: LPT, comparison only). Weights: `commutator::N7LineWeights`
+  (public, `commutator/n7_cost.h`, C14).
+
+### 6.2 Kernel views (`detail/n7_views.h`, C2)
+`ThreeBodyPartView{local, halo, row_off, row_buf, packed, sign}` and
+`ThreeBodyOutView{data, row_off, packed, zero_diagonal}`: z(m, k) of flat row f is
+`buf[row_off[f] + m]` with `buf` = `halo` iff `halo != nullptr && row_buf[f] == 1`. The serial
+tables (`ThreeBodyContext::Impl::row_off_packed/_dense`) address exactly the old elements
+(bitwise identical results). Residency (`row_buf >= 0`) is checked on the host, never in device
+code (`IMSRG_ASSERT` throws and is host-only; review m1).
+
+### 6.3 Kernel contract
+A **batch** is a list of whole tiles, at most one per channel, whose intermediates fit
+`CommutatorOptions::imsrg3_batch_bytes` (default 512 MiB, M10-Q74); a single triple larger than
+the budget is a batch of its own. A batch call processes exactly its lines: it reads three-body
+entries of these lines only (through the views), the replicated 0B/1B/2B parts and the context
+tables; it writes the Z3 rows of its lines (plus the 133 transpose output, below) and adds partial
+Z0/Z1/Z2. Attribution: 223 computes z(m, k), m >= k, of its rows (tiles (T(m), T(k)), no 3B
+operand data); 133 computes the bra side of z(m, k) from line k and the ket side of z(m, r),
+r <= m, from line m, written to a per-batch `TransposeOut` (rows r of column m, r = m skipped
+for an anti-Hermitian Z, review m3) that the caller adds into rows r; 330 and 331 sum per line;
+232, 231 and 132 per W column (the pair-third states of the batch's triples). Public `terms::`
+signatures stay; `Commutator()` runs all N7 terms through one batch driver, per-term calls rebuild
+the intermediates (M10-Q73).
+
+### 6.4 Shared intermediates H and W (C6), with review fix B1
+For a three-body operand B, E the pair-third -> canonical expansion (`op::PairThirdSpace::e_map`):
+* H[s, k] = sum_{r in triple(s)} E[s, r] B(r, k) for **every** pair-third state s of the
+  channel and every batch line k (reads line k only);
+* W[s, t] = sum_{k in triple(t)} H[s, k] E[t, k] = (E B E^T)[s, t] for **every** state s (B1:
+  not only the active classes 0-2, because 132 reads rows ((ij) J, b) whose external pair (ij)
+  can be particle-hole; 232 and 231 skip class 3 through the class ranges they already use;
+  about 7 % more memory) and the states t of the batch's triples.
+* Row order: the comm232 sorted order of `Comm232Tables` (third, Jpq, occupation class, p, q),
+  so that 232 reads contiguous row runs; columns per tile: its kept rows (H) or its pair-third
+  states (W), both contiguous ranges in `ThreeBodySpace` / `PairThirdSpace` order.
+* A non-Hermitian (dense) B also needs H and W of B^T; for packed B, W(B^T) = h_B W(B).
+
+### 6.5 Tests (with review fixes M1 and M3)
+* **Bitwise** where the arithmetic is unchanged (C2 views, 223 work items, 223 locality):
+  `n7_bench --checksum` hashes identical at a fixed thread count.
+* Rewritten kernels against their element-wise predecessors (kept as `detail::*Reference`), and
+  every non-bitwise comparison: `max|dZ| <= 1e-12 max(1, max|Z|)` (the `30` §2 form; never
+  element-wise relative, which fails on cancelled elements once sums are reordered; M3). The
+  actual deviations are logged.
+* **Partition invariance**: for P = 2, 3, 7 and `RowPartition::Balanced` with P = 4, 16 (H, A, N
+  operands), run the batch entry point part by part on replicated data, add the partial Z0-Z2,
+  place the transpose outputs, and compare with `Whole`: bitwise for 223, otherwise the form
+  above.
+* **Masked operands (M1)**: for each part, every operand entry off the part's lines is set to NaN
+  (`tests/support/row_mask.h`); the part's outputs must be bitwise identical to the unmasked run.
+  Output ownership: rows outside the part stay zero (`OnlyRowsNonzero`). This is what "phase 2
+  needs no kernel change" means; replicated-data invariance alone cannot catch a read outside the
+  batch.
+* Timing gates use best-of-5, before and after interleaved; a change counts as a regression only
+  if it is more than 5 % slower in two interleaved pairs (run-to-run noise is 2-4 %, more on the
+  shared machine; M3). Timings record the 1-minute load average.
