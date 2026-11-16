@@ -2,8 +2,8 @@
 
 ## Current state (keep this section up to date)
 
-* **Phase:** **run 3 done** (2026-11-16 12:40 to 2026-11-17 ~04:10 JST; report
-  `design/reports/2026-11-16-run3.md`). `develop` = **7a78f4d** at the last code merge (the owner re-syncs the main
+* **Phase:** **run 3 done** (2026-11-16 12:40 to 2026-11-17 ~06:30 JST; report
+  `design/reports/2026-11-16-run3.md`). `develop` = **9e47646** at the last code merge (the owner re-syncs the main
   checkout, see below). Next: the **owner interview after run 3** (`design/INTERVIEW_PROMPT.md`,
   every open run-3 question with its assumption), then **run 4** (`design/NEXT_SESSION_PROMPT.md`).
   Earlier: run 2 ended 2026-11-16 ~07:30 (report `design/reports/2026-11-15-run2.md`), run 1

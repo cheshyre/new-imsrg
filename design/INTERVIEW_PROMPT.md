@@ -4,7 +4,7 @@
 > interviews so far: 2026-11-13 (D25-D29), 2026-11-15 (D30-D42), 2026-11-16 (D44-D54, report
 > `design/reports/2026-11-16-owner-interview.md`). Run 3 added D55-D60 (check `00` for the next free
 > number). Every run-3 question below carries the assumption the run made, so the owner can
-> answer with one word. Run 3's report: `design/reports/2026-11-16-run3.md`; `develop` = 7a78f4d.
+> answer with one word. Run 3's report: `design/reports/2026-11-16-run3.md`; `develop` = 9e47646.
 > Method additions kept from the last interview: show the owner a progress bar of the agenda after
 > each round (owner request), and measure a numeric consequence live (a worker in a throwaway
 > worktree) when a decision hinges on it.
