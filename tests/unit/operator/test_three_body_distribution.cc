@@ -37,7 +37,8 @@ using basis::KeptRow3Index;
 using basis::RowPartition;
 using basis::ThreeBodyDistribution;
 
-enum class Kind { kBalanced, kWholeChannels };
+// kRootOnly: every row on part 0 (zero weights), all other ranks hold none.
+enum class Kind { kBalanced, kWholeChannels, kRootOnly };
 
 const comm::Communicator& World() { return test_support::TestWorld(); }
 
@@ -54,9 +55,13 @@ std::shared_ptr<const basis::ModelSpace> Distributed(
   w.compute.assign(static_cast<std::size_t>(s.num_triples()), 1.0);
   w.memory.assign(static_cast<std::size_t>(s.num_triples()), 1.0);
   const std::int32_t parts = World().size();
+  if (kind == Kind::kRootOnly) {
+    w.compute.assign(w.compute.size(), 0.0);
+    w.memory.assign(w.memory.size(), 0.0);
+  }
   auto part = std::make_shared<const RowPartition>(
-      kind == Kind::kBalanced ? RowPartition::Balanced(s, w, parts)
-                              : RowPartition::WholeChannels(s, w, parts));
+      kind == Kind::kWholeChannels ? RowPartition::WholeChannels(s, w, parts)
+                                   : RowPartition::Balanced(s, w, parts));
   return ms->WithThreeBodyDistribution(ThreeBodyDistribution{part, World()});
 }
 
@@ -364,6 +369,152 @@ TEST(ThreeBodyDistributionTest, SetHermiticity) {
                   Hermiticity::kNonHermitian);
   EXPECT_THROW(dense.set_hermiticity(Hermiticity::kHermitian),
                NotImplementedError);
+}
+
+// Elements above the diagonal of a packed part are not stored; get() returns
+// h * (transposed element) (0 on the diagonal of an anti-Hermitian part), and
+// set() of such an element writes the stored transposed one.
+TEST(ThreeBodyDistributionTest, UpperTriangleGetSetValues) {
+  for (const Case& c : Cases()) {
+    SCOPED_TRACE(Name(c));
+    const auto ms = Distributed(SerialSpace(c.nucleus), c.kind);
+    ThreeBody t(ms, c.h);
+    FillLocal(t);
+    const double sign = c.h == Hermiticity::kAntiHermitian ? -1.0 : 1.0;
+    std::int64_t checked = 0;
+    for (std::int32_t ch = 0; ch < t.num_channels(); ++ch) {
+      const Channel3Index cc{ch};
+      const std::int32_t n = t.dim(cc);
+      for (std::int32_t j = 0; j < n; ++j) {
+        for (std::int32_t i = 0; i < n; ++i) {
+          if (IsStored(t, i, j) || !IsLocal(t, cc, i, j)) continue;
+          const KeptRow3Index a{i};
+          const KeptRow3Index b{j};
+          ++checked;
+          if (i == j) {
+            EXPECT_EQ(t.get(cc, a, b), 0.0);  // anti-Hermitian diagonal
+          } else {
+            EXPECT_EQ(t.get(cc, a, b), sign * Value(ch, j, i));
+            t.set(cc, a, b, 3.25);
+            EXPECT_EQ(t.get(cc, a, b), 3.25);
+            EXPECT_EQ(t.get(cc, b, a), sign * 3.25);
+          }
+        }
+      }
+    }
+    if (c.h != Hermiticity::kNonHermitian &&
+        ms->three_body_rows().NumRows() > 0) {
+      EXPECT_GT(World().AllreduceSum(checked), 0);
+    }
+  }
+}
+
+// A rank without rows (kRootOnly: all other ranks) takes part in the
+// collectives and in the local arithmetic.
+TEST(ThreeBodyDistributionTest, RankWithoutRows) {
+  for (const Hermiticity h :
+       {Hermiticity::kHermitian, Hermiticity::kAntiHermitian,
+        Hermiticity::kNonHermitian}) {
+    const auto serial = SerialSpace("He4");
+    const auto dist = Distributed(serial, Kind::kRootOnly);
+    ThreeBody whole(serial, h);
+    FillLocal(whole);
+    ThreeBody d(dist, h);
+    EXPECT_EQ(d.size() == 0, !World().is_root());
+    CopyLocalFrom(whole, d);
+    const double ref = ImsrgppNorm(whole);
+    const double got = ImsrgppNorm(d);
+    EXPECT_LE(std::abs(got - ref), 1.0e-14 * std::max(1.0, std::abs(ref)));
+    if (h != Hermiticity::kNonHermitian) {
+      const OperatorSpec spec = OperatorSpec::Scalar(3, h);
+      Operator xs(serial, spec);
+      Operator ys(serial, spec);
+      FillLocal(*xs.three_body());
+      FillLocal(*ys.three_body());
+      Scale(ys, -0.75);
+      Operator xd(dist, spec);
+      Operator yd(dist, spec);
+      CopyLocalFrom(*xs.three_body(), *xd.three_body());
+      CopyLocalFrom(*ys.three_body(), *yd.three_body());
+      Axpy(0.3, xs, ys);
+      Axpy(0.3, xd, yd);
+      Scale(yd, 1.7);
+      Scale(ys, 1.7);
+      if (yd.three_body()->size() > 0) {
+        ExpectLocalRowsEqual(*ys.three_body(), *yd.three_body());
+      }
+    }
+    const ThreeBody g = GatherToRoot(d);
+    if (World().is_root()) {
+      ASSERT_FALSE(g.empty());
+      ASSERT_EQ(g.size(), whole.size());
+      whole.SyncToHost();
+      g.SyncToHost();
+      EXPECT_EQ(std::memcmp(whole.host_span().data(), g.host_span().data(),
+                            whole.size() * sizeof(double)),
+                0);
+    } else {
+      EXPECT_TRUE(g.empty());
+    }
+  }
+}
+
+// Whole-channel partitions leave ranks without rows when there are more
+// ranks than channels worth of work; the collectives still work.
+TEST(ThreeBodyDistributionTest, WholeChannelsCollectives) {
+  const auto serial = SerialSpace("He4");
+  const auto dist = Distributed(serial, Kind::kWholeChannels);
+  ThreeBody whole(serial, Hermiticity::kHermitian);
+  FillLocal(whole);
+  ThreeBody d(dist, Hermiticity::kHermitian);
+  CopyLocalFrom(whole, d);
+  const double ref = ImsrgppNorm(whole);
+  EXPECT_LE(std::abs(ImsrgppNorm(d) - ref), 1.0e-14 * std::max(1.0, ref));
+  const ThreeBody g = GatherToRoot(d);
+  EXPECT_EQ(g.empty(), !World().is_root());
+}
+
+// Deriving a model space with another reference drops the distribution (the
+// kept space depends on the reference).
+TEST(ThreeBodyDistributionTest, WithReferenceDropsDistribution) {
+  const auto serial = SerialSpace("He4");
+  const auto dist = Distributed(serial, Kind::kBalanced);
+  ASSERT_NE(dist->three_body_distribution(), nullptr);
+  const auto derived = dist->WithReference(dist->reference());
+  EXPECT_EQ(derived->three_body_distribution(), nullptr);
+  EXPECT_EQ(derived->three_body_rows().NumRows(),
+            serial->three_body_rows().NumRows());
+  const auto derived2 =
+      dist->WithReferenceAndPartition(dist->reference(), dist->partition());
+  EXPECT_EQ(derived2->three_body_distribution(), nullptr);
+  EXPECT_EQ(dist->WithoutThreeBodyDistribution()->three_body_distribution(),
+            nullptr);
+}
+
+// The partition must cover THIS model space's kept rows.
+TEST(ThreeBodyDistributionTest, PartitionOfAnotherSpaceIsRejected) {
+  const auto serial = SerialSpace("He4");
+  const auto bigger = basis::ModelSpace::FromNames(
+                          basis::BasisTruncation{.emax = 2}, 16.0, "He4", "He4")
+                          ->WithThreeBody(basis::ThreeBodyCuts{.e3max = 6});
+  const basis::ThreeBodySpace& s = *bigger->three_body_space();
+  basis::LineWeights w;
+  w.compute.assign(static_cast<std::size_t>(s.num_triples()), 1.0);
+  w.memory = w.compute;
+  auto part = std::make_shared<const RowPartition>(
+      RowPartition::Balanced(s, w, World().size()));
+  ASSERT_NE(s.num_triples(), serial->three_body_space()->num_triples());
+  EXPECT_THROW(serial->WithThreeBodyDistribution({part, World()}), InputError);
+  EXPECT_NO_THROW(bigger->WithThreeBodyDistribution({part, World()}));
+}
+
+TEST(ThreeBodyDistributionTest, ReadDumpIntoDistributedSpaceThrows) {
+  const auto serial = SerialSpace("He4");
+  std::istringstream in("");
+  EXPECT_THROW(
+      ReadOperatorDump(in, "dist", Distributed(serial, Kind::kBalanced),
+                       OperatorDumpReadOptions{}),
+      InputError);
 }
 
 TEST(ThreeBodyDistributionTest, DumpOfDistributedPartThrows) {
