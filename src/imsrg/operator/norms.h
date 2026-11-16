@@ -27,10 +27,17 @@ double TwoBodyNorm(const Operator& op);
 /// Three-body norm: `ImsrgppNorm` of the three-body part (imsrg++
 /// `ThreeBodyStorage_pn::Norm`, the sum of squares over the stored packed
 /// lower triangle of the canonical pn blocks); 0 without a three-body part.
+/// HIDDEN COLLECTIVE if the three-body part is distributed (see
+/// `ImsrgppNorm`): every rank must call it.
 double ThreeBodyNorm(const Operator& op);
 
 /// imsrg++ `Operator::Norm` for number-conserving operators: sqrt(n1^2 + n2^2 +
 /// n3^2) of the norms above. The zero-body part is EXCLUDED.
+/// HIDDEN COLLECTIVE for an operator with a distributed three-body part (M12b
+/// review note M4): every rank of the distribution's communicator must call
+/// it, and a norm must never be computed inside a rank-0-only branch (e.g. a
+/// writer that runs on the root only). The result has identical bits on all
+/// ranks.
 double Norm(const Operator& op);
 
 }  // namespace imsrg::op
