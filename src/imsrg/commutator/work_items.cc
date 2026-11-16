@@ -7,6 +7,7 @@
 #include "imsrg/commutator/detail/work_items.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <span>
 #include <utility>
@@ -148,8 +149,40 @@ WorkSizes ComputeWorkSizes(const basis::ModelSpace& ms) {
   return s;
 }
 
+// Calibration of the term weights (ladder units): one rank, 16 OpenMP threads
+// (OMP_NUM_THREADS=16 OMP_PROC_BIND=false), release-openmp build, Apple
+// silicon laptop, 2026-11-17, O16 emax 8, `commutator_bench --emax 8 --reps 5`
+// (best of 3 runs of the per-term minimum times: 10.59 ms, 4.76 ms, 15.52 ms;
+// the machine was shared, load average 12-50, so the weights are good to about
+// 15 %; the same bench at emax 6 gives w_ph 3.0, w_122 44, the balance is not
+// sensitive to them): w_t = (time_t / units_t) /
+// (time_ladder / units_ladder) with time_ladder = comm222_pp_hhss, time_122 =
+// comm122ss, time_ph = comm222_phss and units_t the totals of
+// `LadderWorkItems` (5.841e9), `Comm122WorkItems` (4.452e7) and `PhWorkItems`
+// (2.913e9). See design/benchmarks/mpi-scaling.md, "Joint cut".
+const double kComm122WeightInLadderUnits = 59.0;
+const double kPhWeightInLadderUnits = 2.9;
+
 LadderItems LadderWorkItems(const WorkSizes& sizes, std::int32_t num_parts) {
   IMSRG_CHECK(num_parts >= 1, "LadderWorkItems: num_parts must be >= 1");
+  return LadderWorkItems(
+      sizes, std::vector<double>(static_cast<std::size_t>(num_parts), 1.0));
+}
+
+LadderItems LadderWorkItems(const WorkSizes& sizes,
+                            const std::vector<double>& capacity) {
+  IMSRG_CHECK(!capacity.empty(), "LadderWorkItems: need at least one part");
+  const auto num_parts = static_cast<std::int32_t>(capacity.size());
+  double cap_total = 0.0;
+  for (const double c : capacity) {
+    IMSRG_CHECK(std::isfinite(c) && c >= 0.0,
+                "LadderWorkItems: capacities must be finite and >= 0");
+    cap_total += c;
+  }
+  const bool equal = !(cap_total > 0.0);
+  std::vector<double> cum(capacity.size() + 1, 0.0);  // C_r (or r if equal)
+  for (std::size_t r = 0; r < capacity.size(); ++r)
+    cum[r + 1] = cum[r] + (equal ? 1.0 : capacity[r]);
   const std::size_t nch = sizes.num_kets.size();
   auto unit_of = [&](std::size_t c) {  // cost of one row
     return 2.0 * sizes.num_kets[c] * (sizes.k_pp[c] + sizes.k_hh[c]);
@@ -170,11 +203,11 @@ LadderItems LadderWorkItems(const WorkSizes& sizes, std::int32_t num_parts) {
   }
   const auto num_rows = static_cast<std::int64_t>(prefix.size()) - 1;
   const double total = prefix.back();
-  // cut[r] = the boundary whose S_i is nearest to r T / P (ties: lower i).
+  // cut[r] = the boundary whose S_i is nearest to T C_r / C_P (ties: lower i).
   std::vector<std::int64_t> cut(static_cast<std::size_t>(num_parts) + 1, 0);
   cut.back() = num_rows;
   for (std::int32_t r = 1; r < num_parts; ++r) {
-    const double target = total * r / num_parts;
+    const double target = total * cum[static_cast<std::size_t>(r)] / cum.back();
     auto it = std::lower_bound(prefix.begin(), prefix.end(), target);
     auto i = static_cast<std::int64_t>(it - prefix.begin());  // S_i >= target
     if (i > 0 && target - prefix[static_cast<std::size_t>(i - 1)] <=
@@ -227,6 +260,36 @@ ChannelItems PhWorkItems(const WorkSizes& sizes) {
   return items;
 }
 
+LadderItems JointLadderItems(const WorkSizes& sizes,
+                             const comm::OwnershipMap& comm122_map,
+                             const comm::OwnershipMap& ph_map) {
+  const std::int32_t num_parts = comm122_map.num_ranks();
+  IMSRG_CHECK(ph_map.num_ranks() == num_parts,
+              "JointLadderItems: maps must have the same number of ranks");
+  if (num_parts == 1) return LadderWorkItems(sizes, 1);
+  const auto np = static_cast<std::size_t>(num_parts);
+  std::vector<double> other(np, 0.0);
+  double other_sum = 0.0;
+  for (std::int32_t r = 0; r < num_parts; ++r) {
+    other[static_cast<std::size_t>(r)] =
+        kComm122WeightInLadderUnits * comm122_map.load(r) +
+        kPhWeightInLadderUnits * ph_map.load(r);
+    other_sum += other[static_cast<std::size_t>(r)];
+  }
+  double ladder_total = 0.0;
+  for (const double c : LadderWorkItems(sizes, 1).cost) ladder_total += c;
+  const double target = (ladder_total + other_sum) / num_parts;
+  std::vector<double> capacity(np, 0.0);
+  double cap_sum = 0.0;
+  for (std::size_t r = 0; r < np; ++r) {
+    capacity[r] = std::max(0.0, target - other[r]);
+    cap_sum += capacity[r];
+  }
+  if (cap_sum > 0.0)
+    for (double& c : capacity) c *= ladder_total / cap_sum;
+  return LadderWorkItems(sizes, capacity);
+}
+
 WorkAssignment::WorkAssignment() = default;
 
 WorkAssignment WorkAssignment::Build(const WorkSizes& sizes, std::int32_t part,
@@ -236,13 +299,13 @@ WorkAssignment WorkAssignment::Build(const WorkSizes& sizes, std::int32_t part,
   WorkAssignment a;
   a.part_ = part;
   a.num_parts_ = num_parts;
-  const LadderItems lad = LadderWorkItems(sizes, num_parts);
   const ChannelItems c122 = Comm122WorkItems(sizes);
   const ChannelItems ph = PhWorkItems(sizes);
-  a.ladder_map_ =
-      comm::OwnershipMap::FromOwners(lad.owner, lad.cost, num_parts);
   a.comm122_map_ = comm::OwnershipMap::Greedy(c122.cost, num_parts);
   a.ph_map_ = comm::OwnershipMap::Greedy(ph.cost, num_parts);
+  const LadderItems lad = JointLadderItems(sizes, a.comm122_map_, a.ph_map_);
+  a.ladder_map_ =
+      comm::OwnershipMap::FromOwners(lad.owner, lad.cost, num_parts);
   a.ladder_blocks_ = Owned(a.ladder_map_, part, lad.blocks);
   for (const RowBlock& b : a.ladder_blocks_)
     if (a.ladder_channels_.empty() || a.ladder_channels_.back() != b.channel)
