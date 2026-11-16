@@ -181,7 +181,6 @@ Whole table absent or all-default = IMSRG(2). Non-default keys without `in_flow`
 | `discard_residual_input_3n` | bool | `false` | drop input 3N after normal ordering (keep induced only). |
 | `threebody_threshold` | double >= 0 | `0.0` | skip 3-body terms when `\|\|A\|\|` or `\|\|B\|\|` is below. |
 | `de3max` | opt double | none (old `99`) | energy cut on 3-body states; kets above the cut are not enumerated, so the cut acts identically in every term (D34). |
-| `legacy_omega_order` | bool | `false` | perturbative triples only: combine a split Omega stack in imsrg++'s (buggy) operand order, `BchProduct(omega, Omega_n)`, to reproduce imsrg++ goldens (D49, M10-Q40); the default is the transformation order. New key, no legacy name. |
 | `occ_nat3_cut` | opt double > 0 | none (old `-1`) | natural-orbital occupation cut `n(1-n)` on 3-body states (kets failing it are not enumerated, D34); also triggers the NAT-occupation calculation (Q13). |
 
 ### 2.9 `[operators]`

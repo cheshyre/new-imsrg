@@ -39,8 +39,8 @@
 /// the one-body diagonal of H alone (`Get3bDenominator`: no Epstein-Nesbet
 /// terms; sign-keeping floor with `denominator_cutoff` as for the one- and
 /// two-body denominators (D21, M10-Q60; imsrg++ has no 3B floor and gives
-/// inf/NaN for a vanishing Delta3); no `denominator_delta`). Kets dropped by
-/// the three-body cuts do not exist.
+/// inf/NaN for a vanishing Delta3); no `denominator_delta`). Kets dropped by the three-body
+/// cuts do not exist.
 ///
 /// Denominators (Generator.cc:122-230), f = the one-body part of H, n =
 /// reference occupations, V-bar_abab = the J-averaged unnormalized monopole
