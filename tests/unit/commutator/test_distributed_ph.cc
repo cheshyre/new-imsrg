@@ -89,7 +89,7 @@ TEST(commutator_distributed_ph, sum_of_parts_equals_serial) {
       const Operator X = RandomOperator(ms, pr.x, 11);
       const Operator Y = RandomOperator(ms, pr.y, 29);
       const std::vector<double> serial = PartialTerm(ws, X, Y, 0, 1);
-      for (const int parts : {2, 3}) {
+      for (const int parts : {2, 3, 7}) {
         std::vector<double> sum(serial.size(), 0.0);
         for (int p = 0; p < parts; ++p) {
           const std::vector<double> z = PartialTerm(ws, X, Y, p, parts);
