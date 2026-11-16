@@ -295,7 +295,7 @@ TEST(FlowMethods, O16Emax3AdaptiveDriver) {
 // would run to 20. `_hg` (D48): two-stage hunter-gatherer; stage 2 starts from
 // the H rebuilt with the gathered Omega (E0 of its first flow row = the E0
 // reported by stage 1); the flow logs carry one extra row per stage (the
-// rebuilt H), so only steps, gathers and the stage-2 start are compared.
+// rebuilt H), which is skipped in the row-by-row comparison.
 struct StageCase {
   std::string toml;  ///< extra TOML tables (before [output])
   std::string tag;   ///< directory suffix
@@ -377,19 +377,30 @@ void TwoStage(const std::string& method, const char* gdir, const char* tag,
     }
     // The flow file, both stages, row by row.
     if (sc.rows) {
-      ASSERT_EQ(r.flow.rows.size(), gold.size());
+      // Our rows; with hunter-gatherer the last row of each stage (the rebuilt
+      // H, D48) has no counterpart in the golden and is skipped.
+      std::vector<std::size_t> ours;
+      for (std::size_t i = 0; i < r.flow.rows.size(); ++i) {
+        const bool last_of_stage =
+            i + 1 == r.flow.rows.size() ||
+            r.flow.at(i + 1, "stage") != r.flow.at(i, "stage");
+        if (sc.hg && last_of_stage) continue;
+        ours.push_back(i);
+      }
+      ASSERT_EQ(ours.size(), gold.size());
       Deviations d;
-      for (std::size_t i = 0; i < gold.size(); ++i) {
-        d.s = std::max(d.s, std::abs(r.flow.at(i, "s") - gold[i].s));
-        d.e0 = std::max(d.e0, std::abs(r.flow.at(i, "E0") - gold[i].e0));
+      for (std::size_t k = 0; k < gold.size(); ++k) {
+        const std::size_t i = ours[k];
+        d.s = std::max(d.s, std::abs(r.flow.at(i, "s") - gold[k].s));
+        d.e0 = std::max(d.e0, std::abs(r.flow.at(i, "E0") - gold[k].e0));
         d.norm_h = std::max(d.norm_h,
-                            std::abs(r.flow.at(i, "norm_H") - gold[i].norm_h));
+                            std::abs(r.flow.at(i, "norm_H") - gold[k].norm_h));
         d.eta1 = std::max(d.eta1,
-                          std::abs(r.flow.at(i, "norm_eta_1b") - gold[i].eta1));
+                          std::abs(r.flow.at(i, "norm_eta_1b") - gold[k].eta1));
         d.eta2 = std::max(d.eta2,
-                          std::abs(r.flow.at(i, "norm_eta_2b") - gold[i].eta2));
+                          std::abs(r.flow.at(i, "norm_eta_2b") - gold[k].eta2));
         d.e_mp2 =
-            std::max(d.e_mp2, std::abs(r.flow.at(i, "E_MP2") - gold[i].e_mp2));
+            std::max(d.e_mp2, std::abs(r.flow.at(i, "E_MP2") - gold[k].e_mp2));
       }
       Report(tag, gold.size(), d);
       EXPECT_LT(d.s, 1.0e-5);
@@ -462,7 +473,7 @@ TEST(FlowMethods, TwoStageHunterGathererHe4PShellDriver) {
   TwoStage("magnus", "IT-15/He4_emax2_pshell_hg", "IT-15 HG He4 p-shell",
            {"[hartree_fock]\nmixing = \"linear\"\n\n[imsrg.step]\n"
             "omega_norm_max = 0.1\n\n[imsrg.omega]\nhunter_gatherer = true\n\n",
-            "_hg", -1.0, -1.0, false, true});
+            "_hg", -1.0, -1.0, true, true});
 }
 #else   // IMSRG_FLOW_SLOW: O16 emax 4, 7-14 s each in a debug build
 TEST(FlowMethods, O16Emax4Rk4Driver) {
