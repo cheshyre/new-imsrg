@@ -9,7 +9,9 @@
 // 1e-4 MeV (D19) and with the 17-digit value of the reference harness
 // (`harness_triples.json`) to a regression guard of 1e-7 (measured: 1e-15);
 // the deviations are printed. Skips without the 2N input file.
+#include <cinttypes>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <filesystem>
 #include <sstream>
@@ -112,15 +114,16 @@ TEST(Triples, OccNat3Cut_He4_Emax2) {
   const double de0 = base["de"].number;
   const double de1 = tiny["de"].number;
   const double de2 = cut["de"].number;
-  const auto k0 = static_cast<long long>(base["kept_kets"].number);
-  const auto k1 = static_cast<long long>(tiny["kept_kets"].number);
-  const auto k2 = static_cast<long long>(cut["kept_kets"].number);
-  const auto tot = static_cast<long long>(base["total_kets"].number);
+  const auto k0 = static_cast<std::int64_t>(base["kept_kets"].number);
+  const auto k1 = static_cast<std::int64_t>(tiny["kept_kets"].number);
+  const auto k2 = static_cast<std::int64_t>(cut["kept_kets"].number);
+  const auto tot = static_cast<std::int64_t>(base["total_kets"].number);
   std::printf(
-      "[OccNat3 triples He4 emax2] no cut dE %.17g kept %lld/%lld; 1e-300 dE "
-      "%.17g kept %lld; 1e-9 dE %.17g kept %lld/%lld\n",
+      "[OccNat3 triples He4 emax2] no cut dE %.17g kept %" PRId64 "/%" PRId64
+      "; 1e-300 dE "
+      "%.17g kept %" PRId64 "; 1e-9 dE %.17g kept %" PRId64 "/%" PRId64 "\n",
       de0, k0, tot, de1, k1, de2, k2,
-      static_cast<long long>(cut["total_kets"].number));
+      static_cast<std::int64_t>(cut["total_kets"].number));
   EXPECT_EQ(k0, tot);
   EXPECT_EQ(k1, k0);
   // Same kets in the same order; the sums differ only by thread-scheduling
