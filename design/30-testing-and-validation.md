@@ -126,7 +126,7 @@ file3e1max=6 file3e2max=12 file3e3max=18`. **Never emax > 6. IMSRG(3) only at em
 | IT-6 | Operator transformation Rp2 (IT-2 setup) | ⟨Rp2⟩ after IMSRG |
 | IT-7 | Valence space with an open-shell reference: `reference=Ne20`, sd-shell, emax 4 (fractional occupations in normal ordering) | `.snt` elements |
 | IT-8 | Perturbative triples, O16, emax 2 and 3, 2N | E0, triples energy |
-| IT-9 | IMSRG(3)-N7 Magnus, He4 and O16, emax 2 (3 under `slow`) | E0; planned (D49, M10-Q61): ⟨Rp2⟩ from a patched-reference operator golden |
+| IT-9 | IMSRG(3)-N7 Magnus, He4 and O16, emax 2 (3 under `slow`) | E0; ⟨Rp2⟩ transformed with the IMSRG(3) commutators at emax 2 (D49, M10-Q61; golden `IT-9/*_emax2/intRp2.snt` from the patched `imsrg++ Operators=Rp2`, 1e-6 fm²) |
 | IT-10 | IMSRG(3f2) Magnus (owner's recipe, D32: hunter-gatherer, `omega_norm_max` 0.1, 1b intermediates on, 2b off), O16, emax 2 and 3 (golden data from `refharness flow --factorized`, regenerated with the recipe; imsrg++ has no executable switch) | E0 |
 | IT-11 | IT-2 with `mpirun -n 2` and `-n 4` | identical to IT-2 within 1e-10 relative |
 | IT-12 | IT-2 driven through legacy `key=value` arguments vs TOML config | identical results |
