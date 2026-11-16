@@ -24,6 +24,16 @@ namespace {
 
 using linalg::Matrix;
 
+/// Returns the root of the summed squared change of the orbital energies per
+/// orbital: sqrt(sum_i (e_i - prev_i)^2) / n.
+double OrbitalEnergyChange(const std::vector<double>& energies,
+                           const std::vector<double>& prev) {
+  double diff = 0.0;
+  for (std::size_t i = 0; i < energies.size(); ++i)
+    diff += (energies[i] - prev[i]) * (energies[i] - prev[i]);
+  return std::sqrt(diff) / static_cast<double>(energies.size());
+}
+
 /// Everything the iteration needs, built once.
 class Solver {
  public:
@@ -84,10 +94,7 @@ class Solver {
       MixAndRebuild(it, use_diis, diis);
       Energy(res);
 
-      double diff = 0.0;
-      for (std::size_t i = 0; i < n; ++i)
-        diff += (energies[i] - prev[i]) * (energies[i] - prev[i]);
-      diff = std::sqrt(diff) / static_cast<double>(norb_);
+      const double diff = OrbitalEnergyChange(energies, prev);
       res.ediff_history.push_back(diff);
       if (diff < opt_.tolerance) {
         res.converged = true;
@@ -103,6 +110,13 @@ class Solver {
     }
     res.iterations = it;
 
+    FillFinalState(energies, res);
+    return res;
+  }
+
+  /// Rebuilds F from the final rho and stores the final energies and state in
+  /// `res`.
+  void FillFinalState(const std::vector<double>& energies, HFResult& res) {
     // Final state: F consistent with the final rho, final energies.
     BuildFock(rho_, F_);
     Energy(res);
@@ -111,7 +125,6 @@ class Solver {
     res.rho = rho_;
     res.F = F_;
     res.occupations = occ_;
-    return res;
   }
 
   /// The mean-field state of the orthogonal basis `C` (oscillator -> basis)
