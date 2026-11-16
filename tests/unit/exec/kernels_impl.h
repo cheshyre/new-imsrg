@@ -5,6 +5,7 @@
 #define TESTS_UNIT_EXEC_KERNELS_IMPL_H_
 // Test-local kernel entry points (Kokkos-free interface); the kernels are in
 // kernels_impl.cc.
+#include <cstddef>
 #include <cstdint>
 
 #include "imsrg/exec/device_buffer.h"
@@ -33,6 +34,21 @@ void FillMatrix(DeviceBuffer<std::int64_t>& m, std::int64_t n0,
 /// sums[t] = sum_j m(t, j) for each row t, via team_for with team scratch.
 void RowSumsTeam(const DeviceBuffer<std::int64_t>& m, std::int64_t n0,
                  std::int64_t n1, DeviceBuffer<std::int64_t>& sums);
+/// counts[i] += 1 for every league index i of a TeamFor over counts.size()
+/// teams (dynamic schedule if `dynamic`).
+void VisitLeague(DeviceBuffer<std::int64_t>& counts, bool dynamic);
+/// Like RowSumsTeam, but through TeamOptions: `level_kind` 0 auto, 1 level 0,
+/// 2 level 1 (kernel uses the resolved level).
+void RowSumsTeamLevel(const DeviceBuffer<std::int64_t>& m, std::int64_t n0,
+                      std::int64_t n1, DeviceBuffer<std::int64_t>& sums,
+                      int level_kind);
+/// sum over teams t < n of (t + 0.5) via TeamReduce (exactly representable).
+double TeamReduceHalfIntegers(int n, bool dynamic);
+/// ResolveScratchLevel for `level_kind` (as above) and `bytes`; throws on
+/// overflow of the level.
+int ResolveLevel(int level_kind, std::size_t bytes);
+/// TeamScratchMax(level).
+std::size_t ScratchMax(int level);
 /// p[i] = {i, i, -i}.
 void FillPods(DeviceBuffer<Pod>& p);
 

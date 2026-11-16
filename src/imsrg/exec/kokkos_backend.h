@@ -20,6 +20,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <type_traits>
 
 #include <Kokkos_Core.hpp>
 
@@ -100,25 +101,131 @@ void ParallelReduceMax(const char* name, Index n, const F& f, T& result) {
   Kokkos::parallel_reduce(name, RangePolicy(0, n), f, Kokkos::Max<T>(result));
 }
 
-/// Runs `f(member)` on EVERY thread of `league_size` teams of `team_size`
-/// threads (<= 0: chosen by Kokkos, AUTO; Serial always uses 1), each team with
-/// `scratch_bytes_per_team` bytes of level-0 scratch
-/// (`member.team_scratch(0)`). Kernels must therefore split work with
+/// Work distribution of a team launch. `kStatic`: the league is split in
+/// fixed chunks (deterministic assignment). `kDynamic`: teams take league
+/// indices on demand, chunk 1 (for ragged work such as the triples tiles).
+enum class Schedule { kStatic, kDynamic };
+
+/// Team scratch level request: `kAuto` picks level 0 if `scratch_bytes` fit
+/// there, else level 1; `kLevel0`/`kLevel1` force the level.
+enum class ScratchLevel { kAuto, kLevel0, kLevel1 };
+
+/// Launch options of `TeamFor`/`TeamReduce`. Trivially copyable.
+struct TeamOptions {
+  Schedule schedule = Schedule::kStatic;
+  int team_size = 0;      ///< Threads per team; <= 0: AUTO (Serial uses 1).
+  int vector_length = 0;  ///< Vector length; <= 0: AUTO.
+  ScratchLevel level = ScratchLevel::kAuto;
+  std::size_t scratch_bytes = 0;  ///< Team scratch per team, in bytes.
+};
+static_assert(std::is_trivially_copyable_v<TeamOptions>);
+
+namespace detail {
+using StaticTeamPolicy = Kokkos::TeamPolicy<DefaultExecSpace>;
+using DynamicTeamPolicy =
+    Kokkos::TeamPolicy<DefaultExecSpace, Kokkos::Schedule<Kokkos::Dynamic>>;
+static_assert(std::is_same_v<StaticTeamPolicy::member_type,
+                             DynamicTeamPolicy::member_type>,
+              "team member types of both schedules must agree");
+}  // namespace detail
+
+/// Largest team scratch (bytes per team) the default execution space offers
+/// at `level` (0 or 1).
+inline std::size_t TeamScratchMax(int level) {
+  IMSRG_CHECK(level == 0 || level == 1, "TeamScratchMax: level must be 0 or 1");
+  return static_cast<std::size_t>(
+      detail::StaticTeamPolicy::scratch_size_max(level));
+}
+
+/// The scratch level (0 or 1) `opts` uses: the forced one, or for `kAuto`
+/// level 0 if `scratch_bytes <= TeamScratchMax(0)`, else level 1.
+/// IMSRG_CHECK (throws) that `scratch_bytes` fits the chosen level.
+inline int ResolveScratchLevel(const TeamOptions& opts) {
+  int level = 0;
+  if (opts.level == ScratchLevel::kLevel1) {
+    level = 1;
+  } else if (opts.level == ScratchLevel::kAuto &&
+             opts.scratch_bytes > TeamScratchMax(0)) {
+    level = 1;
+  }
+  IMSRG_CHECK(opts.scratch_bytes <= TeamScratchMax(level),
+              "ResolveScratchLevel: the team scratch does not fit");
+  return level;
+}
+
+namespace detail {
+template <class Policy>
+Policy MakeTeamPolicy(int league_size, const TeamOptions& opts) {
+  const int level = ResolveScratchLevel(opts);
+  Policy policy =
+      opts.team_size > 0
+          ? (opts.vector_length > 0
+                 ? Policy(league_size, opts.team_size, opts.vector_length)
+                 : Policy(league_size, opts.team_size))
+          : (opts.vector_length > 0
+                 ? Policy(league_size, Kokkos::AUTO, opts.vector_length)
+                 : Policy(league_size, Kokkos::AUTO));
+  if (opts.scratch_bytes > 0) {
+    policy.set_scratch_size(level, Kokkos::PerTeam(opts.scratch_bytes));
+  }
+  return policy;
+}
+}  // namespace detail
+
+/// Runs `f(member)` on EVERY thread of `league_size` teams (shape and scratch
+/// from `opts`; team scratch via `member.team_scratch(level)` with the level
+/// of `ResolveScratchLevel(opts)`). Kernels must therefore split work with
 /// `Kokkos::TeamThreadRange` and guard per-team writes with
 /// `Kokkos::single(PerTeam)` and `member.team_barrier()`; CPU tests with team
-/// size 1 do not exercise this, so review it. Asynchronous on async backends.
+/// size 1 do not exercise this, so review it. `Schedule::kDynamic` uses chunk
+/// size 1. Asynchronous on async backends.
+template <class F>
+void TeamFor(const char* name, int league_size, const TeamOptions& opts,
+             const F& f) {
+  IMSRG_CHECK(league_size >= 0, name);
+  if (opts.schedule == Schedule::kDynamic) {
+    auto policy =
+        detail::MakeTeamPolicy<detail::DynamicTeamPolicy>(league_size, opts);
+    policy.set_chunk_size(1);
+    Kokkos::parallel_for(name, policy, f);
+  } else {
+    Kokkos::parallel_for(
+        name,
+        detail::MakeTeamPolicy<detail::StaticTeamPolicy>(league_size, opts), f);
+  }
+}
+
+/// `sum = sum over teams of the contributions `f(member, partial)` add to
+/// `partial` (`partial += ...`, once per team; guard with
+/// `Kokkos::single(PerTeam)` as in `TeamFor`). `sum` is overwritten. Blocking.
+/// Determinism: with `Schedule::kDynamic` (and on any threaded backend) the
+/// reduction order, hence the floating-point result, may vary from run to run.
+template <class F>
+void TeamReduce(const char* name, int league_size, const TeamOptions& opts,
+                const F& f, double& sum) {
+  IMSRG_CHECK(league_size >= 0, name);
+  if (opts.schedule == Schedule::kDynamic) {
+    auto policy =
+        detail::MakeTeamPolicy<detail::DynamicTeamPolicy>(league_size, opts);
+    policy.set_chunk_size(1);
+    Kokkos::parallel_reduce(name, policy, f, Kokkos::Sum<double>(sum));
+  } else {
+    Kokkos::parallel_reduce(
+        name,
+        detail::MakeTeamPolicy<detail::StaticTeamPolicy>(league_size, opts), f,
+        Kokkos::Sum<double>(sum));
+  }
+}
+
+/// Convenience overload: static schedule, team size `team_size` (<= 0: AUTO),
+/// `scratch_bytes_per_team` bytes of scratch (level chosen automatically).
 template <class F>
 void TeamFor(const char* name, int league_size, int team_size,
              std::size_t scratch_bytes_per_team, const F& f) {
-  IMSRG_CHECK(league_size >= 0, name);
-  Kokkos::TeamPolicy<DefaultExecSpace> policy =
-      team_size > 0
-          ? Kokkos::TeamPolicy<DefaultExecSpace>(league_size, team_size)
-          : Kokkos::TeamPolicy<DefaultExecSpace>(league_size, Kokkos::AUTO);
-  if (scratch_bytes_per_team > 0) {
-    policy.set_scratch_size(0, Kokkos::PerTeam(scratch_bytes_per_team));
-  }
-  Kokkos::parallel_for(name, policy, f);
+  TeamOptions opts;
+  opts.team_size = team_size;
+  opts.scratch_bytes = scratch_bytes_per_team;
+  TeamFor(name, league_size, opts, f);
 }
 
 /// Waits for all work on the default execution space.
