@@ -21,6 +21,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <type_traits>
 
 #include "imsrg/basis/three_body_rows.h"
@@ -37,6 +38,11 @@ namespace imsrg::commutator::detail {
 
 /// Default byte budget of the per-batch intermediates (H and W of all operand
 /// blocks together): 512 MiB, as comm232ss before the row tiling (M10-Q74).
+/// It bounds the H + W of ONE batch (`PlanBatches`); the allocation of
+/// `ForEachN7Batch` is the max over batches of H plus the max of W (at most
+/// twice the budget), and the 133 `TransposeOut` (~ sum over lines of (m + 1)
+/// doubles) and slot tables (36 bytes per entry, n 3 n1max entries per tile
+/// channel) come on top; see `PlanBatches`.
 inline constexpr std::int64_t kN7BatchBytes = std::int64_t{1} << 29;
 
 /// Which intermediates the batch loop builds for the three-body operands.
@@ -84,7 +90,11 @@ static_assert(std::is_trivially_copyable_v<N7BatchInputs>);
 /// three-body parts in `v` (device work fenced before `body`). The buffers
 /// are allocated once per call (largest batch) and reused, so `body` must
 /// finish its device work (fence) before it returns. Operand blocks for the
-/// budget: one per present three-body part, two for a dense one. Host only.
+/// budget: one per present three-body part, two for a dense one. Device memory
+/// of the H/W buffers: 8 blocks (h_max + w_max) bytes, with h_max / w_max the
+/// largest H / W of any batch (so up to twice `budget_bytes`, see
+/// `PlanBatches`; W only if requested), plus what `body` allocates itself
+/// (e.g. the 133 TransposeOut and slot tables). Host only.
 /// Preconditions: `v` from `PrepareN7` (or with masked operand data of the
 /// same layout) for the context `ctx`; `rows` built on the context's
 /// three-body space. Cost: the H/W builds (`BuildH`, `BuildW`) plus `body`.
@@ -125,11 +135,36 @@ void Comm132Batch(const N7BatchInputs& in, const TwoBodyOutView& z2);
 /// [X3, Y3] -> Z0: the sum over the lines of the batch (needs nothing).
 double Comm330Batch(const N7BatchInputs& in);
 
+/// Per-call state of the 133 batch loop: the largest one-body channel and the
+/// slot table of the channels of the last batch (a table entry depends on its
+/// channel only, not on the batch's row range, so consecutive batches of the
+/// same channels reuse it). Create one per `Comm133Rows`/`RunN7` call; the
+/// operands, the context and the set of present H blocks must stay the same
+/// for all batches that share it. Move-only value.
+class Comm133Cache {
+ public:
+  Comm133Cache();
+  ~Comm133Cache();
+  Comm133Cache(const Comm133Cache&) = delete;
+  Comm133Cache& operator=(const Comm133Cache&) = delete;
+  Comm133Cache(Comm133Cache&&) noexcept;
+  Comm133Cache& operator=(Comm133Cache&&) noexcept;
+
+  struct Impl;  // Defined in kernels/comm133.cc.
+  Impl& impl() { return *impl_; }
+
+ private:
+  std::unique_ptr<Impl> impl_;
+};
+
 /// [X1, Y3] + [X3, Y1] -> Z3: the bra side into the Z3 rows of the batch's
 /// lines (`z3`), the ket side into `tout` (needs H). Packed Z only; a dense
-/// Z uses `Comm133ssReference`.
+/// Z uses `Comm133ssReference`. `cache` is the per-call state (see
+/// `Comm133Cache`): the host and device work per batch is proportional to the
+/// batch's tiles, except when the list of tile channels differs from the
+/// previous batch's (then the slot tables of those channels are rebuilt).
 void Comm133Batch(const N7BatchInputs& in, const ThreeBodyOutView& z3,
-                  const TransposeOut& tout);
+                  const TransposeOut& tout, Comm133Cache& cache);
 
 /// Adds the ket-side values of `tout` (written by `Comm133Batch` for the
 /// batch `in.batch`) into the stored elements z(m, r) of `z3`. Blocking.

@@ -108,25 +108,6 @@ std::vector<detail::TileWorkItem> BuildTileItems(
   return items;
 }
 
-/// The items as a flat int32 array (3 per item: bra, ket begin, ket end), the
-/// element type `exec::DeviceBuffer` supports.
-std::vector<std::int32_t> Flatten(
-    const std::vector<detail::TileWorkItem>& items) {
-  std::vector<std::int32_t> flat;
-  flat.reserve(3 * items.size());
-  for (const detail::TileWorkItem& it : items) {
-    flat.insert(flat.end(), {it.bra_triple, it.ket_begin, it.ket_end});
-  }
-  return flat;
-}
-
-/// The device items of an upload made by `Flatten` (TileWorkItem is three
-/// int32 without padding).
-const detail::TileWorkItem* ItemsOf(const exec::DeviceBuffer<std::int32_t>& b) {
-  static_assert(sizeof(detail::TileWorkItem) == 3 * sizeof(std::int32_t));
-  return reinterpret_cast<const detail::TileWorkItem*>(b.device_data());
-}
-
 /// Group of the orbit `o` (see `detail::OrbitGroupsView`).
 std::int32_t GroupOfOrbit(const basis::Orbit& o) {
   return detail::OrbitGroupsView::GroupOf(o.l % 2, o.tz2.twice);
@@ -513,10 +494,10 @@ void InitWorkOrders(ThreeBodyContext::Impl& im, const basis::ModelSpace& ms3,
   const basis::ThreeBodySpace& space = *ms3.three_body_space();
   const basis::RowSet whole = basis::RowSet::Whole(space);
   im.items_lower =
-      Upload(Flatten(BuildTileItems(space, im.state_prefix_host, whole, true)),
+      Upload(BuildTileItems(space, im.state_prefix_host, whole, true),
              "commutator::comm223_items_lower");
   im.items_full =
-      Upload(Flatten(BuildTileItems(space, im.state_prefix_host, whole, false)),
+      Upload(BuildTileItems(space, im.state_prefix_host, whole, false),
              "commutator::comm223_items_full");
   const std::vector<std::int32_t> tri = ByCost(cost_triples);
   im.triples_league = static_cast<std::int32_t>(
@@ -722,10 +703,10 @@ void detail::AddComm223(const op::Operator& X, const op::Operator& Y,
   const detail::TileViews v = Comm223Views(X, Y, z, ctx);
   if (z.packed()) {
     detail::RunComm223Tiles(v, detail::TileMode::kLowerPacked,
-                            ItemsOf(impl.items_lower), impl.num_triples);
+                            impl.items_lower.device_data(), impl.num_triples);
   } else {
     detail::RunComm223Tiles(v, detail::TileMode::kFullDense,
-                            ItemsOf(impl.items_full), impl.num_triples);
+                            impl.items_full.device_data(), impl.num_triples);
   }
 }
 
@@ -739,11 +720,11 @@ void detail::AddComm223Rows(const op::Operator& X, const op::Operator& Y,
       BuildTileItems(*ctx.model_space_ptr()->three_body_space(),
                      impl.state_prefix_host, rows, lower);
   if (items.empty()) return;
-  const exec::DeviceBuffer<std::int32_t> dev =
-      Upload(Flatten(items), "commutator::comm223_rows_items");
+  const exec::DeviceBuffer<detail::TileWorkItem> dev =
+      Upload(items, "commutator::comm223_rows_items");
   detail::RunComm223Tiles(
       v, lower ? detail::TileMode::kLowerPacked : detail::TileMode::kFullDense,
-      ItemsOf(dev), static_cast<std::int32_t>(items.size()));
+      dev.device_data(), static_cast<std::int32_t>(items.size()));
 }
 
 double PerturbativeTriplesEnergy(const op::Operator& X, const op::Operator& Y,

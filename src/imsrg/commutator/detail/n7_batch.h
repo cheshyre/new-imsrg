@@ -147,6 +147,19 @@ class LineBatchDevice {
 /// next tile does not fit, and a single triple over the budget is a batch of
 /// its own. Tile sizes: H S k doubles and W S m, with S the pair-third states
 /// of the channel, k the rows and m the states of the tile's triples.
+///
+/// What the budget bounds: per batch, the H and W blocks of the operands
+/// (`operand_blocks` of each, counted as H + W of the SAME batch, also when W
+/// is not built). It does NOT cover what the kernels add on top: for 133 the
+/// `TransposeOut` (sum over the batch's lines of (m + 1) doubles, m the line's
+/// channel-local row) and the slot tables (36 bytes per entry, n 3 n1max
+/// entries per tile channel), nor the offset tables and work lists of the
+/// other terms. `ForEachN7Batch` allocates the maximum over the batches of H
+/// and of W separately, so its allocation is at most 8 `operand_blocks`
+/// (h_max + w_max) bytes with h_max and w_max from possibly different
+/// batches: at most twice `budget_bytes` (each of the two is bounded by the
+/// budget), usually the budget (single-channel plans have a dominant first
+/// batch). Only a single triple over the budget exceeds this.
 /// Preconditions: `rows` was built for the space of `im`;
 /// `operand_blocks >= 1`, `budget_bytes >= 0` (IMSRG_CHECK). O(triples).
 std::vector<LineBatch> PlanBatches(const ThreeBodyContext::Impl& im,

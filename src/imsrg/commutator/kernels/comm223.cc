@@ -16,6 +16,13 @@
 #include "imsrg/exec/kokkos_backend.h"
 #include "imsrg/operator/three_body.h"
 
+namespace imsrg::exec {
+// The one instantiation of the buffer of the work items (a POD of this
+// module, see imsrg/exec/device_buffer.h); needs the impl header, hence this
+// kernel TU.
+template class DeviceBuffer<commutator::detail::TileWorkItem>;
+}  // namespace imsrg::exec
+
 namespace imsrg::commutator::detail {
 
 namespace {
