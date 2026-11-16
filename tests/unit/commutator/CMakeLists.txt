@@ -4,7 +4,7 @@ set(_imsrg_comm_support "${PROJECT_SOURCE_DIR}/tests/support/commutator_test_sup
 set(_imsrg_comm_cases "${CMAKE_CURRENT_SOURCE_DIR}/commutator_test_cases.cc")
 
 foreach(_t options simple_terms ladder_terms particle_hole dispatch robustness
-          factorized general work_items)
+          factorized general work_items distributed_ladder)
   imsrg_add_test(NAME commutator_${_t}
     SOURCES test_${_t}.cc ${_imsrg_exec_main} ${_imsrg_comm_support} ${_imsrg_comm_cases}
     DEPS commutator commutator_ref operator
