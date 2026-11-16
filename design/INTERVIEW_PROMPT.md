@@ -5,6 +5,12 @@
 > `design/reports/2026-11-15-owner-interview.md`). The next free decision number is D44 (D43 is the
 > layout decision of run 2; check `00` for later rows). Every run-2 question below carries the
 > assumption the run made, so the owner can answer with one word.
+>
+> **Used on 2026-11-16** (report `design/reports/2026-11-16-owner-interview.md`, decisions D44–D54;
+> every question below is answered in `QUESTIONS.md`). Run 3 replaces the agenda for the interview
+> after it and keeps the method, with two additions from this session: show the owner a progress
+> bar of the agenda after each round (owner request), and measure a numeric consequence live
+> (a worker in a throwaway worktree) when a decision hinges on it, as for M8-Q10.
 
 **How to use:** after syncing the main checkout (QUESTIONS O1/O3), start an **interactive** Claude
 Code session (Opus) in `/Users/cheshyre/Downloads/new-imsrg` on `develop`, and paste everything
