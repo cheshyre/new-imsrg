@@ -13,8 +13,8 @@ namespace imsrg::angmom::test {
 
 double SumSixjDevice(const SixJTable& t, double& abs_sum) {
   const SixJView v = t.device_view();
-  const std::int64_t nj = v.emax + 1;
-  const std::int64_t nJ = 2 * static_cast<std::int64_t>(v.emax) + 2;
+  const std::int64_t nj = v.emax() + 1;
+  const std::int64_t nJ = 2 * static_cast<std::int64_t>(v.emax()) + 2;
   const std::int64_t n = nj * nj * nj * nj * nJ * nJ;
   double result = 0.0;
   exec::ParallelReduce(
@@ -67,9 +67,9 @@ double SumSixjDevice(const SixJTable& t, double& abs_sum) {
 
 double SumNinejDevice(const NineJLSjjTable& t) {
   const NineJLSjjView v = t.device_view();
-  const std::int64_t nl = v.lmax + 1;
-  const std::int64_t nL = 2 * static_cast<std::int64_t>(v.lmax) + 1;
-  const std::int64_t nJ = 2 * static_cast<std::int64_t>(v.lmax) + 2;
+  const std::int64_t nl = v.lmax() + 1;
+  const std::int64_t nL = 2 * static_cast<std::int64_t>(v.lmax()) + 1;
+  const std::int64_t nJ = 2 * static_cast<std::int64_t>(v.lmax()) + 2;
   const std::int64_t n = nl * 2 * nl * 2 * nL * 2 * nJ;
   double result = 0.0;
   exec::ParallelReduce(

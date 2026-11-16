@@ -363,7 +363,7 @@ IMSRG_INLINE_FUNCTION void TeamTiles(const Member& team, const TileViews& v,
           const double hat_s = sc.col_hat[s];
           const double* xb_slot = sc.bra + sc.col_slot[s] * m_max * leg;
           const double* six_s =
-              v.sj.data + v.c1 * ((jw - 1) / 2) + v.c5 * iJ + J2;
+              v.sj.data() + v.c1 * ((jw - 1) / 2) + v.c5 * iJ + J2;
           std::int32_t lo_z[kMaxThirds] = {0, 0, 0};
           std::int32_t hi_z[kMaxThirds] = {0, 0, 0};
           const std::int32_t* jp_z[kMaxThirds] = {nullptr, nullptr, nullptr};

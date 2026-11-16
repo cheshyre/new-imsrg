@@ -32,9 +32,23 @@
 namespace imsrg::angmom {
 
 /// Read-only view of a `SixJTable`; see there.
-struct SixJView {
-  const double* data = nullptr;
-  std::int32_t emax = -1;
+class SixJView {
+ public:
+  SixJView() = default;
+  /// View of `data` laid out for shell `emax` (see `SixJTable`); `data` must
+  /// hold nj^4 nJ^2 doubles, or be null.
+  IMSRG_INLINE_FUNCTION constexpr SixJView(const double* data,
+                                           std::int32_t emax) noexcept
+      : data_(data), emax_(emax) {}
+  SixJView(const SixJView&) = default;
+  SixJView& operator=(const SixJView&) = default;
+  SixJView(SixJView&&) = default;
+  SixJView& operator=(SixJView&&) = default;
+
+  /// The 6j values (layout: see `SixJTable`); null for a default view.
+  IMSRG_INLINE_FUNCTION const double* data() const noexcept { return data_; }
+  /// The maximum single-particle shell, -1 for a default view.
+  IMSRG_INLINE_FUNCTION std::int32_t emax() const noexcept { return emax_; }
 
   /// 6j symbol {ja jb J; jc jd J'} (the same value as `Wigner6j(ja, jb, J, jc,
   /// jd, Jp)`) for single-particle ja..jd (odd 2j in [1, 2 emax + 1]) and
@@ -50,10 +64,10 @@ struct SixJView {
   /// NOT be passed in any slot: use `SixJ3Table` for that 6j family.
   IMSRG_INLINE_FUNCTION double operator()(TwoJ ja, TwoJ jb, TwoJ J, TwoJ jc,
                                           TwoJ jd, TwoJ Jp) const noexcept {
-    const std::int32_t nj = emax + 1;
-    const std::int32_t nJ = 2 * emax + 2;
-    const std::int32_t tmax = 2 * emax + 1;
-    if (data == nullptr) {
+    const std::int32_t nj = emax_ + 1;
+    const std::int32_t nJ = 2 * emax_ + 2;
+    const std::int32_t tmax = 2 * emax_ + 1;
+    if (data_ == nullptr) {
       return 0.0;
     }
     if (BeyondOdd(ja.twice, tmax) || BeyondOdd(jb.twice, tmax) ||
@@ -80,7 +94,7 @@ struct SixJView {
          (jd.twice - 1) / 2) *
             nJ +
         Jp.twice / 2;
-    return data[i];
+    return data_[i];
   }
 
   /// The row {ja jb J; jc jd J'} for J' = 0, 1, ..., 2 emax + 1: element J'
@@ -90,17 +104,17 @@ struct SixJView {
   /// jb, jc, jd and even 2J in [0, 2 (2 emax + 1)] (no NaN guard). O(1).
   IMSRG_INLINE_FUNCTION const double* row(TwoJ ja, TwoJ jb, TwoJ J, TwoJ jc,
                                           TwoJ jd) const noexcept {
-    const std::int32_t nj = emax + 1;
-    const std::int32_t nJ = 2 * emax + 2;
-    return data + ((((static_cast<std::int64_t>((ja.twice - 1) / 2) * nj +
-                      (jb.twice - 1) / 2) *
-                         nJ +
-                     J.twice / 2) *
+    const std::int32_t nj = emax_ + 1;
+    const std::int32_t nJ = 2 * emax_ + 2;
+    return data_ + ((((static_cast<std::int64_t>((ja.twice - 1) / 2) * nj +
+                       (jb.twice - 1) / 2) *
+                          nJ +
+                      J.twice / 2) *
+                         nj +
+                     (jc.twice - 1) / 2) *
                         nj +
-                    (jc.twice - 1) / 2) *
-                       nj +
-                   (jd.twice - 1) / 2) *
-                      nJ;
+                    (jd.twice - 1) / 2) *
+                       nJ;
   }
 
  private:
@@ -113,6 +127,9 @@ struct SixJView {
       std::int32_t t, std::int32_t tmax) noexcept {
     return t > tmax && (t & 1) == 0;
   }
+
+  const double* data_ = nullptr;
+  std::int32_t emax_ = -1;
 };
 static_assert(std::is_trivially_copyable_v<SixJView>);
 
@@ -158,9 +175,23 @@ class SixJTable {
 };
 
 /// Read-only view of an `NineJLSjjTable`; see there.
-struct NineJLSjjView {
-  const double* data = nullptr;
-  std::int32_t lmax = -1;
+class NineJLSjjView {
+ public:
+  NineJLSjjView() = default;
+  /// View of `data` laid out for `lmax` (see `NineJLSjjTable`); `data` must
+  /// hold the full table, or be null.
+  IMSRG_INLINE_FUNCTION constexpr NineJLSjjView(const double* data,
+                                                std::int32_t lmax) noexcept
+      : data_(data), lmax_(lmax) {}
+  NineJLSjjView(const NineJLSjjView&) = default;
+  NineJLSjjView& operator=(const NineJLSjjView&) = default;
+  NineJLSjjView(NineJLSjjView&&) = default;
+  NineJLSjjView& operator=(NineJLSjjView&&) = default;
+
+  /// The table values (layout: see `NineJLSjjTable`); null for a default view.
+  IMSRG_INLINE_FUNCTION const double* data() const noexcept { return data_; }
+  /// The maximum orbital angular momentum, -1 for a default view.
+  IMSRG_INLINE_FUNCTION std::int32_t lmax() const noexcept { return lmax_; }
 
   /// LS-jj coefficient `Norm9j(la, 1/2, ja, lb, 1/2, jb, L, S, J)` for 0 <=
   /// la, lb <= lmax, ja = la +- 1/2 and jb = lb +- 1/2 (each >= 1/2), L in [0,
@@ -171,16 +202,16 @@ struct NineJLSjjView {
     const std::int32_t da =
         ja.twice - 2 * la + 1;  // 0 for j = l - 1/2, 2 for j = l + 1/2
     const std::int32_t db = jb.twice - 2 * lb + 1;
-    if (data == nullptr || la < 0 || la > lmax || lb < 0 || lb > lmax ||
+    if (data_ == nullptr || la < 0 || la > lmax_ || lb < 0 || lb > lmax_ ||
         (da != 0 && da != 2) || (db != 0 && db != 2) || ja.twice < 1 ||
-        jb.twice < 1 || L < 0 || L > 2 * lmax || S < 0 || S > 1 ||
-        J.twice < 0 || (J.twice & 1) != 0 || J.twice / 2 > 2 * lmax + 1) {
+        jb.twice < 1 || L < 0 || L > 2 * lmax_ || S < 0 || S > 1 ||
+        J.twice < 0 || (J.twice & 1) != 0 || J.twice / 2 > 2 * lmax_ + 1) {
       return 0.0;
     }
-    const std::int32_t nL = 2 * lmax + 1;
-    const std::int32_t nJ = 2 * lmax + 2;
+    const std::int32_t nL = 2 * lmax_ + 1;
+    const std::int32_t nJ = 2 * lmax_ + 2;
     const std::int64_t i =
-        (((((static_cast<std::int64_t>(la) * 2 + da / 2) * (lmax + 1) + lb) *
+        (((((static_cast<std::int64_t>(la) * 2 + da / 2) * (lmax_ + 1) + lb) *
                2 +
            db / 2) *
               nL +
@@ -189,8 +220,12 @@ struct NineJLSjjView {
          S) *
             nJ +
         J.twice / 2;
-    return data[i];
+    return data_[i];
   }
+
+ private:
+  const double* data_ = nullptr;
+  std::int32_t lmax_ = -1;
 };
 static_assert(std::is_trivially_copyable_v<NineJLSjjView>);
 
@@ -234,14 +269,32 @@ class NineJLSjjTable {
 };
 
 /// Read-only view of a `MoshinskyTable`; see there.
-struct MoshinskyView {
-  const double* data = nullptr;  ///< concatenated K(E) x K(E) blocks
-  const std::int32_t* position =
-      nullptr;  ///< (n1,l1,n2,l2) -> local index within its E, or -1
-  const std::int64_t* offset =
-      nullptr;  ///< block start per (E, lambda): [E (e2max+1) + lambda]
-  const std::int32_t* block_size = nullptr;  ///< K(E)
-  std::int32_t e2max = -1;
+class MoshinskyView {
+ public:
+  MoshinskyView() = default;
+  /// View of the table arrays (see `MoshinskyTable`): `data` the concatenated
+  /// K(E) x K(E) blocks, `position` the (n1,l1,n2,l2) -> local index map (-1
+  /// if absent), `offset` the block start per (E, lambda) at [E (e2max + 1) +
+  /// lambda], `block_size` K(E). All consistent with `e2max`, or all null.
+  IMSRG_INLINE_FUNCTION constexpr MoshinskyView(const double* data,
+                                                const std::int32_t* position,
+                                                const std::int64_t* offset,
+                                                const std::int32_t* block_size,
+                                                std::int32_t e2max) noexcept
+      : data_(data),
+        position_(position),
+        offset_(offset),
+        block_size_(block_size),
+        e2max_(e2max) {}
+  MoshinskyView(const MoshinskyView&) = default;
+  MoshinskyView& operator=(const MoshinskyView&) = default;
+  MoshinskyView(MoshinskyView&&) = default;
+  MoshinskyView& operator=(MoshinskyView&&) = default;
+
+  /// The concatenated bracket blocks; null for a default view.
+  IMSRG_INLINE_FUNCTION const double* data() const noexcept { return data_; }
+  /// The largest HO energy E stored, -1 for a default view.
+  IMSRG_INLINE_FUNCTION std::int32_t e2max() const noexcept { return e2max_; }
 
   /// Bracket `Moshinsky(cm, rel, a, b, lambda)`; 0.0 if energy is not
   /// conserved, a quantum number is negative or beyond e2max, or lambda is
@@ -249,23 +302,31 @@ struct MoshinskyView {
   IMSRG_INLINE_FUNCTION double operator()(HoNL cm, HoNL rel, HoNL a, HoNL b,
                                           int lambda) const noexcept {
     const std::int32_t E = 2 * a.n + a.l + 2 * b.n + b.l;
-    if (data == nullptr || a.n < 0 || a.l < 0 || b.n < 0 || b.l < 0 ||
-        cm.n < 0 || cm.l < 0 || rel.n < 0 || rel.l < 0 || E > e2max ||
+    if (data_ == nullptr || a.n < 0 || a.l < 0 || b.n < 0 || b.l < 0 ||
+        cm.n < 0 || cm.l < 0 || rel.n < 0 || rel.l < 0 || E > e2max_ ||
         2 * cm.n + cm.l + 2 * rel.n + rel.l != E || lambda < 0 || lambda > E) {
       return 0.0;
     }
-    const std::int32_t nn = e2max / 2 + 1;
-    const std::int32_t nl = e2max + 1;
+    const std::int32_t nn = e2max_ / 2 + 1;
+    const std::int32_t nl = e2max_ + 1;
     const std::int32_t ilab =
-        position[((a.n * nl + a.l) * nn + b.n) * nl + b.l];
+        position_[((a.n * nl + a.l) * nn + b.n) * nl + b.l];
     const std::int32_t icm =
-        position[((cm.n * nl + cm.l) * nn + rel.n) * nl + rel.l];
+        position_[((cm.n * nl + cm.l) * nn + rel.n) * nl + rel.l];
     if (ilab < 0 || icm < 0) {
       return 0.0;
     }
-    return data[offset[E * (e2max + 1) + lambda] +
-                static_cast<std::int64_t>(icm) * block_size[E] + ilab];
+    return data_[offset_[E * (e2max_ + 1) + lambda] +
+                 static_cast<std::int64_t>(icm) * block_size_[E] + ilab];
   }
+
+ private:
+  const double* data_ = nullptr;
+  const std::int32_t* position_ =
+      nullptr;  ///< (n1,l1,n2,l2) -> index in E, or -1
+  const std::int64_t* offset_ = nullptr;      ///< block start per (E, lambda)
+  const std::int32_t* block_size_ = nullptr;  ///< K(E)
+  std::int32_t e2max_ = -1;
 };
 static_assert(std::is_trivially_copyable_v<MoshinskyView>);
 

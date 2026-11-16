@@ -28,10 +28,25 @@
 namespace imsrg::angmom {
 
 /// Read-only view of a `SixJ3Table`; trivially copyable, captured by value.
-struct SixJ3View {
-  const double* data = nullptr;  ///< The 6j values (layout: see SixJ3Table).
-  const double* hat = nullptr;   ///< hat[J] = sqrt(2J + 1), J = 0..2 emax + 1.
-  std::int32_t emax = -1;        ///< Largest single-particle shell.
+class SixJ3View {
+ public:
+  SixJ3View() = default;
+  /// View of `data` (6j values, layout: see `SixJ3Table`) and `hat` (hat[J] =
+  /// sqrt(2J + 1), J = 0..2 emax + 1) for shell `emax`; both null or both
+  /// consistent with `emax`.
+  IMSRG_INLINE_FUNCTION constexpr SixJ3View(const double* data,
+                                            const double* hat,
+                                            std::int32_t emax) noexcept
+      : data_(data), hat_(hat), emax_(emax) {}
+  SixJ3View(const SixJ3View&) = default;
+  SixJ3View& operator=(const SixJ3View&) = default;
+  SixJ3View(SixJ3View&&) = default;
+  SixJ3View& operator=(SixJ3View&&) = default;
+
+  /// The 6j values (layout: see `SixJ3Table`); null for a default view.
+  IMSRG_INLINE_FUNCTION const double* data() const noexcept { return data_; }
+  /// The largest single-particle shell, -1 for a default view.
+  IMSRG_INLINE_FUNCTION std::int32_t emax() const noexcept { return emax_; }
 
   /// {j1 j2 J12; j3 J J23} for single-particle j1, j2, j3 (odd 2j in [1, 2
   /// emax + 1]), integer J12, J23 (`.twice` even, in [0, 2 (2 emax + 1)]) and
@@ -39,15 +54,15 @@ struct SixJ3View {
   /// when a triangle fails. O(1), no allocation, no exceptions.
   IMSRG_INLINE_FUNCTION double operator()(TwoJ j1, TwoJ j2, TwoJ J12, TwoJ j3,
                                           TwoJ J, TwoJ J23) const noexcept {
-    const std::int32_t tmax = 2 * emax + 1;
-    if (data == nullptr || !OddIn(j1.twice, tmax) || !OddIn(j2.twice, tmax) ||
-        !OddIn(j3.twice, tmax) || !OddIn(J.twice, 6 * emax + 3) ||
+    const std::int32_t tmax = 2 * emax_ + 1;
+    if (data_ == nullptr || !OddIn(j1.twice, tmax) || !OddIn(j2.twice, tmax) ||
+        !OddIn(j3.twice, tmax) || !OddIn(J.twice, 6 * emax_ + 3) ||
         !EvenIn(J12.twice, 2 * tmax) || !EvenIn(J23.twice, 2 * tmax)) {
       return 0.0;
     }
-    const std::int64_t nj = emax + 1;
-    const std::int64_t nJ = 2 * emax + 2;
-    const std::int64_t nJ3 = 3 * emax + 2;
+    const std::int64_t nj = emax_ + 1;
+    const std::int64_t nJ = 2 * emax_ + 2;
+    const std::int64_t nJ3 = 3 * emax_ + 2;
     const std::int64_t i =
         (((((j1.twice - 1) / 2 * nj + (j2.twice - 1) / 2) * nJ +
            J12.twice / 2) *
@@ -57,14 +72,15 @@ struct SixJ3View {
          (J.twice - 1) / 2) *
             nJ +
         J23.twice / 2;
-    return data[i];
+    return data_[i];
   }
 
   /// sqrt(2J + 1) for an integer two-body J in [0, 2 emax + 1] (no check).
   IMSRG_INLINE_FUNCTION double Hat(std::int32_t J) const noexcept {
-    return hat[J];
+    return hat_[J];
   }
 
+ private:
   /// True if `t` is odd and in [1, tmax].
   static IMSRG_INLINE_FUNCTION constexpr bool OddIn(std::int32_t t,
                                                     std::int32_t tmax) {
@@ -75,6 +91,10 @@ struct SixJ3View {
                                                      std::int32_t tmax) {
     return t >= 0 && t <= tmax && (t & 1) == 0;
   }
+
+  const double* data_ = nullptr;  ///< The 6j values (layout: see SixJ3Table).
+  const double* hat_ = nullptr;  ///< hat_[J] = sqrt(2J + 1), J = 0..2 emax + 1.
+  std::int32_t emax_ = -1;       ///< Largest single-particle shell.
 };
 static_assert(std::is_trivially_copyable_v<SixJ3View>);
 
