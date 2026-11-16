@@ -17,4 +17,4 @@ imsrg_add_module(NAME basis
     three_body_rows.cc
     model_space.cc
     device_tables.cc
-  DEPS base exec)
+  DEPS base exec comm)

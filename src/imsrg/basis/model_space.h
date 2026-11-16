@@ -16,6 +16,8 @@
 #include "imsrg/basis/reference.h"
 #include "imsrg/basis/single_particle_basis.h"
 #include "imsrg/basis/three_body_channels.h"
+#include "imsrg/basis/three_body_distribution.h"
+#include "imsrg/basis/three_body_rows.h"
 #include "imsrg/basis/three_body_space.h"
 #include "imsrg/basis/two_body_channels.h"
 
@@ -97,6 +99,19 @@ class ModelSpace {
     return three_body_space_.get();
   }
 
+  /// The rows of the three-body space stored on this rank:
+  /// `RowSet::Whole` of `three_body_space()` unless the model space is
+  /// distributed (`WithThreeBodyDistribution`), then this rank's part of the
+  /// partition. An empty set for a model space without three-body space.
+  /// O(1) (cached at construction).
+  const RowSet& three_body_rows() const noexcept { return *three_body_rows_; }
+
+  /// The three-body row distribution, or nullptr if the three-body space is
+  /// not distributed (every rank holds all rows).
+  const ThreeBodyDistribution* three_body_distribution() const noexcept {
+    return three_body_distribution_.get();
+  }
+
   /// Number of orbits.
   std::int32_t num_orbits() const noexcept { return basis_->num_orbits(); }
 
@@ -121,13 +136,30 @@ class ModelSpace {
   std::shared_ptr<const ModelSpace> WithThreeBody(
       const ThreeBodyCuts& cuts) const;
 
-  /// Structural equality: same basis, occupations and partition, and the same
-  /// three-body cuts (or both without three-body channels). Operators on equal
-  /// model spaces may be combined.
+  /// The same model space with its three-body rows distributed as `d`: this
+  /// rank stores `d.partition->part(d.comm.rank())`. Distributing a model
+  /// space that is already distributed replaces the distribution.
+  /// `WithReference`/`WithReferenceAndPartition` of a distributed space drop
+  /// the distribution (the kept space depends on the reference, so the
+  /// partition would no longer cover it): distribute the derived space again.
+  /// @throws InputError if there is no three-body space, the partition is
+  ///         null, or `partition->num_parts() != comm.size()`.
+  std::shared_ptr<const ModelSpace> WithThreeBodyDistribution(
+      ThreeBodyDistribution d) const;
+
+  /// The same model space with the three-body rows not distributed (all rows
+  /// local). Used by `op::GatherToRoot`.
+  std::shared_ptr<const ModelSpace> WithoutThreeBodyDistribution() const;
+
+  /// Structural equality: same basis, occupations and partition, the same
+  /// three-body cuts (or both without three-body channels) and the same
+  /// three-body distribution (both undistributed, or the same rank and the
+  /// same partition content). Operators on equal model spaces may be
+  /// combined.
   friend bool operator==(const ModelSpace& a, const ModelSpace& b) noexcept;
 
  private:
-  ModelSpace() = default;
+  ModelSpace();
 
   std::shared_ptr<const SingleParticleBasis> basis_;
   std::shared_ptr<const Reference> reference_;
@@ -137,6 +169,8 @@ class ModelSpace {
   std::shared_ptr<const ParticleHoleChannels> particle_hole_;
   std::shared_ptr<const ThreeBodyChannels> three_body_;     // may be null
   std::shared_ptr<const ThreeBodySpace> three_body_space_;  // may be null
+  std::shared_ptr<const ThreeBodyDistribution> three_body_distribution_;
+  std::shared_ptr<const RowSet> three_body_rows_;  // never null
 };
 
 }  // namespace imsrg::basis

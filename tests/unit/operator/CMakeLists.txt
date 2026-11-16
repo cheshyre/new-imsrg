@@ -63,3 +63,19 @@ imsrg_add_test(NAME operator_three_body_row_mask
   DEPS operator basis
   LABELS unit
   NO_GTEST_MAIN)
+
+# Distributed op::ThreeBody (M12b D7): the same executable serially (unit) and on 2 and 4 ranks.
+foreach(_ranks 2 4)
+  imsrg_add_test(NAME operator_three_body_distribution_${_ranks}ranks
+    SOURCES test_three_body_distribution.cc ${PROJECT_SOURCE_DIR}/tests/support/mpi_test_main.cc
+    DEPS operator basis comm exec
+    MPI_RANKS ${_ranks}
+    LABELS mpi
+    NO_GTEST_MAIN
+    TIMEOUT 300)
+endforeach()
+imsrg_add_test(NAME operator_three_body_distribution_serial
+  SOURCES test_three_body_distribution.cc ${PROJECT_SOURCE_DIR}/tests/support/mpi_test_main.cc
+  DEPS operator basis comm exec
+  LABELS unit
+  NO_GTEST_MAIN)

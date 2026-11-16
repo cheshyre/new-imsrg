@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <span>
 #include <vector>
@@ -14,6 +15,8 @@
 #include "imsrg/base/constants.h"
 #include "imsrg/base/error.h"
 #include "imsrg/basis/model_space.h"
+#include "imsrg/basis/three_body_rows.h"
+#include "imsrg/flow/detail/generator_three_body.h"
 #include "imsrg/operator/operator.h"
 
 namespace imsrg::flow {
@@ -316,44 +319,26 @@ void FillTwoBodyEta(const op::Operator& Hh, const Denominators& den,
 }
 
 // Fills the three-body part of eta (imsrg++
-// ConstructGenerator_SingleRef_3body).
+// ConstructGenerator_SingleRef_3body) with the device kernel over the stored
+// elements of the rows of the three-body space. eta's device data must be
+// current (zero) on entry; they are written here and the host mirror of the
+// three-body part is stale on return.
 void FillThreeBodyEta(const op::Operator& Hh, const Denominators& den,
                       const basis::ModelSpace& ms, const basis::Partition& part,
-                      GeneratorKind kind, int nq, op::Operator& eta) {
+                      const GeneratorOptions& opts, op::Operator& eta) {
   const basis::ThreeBodySpace& ts = *ms.three_body_space();
-  const op::ThreeBody& H3 = *Hh.three_body();
-  op::ThreeBody& eta3 = *eta.three_body();
-  using basis::OrbitClass;
-  const auto all_class = [&](const basis::OrbitTriple& t, bool core) {
-    const bool a = part.orbit_class(t.a) == OrbitClass::kCore;
-    const bool b = part.orbit_class(t.b) == OrbitClass::kCore;
-    const bool c = part.orbit_class(t.c) == OrbitClass::kCore;
-    return core ? (a && b && c) : (!a && !b && !c);
-  };
-  for (std::int32_t c = 0; c < ts.num_channels(); ++c) {
-    const Channel3Index ch{c};
-    const basis::KeptChannel3& kc = ts.channel(ch);
-    for (std::int32_t tb = kc.triple_begin.value(); tb < kc.triple_end.value();
-         ++tb) {
-      const basis::OrbitTriple& bt = ts.triple(basis::Triple3Index{tb});
-      if (!all_class(bt, false)) continue;
-      for (std::int32_t tk = kc.triple_begin.value();
-           tk < kc.triple_end.value(); ++tk) {
-        const basis::OrbitTriple& kt = ts.triple(basis::Triple3Index{tk});
-        if (!all_class(kt, true)) continue;
-        const double d = den.three_body(bt.a, bt.b, bt.c, kt.a, kt.b, kt.c);
-        for (std::int32_t i = bt.row_begin.value(); i < bt.row_end.value();
-             ++i) {
-          for (std::int32_t j = kt.row_begin.value(); j < kt.row_end.value();
-               ++j) {
-            const basis::KeptRow3Index ri{i}, rj{j};
-            eta3.set(ch, ri, rj,
-                     GeneratorFunction(kind, H3.get(ch, ri, rj), d, nq));
-          }
-        }
-      }
-    }
+  // The rows of this process (all rows if the model space is not
+  // distributed).
+  const basis::RowSet& rows = ms.three_body_rows();
+  const std::int32_t norb = ms.basis().num_orbits();
+  std::vector<std::int32_t> is_core(static_cast<std::size_t>(norb));
+  for (std::int32_t o = 0; o < norb; ++o) {
+    is_core[static_cast<std::size_t>(o)] =
+        part.orbit_class(OrbitIndex{o}) == basis::OrbitClass::kCore ? 1 : 0;
   }
+  detail::FillThreeBodyGenerator(
+      *Hh.three_body(), *eta.three_body(), ts, rows, den.OneBodyDiagonal(),
+      is_core, opts.denominator_cutoff, opts.kind, opts.qtransfer_n);
 }
 
 }  // namespace
@@ -386,10 +371,11 @@ void ComputeGenerator(const op::Operator& H, op::Operator& eta,
   const GeneratorKind kind = opts.kind;
   FillOneBodyEta(Hh, den, sp, part, kind, shell, nq, eta);
   if (!opts.only_1b_eta) FillTwoBodyEta(Hh, den, ms, kind, shell, nq, eta);
-  if (rank3 && !opts.only_1b_eta && !opts.only_2b_eta) {
-    FillThreeBodyEta(Hh, den, ms, part, kind, nq, eta);
-  }
   eta.SyncToDevice();
+  if (rank3 && !opts.only_1b_eta && !opts.only_2b_eta) {
+    // After the sync: the kernel writes the device data of eta's 3B part.
+    FillThreeBodyEta(Hh, den, ms, part, opts, eta);
+  }
 }
 
 op::Operator ComputeGenerator(const op::Operator& H,
