@@ -156,19 +156,11 @@ void AddToEveryTwoBodyElement(Operator& Z, F&& f) {
   }
 }
 
-}  // namespace
-
-void Factorized231Chi1b(const Operator& eta, const Operator& gamma,
-                        Operator& Z) {
-  int h_gamma = 0;
-  CheckOperands(eta, gamma, Z, h_gamma);
-  if (!eta.two_body().allocated() || !gamma.two_body().allocated()) return;
-  const int h_eta = -1;
-  const int h_Z = h_gamma;
-  const int n = Z.model_space().num_orbits();
-  const Occupations occ(Z);
+/// Diagram I intermediate of Factorized231Chi1b, in a scratch two-body
+/// operator.
+Operator BuildDiagramI231(const Operator& eta, const Operator& Z,
+                          const Occupations& occ) {
   const auto& chans = Z.model_space().two_body();
-
   // Diagram I. Per channel: Nnnn = Eta with the occupation factor applied as
   // imsrg++ does (ibra <= iket: *occfactor, then iket, ibra: *(-occfactor));
   // intermediate = tmp + tmp^T with tmp = 2 (2J+1) Nnnn * Eta (normalized
@@ -220,7 +212,12 @@ void Factorized231Chi1b(const Operator& eta, const Operator& gamma,
       }
     }
   }
+  return inter;
+}
 
+/// Chi_221_a of Factorized231Chi1b from the diagram I intermediate.
+Mat BuildChiA231(const Operator& Z, const Operator& inter) {
+  const int n = Z.model_space().num_orbits();
   // Chi_221_a(d, e) = 1/(2 j_d + 1) sum_b sum_J0 inter^J0_{bd,be}.
   Mat chi_a(n);
   for (int d = 0; d < n; ++d) {
@@ -238,7 +235,14 @@ void Factorized231Chi1b(const Operator& eta, const Operator& gamma,
       chi_a(d, e) = eta_de / (jd + 1.0);
     }
   }
+  return chi_a;
+}
 
+/// Chi_221_b of Factorized231Chi1b.
+Mat BuildChiB231(const Operator& eta, const Operator& gamma, const Operator& Z,
+                 const Occupations& occ) {
+  const int n = Z.model_space().num_orbits();
+  const auto& chans = Z.model_space().two_body();
   // Chi_221_b(d, e) = 1/(2 j_d + 1) sum_{J0, b<=c, a} (2J0+1) occfactor
   //   eta^J0_{bc,ae} gamma^J0_{ad,bc} (counted twice for b != c).
   Mat chi_b(n);
@@ -270,7 +274,14 @@ void Factorized231Chi1b(const Operator& eta, const Operator& gamma,
       chi_b(d, e) = eta_de / (J2Of(Z, d) + 1.0);
     }
   }
+  return chi_b;
+}
 
+/// Adds the one-body contractions of chi_a and chi_b to Z.
+void AddContractions231(const Operator& eta, const Operator& gamma,
+                        const Mat& chi_a, const Mat& chi_b, int h_eta, int h_Z,
+                        Operator& Z) {
+  const int n = Z.model_space().num_orbits();
   // Contractions, every (p, q) of each one-body channel.
   for (int p = 0; p < n; ++p) {
     const int jp = J2Of(Z, p);
@@ -302,29 +313,18 @@ void Factorized231Chi1b(const Operator& eta, const Operator& gamma,
                                    0.5 * (zij_a - zij_b) / (jp + 1.0));
     }
   }
-  Z.SyncToDevice();
 }
 
-void Factorized232Chi1b(const Operator& eta, const Operator& gamma,
-                        Operator& Z) {
-  int h_gamma = 0;
-  CheckOperands(eta, gamma, Z, h_gamma);
-  if (!eta.two_body().allocated() || !gamma.two_body().allocated() ||
-      !Z.two_body().allocated()) {
-    return;
-  }
-  const int h_eta = -1;
-  const int h_Z = h_gamma;
+/// Fills CHI_I and CHI_II of Factorized232Chi1b (CHI_II is the same as CHI_I
+/// with the first factor of each product from gamma).
+void BuildChi232(const Operator& eta, const Operator& gamma, const Operator& Z,
+                 const Occupations& occ, Mat& chi_I, Mat& chi_II) {
   const int n = Z.model_space().num_orbits();
-  const Occupations occ(Z);
-
   // CHI_I_pq  = 1/2 sum_{a,i,j,J2} (2J2+1)/(2 j_q + 1) nbar_a n_i n_j
   //               eta^J2_{ap,ij} eta^J2_{ij,aq}
   //           + 1/2 sum_{a,b,i,J2} (2J2+1)/(2 j_q + 1) nbar_a nbar_b n_i
   //               eta^J2_{ip,ab} eta^J2_{ab,iq};
   // CHI_II_pq is the same with the first factor of each product from gamma.
-  Mat chi_I(n);
-  Mat chi_II(n);
   for (int p = 0; p < n; ++p) {
     const int jp = J2Of(Z, p);
     for (const int q : Channel(Z, p)) {
@@ -378,6 +378,42 @@ void Factorized232Chi1b(const Operator& eta, const Operator& gamma,
       chi_II(p, q) = chi_Y;
     }
   }
+}
+
+}  // namespace
+
+void Factorized231Chi1b(const Operator& eta, const Operator& gamma,
+                        Operator& Z) {
+  int h_gamma = 0;
+  CheckOperands(eta, gamma, Z, h_gamma);
+  if (!eta.two_body().allocated() || !gamma.two_body().allocated()) return;
+  const int h_eta = -1;
+  const int h_Z = h_gamma;
+  const Occupations occ(Z);
+
+  const Operator inter = BuildDiagramI231(eta, Z, occ);
+  const Mat chi_a = BuildChiA231(Z, inter);
+  const Mat chi_b = BuildChiB231(eta, gamma, Z, occ);
+  AddContractions231(eta, gamma, chi_a, chi_b, h_eta, h_Z, Z);
+  Z.SyncToDevice();
+}
+
+void Factorized232Chi1b(const Operator& eta, const Operator& gamma,
+                        Operator& Z) {
+  int h_gamma = 0;
+  CheckOperands(eta, gamma, Z, h_gamma);
+  if (!eta.two_body().allocated() || !gamma.two_body().allocated() ||
+      !Z.two_body().allocated()) {
+    return;
+  }
+  const int h_eta = -1;
+  const int h_Z = h_gamma;
+  const int n = Z.model_space().num_orbits();
+  const Occupations occ(Z);
+
+  Mat chi_I(n);
+  Mat chi_II(n);
+  BuildChi232(eta, gamma, Z, occ, chi_I, chi_II);
 
   // Z^J_pqrs: CHI_I on gamma and CHI_II on eta, on each of the four legs.
   AddToEveryTwoBodyElement(Z, [&](int J, int p, int q, int r, int s) {

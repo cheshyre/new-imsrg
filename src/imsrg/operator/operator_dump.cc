@@ -171,34 +171,33 @@ std::int32_t ReadCount(Fields& f, const char* what) {
   return n;
 }
 
-ParsedHeader ParseHeader(LineReader& r) {
-  ParsedHeader h;
+/// Reads the `source` line into `hd.source`.
+void ParseSourceLine(LineReader& r, OperatorDumpHeader& hd) {
+  std::string line;
+  if (!r.Next(line)) r.Fail("unexpected end of file, expected 'source'");
+  if (line != "source" && line.rfind("source ", 0) != 0) {
+    r.Fail("expected 'source', got '" + line.substr(0, line.find(' ')) + "'");
+  }
+  hd.source = line.size() > 7 ? line.substr(7) : "";
+}
+
+/// Reads the `basis` line into `hd` and records its line number in `h`.
+void ParseBasisLine(LineReader& r, ParsedHeader& h) {
   OperatorDumpHeader& hd = h.header;
-  r.CheckVersion();
-  {
-    std::string line;
-    if (!r.Next(line)) r.Fail("unexpected end of file, expected 'source'");
-    if (line != "source" && line.rfind("source ", 0) != 0) {
-      r.Fail("expected 'source', got '" + line.substr(0, line.find(' ')) + "'");
-    }
-    hd.source = line.size() > 7 ? line.substr(7) : "";
-  }
-  {
-    auto f = r.Expect("basis");
-    h.basis_line = f.lineno();
-    f.ExpectKey("emax");
-    hd.emax = f.NextInt("emax");
-    f.ExpectKey("lmax");
-    hd.lmax = f.NextInt("lmax");
-    f.ExpectKey("hw");
-    hd.hw = f.NextDouble("hw");
-    f.ExpectEnd();
-  }
-  {
-    auto f = r.Expect("reference");
-    hd.reference = f.NextToken("reference");
-    f.ExpectEnd();
-  }
+  auto f = r.Expect("basis");
+  h.basis_line = f.lineno();
+  f.ExpectKey("emax");
+  hd.emax = f.NextInt("emax");
+  f.ExpectKey("lmax");
+  hd.lmax = f.NextInt("lmax");
+  f.ExpectKey("hw");
+  hd.hw = f.NextDouble("hw");
+  f.ExpectEnd();
+}
+
+/// Reads the `norbits` line and the `orbit` lines into `h`.
+void ParseOrbitLines(LineReader& r, ParsedHeader& h) {
+  OperatorDumpHeader& hd = h.header;
   std::int32_t norb = 0;
   {
     auto f = r.Expect("norbits");
@@ -220,27 +219,45 @@ ParsedHeader ParseHeader(LineReader& r) {
     hd.orbits.push_back({o, occ});
     h.orbit_lines.push_back(f.lineno());
   }
-  {
-    auto f = r.Expect("spec");
-    h.spec_line = f.lineno();
-    f.ExpectKey("particle_rank");
-    hd.spec.particle_rank = f.NextInt("particle_rank");
-    f.ExpectKey("rank_J");
-    hd.spec.rank_J = f.NextInt("rank_J");
-    f.ExpectKey("parity");
-    const auto par = f.NextInt("parity");
-    if (par != 0 && par != 1) f.Fail("parity must be 0 or 1");
-    hd.spec.parity = par == 0 ? Parity::kEven : Parity::kOdd;
-    f.ExpectKey("delta_Tz");
-    hd.spec.delta_Tz = f.NextInt("delta_Tz");
-    f.ExpectKey("hermiticity");
-    const std::string hc = f.NextToken("hermiticity");
-    f.ExpectEnd();
-    if (hc.size() != 1 || (hc[0] != 'H' && hc[0] != 'A' && hc[0] != 'N')) {
-      f.Fail("bad hermiticity '" + hc + "' (expected H, A or N)");
-    }
-    hd.spec.hermiticity = HermiticityFromCode(hc[0]);
+}
+
+/// Reads the `spec` line into `hd.spec` and records its line number in `h`.
+void ParseSpecLine(LineReader& r, ParsedHeader& h) {
+  OperatorDumpHeader& hd = h.header;
+  auto f = r.Expect("spec");
+  h.spec_line = f.lineno();
+  f.ExpectKey("particle_rank");
+  hd.spec.particle_rank = f.NextInt("particle_rank");
+  f.ExpectKey("rank_J");
+  hd.spec.rank_J = f.NextInt("rank_J");
+  f.ExpectKey("parity");
+  const auto par = f.NextInt("parity");
+  if (par != 0 && par != 1) f.Fail("parity must be 0 or 1");
+  hd.spec.parity = par == 0 ? Parity::kEven : Parity::kOdd;
+  f.ExpectKey("delta_Tz");
+  hd.spec.delta_Tz = f.NextInt("delta_Tz");
+  f.ExpectKey("hermiticity");
+  const std::string hc = f.NextToken("hermiticity");
+  f.ExpectEnd();
+  if (hc.size() != 1 || (hc[0] != 'H' && hc[0] != 'A' && hc[0] != 'N')) {
+    f.Fail("bad hermiticity '" + hc + "' (expected H, A or N)");
   }
+  hd.spec.hermiticity = HermiticityFromCode(hc[0]);
+}
+
+/// Parses the header lines of a dump (up to and including `spec`).
+ParsedHeader ParseHeader(LineReader& r) {
+  ParsedHeader h;
+  r.CheckVersion();
+  ParseSourceLine(r, h.header);
+  ParseBasisLine(r, h);
+  {
+    auto f = r.Expect("reference");
+    h.header.reference = f.NextToken("reference");
+    f.ExpectEnd();
+  }
+  ParseOrbitLines(r, h);
+  ParseSpecLine(r, h);
   return h;
 }
 
@@ -333,6 +350,80 @@ class ThreeBodyRecords {
   std::vector<double> values_;
 };
 
+/// The numeric fields of one three-body record.
+struct ThreeBodyFields {
+  std::int32_t x[8];
+  std::int32_t two_j;
+  double v;
+};
+
+/// Reads and range-checks the fields of one `a b c Jab d e f Jde 2J value`
+/// record of a dump with `norb` orbits; errors carry the line of `f`.
+ThreeBodyFields ReadThreeBodyFields(Fields& f, std::int32_t norb) {
+  ThreeBodyFields r{};
+  static const char* const kLabels[8] = {"a", "b", "c", "Jab",
+                                         "d", "e", "f", "Jde"};
+  for (int k = 0; k < 8; ++k) r.x[k] = f.NextInt(kLabels[k]);
+  r.two_j = f.NextInt("2J");
+  r.v = f.NextDouble("value");
+  f.ExpectEnd();
+  for (const int k : {0, 1, 2, 4, 5, 6}) {
+    if (r.x[k] < 0 || r.x[k] >= norb) f.Fail("orbit index out of range");
+  }
+  if (r.x[3] < 0 || r.x[7] < 0) f.Fail("negative J");
+  if (r.two_j <= 0 || r.two_j % 2 == 0) {
+    f.Fail("2J must be a positive odd number");
+  }
+  if (r.x[0] > r.x[1] || r.x[1] > r.x[2] || r.x[4] > r.x[5] ||
+      r.x[5] > r.x[6]) {
+    f.Fail("three-body entries need a <= b <= c and d <= e <= f");
+  }
+  return r;
+}
+
+/// A located three-body ket: its channel and kept row.
+struct KetLoc {
+  Channel3Index ch;
+  basis::KeptRow3Index row;
+};
+
+/// Locates the ket `|(x[k0] x[k0+1]) x[k0+3], x[k0+2]; 2J>` of a record in the
+/// three-body space of `ms`; `what` ("bra" or "ket") names it in errors.
+KetLoc LocateThreeBodyKet(Fields& f, const basis::ModelSpace& ms,
+                          const basis::ThreeBodySpace& space,
+                          const std::vector<OrbitIndex>& map,
+                          const ThreeBodyFields& rec, int k0,
+                          const char* what) {
+  const auto& sp = ms.basis();
+  OrbitIndex o[3];
+  Parity par = Parity::kEven;
+  std::int32_t tz = 0;
+  for (int m = 0; m < 3; ++m) {
+    o[m] = map[static_cast<std::size_t>(rec.x[k0 + m])];
+    const basis::Orbit& orb = sp.orbit(o[m]);
+    par = par * orb.parity();
+    tz += orb.tz2.twice;
+  }
+  if (o[0].value() > o[1].value() || o[1].value() > o[2].value()) {
+    f.Fail(std::string(what) +
+           " ket is not canonical in the model space's orbit order");
+  }
+  const auto ch =
+      ms.three_body()->find_channel(TwoJ{rec.two_j}, par, TwoTz{tz});
+  if (!ch) {
+    f.Fail(std::string(what) +
+           " ket: 2J, parity or 2Tz does not belong to a three-body channel");
+  }
+  const auto row =
+      space.find_row(*ch, o[0], o[1], o[2], TwoJ::FromInteger(rec.x[k0 + 3]));
+  if (!row) {
+    f.Fail(std::string(what) +
+           " ket |(a b) Jab, c; 2J> is not a kept ket of the three-body "
+           "space (not coupled, cut, or outside its channel)");
+  }
+  return KetLoc{*ch, *row};
+}
+
 /// Reads one `a b c Jab d e f Jde 2J value` record and stores it in `t`.
 /// Both labels of the record must be canonical kept kets of the same channel
 /// (`two_j`, parity, 2Tz); errors carry the line of `f`. Lower-triangle (and
@@ -343,57 +434,10 @@ void ReadThreeBodyRecord(Fields& f, const basis::ModelSpace& ms,
                          const std::vector<OrbitIndex>& map, ThreeBody& t,
                          ThreeBodyRecords& upper) {
   const auto norb = static_cast<std::int32_t>(hd.orbits.size());
-  std::int32_t x[8];
-  static const char* const kLabels[8] = {"a", "b", "c", "Jab",
-                                         "d", "e", "f", "Jde"};
-  for (int k = 0; k < 8; ++k) x[k] = f.NextInt(kLabels[k]);
-  const std::int32_t two_j = f.NextInt("2J");
-  const double v = f.NextDouble("value");
-  f.ExpectEnd();
-  for (const int k : {0, 1, 2, 4, 5, 6}) {
-    if (x[k] < 0 || x[k] >= norb) f.Fail("orbit index out of range");
-  }
-  if (x[3] < 0 || x[7] < 0) f.Fail("negative J");
-  if (two_j <= 0 || two_j % 2 == 0) f.Fail("2J must be a positive odd number");
-  if (x[0] > x[1] || x[1] > x[2] || x[4] > x[5] || x[5] > x[6]) {
-    f.Fail("three-body entries need a <= b <= c and d <= e <= f");
-  }
-  const basis::ThreeBodySpace& space = t.space();
-  const auto& sp = ms.basis();
-  struct KetLoc {
-    Channel3Index ch;
-    basis::KeptRow3Index row;
-  };
-  const auto locate = [&](int k0, const char* what) {
-    OrbitIndex o[3];
-    Parity par = Parity::kEven;
-    std::int32_t tz = 0;
-    for (int m = 0; m < 3; ++m) {
-      o[m] = map[static_cast<std::size_t>(x[k0 + m])];
-      const basis::Orbit& orb = sp.orbit(o[m]);
-      par = par * orb.parity();
-      tz += orb.tz2.twice;
-    }
-    if (o[0].value() > o[1].value() || o[1].value() > o[2].value()) {
-      f.Fail(std::string(what) +
-             " ket is not canonical in the model space's orbit order");
-    }
-    const auto ch = ms.three_body()->find_channel(TwoJ{two_j}, par, TwoTz{tz});
-    if (!ch) {
-      f.Fail(std::string(what) +
-             " ket: 2J, parity or 2Tz does not belong to a three-body channel");
-    }
-    const auto row =
-        space.find_row(*ch, o[0], o[1], o[2], TwoJ::FromInteger(x[k0 + 3]));
-    if (!row) {
-      f.Fail(std::string(what) +
-             " ket |(a b) Jab, c; 2J> is not a kept ket of the three-body "
-             "space (not coupled, cut, or outside its channel)");
-    }
-    return KetLoc{*ch, *row};
-  };
-  const KetLoc bra = locate(0, "bra");
-  const KetLoc ket = locate(4, "ket");
+  const ThreeBodyFields rec = ReadThreeBodyFields(f, norb);
+  const double v = rec.v;
+  const KetLoc bra = LocateThreeBodyKet(f, ms, t.space(), map, rec, 0, "bra");
+  const KetLoc ket = LocateThreeBodyKet(f, ms, t.space(), map, rec, 4, "ket");
   if (bra.ch != ket.ch) {
     f.Fail("bra and ket are in different three-body channels");
   }
@@ -455,6 +499,289 @@ void WriteThreeBody(std::ostream& out, const ThreeBody& t) {
   out << "three_body " << count << "\n" << body.str();
 }
 
+/// Checks the dump's `hw` against the model space's.
+void CheckDumpHw(std::string_view name, const ParsedHeader& ph,
+                 const basis::ModelSpace& ms) {
+  const OperatorDumpHeader& hd = ph.header;
+  const double hw_ms = ms.basis().hbar_omega();
+  if (std::abs(hd.hw - hw_ms) >
+      1.0e-12 * std::max(std::abs(hd.hw), std::abs(hw_ms))) {
+    FailAt(name, ph.basis_line,
+           "hw " + Fmt17(hd.hw) + " differs from the model space's " +
+               Fmt17(hw_ms));
+  }
+}
+
+/// Maps the dump's orbit indices to the model space's, checking presence,
+/// occupations and uniqueness.
+std::vector<OrbitIndex> MapDumpOrbits(std::string_view name,
+                                      const ParsedHeader& ph,
+                                      const basis::ModelSpace& ms,
+                                      const OperatorDumpReadOptions& options) {
+  const OperatorDumpHeader& hd = ph.header;
+  const std::int32_t norb = static_cast<std::int32_t>(hd.orbits.size());
+  std::vector<OrbitIndex> map(hd.orbits.size());
+  std::vector<bool> mapped(static_cast<std::size_t>(ms.num_orbits()), false);
+  for (std::int32_t i = 0; i < norb; ++i) {
+    const auto& d = hd.orbits[static_cast<std::size_t>(i)];
+    const int line = ph.orbit_lines[static_cast<std::size_t>(i)];
+    const auto k = ms.basis().find(d.orbit);
+    if (!k)
+      FailAt(name, line,
+             "orbit " + basis::OrbitLabel(d.orbit) + " not in the model space");
+    if (options.check_occupations &&
+        std::abs(ms.reference().occupation(*k) - d.occupation) >
+            options.occupation_tolerance) {
+      FailAt(name, line,
+             "occupation " + Fmt17(d.occupation) + " of orbit " +
+                 basis::OrbitLabel(d.orbit) +
+                 " differs from the model-space reference");
+    }
+    if (mapped[k->ToSize()]) {
+      FailAt(name, line,
+             "orbit " + basis::OrbitLabel(d.orbit) + " is listed twice");
+    }
+    mapped[k->ToSize()] = true;
+    map[static_cast<std::size_t>(i)] = *k;
+  }
+  return map;
+}
+
+/// Reads the `zero_body` and `one_body` sections into `op`.
+void ReadOneBodySection(LineReader& r, const OperatorDumpHeader& hd,
+                        const std::vector<OrbitIndex>& map, Operator& op) {
+  const auto norb = static_cast<std::int32_t>(hd.orbits.size());
+  {
+    auto f = r.Expect("zero_body");
+    op.zero_body() = f.NextDouble("zero_body");
+    f.ExpectEnd();
+  }
+  std::int32_t n1 = 0;
+  {
+    auto f = r.Expect("one_body");
+    n1 = ReadCount(f, "count");
+    f.ExpectEnd();
+  }
+  for (std::int32_t i = 0; i < n1; ++i) {
+    auto f = r.data("one_body");
+    const auto a = f.NextInt("a");
+    const auto b = f.NextInt("b");
+    const double v = f.NextDouble("value");
+    f.ExpectEnd();
+    if (a < 0 || b < 0 || a >= norb || b >= norb)
+      f.Fail("orbit index out of range");
+    {
+      // A scalar one-body operator only connects orbits with equal (l, 2j,
+      // tz2); the norms and the normal ordering ignore other entries, so they
+      // must not be accepted silently.
+      const auto& oa = hd.orbits[static_cast<std::size_t>(a)].orbit;
+      const auto& ob = hd.orbits[static_cast<std::size_t>(b)].orbit;
+      if (hd.spec.is_scalar() &&
+          (oa.l != ob.l || oa.j2 != ob.j2 || oa.tz2 != ob.tz2)) {
+        f.Fail(
+            "one-body entry between orbits of different (l, 2j, tz2) in a "
+            "scalar operator");
+      }
+    }
+    op.one_body().set_element(map[static_cast<std::size_t>(a)],
+                              map[static_cast<std::size_t>(b)], v);
+  }
+}
+
+/// Reads the `two_body` section into `op`.
+void ReadTwoBodySection(LineReader& r, const basis::ModelSpace& ms,
+                        const OperatorDumpHeader& hd,
+                        const std::vector<OrbitIndex>& map, Operator& op) {
+  const auto norb = static_cast<std::int32_t>(hd.orbits.size());
+  std::int32_t n2 = 0;
+  {
+    auto f = r.Expect("two_body");
+    n2 = ReadCount(f, "count");
+    f.ExpectEnd();
+  }
+  const auto& tbc = ms.two_body();
+  for (std::int32_t i = 0; i < n2; ++i) {
+    auto f = r.data("two_body");
+    std::int32_t x[4];
+    const char* const labels[4] = {"p", "q", "r", "s"};
+    for (int k = 0; k < 4; ++k) x[k] = f.NextInt(labels[k]);
+    const auto jb = f.NextInt("J_bra");
+    const auto jk = f.NextInt("J_ket");
+    const double v = f.NextDouble("value");
+    f.ExpectEnd();
+    for (int k = 0; k < 4; ++k) {
+      if (x[k] < 0 || x[k] >= norb) f.Fail("orbit index out of range");
+    }
+    if (jb < 0 || jk < 0) f.Fail("negative J");
+    if (x[0] > x[1] || x[2] > x[3])
+      f.Fail("two-body entries need p <= q and r <= s");
+    if (!op.two_body().allocated())
+      f.Fail("two-body entry in an operator with particle_rank 1");
+    const auto m = [&](int k) { return map[static_cast<std::size_t>(x[k])]; };
+    const Side bra = LocateSide(tbc, m(0), m(1), TwoJ::FromInteger(jb));
+    const Side ket = LocateSide(tbc, m(2), m(3), TwoJ::FromInteger(jk));
+    if (!bra.idx) f.Fail("bra ket |p q; J> is not present in its channel");
+    if (!ket.idx) f.Fail("ket |r s; J> is not present in its channel");
+    if (bra.ch != ket.ch) {
+      f.Fail(
+          "bra and ket are in different channels (not allowed for a scalar "
+          "operator)");
+    }
+    op.two_body().set(*bra.ch, *ket.ch, *bra.idx, *ket.idx,
+                      bra.phase * ket.phase * v);
+  }
+}
+
+/// Reads the `three_body` section into `op`; `upper` receives the
+/// upper-triangle records.
+void ReadThreeBodySection(LineReader& r, std::string_view name,
+                          const basis::ModelSpace& ms,
+                          const OperatorDumpHeader& hd,
+                          const std::vector<OrbitIndex>& map, Operator& op,
+                          ThreeBodyRecords& upper) {
+  auto f = r.Expect("three_body");
+  const std::string w = f.NextToken("count");
+  f.ExpectEnd();
+  std::int32_t n3 = 0;
+  if (w != "none") {
+    Fields cf(w, name, f.lineno());
+    n3 = ReadCount(cf, "count");
+  }
+  if (n3 > 0 && !op.three_body()) {
+    f.Fail("three_body entries in an operator with particle_rank " +
+           std::to_string(hd.spec.particle_rank) + " (need 3)");
+  }
+  if (op.three_body()) upper.Init(*op.three_body());
+  for (std::int32_t i = 0; i < n3; ++i) {
+    auto g = r.data("three_body");
+    ReadThreeBodyRecord(g, ms, hd, map, *op.three_body(), upper);
+  }
+}
+
+/// Checks the declared (anti-)Hermiticity of `op` after reading, with
+/// tolerance 1e-12 * max|V| (design/15).
+void CheckDumpHermiticity(std::string_view name, int lineno,
+                          const OperatorDumpHeader& hd,
+                          const basis::ModelSpace& ms, const Operator& op,
+                          const ThreeBodyRecords& upper,
+                          const std::vector<double>& three_body_values) {
+  const auto norb = static_cast<std::int32_t>(hd.orbits.size());
+  if (hd.spec.hermiticity == Hermiticity::kNonHermitian) return;
+  const double sgn =
+      hd.spec.hermiticity == Hermiticity::kHermitian ? 1.0 : -1.0;
+  double vmax = 0.0;
+  double dev = 0.0;
+  const auto ob = op.one_body().buffer().ToVector();
+  AccumulateSymmetry(ob.data(), norb == 0 ? 0 : ms.num_orbits(), sgn, vmax,
+                     dev);
+  if (op.two_body().allocated()) {
+    const auto& mat = op.two_body().matrix();
+    const auto tb = mat.buffer().ToVector();
+    for (std::size_t k = 0; k < mat.num_blocks(); ++k) {
+      const auto& info = mat.block_info(k);
+      AccumulateSymmetry(tb.data() + info.offset, info.rows, sgn, vmax, dev);
+    }
+  }
+  if (op.three_body()) {
+    upper.Accumulate(*op.three_body(), three_body_values, vmax, dev);
+  }
+  if (dev > 1.0e-12 * std::max(vmax, 1.0e-300)) {
+    FailAt(name, lineno,
+           "hermiticity check failed: max deviation " + Fmt17(dev) +
+               " for max|V| " + Fmt17(vmax));
+  }
+}
+
+/// Writes the header lines of a dump (version through `zero_body`), checking
+/// the `source` and `reference` texts.
+void WriteDumpHeader(std::ostream& out, const Operator& op,
+                     const OperatorDumpWriteOptions& options) {
+  const basis::ModelSpace& ms = op.model_space();
+  const auto& b = ms.basis();
+  const std::string& ref_name =
+      options.reference.empty() ? ms.reference().name() : options.reference;
+  if (options.source.find('\n') != std::string::npos) {
+    throw InputError(
+        "OperatorDump writer: the source text must not contain a newline");
+  }
+  if (ref_name.empty() ||
+      ref_name.find_first_of(" \t\n") != std::string::npos) {
+    throw InputError(
+        "OperatorDump writer: the reference name must be one non-empty word, "
+        "got '" +
+        ref_name + "'");
+  }
+  out << kVersionLine << "\n";
+  out << "source " << options.source << "\n";
+  out << "basis emax " << b.emax() << " lmax " << b.lmax() << " hw "
+      << Fmt17(b.hbar_omega()) << "\n";
+  out << "reference " << ref_name << "\n";
+  const std::int32_t norb = ms.num_orbits();
+  out << "norbits " << norb << "\n";
+  for (std::int32_t i = 0; i < norb; ++i) {
+    const basis::Orbit& o = b.orbit(OrbitIndex{i});
+    out << "orbit " << i << " " << o.n << " " << o.l << " " << o.j2.twice << " "
+        << o.tz2.twice << " " << Fmt17(ms.reference().occupation(OrbitIndex{i}))
+        << "\n";
+  }
+  const OperatorSpec& s = op.spec();
+  out << "spec particle_rank " << s.particle_rank << " rank_J " << s.rank_J
+      << " parity " << static_cast<int>(s.parity) << " delta_Tz " << s.delta_Tz
+      << " hermiticity " << HermiticityCode(s.hermiticity) << "\n";
+  out << "zero_body " << Fmt17(op.zero_body()) << "\n";
+}
+
+/// Writes the `one_body` section: every nonzero element of the dense
+/// `norb` x `norb` matrix, in the order of a (outer) and c (inner).
+void WriteOneBody(std::ostream& out, const Operator& op, std::int32_t norb) {
+  const auto ob = op.one_body().buffer().ToVector();
+  std::int64_t n1 = 0;
+  for (const double v : ob) n1 += (v != 0.0);
+  out << "one_body " << n1 << "\n";
+  for (std::int32_t a = 0; a < norb; ++a) {
+    for (std::int32_t c = 0; c < norb; ++c) {
+      const double v =
+          ob[static_cast<std::size_t>(a) +
+             static_cast<std::size_t>(c) * static_cast<std::size_t>(norb)];
+      if (v != 0.0) out << a << " " << c << " " << Fmt17(v) << "\n";
+    }
+  }
+}
+
+/// Writes the `two_body` section: channel by channel, every nonzero element
+/// of the diagonal-channel blocks.
+void WriteTwoBody(std::ostream& out, const Operator& op) {
+  const auto& tbc = op.model_space().two_body();
+  std::vector<double> tb;
+  const bool has2 = op.two_body().allocated();
+  if (has2) tb = op.two_body().matrix().buffer().ToVector();
+  std::int64_t n2 = 0;
+  for (const double v : tb) n2 += (v != 0.0);
+  out << "two_body " << n2 << "\n";
+  if (has2) {
+    for (std::int32_t ch = 0; ch < tbc.num_channels(); ++ch) {
+      const auto k =
+          op.two_body().block_index(ChannelIndex{ch}, ChannelIndex{ch});
+      if (!k) continue;
+      const auto& info = op.two_body().matrix().block_info(*k);
+      const auto kets = tbc.channel_kets(ChannelIndex{ch});
+      const std::int32_t J = tbc.channel(ChannelIndex{ch}).J();
+      for (std::int64_t i = 0; i < info.rows; ++i) {
+        const auto& bk = tbc.ket(kets[static_cast<std::size_t>(i)]);
+        for (std::int64_t j = 0; j < info.cols; ++j) {
+          const double v =
+              tb[static_cast<std::size_t>(info.offset + i + j * info.rows)];
+          if (v == 0.0) continue;
+          const auto& kk = tbc.ket(kets[static_cast<std::size_t>(j)]);
+          out << bk.p.value() << " " << bk.q.value() << " " << kk.p.value()
+              << " " << kk.q.value() << " " << J << " " << J << " " << Fmt17(v)
+              << "\n";
+        }
+      }
+    }
+  }
+}
+
 }  // namespace
 
 OperatorDumpHeader ReadOperatorDumpHeader(const std::filesystem::path& path) {
@@ -500,38 +827,8 @@ Operator ReadOperatorDump(std::istream& in, std::string_view name,
   const ParsedHeader ph = ParseHeader(r);
   const OperatorDumpHeader& hd = ph.header;
 
-  const double hw_ms = ms->basis().hbar_omega();
-  if (std::abs(hd.hw - hw_ms) >
-      1.0e-12 * std::max(std::abs(hd.hw), std::abs(hw_ms))) {
-    FailAt(name, ph.basis_line,
-           "hw " + Fmt17(hd.hw) + " differs from the model space's " +
-               Fmt17(hw_ms));
-  }
-  const std::int32_t norb = static_cast<std::int32_t>(hd.orbits.size());
-  std::vector<OrbitIndex> map(hd.orbits.size());
-  std::vector<bool> mapped(static_cast<std::size_t>(ms->num_orbits()), false);
-  for (std::int32_t i = 0; i < norb; ++i) {
-    const auto& d = hd.orbits[static_cast<std::size_t>(i)];
-    const int line = ph.orbit_lines[static_cast<std::size_t>(i)];
-    const auto k = ms->basis().find(d.orbit);
-    if (!k)
-      FailAt(name, line,
-             "orbit " + basis::OrbitLabel(d.orbit) + " not in the model space");
-    if (options.check_occupations &&
-        std::abs(ms->reference().occupation(*k) - d.occupation) >
-            options.occupation_tolerance) {
-      FailAt(name, line,
-             "occupation " + Fmt17(d.occupation) + " of orbit " +
-                 basis::OrbitLabel(d.orbit) +
-                 " differs from the model-space reference");
-    }
-    if (mapped[k->ToSize()]) {
-      FailAt(name, line,
-             "orbit " + basis::OrbitLabel(d.orbit) + " is listed twice");
-    }
-    mapped[k->ToSize()] = true;
-    map[static_cast<std::size_t>(i)] = *k;
-  }
+  CheckDumpHw(name, ph, *ms);
+  const std::vector<OrbitIndex> map = MapDumpOrbits(name, ph, *ms, options);
 
   // NotImplementedError propagates; an InputError gets the spec line.
   std::optional<Operator> opt;
@@ -542,98 +839,10 @@ Operator ReadOperatorDump(std::istream& in, std::string_view name,
   }
   Operator& op = *opt;
 
-  {
-    auto f = r.Expect("zero_body");
-    op.zero_body() = f.NextDouble("zero_body");
-    f.ExpectEnd();
-  }
-  std::int32_t n1 = 0;
-  {
-    auto f = r.Expect("one_body");
-    n1 = ReadCount(f, "count");
-    f.ExpectEnd();
-  }
-  for (std::int32_t i = 0; i < n1; ++i) {
-    auto f = r.data("one_body");
-    const auto a = f.NextInt("a");
-    const auto b = f.NextInt("b");
-    const double v = f.NextDouble("value");
-    f.ExpectEnd();
-    if (a < 0 || b < 0 || a >= norb || b >= norb)
-      f.Fail("orbit index out of range");
-    {
-      // A scalar one-body operator only connects orbits with equal (l, 2j,
-      // tz2); the norms and the normal ordering ignore other entries, so they
-      // must not be accepted silently.
-      const auto& oa = hd.orbits[static_cast<std::size_t>(a)].orbit;
-      const auto& ob = hd.orbits[static_cast<std::size_t>(b)].orbit;
-      if (hd.spec.is_scalar() &&
-          (oa.l != ob.l || oa.j2 != ob.j2 || oa.tz2 != ob.tz2)) {
-        f.Fail(
-            "one-body entry between orbits of different (l, 2j, tz2) in a "
-            "scalar operator");
-      }
-    }
-    op.one_body().set_element(map[static_cast<std::size_t>(a)],
-                              map[static_cast<std::size_t>(b)], v);
-  }
-  std::int32_t n2 = 0;
-  {
-    auto f = r.Expect("two_body");
-    n2 = ReadCount(f, "count");
-    f.ExpectEnd();
-  }
-  const auto& tbc = ms->two_body();
-  for (std::int32_t i = 0; i < n2; ++i) {
-    auto f = r.data("two_body");
-    std::int32_t x[4];
-    const char* const labels[4] = {"p", "q", "r", "s"};
-    for (int k = 0; k < 4; ++k) x[k] = f.NextInt(labels[k]);
-    const auto jb = f.NextInt("J_bra");
-    const auto jk = f.NextInt("J_ket");
-    const double v = f.NextDouble("value");
-    f.ExpectEnd();
-    for (int k = 0; k < 4; ++k) {
-      if (x[k] < 0 || x[k] >= norb) f.Fail("orbit index out of range");
-    }
-    if (jb < 0 || jk < 0) f.Fail("negative J");
-    if (x[0] > x[1] || x[2] > x[3])
-      f.Fail("two-body entries need p <= q and r <= s");
-    if (!op.two_body().allocated())
-      f.Fail("two-body entry in an operator with particle_rank 1");
-    const auto m = [&](int k) { return map[static_cast<std::size_t>(x[k])]; };
-    const Side bra = LocateSide(tbc, m(0), m(1), TwoJ::FromInteger(jb));
-    const Side ket = LocateSide(tbc, m(2), m(3), TwoJ::FromInteger(jk));
-    if (!bra.idx) f.Fail("bra ket |p q; J> is not present in its channel");
-    if (!ket.idx) f.Fail("ket |r s; J> is not present in its channel");
-    if (bra.ch != ket.ch) {
-      f.Fail(
-          "bra and ket are in different channels (not allowed for a scalar "
-          "operator)");
-    }
-    op.two_body().set(*bra.ch, *ket.ch, *bra.idx, *ket.idx,
-                      bra.phase * ket.phase * v);
-  }
+  ReadOneBodySection(r, hd, map, op);
+  ReadTwoBodySection(r, *ms, hd, map, op);
   ThreeBodyRecords upper;  // upper-triangle records, for the symmetry check
-  {
-    auto f = r.Expect("three_body");
-    const std::string w = f.NextToken("count");
-    f.ExpectEnd();
-    std::int32_t n3 = 0;
-    if (w != "none") {
-      Fields cf(w, name, f.lineno());
-      n3 = ReadCount(cf, "count");
-    }
-    if (n3 > 0 && !op.three_body()) {
-      f.Fail("three_body entries in an operator with particle_rank " +
-             std::to_string(hd.spec.particle_rank) + " (need 3)");
-    }
-    if (op.three_body()) upper.Init(*op.three_body());
-    for (std::int32_t i = 0; i < n3; ++i) {
-      auto g = r.data("three_body");
-      ReadThreeBodyRecord(g, *ms, hd, map, *op.three_body(), upper);
-    }
-  }
+  ReadThreeBodySection(r, name, *ms, hd, map, op, upper);
   {
     auto f = r.Expect("end");
     f.ExpectEnd();
@@ -643,32 +852,7 @@ Operator ReadOperatorDump(std::istream& in, std::string_view name,
       op.three_body() ? std::as_const(op).three_body()->buffer().ToVector()
                       : std::vector<double>();
 
-  // Hermiticity check, tolerance 1e-12 * max|V| (design/15).
-  if (hd.spec.hermiticity != Hermiticity::kNonHermitian) {
-    const double sgn =
-        hd.spec.hermiticity == Hermiticity::kHermitian ? 1.0 : -1.0;
-    double vmax = 0.0;
-    double dev = 0.0;
-    const auto ob = std::as_const(op).one_body().buffer().ToVector();
-    AccumulateSymmetry(ob.data(), norb == 0 ? 0 : ms->num_orbits(), sgn, vmax,
-                       dev);
-    if (op.two_body().allocated()) {
-      const auto& mat = std::as_const(op).two_body().matrix();
-      const auto tb = mat.buffer().ToVector();
-      for (std::size_t k = 0; k < mat.num_blocks(); ++k) {
-        const auto& info = mat.block_info(k);
-        AccumulateSymmetry(tb.data() + info.offset, info.rows, sgn, vmax, dev);
-      }
-    }
-    if (op.three_body()) {
-      upper.Accumulate(*op.three_body(), three_body_values, vmax, dev);
-    }
-    if (dev > 1.0e-12 * std::max(vmax, 1.0e-300)) {
-      FailAt(name, r.lineno(),
-             "hermiticity check failed: max deviation " + Fmt17(dev) +
-                 " for max|V| " + Fmt17(vmax));
-    }
-  }
+  CheckDumpHermiticity(name, r.lineno(), hd, *ms, op, upper, three_body_values);
   return std::move(op);
 }
 
@@ -683,82 +867,9 @@ Operator ReadOperatorDump(const std::filesystem::path& path,
 
 void WriteOperatorDump(std::ostream& out, const Operator& op,
                        const OperatorDumpWriteOptions& options) {
-  const basis::ModelSpace& ms = op.model_space();
-  const auto& b = ms.basis();
-  const std::string& ref_name =
-      options.reference.empty() ? ms.reference().name() : options.reference;
-  if (options.source.find('\n') != std::string::npos) {
-    throw InputError(
-        "OperatorDump writer: the source text must not contain a newline");
-  }
-  if (ref_name.empty() ||
-      ref_name.find_first_of(" \t\n") != std::string::npos) {
-    throw InputError(
-        "OperatorDump writer: the reference name must be one non-empty word, "
-        "got '" +
-        ref_name + "'");
-  }
-  out << kVersionLine << "\n";
-  out << "source " << options.source << "\n";
-  out << "basis emax " << b.emax() << " lmax " << b.lmax() << " hw "
-      << Fmt17(b.hbar_omega()) << "\n";
-  out << "reference " << ref_name << "\n";
-  const std::int32_t norb = ms.num_orbits();
-  out << "norbits " << norb << "\n";
-  for (std::int32_t i = 0; i < norb; ++i) {
-    const basis::Orbit& o = b.orbit(OrbitIndex{i});
-    out << "orbit " << i << " " << o.n << " " << o.l << " " << o.j2.twice << " "
-        << o.tz2.twice << " " << Fmt17(ms.reference().occupation(OrbitIndex{i}))
-        << "\n";
-  }
-  const OperatorSpec& s = op.spec();
-  out << "spec particle_rank " << s.particle_rank << " rank_J " << s.rank_J
-      << " parity " << static_cast<int>(s.parity) << " delta_Tz " << s.delta_Tz
-      << " hermiticity " << HermiticityCode(s.hermiticity) << "\n";
-  out << "zero_body " << Fmt17(op.zero_body()) << "\n";
-
-  const auto ob = op.one_body().buffer().ToVector();
-  std::int64_t n1 = 0;
-  for (const double v : ob) n1 += (v != 0.0);
-  out << "one_body " << n1 << "\n";
-  for (std::int32_t a = 0; a < norb; ++a) {
-    for (std::int32_t c = 0; c < norb; ++c) {
-      const double v =
-          ob[static_cast<std::size_t>(a) +
-             static_cast<std::size_t>(c) * static_cast<std::size_t>(norb)];
-      if (v != 0.0) out << a << " " << c << " " << Fmt17(v) << "\n";
-    }
-  }
-
-  const auto& tbc = ms.two_body();
-  std::vector<double> tb;
-  const bool has2 = op.two_body().allocated();
-  if (has2) tb = op.two_body().matrix().buffer().ToVector();
-  std::int64_t n2 = 0;
-  for (const double v : tb) n2 += (v != 0.0);
-  out << "two_body " << n2 << "\n";
-  if (has2) {
-    for (std::int32_t ch = 0; ch < tbc.num_channels(); ++ch) {
-      const auto k =
-          op.two_body().block_index(ChannelIndex{ch}, ChannelIndex{ch});
-      if (!k) continue;
-      const auto& info = op.two_body().matrix().block_info(*k);
-      const auto kets = tbc.channel_kets(ChannelIndex{ch});
-      const std::int32_t J = tbc.channel(ChannelIndex{ch}).J();
-      for (std::int64_t i = 0; i < info.rows; ++i) {
-        const auto& bk = tbc.ket(kets[static_cast<std::size_t>(i)]);
-        for (std::int64_t j = 0; j < info.cols; ++j) {
-          const double v =
-              tb[static_cast<std::size_t>(info.offset + i + j * info.rows)];
-          if (v == 0.0) continue;
-          const auto& kk = tbc.ket(kets[static_cast<std::size_t>(j)]);
-          out << bk.p.value() << " " << bk.q.value() << " " << kk.p.value()
-              << " " << kk.q.value() << " " << J << " " << J << " " << Fmt17(v)
-              << "\n";
-        }
-      }
-    }
-  }
+  WriteDumpHeader(out, op, options);
+  WriteOneBody(out, op, op.model_space().num_orbits());
+  WriteTwoBody(out, op);
   if (op.three_body()) {
     WriteThreeBody(out, *op.three_body());
   } else {

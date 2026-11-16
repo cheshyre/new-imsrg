@@ -40,21 +40,16 @@ bool CheckChannelKet(const Orbit& oa, const Orbit& ob, const Orbit& oc,
   return true;
 }
 
-}  // namespace
-
-ThreeBodyChannels::ThreeBodyChannels(const SingleParticleBasis& basis,
-                                     const ThreeBodyCuts& cuts)
-    : cuts_(cuts) {
-  if (cuts_.emax_3body < 0) cuts_.emax_3body = basis.emax();
-  IMSRG_CHECK(cuts_.emax_3body <= basis.emax(),
-              "emax_3body exceeds the basis emax");
-  IMSRG_CHECK(cuts_.e3max >= 0, "e3max must be non-negative");
-
-  const std::span<const Orbit> orbits = basis.orbits();
+// Builds the global kets of the three-body space, in the loop order of
+// Setup3bKets (p <= q <= r, ascending orbit index, then Jpq).
+std::vector<Ket3> BuildKets(std::span<const Orbit> orbits,
+                            std::int32_t num_orbits,
+                            const ThreeBodyCuts& cuts) {
+  std::vector<Ket3> kets;
   std::vector<std::int32_t>
       space;  // orbits of the three-body space, ascending index
-  for (std::int32_t i = 0; i < basis.num_orbits(); ++i) {
-    if (orbits[static_cast<std::size_t>(i)].e() <= cuts_.emax_3body)
+  for (std::int32_t i = 0; i < num_orbits; ++i) {
+    if (orbits[static_cast<std::size_t>(i)].e() <= cuts.emax_3body)
       space.push_back(i);
   }
 
@@ -67,30 +62,68 @@ ThreeBodyChannels::ThreeBodyChannels(const SingleParticleBasis& basis,
       const std::int32_t jpq_max = (op.j2.twice + oq.j2.twice) / 2;
       for (std::size_t ir = iq; ir < space.size(); ++ir) {
         const Orbit& orr = orbits[static_cast<std::size_t>(space[ir])];
-        if (2 * (op.n + oq.n + orr.n) + op.l + oq.l + orr.l > cuts_.e3max)
+        if (2 * (op.n + oq.n + orr.n) + op.l + oq.l + orr.l > cuts.e3max)
           continue;
         for (std::int32_t jpq = jpq_min; jpq <= jpq_max; ++jpq) {
           if (ip == iq && jpq % 2 > 0) continue;
           if (ip == iq && iq == ir && op.j2.twice == 1) continue;
-          kets_.push_back(Ket3{OrbitIndex{space[ip]}, OrbitIndex{space[iq]},
-                               OrbitIndex{space[ir]}, TwoJ{2 * jpq}});
+          kets.push_back(Ket3{OrbitIndex{space[ip]}, OrbitIndex{space[iq]},
+                              OrbitIndex{space[ir]}, TwoJ{2 * jpq}});
         }
       }
     }
   }
+  return kets;
+}
+
+// Builds the nch channels in std::set order of (2J, parity, 2Tz), without
+// kets.
+std::vector<ThreeBodyChannel> MakeChannelSkeleton(std::int32_t nch) {
+  std::vector<ThreeBodyChannel> channels(static_cast<std::size_t>(nch));
+  for (std::int32_t ch = 0; ch < nch; ++ch) {
+    ThreeBodyChannel& c = channels[static_cast<std::size_t>(ch)];
+    c.two_j = TwoJ{2 * (ch / 8) + 1};
+    c.parity = ((ch % 8) / 4 == 0) ? Parity::kEven : Parity::kOdd;
+    c.two_tz = TwoTz{2 * (ch % 4) - 3};
+  }
+  return channels;
+}
+
+// Concatenates the member lists into `table` and records each channel's ket
+// count and offset.
+void AssignChannelKets(const std::vector<std::vector<Ket3Index>>& members,
+                       std::vector<ThreeBodyChannel>& channels,
+                       std::vector<Ket3Index>& table) {
+  std::int64_t offset = 0;
+  for (std::size_t ch = 0; ch < members.size(); ++ch) {
+    const auto& list = members[ch];
+    ThreeBodyChannel& c = channels[ch];
+    c.num_kets = static_cast<std::int64_t>(list.size());
+    c.ket_offset = offset;
+    offset += c.num_kets;
+    table.insert(table.end(), list.begin(), list.end());
+  }
+}
+
+}  // namespace
+
+ThreeBodyChannels::ThreeBodyChannels(const SingleParticleBasis& basis,
+                                     const ThreeBodyCuts& cuts)
+    : cuts_(cuts) {
+  if (cuts_.emax_3body < 0) cuts_.emax_3body = basis.emax();
+  IMSRG_CHECK(cuts_.emax_3body <= basis.emax(),
+              "emax_3body exceeds the basis emax");
+  IMSRG_CHECK(cuts_.e3max >= 0, "e3max must be non-negative");
+
+  const std::span<const Orbit> orbits = basis.orbits();
+  kets_ = BuildKets(orbits, basis.num_orbits(), cuts_);
   IMSRG_CHECK(kets_.size() < static_cast<std::size_t>(INT32_MAX),
               "too many three-body kets");
 
   // Channels, in std::set order of (2J, parity, 2Tz).
   const std::int32_t num_two_j = 3 * cuts_.emax_3body + 1;
   const std::int32_t nch = 8 * num_two_j;
-  channels_.resize(static_cast<std::size_t>(nch));
-  for (std::int32_t ch = 0; ch < nch; ++ch) {
-    ThreeBodyChannel& c = channels_[static_cast<std::size_t>(ch)];
-    c.two_j = TwoJ{2 * (ch / 8) + 1};
-    c.parity = ((ch % 8) / 4 == 0) ? Parity::kEven : Parity::kOdd;
-    c.two_tz = TwoTz{2 * (ch % 4) - 3};
-  }
+  channels_ = MakeChannelSkeleton(nch);
 
   // Membership: for every ket, test the channels its 2J range reaches (parity
   // and 2Tz are fixed by the ket), and record the local indices in the compact
@@ -126,16 +159,7 @@ ThreeBodyChannels::ThreeBodyChannels(const SingleParticleBasis& basis,
     }
   }
 
-  std::int64_t offset = 0;
-  for (std::int32_t ch = 0; ch < nch; ++ch) {
-    const auto& list = members[static_cast<std::size_t>(ch)];
-    ThreeBodyChannel& c = channels_[static_cast<std::size_t>(ch)];
-    c.num_kets = static_cast<std::int64_t>(list.size());
-    c.ket_offset = offset;
-    offset += c.num_kets;
-    channel_ket_table_.insert(channel_ket_table_.end(), list.begin(),
-                              list.end());
-  }
+  AssignChannelKets(members, channels_, channel_ket_table_);
 }
 
 const Ket3& ThreeBodyChannels::ket(Ket3Index k) const {

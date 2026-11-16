@@ -39,9 +39,8 @@ std::string JoinIssues(const driver::ConfigIssues& issues) {
   return out;
 }
 
-}  // namespace
-
-void BindConfig(nb::module_& m) {
+/// Binds RunConfig.
+void BindRunConfig(nb::module_& m) {
   nb::class_<RunConfig>(
       m, "RunConfig",
       "A resolved, validated run configuration (immutable from Python).")
@@ -73,7 +72,10 @@ void BindConfig(nb::module_& m) {
         for (const auto& i : c.provenance.warnings) w.push_back(i.ToString());
         return w;
       });
+}
 
+/// Binds run_config and load_config.
+void BindConfigFunctions(nb::module_& m) {
   m.def(
       "run_config",
       [](const RunConfig& c) {
@@ -111,6 +113,13 @@ void BindConfig(nb::module_& m) {
       "Loads, resolves and validates a config from TOML `text` and/or a "
       "`file`, then applies the\n"
       "`set` overrides (\"a.b=v\"). Raises ConfigError listing all issues.");
+}
+
+}  // namespace
+
+void BindConfig(nb::module_& m) {
+  BindRunConfig(m);
+  BindConfigFunctions(m);
 }
 
 }  // namespace imsrg::py

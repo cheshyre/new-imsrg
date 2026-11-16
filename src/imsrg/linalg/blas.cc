@@ -17,6 +17,42 @@
 #include "imsrg/linalg/detail/blas.h"
 
 namespace imsrg::linalg {
+namespace detail {
+
+int SyevdLower(int n, double* a, int lda, double* w) {
+  int info = 0;
+  int lwork = -1;
+  int liwork = -1;
+  double wq = 0.0;
+  int iwq = 0;
+#if defined(IMSRG_BLAS_ACCELERATE) && IMSRG_BLAS_ACCELERATE
+  char jobz = 'V';
+  char uplo = 'L';
+  dsyevd_(&jobz, &uplo, &n, a, &lda, w, &wq, &lwork, &iwq, &liwork, &info);
+  if (info != 0) return info;
+  lwork = static_cast<int>(wq);
+  liwork = iwq;
+  std::vector<double> work(static_cast<std::size_t>(std::max(lwork, 1)));
+  std::vector<int> iwork(static_cast<std::size_t>(std::max(liwork, 1)));
+  dsyevd_(&jobz, &uplo, &n, a, &lda, w, work.data(), &lwork, iwork.data(),
+          &liwork, &info);
+#else
+  const char jobz = 'V';
+  const char uplo = 'L';
+  dsyevd_(&jobz, &uplo, &n, a, &lda, w, &wq, &lwork, &iwq, &liwork, &info);
+  if (info != 0) return info;
+  lwork = static_cast<int>(wq);
+  liwork = iwq;
+  std::vector<double> work(static_cast<std::size_t>(std::max(lwork, 1)));
+  std::vector<int> iwork(static_cast<std::size_t>(std::max(liwork, 1)));
+  dsyevd_(&jobz, &uplo, &n, a, &lda, w, work.data(), &lwork, iwork.data(),
+          &liwork, &info);
+#endif
+  return info;
+}
+
+}  // namespace detail
+
 namespace {
 
 constexpr std::int64_t kBlasLimit = std::numeric_limits<std::int32_t>::max();

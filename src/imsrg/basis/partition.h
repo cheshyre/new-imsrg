@@ -22,7 +22,7 @@ namespace imsrg::basis {
 /// Class of an orbit in the decoupling partition. The numeric values are
 /// imsrg++'s `cvq` (0 core, 1 valence, 2 q-space), which the two-body subset
 /// rules use arithmetically.
-enum class OrbitClass : std::uint8_t { kCore = 0, kValence = 1, kQSpace = 2 };
+enum class OrbitClass : std::int8_t { kCore = 0, kValence = 1, kQSpace = 2 };
 
 /// imsrg++ `cvq` value of a class (0, 1 or 2).
 constexpr std::int32_t Cvq(OrbitClass c) noexcept {

@@ -81,7 +81,10 @@ void EnsureRuntime() {
   InitLocked(s, {}, false);
 }
 
-void BindRuntime(nb::module_& m) {
+namespace {
+
+/// Binds Runtime.
+void BindRuntimeClass(nb::module_& m) {
   nb::class_<RuntimeHandle>(m, "Runtime",
                             "Process-wide Kokkos (and optional MPI) runtime. "
                             "Constructing it initializes explicitly; "
@@ -134,7 +137,10 @@ void BindRuntime(nb::module_& m) {
       .def_static(
           "mpi_enabled", [] { return comm::Environment::MpiEnabled(); },
           "True if the build has MPI.");
+}
 
+/// Binds the atexit hook.
+void BindExitHook(nb::module_& m) {
   // Called by imsrg's atexit handler after gc.collect(): frees the device data
   // of objects still alive (M11-Q1, D41) and finalizes, unless numpy views of
   // them are alive (then Kokkos is left to process exit).
@@ -149,6 +155,13 @@ void BindRuntime(nb::module_& m) {
       "live_objects", [] { return LiveObjects(); },
       "Number of live objects (operators, solvers, workspaces) that own "
       "device data.");
+}
+
+}  // namespace
+
+void BindRuntime(nb::module_& m) {
+  BindRuntimeClass(m);
+  BindExitHook(m);
 }
 
 }  // namespace imsrg::py

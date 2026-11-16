@@ -17,8 +17,17 @@ namespace detail {
 
 /// Triples body of one bra triple t: the tiles (t, t' < t) with a nonzero
 /// occupation factor, E_t = (2J + 1) sum f sum (w w Z)^2.
-struct TriplesBody {
-  const double* epsilon = nullptr;
+class TriplesBody {
+ public:
+  TriplesBody() = default;
+  /// Body using the per-orbit energies `epsilon` (device pointer or null).
+  IMSRG_INLINE_FUNCTION constexpr explicit TriplesBody(
+      const double* epsilon) noexcept
+      : epsilon_(epsilon) {}
+  TriplesBody(const TriplesBody&) = default;
+  TriplesBody& operator=(const TriplesBody&) = default;
+  TriplesBody(TriplesBody&&) = default;
+  TriplesBody& operator=(TriplesBody&&) = default;
 
   IMSRG_FUNCTION void operator()(const TileViews& tv, const TileScratch& sc,
                                  std::int32_t t, double& acc) const {
@@ -52,9 +61,11 @@ struct TriplesBody {
   }
   IMSRG_INLINE_FUNCTION double Energy(const TileViews& tv,
                                       std::int32_t t) const {
-    return epsilon[tv.cv.tr_a[t]] + epsilon[tv.cv.tr_b[t]] +
-           epsilon[tv.cv.tr_c[t]];
+    return epsilon_[tv.cv.tr_a[t]] + epsilon_[tv.cv.tr_b[t]] +
+           epsilon_[tv.cv.tr_c[t]];
   }
+
+  const double* epsilon_ = nullptr;
 };
 static_assert(std::is_trivially_copyable_v<TriplesBody>);
 
@@ -72,8 +83,7 @@ double TriplesTiled(const KernelContext& ctx, const LayoutView& layout,
       detail::MakeTileViews(ctx, layout, X, Y, sz, &tables);
   exec::DeviceBuffer<double> eps(epsilon.size(), "imsrg3_layout::epsilon");
   eps.CopyFromHost(epsilon);
-  detail::TriplesBody body;
-  body.epsilon = eps.device_data();
+  const detail::TriplesBody body(eps.device_data());
   return detail::RunTileLeague("imsrg3_layout::triples_tiled", tv, sz,
                                ctx.WorkOrder(), ctx.Space().NumTriples(), body);
 }

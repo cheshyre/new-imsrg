@@ -20,9 +20,9 @@ struct ResolveOptions {
   /// for legacy input (V-21, V-40, V-41, V-42, ...) report warnings instead of
   /// errors.
   bool legacy = false;
-  /// Check that input files exist and are readable and that output/scratch
-  /// directories are creatable (V-14). Tests of pure configuration logic turn
-  /// this off.
+  /// Whether to check that input files exist and are readable and that
+  /// output/scratch directories are creatable (V-14). Tests of pure
+  /// configuration logic turn this off.
   bool check_files = true;
 };
 

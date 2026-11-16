@@ -58,6 +58,103 @@ void LinComb(State& out, std::initializer_list<Term> terms) {
   }
 }
 
+// Adds ds/6 (K1 + 2 K2 + 2 K3 + K4) to `state`, summed in imsrg++'s order.
+void Rk4Combine(State& state, const State& k1, const State& k2, const State& k3,
+                const State& k4, double ds) {
+  for (std::size_t i = 0; i < state.size(); ++i) {
+    op::Operator sum = k1[i];
+    op::Axpy(2.0, k2[i], sum);
+    op::Axpy(2.0, k3[i], sum);
+    op::Axpy(1.0, k4[i], sum);
+    op::Axpy(ds / 6.0, sum, state[i]);
+  }
+}
+
+// Dormand-Prince coefficients exactly as boost/numeric/odeint/stepper/
+// runge_kutta_dopri5.hpp.
+constexpr double kA2 = 1.0 / 5.0, kA3 = 3.0 / 10.0, kA4 = 4.0 / 5.0,
+                 kA5 = 8.0 / 9.0;
+constexpr double kB21 = 1.0 / 5.0;
+constexpr double kB31 = 3.0 / 40.0, kB32 = 9.0 / 40.0;
+constexpr double kB41 = 44.0 / 45.0, kB42 = -56.0 / 15.0, kB43 = 32.0 / 9.0;
+constexpr double kB51 = 19372.0 / 6561.0, kB52 = -25360.0 / 2187.0,
+                 kB53 = 64448.0 / 6561.0, kB54 = -212.0 / 729.0;
+constexpr double kB61 = 9017.0 / 3168.0, kB62 = -355.0 / 33.0,
+                 kB63 = 46732.0 / 5247.0, kB64 = 49.0 / 176.0,
+                 kB65 = -5103.0 / 18656.0;
+constexpr double kC1 = 35.0 / 384.0, kC3 = 500.0 / 1113.0, kC4 = 125.0 / 192.0,
+                 kC5 = -2187.0 / 6784.0, kC6 = 11.0 / 84.0;
+constexpr double kDc1 = kC1 - 5179.0 / 57600.0;
+constexpr double kDc3 = kC3 - 7571.0 / 16695.0;
+constexpr double kDc4 = kC4 - 393.0 / 640.0;
+constexpr double kDc5 = kC5 + 92097.0 / 339200.0;
+constexpr double kDc6 = kC6 - 187.0 / 2100.0;
+constexpr double kDc7 = -1.0 / 40.0;
+
+// The stage vectors of one Dormand-Prince step (dxdt is k1).
+struct DopriStages {
+  State dxdt, dxdt_new, xnew, xerr, xtmp, k2, k3, k4, k5, k6;
+};
+
+// One Dormand-Prince step from (x, t) with step dt, given dxdt = f(x, t) in
+// `w`: fills w.xnew, w.dxdt_new (FSAL) and the error estimate w.xerr. `rhs`
+// is called as rhs(x, dxdt, t) in odeint's stage order.
+template <typename RhsFn>
+void DopriTrialStep(RhsFn&& rhs, const State& x, double t, double dt,
+                    DopriStages& w) {
+  LinComb(w.xtmp, {{1.0, &x}, {dt * kB21, &w.dxdt}});
+  rhs(w.xtmp, w.k2, t + dt * kA2);
+  LinComb(w.xtmp, {{1.0, &x}, {dt * kB31, &w.dxdt}, {dt * kB32, &w.k2}});
+  rhs(w.xtmp, w.k3, t + dt * kA3);
+  LinComb(w.xtmp, {{1.0, &x},
+                   {dt * kB41, &w.dxdt},
+                   {dt * kB42, &w.k2},
+                   {dt * kB43, &w.k3}});
+  rhs(w.xtmp, w.k4, t + dt * kA4);
+  LinComb(w.xtmp, {{1.0, &x},
+                   {dt * kB51, &w.dxdt},
+                   {dt * kB52, &w.k2},
+                   {dt * kB53, &w.k3},
+                   {dt * kB54, &w.k4}});
+  rhs(w.xtmp, w.k5, t + dt * kA5);
+  LinComb(w.xtmp, {{1.0, &x},
+                   {dt * kB61, &w.dxdt},
+                   {dt * kB62, &w.k2},
+                   {dt * kB63, &w.k3},
+                   {dt * kB64, &w.k4},
+                   {dt * kB65, &w.k5}});
+  rhs(w.xtmp, w.k6, t + dt);
+  LinComb(w.xnew, {{1.0, &x},
+                   {dt * kC1, &w.dxdt},
+                   {dt * kC3, &w.k3},
+                   {dt * kC4, &w.k4},
+                   {dt * kC5, &w.k5},
+                   {dt * kC6, &w.k6}});
+  rhs(w.xnew, w.dxdt_new, t + dt);  // the new derivative (FSAL)
+  LinComb(w.xerr, {{dt * kDc1, &w.dxdt},
+                   {dt * kDc3, &w.k3},
+                   {dt * kDc4, &w.k4},
+                   {dt * kDc5, &w.k5},
+                   {dt * kDc6, &w.k6},
+                   {dt * kDc7, &w.dxdt_new}});
+}
+
+/// Shrinks `dt` after a rejected step with scaled error `err` > 1
+/// (odeint default_step_adjuster::decrease_step, error order 4).
+void DecreaseStep(double& dt, double err) {
+  dt *= std::max(0.9 * std::pow(err, -1.0 / 3.0), 1.0 / 5.0);
+}
+
+/// Grows `dt` after an accepted step with scaled error `err` (odeint
+/// default_step_adjuster::increase_step, stepper order 5); unchanged for
+/// err >= 0.5.
+void IncreaseStep(double& dt, double err) {
+  if (err < 0.5) {
+    const double e = std::max(std::pow(5.0, -5.0), err);
+    dt *= 0.9 * std::pow(e, -1.0 / 5.0);
+  }
+}
+
 }  // namespace
 
 double ScaledStateError(const State& x_err, const State& x, const State& dxdt,
@@ -257,14 +354,7 @@ SolveResult OdeSolver::SolveRk4() {
     LinComb(tmp, {{1.0, &state_}, {1.0 * ds, &k3}});
     ComputeGenerator(tmp[0], eta_, generator_);
     commutators(tmp, k4);
-    // X += ds/6 (K1 + 2 K2 + 2 K3 + K4), summed in imsrg++'s order.
-    for (std::size_t i = 0; i < n; ++i) {
-      op::Operator sum = k1[i];
-      op::Axpy(2.0, k2[i], sum);
-      op::Axpy(2.0, k3[i], sum);
-      op::Axpy(1.0, k4[i], sum);
-      op::Axpy(ds / 6.0, sum, state_[i]);
-    }
+    Rk4Combine(state_, k1, k2, k3, k4, ds);
     if (shell_atan && norm_eta < 1.0) generator_.denominator_cutoff = 1.0e-6;
     ComputeGenerator(state_[0], eta_, generator_);
     if (on_status_) on_status_(MakeStatus(istep, ds, s_, state_[0], false));
@@ -275,26 +365,6 @@ SolveResult OdeSolver::SolveRk4() {
 }
 
 SolveResult OdeSolver::SolveDopri5() {
-  // Dormand-Prince coefficients exactly as boost/numeric/odeint/stepper/
-  // runge_kutta_dopri5.hpp.
-  constexpr double a2 = 1.0 / 5.0, a3 = 3.0 / 10.0, a4 = 4.0 / 5.0,
-                   a5 = 8.0 / 9.0;
-  constexpr double b21 = 1.0 / 5.0;
-  constexpr double b31 = 3.0 / 40.0, b32 = 9.0 / 40.0;
-  constexpr double b41 = 44.0 / 45.0, b42 = -56.0 / 15.0, b43 = 32.0 / 9.0;
-  constexpr double b51 = 19372.0 / 6561.0, b52 = -25360.0 / 2187.0,
-                   b53 = 64448.0 / 6561.0, b54 = -212.0 / 729.0;
-  constexpr double b61 = 9017.0 / 3168.0, b62 = -355.0 / 33.0,
-                   b63 = 46732.0 / 5247.0, b64 = 49.0 / 176.0,
-                   b65 = -5103.0 / 18656.0;
-  constexpr double c1 = 35.0 / 384.0, c3 = 500.0 / 1113.0, c4 = 125.0 / 192.0,
-                   c5 = -2187.0 / 6784.0, c6 = 11.0 / 84.0;
-  constexpr double dc1 = c1 - 5179.0 / 57600.0;
-  constexpr double dc3 = c3 - 7571.0 / 16695.0;
-  constexpr double dc4 = c4 - 393.0 / 640.0;
-  constexpr double dc5 = c5 + 92097.0 / 339200.0;
-  constexpr double dc6 = c6 - 187.0 / 2100.0;
-  constexpr double dc7 = -1.0 / 40.0;
   constexpr double kEps = std::numeric_limits<double>::epsilon();
 
   SolveResult result;
@@ -302,7 +372,10 @@ SolveResult OdeSolver::SolveDopri5() {
   if (on_status_) on_status_(MakeStatus(0, 0.0, s_, state_[0], true));
 
   State& x = state_;
-  State dxdt, dxdt_new, xnew, xerr, xtmp, k2, k3, k4, k5, k6;
+  DopriStages w;
+  const auto rhs = [this](const State& xs, State& dxs, double ts) {
+    Rhs(xs, dxs, ts);
+  };
   double t = s_;
   double dt = std::min(solver_.ds_0, solver_.dsmax);
   const double end = solver_.smax;
@@ -316,48 +389,15 @@ SolveResult OdeSolver::SolveDopri5() {
     bool accepted = false;
     do {
       if (first_call) {
-        Rhs(x, dxdt, t);
+        Rhs(x, w.dxdt, t);
         first_call = false;
       }
-      // ---- try_step: one Dormand-Prince step with error estimate.
-      LinComb(xtmp, {{1.0, &x}, {dt * b21, &dxdt}});
-      Rhs(xtmp, k2, t + dt * a2);
-      LinComb(xtmp, {{1.0, &x}, {dt * b31, &dxdt}, {dt * b32, &k2}});
-      Rhs(xtmp, k3, t + dt * a3);
-      LinComb(xtmp,
-              {{1.0, &x}, {dt * b41, &dxdt}, {dt * b42, &k2}, {dt * b43, &k3}});
-      Rhs(xtmp, k4, t + dt * a4);
-      LinComb(xtmp, {{1.0, &x},
-                     {dt * b51, &dxdt},
-                     {dt * b52, &k2},
-                     {dt * b53, &k3},
-                     {dt * b54, &k4}});
-      Rhs(xtmp, k5, t + dt * a5);
-      LinComb(xtmp, {{1.0, &x},
-                     {dt * b61, &dxdt},
-                     {dt * b62, &k2},
-                     {dt * b63, &k3},
-                     {dt * b64, &k4},
-                     {dt * b65, &k5}});
-      Rhs(xtmp, k6, t + dt);
-      LinComb(xnew, {{1.0, &x},
-                     {dt * c1, &dxdt},
-                     {dt * c3, &k3},
-                     {dt * c4, &k4},
-                     {dt * c5, &k5},
-                     {dt * c6, &k6}});
-      Rhs(xnew, dxdt_new, t + dt);  // the new derivative (FSAL)
-      LinComb(xerr, {{dt * dc1, &dxdt},
-                     {dt * dc3, &k3},
-                     {dt * dc4, &k4},
-                     {dt * dc5, &k5},
-                     {dt * dc6, &k6},
-                     {dt * dc7, &dxdt_new}});
+      DopriTrialStep(rhs, x, t, dt, w);  // try_step with error estimate
       if (diverged_) return result;
-      const double err = ScaledStateError(xerr, x, dxdt, dt, eps_, eps_);
+      const double err = ScaledStateError(w.xerr, x, w.dxdt, dt, eps_, eps_);
       if (err > 1.0) {
         // default_step_adjuster::decrease_step (error_order 4).
-        dt *= std::max(0.9 * std::pow(err, -1.0 / 3.0), 1.0 / 5.0);
+        DecreaseStep(dt, err);
         if (++failed >= 500) {
           throw NumericalError(
               "OdeSolver: max number of iterations exceeded (500): a new step "
@@ -366,12 +406,9 @@ SolveResult OdeSolver::SolveDopri5() {
       } else {
         t += dt;
         // default_step_adjuster::increase_step (stepper_order 5).
-        if (err < 0.5) {
-          const double e = std::max(std::pow(5.0, -5.0), err);
-          dt *= 0.9 * std::pow(e, -1.0 / 5.0);
-        }
-        std::swap(x, xnew);
-        std::swap(dxdt, dxdt_new);
+        IncreaseStep(dt, err);
+        std::swap(x, w.xnew);
+        std::swap(w.dxdt, w.dxdt_new);
         accepted = true;
       }
     } while (!accepted);

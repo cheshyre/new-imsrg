@@ -71,7 +71,7 @@ namespace imsrg::flow {
 
 /// Generator types (imsrg++ `generator_type` strings in the comments; the
 /// driver maps its `driver::Generator` enum 1:1 onto this one).
-enum class GeneratorKind : std::uint8_t {
+enum class GeneratorKind : std::int8_t {
   kWhite,           ///< "white"
   kAtan,            ///< "atan" (imsrg++ default core generator)
   kImaginaryTime,   ///< "imaginary-time"
@@ -88,7 +88,7 @@ enum class GeneratorKind : std::uint8_t {
 };
 
 /// Energy-denominator partitioning (imsrg++ `denominator_partitioning`).
-enum class Partitioning : std::uint8_t {
+enum class Partitioning : std::int8_t {
   kEpsteinNesbet,  ///< "Epstein_Nesbet" (default): SPE differences plus
                    ///< monopole terms.
   kMollerPlesset,  ///< "Moller_Plesset": SPE differences only.
@@ -116,8 +116,8 @@ struct GeneratorOptions {
   int qtransfer_n = 1;
   /// Only the one-body part of eta (imsrg++ `only_1b_eta`).
   bool only_1b_eta = false;
-  /// Keep eta to its one- and two-body parts even for a rank-3 H (imsrg++
-  /// `only_2b_eta`).
+  /// Whether eta is limited to its one- and two-body parts even for a rank-3 H
+  /// (imsrg++ `only_2b_eta`).
   bool only_2b_eta = false;
 };
 

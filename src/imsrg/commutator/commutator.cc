@@ -67,16 +67,12 @@ op::OperatorSpec CommutatorSpec(const op::OperatorSpec& x,
   return z;
 }
 
-void Commutator(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
-                const CommutatorOptions& opts, Workspace& ws) {
-  IMSRG_CHECK(ws.Compatible(X),
-              "commutator: X is not on the workspace's model space");
-  IMSRG_CHECK(ws.Compatible(Y),
-              "commutator: Y is not on the workspace's model space");
-  IMSRG_CHECK(&Z != &X && &Z != &Y, "commutator: Z must not alias X or Y");
+namespace {
 
-  const TermMask m = opts.terms;
-  const TermMask m3 = m.ThreeBodyTerms();
+/// Throws unless the IMSRG(3) terms `m3` (empty for a pure IMSRG(2) set) and
+/// the operands' three-body parts are supported by the workspace `ws`.
+void CheckTermSet(const op::Operator& X, const op::Operator& Y,
+                  const TermMask m3, const Workspace& ws) {
   const bool imsrg3 = !m3.empty();
   if (imsrg3) {
     const TermMask n7_3b = TermMask::Imsrg3N7().ThreeBodyTerms();
@@ -95,7 +91,12 @@ void Commutator(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
         "set (e.g. TermMask::Imsrg3N7()); the [2,2]->3 part alone is "
         "commutator::Comm223");
   }
+}
 
+/// Sets Z to zero with the spec of [X, Y] (rank 3 if `imsrg3`), reusing its
+/// storage when it already has that spec on the workspace's model space.
+void PrepareOutput(const op::Operator& X, const op::Operator& Y, bool imsrg3,
+                   const Workspace& ws, op::Operator& Z) {
   op::OperatorSpec spec = CommutatorSpec(X.spec(), Y.spec());
   spec.particle_rank = imsrg3 ? 3 : spec.particle_rank;
   if (!Z.empty() && Z.spec() == spec && ws.Compatible(Z)) {
@@ -103,6 +104,23 @@ void Commutator(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   } else {
     Z = op::Operator(ws.model_space_ptr(), spec);
   }
+}
+
+}  // namespace
+
+void Commutator(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+                const CommutatorOptions& opts, Workspace& ws) {
+  IMSRG_CHECK(ws.Compatible(X),
+              "commutator: X is not on the workspace's model space");
+  IMSRG_CHECK(ws.Compatible(Y),
+              "commutator: Y is not on the workspace's model space");
+  IMSRG_CHECK(&Z != &X && &Z != &Y, "commutator: Z must not alias X or Y");
+
+  const TermMask m = opts.terms;
+  const TermMask m3 = m.ThreeBodyTerms();
+  const bool imsrg3 = !m3.empty();
+  CheckTermSet(X, Y, m3, ws);
+  PrepareOutput(X, Y, imsrg3, ws, Z);
 
   if (m.test(Term::kComm110ss)) terms::Comm110ss(X, Y, Z, ws);
   if (m.test(Term::kComm220ss)) terms::Comm220ss(X, Y, Z, ws);

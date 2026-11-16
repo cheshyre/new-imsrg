@@ -4,6 +4,7 @@
 #include "imsrg/hf/monopole.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <utility>
 #include <vector>
@@ -20,6 +21,37 @@ namespace {
 int BlockOf(const basis::Orbit& p, const basis::Orbit& q) {
   const int tz = (p.tz2.twice + q.tz2.twice) / 2;
   return (tz + 1) * 2 + (p.l + q.l) % 2;
+}
+
+/// Fills the symmetric (2J+1)-weighted direct and exchange monopole matrices
+/// of the kets `ks` of one (Tz, parity) block.
+void FillBlockMonopoles(const op::TwoBody& tb,
+                        const std::vector<std::int32_t>& two_j,
+                        const std::vector<std::array<std::int32_t, 2>>& ks,
+                        linalg::Matrix<double>& vmon,
+                        linalg::Matrix<double>& vmon_exch) {
+  const auto nk = static_cast<std::int64_t>(ks.size());
+  // Upper triangle (ket >= bra), mirrored: both matrices are symmetric.
+  for (std::int64_t bra = 0; bra < nk; ++bra) {
+    const OrbitIndex a{ks[static_cast<std::size_t>(bra)][0]};
+    const OrbitIndex b{ks[static_cast<std::size_t>(bra)][1]};
+    const int ja = two_j[static_cast<std::size_t>(a.value())];
+    const int jb = two_j[static_cast<std::size_t>(b.value())];
+    for (std::int64_t ket = bra; ket < nk; ++ket) {
+      const OrbitIndex c{ks[static_cast<std::size_t>(ket)][0]};
+      const OrbitIndex d{ks[static_cast<std::size_t>(ket)][1]};
+      double v = 0.0;
+      double vx = 0.0;
+      for (int J2 = std::abs(ja - jb); J2 <= ja + jb; J2 += 2) {
+        v += (J2 + 1) * tb.get_unnormalized(a, b, c, d, TwoJ{J2});
+        vx += (J2 + 1) * tb.get_unnormalized(a, b, d, c, TwoJ{J2});
+      }
+      vmon(bra, ket) = v;
+      vmon(ket, bra) = v;
+      vmon_exch(bra, ket) = vx;
+      vmon_exch(ket, bra) = vx;
+    }
+  }
 }
 
 }  // namespace
@@ -69,27 +101,7 @@ Monopole2B::Monopole2B(const op::Operator& H) {
     const auto nk = static_cast<std::int64_t>(ks.size());
     vmon_[blk] = linalg::Matrix<double>(nk, nk);
     vmon_exch_[blk] = linalg::Matrix<double>(nk, nk);
-    // Upper triangle (ket >= bra), mirrored: both matrices are symmetric.
-    for (std::int64_t bra = 0; bra < nk; ++bra) {
-      const OrbitIndex a{ks[static_cast<std::size_t>(bra)][0]};
-      const OrbitIndex b{ks[static_cast<std::size_t>(bra)][1]};
-      const int ja = two_j_[static_cast<std::size_t>(a.value())];
-      const int jb = two_j_[static_cast<std::size_t>(b.value())];
-      for (std::int64_t ket = bra; ket < nk; ++ket) {
-        const OrbitIndex c{ks[static_cast<std::size_t>(ket)][0]};
-        const OrbitIndex d{ks[static_cast<std::size_t>(ket)][1]};
-        double v = 0.0;
-        double vx = 0.0;
-        for (int J2 = std::abs(ja - jb); J2 <= ja + jb; J2 += 2) {
-          v += (J2 + 1) * tb.get_unnormalized(a, b, c, d, TwoJ{J2});
-          vx += (J2 + 1) * tb.get_unnormalized(a, b, d, c, TwoJ{J2});
-        }
-        vmon_[blk](bra, ket) = v;
-        vmon_[blk](ket, bra) = v;
-        vmon_exch_[blk](bra, ket) = vx;
-        vmon_exch_[blk](ket, bra) = vx;
-      }
-    }
+    FillBlockMonopoles(tb, two_j_, ks, vmon_[blk], vmon_exch_[blk]);
   }
 }
 
@@ -165,10 +177,9 @@ Monopole3B::Monopole3B(const op::Operator& H, const op::No2bThreeBody& v3,
                 v += v3.get_pn(oa, oc, oi, ob, od, oj, J);
               if (v == 0.0) continue;
               keys_.push_back(
-                  {static_cast<std::uint16_t>(i), static_cast<std::uint16_t>(j),
-                   static_cast<std::uint16_t>(a), static_cast<std::uint16_t>(b),
-                   static_cast<std::uint16_t>(c),
-                   static_cast<std::uint16_t>(d)});
+                  {static_cast<std::int16_t>(i), static_cast<std::int16_t>(j),
+                   static_cast<std::int16_t>(a), static_cast<std::int16_t>(b),
+                   static_cast<std::int16_t>(c), static_cast<std::int16_t>(d)});
               values_.push_back(v / static_cast<double>(oi.j2.twice + 1));
             }
           }

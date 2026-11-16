@@ -112,8 +112,8 @@ void ThrowIfSignalPending() {
 }
 
 PyModelSpace::~PyModelSpace() {
-  const bool shared = ms && ms.use_count() > 1;
-  ms.reset();
+  const bool shared = ms_ && ms_.use_count() > 1;
+  ms_.reset();
   if (shared) PurgeWorkspaceCache();
 }
 
@@ -178,29 +178,29 @@ const PyOperator& Alive(const PyOperator& o) {
 
 const op::Operator& Input(const PyOperator& o) {
   Alive(o);
-  if (o.residency == Residency::kHostCurrent) {
+  if (o.residency() == Residency::kHostCurrent) {
     // Python hands out non-const objects; the push changes where the data
     // live, not their value (design/18 section 2.2).
     auto& m = const_cast<PyOperator&>(o);
     m.SyncToDevice();
     // A live writable view keeps the host side authoritative: its later
     // edits must be pushed before the next call as well.
-    if (m.writable_views->load() == 0) m.residency = Residency::kBoth;
+    if (m.writable_views()->load() == 0) m.set_residency(Residency::kBoth);
   }
   return o;
 }
 
 void PrepareHostAccess(PyOperator& o, bool writable) {
   Alive(o);
-  if (o.residency == Residency::kDeviceCurrent) {
+  if (o.residency() == Residency::kDeviceCurrent) {
     if (ResidencyEnforced())
       throw StaleHostError(
           "the host mirror of this operator is stale (its data were last "
           "written on the device): call op.sync_to_host() first");
     o.SyncToHost();
-    o.residency = Residency::kBoth;
+    o.set_residency(Residency::kBoth);
   }
-  if (writable) o.residency = Residency::kHostCurrent;
+  if (writable) o.set_residency(Residency::kHostCurrent);
 }
 
 namespace {
@@ -216,8 +216,8 @@ struct ViewGuard {
 
 nb::object MakeViewGuard(nb::handle self, bool writable) {
   auto& o = nb::cast<PyOperator&>(self);
-  auto* g = new ViewGuard{nb::borrow(self), o.views,
-                          writable ? o.writable_views : nullptr};
+  auto* g = new ViewGuard{nb::borrow(self), o.views(),
+                          writable ? o.writable_views() : nullptr};
   ++*g->count;
   if (g->writable) ++*g->writable;
   return nb::capsule(g, [](void* p) noexcept {
@@ -229,11 +229,11 @@ nb::object MakeViewGuard(nb::handle self, bool writable) {
 }
 
 void MarkModifiedInPlace(PyOperator& o) {
-  if (o.writable_views->load() > 0) {
+  if (o.writable_views()->load() > 0) {
     o.SyncToHost();
-    o.residency = Residency::kHostCurrent;
+    o.set_residency(Residency::kHostCurrent);
   } else {
-    o.residency = Residency::kDeviceCurrent;
+    o.set_residency(Residency::kDeviceCurrent);
   }
 }
 

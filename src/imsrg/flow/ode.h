@@ -28,7 +28,7 @@
 namespace imsrg::flow {
 
 /// The integrator of `OdeSolver`.
-enum class OdeMethod : std::uint8_t {
+enum class OdeMethod : std::int8_t {
   kRk4,     ///< `flow_RK4`: fixed step ds = min(dsmax, smax - s).
   kDopri5,  ///< `flow`: adaptive Dormand-Prince 5(4), odeint step control.
 };

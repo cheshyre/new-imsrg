@@ -18,69 +18,46 @@ std::size_t U(std::int64_t i) { return static_cast<std::size_t>(i); }
 double Diag(const op::Operator& H, OrbitIndex a) {
   return H.one_body().get(a, a);
 }
-}  // namespace
 
-double Mp2Energy(op::Operator& H) {
-  H.SyncToHost();
-  const auto& ms = H.model_space();
-  const auto& basis = ms.basis();
-  const auto& ref = ms.reference();
+/// Adds to `e2` the doubles term of the particle pair (i, j) and hole pair
+/// (a, b) of the MP2 energy.
+void AddMp2PairTerm(const op::Operator& H, OrbitIndex i, OrbitIndex j,
+                    OrbitIndex a, OrbitIndex b, double& e2) {
+  const auto& basis = H.model_space().basis();
+  const auto& ref = H.model_space().reference();
   const auto& two = H.two_body();
-  double e2 = 0.0;
-  for (const OrbitIndex i : ref.particles()) {
-    const auto& oi = basis.orbit(i);
-    const double ei = Diag(H, i);
-    for (const OrbitIndex a : ref.holes()) {
-      const auto& oa = basis.orbit(a);
-      const double ea = Diag(H, a);
-      const double fia = H.one_body().get(i, a);
-      if (std::abs(fia) > 1.0e-9)
-        e2 += (oa.j2.twice + 1) * ref.occupation(a) * fia * fia / (ea - ei);
-      for (const OrbitIndex j : ref.particles()) {
-        if (j.value() < i.value()) continue;
-        const auto& oj = basis.orbit(j);
-        const double ej = Diag(H, j);
-        for (const OrbitIndex b : ref.holes()) {
-          if (b.value() < a.value()) continue;
-          const auto& ob = basis.orbit(b);
-          if ((oi.l + oj.l + oa.l + ob.l) % 2 > 0) continue;
-          if (oi.tz2.twice + oj.tz2.twice != oa.tz2.twice + ob.tz2.twice)
-            continue;
-          const double denom = ea + Diag(H, b) - ei - ej;
-          int jmin = std::max(std::abs(oi.j2.twice - oj.j2.twice),
-                              std::abs(oa.j2.twice - ob.j2.twice)) /
-                     2;
-          const int jmax =
-              std::min(oi.j2.twice + oj.j2.twice, oa.j2.twice + ob.j2.twice) /
-              2;
-          int dj = 1;
-          if (a == b || i == j) {
-            jmin += jmin % 2;
-            dj = 2;
-          }
-          for (int J = jmin; J <= jmax; J += dj) {
-            const double t = two.get_normalized(a, b, i, j, TwoJ{2 * J});
-            if (std::abs(t) > 1.0e-9)
-              e2 += (2 * J + 1) * ref.occupation(a) * ref.occupation(b) * t *
-                    t / denom;
-          }
-        }
-      }
-    }
+  const auto& oi = basis.orbit(i);
+  const auto& oj = basis.orbit(j);
+  const auto& oa = basis.orbit(a);
+  const double ei = Diag(H, i);
+  const double ej = Diag(H, j);
+  const double ea = Diag(H, a);
+  const auto& ob = basis.orbit(b);
+  if ((oi.l + oj.l + oa.l + ob.l) % 2 > 0) return;
+  if (oi.tz2.twice + oj.tz2.twice != oa.tz2.twice + ob.tz2.twice) return;
+  const double denom = ea + Diag(H, b) - ei - ej;
+  int jmin = std::max(std::abs(oi.j2.twice - oj.j2.twice),
+                      std::abs(oa.j2.twice - ob.j2.twice)) /
+             2;
+  const int jmax =
+      std::min(oi.j2.twice + oj.j2.twice, oa.j2.twice + ob.j2.twice) / 2;
+  int dj = 1;
+  if (a == b || i == j) {
+    jmin += jmin % 2;
+    dj = 2;
   }
-  return e2;
+  for (int J = jmin; J <= jmax; J += dj) {
+    const double t = two.get_normalized(a, b, i, j, TwoJ{2 * J});
+    if (std::abs(t) > 1.0e-9)
+      e2 += (2 * J + 1) * ref.occupation(a) * ref.occupation(b) * t * t / denom;
+  }
 }
 
-Mp3Energy ComputeMp3Energy(op::Operator& H) {
-  H.SyncToHost();
+/// Adds the pp and hh ladder terms to `out.pp` and `out.hh`.
+void AddLadderTerms(op::Operator& H, Mp3Energy& out) {
   const auto& ms = H.model_space();
-  const auto& basis = ms.basis();
-  const auto& ref = ms.reference();
   const auto& tb = ms.two_body();
   const auto& sub = ms.two_body_subsets();
-  Mp3Energy out;
-
-  // pp and hh ladders.
   for (std::int32_t c = 0; c < tb.num_channels(); ++c) {
     const ChannelIndex ch{c};
     const auto& tbc = tb.channel(ch);
@@ -116,83 +93,145 @@ Mp3Energy ComputeMp3Energy(op::Operator& H) {
         out.hh += w * s * V(hh[U(I)].value(), hh[U(K)].value());
       }
   }
+}
+
+/// A particle-hole ket (a, i) of a cross-coupled channel with its orbit
+/// spins and exchange phases.
+struct PhKet {
+  OrbitIndex a, i;
+  int ja2, ji2;
+  double phase_ai, phase_ia;
+};
+
+/// Returns the particle-hole kets of the cross-coupled channel `ch` of
+/// total J `Jph`, ordered (particle, hole) with the exchange phases.
+std::vector<PhKet> PhKets(const op::Operator& H, ChannelIndex ch, int Jph) {
+  const auto& ms = H.model_space();
+  const auto& basis = ms.basis();
+  const auto& ref = ms.reference();
+  const auto& tb = ms.two_body();
+  const auto& ph = ms.particle_hole();
+  std::vector<PhKet> pk;
+  for (const KetIndex k : ph.channel_kets(ch)) {
+    const auto& ket = tb.ket(k);
+    const bool hp = ref.occupation(ket.p) >= basis::kOccupationCut;
+    const bool hq = ref.occupation(ket.q) >= basis::kOccupationCut;
+    if (hp == hq) continue;
+    PhKet x{
+        ket.p, ket.q, basis.orbit(ket.p).j2.twice, basis.orbit(ket.q).j2.twice,
+        1.0,   0.0};
+    const int e = (x.ja2 + x.ji2) / 2 - Jph;
+    x.phase_ia = -((e % 2 == 0) ? 1.0 : -1.0);
+    if (ref.occupation(ket.p) < ref.occupation(ket.q)) {
+      std::swap(x.a, x.i);
+      std::swap(x.ja2, x.ji2);
+      std::swap(x.phase_ai, x.phase_ia);
+    }
+    pk.push_back(x);
+  }
+  return pk;
+}
+
+/// Fills the ring-term matrices `V1` (rows I, columns II) and `V2` (the
+/// transposed layout) of a cross-coupled channel from the ph kets `pk`.
+void FillRingMatrices(const op::Operator& H, const std::vector<PhKet>& pk,
+                      int Jph, linalg::Matrix<double>& V1,
+                      linalg::Matrix<double>& V2) {
+  const auto n = static_cast<std::int64_t>(pk.size());
+  const TwoJ tJph{2 * Jph};
+  const auto& two = H.two_body();
+  for (std::int64_t I = 0; I < n; ++I)
+    for (std::int64_t II = 0; II < n; ++II) {
+      const auto& x = pk[U(I)];
+      const auto& y = pk[U(II)];  // (b, j)
+      const double delta =
+          Diag(H, x.i) + Diag(H, y.i) - Diag(H, x.a) - Diag(H, y.a);
+      V1(I, II) = 0.0;
+      V2(II, I) = 0.0;
+      const TwoJ ja{x.ja2}, ji{x.ji2}, jb{y.ja2}, jj{y.ji2};
+      if (!angmom::Triangle(jj, jb, tJph) || !angmom::Triangle(ji, ja, tJph))
+        continue;
+      double t1 = 0.0;
+      for (int J1 = std::max(std::abs(ja.twice - jb.twice),
+                             std::abs(ji.twice - jj.twice)) /
+                    2;
+           J1 <= std::min(ja.twice + jb.twice, ji.twice + jj.twice) / 2; ++J1)
+        t1 -= angmom::Wigner6j(ja, ji, tJph, jj, jb, TwoJ{2 * J1}) *
+              (2 * J1 + 1) *
+              two.get_unnormalized(x.i, y.i, y.a, x.a, TwoJ{2 * J1});
+      double t2 = 0.0;
+      for (int J1 = std::max(std::abs(ji.twice - jb.twice),
+                             std::abs(ja.twice - jj.twice)) /
+                    2;
+           J1 <= std::min(ji.twice + jb.twice, ja.twice + jj.twice) / 2; ++J1)
+        t2 -= angmom::Wigner6j(jb, jj, tJph, ja, ji, TwoJ{2 * J1}) *
+              (2 * J1 + 1) *
+              two.get_unnormalized(y.a, x.i, x.a, y.i, TwoJ{2 * J1});
+      V1(I, II) = t1 * x.phase_ia * y.phase_ai / delta;
+      V2(II, I) = t2 * y.phase_ai * x.phase_ai;
+    }
+}
+
+/// Adds the ph ring term of the cross-coupled channel `ch` to `ph_energy`.
+void AddRingChannel(const op::Operator& H, ChannelIndex ch, double& ph_energy) {
+  const auto& ph = H.model_space().particle_hole();
+  const int Jph = ph.channel(ch).J();
+  const std::vector<PhKet> pk = PhKets(H, ch, Jph);
+  const auto n = static_cast<std::int64_t>(pk.size());
+  if (n == 0) return;
+  linalg::Matrix<double> V1(n, n);
+  linalg::Matrix<double> V2(n, n);
+  FillRingMatrices(H, pk, Jph, V1, V2);
+  // Eph += (2Jph+1) tr(V1 V2 V1^T)
+  double tr = 0.0;
+  for (std::int64_t I = 0; I < n; ++I)
+    for (std::int64_t K = 0; K < n; ++K) {
+      double s = 0.0;
+      for (std::int64_t II = 0; II < n; ++II) s += V1(I, II) * V2(II, K);
+      tr += s * V1(I, K);
+    }
+  ph_energy += (2 * Jph + 1) * tr;
+}
+
+}  // namespace
+
+double Mp2Energy(op::Operator& H) {
+  H.SyncToHost();
+  const auto& ms = H.model_space();
+  const auto& basis = ms.basis();
+  const auto& ref = ms.reference();
+  double e2 = 0.0;
+  for (const OrbitIndex i : ref.particles()) {
+    const double ei = Diag(H, i);
+    for (const OrbitIndex a : ref.holes()) {
+      const auto& oa = basis.orbit(a);
+      const double ea = Diag(H, a);
+      const double fia = H.one_body().get(i, a);
+      if (std::abs(fia) > 1.0e-9)
+        e2 += (oa.j2.twice + 1) * ref.occupation(a) * fia * fia / (ea - ei);
+      for (const OrbitIndex j : ref.particles()) {
+        if (j.value() < i.value()) continue;
+        for (const OrbitIndex b : ref.holes()) {
+          if (b.value() < a.value()) continue;
+          AddMp2PairTerm(H, i, j, a, b, e2);
+        }
+      }
+    }
+  }
+  return e2;
+}
+
+Mp3Energy ComputeMp3Energy(op::Operator& H) {
+  H.SyncToHost();
+  const auto& ph = H.model_space().particle_hole();
+  Mp3Energy out;
+
+  // pp and hh ladders.
+  AddLadderTerms(H, out);
 
   // ph ring term in the cross-coupled channels.
-  const auto& ph = ms.particle_hole();
-  struct PhKet {
-    OrbitIndex a, i;
-    int ja2, ji2;
-    double phase_ai, phase_ia;
-  };
   for (std::int32_t c = 0; c < ph.num_channels(); ++c) {
-    const ChannelIndex ch{c};
-    const int Jph = ph.channel(ch).J();
-    std::vector<PhKet> pk;
-    for (const KetIndex k : ph.channel_kets(ch)) {
-      const auto& ket = tb.ket(k);
-      const bool hp = ref.occupation(ket.p) >= basis::kOccupationCut;
-      const bool hq = ref.occupation(ket.q) >= basis::kOccupationCut;
-      if (hp == hq) continue;
-      PhKet x{ket.p,
-              ket.q,
-              basis.orbit(ket.p).j2.twice,
-              basis.orbit(ket.q).j2.twice,
-              1.0,
-              0.0};
-      const int e = (x.ja2 + x.ji2) / 2 - Jph;
-      x.phase_ia = -((e % 2 == 0) ? 1.0 : -1.0);
-      if (ref.occupation(ket.p) < ref.occupation(ket.q)) {
-        std::swap(x.a, x.i);
-        std::swap(x.ja2, x.ji2);
-        std::swap(x.phase_ai, x.phase_ia);
-      }
-      pk.push_back(x);
-    }
-    const auto n = static_cast<std::int64_t>(pk.size());
-    if (n == 0) continue;
-    linalg::Matrix<double> V1(n, n);
-    linalg::Matrix<double> V2(n, n);
-    const TwoJ tJph{2 * Jph};
-    const auto& two = H.two_body();
-    for (std::int64_t I = 0; I < n; ++I)
-      for (std::int64_t II = 0; II < n; ++II) {
-        const auto& x = pk[U(I)];
-        const auto& y = pk[U(II)];  // (b, j)
-        const double delta =
-            Diag(H, x.i) + Diag(H, y.i) - Diag(H, x.a) - Diag(H, y.a);
-        V1(I, II) = 0.0;
-        V2(II, I) = 0.0;
-        const TwoJ ja{x.ja2}, ji{x.ji2}, jb{y.ja2}, jj{y.ji2};
-        if (!angmom::Triangle(jj, jb, tJph) || !angmom::Triangle(ji, ja, tJph))
-          continue;
-        double t1 = 0.0;
-        for (int J1 = std::max(std::abs(ja.twice - jb.twice),
-                               std::abs(ji.twice - jj.twice)) /
-                      2;
-             J1 <= std::min(ja.twice + jb.twice, ji.twice + jj.twice) / 2; ++J1)
-          t1 -= angmom::Wigner6j(ja, ji, tJph, jj, jb, TwoJ{2 * J1}) *
-                (2 * J1 + 1) *
-                two.get_unnormalized(x.i, y.i, y.a, x.a, TwoJ{2 * J1});
-        double t2 = 0.0;
-        for (int J1 = std::max(std::abs(ji.twice - jb.twice),
-                               std::abs(ja.twice - jj.twice)) /
-                      2;
-             J1 <= std::min(ji.twice + jb.twice, ja.twice + jj.twice) / 2; ++J1)
-          t2 -= angmom::Wigner6j(jb, jj, tJph, ja, ji, TwoJ{2 * J1}) *
-                (2 * J1 + 1) *
-                two.get_unnormalized(y.a, x.i, x.a, y.i, TwoJ{2 * J1});
-        V1(I, II) = t1 * x.phase_ia * y.phase_ai / delta;
-        V2(II, I) = t2 * y.phase_ai * x.phase_ai;
-      }
-    // Eph += (2Jph+1) tr(V1 V2 V1^T)
-    double tr = 0.0;
-    for (std::int64_t I = 0; I < n; ++I)
-      for (std::int64_t K = 0; K < n; ++K) {
-        double s = 0.0;
-        for (std::int64_t II = 0; II < n; ++II) s += V1(I, II) * V2(II, K);
-        tr += s * V1(I, K);
-      }
-    out.ph += (2 * Jph + 1) * tr;
+    AddRingChannel(H, ChannelIndex{c}, out.ph);
   }
   out.total = out.pp + out.hh + out.ph;
   return out;

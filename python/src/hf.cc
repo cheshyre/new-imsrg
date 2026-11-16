@@ -66,9 +66,8 @@ op::Operator& Mutable(PyOperator& o) {
   return o;
 }
 
-}  // namespace
-
-void BindHf(nb::module_& m) {
+/// Binds Mixing and HFOptions.
+void BindHfOptions(nb::module_& m) {
   nb::enum_<hf::Mixing>(m, "Mixing",
                         "How successive HF densities are combined.")
       .value("Linear", hf::Mixing::kLinear)
@@ -114,7 +113,10 @@ void BindHf(nb::module_& m) {
       .def_rw("e3max", &hf::HFOptions::e3max,
               "Only three-body monopole terms with e_a + e_b + e_c <= e3max "
               "enter.");
+}
 
+/// Binds HFResult.
+void BindHfResult(nb::module_& m) {
   nb::class_<hf::HFResult>(m, "HFResult",
                            "Result of a Hartree-Fock calculation (host data; "
                            "matrices are numpy copies).")
@@ -140,7 +142,10 @@ void BindHf(nb::module_& m) {
       .def_prop_ro(
           "fock", [](const hf::HFResult& r) { return ToNumpy(r.F); },
           nb::rv_policy::move, "Fock matrix in the oscillator basis.");
+}
 
+/// Binds the Hartree-Fock functions.
+void BindHfFunctions(nb::module_& m) {
   m.def(
       "hf_solve",
       [](const PyOperator& h, const op::No2bThreeBody* v3,
@@ -190,7 +195,10 @@ void BindHf(nb::module_& m) {
       },
       nb::arg("operator"), nb::arg("result"),
       "The operator transformed to the HF basis (no normal ordering).");
+}
 
+/// Binds Mp3Energy and the MBPT energy functions.
+void BindMbpt(nb::module_& m) {
   // ---- mbpt
   nb::class_<mbpt::Mp3Energy>(m, "Mp3Energy", "MBPT(3) energy terms (MeV).")
       .def_ro("pp", &mbpt::Mp3Energy::pp)
@@ -217,7 +225,10 @@ void BindHf(nb::module_& m) {
       nb::arg("hamiltonian"),
       "MBPT(3) energy terms (pp, hh, ph, total; MeV), same preconditions as "
       "mp2_energy.");
+}
 
+/// Binds NaturalOrbitals and the natural-orbital functions.
+void BindNaturalOrbitals(nb::module_& m) {
   nb::class_<mbpt::NaturalOrbitals>(m, "NaturalOrbitals",
                                     "Natural orbitals of a density matrix.")
       .def_prop_ro(
@@ -229,6 +240,10 @@ void BindHf(nb::module_& m) {
       .def_prop_ro("occupations", [](const mbpt::NaturalOrbitals& n) {
         return n.occupations;
       });
+}
+
+/// Binds the density-matrix and natural-orbital functions.
+void BindNaturalOrbitalFunctions(nb::module_& m) {
   m.def(
       "mbpt2_density_matrix",
       [](PyOperator& h) {
@@ -248,7 +263,7 @@ void BindHf(nb::module_& m) {
          const PyModelSpace& ms) {
         const linalg::Matrix<double> rho = FromNumpy(rho_hf);
         GilFree r;
-        return mbpt::ComputeNaturalOrbitals(rho, *ms.ms);
+        return mbpt::ComputeNaturalOrbitals(rho, *ms.model_space());
       },
       nb::arg("rho_hf"), nb::arg("model_space"),
       "Diagonalizes each (l, j, tz) block of the density matrix; checks the "
@@ -258,7 +273,7 @@ void BindHf(nb::module_& m) {
       [](const nb::ndarray<const double, nb::ndim<2>>& c_ho2nat,
          const PyModelSpace& ms) {
         const linalg::Matrix<double> c = FromNumpy(c_ho2nat);
-        return ToNumpy(mbpt::ReferenceDensityHo(c, *ms.ms));
+        return ToNumpy(mbpt::ReferenceDensityHo(c, *ms.model_space()));
       },
       nb::arg("c_ho2nat"), nb::arg("model_space"),
       "Oscillator-basis reference density of the NAT basis.");
@@ -273,6 +288,17 @@ void BindHf(nb::module_& m) {
       nb::arg("hamiltonian"), nb::arg("c_hf2nat"),
       "Transforms the one- and two-body parts of H (HF basis) to the NAT "
       "basis.");
+}
+
+}  // namespace
+
+void BindHf(nb::module_& m) {
+  BindHfOptions(m);
+  BindHfResult(m);
+  BindHfFunctions(m);
+  BindMbpt(m);
+  BindNaturalOrbitals(m);
+  BindNaturalOrbitalFunctions(m);
 }
 
 }  // namespace imsrg::py

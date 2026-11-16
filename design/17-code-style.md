@@ -8,7 +8,8 @@ check names.
 
 **Status:** done. The existing code was converted in run 2 (2026-11-15, branch
 `feature/style-google`, §6); `tools/ci.sh` enforces clang-format and cpplint, `tools/lint.sh` the
-naming. The structural items of §2.D are done in part (§6); `AGENTS.md` states the conventions.
+naming. The structural items of §2.D were done in part in run 2 and by the structural pass MS2 in
+run 3 (2026-11-16, branch `feature/style-structural`, §6); `AGENTS.md` states the conventions.
 
 ## 1. Rules in one paragraph
 
@@ -110,7 +111,7 @@ unindented namespaces and access specifiers (clang-format Google base); project 
    local constants may also be `kName`. So `twoJ`, `ket_J_offsets`, `delta_Tz`, `hw_MeV`,
    `A_core_`, `Z_fast` pass; camelCase such as `numOrbits` or `bigA` does not (a descriptive
    suffix is a separate part: `A_big`). The list (159 symbols, collected with clang-tidy from the
-   names the code used on 2026-11-16) holds single letters (`A`..`Z`), numbered or labelled
+   names the code used on 2026-11-16; 158 since MS2 renamed `Jbig` to `J_big`) holds single letters (`A`..`Z`), numbered or labelled
    forms (`J12`, `T45`, `Hh`, `Zg`), angular-momentum and isospin quantities (`Jab`, `Jpmax`,
    `Tz`, `twoJ`, `twoTz`), index/count/double forms (`iJ`, `nA`, `tJ`, `dZ`), nucleon numbers and
    reference labels (`Aref`, `Zcore`), `Om`/`Omega` and `MeV`. A new symbol is added to the file,
@@ -272,7 +273,51 @@ local `busy_` -> `busy`. Borderline, kept as symbols: the one-letter-prefixed fo
 `tJ`, `dZ`, ... (index, number, twice, change of a symbol) and the labelled matrices `Hh`, `Fk`,
 `Ct`, `EB`, `Lam`, `PL`, `Tde`, which are physics notation of the formulas they implement. No
 other camelCase names exist in variables, parameters or members (public API methods and types are
-checked by the other naming kinds). For the structural pass (MS2): `Jbig` could be `J_big`.
+checked by the other naming kinds). MS2 renamed `Jbig` to `J_big` and dropped it from the list.
 The method allowlist of `.clang-tidy` gained 12 accessors that run-3 code added without a clang-tidy
 run (`flowing_operator`, `num_omegas`, `num_gathers`, `num_operators`, `is_magnus`,
 `magnus_solver`, `three_body_context`, `chi1`, `chia`, `row`, `mutex`, `ws`).
+
+### Structural pass (run 3, MS2, D50)
+
+Branch `feature/style-structural`, cut from `develop` 0cc1efb (2026-11-16, 16:10-19:00 JST); the
+lead (Opus) and seven Sonnet workers (one per module group, at most two at a time, each in its own
+worktree, one commit per item and module, cherry-picked in item order; a second round of splits
+followed the documentation commit). After every item `tools/ci.sh dev-openmp` passed
+with the baseline counts (1073 unit, 67 integration, 3 MPI, 150 Python + 1 skipped) and the outputs
+were identical to the baseline taken before item 1: the `ctest -L integration -V` logs with every
+printed number (wall-time columns and `(N ms)` / `N s` timings masked), every file the driver tests
+write (`results.json`, flow CSVs without `wall_s`, `.snt`, resolved configs without date, git hash
+and temp paths), the `ctest -N` list and the Python API surface (every `_core` name with its
+docstring and signature, the `__all__` lists). Two baseline effects needed care (MS2-Q3, MS2-Q4):
+the perturbative-triples dE is not bitwise reproducible between two runs of one binary (compared to
+13 digits), and 53 gtest names embed heap pointers (masked). `commutator_bench --checksum` (FNV hash
+of [X, Y] at emax 6) is identical before and after; `tools/lint.sh` is clean.
+
+| Item | Commits | Result |
+|------|---------|--------|
+| 1 structs with invariants -> classes | `9b89054` python, `42cc14f` driver, `fa20e80` allowlist, `7b7eb2c` angmom + bench | 12 classes: `PyModelSpace`, `PyOperator`, `PyMagnus`, `PyOde` (virtual functions, bases, a destructor that purges caches); `LineWriter`, `KeyCollector`, `SchemaLists` (stateful helpers); `SixJView`, `NineJLSjjView`, `MoshinskyView`, `SixJ3View` (lookups that rely on the pointer matching the size fields; still trivially copyable, `IMSRG_INLINE_FUNCTION` constructors and accessors `data()`, `emax()`, `lmax()`, `e2max()`); the bench's `TriplesBody`. Kept as structs: passive aggregates (configs, options, results, keys, `Orbit`, `OperatorSpec`, ...), pimpl `Impl` structs, kernel functors, and the device views and kernel data bundles listed in MS2-Q1 |
+| 2 unsigned -> signed | `91a8db6` python, `eccde3c` | 14 scoped enums `std::uint8_t` -> `std::int8_t`, the NO2B monopole orbit indices -> `std::int16_t`, two test counters; what stays unsigned and why: MS2-Q2 |
+| 3 functions over ~40 lines split | round 1: `39b337a` python, `f80c0a0` driver, `732f45d` operator, `2a86576` io, `eb78d09` hf, `0300529` mbpt, `e3e1b32` opslib, `4000ac8` flow, `c8fc09a` basis, `4ccb6f2` angmom, `f07a7fe` commutator_ref, `623d308` + `2336af6` + `0a373e2` commutator; round 2: `9799513` driver, `8976c7c` io, `a1b9c67` python, `e996ad4` flow, `c16d92d` angmom, `d5656e7` commutator, `6eec4bf` hf, `8ff32ef` flow | about 85 functions split into named helpers (anonymous namespaces; code moved verbatim, accumulators passed by reference, no expression split across a helper boundary, no reordering of floating-point operations). Function bodies (clang-tidy `readability-function-size`): over 40 lines 147 -> 125 (splits create helpers of 41-60 lines), over 60 lines 84 -> 30, over 100 lines 35 -> 11; host code outside kernels and tests: over 40 lines 97 -> 76, over 60 lines 62 -> 8, over 100 lines 25 -> 1 (the `VisitSchema` table; `driver::Run` 217 -> under 60) |
+| 4 long inline header functions -> `.cc` | `92a9e3b` | `linalg::detail::SyevdLower` and 13 test helpers (`ReadSnt`, `CompareSnt`, the mini-JSON parsers, `Execute`, `ReadFlow`, `TomlText`, `FreshDir`, `LoadGolden`, `CompareToGolden`, `BuildNat`) moved into 5 new `.cc` files; header functions over 10 lines 35 -> 22, all templates (`VisitSchema`, `GuardRead`, the `PairEngine` adders, `DeviceBuffer` members) or device-code lookups (`n7_views.h`, `device_views.h`, `three_body_recoupling.h`, the angmom views, the constexpr `half.h` converters). No function stayed inline for timing reasons |
+| 5 descriptive function comments | `68afe0a` driver, `b597472` | 2 imperative function comments and 5 field comments reworded; the 14 imperative `///` comments counted in run 2 had been reworded since |
+| 6 leftovers | `a355e54`, `6122b0c` | `Jbig` -> `J_big`, `Jbig` dropped from `tools/physics_symbols.txt` (158 symbols); `tools/lint.sh` clean |
+
+Not split (guidelines for later): the kernels (23 functions in `*/kernels/*.cc`, e.g. `TeamTiles`
+285 lines, `Comm222Phss` 233; splitting them is left to the N7 tiling work, where register pressure
+and inlining can be measured), test bodies and test tables (26), data tables (`VisitSchema`,
+`AddP1Rows`, `AddPlannedRows`), 68 host functions of 41-60 lines (many of them new helpers) and
+five of 61-80 lines where a split would mostly add parameters or need header changes
+(`apps/imsrg` `main` 80, `MagnusSolver::Solve` 79, the `PairThirdSpace` and `DeviceTables`
+constructors 77 and 75, `Moshinsky` 66).
+
+Timing (release-openmp with `IMSRG_BUILD_BENCH`, separate build trees for 0cc1efb and the final
+branch head 8ff32ef, `OMP_NUM_THREADS=6`, `OMP_PROC_BIND=false`, runs interleaved, best of 5; machine
+shared with other worktrees, loads 4.6 / 8.0 / 8.7 at the start, 5.2 / 6.6 / 7.9 at the end). Both
+differences are within the run-to-run spread (commutator 4.63-4.75 ms, IT-9 24.15-24.60 s; the same
+measurement after round 1 gave -0.3 % and +0.1 %); the commutator checksums are identical:
+
+| Benchmark | before (0cc1efb) | after (MS2) | change |
+|-----------|-----------------:|------------:|-------:|
+| IMSRG(2) commutator, emax 6 (`commutator_bench --emax 6 --reps 10 --only-full`, mean ms per call) | 4.643 | 4.626 | -0.4 % |
+| IT-9 He4 emax 2 (`driver_imsrg3_n7 --gtest_filter=Imsrg3N7.He4Emax2`, s) | 24.28 | 24.15 | -0.5 % |

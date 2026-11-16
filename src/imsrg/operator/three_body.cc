@@ -4,6 +4,9 @@
 #include "imsrg/operator/three_body.h"
 
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <span>
 #include <utility>
 #include <vector>
 
@@ -96,6 +99,55 @@ void ThreeBody::set_zero() {
   if (data_.size() > 0) data_.fill(0.0);
 }
 
+namespace {
+
+/// Zeroes the diagonal of every channel block of a packed part `hs`.
+void ZeroPackedDiagonals(std::span<double> hs,
+                         std::span<const basis::KeptChannel3> channels,
+                         const std::vector<std::int64_t>& offsets) {
+  for (std::size_t ch = 0; ch < channels.size(); ++ch) {
+    const std::int64_t n = channels[ch].dim;
+    for (std::int64_t i = 0; i < n; ++i) {
+      hs[static_cast<std::size_t>(offsets[ch] +
+                                  ThreeBody::PackedIndex(n, i, i))] = 0.0;
+    }
+  }
+}
+
+/// Converts `src` (layout `offsets`) to `dst` (layout `new_offsets`):
+/// packed -> dense when `!to_packed` (the old symmetry sign `old_h` fills the
+/// upper triangle), dense -> packed otherwise (target hermiticity `h`).
+void ConvertThreeBodyLayout(std::span<const double> src, std::span<double> dst,
+                            std::span<const basis::KeptChannel3> channels,
+                            const std::vector<std::int64_t>& offsets,
+                            const std::vector<std::int64_t>& new_offsets,
+                            bool to_packed, Hermiticity h, std::int32_t old_h) {
+  for (std::size_t ch = 0; ch < channels.size(); ++ch) {
+    const std::int64_t n = channels[ch].dim;
+    const std::int64_t so = offsets[ch];
+    const std::int64_t d0 = new_offsets[ch];
+    for (std::int64_t j = 0; j < n; ++j) {
+      for (std::int64_t i = 0; i < n; ++i) {
+        if (!to_packed) {
+          // Packed -> dense: the old symmetry fills the upper triangle.
+          const double v =
+              i >= j ? src[static_cast<std::size_t>(
+                           so + ThreeBody::PackedIndex(n, i, j))]
+                     : old_h * src[static_cast<std::size_t>(
+                                   so + ThreeBody::PackedIndex(n, j, i))];
+          dst[static_cast<std::size_t>(d0 + i + j * n)] = v;
+        } else if (i >= j) {
+          const bool zero_diag = i == j && h == Hermiticity::kAntiHermitian;
+          dst[static_cast<std::size_t>(d0 + ThreeBody::PackedIndex(n, i, j))] =
+              zero_diag ? 0.0 : src[static_cast<std::size_t>(so + i + j * n)];
+        }
+      }
+    }
+  }
+}
+
+}  // namespace
+
 void ThreeBody::set_hermiticity(Hermiticity h) {
   if (h == hermiticity_) return;
   if (ms_ == nullptr) {
@@ -110,14 +162,7 @@ void ThreeBody::set_hermiticity(Hermiticity h) {
     if (h == Hermiticity::kAntiHermitian) {
       data_.SyncToHost();
       auto hs = data_.host_span();
-      const auto channels = space().channels();
-      for (std::size_t ch = 0; ch < channels.size(); ++ch) {
-        const std::int64_t n = channels[ch].dim;
-        for (std::int64_t i = 0; i < n; ++i) {
-          hs[static_cast<std::size_t>(offsets_[ch] + PackedIndex(n, i, i))] =
-              0.0;
-        }
-      }
+      ZeroPackedDiagonals(hs, space().channels(), offsets_);
       data_.SyncToDevice();
     }
     return;
@@ -130,28 +175,8 @@ void ThreeBody::set_hermiticity(Hermiticity h) {
                                  "imsrg::op::ThreeBody");
   const auto src = std::as_const(data_).host_span();
   auto dst = out.host_span();
-  const auto channels = space().channels();
-  for (std::size_t ch = 0; ch < channels.size(); ++ch) {
-    const std::int64_t n = channels[ch].dim;
-    const std::int64_t so = offsets_[ch];
-    const std::int64_t d0 = new_offsets[ch];
-    for (std::int64_t j = 0; j < n; ++j) {
-      for (std::int64_t i = 0; i < n; ++i) {
-        if (!to_packed) {
-          // Packed -> dense: the old symmetry fills the upper triangle.
-          const double v =
-              i >= j ? src[static_cast<std::size_t>(so + PackedIndex(n, i, j))]
-                     : old_h * src[static_cast<std::size_t>(
-                                   so + PackedIndex(n, j, i))];
-          dst[static_cast<std::size_t>(d0 + i + j * n)] = v;
-        } else if (i >= j) {
-          const bool zero_diag = i == j && h == Hermiticity::kAntiHermitian;
-          dst[static_cast<std::size_t>(d0 + PackedIndex(n, i, j))] =
-              zero_diag ? 0.0 : src[static_cast<std::size_t>(so + i + j * n)];
-        }
-      }
-    }
-  }
+  ConvertThreeBodyLayout(src, dst, space().channels(), offsets_, new_offsets,
+                         to_packed, h, old_h);
   out.SyncToDevice();
   data_ = std::move(out);
   offsets_ = std::move(new_offsets);

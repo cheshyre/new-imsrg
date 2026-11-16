@@ -119,6 +119,105 @@ PnOrbit Locate(const basis::SingleParticleBasis& b, const FileOrbit& o) {
   return {*p, *n, true};
 }
 
+/// The four values of one file record, in file order, widened from float.
+struct RecordValues {
+  double v00;  // T = 0 pn
+  double vnn;
+  double v10;  // T = 1 pn
+  double vpp;
+};
+
+/// Stores one (abcd, J) record in `tb` (the file is unnormalized: identical
+/// pairs are normalized in the imsrg++ order of operations); `i1..i4` are the
+/// file-orbit indices of `a..d`. Nothing is stored unless all four orbits are
+/// present in the model space.
+void StoreRecord(op::TwoBody& tb, const PnOrbit& a, const PnOrbit& b,
+                 const PnOrbit& c, const PnOrbit& d, std::size_t i1,
+                 std::size_t i2, std::size_t i3, std::size_t i4, std::int32_t J,
+                 const RecordValues& rv) {
+  if (!(a.present && b.present && c.present && d.present)) return;
+
+  double norm = 1.0;
+  const bool ab = (i1 == i2);
+  const bool cd = (i3 == i4);
+  if (ab) norm /= kSqrt2;
+  if (cd) norm /= kSqrt2;
+  const TwoJ tj{2 * J};
+
+  if (norm > 0.9 || J % 2 == 0) {
+    tb.set_normalized(a.p, b.p, c.p, d.p, tj, rv.vpp * norm);
+    tb.set_normalized(a.n, b.n, c.n, d.n, tj, rv.vnn * norm);
+  }
+  // Set_pn_TBME_from_iso for T = 1 (even J for identical pairs) and T = 0.
+  const auto add_iso = [&](double value, int phase) {
+    double t = value * norm;
+    t *= 0.5;
+    if (ab) t *= kSqrt2;
+    if (cd) t *= kSqrt2;
+    tb.AddNormalized(a.p, b.n, c.p, d.n, tj, t);
+    if (i3 != i4) tb.AddNormalized(a.p, b.n, c.n, d.p, tj, t * phase);
+    if (i1 != i2 && i3 != i4) tb.AddNormalized(a.n, b.p, c.n, d.p, tj, t);
+    if (i1 != i2 && (i1 != i3 || i2 != i4)) {
+      tb.AddNormalized(a.n, b.p, c.p, d.n, tj, t * phase);
+    }
+  };
+  if (norm > 0.9 || J % 2 == 0) add_iso(rv.v10, +1);
+  if (norm > 0.9 || J % 2 != 0) add_iso(rv.v00, -1);
+}
+
+/// Checks that nothing beyond the `expected` values is left in `in` (`read`
+/// were consumed): otherwise the truncation does not describe the file.
+void CheckNoExtraValues(TextInput& in, const std::filesystem::path& path,
+                        std::int64_t read, std::int64_t expected) {
+  float extra = 0.0F;
+  std::int64_t found = read;
+  while (in.NextFloat(extra)) ++found;
+  if (found != expected) {
+    throw InputError(
+        "'" + path.string() + "': found " + std::to_string(found) +
+        " values but expected " + std::to_string(expected) +
+        " for the given file truncation; check file2e1max, file2e2max and "
+        "file2lmax");
+  }
+}
+
+/// Reads every record of the file prefix into `tb` and returns the number of
+/// values consumed; `expected` is only used for the truncation message.
+std::int64_t ReadRecords(TextInput& in, const std::filesystem::path& path,
+                         const Resolved& r, const std::vector<FileOrbit>& orbs,
+                         const std::vector<PnOrbit>& pn, op::TwoBody& tb,
+                         std::int64_t expected) {
+  std::int64_t read = 0;
+
+  const auto next = [&]() {
+    float v = 0.0F;
+    if (!in.NextFloat(v)) {
+      throw InputError("'" + path.string() + "': data ended after " +
+                       std::to_string(read) + " values; " +
+                       std::to_string(expected) +
+                       " are needed for the given file truncation (check "
+                       "file2e1max, file2e2max "
+                       "and file2lmax)");
+    }
+    ++read;
+    return static_cast<double>(v);
+  };
+
+  ForEachRecord(orbs, r.e2max,
+                [&](std::size_t i1, std::size_t i2, std::size_t i3,
+                    std::size_t i4, std::int32_t J) {
+                  // File order: T=0 pn, nn, T=1 pn, pp (widened from float).
+                  RecordValues rv{};
+                  rv.v00 = next();
+                  rv.vnn = next();
+                  rv.v10 = next();
+                  rv.vpp = next();
+                  StoreRecord(tb, pn[i1], pn[i2], pn[i3], pn[i4], i1, i2, i3,
+                              i4, J, rv);
+                });
+  return read;
+}
+
 }  // namespace
 
 std::int64_t Me2jValueCount(const Me2jTruncation& file,
@@ -150,83 +249,10 @@ op::Operator ReadMe2j(const std::filesystem::path& path,
   in.SkipLine();  // header line
 
   const std::int64_t expected = CountValues(r, emax_read);
-  std::int64_t read = 0;
-
-  const auto next = [&]() {
-    float v = 0.0F;
-    if (!in.NextFloat(v)) {
-      throw InputError("'" + path.string() + "': data ended after " +
-                       std::to_string(read) + " values; " +
-                       std::to_string(expected) +
-                       " are needed for the given file truncation (check "
-                       "file2e1max, file2e2max "
-                       "and file2lmax)");
-    }
-    ++read;
-    return static_cast<double>(v);
-  };
-
-  ForEachRecord(orbs, r.e2max,
-                [&](std::size_t i1, std::size_t i2, std::size_t i3,
-                    std::size_t i4, std::int32_t J) {
-                  // File order: T=0 pn, nn, T=1 pn, pp (widened from float).
-                  const double v00 = next();
-                  const double vnn = next();
-                  const double v10 = next();
-                  const double vpp = next();
-                  const PnOrbit& a = pn[i1];
-                  const PnOrbit& b = pn[i2];
-                  const PnOrbit& c = pn[i3];
-                  const PnOrbit& d = pn[i4];
-                  if (!(a.present && b.present && c.present && d.present))
-                    return;
-
-                  // The file is unnormalized: normalize identical pairs
-                  // (imsrg++ order of ops).
-                  double norm = 1.0;
-                  const bool ab = (i1 == i2);
-                  const bool cd = (i3 == i4);
-                  if (ab) norm /= kSqrt2;
-                  if (cd) norm /= kSqrt2;
-                  const TwoJ tj{2 * J};
-
-                  if (norm > 0.9 || J % 2 == 0) {
-                    tb.set_normalized(a.p, b.p, c.p, d.p, tj, vpp * norm);
-                    tb.set_normalized(a.n, b.n, c.n, d.n, tj, vnn * norm);
-                  }
-                  // Set_pn_TBME_from_iso for T = 1 (even J for identical
-                  // pairs) and T = 0.
-                  const auto add_iso = [&](double value, int phase) {
-                    double t = value * norm;
-                    t *= 0.5;
-                    if (ab) t *= kSqrt2;
-                    if (cd) t *= kSqrt2;
-                    tb.AddNormalized(a.p, b.n, c.p, d.n, tj, t);
-                    if (i3 != i4)
-                      tb.AddNormalized(a.p, b.n, c.n, d.p, tj, t * phase);
-                    if (i1 != i2 && i3 != i4)
-                      tb.AddNormalized(a.n, b.p, c.n, d.p, tj, t);
-                    if (i1 != i2 && (i1 != i3 || i2 != i4)) {
-                      tb.AddNormalized(a.n, b.p, c.p, d.n, tj, t * phase);
-                    }
-                  };
-                  if (norm > 0.9 || J % 2 == 0) add_iso(v10, +1);
-                  if (norm > 0.9 || J % 2 != 0) add_iso(v00, -1);
-                });
+  const std::int64_t read = ReadRecords(in, path, r, orbs, pn, tb, expected);
 
   if (options.read_whole_file) {
-    // Everything beyond the expected values means the truncation does not
-    // describe the file.
-    float extra = 0.0F;
-    std::int64_t found = read;
-    while (in.NextFloat(extra)) ++found;
-    if (found != expected) {
-      throw InputError(
-          "'" + path.string() + "': found " + std::to_string(found) +
-          " values but expected " + std::to_string(expected) +
-          " for the given file truncation; check file2e1max, file2e2max and "
-          "file2lmax");
-    }
+    CheckNoExtraValues(in, path, read, expected);
   }
 
   if (report != nullptr) {

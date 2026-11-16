@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <limits>
+#include <optional>
 
 #include "imsrg/angmom/detail/double_double.h"
 
@@ -199,19 +200,56 @@ DD DdNinejImpl(int a, int b, int c, int d, int e, int f, int g, int h, int i) {
   return sum;
 }
 
-}  // namespace
-
-namespace detail {
-
-double DdCg0(int a, int b, int c) { return ToDouble(DdCg0Impl(a, b, c)); }
-
-double DdNinej(int a, int b, int c, int d, int e, int f, int g, int h, int i) {
-  return ToDouble(DdNinejImpl(a, b, c, d, e, f, g, h, i));
+/// The prefactor of the Buck et al. sum, in dd: the 2^(-1/4) power, the
+/// square roots of the factorials and double factorials and the sign
+/// (-1)^((l1+l2+L+l)/2).
+DD BuckPrefactor(HoNL cm, HoNL rel, HoNL a, HoNL b) {
+  const int N = cm.n, L = cm.l, n = rel.n, l = rel.l;
+  const int n1 = a.n, l1 = a.l, n2 = b.n, l2 = b.l;
+  const DdTables& t = Tab();
+  const auto u = [](int x) { return static_cast<std::size_t>(x); };
+  DD mosh1 = Pow2Quarter(-(l1 + l2 + L + l));
+  mosh1 = mosh1 *
+          DdSqrt(t.fact[u(n1)] * t.fact[u(n2)] * t.fact[u(N)] * t.fact[u(n)]);
+  mosh1 = mosh1 * DdSqrt(t.dfact[u(2 * (n1 + l1) + 1)]);
+  mosh1 = mosh1 * DdSqrt(t.dfact[u(2 * (n2 + l2) + 1)]);
+  mosh1 = mosh1 * DdSqrt(t.dfact[u(2 * (N + L) + 1)]);
+  mosh1 = mosh1 * DdSqrt(t.dfact[u(2 * (n + l) + 1)]);
+  if (((l1 + l2 + L + l) / 2) % 2 != 0) {
+    mosh1 = -mosh1;
+  }
+  return mosh1;
 }
 
-}  // namespace detail
+/// The innermost Buck et al. sum over ia (0..amax) of the inverse-factorial
+/// products, in dd, accumulated in ascending ia.
+DD BuckInnerSum(int f1, int f2, int F, int la, int lb, int lc, int ld,
+                int amax) {
+  const DdTables& t = Tab();
+  const auto u = [](int x) { return static_cast<std::size_t>(x); };
+  const auto idf = [&t, &u](int x) { return t.inv_dfact[u(x)]; };
+  DD mosh3{};
+  for (int ia = 0; ia <= amax; ++ia) {
+    const int ib = (f1 - 2 * ia - la - lb) / 2;
+    const int ic = (F - 2 * ia - la - lc) / 2;
+    const int id = (f2 - F + 2 * ia + la - ld) / 2;
+    if (ib < 0 || ic < 0 || id < 0) {
+      continue;
+    }
+    mosh3 = mosh3 + Ifa(ia) * idf(2 * (ia + la) + 1) * Ifa(ib) *
+                        idf(2 * (ib + lb) + 1) * Ifa(ic) *
+                        idf(2 * (ic + lc) + 1) * Ifa(id) *
+                        idf(2 * (id + ld) + 1);
+  }
+  return mosh3;
+}
 
-double Moshinsky(HoNL cm, HoNL rel, HoNL a, HoNL b, int lam) noexcept {
+/// Returns the value of Moshinsky(cm, rel, a, b, lam) when it is fixed by the
+/// selection rules (0 for negative quantum numbers, energy or parity/coupling
+/// violations; NaN beyond the dd tables), and std::nullopt when the Buck et
+/// al. sum has to be evaluated.
+std::optional<double> MoshinskySelectionRules(HoNL cm, HoNL rel, HoNL a, HoNL b,
+                                              int lam) {
   const int N = cm.n, L = cm.l, n = rel.n, l = rel.l;
   const int n1 = a.n, l1 = a.l, n2 = b.n, l2 = b.l;
   if (N < 0 || L < 0 || n < 0 || l < 0 || n1 < 0 || l1 < 0 || n2 < 0 ||
@@ -235,24 +273,37 @@ double Moshinsky(HoNL cm, HoNL rel, HoNL a, HoNL b, int lam) noexcept {
       lam < std::abs(L - l) || lam > L + l) {
     return 0.0;
   }
+  return std::nullopt;
+}
+
+}  // namespace
+
+namespace detail {
+
+double DdCg0(int a, int b, int c) { return ToDouble(DdCg0Impl(a, b, c)); }
+
+double DdNinej(int a, int b, int c, int d, int e, int f, int g, int h, int i) {
+  return ToDouble(DdNinejImpl(a, b, c, d, e, f, g, h, i));
+}
+
+}  // namespace detail
+
+double Moshinsky(HoNL cm, HoNL rel, HoNL a, HoNL b, int lam) noexcept {
+  if (const std::optional<double> fixed =
+          MoshinskySelectionRules(cm, rel, a, b, lam)) {
+    return *fixed;
+  }
+  const int N = cm.n, L = cm.l, l = rel.l;
+  const int n1 = a.n, l1 = a.l, n2 = b.n, l2 = b.l;
+  const int f1 = 2 * n1 + l1;
+  const int f2 = 2 * n2 + l2;
+  const int F = 2 * N + L;
 
   // Buck et al. evaluated entirely in double-double. With cos B = sin B =
   // 2^(-1/2) every term of the innermost sum carries the same factor
   // 2^(-(f1+f2)/2) (the exponent 2(ia+ib+ic+id) + la+lb+lc+ld equals f1+f2),
   // applied once at the end.
-  const DdTables& t = Tab();
-  const auto u = [](int x) { return static_cast<std::size_t>(x); };
-  DD mosh1 = Pow2Quarter(-(l1 + l2 + L + l));
-  mosh1 = mosh1 *
-          DdSqrt(t.fact[u(n1)] * t.fact[u(n2)] * t.fact[u(N)] * t.fact[u(n)]);
-  mosh1 = mosh1 * DdSqrt(t.dfact[u(2 * (n1 + l1) + 1)]);
-  mosh1 = mosh1 * DdSqrt(t.dfact[u(2 * (n2 + l2) + 1)]);
-  mosh1 = mosh1 * DdSqrt(t.dfact[u(2 * (N + L) + 1)]);
-  mosh1 = mosh1 * DdSqrt(t.dfact[u(2 * (n + l) + 1)]);
-  if (((l1 + l2 + L + l) / 2) % 2 != 0) {
-    mosh1 = -mosh1;
-  }
-  const auto idf = [&t, &u](int x) { return t.inv_dfact[u(x)]; };
+  const DD mosh1 = BuckPrefactor(cm, rel, a, b);
 
   DD mosh2{};
   for (int la = 0; la <= std::min(f1, F); ++la) {
@@ -292,19 +343,7 @@ double Moshinsky(HoNL cm, HoNL rel, HoNL a, HoNL b, int lam) noexcept {
           if ((la + lb + lc) % 2 != 0) {
             pre = -pre;
           }
-          DD mosh3{};
-          for (int ia = 0; ia <= amax; ++ia) {
-            const int ib = (f1 - 2 * ia - la - lb) / 2;
-            const int ic = (F - 2 * ia - la - lc) / 2;
-            const int id = (f2 - F + 2 * ia + la - ld) / 2;
-            if (ib < 0 || ic < 0 || id < 0) {
-              continue;
-            }
-            mosh3 = mosh3 + Ifa(ia) * idf(2 * (ia + la) + 1) * Ifa(ib) *
-                                idf(2 * (ib + lb) + 1) * Ifa(ic) *
-                                idf(2 * (ic + lc) + 1) * Ifa(id) *
-                                idf(2 * (id + ld) + 1);
-          }
+          const DD mosh3 = BuckInnerSum(f1, f2, F, la, lb, lc, ld, amax);
           mosh2 = mosh2 + mosh3 * pre;
         }
       }

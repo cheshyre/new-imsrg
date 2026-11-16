@@ -22,10 +22,10 @@ namespace imsrg::basis {
 /// parameters of the same names. There is no E2max cut on two-body kets (E2max
 /// only matters to file readers).
 struct BasisTruncation {
-  /// Keep orbits with shell e = 2n + l <= emax (emax >= 0).
+  /// Orbits with shell e = 2n + l <= emax are kept (emax >= 0).
   std::int32_t emax = 0;
-  /// Keep orbits with l <= lmax; a negative value means no cut (imsrg++ default
-  /// lmax = 99999).
+  /// Orbits with l <= lmax are kept; a negative value means no cut (imsrg++
+  /// default lmax = 99999).
   std::int32_t lmax = -1;
   /// Unoccupied-shell cut (imsrg++ `emax_unocc`): when 0 <= emax_unocc < emax,
   /// an orbit with e > emax_unocc is dropped unless l <= lmax_unocc. A negative

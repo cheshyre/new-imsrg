@@ -215,7 +215,7 @@ class TwoBodyChannels {
 /// generators: by occupation (pp, hh, ph) and by partition class (cc, vc, qc,
 /// vv, qv, qq). The enumerator order is the order of the golden
 /// `channel_subset` records.
-enum class KetClass : std::uint8_t {
+enum class KetClass : std::int8_t {
   kPp = 0,
   kHh,
   kPh,

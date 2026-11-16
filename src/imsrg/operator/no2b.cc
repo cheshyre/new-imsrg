@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <utility>
+#include <vector>
 
 #include "imsrg/angmom/wigner.h"
 #include "imsrg/base/assert.h"
@@ -92,6 +93,50 @@ const IsospinCgTables& IsospinCg() {
   return *kTables;
 }
 
+/// Fills `ch.states` with the basis states (a <= b, c, t_ab) of the channel
+/// (J2, P2, J1, P1, T3) in the order a, b, c, t_ab (a state with a == b and
+/// odd J2 + t_ab is absent; the swapped key carries the exchange phase) and
+/// returns their number.
+template <class Channel>
+std::int32_t FillChannelStates(const No2bTruncation& t,
+                               const std::vector<IsospinOrbit>& orbits,
+                               std::int32_t J2, std::int32_t P2,
+                               std::int32_t J1, std::int32_t P1,
+                               std::int32_t T3, Channel& ch) {
+  const auto norb = static_cast<std::int32_t>(orbits.size());
+  std::int32_t ndim = 0;
+  for (std::int32_t ia = 0; ia < norb; ++ia) {
+    const auto& oa = orbits[static_cast<std::size_t>(ia)];
+    if (oa.e() > t.emax) continue;
+    for (std::int32_t ib = ia; ib < norb; ++ib) {
+      const auto& ob = orbits[static_cast<std::size_t>(ib)];
+      if (ob.e() > t.emax) continue;
+      if (oa.e() + ob.e() > t.e2max) continue;
+      if (!Triangle2(oa.j2.twice, ob.j2.twice, 2 * J2)) continue;
+      if ((oa.l + ob.l) % 2 != P2) continue;
+      for (std::int32_t ic = 0; ic < norb; ++ic) {
+        const auto& oc = orbits[static_cast<std::size_t>(ic)];
+        if (oc.j2.twice != J1) continue;
+        if (oc.l % 2 != P1) continue;
+        if (oc.e() > t.emax) continue;
+        if (oa.e() + oc.e() > t.e2max) continue;
+        if (ob.e() + oc.e() > t.e2max) continue;
+        if (oa.e() + ob.e() + oc.e() > t.e3max) continue;
+        for (std::int32_t tab : {0, 1}) {
+          if (!Triangle2(2 * tab, 1, T3)) continue;
+          if ((J2 + tab) % 2 == 0 && ia == ib) continue;
+          const std::int32_t ph =
+              1 - 2 * (((oa.j2.twice + ob.j2.twice) / 2 + J2 + tab) % 2);
+          ch.states[StateKey(ia, ib, ic, tab)] = {ndim, 1};
+          ch.states[StateKey(ib, ia, ic, tab)] = {ndim, ph};
+          ++ndim;
+        }
+      }
+    }
+  }
+  return ndim;
+}
+
 }  // namespace
 
 No2bThreeBody::No2bThreeBody(const No2bTruncation& t) : trunc_(t) {
@@ -133,37 +178,8 @@ No2bThreeBody::No2bThreeBody(const No2bTruncation& t) : trunc_(t) {
             ch.J1 = J1;
             ch.P1 = P1;
             ch.T3 = T3;
-            std::int32_t ndim = 0;
-            for (std::int32_t ia = 0; ia < norb; ++ia) {
-              const auto& oa = orbits_[static_cast<std::size_t>(ia)];
-              if (oa.e() > t.emax) continue;
-              for (std::int32_t ib = ia; ib < norb; ++ib) {
-                const auto& ob = orbits_[static_cast<std::size_t>(ib)];
-                if (ob.e() > t.emax) continue;
-                if (oa.e() + ob.e() > t.e2max) continue;
-                if (!Triangle2(oa.j2.twice, ob.j2.twice, 2 * J2)) continue;
-                if ((oa.l + ob.l) % 2 != P2) continue;
-                for (std::int32_t ic = 0; ic < norb; ++ic) {
-                  const auto& oc = orbits_[static_cast<std::size_t>(ic)];
-                  if (oc.j2.twice != J1) continue;
-                  if (oc.l % 2 != P1) continue;
-                  if (oc.e() > t.emax) continue;
-                  if (oa.e() + oc.e() > t.e2max) continue;
-                  if (ob.e() + oc.e() > t.e2max) continue;
-                  if (oa.e() + ob.e() + oc.e() > t.e3max) continue;
-                  for (std::int32_t tab : {0, 1}) {
-                    if (!Triangle2(2 * tab, 1, T3)) continue;
-                    if ((J2 + tab) % 2 == 0 && ia == ib) continue;
-                    const std::int32_t ph =
-                        1 -
-                        2 * (((oa.j2.twice + ob.j2.twice) / 2 + J2 + tab) % 2);
-                    ch.states[StateKey(ia, ib, ic, tab)] = {ndim, 1};
-                    ch.states[StateKey(ib, ia, ic, tab)] = {ndim, ph};
-                    ++ndim;
-                  }
-                }
-              }
-            }
+            const std::int32_t ndim =
+                FillChannelStates(t, orbits_, J2, P2, J1, P1, T3, ch);
             if (ndim < 1) continue;
             ch.num_states = ndim;
             ch.offset = offset;

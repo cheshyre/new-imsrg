@@ -24,7 +24,7 @@ namespace imsrg::commutator {
 /// the IMSRG(3) block, the seven N7 terms first and then the six N8/N9 terms of
 /// the full IMSRG(3), which are not implemented (requesting them throws
 /// NotImplementedError).
-enum class Term : std::uint8_t {
+enum class Term : std::int8_t {
   kComm110ss = 0,  ///< [X1, Y1] -> Z0.
   kComm220ss,      ///< [X2, Y2] -> Z0.
   kComm111ss,      ///< [X1, Y1] -> Z1.
@@ -137,7 +137,7 @@ class TermMask {
  private:
   constexpr explicit TermMask(std::uint64_t bits) noexcept : bits_(bits) {}
   static constexpr std::uint64_t Bit(Term t) noexcept {
-    return std::uint64_t{1} << static_cast<std::uint8_t>(t);
+    return std::uint64_t{1} << static_cast<int>(t);
   }
   std::uint64_t bits_ = 0;
 };

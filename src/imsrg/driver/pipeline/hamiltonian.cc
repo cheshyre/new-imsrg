@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <variant>
@@ -81,14 +83,10 @@ void ToNaturalOrbitalBasis(const op::Operator& H, const op::No2bThreeBody* v3,
   out.nat = std::move(r);
 }
 
-}  // namespace
-
-PreparedHamiltonian PrepareHamiltonian(const RunConfig& config) {
-  RejectPlanned(config);
+/// Builds the oscillator model space of the configuration.
+std::shared_ptr<const basis::ModelSpace> MakeModelSpace(
+    const RunConfig& config) {
   const BasisConfig& b = config.basis;
-  const auto& tb = config.interaction.two_body;
-  if (tb.file.empty()) throw ConfigError("interaction.two_body.file is empty");
-
   const std::int32_t lmax = b.lmax.value_or(-1);
   const std::string reference = config.reference.nucleus.value_or("default");
   std::string valence;
@@ -100,16 +98,15 @@ PreparedHamiltonian PrepareHamiltonian(const RunConfig& config) {
     throw ConfigError(
         "either reference.nucleus or valence.space must be given");
   }
-  auto ms = basis::ModelSpace::FromNames(
+  return basis::ModelSpace::FromNames(
       basis::BasisTruncation{.emax = b.emax, .lmax = lmax}, b.hw, reference,
       valence);
+}
 
-  op::Operator H = io::ReadMe2j(
-      tb.file.front(),
-      io::Me2jReadOptions{
-          .file = {.e1max = tb.e1max, .e2max = tb.e2max, .lmax = tb.lmax}},
-      ms);
-
+/// Adds the kinetic energy of the configuration to `H`.
+void AddKineticEnergy(op::Operator& H, const RunConfig& config,
+                      const std::shared_ptr<const basis::ModelSpace>& ms) {
+  const BasisConfig& b = config.basis;
   switch (config.hamiltonian.kinetic) {
     case KineticEnergy::kIntrinsic:
       H += opslib::TRel(ms, b.mass_number);
@@ -120,15 +117,13 @@ PreparedHamiltonian PrepareHamiltonian(const RunConfig& config) {
     case KineticEnergy::kNone:
       break;
   }
-  // Lawson term: beta_cm * HCM(hw = beta_cm_hw); its constant is removed after
-  // normal ordering.
-  const double beta = config.hamiltonian.beta_cm;
-  const bool lawson = std::abs(beta) > 1.0e-6;
-  if (lawson) {
-    H += beta * opslib::HCm(ms, b.mass_number, config.hamiltonian.beta_cm_hw);
-  }
+}
 
-  std::optional<op::No2bThreeBody> v3;
+/// Reads the normal-ordered two-body part of the three-body interaction
+/// (`v3` is engaged iff `config.interaction.three_body` is set).
+void ReadThreeBody(const RunConfig& config,
+                   std::optional<op::No2bThreeBody>& v3) {
+  const BasisConfig& b = config.basis;
   if (const auto& t = config.interaction.three_body) {
     const std::int32_t l3 =
         std::min(b.lmax3.value_or(b.lmax.value_or(b.emax)), b.emax);
@@ -144,13 +139,13 @@ PreparedHamiltonian PrepareHamiltonian(const RunConfig& config) {
                        : io::No2bPrecision::kSingle;
     io::ReadNo2b(t->file, ro, *v3);
   }
-  const op::No2bThreeBody* v3p = v3 ? &*v3 : nullptr;
+}
 
-  PreparedHamiltonian out;
-  out.ms_bare = ms;
-  out.mass_number = b.mass_number;
-  out.proton_number = ms->reference().target_Z();
-
+/// Fills `out.hno`, `out.e_reference` (and `out.hf`, `out.nat`) from the bare
+/// Hamiltonian `H`: HF or NAT solution, or the plain oscillator basis.
+void SolveReferenceState(const op::Operator& H, const op::No2bThreeBody* v3p,
+                         const RunConfig& config, PreparedHamiltonian& out) {
+  const BasisConfig& b = config.basis;
   if (b.kind == BasisKind::kHf || b.kind == BasisKind::kNat) {
     hf::HFOptions ho;
     ho.mixing = config.hartree_fock.mixing == HartreeFockMixing::kDiis
@@ -173,6 +168,82 @@ PreparedHamiltonian PrepareHamiltonian(const RunConfig& config) {
     out.e_reference = out.hno.zero_body();
     log::Info("Oscillator basis: E_ref = {:.8f} MeV", out.e_reference);
   }
+}
+
+/// Builds the bare (oscillator-basis) operator of `request` in the model space
+/// of `ph`; `Planned` for kinds that are not implemented.
+op::Operator BuildBareOperator(const OperatorRequest& request,
+                               const PreparedHamiltonian& ph) {
+  const auto& ms = ph.ms_bare;
+  const int A = ph.mass_number;
+  const int Z = ph.proton_number;
+  switch (request.kind) {
+    case OperatorKind::kRp2:
+      return opslib::Rp2(ms, A, Z);
+    case OperatorKind::kRso:
+      return opslib::RpSpinOrbitCorrection(ms);
+    case OperatorKind::kRn2:
+      return opslib::Rn2(ms, A, Z);
+    case OperatorKind::kRm2:
+      return opslib::Rm2(ms, A);
+    case OperatorKind::kTcm:
+      return opslib::TCm(ms, A);
+    case OperatorKind::kTrel:
+      return opslib::TRel(ms, A);
+    case OperatorKind::kTlab:
+      return opslib::KineticEnergy(ms);
+    case OperatorKind::kHcm: {
+      std::optional<double> hw;
+      if (!request.params.empty()) {
+        if (const auto* d = std::get_if<double>(&request.params.front())) {
+          hw = *d;
+        } else if (const auto* i =
+                       std::get_if<std::int64_t>(&request.params.front())) {
+          hw = static_cast<double>(*i);
+        }
+      }
+      return opslib::HCm(ms, A, hw);
+    }
+    default:
+      Planned("operator '" + request.canonical_name + "'");
+  }
+}
+
+}  // namespace
+
+PreparedHamiltonian PrepareHamiltonian(const RunConfig& config) {
+  RejectPlanned(config);
+  const BasisConfig& b = config.basis;
+  const auto& tb = config.interaction.two_body;
+  if (tb.file.empty()) throw ConfigError("interaction.two_body.file is empty");
+
+  auto ms = MakeModelSpace(config);
+
+  op::Operator H = io::ReadMe2j(
+      tb.file.front(),
+      io::Me2jReadOptions{
+          .file = {.e1max = tb.e1max, .e2max = tb.e2max, .lmax = tb.lmax}},
+      ms);
+
+  AddKineticEnergy(H, config, ms);
+  // Lawson term: beta_cm * HCM(hw = beta_cm_hw); its constant is removed after
+  // normal ordering.
+  const double beta = config.hamiltonian.beta_cm;
+  const bool lawson = std::abs(beta) > 1.0e-6;
+  if (lawson) {
+    H += beta * opslib::HCm(ms, b.mass_number, config.hamiltonian.beta_cm_hw);
+  }
+
+  std::optional<op::No2bThreeBody> v3;
+  ReadThreeBody(config, v3);
+  const op::No2bThreeBody* v3p = v3 ? &*v3 : nullptr;
+
+  PreparedHamiltonian out;
+  out.ms_bare = ms;
+  out.mass_number = b.mass_number;
+  out.proton_number = ms->reference().target_Z();
+
+  SolveReferenceState(H, v3p, config, out);
   {
     // MBPT(2) correlation energy of the Hamiltonian entering the flow
     // (imsrg++.cc:739); Mp2Energy syncs its argument, so use a copy.
@@ -187,41 +258,7 @@ PreparedHamiltonian PrepareHamiltonian(const RunConfig& config) {
 op::Operator PrepareOperator(const OperatorRequest& request,
                              const PreparedHamiltonian& ph,
                              const RunConfig& /*config*/) {
-  const auto& ms = ph.ms_bare;
-  const int A = ph.mass_number;
-  const int Z = ph.proton_number;
-  op::Operator o = [&]() -> op::Operator {
-    switch (request.kind) {
-      case OperatorKind::kRp2:
-        return opslib::Rp2(ms, A, Z);
-      case OperatorKind::kRso:
-        return opslib::RpSpinOrbitCorrection(ms);
-      case OperatorKind::kRn2:
-        return opslib::Rn2(ms, A, Z);
-      case OperatorKind::kRm2:
-        return opslib::Rm2(ms, A);
-      case OperatorKind::kTcm:
-        return opslib::TCm(ms, A);
-      case OperatorKind::kTrel:
-        return opslib::TRel(ms, A);
-      case OperatorKind::kTlab:
-        return opslib::KineticEnergy(ms);
-      case OperatorKind::kHcm: {
-        std::optional<double> hw;
-        if (!request.params.empty()) {
-          if (const auto* d = std::get_if<double>(&request.params.front())) {
-            hw = *d;
-          } else if (const auto* i =
-                         std::get_if<std::int64_t>(&request.params.front())) {
-            hw = static_cast<double>(*i);
-          }
-        }
-        return opslib::HCm(ms, A, hw);
-      }
-      default:
-        Planned("operator '" + request.canonical_name + "'");
-    }
-  }();
+  op::Operator o = BuildBareOperator(request, ph);
   if (ph.nat) {
     o = hf::ToHfBasis(o, *ph.nat);
   } else if (ph.hf) {

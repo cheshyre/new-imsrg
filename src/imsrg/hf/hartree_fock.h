@@ -27,7 +27,7 @@
 namespace imsrg::hf {
 
 /// How successive densities are combined.
-enum class Mixing : std::uint8_t {
+enum class Mixing : std::int8_t {
   kLinear,  ///< imsrg++ scheme: rho <- (1 - w) rho_new + w rho_old with w =
             ///< `density_mixing`.
   kDiis     ///< Pulay DIIS on the Fock matrix (no density mixing).
@@ -44,10 +44,10 @@ struct HFOptions {
   /// Linear mixing: weight of the OLD density (imsrg++ 0.2 for the density
   /// mixing).
   double density_mixing = 0.2;
-  /// Keep the occupations of the reference fixed (no `FillLowestOrbits`). With
-  /// false (default, as the imsrg++ driver, which calls
-  /// `UnFreezeOccupations()`; the goldens were produced so) the lowest orbits
-  /// are re-filled periodically from iteration 11 on.
+  /// Whether the occupations of the reference stay fixed (no
+  /// `FillLowestOrbits`). With false (default, as the imsrg++ driver, which
+  /// calls `UnFreezeOccupations()`; the goldens were produced so) the lowest
+  /// orbits are re-filled periodically from iteration 11 on.
   bool freeze_occupations = false;
   /// DIIS: first iteration whose Fock matrix enters the subspace.
   std::int32_t diis_start = 2;

@@ -117,30 +117,42 @@ void CheckOperand(const char* caller, const op::Operator& op, const char* name,
 
 }  // namespace
 
-ThreeBodyContext::Impl::Impl(
-    const std::shared_ptr<const basis::ModelSpace>& ms3)
-    : tables(*ms3),
-      sixj(ms3->basis().emax()),
-      pair_third(*ms3->three_body_space(), ms3->basis(), sixj) {
-  const basis::ThreeBodySpace& space = *ms3->three_body_space();
-  const auto orbits = ms3->basis().orbits();
-  const op::PairThirdView pv = pair_third.host_view();
+namespace {
 
+/// Host copies of the kept canonical space used by later construction steps.
+struct KeptHost {
+  std::vector<std::int32_t> c_tb, c_te, t_a, t_b, t_c, t_rb, t_re;
+};
+
+/// Orbit-group host tables used by the leg tables.
+struct GroupHost {
+  std::vector<std::int32_t> g_orb, g_jpos;
+};
+
+/// Builds the two-body block offsets of `im` as op::TwoBody stores a scalar
+/// operator.
+void InitTwoBodyOffsets(ThreeBodyContext::Impl& im,
+                        const basis::ModelSpace& ms3) {
   // Two-body block offsets as op::TwoBody stores a scalar operator.
-  const auto& tbc = ms3->two_body();
-  two_body_offset_host.assign(U(tbc.num_channels()) + 1, 0);
+  const auto& tbc = ms3.two_body();
+  im.two_body_offset_host.assign(U(tbc.num_channels()) + 1, 0);
   for (std::int32_t ch = 0; ch < tbc.num_channels(); ++ch) {
     const std::int64_t n = tbc.channel(ChannelIndex{ch}).num_kets;
-    two_body_offset_host[U(ch) + 1] = two_body_offset_host[U(ch)] + n * n;
+    im.two_body_offset_host[U(ch) + 1] = im.two_body_offset_host[U(ch)] + n * n;
   }
+}
 
+/// Builds the kept-space channel tables of `im` and stores the host copies of
+/// the triple ranges in `kh`.
+void InitKeptChannelTables(ThreeBodyContext::Impl& im,
+                           const basis::ThreeBodySpace& space, KeptHost& kh) {
   // Kept canonical space.
   const auto channels = space.channels();
   const std::size_t nc = channels.size();
   std::vector<std::int32_t> c_two_j(nc), c_dim(nc), c_tb(nc), c_te(nc);
   std::vector<std::int64_t> c_row(nc);
-  packed_offset_host.assign(nc + 1, 0);
-  dense_offset_host.assign(nc + 1, 0);
+  im.packed_offset_host.assign(nc + 1, 0);
+  im.dense_offset_host.assign(nc + 1, 0);
   for (std::size_t c = 0; c < nc; ++c) {
     const basis::KeptChannel3& kc = channels[c];
     c_two_j[c] = kc.two_j.twice;
@@ -148,23 +160,30 @@ ThreeBodyContext::Impl::Impl(
     c_tb[c] = kc.triple_begin.value();
     c_te[c] = kc.triple_end.value();
     c_row[c] = kc.row_offset;
-    packed_offset_host[c + 1] =
-        packed_offset_host[c] + op::ThreeBody::BlockSize(kc.dim, true);
-    dense_offset_host[c + 1] =
-        dense_offset_host[c] + op::ThreeBody::BlockSize(kc.dim, false);
+    im.packed_offset_host[c + 1] =
+        im.packed_offset_host[c] + op::ThreeBody::BlockSize(kc.dim, true);
+    im.dense_offset_host[c + 1] =
+        im.dense_offset_host[c] + op::ThreeBody::BlockSize(kc.dim, false);
   }
-  ch_two_j = Upload(c_two_j, "commutator::comm223_ch_two_j");
-  ch_dim = Upload(c_dim, "commutator::comm223_ch_dim");
-  ch_triple_begin = Upload(c_tb, "commutator::comm223_ch_triple_begin");
-  ch_triple_end = Upload(c_te, "commutator::comm223_ch_triple_end");
-  ch_row_offset = Upload(c_row, "commutator::comm223_ch_row_offset");
-  ch_packed_offset =
-      Upload(packed_offset_host, "commutator::comm223_ch_packed_offset");
-  ch_dense_offset =
-      Upload(dense_offset_host, "commutator::comm223_ch_dense_offset");
+  im.ch_two_j = Upload(c_two_j, "commutator::comm223_ch_two_j");
+  im.ch_dim = Upload(c_dim, "commutator::comm223_ch_dim");
+  im.ch_triple_begin = Upload(c_tb, "commutator::comm223_ch_triple_begin");
+  im.ch_triple_end = Upload(c_te, "commutator::comm223_ch_triple_end");
+  im.ch_row_offset = Upload(c_row, "commutator::comm223_ch_row_offset");
+  im.ch_packed_offset =
+      Upload(im.packed_offset_host, "commutator::comm223_ch_packed_offset");
+  im.ch_dense_offset =
+      Upload(im.dense_offset_host, "commutator::comm223_ch_dense_offset");
+  kh.c_tb = std::move(c_tb);
+  kh.c_te = std::move(c_te);
+}
 
+/// Builds the orbit-triple tables of `im` and stores the host copies of the
+/// triples in `kh`.
+void InitTripleTables(ThreeBodyContext::Impl& im,
+                      const basis::ThreeBodySpace& space, KeptHost& kh) {
   const auto triples = space.triples();
-  num_triples = static_cast<std::int32_t>(triples.size());
+  im.num_triples = static_cast<std::int32_t>(triples.size());
   const std::size_t nt = triples.size();
   std::vector<std::int32_t> t_a(nt), t_b(nt), t_c(nt), t_ch(nt), t_rb(nt),
       t_re(nt), t_sym(nt);
@@ -178,15 +197,37 @@ ThreeBodyContext::Impl::Impl(
     t_re[t] = tr.row_end.value();
     t_sym[t] = tr.sym;
   }
-  tr_a = Upload(t_a, "commutator::comm223_tr_a");
-  tr_b = Upload(t_b, "commutator::comm223_tr_b");
-  tr_c = Upload(t_c, "commutator::comm223_tr_c");
-  tr_channel = Upload(t_ch, "commutator::comm223_tr_channel");
-  tr_row_begin = Upload(t_rb, "commutator::comm223_tr_row_begin");
-  tr_row_end = Upload(t_re, "commutator::comm223_tr_row_end");
-  tr_sym = Upload(t_sym, "commutator::comm223_tr_sym");
+  im.tr_a = Upload(t_a, "commutator::comm223_tr_a");
+  im.tr_b = Upload(t_b, "commutator::comm223_tr_b");
+  im.tr_c = Upload(t_c, "commutator::comm223_tr_c");
+  im.tr_channel = Upload(t_ch, "commutator::comm223_tr_channel");
+  im.tr_row_begin = Upload(t_rb, "commutator::comm223_tr_row_begin");
+  im.tr_row_end = Upload(t_re, "commutator::comm223_tr_row_end");
+  im.tr_sym = Upload(t_sym, "commutator::comm223_tr_sym");
+  kh.t_a = std::move(t_a);
+  kh.t_b = std::move(t_b);
+  kh.t_c = std::move(t_c);
+  kh.t_rb = std::move(t_rb);
+  kh.t_re = std::move(t_re);
+}
 
-  // N7 tables: 2 Jab and triple per flat kept row, two-body block offsets,
+/// Builds the two-body block offsets, the kept-space channel tables and the
+/// triple tables of `im`; returns host copies of the channel and triple
+/// ranges.
+KeptHost InitKeptSpace(ThreeBodyContext::Impl& im,
+                       const basis::ModelSpace& ms3) {
+  KeptHost kh;
+  InitTwoBodyOffsets(im, ms3);
+  InitKeptChannelTables(im, *ms3.three_body_space(), kh);
+  InitTripleTables(im, *ms3.three_body_space(), kh);
+  return kh;
+}
+
+/// Builds the N7 tables of `im`: 2 Jab and triple per flat kept row, the
+/// two-body block offsets, the one-body channel CSR and the comm232 tables.
+void InitN7Tables(ThreeBodyContext::Impl& im, const basis::ModelSpace& ms3) {
+  const basis::ThreeBodySpace& space = *ms3.three_body_space();
+  // N7 im.tables: 2 Jab and triple per flat kept row, two-body block offsets,
   // one-body channel CSR (orbits with equal (l, 2j, 2tz)).
   {
     const std::int64_t nrows = space.NumRows();
@@ -195,29 +236,35 @@ ThreeBodyContext::Impl::Impl(
       r_jab[U(r)] = space.row_two_jab(r).twice;
       r_tr[U(r)] = space.row_triple(r).value();
     }
-    row_two_jab = Upload(r_jab, "commutator::n7_row_two_jab");
-    row_triple = Upload(r_tr, "commutator::n7_row_triple");
-    two_body_offset =
-        Upload(two_body_offset_host, "commutator::n7_two_body_offset");
-    const std::int32_t norb = ms3->num_orbits();
+    im.row_two_jab = Upload(r_jab, "commutator::n7_row_two_jab");
+    im.row_triple = Upload(r_tr, "commutator::n7_row_triple");
+    im.two_body_offset =
+        Upload(im.two_body_offset_host, "commutator::n7_two_body_offset");
+    const std::int32_t norb = ms3.num_orbits();
     std::vector<std::int32_t> offs(U(norb) + 1, 0);
     std::vector<std::int32_t> orbs;
     for (std::int32_t p = 0; p < norb; ++p) {
-      for (const OrbitIndex q : ms3->basis().SameLjtz(OrbitIndex{p})) {
+      for (const OrbitIndex q : ms3.basis().SameLjtz(OrbitIndex{p})) {
         orbs.push_back(q.value());
       }
       offs[U(p) + 1] = static_cast<std::int32_t>(orbs.size());
     }
-    ob_offsets = Upload(offs, "commutator::n7_ob_offsets");
-    ob_orbits = Upload(orbs, "commutator::n7_ob_orbits");
-    comm232 = detail::BuildComm232Tables(pair_third, *ms3);
+    im.ob_offsets = Upload(offs, "commutator::n7_ob_offsets");
+    im.ob_orbits = Upload(orbs, "commutator::n7_ob_orbits");
+    im.comm232 = detail::BuildComm232Tables(im.pair_third, ms3);
   }
+}
 
+/// Builds the orbit groups by (parity, 2tz), sorted by (2j, index), with the j
+/// blocks.
+GroupHost InitOrbitGroups(ThreeBodyContext::Impl& im,
+                          const basis::ModelSpace& ms3) {
+  const auto orbits = ms3.basis().orbits();
   // Orbit groups by (parity, 2tz), sorted by (2j, index), with the j blocks.
-  nj = ms3->basis().emax() + 1;
+  im.nj = ms3.basis().emax() + 1;
   std::vector<std::int32_t> g_off(5, 0);
   std::vector<std::int32_t> g_orb;
-  std::vector<std::int32_t> g_jpos(U(4 * (nj + 1)), 0);
+  std::vector<std::int32_t> g_jpos(U(4 * (im.nj + 1)), 0);
   for (std::int32_t g = 0; g < 4; ++g) {
     std::vector<std::int32_t> members;
     for (std::size_t i = 0; i < orbits.size(); ++i) {
@@ -229,32 +276,44 @@ ThreeBodyContext::Impl::Impl(
                      [&orbits](std::int32_t x, std::int32_t y) {
                        return orbits[U(x)].j2.twice < orbits[U(y)].j2.twice;
                      });
-    for (std::int32_t ij = 0; ij <= nj; ++ij) {
+    for (std::int32_t ij = 0; ij <= im.nj; ++ij) {
       std::int32_t pos = 0;
       while (pos < static_cast<std::int32_t>(members.size()) &&
              (orbits[U(members[U(pos)])].j2.twice - 1) / 2 < ij) {
         ++pos;
       }
-      g_jpos[U(g * (nj + 1) + ij)] = pos;
+      g_jpos[U(g * (im.nj + 1) + ij)] = pos;
     }
     g_orb.insert(g_orb.end(), members.begin(), members.end());
     g_off[U(g) + 1] = static_cast<std::int32_t>(g_orb.size());
-    ext.s_max = std::max(ext.s_max, static_cast<std::int32_t>(members.size()));
+    im.ext.s_max =
+        std::max(im.ext.s_max, static_cast<std::int32_t>(members.size()));
   }
-  group_offset = Upload(g_off, "commutator::comm223_group_offset");
-  group_orbits = Upload(g_orb, "commutator::comm223_group_orbits");
-  group_j_pos = Upload(g_jpos, "commutator::comm223_group_j_pos");
+  im.group_offset = Upload(g_off, "commutator::comm223_group_offset");
+  im.group_orbits = Upload(g_orb, "commutator::comm223_group_orbits");
+  im.group_j_pos = Upload(g_jpos, "commutator::comm223_group_j_pos");
 
-  // Leg tables (detail::LegTablesView): per (third o, J, grouped position of
+  return GroupHost{std::move(g_orb), std::move(g_jpos)};
+}
+
+/// Builds the leg tables of `im`: per (third o, J, grouped position of a) the
+/// local ket index and factor, and the leg ranges.
+void InitLegTables(ThreeBodyContext::Impl& im, const basis::ModelSpace& ms3,
+                   const GroupHost& gh) {
+  const auto orbits = ms3.basis().orbits();
+  const auto& tbc = ms3.two_body();
+  const std::vector<std::int32_t>& g_orb = gh.g_orb;
+  const std::vector<std::int32_t>& g_jpos = gh.g_jpos;
+  // Leg im.tables (detail::LegTablesView): per (third o, J, grouped position of
   // a) the local index of the ket (min(o, a), max(o, a)) and the factor
   // (exchange phase for o > a, sqrt 2 for o == a, 0 if the ket is absent).
-  const std::int32_t norb = ms3->num_orbits();
-  num_j = 2 * ms3->basis().emax() + 2;
-  std::vector<std::int32_t> p_local(U(norb) * U(num_j) * U(norb), 0);
+  const std::int32_t norb = ms3.num_orbits();
+  im.num_j = 2 * ms3.basis().emax() + 2;
+  std::vector<std::int32_t> p_local(U(norb) * U(im.num_j) * U(norb), 0);
   std::vector<double> p_factor(p_local.size(), 0.0);
   for (std::int32_t o = 0; o < norb; ++o) {
     const TwoJ jo = orbits[U(o)].j2;
-    for (std::int32_t J = 0; J < num_j; ++J) {
+    for (std::int32_t J = 0; J < im.num_j; ++J) {
       for (std::int32_t gp = 0; gp < norb; ++gp) {
         const std::int32_t a = g_orb[U(gp)];
         const TwoJ ja = orbits[U(a)].j2;
@@ -262,7 +321,7 @@ ThreeBodyContext::Impl::Impl(
                                            OrbitIndex{std::max(o, a)});
         const auto li = tbc.local_index(ket, TwoJ{2 * J});
         if (!li.has_value()) continue;
-        const std::size_t e = (U(o) * U(num_j) + U(J)) * U(norb) + U(gp);
+        const std::size_t e = (U(o) * U(im.num_j) + U(J)) * U(norb) + U(gp);
         p_local[e] = li->value();
         p_factor[e] =
             o < a ? 1.0
@@ -272,26 +331,32 @@ ThreeBodyContext::Impl::Impl(
       }
     }
   }
-  pair_local = Upload(p_local, "commutator::comm223_pair_local");
-  pair_factor = Upload(p_factor, "commutator::comm223_pair_factor");
+  im.pair_local = Upload(p_local, "commutator::comm223_pair_local");
+  im.pair_factor = Upload(p_factor, "commutator::comm223_pair_factor");
   // Leg ranges: positions of the j blocks in the triangle range of (o, J).
   {
-    std::vector<std::int32_t> range(U(norb) * U(num_j) * 8, 0);
+    std::vector<std::int32_t> range(U(norb) * U(im.num_j) * 8, 0);
     for (std::int32_t o = 0; o < norb; ++o) {
       const std::int32_t j2o = orbits[U(o)].j2.twice;
-      for (std::int32_t J = 0; J < num_j; ++J) {
+      for (std::int32_t J = 0; J < im.num_j; ++J) {
         const std::int32_t ij_lo = (std::abs(2 * J - j2o) - 1) / 2;
-        const std::int32_t ij_hi = std::min((2 * J + j2o - 1) / 2, nj - 1);
+        const std::int32_t ij_hi = std::min((2 * J + j2o - 1) / 2, im.nj - 1);
         for (std::int32_t g = 0; g < 4; ++g) {
-          const std::size_t e = ((U(o) * U(num_j) + U(J)) * 4 + U(g)) * 2;
+          const std::size_t e = ((U(o) * U(im.num_j) + U(J)) * 4 + U(g)) * 2;
           if (ij_lo > ij_hi) continue;
-          range[e] = g_jpos[U(g * (nj + 1) + ij_lo)];
-          range[e + 1] = g_jpos[U(g * (nj + 1) + ij_hi + 1)];
+          range[e] = g_jpos[U(g * (im.nj + 1) + ij_lo)];
+          range[e + 1] = g_jpos[U(g * (im.nj + 1) + ij_hi + 1)];
         }
       }
     }
-    leg_range = Upload(range, "commutator::comm223_leg_range");
+    im.leg_range = Upload(range, "commutator::comm223_leg_range");
   }
+}
+
+/// Builds, per pair-third state, the two-body bases of its pair (p, q) at Jpq.
+void InitStateBases(ThreeBodyContext::Impl& im, const basis::ModelSpace& ms3) {
+  const auto& tbc = ms3.two_body();
+  const op::PairThirdView pv = im.pair_third.host_view();
   // Per pair-third state: the two-body bases of its pair (p, q) at Jpq.
   {
     const auto ns = static_cast<std::size_t>(pv.num_states);
@@ -307,22 +372,33 @@ ThreeBodyContext::Impl::Impl(
                   "ThreeBodyContext: pair-third state without a two-body ket");
       const ChannelIndex ch = tbc.channel_of(p, q, tj);
       const std::int64_t n = tbc.channel(ch).num_kets;
-      const std::int64_t off = two_body_offset_host[ch.ToSize()];
+      const std::int64_t off = im.two_body_offset_host[ch.ToSize()];
       bra[f] = off + li->value();
       ket[f] = off + n * li->value();
       dim[f] = static_cast<std::int32_t>(n);
     }
-    state_bra_base = Upload(bra, "commutator::comm223_state_bra_base");
-    state_ket_base = Upload(ket, "commutator::comm223_state_ket_base");
-    state_dim = Upload(dim, "commutator::comm223_state_dim");
+    im.state_bra_base = Upload(bra, "commutator::comm223_state_bra_base");
+    im.state_ket_base = Upload(ket, "commutator::comm223_state_ket_base");
+    im.state_dim = Upload(dim, "commutator::comm223_state_dim");
   }
+}
 
-  // Tile extents and work orders. Estimated work of bra triple t: m_t times
-  // the summed m of its ket triples (m = pair-third states).
-  std::vector<double> cost_lower(nt, 0.0);
-  std::vector<double> cost_full(nt, 0.0);
-  std::vector<double> cost_triples(nt, 0.0);
-  const auto occ = ms3->reference().occupations();
+/// Fills the per-triple cost estimates and the tile extents (`im.ext`) from the
+/// pair-third state counts; `cost_triples` skips triple pairs without work.
+void ComputeWorkCosts(ThreeBodyContext::Impl& im, const basis::ModelSpace& ms3,
+                      const op::PairThirdView& pv, const KeptHost& kh,
+                      std::vector<double>& cost_lower,
+                      std::vector<double>& cost_full,
+                      std::vector<double>& cost_triples) {
+  const std::size_t nc = kh.c_tb.size();
+  const std::vector<std::int32_t>& c_tb = kh.c_tb;
+  const std::vector<std::int32_t>& c_te = kh.c_te;
+  const std::vector<std::int32_t>& t_a = kh.t_a;
+  const std::vector<std::int32_t>& t_b = kh.t_b;
+  const std::vector<std::int32_t>& t_c = kh.t_c;
+  const std::vector<std::int32_t>& t_rb = kh.t_rb;
+  const std::vector<std::int32_t>& t_re = kh.t_re;
+  const auto occ = ms3.reference().occupations();
   // Host copies of the occupation tests of the triples kernel, with half the
   // threshold: a triple listed here without work is skipped by the kernel,
   // which applies imsrg++'s exact test.
@@ -345,8 +421,8 @@ ThreeBodyContext::Impl::Impl(
       running += m;
       cost_lower[U(t)] = m * running;
       cost_full[U(t)] = m * sum_all;
-      ext.m_max = std::max(ext.m_max, static_cast<std::int32_t>(m));
-      ext.k_max = std::max(ext.k_max, t_re[U(t)] - t_rb[U(t)]);
+      im.ext.m_max = std::max(im.ext.m_max, static_cast<std::int32_t>(m));
+      im.ext.k_max = std::max(im.ext.k_max, t_re[U(t)] - t_rb[U(t)]);
       double o_t = 0.0;
       double u_t = 0.0;
       occupation(U(t), o_t, u_t);
@@ -362,32 +438,66 @@ ThreeBodyContext::Impl::Impl(
       cost_triples[U(t)] = m * work;
     }
   }
-  order_lower = Upload(ByCost(cost_lower), "commutator::comm223_order_lower");
-  order_full = Upload(ByCost(cost_full), "commutator::comm223_order_full");
+}
+
+/// Builds the tile extents and the work orders of `im`. Estimated work of bra
+/// triple t: m_t times the summed m of its ket triples (m = pair-third
+/// states).
+void InitWorkOrders(ThreeBodyContext::Impl& im, const basis::ModelSpace& ms3,
+                    const KeptHost& kh) {
+  const op::PairThirdView pv = im.pair_third.host_view();
+  const std::size_t nt = kh.t_a.size();
+  std::vector<double> cost_lower(nt, 0.0);
+  std::vector<double> cost_full(nt, 0.0);
+  std::vector<double> cost_triples(nt, 0.0);
+  ComputeWorkCosts(im, ms3, pv, kh, cost_lower, cost_full, cost_triples);
+  im.order_lower =
+      Upload(ByCost(cost_lower), "commutator::comm223_order_lower");
+  im.order_full = Upload(ByCost(cost_full), "commutator::comm223_order_full");
   const std::vector<std::int32_t> tri = ByCost(cost_triples);
-  triples_league = static_cast<std::int32_t>(
+  im.triples_league = static_cast<std::int32_t>(
       std::count_if(cost_triples.begin(), cost_triples.end(),
                     [](double x) { return x > 0.0; }));
-  order_triples = Upload(tri, "commutator::comm223_order_triples");
+  im.order_triples = Upload(tri, "commutator::comm223_order_triples");
+}
 
+/// Returns the device bytes of the tables of `im` (excluding the scratch).
+std::int64_t TableBytesOf(const ThreeBodyContext::Impl& im,
+                          const basis::ModelSpace& ms3) {
+  return DeviceTablesBytes(ms3) + im.sixj.size_bytes() + im.pair_third.Bytes() +
+         BufferBytes(im.ch_two_j) + BufferBytes(im.ch_dim) +
+         BufferBytes(im.ch_triple_begin) + BufferBytes(im.ch_triple_end) +
+         BufferBytes(im.ch_row_offset) + BufferBytes(im.ch_packed_offset) +
+         BufferBytes(im.ch_dense_offset) + BufferBytes(im.tr_a) +
+         BufferBytes(im.tr_b) + BufferBytes(im.tr_c) +
+         BufferBytes(im.tr_channel) + BufferBytes(im.tr_row_begin) +
+         BufferBytes(im.tr_row_end) + BufferBytes(im.tr_sym) +
+         BufferBytes(im.group_offset) + BufferBytes(im.group_orbits) +
+         BufferBytes(im.group_j_pos) + BufferBytes(im.pair_local) +
+         BufferBytes(im.pair_factor) + BufferBytes(im.leg_range) +
+         BufferBytes(im.state_bra_base) + BufferBytes(im.state_ket_base) +
+         BufferBytes(im.state_dim) + BufferBytes(im.order_lower) +
+         BufferBytes(im.order_full) + BufferBytes(im.order_triples) +
+         BufferBytes(im.row_two_jab) + BufferBytes(im.row_triple) +
+         BufferBytes(im.two_body_offset) + BufferBytes(im.ob_offsets) +
+         BufferBytes(im.ob_orbits) + im.comm232.Bytes();
+}
+
+}  // namespace
+
+ThreeBodyContext::Impl::Impl(
+    const std::shared_ptr<const basis::ModelSpace>& ms3)
+    : tables(*ms3),
+      sixj(ms3->basis().emax()),
+      pair_third(*ms3->three_body_space(), ms3->basis(), sixj) {
+  const KeptHost kh = InitKeptSpace(*this, *ms3);
+  InitN7Tables(*this, *ms3);
+  const GroupHost gh = InitOrbitGroups(*this, *ms3);
+  InitLegTables(*this, *ms3, gh);
+  InitStateBases(*this, *ms3);
+  InitWorkOrders(*this, *ms3, kh);
   scratch_bytes = num_triples > 0 ? detail::TeamScratchBytes(ext) : 0;
-  table_bytes = DeviceTablesBytes(*ms3) + sixj.size_bytes() +
-                pair_third.Bytes() + BufferBytes(ch_two_j) +
-                BufferBytes(ch_dim) + BufferBytes(ch_triple_begin) +
-                BufferBytes(ch_triple_end) + BufferBytes(ch_row_offset) +
-                BufferBytes(ch_packed_offset) + BufferBytes(ch_dense_offset) +
-                BufferBytes(tr_a) + BufferBytes(tr_b) + BufferBytes(tr_c) +
-                BufferBytes(tr_channel) + BufferBytes(tr_row_begin) +
-                BufferBytes(tr_row_end) + BufferBytes(tr_sym) +
-                BufferBytes(group_offset) + BufferBytes(group_orbits) +
-                BufferBytes(group_j_pos) + BufferBytes(pair_local) +
-                BufferBytes(pair_factor) + BufferBytes(leg_range) +
-                BufferBytes(state_bra_base) + BufferBytes(state_ket_base) +
-                BufferBytes(state_dim) + BufferBytes(order_lower) +
-                BufferBytes(order_full) + BufferBytes(order_triples) +
-                BufferBytes(row_two_jab) + BufferBytes(row_triple) +
-                BufferBytes(two_body_offset) + BufferBytes(ob_offsets) +
-                BufferBytes(ob_orbits) + comm232.Bytes();
+  table_bytes = TableBytesOf(*this, *ms3);
 }
 
 detail::TileViews ThreeBodyContext::Impl::Views() const {

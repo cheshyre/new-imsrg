@@ -476,19 +476,19 @@ TEST(Comm223Context, SixJStridesMatchTheTable) {
       PlainSpace("He4", 3)->WithThreeBody(ThreeBodyCuts{.e3max = 3}));
   const detail::TileViews v = ctx.impl().Views();
   const angmom::SixJ3View t = ctx.impl().sixj.host_view();
-  const int tmax = 2 * t.emax + 1;
+  const int tmax = 2 * t.emax() + 1;
   int checked = 0;
   for (int j1 = 1; j1 <= tmax; j1 += 2) {
     for (int j2 = 1; j2 <= tmax; j2 += 2) {
       for (int j3 = 1; j3 <= tmax; j3 += 2) {
         for (int J12 = 0; J12 <= tmax; ++J12) {
           for (int J23 = 0; J23 <= tmax; J23 += 3) {
-            for (int J = 1; J <= 6 * t.emax + 3; J += 4) {
+            for (int J = 1; J <= 6 * t.emax() + 3; J += 4) {
               const std::int64_t idx =
                   v.c1 * ((j1 - 1) / 2) + v.c2 * ((j2 - 1) / 2) + v.c3 * J12 +
                   v.c4 * ((j3 - 1) / 2) + v.c5 * ((J - 1) / 2) + J23;
-              ASSERT_EQ(t.data[idx], t(TwoJ{j1}, TwoJ{j2}, TwoJ{2 * J12},
-                                       TwoJ{j3}, TwoJ{J}, TwoJ{2 * J23}));
+              ASSERT_EQ(t.data()[idx], t(TwoJ{j1}, TwoJ{j2}, TwoJ{2 * J12},
+                                         TwoJ{j3}, TwoJ{J}, TwoJ{2 * J23}));
               ++checked;
             }
           }

@@ -24,6 +24,16 @@ namespace {
 
 using linalg::Matrix;
 
+/// Returns the root of the summed squared change of the orbital energies per
+/// orbital: sqrt(sum_i (e_i - prev_i)^2) / n.
+double OrbitalEnergyChange(const std::vector<double>& energies,
+                           const std::vector<double>& prev) {
+  double diff = 0.0;
+  for (std::size_t i = 0; i < energies.size(); ++i)
+    diff += (energies[i] - prev[i]) * (energies[i] - prev[i]);
+  return std::sqrt(diff) / static_cast<double>(energies.size());
+}
+
 /// Everything the iteration needs, built once.
 class Solver {
  public:
@@ -53,20 +63,9 @@ class Solver {
   }
 
   HFResult Run() {
-    const auto& ref = H_.model_space().reference();
-    z_ref_ = ref.Z();
-    n_ref_ = ref.N();
     const auto n = static_cast<std::size_t>(norb_);
-
     HFResult res;
-    C_ = Matrix<double>(norb_, norb_);
-    for (std::int32_t i = 0; i < norb_; ++i) C_(i, i) = 1.0;
-    occ_.assign(n, 0.0);
-    for (std::int32_t i = 0; i < norb_; ++i) {
-      occ_[static_cast<std::size_t>(i)] = ref.occupation(OrbitIndex{i});
-    }
-    rho_ = Density();
-    BuildFock(rho_, F_);
+    InitializeState();
 
     std::vector<double> energies(n), prev(n, 0.0);
     for (std::int32_t i = 0; i < norb_; ++i)
@@ -92,32 +91,10 @@ class Solver {
       if (it == 800)
         freeze = true;  // imsrg++: stop re-filling a run that does not settle
 
-      Matrix<double> rho_new = Density();
-      if (use_diis) {
-        rho_ = std::move(rho_new);
-        Matrix<double> Fk;
-        BuildFock(rho_, Fk);
-        if (it >= opt_.diis_start) {
-          diis.Push(Fk, Commutator(Fk, rho_));
-          F_ = diis.Extrapolate();
-        } else {
-          F_ = std::move(Fk);
-        }
-      } else {
-        const double w = opt_.density_mixing;
-        for (std::int32_t j = 0; j < norb_; ++j) {
-          for (std::int32_t i = 0; i < norb_; ++i) {
-            rho_(i, j) = (1.0 - w) * rho_new(i, j) + w * rho_(i, j);
-          }
-        }
-        BuildFock(rho_, F_);
-      }
+      MixAndRebuild(it, use_diis, diis);
       Energy(res);
 
-      double diff = 0.0;
-      for (std::size_t i = 0; i < n; ++i)
-        diff += (energies[i] - prev[i]) * (energies[i] - prev[i]);
-      diff = std::sqrt(diff) / static_cast<double>(norb_);
+      const double diff = OrbitalEnergyChange(energies, prev);
       res.ediff_history.push_back(diff);
       if (diff < opt_.tolerance) {
         res.converged = true;
@@ -133,6 +110,13 @@ class Solver {
     }
     res.iterations = it;
 
+    FillFinalState(energies, res);
+    return res;
+  }
+
+  /// Rebuilds F from the final rho and stores the final energies and state in
+  /// `res`.
+  void FillFinalState(const std::vector<double>& energies, HFResult& res) {
     // Final state: F consistent with the final rho, final energies.
     BuildFock(rho_, F_);
     Energy(res);
@@ -141,7 +125,6 @@ class Solver {
     res.rho = rho_;
     res.F = F_;
     res.occupations = occ_;
-    return res;
   }
 
   /// The mean-field state of the orthogonal basis `C` (oscillator -> basis)
@@ -174,6 +157,49 @@ class Solver {
   }
 
  private:
+  /// Sets the reference particle numbers, C = 1, the reference occupations
+  /// and the first density and Fock matrix.
+  void InitializeState() {
+    const auto& ref = H_.model_space().reference();
+    z_ref_ = ref.Z();
+    n_ref_ = ref.N();
+    const auto n = static_cast<std::size_t>(norb_);
+    C_ = Matrix<double>(norb_, norb_);
+    for (std::int32_t i = 0; i < norb_; ++i) C_(i, i) = 1.0;
+    occ_.assign(n, 0.0);
+    for (std::int32_t i = 0; i < norb_; ++i) {
+      occ_[static_cast<std::size_t>(i)] = ref.occupation(OrbitIndex{i});
+    }
+    rho_ = Density();
+    BuildFock(rho_, F_);
+  }
+
+  /// One density update of iteration `it`: the new density from the current
+  /// orbitals, then DIIS-extrapolated or linearly mixed, and the Fock matrix
+  /// `F_` rebuilt from it.
+  void MixAndRebuild(std::int32_t it, bool use_diis, detail::PulayDiis& diis) {
+    Matrix<double> rho_new = Density();
+    if (use_diis) {
+      rho_ = std::move(rho_new);
+      Matrix<double> Fk;
+      BuildFock(rho_, Fk);
+      if (it >= opt_.diis_start) {
+        diis.Push(Fk, Commutator(Fk, rho_));
+        F_ = diis.Extrapolate();
+      } else {
+        F_ = std::move(Fk);
+      }
+    } else {
+      const double w = opt_.density_mixing;
+      for (std::int32_t j = 0; j < norb_; ++j) {
+        for (std::int32_t i = 0; i < norb_; ++i) {
+          rho_(i, j) = (1.0 - w) * rho_new(i, j) + w * rho_(i, j);
+        }
+      }
+      BuildFock(rho_, F_);
+    }
+  }
+
   /// rho(a,b) = sum_alpha n_alpha C(a,alpha) C(b,alpha) over the holes alpha.
   Matrix<double> Density() const {
     Matrix<double> rho(norb_, norb_);
@@ -322,6 +348,58 @@ class Solver {
   std::unique_ptr<detail::Monopole3B> mono3_;
 };
 
+/// Adds the NO2B three-body contribution (density-contracted with
+/// `r.rho`) to the two-body part of `X` (oscillator basis, host-synced).
+void AddThreeBodyContribution(op::Operator& X, const op::No2bThreeBody& v3,
+                              const HFResult& r, const HFOptions& options) {
+  const auto ms = X.model_space_ptr();
+  const auto& basis = ms->basis();
+  const std::int32_t norb = basis.num_orbits();
+  const auto channels = detail::OneBodyChannels(basis);
+  std::vector<const std::vector<std::int32_t>*> channel_of(
+      static_cast<std::size_t>(norb));
+  for (const auto& ch : channels)
+    for (std::int32_t i : ch) channel_of[static_cast<std::size_t>(i)] = &ch;
+  const auto& tbc = ms->two_body();
+  for (std::int32_t ch = 0; ch < tbc.num_channels(); ++ch) {
+    const ChannelIndex chi{ch};
+    const auto kets = tbc.channel_kets(chi);
+    const std::int32_t J = tbc.channel(chi).J();
+    auto blk = X.two_body().host_block(chi);
+    const auto npq = static_cast<std::int64_t>(kets.size());
+    for (std::int64_t i = 0; i < npq; ++i) {
+      const auto& bra = tbc.ket(kets[static_cast<std::size_t>(i)]);
+      const auto& orbit_p = basis.orbit(bra.p);
+      const auto& oq = basis.orbit(bra.q);
+      const std::int32_t e2bra = orbit_p.e() + oq.e();
+      for (std::int64_t j = i; j < npq; ++j) {
+        const auto& ket = tbc.ket(kets[static_cast<std::size_t>(j)]);
+        const auto& orr = basis.orbit(ket.p);
+        const auto& os = basis.orbit(ket.q);
+        const std::int32_t e2ket = orr.e() + os.e();
+        double v = 0.0;
+        for (std::int32_t a = 0; a < norb; ++a) {
+          const auto& oa = basis.orbit(OrbitIndex{a});
+          if (oa.e() + e2bra > options.e3max) continue;
+          for (std::int32_t b : *channel_of[static_cast<std::size_t>(a)]) {
+            const auto& ob = basis.orbit(OrbitIndex{b});
+            if (ob.e() + e2ket > options.e3max) continue;
+            const double rab = r.rho(a, b);
+            if (std::abs(rab) < 1.0e-8) continue;
+            // imsrg++ passes the integer J as the J2 argument.
+            v += rab * v3.get_pn(orbit_p, oq, oa, orr, os, ob, J);
+          }
+        }
+        v /= static_cast<double>(2 * J + 1);
+        if (bra.p == bra.q) v /= std::sqrt(2.0);
+        if (ket.p == ket.q) v /= std::sqrt(2.0);
+        blk(i, j) += v;
+        if (j != i) blk(j, i) += v;
+      }
+    }
+  }
+}
+
 }  // namespace
 
 HFResult Solve(const op::Operator& H, const op::No2bThreeBody* v3,
@@ -374,51 +452,7 @@ op::Operator NormalOrderedHamiltonian(const op::Operator& H,
       for (std::int64_t i = 0; i < norb; ++i) f(i, j) = r.F(i, j);
   }
 
-  if (v3 != nullptr) {
-    const auto channels = detail::OneBodyChannels(basis);
-    std::vector<const std::vector<std::int32_t>*> channel_of(
-        static_cast<std::size_t>(norb));
-    for (const auto& ch : channels)
-      for (std::int32_t i : ch) channel_of[static_cast<std::size_t>(i)] = &ch;
-    const auto& tbc = ms->two_body();
-    for (std::int32_t ch = 0; ch < tbc.num_channels(); ++ch) {
-      const ChannelIndex chi{ch};
-      const auto kets = tbc.channel_kets(chi);
-      const std::int32_t J = tbc.channel(chi).J();
-      auto blk = X.two_body().host_block(chi);
-      const auto npq = static_cast<std::int64_t>(kets.size());
-      for (std::int64_t i = 0; i < npq; ++i) {
-        const auto& bra = tbc.ket(kets[static_cast<std::size_t>(i)]);
-        const auto& orbit_p = basis.orbit(bra.p);
-        const auto& oq = basis.orbit(bra.q);
-        const std::int32_t e2bra = orbit_p.e() + oq.e();
-        for (std::int64_t j = i; j < npq; ++j) {
-          const auto& ket = tbc.ket(kets[static_cast<std::size_t>(j)]);
-          const auto& orr = basis.orbit(ket.p);
-          const auto& os = basis.orbit(ket.q);
-          const std::int32_t e2ket = orr.e() + os.e();
-          double v = 0.0;
-          for (std::int32_t a = 0; a < norb; ++a) {
-            const auto& oa = basis.orbit(OrbitIndex{a});
-            if (oa.e() + e2bra > options.e3max) continue;
-            for (std::int32_t b : *channel_of[static_cast<std::size_t>(a)]) {
-              const auto& ob = basis.orbit(OrbitIndex{b});
-              if (ob.e() + e2ket > options.e3max) continue;
-              const double rab = r.rho(a, b);
-              if (std::abs(rab) < 1.0e-8) continue;
-              // imsrg++ passes the integer J as the J2 argument.
-              v += rab * v3->get_pn(orbit_p, oq, oa, orr, os, ob, J);
-            }
-          }
-          v /= static_cast<double>(2 * J + 1);
-          if (bra.p == bra.q) v /= std::sqrt(2.0);
-          if (ket.p == ket.q) v /= std::sqrt(2.0);
-          blk(i, j) += v;
-          if (j != i) blk(j, i) += v;
-        }
-      }
-    }
-  }
+  if (v3 != nullptr) AddThreeBodyContribution(X, *v3, r, options);
   X.SyncToDevice();
 
   op::Operator out = op::TransformBasis(X, r.C.const_view());

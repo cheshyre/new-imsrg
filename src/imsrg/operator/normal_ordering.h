@@ -21,7 +21,7 @@ namespace imsrg::op {
 
 /// Direction of a normal-ordering transformation: imsrg++ `sign` = +1 (vacuum
 /// -> reference) or -1 (reference -> vacuum).
-enum class NormalOrderDirection : std::uint8_t { kToReference, kToVacuum };
+enum class NormalOrderDirection : std::int8_t { kToReference, kToVacuum };
 
 /// Normal orders the 0B + 1B + 2B parts of a scalar operator w.r.t. the
 /// occupations n_a (one per orbit). The sums run over the "occupied" orbits n_a

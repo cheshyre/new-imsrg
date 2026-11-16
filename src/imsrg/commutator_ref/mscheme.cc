@@ -553,12 +553,11 @@ std::vector<TripleEntry> ExpandEntries(const op::Operator& X, const MBasis& mb,
 
 }  // namespace
 
-MOperator Expand(const op::Operator& X, const MBasis& mb) {
-  X.SyncToHost();
+namespace {
+
+/// Fills the one-body part of A from X (states with equal 2m only).
+void ExpandOneBody(const op::Operator& X, const MBasis& mb, MOperator& A) {
   const int n = mb.size();
-  MOperator A(n);
-  A.zero_body() = X.zero_body();
-  // One body.
   for (int a = 0; a < n; ++a) {
     for (int b = 0; b < n; ++b) {
       if (mb.StateAt(a).two_m != mb.StateAt(b).two_m) continue;
@@ -569,7 +568,12 @@ MOperator Expand(const op::Operator& X, const MBasis& mb) {
                              OrbitIndex{mb.StateAt(b).orbit}));
     }
   }
-  // Two body.
+}
+
+/// Fills the two-body part of A from X (CG-coupled unnormalized elements), if
+/// X has one.
+void ExpandTwoBody(const op::Operator& X, const MBasis& mb, MOperator& A) {
+  const int n = mb.size();
   if (X.two_body().allocated()) {
     for (int a = 0; a < n; ++a) {
       for (int b = a + 1; b < n; ++b) {
@@ -607,7 +611,12 @@ MOperator Expand(const op::Operator& X, const MBasis& mb) {
       }
     }
   }
-  // Three body.
+}
+
+/// Fills the three-body part of A from X (triples grouped by 2M, 2Tz, parity),
+/// if X has one.
+void ExpandThreeBody(const op::Operator& X, const MBasis& mb, MOperator& A) {
+  const int n = mb.size();
   if (X.three_body().has_value() && !X.three_body()->empty()) {
     const op::ThreeBody& x3 = *X.three_body();
     std::vector<Labels> triples;
@@ -643,6 +652,18 @@ MOperator Expand(const op::Operator& X, const MBasis& mb) {
       }
     }
   }
+}
+
+}  // namespace
+
+MOperator Expand(const op::Operator& X, const MBasis& mb) {
+  X.SyncToHost();
+  const int n = mb.size();
+  MOperator A(n);
+  A.zero_body() = X.zero_body();
+  ExpandOneBody(X, mb, A);
+  ExpandTwoBody(X, mb, A);
+  ExpandThreeBody(X, mb, A);
   return A;
 }
 
@@ -702,19 +723,11 @@ std::vector<CoupledTerm> CoupleThree(const MBasis& mb, int oa, int ob, int oc,
 
 }  // namespace
 
-op::Operator Contract(const MOperator& A,
-                      std::shared_ptr<const basis::ModelSpace> ms,
-                      const op::OperatorSpec& spec) {
-  IMSRG_CHECK(ms != nullptr, "mscheme::Contract: null model space");
-  if (spec.particle_rank == 3 && ms->three_body_space() == nullptr) {
-    throw InputError("mscheme::Contract: rank 3 needs a three-body space");
-  }
-  const MBasis mb(*ms);
-  IMSRG_CHECK(mb.size() == A.num_states(),
-              "mscheme::Contract: operator and model space disagree");
-  op::Operator Z(ms, spec);
-  Z.zero_body() = A.zero_body();
-  // One body.
+namespace {
+
+/// Fills the one-body part of Z from the m-scheme operator A.
+void ContractOneBody(const MOperator& A, const MBasis& mb,
+                     const basis::ModelSpace* ms, op::Operator& Z) {
   const int no = ms->num_orbits();
   for (int a = 0; a < no; ++a) {
     for (const OrbitIndex bo : ms->basis().SameLjtz(OrbitIndex{a})) {
@@ -725,7 +738,13 @@ op::Operator Contract(const MOperator& A,
       Z.one_body().set_element(OrbitIndex{a}, bo, A.Get(1, ia, ib));
     }
   }
-  // Two body.
+}
+
+/// Fills the two-body part of Z (JT-coupled, normalized) from A, if
+/// requested by the spec.
+void ContractTwoBody(const MOperator& A, const MBasis& mb,
+                     const basis::ModelSpace* ms, const op::OperatorSpec& spec,
+                     op::Operator& Z) {
   if (spec.particle_rank >= 2) {
     const basis::TwoBodyChannels& chans = ms->two_body();
     for (std::int32_t c = 0; c < chans.num_channels(); ++c) {
@@ -757,7 +776,12 @@ op::Operator Contract(const MOperator& A,
       }
     }
   }
-  // Three body.
+}
+
+/// Fills the three-body part of Z from A, if requested by the spec.
+void ContractThreeBody(const MOperator& A, const MBasis& mb,
+                       const basis::ModelSpace* ms,
+                       const op::OperatorSpec& spec, op::Operator& Z) {
   if (spec.particle_rank >= 3) {
     const basis::ThreeBodySpace& space = *ms->three_body_space();
     op::ThreeBody& z3 = *Z.three_body();
@@ -794,19 +818,38 @@ op::Operator Contract(const MOperator& A,
       }
     }
   }
+}
+
+}  // namespace
+
+op::Operator Contract(const MOperator& A,
+                      std::shared_ptr<const basis::ModelSpace> ms,
+                      const op::OperatorSpec& spec) {
+  IMSRG_CHECK(ms != nullptr, "mscheme::Contract: null model space");
+  if (spec.particle_rank == 3 && ms->three_body_space() == nullptr) {
+    throw InputError("mscheme::Contract: rank 3 needs a three-body space");
+  }
+  const MBasis mb(*ms);
+  IMSRG_CHECK(mb.size() == A.num_states(),
+              "mscheme::Contract: operator and model space disagree");
+  op::Operator Z(ms, spec);
+  Z.zero_body() = A.zero_body();
+  ContractOneBody(A, mb, ms.get(), Z);
+  ContractTwoBody(A, mb, ms.get(), spec, Z);
+  ContractThreeBody(A, mb, ms.get(), spec, Z);
   Z.SyncToDevice();
   return Z;
 }
 
 // ------------------------------------------------------------- Commutator
 
-MOperator CommutatorPart(const MOperator& A, int nA, const MOperator& B, int nB,
-                         int nC, const MBasis& mb) {
-  IMSRG_CHECK(nA >= 0 && nA <= 3 && nB >= 0 && nB <= 3 && nC >= 0 && nC <= 3,
-              "CommutatorPart: ranks must be in 0..3");
-  IMSRG_CHECK(A.num_states() == mb.size() && B.num_states() == mb.size(),
-              "CommutatorPart: operator and basis disagree");
-  MOperator Z(mb.size());
+namespace {
+
+/// The patterns of engine(A, B) and engine(B, A) that contribute to a rank-nC
+/// commutator part.
+std::vector<Pattern> BuildPatterns(const MOperator& A, int nA,
+                                   const MOperator& B, int nB, int nC,
+                                   const MBasis& mb) {
   // The patterns of engine(A, B) and engine(B, A).
   std::vector<Pattern> patterns;
   for (int swapped = 0; swapped < 2; ++swapped) {
@@ -833,6 +876,19 @@ MOperator CommutatorPart(const MOperator& A, int nA, const MOperator& B, int nB,
       }
     }
   }
+  return patterns;
+}
+
+}  // namespace
+
+MOperator CommutatorPart(const MOperator& A, int nA, const MOperator& B, int nB,
+                         int nC, const MBasis& mb) {
+  IMSRG_CHECK(nA >= 0 && nA <= 3 && nB >= 0 && nB <= 3 && nC >= 0 && nC <= 3,
+              "CommutatorPart: ranks must be in 0..3");
+  IMSRG_CHECK(A.num_states() == mb.size() && B.num_states() == mb.size(),
+              "CommutatorPart: operator and basis disagree");
+  MOperator Z(mb.size());
+  const std::vector<Pattern> patterns = BuildPatterns(A, nA, B, nB, nC, mb);
   if (patterns.empty()) return Z;
   const auto groups = GroupedTuples(mb, nC);
   for (const auto& [key, tuples] : groups) {

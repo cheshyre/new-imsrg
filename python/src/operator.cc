@@ -51,7 +51,8 @@ PyOperator& AsOp(nb::handle h) {
 PyOperator CopyOf(const PyOperator& o) {
   Input(o);
   PyOperator c(static_cast<const PyOperator&>(o));
-  if (c.residency == Residency::kHostCurrent) c.residency = Residency::kBoth;
+  if (c.residency() == Residency::kHostCurrent)
+    c.set_residency(Residency::kBoth);
   return c;
 }
 
@@ -63,9 +64,315 @@ PyOperator Apply(const PyOperator& o, F&& f) {
   return Result(f(in));
 }
 
-}  // namespace
+/// Binds the constructor and the properties of Operator.
+void DefineOperatorProperties(nb::class_<PyOperator>& cls) {
+  cls.def(
+         "__init__",
+         [](PyOperator* self, const PyModelSpace& ms,
+            const op::OperatorSpec& spec) {
+           EnsureRuntime();
+           new (self) PyOperator(op::Operator(ms.model_space(), spec),
+                                 Residency::kBoth);
+         },
+         nb::arg("model_space"), nb::arg("spec") = op::OperatorSpec{})
+      .def_prop_ro(
+          "model_space",
+          [](const PyOperator& o) {
+            return PyModelSpace{Alive(o).model_space_ptr()};
+          },
+          "The model space the operator lives on.")
+      .def_prop_ro(
+          "spec", [](const PyOperator& o) { return Alive(o).spec(); },
+          "Symmetry and rank labels (OperatorSpec).")
+      .def_prop_ro(
+          "residency", [](const PyOperator& o) { return Alive(o).residency(); },
+          "Which side holds the current data: Residency.HostCurrent, "
+          "DeviceCurrent or Both (design/18 section 2.2).")
+      .def_prop_rw(
+          "zero_body", [](const PyOperator& o) { return Alive(o).zero_body(); },
+          [](PyOperator& o, double v) {
+            Alive(o);
+            o.zero_body() = v;
+          },
+          "Zero-body value (MeV).")
+      .def_prop_ro(
+          "one_body",
+          [](nb::object self) {
+            auto& o = AsOp(self);
+            PrepareHostAccess(o, false);
+            auto v = std::as_const(o).one_body().host_view();
+            return NumpyMatrixView<const double>(v.data, v.rows, v.cols, v.ld,
+                                                 MakeViewGuard(self));
+          },
+          "Read-only zero-copy numpy view (column-major) of the one-body "
+          "matrix (host mirror). Raises StaleHostError if the host mirror is "
+          "stale and residency is enforced: call sync_to_host() first.");
+}
 
-void BindOperator(nb::module_& m) {
+/// Binds the numpy host views of Operator.
+void DefineOperatorHostViews(nb::class_<PyOperator>& cls) {
+  cls.def(
+         "one_body_view",
+         [](nb::object self, bool writable) {
+           auto& o = AsOp(self);
+           PrepareHostAccess(o, writable);
+           if (!writable) {
+             auto v = std::as_const(o).one_body().host_view();
+             return NumpyMatrixView<const double>(v.data, v.rows, v.cols, v.ld,
+                                                  MakeViewGuard(self));
+           }
+           auto v = o.one_body().host_view();
+           return NumpyMatrixView<double>(v.data, v.rows, v.cols, v.ld,
+                                          MakeViewGuard(self, true));
+         },
+         nb::arg("writable") = false,
+         "Zero-copy view of the one-body matrix. A writable view marks the "
+         "device data stale (residency HostCurrent); compute calls push the "
+         "edits to the device by themselves, or call sync_to_device().")
+      .def(
+          "two_body_block",
+          [](nb::object self, int channel, bool writable) {
+            auto& o = AsOp(self);
+            const auto& tb = o.model_space_ptr()->two_body();
+            if (channel < 0 || channel >= tb.num_channels())
+              throw imsrg::InputError("channel index out of range");
+            PrepareHostAccess(o, writable);
+            const ChannelIndex ch{channel};
+            if (!writable) {
+              auto v = std::as_const(o).two_body().host_block(ch);
+              return NumpyMatrixView<const double>(v.data, v.rows, v.cols, v.ld,
+                                                   MakeViewGuard(self));
+            }
+            auto v = o.two_body().host_block(ch);
+            return NumpyMatrixView<double>(v.data, v.rows, v.cols, v.ld,
+                                           MakeViewGuard(self, true));
+          },
+          nb::arg("channel"), nb::arg("writable") = false,
+          "Zero-copy numpy view of the two-body block of a channel "
+          "(column-major); residency rules as for one_body_view.");
+}
+
+/// Binds the residency synchronization and copies of Operator.
+void DefineOperatorSync(nb::class_<PyOperator>& cls) {
+  cls.def(
+         "sync_to_host",
+         [](nb::object self) {
+           auto& o = AsOp(self);
+           if (o.residency() == Residency::kDeviceCurrent) {
+             {
+               GilFree r;
+               o.SyncToHost();
+             }
+             o.set_residency(Residency::kBoth);
+           }
+           return self;
+         },
+         "Refreshes the host mirror from the device data "
+         "(DeviceCurrent -> Both); a no-op if the host mirror holds edits "
+         "(HostCurrent). Returns the operator.")
+      .def(
+          "sync_to_device",
+          [](nb::object self) {
+            auto& o = AsOp(self);
+            if (o.residency() == Residency::kHostCurrent) {
+              {
+                GilFree r;
+                o.SyncToDevice();
+              }
+              // With a writable view alive the host stays authoritative.
+              if (o.writable_views()->load() == 0)
+                o.set_residency(Residency::kBoth);
+            }
+            return self;
+          },
+          "Copies host edits (writable views) to the device data "
+          "(HostCurrent -> Both; it stays HostCurrent while a writable view "
+          "is alive, because that view can edit again). Returns the "
+          "operator.")
+      .def(
+          "set_zero",
+          [](PyOperator& o) {
+            Alive(o);
+            {
+              GilFree r;
+              o.set_zero();
+            }
+            MarkModifiedInPlace(o);
+          },
+          "Sets all parts to zero.")
+      .def(
+          "copy", [](const PyOperator& o) { return CopyOf(o); },
+          "Deep copy; the copy inherits the residency state.");
+}
+
+/// Binds the copy protocol and arithmetic operators of Operator.
+void DefineOperatorArithmetic(nb::class_<PyOperator>& cls) {
+  cls.def("__copy__", [](const PyOperator& o) { return CopyOf(o); })
+      .def("__deepcopy__",
+           [](const PyOperator& o, nb::handle) { return CopyOf(o); })
+      .def("__add__",
+           [](const PyOperator& a, const PyOperator& b) {
+             const op::Operator& x = Input(a);
+             const op::Operator& y = Input(b);
+             RequireSameModelSpace(x, y);
+             GilFree r;
+             return Result(op::operator+(x, y));
+           })
+      .def("__sub__",
+           [](const PyOperator& a, const PyOperator& b) {
+             const op::Operator& x = Input(a);
+             const op::Operator& y = Input(b);
+             RequireSameModelSpace(x, y);
+             GilFree r;
+             return Result(op::operator-(x, y));
+           })
+      .def("__neg__",
+           [](const PyOperator& a) {
+             const op::Operator& x = Input(a);
+             GilFree r;
+             return Result(op::operator-(x));
+           })
+      .def("__mul__",
+           [](const PyOperator& a, double c) {
+             const op::Operator& x = Input(a);
+             GilFree r;
+             return Result(op::operator*(x, c));
+           })
+      .def("__rmul__",
+           [](const PyOperator& a, double c) {
+             const op::Operator& x = Input(a);
+             GilFree r;
+             return Result(op::operator*(c, x));
+           })
+      .def("__truediv__", [](const PyOperator& a, double c) {
+        const op::Operator& x = Input(a);
+        GilFree r;
+        return Result(op::operator/(x, c));
+      });
+}
+
+/// Binds the in-place arithmetic operators of Operator.
+void DefineOperatorInPlace(nb::class_<PyOperator>& cls) {
+  cls.def(
+         "__iadd__",
+         [](nb::object self, const PyOperator& b) {
+           auto& a = AsOp(self);
+           Input(a);
+           const op::Operator& y = Input(b);
+           RequireSameModelSpace(a, y);
+           {
+             GilFree r;
+             op::operator+=(a, y);
+           }
+           MarkModifiedInPlace(a);
+           return self;
+         },
+         "In-place sum. Not synchronized with numpy views of the operator "
+         "that other threads read at the same time: use an operator from "
+         "one thread at a time (design/18 section 4.1).")
+      .def("__isub__",
+           [](nb::object self, const PyOperator& b) {
+             auto& a = AsOp(self);
+             Input(a);
+             const op::Operator& y = Input(b);
+             RequireSameModelSpace(a, y);
+             {
+               GilFree r;
+               op::operator-=(a, y);
+             }
+             MarkModifiedInPlace(a);
+             return self;
+           })
+      .def("__imul__",
+           [](nb::object self, double c) {
+             auto& a = AsOp(self);
+             Input(a);
+             {
+               GilFree r;
+               op::operator*=(a, c);
+             }
+             MarkModifiedInPlace(a);
+             return self;
+           })
+      .def("__itruediv__", [](nb::object self, double c) {
+        auto& a = AsOp(self);
+        Input(a);
+        {
+          GilFree r;
+          op::operator/=(a, c);
+        }
+        MarkModifiedInPlace(a);
+        return self;
+      });
+}
+
+/// Binds the norms of Operator.
+void DefineOperatorNorms(nb::class_<PyOperator>& cls) {
+  cls.def(
+         "norm",
+         [](const PyOperator& o) {
+           const op::Operator& x = Input(o);
+           GilFree r;
+           return op::Norm(x);
+         },
+         "Frobenius-type total norm (a device reduction; no host sync "
+         "needed).")
+      .def(
+          "one_body_norm",
+          [](const PyOperator& o) {
+            const op::Operator& x = Input(o);
+            GilFree r;
+            return op::OneBodyNorm(x);
+          },
+          "Norm of the one-body part.")
+      .def(
+          "two_body_norm",
+          [](const PyOperator& o) {
+            const op::Operator& x = Input(o);
+            GilFree r;
+            return op::TwoBodyNorm(x);
+          },
+          "Norm of the two-body part.")
+      .def(
+          "three_body_norm",
+          [](const PyOperator& o) {
+            const op::Operator& x = Input(o);
+            GilFree r;
+            return op::ThreeBodyNorm(x);
+          },
+          "Norm of the three-body part (0 until the IMSRG(3) layout lands).");
+}
+
+/// Binds the normal ordering and the repr of Operator.
+void DefineOperatorNormalOrdering(nb::class_<PyOperator>& cls) {
+  cls.def(
+         "normal_ordered",
+         [](const PyOperator& o) {
+           const op::Operator& x = Input(o);
+           GilFree r;
+           return Result(op::NormalOrder(x));
+         },
+         "Normal ordering w.r.t. the model-space reference (two-body "
+         "approximation).")
+      .def(
+          "undo_normal_order",
+          [](const PyOperator& o) {
+            const op::Operator& x = Input(o);
+            GilFree r;
+            return Result(op::UndoNormalOrder(x));
+          },
+          "Inverse of normal_ordered.")
+      .def("__repr__", [](const PyOperator& o) {
+        if (o.released) return std::string("Operator(<released>)");
+        return "Operator(zero_body=" + std::to_string(o.zero_body()) +
+               ", norb=" + std::to_string(o.model_space_ptr()->num_orbits()) +
+               ")";
+      });
+}
+
+/// Binds the Parity, Residency and Hermiticity enums and the residency policy
+/// functions.
+void BindOperatorEnums(nb::module_& m) {
   nb::enum_<Parity>(m, "Parity")
       .value("Even", Parity::kEven)
       .value("Odd", Parity::kOdd);
@@ -97,7 +404,10 @@ void BindOperator(nb::module_& m) {
       .value("Hermitian", Hermiticity::kHermitian)
       .value("AntiHermitian", Hermiticity::kAntiHermitian)
       .value("NonHermitian", Hermiticity::kNonHermitian);
+}
 
+/// Binds OperatorSpec.
+void BindOperatorSpec(nb::module_& m) {
   nb::class_<op::OperatorSpec>(m, "OperatorSpec",
                                "Symmetry and rank labels of an operator.")
       .def(
@@ -135,289 +445,24 @@ void BindOperator(nb::module_& m) {
                ", parity=" + (s.parity == Parity::kEven ? "Even" : "Odd") +
                ", delta_Tz=" + std::to_string(s.delta_Tz) + ")";
       });
+}
 
-  nb::class_<PyOperator>(
+/// Binds Operator.
+void BindOperatorClass(nb::module_& m) {
+  nb::class_<PyOperator> cls(
       m, "Operator",
-      "Zero-, one- and two-body operator on a ModelSpace (value semantics).")
-      .def(
-          "__init__",
-          [](PyOperator* self, const PyModelSpace& ms,
-             const op::OperatorSpec& spec) {
-            EnsureRuntime();
-            new (self) PyOperator(op::Operator(ms.ms, spec), Residency::kBoth);
-          },
-          nb::arg("model_space"), nb::arg("spec") = op::OperatorSpec{})
-      .def_prop_ro(
-          "model_space",
-          [](const PyOperator& o) {
-            return PyModelSpace{Alive(o).model_space_ptr()};
-          },
-          "The model space the operator lives on.")
-      .def_prop_ro(
-          "spec", [](const PyOperator& o) { return Alive(o).spec(); },
-          "Symmetry and rank labels (OperatorSpec).")
-      .def_prop_ro(
-          "residency", [](const PyOperator& o) { return Alive(o).residency; },
-          "Which side holds the current data: Residency.HostCurrent, "
-          "DeviceCurrent or Both (design/18 section 2.2).")
-      .def_prop_rw(
-          "zero_body", [](const PyOperator& o) { return Alive(o).zero_body(); },
-          [](PyOperator& o, double v) {
-            Alive(o);
-            o.zero_body() = v;
-          },
-          "Zero-body value (MeV).")
-      .def_prop_ro(
-          "one_body",
-          [](nb::object self) {
-            auto& o = AsOp(self);
-            PrepareHostAccess(o, false);
-            auto v = std::as_const(o).one_body().host_view();
-            return NumpyMatrixView<const double>(v.data, v.rows, v.cols, v.ld,
-                                                 MakeViewGuard(self));
-          },
-          "Read-only zero-copy numpy view (column-major) of the one-body "
-          "matrix (host mirror). Raises StaleHostError if the host mirror is "
-          "stale and residency is enforced: call sync_to_host() first.")
-      .def(
-          "one_body_view",
-          [](nb::object self, bool writable) {
-            auto& o = AsOp(self);
-            PrepareHostAccess(o, writable);
-            if (!writable) {
-              auto v = std::as_const(o).one_body().host_view();
-              return NumpyMatrixView<const double>(v.data, v.rows, v.cols, v.ld,
-                                                   MakeViewGuard(self));
-            }
-            auto v = o.one_body().host_view();
-            return NumpyMatrixView<double>(v.data, v.rows, v.cols, v.ld,
-                                           MakeViewGuard(self, true));
-          },
-          nb::arg("writable") = false,
-          "Zero-copy view of the one-body matrix. A writable view marks the "
-          "device data stale (residency HostCurrent); compute calls push the "
-          "edits to the device by themselves, or call sync_to_device().")
-      .def(
-          "two_body_block",
-          [](nb::object self, int channel, bool writable) {
-            auto& o = AsOp(self);
-            const auto& tb = o.model_space_ptr()->two_body();
-            if (channel < 0 || channel >= tb.num_channels())
-              throw imsrg::InputError("channel index out of range");
-            PrepareHostAccess(o, writable);
-            const ChannelIndex ch{channel};
-            if (!writable) {
-              auto v = std::as_const(o).two_body().host_block(ch);
-              return NumpyMatrixView<const double>(v.data, v.rows, v.cols, v.ld,
-                                                   MakeViewGuard(self));
-            }
-            auto v = o.two_body().host_block(ch);
-            return NumpyMatrixView<double>(v.data, v.rows, v.cols, v.ld,
-                                           MakeViewGuard(self, true));
-          },
-          nb::arg("channel"), nb::arg("writable") = false,
-          "Zero-copy numpy view of the two-body block of a channel "
-          "(column-major); residency rules as for one_body_view.")
-      .def(
-          "sync_to_host",
-          [](nb::object self) {
-            auto& o = AsOp(self);
-            if (o.residency == Residency::kDeviceCurrent) {
-              {
-                GilFree r;
-                o.SyncToHost();
-              }
-              o.residency = Residency::kBoth;
-            }
-            return self;
-          },
-          "Refreshes the host mirror from the device data "
-          "(DeviceCurrent -> Both); a no-op if the host mirror holds edits "
-          "(HostCurrent). Returns the operator.")
-      .def(
-          "sync_to_device",
-          [](nb::object self) {
-            auto& o = AsOp(self);
-            if (o.residency == Residency::kHostCurrent) {
-              {
-                GilFree r;
-                o.SyncToDevice();
-              }
-              // With a writable view alive the host stays authoritative.
-              if (o.writable_views->load() == 0) o.residency = Residency::kBoth;
-            }
-            return self;
-          },
-          "Copies host edits (writable views) to the device data "
-          "(HostCurrent -> Both; it stays HostCurrent while a writable view "
-          "is alive, because that view can edit again). Returns the "
-          "operator.")
-      .def(
-          "set_zero",
-          [](PyOperator& o) {
-            Alive(o);
-            {
-              GilFree r;
-              o.set_zero();
-            }
-            MarkModifiedInPlace(o);
-          },
-          "Sets all parts to zero.")
-      .def(
-          "copy", [](const PyOperator& o) { return CopyOf(o); },
-          "Deep copy; the copy inherits the residency state.")
-      .def("__copy__", [](const PyOperator& o) { return CopyOf(o); })
-      .def("__deepcopy__",
-           [](const PyOperator& o, nb::handle) { return CopyOf(o); })
-      .def("__add__",
-           [](const PyOperator& a, const PyOperator& b) {
-             const op::Operator& x = Input(a);
-             const op::Operator& y = Input(b);
-             RequireSameModelSpace(x, y);
-             GilFree r;
-             return Result(op::operator+(x, y));
-           })
-      .def("__sub__",
-           [](const PyOperator& a, const PyOperator& b) {
-             const op::Operator& x = Input(a);
-             const op::Operator& y = Input(b);
-             RequireSameModelSpace(x, y);
-             GilFree r;
-             return Result(op::operator-(x, y));
-           })
-      .def("__neg__",
-           [](const PyOperator& a) {
-             const op::Operator& x = Input(a);
-             GilFree r;
-             return Result(op::operator-(x));
-           })
-      .def("__mul__",
-           [](const PyOperator& a, double c) {
-             const op::Operator& x = Input(a);
-             GilFree r;
-             return Result(op::operator*(x, c));
-           })
-      .def("__rmul__",
-           [](const PyOperator& a, double c) {
-             const op::Operator& x = Input(a);
-             GilFree r;
-             return Result(op::operator*(c, x));
-           })
-      .def("__truediv__",
-           [](const PyOperator& a, double c) {
-             const op::Operator& x = Input(a);
-             GilFree r;
-             return Result(op::operator/(x, c));
-           })
-      .def(
-          "__iadd__",
-          [](nb::object self, const PyOperator& b) {
-            auto& a = AsOp(self);
-            Input(a);
-            const op::Operator& y = Input(b);
-            RequireSameModelSpace(a, y);
-            {
-              GilFree r;
-              op::operator+=(a, y);
-            }
-            MarkModifiedInPlace(a);
-            return self;
-          },
-          "In-place sum. Not synchronized with numpy views of the operator "
-          "that other threads read at the same time: use an operator from "
-          "one thread at a time (design/18 section 4.1).")
-      .def("__isub__",
-           [](nb::object self, const PyOperator& b) {
-             auto& a = AsOp(self);
-             Input(a);
-             const op::Operator& y = Input(b);
-             RequireSameModelSpace(a, y);
-             {
-               GilFree r;
-               op::operator-=(a, y);
-             }
-             MarkModifiedInPlace(a);
-             return self;
-           })
-      .def("__imul__",
-           [](nb::object self, double c) {
-             auto& a = AsOp(self);
-             Input(a);
-             {
-               GilFree r;
-               op::operator*=(a, c);
-             }
-             MarkModifiedInPlace(a);
-             return self;
-           })
-      .def("__itruediv__",
-           [](nb::object self, double c) {
-             auto& a = AsOp(self);
-             Input(a);
-             {
-               GilFree r;
-               op::operator/=(a, c);
-             }
-             MarkModifiedInPlace(a);
-             return self;
-           })
-      .def(
-          "norm",
-          [](const PyOperator& o) {
-            const op::Operator& x = Input(o);
-            GilFree r;
-            return op::Norm(x);
-          },
-          "Frobenius-type total norm (a device reduction; no host sync "
-          "needed).")
-      .def(
-          "one_body_norm",
-          [](const PyOperator& o) {
-            const op::Operator& x = Input(o);
-            GilFree r;
-            return op::OneBodyNorm(x);
-          },
-          "Norm of the one-body part.")
-      .def(
-          "two_body_norm",
-          [](const PyOperator& o) {
-            const op::Operator& x = Input(o);
-            GilFree r;
-            return op::TwoBodyNorm(x);
-          },
-          "Norm of the two-body part.")
-      .def(
-          "three_body_norm",
-          [](const PyOperator& o) {
-            const op::Operator& x = Input(o);
-            GilFree r;
-            return op::ThreeBodyNorm(x);
-          },
-          "Norm of the three-body part (0 until the IMSRG(3) layout lands).")
-      .def(
-          "normal_ordered",
-          [](const PyOperator& o) {
-            const op::Operator& x = Input(o);
-            GilFree r;
-            return Result(op::NormalOrder(x));
-          },
-          "Normal ordering w.r.t. the model-space reference (two-body "
-          "approximation).")
-      .def(
-          "undo_normal_order",
-          [](const PyOperator& o) {
-            const op::Operator& x = Input(o);
-            GilFree r;
-            return Result(op::UndoNormalOrder(x));
-          },
-          "Inverse of normal_ordered.")
-      .def("__repr__", [](const PyOperator& o) {
-        if (o.released) return std::string("Operator(<released>)");
-        return "Operator(zero_body=" + std::to_string(o.zero_body()) +
-               ", norb=" + std::to_string(o.model_space_ptr()->num_orbits()) +
-               ")";
-      });
+      "Zero-, one- and two-body operator on a ModelSpace (value semantics).");
+  DefineOperatorProperties(cls);
+  DefineOperatorHostViews(cls);
+  DefineOperatorSync(cls);
+  DefineOperatorArithmetic(cls);
+  DefineOperatorInPlace(cls);
+  DefineOperatorNorms(cls);
+  DefineOperatorNormalOrdering(cls);
+}
 
+/// Binds random_operator.
+void BindRandomOperator(nb::module_& m) {
   m.def(
       "random_operator",
       [](const PyModelSpace& ms, const op::OperatorSpec& spec,
@@ -429,13 +474,16 @@ void BindOperator(nb::module_& m) {
         opt.zero_body_scale = zero_body_scale;
         opt.one_body_scale = one_body_scale;
         opt.two_body_scale = two_body_scale;
-        return Result(op::RandomOperator(ms.ms, spec, opt));
+        return Result(op::RandomOperator(ms.model_space(), spec, opt));
       },
       nb::arg("model_space"), nb::arg("spec") = op::OperatorSpec{},
       nb::arg("seed") = 1, nb::arg("zero_body_scale") = 0.0,
       nb::arg("one_body_scale") = 1.0, nb::arg("two_body_scale") = 1.0,
       "Seeded, platform-reproducible random operator.");
+}
 
+/// Binds read_operator_dump_header and read_operator_dump.
+void BindOperatorDumpReaders(nb::module_& m) {
   m.def(
       "read_operator_dump_header",
       [](const std::filesystem::path& path) {
@@ -469,7 +517,7 @@ void BindOperator(nb::module_& m) {
         return GuardRead(path, [&] {
           std::shared_ptr<const basis::ModelSpace> space;
           if (ms) {
-            space = ms->ms;
+            space = ms->model_space();
           } else {
             space = op::ModelSpaceForDump(op::ReadOperatorDumpHeader(path));
           }
@@ -482,7 +530,10 @@ void BindOperator(nb::module_& m) {
       nb::arg("check_occupations") = true,
       "Reads an OperatorDump v1; builds the model space from the header if "
       "none is given.");
+}
 
+/// Binds write_operator_dump.
+void BindOperatorDumpWriter(nb::module_& m) {
   m.def(
       "write_operator_dump",
       [](const std::filesystem::path& path, const PyOperator& o,
@@ -498,6 +549,17 @@ void BindOperator(nb::module_& m) {
       nb::arg("reference") = "",
       "Writes the operator as an OperatorDump v1 file (device-resident "
       "operators need no sync).");
+}
+
+}  // namespace
+
+void BindOperator(nb::module_& m) {
+  BindOperatorEnums(m);
+  BindOperatorSpec(m);
+  BindOperatorClass(m);
+  BindRandomOperator(m);
+  BindOperatorDumpReaders(m);
+  BindOperatorDumpWriter(m);
 }
 
 }  // namespace imsrg::py

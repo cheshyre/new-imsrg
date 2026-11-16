@@ -97,7 +97,7 @@ class Monopole3B {
 
  private:
   struct Key {
-    std::uint16_t i, j, a, b, c, d;
+    std::int16_t i, j, a, b, c, d;
   };
   std::int32_t norb_ = 0;
   std::vector<Key> keys_;

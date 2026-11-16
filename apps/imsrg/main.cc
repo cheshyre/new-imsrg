@@ -51,6 +51,43 @@ std::string JoinCommandLine(int argc, char** argv) {
   return out;
 }
 
+/// Prints the issues of a failed `LoadConfig` to stderr and returns the exit
+/// code: 3 if only input files are at fault (unreadable config file, missing
+/// input files), else 2.
+int ReportLoadFailure(const imsrg::driver::ConfigIssues& issues) {
+  bool all_input = true;
+  for (const auto& issue : issues) {
+    std::cerr << "imsrg: " << issue.ToString() << "\n";
+    if (issue.severity == imsrg::driver::Severity::kError &&
+        issue.code != "V-14" && issue.code != "E-FILE") {
+      all_input = false;
+    }
+  }
+  return all_input ? 3 : 2;
+}
+
+/// Runs the pipeline for `config` and returns the exit code (0 ok, 1 runtime
+/// failure, 2 configuration error, 3 input file error).
+int RunPipeline(int argc, char** argv, const imsrg::driver::RunConfig& config) {
+  try {
+    // MPI first, Kokkos second (design/10 section 4); both live only around the
+    // pipeline, which destroys all operators before they finalize.
+    imsrg::comm::Environment environment(argc, argv);
+    imsrg::exec::Runtime runtime(argc, argv);
+    imsrg::driver::Run(config);
+  } catch (const imsrg::ConfigError& e) {
+    std::cerr << "imsrg: " << e.what() << "\n";
+    return 2;
+  } catch (const imsrg::InputError& e) {
+    std::cerr << "imsrg: " << e.what() << "\n";
+    return 3;
+  } catch (const std::exception& e) {
+    std::cerr << "imsrg: " << e.what() << "\n";
+    return 1;
+  }
+  return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -117,19 +154,7 @@ int main(int argc, char** argv) {
   sources.command_line = JoinCommandLine(argc, argv);
 
   auto loaded = imsrg::driver::LoadConfig(sources);
-  if (!loaded) {
-    // Exit 3 if only input files are at fault (unreadable config file, missing
-    // input files).
-    bool all_input = true;
-    for (const auto& issue : loaded.error()) {
-      std::cerr << "imsrg: " << issue.ToString() << "\n";
-      if (issue.severity == imsrg::driver::Severity::kError &&
-          issue.code != "V-14" && issue.code != "E-FILE") {
-        all_input = false;
-      }
-    }
-    return all_input ? 3 : 2;
-  }
+  if (!loaded) return ReportLoadFailure(loaded.error());
   const imsrg::driver::RunConfig& config = loaded.value();
   for (const auto& w : config.provenance.warnings) {
     std::cerr << "imsrg: " << w.ToString() << "\n";
@@ -144,21 +169,5 @@ int main(int argc, char** argv) {
     return 0;
   }
 
-  try {
-    // MPI first, Kokkos second (design/10 section 4); both live only around the
-    // pipeline, which destroys all operators before they finalize.
-    imsrg::comm::Environment environment(argc, argv);
-    imsrg::exec::Runtime runtime(argc, argv);
-    imsrg::driver::Run(config);
-  } catch (const imsrg::ConfigError& e) {
-    std::cerr << "imsrg: " << e.what() << "\n";
-    return 2;
-  } catch (const imsrg::InputError& e) {
-    std::cerr << "imsrg: " << e.what() << "\n";
-    return 3;
-  } catch (const std::exception& e) {
-    std::cerr << "imsrg: " << e.what() << "\n";
-    return 1;
-  }
-  return 0;
+  return RunPipeline(argc, argv, config);
 }

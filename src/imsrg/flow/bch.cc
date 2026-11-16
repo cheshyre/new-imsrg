@@ -62,6 +62,25 @@ std::int32_t CommutatorRank(const commutator::CommutatorOptions& copts,
              : 2;
 }
 
+// Warns when the BCH transform reaches the slow-convergence iteration count or
+// the iteration limit.
+void WarnSlowConvergence(int i, const BchOptions& opts) {
+  if (i == opts.warn_iterations)
+    log::Warn("BCH transform not converged after {} nested commutators",
+              opts.warn_iterations);
+  else if (i == opts.max_iterations)
+    log::Warn("BCH transform did not converge after {} nested commutators",
+              opts.max_iterations);
+}
+
+// Writes the outcome of a BCH transform into `report` (if any).
+void FillReport(BchReport* report, int count, bool converged, int corrections) {
+  if (report == nullptr) return;
+  report->nested_commutators = count;
+  report->converged = converged;
+  report->factorized_corrections = corrections;
+}
+
 }  // namespace
 
 op::Operator WithParticleRank(const op::Operator& op,
@@ -127,18 +146,9 @@ op::Operator BchTransform(const op::Operator& X, const op::Operator& Omega,
       converged = true;
       break;
     }
-    if (i == opts.warn_iterations)
-      log::Warn("BCH transform not converged after {} nested commutators",
-                opts.warn_iterations);
-    else if (i == opts.max_iterations)
-      log::Warn("BCH transform did not converge after {} nested commutators",
-                opts.max_iterations);
+    WarnSlowConvergence(i, opts);
   }
-  if (report != nullptr) {
-    report->nested_commutators = count;
-    report->converged = converged;
-    report->factorized_corrections = corrections;
-  }
+  FillReport(report, count, converged, corrections);
   return out;
 }
 

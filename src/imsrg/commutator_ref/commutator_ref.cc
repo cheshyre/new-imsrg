@@ -310,59 +310,69 @@ void Comm222PpHhss(const Operator& X, const Operator& Y, Operator& Z) {
   Z.SyncToDevice();
 }
 
-void Comm222Phss(const Operator& X, const Operator& Y, Operator& Z) {
-  if (!X.two_body().allocated() || !Y.two_body().allocated()) return;
-  const int n = X.model_space().num_orbits();
-  const auto occ = OccupationsOf(X);
-  const int Jbig = X.model_space().basis().max_two_body_J();
+namespace {
 
-  // Pandya table
-  //   F[Jp][p][q][r][s] = - sum_Jpp (2 Jpp + 1) {j_p j_q Jp; j_r j_s Jpp}
-  //                       <p s; Jpp| V |r q; Jpp>   (unnormalized),
-  // so xbar_ilab = F[Jp][i][l][a][b] and xbar_abkj = F[Jp][a][b][k][j].
+/// Number of entries of one Jp block of a Pandya table: n^4.
+std::size_t PandyaStride(int n) {
   const std::size_t n2 =
       static_cast<std::size_t>(n) * static_cast<std::size_t>(n);
-  const std::size_t n4 = n2 * n2;
-  auto idx = [&](int Jp, int p, int q, int r, int s) {
-    const auto un = static_cast<std::size_t>(n);
-    return static_cast<std::size_t>(Jp) * n4 +
-           ((static_cast<std::size_t>(p) * un + static_cast<std::size_t>(q)) *
-                un +
-            static_cast<std::size_t>(r)) *
-               un +
-           static_cast<std::size_t>(s);
-  };
-  auto build = [&](const Operator& O) {
-    std::vector<double> F(static_cast<std::size_t>(Jbig + 1) * n4, 0.0);
-    for (int Jp = 0; Jp <= Jbig; ++Jp) {
-      for (int p = 0; p < n; ++p) {
-        for (int q = 0; q < n; ++q) {
-          for (int r = 0; r < n; ++r) {
-            for (int s = 0; s < n; ++s) {
-              const int jp = J2Of(O, p);
-              const int jq = J2Of(O, q);
-              const int jr = J2Of(O, r);
-              const int js = J2Of(O, s);
-              const int Jmin =
-                  std::max(std::abs(jp - js), std::abs(jr - jq)) / 2;
-              const int Jmax = std::min(jp + js, jr + jq) / 2;
-              double f = 0.0;
-              for (int Jpp = Jmin; Jpp <= Jmax; ++Jpp) {
-                const double sixj =
-                    angmom::Wigner6j(TwoJ{jp}, TwoJ{jq}, TwoJ{2 * Jp}, TwoJ{jr},
-                                     TwoJ{js}, TwoJ{2 * Jpp});
-                f -= (2 * Jpp + 1) * sixj * Tbme(O, Jpp, p, s, r, q);
-              }
-              F[idx(Jp, p, q, r, s)] = f;
+  return n2 * n2;
+}
+
+/// Position of (Jp, p, q, r, s) in a Pandya table over n orbits.
+std::size_t PandyaIndex(int n, int Jp, int p, int q, int r, int s) {
+  const auto un = static_cast<std::size_t>(n);
+  return static_cast<std::size_t>(Jp) * PandyaStride(n) +
+         ((static_cast<std::size_t>(p) * un + static_cast<std::size_t>(q)) *
+              un +
+          static_cast<std::size_t>(r)) *
+             un +
+         static_cast<std::size_t>(s);
+}
+
+/// Pandya table of O,
+///   F[Jp][p][q][r][s] = - sum_Jpp (2 Jpp + 1) {j_p j_q Jp; j_r j_s Jpp}
+///                       <p s; Jpp| V |r q; Jpp>   (unnormalized),
+/// so xbar_ilab = F[Jp][i][l][a][b] and xbar_abkj = F[Jp][a][b][k][j].
+std::vector<double> BuildPandyaTable(const Operator& O, int n, int J_big) {
+  std::vector<double> F(static_cast<std::size_t>(J_big + 1) * PandyaStride(n),
+                        0.0);
+  for (int Jp = 0; Jp <= J_big; ++Jp) {
+    for (int p = 0; p < n; ++p) {
+      for (int q = 0; q < n; ++q) {
+        for (int r = 0; r < n; ++r) {
+          for (int s = 0; s < n; ++s) {
+            const int jp = J2Of(O, p);
+            const int jq = J2Of(O, q);
+            const int jr = J2Of(O, r);
+            const int js = J2Of(O, s);
+            const int Jmin = std::max(std::abs(jp - js), std::abs(jr - jq)) / 2;
+            const int Jmax = std::min(jp + js, jr + jq) / 2;
+            double f = 0.0;
+            for (int Jpp = Jmin; Jpp <= Jmax; ++Jpp) {
+              const double sixj =
+                  angmom::Wigner6j(TwoJ{jp}, TwoJ{jq}, TwoJ{2 * Jp}, TwoJ{jr},
+                                   TwoJ{js}, TwoJ{2 * Jpp});
+              f -= (2 * Jpp + 1) * sixj * Tbme(O, Jpp, p, s, r, q);
             }
+            F[PandyaIndex(n, Jp, p, q, r, s)] = f;
           }
         }
       }
     }
-    return F;
-  };
-  const std::vector<double> FX = build(X);
-  const std::vector<double> FY = build(Y);
+  }
+  return F;
+}
+}  // namespace
+
+void Comm222Phss(const Operator& X, const Operator& Y, Operator& Z) {
+  if (!X.two_body().allocated() || !Y.two_body().allocated()) return;
+  const int n = X.model_space().num_orbits();
+  const auto occ = OccupationsOf(X);
+  const int J_big = X.model_space().basis().max_two_body_J();
+
+  const std::vector<double> FX = BuildPandyaTable(X, n, J_big);
+  const std::vector<double> FY = BuildPandyaTable(Y, n, J_big);
 
   AddToEveryTwoBodyElement(Z, [&](int J, int i, int j, int k, int l) {
     const int ji = J2Of(X, i);
@@ -382,10 +392,14 @@ void Comm222Phss(const Operator& X, const Operator& Y, Operator& Z) {
         for (int b = 0; b < n; ++b) {
           const double w = occ[a] - occ[b];
           if (w == 0.0) continue;
-          zbar_ilkj += w * (FX[idx(Jp, i, l, a, b)] * FY[idx(Jp, a, b, k, j)] -
-                            FY[idx(Jp, i, l, a, b)] * FX[idx(Jp, a, b, k, j)]);
-          zbar_jlki += w * (FX[idx(Jp, j, l, a, b)] * FY[idx(Jp, a, b, k, i)] -
-                            FY[idx(Jp, j, l, a, b)] * FX[idx(Jp, a, b, k, i)]);
+          zbar_ilkj += w * (FX[PandyaIndex(n, Jp, i, l, a, b)] *
+                                FY[PandyaIndex(n, Jp, a, b, k, j)] -
+                            FY[PandyaIndex(n, Jp, i, l, a, b)] *
+                                FX[PandyaIndex(n, Jp, a, b, k, j)]);
+          zbar_jlki += w * (FX[PandyaIndex(n, Jp, j, l, a, b)] *
+                                FY[PandyaIndex(n, Jp, a, b, k, i)] -
+                            FY[PandyaIndex(n, Jp, j, l, a, b)] *
+                                FX[PandyaIndex(n, Jp, a, b, k, i)]);
         }
       }
       const double sixj_ijkl = angmom::Wigner6j(

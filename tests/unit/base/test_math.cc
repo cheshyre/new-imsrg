@@ -25,9 +25,9 @@ TEST(Math, Phase) {
 }
 
 TEST(Math, FactorialExactUpTo20) {
-  std::uint64_t p = 1;
+  std::int64_t p = 1;
   for (int n = 0; n <= 20; ++n) {
-    if (n > 0) p *= static_cast<std::uint64_t>(n);
+    if (n > 0) p *= n;
     EXPECT_EQ(m::Factorial(n), static_cast<double>(p)) << n;
   }
 }

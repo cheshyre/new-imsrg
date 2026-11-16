@@ -19,7 +19,7 @@
 namespace imsrg::linalg {
 
 /// Whether a gemm operand is used as is or transposed.
-enum class Op : std::uint8_t { kNoTrans, kTrans };
+enum class Op : std::int8_t { kNoTrans, kTrans };
 
 /// Non-owning column-major view of a `rows x cols` matrix with leading
 /// dimension `ld >= rows`. Trivially copyable, so it can be captured by value

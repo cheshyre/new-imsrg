@@ -23,6 +23,56 @@ exec::DeviceBuffer<T> Upload(const std::vector<T>& src, const char* label) {
   return Upload<T>(std::span<const T>(src), label);
 }
 
+// Host copies of the per-orbit columns uploaded to the device.
+struct OrbitColumns {
+  std::vector<std::int32_t> n, l, j2, tz2, cvq;
+};
+
+// Builds the per-orbit columns (n, l, 2j, 2tz, core/valence/qspace class).
+OrbitColumns MakeOrbitColumns(const SingleParticleBasis& basis,
+                              const Partition& partition) {
+  const auto orbs = basis.orbits();
+  const std::size_t no = orbs.size();
+  OrbitColumns c;
+  c.n.resize(no);
+  c.l.resize(no);
+  c.j2.resize(no);
+  c.tz2.resize(no);
+  c.cvq.resize(no);
+  for (std::size_t i = 0; i < no; ++i) {
+    c.n[i] = orbs[i].n;
+    c.l[i] = orbs[i].l;
+    c.j2[i] = orbs[i].j2.twice;
+    c.tz2[i] = orbs[i].tz2.twice;
+    c.cvq[i] = static_cast<std::int32_t>(partition.classes()[i]);
+  }
+  return c;
+}
+
+// Host copies of the per-channel columns uploaded to the device.
+struct ChannelColumns {
+  std::vector<std::int32_t> two_j, parity, two_tz, num_kets, ket_offset;
+};
+
+// Builds the per-channel columns (2J, parity, 2Tz, ket count, ket offset).
+ChannelColumns MakeChannelColumns(std::span<const TwoBodyChannel> chs) {
+  const std::size_t nc = chs.size();
+  ChannelColumns c;
+  c.two_j.resize(nc);
+  c.parity.resize(nc);
+  c.two_tz.resize(nc);
+  c.num_kets.resize(nc);
+  c.ket_offset.resize(nc);
+  for (std::size_t i = 0; i < nc; ++i) {
+    c.two_j[i] = chs[i].two_j.twice;
+    c.parity[i] = static_cast<std::int32_t>(chs[i].parity);
+    c.two_tz[i] = chs[i].two_tz.twice;
+    c.num_kets[i] = chs[i].num_kets;
+    c.ket_offset[i] = chs[i].ket_offset;
+  }
+  return c;
+}
+
 }  // namespace
 
 DeviceTables::DeviceTables(const SingleParticleBasis& basis,
@@ -30,23 +80,15 @@ DeviceTables::DeviceTables(const SingleParticleBasis& basis,
                            const Partition& partition,
                            const TwoBodyChannels& channels,
                            const TwoBodyKetSubsets& subsets) {
-  const auto orbs = basis.orbits();
-  const std::size_t no = orbs.size();
-  std::vector<std::int32_t> n(no), l(no), j2(no), tz2(no), cvq_v(no);
-  for (std::size_t i = 0; i < no; ++i) {
-    n[i] = orbs[i].n;
-    l[i] = orbs[i].l;
-    j2[i] = orbs[i].j2.twice;
-    tz2[i] = orbs[i].tz2.twice;
-    cvq_v[i] = static_cast<std::int32_t>(partition.classes()[i]);
-  }
-  orb_n_ = Upload(n, "basis::orb_n");
-  orb_l_ = Upload(l, "basis::orb_l");
-  orb_j2_ = Upload(j2, "basis::orb_j2");
-  orb_tz2_ = Upload(tz2, "basis::orb_tz2");
-  orb_cvq_ = Upload(cvq_v, "basis::orb_cvq");
+  const OrbitColumns oc = MakeOrbitColumns(basis, partition);
+  orb_n_ = Upload(oc.n, "basis::orb_n");
+  orb_l_ = Upload(oc.l, "basis::orb_l");
+  orb_j2_ = Upload(oc.j2, "basis::orb_j2");
+  orb_tz2_ = Upload(oc.tz2, "basis::orb_tz2");
+  orb_cvq_ = Upload(oc.cvq, "basis::orb_cvq");
   orb_occ_ = Upload<double>(reference.occupations(), "basis::orb_occ");
 
+  const std::size_t no = oc.n.size();
   const auto kets = channels.kets();
   std::vector<std::int32_t> kp(kets.size()), kq(kets.size());
   for (std::size_t i = 0; i < kets.size(); ++i) {
@@ -56,21 +98,12 @@ DeviceTables::DeviceTables(const SingleParticleBasis& basis,
   ket_p_ = Upload(kp, "basis::ket_p");
   ket_q_ = Upload(kq, "basis::ket_q");
 
-  const auto chs = channels.channels();
-  const std::size_t nc = chs.size();
-  std::vector<std::int32_t> cj(nc), cp(nc), ct(nc), cn(nc), co(nc);
-  for (std::size_t i = 0; i < nc; ++i) {
-    cj[i] = chs[i].two_j.twice;
-    cp[i] = static_cast<std::int32_t>(chs[i].parity);
-    ct[i] = chs[i].two_tz.twice;
-    cn[i] = chs[i].num_kets;
-    co[i] = chs[i].ket_offset;
-  }
-  ch_two_j_ = Upload(cj, "basis::ch_two_j");
-  ch_parity_ = Upload(cp, "basis::ch_parity");
-  ch_two_tz_ = Upload(ct, "basis::ch_two_tz");
-  ch_num_kets_ = Upload(cn, "basis::ch_num_kets");
-  ch_offset_ = Upload(co, "basis::ch_ket_offset");
+  const ChannelColumns cc = MakeChannelColumns(channels.channels());
+  ch_two_j_ = Upload(cc.two_j, "basis::ch_two_j");
+  ch_parity_ = Upload(cc.parity, "basis::ch_parity");
+  ch_two_tz_ = Upload(cc.two_tz, "basis::ch_two_tz");
+  ch_num_kets_ = Upload(cc.num_kets, "basis::ch_num_kets");
+  ch_offset_ = Upload(cc.ket_offset, "basis::ch_ket_offset");
 
   const auto ckt = channels.channel_ket_table();
   std::vector<std::int32_t> ck(ckt.size());

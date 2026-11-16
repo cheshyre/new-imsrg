@@ -45,22 +45,12 @@ double Regulated(double tbme, double eps) {
   return 0.5 * (s - eps) / s;
 }
 
-}  // namespace
-
-linalg::Matrix<double> Mbpt2DensityMatrix(op::Operator& H) {
-  H.SyncToHost();
-  const auto& ms = H.model_space();
-  const auto& ref = ms.reference();
-  const Ctx x{H, ms, ref};
-  const auto N = ms.num_orbits();
-  linalg::Matrix<double> rho(N, N);
-  for (const OrbitIndex i : ref.holes())
-    rho(i.value(), i.value()) = ref.occupation(i);
-
+/// Fills the particle-particle block `rho_pp` of the second-order density.
+void FillPpBlock(const Ctx& x, linalg::Matrix<double>& rho_pp) {
+  const auto& ms = x.ms;
+  const auto& ref = x.ref;
   const auto particles = ref.particles();
   const auto holes = ref.holes();
-  linalg::Matrix<double> rho_pp(N, N), rho_hh(N, N), rho_ph(N, N);
-
   // PP block: a, b particles in the same channel, b <= a.
   for (const OrbitIndex a : particles) {
     for (const OrbitIndex b : ms.basis().SameLjtz(a)) {
@@ -93,7 +83,14 @@ linalg::Matrix<double> Mbpt2DensityMatrix(op::Operator& H) {
       rho_pp(b.value(), a.value()) = v;
     }
   }
+}
 
+/// Fills the hole-hole block `rho_hh` of the second-order density.
+void FillHhBlock(const Ctx& x, linalg::Matrix<double>& rho_hh) {
+  const auto& ms = x.ms;
+  const auto& ref = x.ref;
+  const auto particles = ref.particles();
+  const auto holes = ref.holes();
   // HH block: i, j holes in the same channel, j <= i.
   for (const OrbitIndex i : holes) {
     for (const OrbitIndex j : ms.basis().SameLjtz(i)) {
@@ -125,7 +122,14 @@ linalg::Matrix<double> Mbpt2DensityMatrix(op::Operator& H) {
       rho_hh(j.value(), i.value()) = v;
     }
   }
+}
 
+/// Adds the particle-hole block (two terms) to `rho_ph`.
+void FillPhBlock(const Ctx& x, linalg::Matrix<double>& rho_ph) {
+  const auto& ms = x.ms;
+  const auto& ref = x.ref;
+  const auto particles = ref.particles();
+  const auto holes = ref.holes();
   // PH block, two terms.
   for (const OrbitIndex i : holes) {
     for (const OrbitIndex a : ms.basis().SameLjtz(i)) {
@@ -174,6 +178,25 @@ linalg::Matrix<double> Mbpt2DensityMatrix(op::Operator& H) {
       rho_ph(i.value(), a.value()) += v;
     }
   }
+}
+
+}  // namespace
+
+linalg::Matrix<double> Mbpt2DensityMatrix(op::Operator& H) {
+  H.SyncToHost();
+  const auto& ms = H.model_space();
+  const auto& ref = ms.reference();
+  const Ctx x{H, ms, ref};
+  const auto N = ms.num_orbits();
+  linalg::Matrix<double> rho(N, N);
+  for (const OrbitIndex i : ref.holes())
+    rho(i.value(), i.value()) = ref.occupation(i);
+
+  linalg::Matrix<double> rho_pp(N, N), rho_hh(N, N), rho_ph(N, N);
+
+  FillPpBlock(x, rho_pp);
+  FillHhBlock(x, rho_hh);
+  FillPhBlock(x, rho_ph);
 
   for (std::int64_t p = 0; p < N; ++p)
     for (std::int64_t q = 0; q < N; ++q)

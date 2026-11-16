@@ -15,9 +15,11 @@
 
 namespace imsrg::basis {
 
-Reference Reference::FromOccupations(const SingleParticleBasis& basis,
-                                     std::vector<double> occupations,
-                                     std::string name) {
+namespace {
+
+// Throws InputError unless there is one occupation in [0, 1] per orbit.
+void ValidateOccupations(const SingleParticleBasis& basis,
+                         const std::vector<double>& occupations) {
   if (static_cast<std::int32_t>(occupations.size()) != basis.num_orbits()) {
     throw InputError(
         fmt::format("Reference: {} occupations given for a basis of {} orbits",
@@ -31,6 +33,14 @@ Reference Reference::FromOccupations(const SingleParticleBasis& basis,
           OrbitLabel(basis.orbits()[a])));
     }
   }
+}
+
+}  // namespace
+
+Reference Reference::FromOccupations(const SingleParticleBasis& basis,
+                                     std::vector<double> occupations,
+                                     std::string name) {
+  ValidateOccupations(basis, occupations);
 
   Reference ref;
   ref.occ_ = std::move(occupations);

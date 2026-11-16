@@ -67,13 +67,19 @@ class Checker {
 
  private:
   void Ranges();
+  void ImsrgRanges();
   void Planned();
   void Valence();
   void Cuts();
+  void ThreeBodyCuts();
   void Files();
   void HamiltonianBasis();
   void ImsrgRules();
+  void ImsrgStageRules();
+  void DeltaOrbitRule();
+  void ImsrgSpaceRules();
   void Imsrg3Rules();
+  void FactorizedRules();
   void Operators();
   void Output();
 
@@ -177,6 +183,11 @@ void Checker::Ranges() {
     if (t3->e2max) NeedGe("interaction.three_body.e2max", *t3->e2max, 0);
   }
 
+  ImsrgRanges();
+}
+
+/// Range checks of the imsrg and imsrg3 tables (V-02).
+void Checker::ImsrgRanges() {
   const auto& im = cfg_.imsrg;
   if (im.steps != 1 && im.steps != 2) {
     AddError("V-02", "imsrg.steps",
@@ -306,6 +317,12 @@ void Checker::Cuts() {
         "basis.lmax = " + std::to_string(*b.lmax) +
             " exceeds interaction.two_body.lmax = " + std::to_string(t2.lmax));
   }
+  ThreeBodyCuts();
+}
+
+/// V-13: the three-body file covers the basis cuts.
+void Checker::ThreeBodyCuts() {
+  const auto& b = cfg_.basis;
   if (const auto& t3 = cfg_.interaction.three_body) {
     const int lim = std::min(b.emax, b.e3max);
     if (lim > t3->e1max) {
@@ -357,7 +374,9 @@ void Checker::HamiltonianBasis() {
   }
 }
 
-void Checker::ImsrgRules() {
+/// V-40 to V-42: the stage count and the core generator against the valence
+/// space.
+void Checker::ImsrgStageRules() {
   const auto& im = cfg_.imsrg;
   const bool has_val = cfg_.valence.has_valence_space();
   if (im.steps == 2 && !has_val) {
@@ -382,27 +401,17 @@ void Checker::ImsrgRules() {
                std::string(ToString(im.generator.core)) +
                "\" is a shell-model generator and needs a valence space");
   }
+}
+
+void Checker::ImsrgRules() {
+  const auto& im = cfg_.imsrg;
+  ImsrgStageRules();
   if (im.denominator.delta != 0 && !im.denominator.delta_orbit) {
     Strict("V-43", "imsrg.denominator.delta_orbit",
            "imsrg.denominator.delta is nonzero but "
            "imsrg.denominator.delta_orbit is not set");
   }
-  if (im.denominator.delta_orbit && *im.denominator.delta_orbit != "all") {
-    const std::string& lab = *im.denominator.delta_orbit;
-    try {
-      const auto o = basis::ParseOrbitLabel(lab);
-      if (o.e() > cfg_.basis.emax) {
-        AddError("V-43", "imsrg.denominator.delta_orbit",
-                 "orbit '" + lab + "' (e = " + std::to_string(o.e()) +
-                     ") lies outside basis.emax = " +
-                     std::to_string(cfg_.basis.emax));
-      }
-    } catch (const std::exception&) {
-      AddError("V-43", "imsrg.denominator.delta_orbit",
-               "imsrg.denominator.delta_orbit '" + lab +
-                   "' is neither \"all\" nor an orbit label");
-    }
-  }
+  DeltaOrbitRule();
   if (cfg_.imsrg.omega.storage == OmegaStorage::kDiscard &&
       cfg_.operators.any()) {
     AddError("V-44", "imsrg.omega.storage",
@@ -427,6 +436,34 @@ void Checker::ImsrgRules() {
              "flow method \"" + std::string(ToString(im.method)) +
                  "\" cannot be combined with IMSRG(3)");
   }
+  ImsrgSpaceRules();
+}
+
+/// V-43: `imsrg.denominator.delta_orbit` is "all" or an orbit inside the
+/// basis.
+void Checker::DeltaOrbitRule() {
+  const auto& im = cfg_.imsrg;
+  if (im.denominator.delta_orbit && *im.denominator.delta_orbit != "all") {
+    const std::string& lab = *im.denominator.delta_orbit;
+    try {
+      const auto o = basis::ParseOrbitLabel(lab);
+      if (o.e() > cfg_.basis.emax) {
+        AddError("V-43", "imsrg.denominator.delta_orbit",
+                 "orbit '" + lab + "' (e = " + std::to_string(o.e()) +
+                     ") lies outside basis.emax = " +
+                     std::to_string(cfg_.basis.emax));
+      }
+    } catch (const std::exception&) {
+      AddError("V-43", "imsrg.denominator.delta_orbit",
+               "imsrg.denominator.delta_orbit '" + lab +
+                   "' is neither \"all\" nor an orbit label");
+    }
+  }
+}
+
+/// V-48: the IMSRG model space fits into the basis.
+void Checker::ImsrgSpaceRules() {
+  const auto& im = cfg_.imsrg;
   if (im.space) {
     const auto& s = *im.space;
     if (s.emax > cfg_.basis.emax) {
@@ -470,6 +507,33 @@ void Checker::Imsrg3Rules() {
     if (i3.threebody_threshold != def.threebody_threshold)
       bad("threebody_threshold");
   }
+  FactorizedRules();
+  if (i3.at_end) {
+    if (cfg_.imsrg.method != Method::kMagnus) {
+      Strict("V-52", "imsrg3.at_end",
+             "imsrg3.at_end requires imsrg.method = \"magnus\"");
+    }
+    if (!cfg_.interaction.three_body) {
+      Warning("V-52", "imsrg3.at_end",
+              "imsrg3.at_end is set but no three-body interaction is given");
+    }
+    if (!i3.in_flow) {
+      Warning("W-Q11", "imsrg3.at_end",
+              "input 3N is not included at IMSRG(3) level");
+    }
+  }
+  if ((i3.de3max || i3.occ_nat3_cut) &&
+      !(i3.active() || cfg_.imsrg.perturbative_triples)) {
+    Strict("V-54", i3.de3max ? "imsrg3.de3max" : "imsrg3.occ_nat3_cut",
+           "imsrg3.de3max / imsrg3.occ_nat3_cut require IMSRG(3) or "
+           "imsrg.perturbative_triples");
+  }
+}
+
+/// V-56 and V-57: the factorized (3f2) switches.
+void Checker::FactorizedRules() {
+  const auto& i3 = cfg_.imsrg3;
+  const Imsrg3Config def{};
   if (!i3.factorized) {
     // V-56: the 3f2 sub-switches only mean something with `factorized`.
     if (i3.factorized_1b_intermediates != def.factorized_1b_intermediates ||
@@ -495,26 +559,6 @@ void Checker::Imsrg3Rules() {
       Strict("V-57", "imsrg3.factorized",
              "imsrg3.factorized requires imsrg.method = \"magnus\"");
     }
-  }
-  if (i3.at_end) {
-    if (cfg_.imsrg.method != Method::kMagnus) {
-      Strict("V-52", "imsrg3.at_end",
-             "imsrg3.at_end requires imsrg.method = \"magnus\"");
-    }
-    if (!cfg_.interaction.three_body) {
-      Warning("V-52", "imsrg3.at_end",
-              "imsrg3.at_end is set but no three-body interaction is given");
-    }
-    if (!i3.in_flow) {
-      Warning("W-Q11", "imsrg3.at_end",
-              "input 3N is not included at IMSRG(3) level");
-    }
-  }
-  if ((i3.de3max || i3.occ_nat3_cut) &&
-      !(i3.active() || cfg_.imsrg.perturbative_triples)) {
-    Strict("V-54", i3.de3max ? "imsrg3.de3max" : "imsrg3.occ_nat3_cut",
-           "imsrg3.de3max / imsrg3.occ_nat3_cut require IMSRG(3) or "
-           "imsrg.perturbative_triples");
   }
 }
 

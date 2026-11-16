@@ -52,27 +52,57 @@ StatusFn WrapCallback(const std::optional<nb::callable>& cb) {
 }
 
 /// A Magnus solver owned by Python (releasable with the Runtime).
-struct PyMagnus : Releasable {
-  BusyFlag busy;  ///< one thread at a time
-  std::unique_ptr<flow::MagnusSolver> s;
+class PyMagnus : public Releasable {
+ public:
+  PyMagnus() = default;
+  PyMagnus(const PyMagnus&) = delete;
+  PyMagnus& operator=(const PyMagnus&) = delete;
+  PyMagnus(PyMagnus&&) = delete;
+  PyMagnus& operator=(PyMagnus&&) = delete;
+  ~PyMagnus() override = default;
+
   bool CanRelease() const noexcept override { return true; }
-  void Release() noexcept override { s.reset(); }
+  void Release() noexcept override { s_.reset(); }
+  /// The busy flag: one thread at a time.
+  BusyFlag& busy() { return busy_; }
+  /// Installs the solver (built before the object is registered).
+  void set_solver(std::unique_ptr<flow::MagnusSolver> s) { s_ = std::move(s); }
+  /// The solver. @throws StaleHostError if released.
   flow::MagnusSolver& get() {
-    if (!s) throw StaleHostError("the solver's device data were released");
-    return *s;
+    if (!s_) throw StaleHostError("the solver's device data were released");
+    return *s_;
   }
+
+ private:
+  BusyFlag busy_;
+  std::unique_ptr<flow::MagnusSolver> s_;
 };
 
 /// An ODE solver owned by Python.
-struct PyOde : Releasable {
-  BusyFlag busy;  ///< one thread at a time
-  std::unique_ptr<flow::OdeSolver> s;
+class PyOde : public Releasable {
+ public:
+  PyOde() = default;
+  PyOde(const PyOde&) = delete;
+  PyOde& operator=(const PyOde&) = delete;
+  PyOde(PyOde&&) = delete;
+  PyOde& operator=(PyOde&&) = delete;
+  ~PyOde() override = default;
+
   bool CanRelease() const noexcept override { return true; }
-  void Release() noexcept override { s.reset(); }
+  void Release() noexcept override { s_.reset(); }
+  /// The busy flag: one thread at a time.
+  BusyFlag& busy() { return busy_; }
+  /// Installs the solver (built before the object is registered).
+  void set_solver(std::unique_ptr<flow::OdeSolver> s) { s_ = std::move(s); }
+  /// The solver. @throws StaleHostError if released.
   flow::OdeSolver& get() {
-    if (!s) throw StaleHostError("the solver's device data were released");
-    return *s;
+    if (!s_) throw StaleHostError("the solver's device data were released");
+    return *s_;
   }
+
+ private:
+  BusyFlag busy_;
+  std::unique_ptr<flow::OdeSolver> s_;
 };
 
 std::vector<op::Operator> Inputs(const std::vector<PyOperator>& ops) {
@@ -81,9 +111,229 @@ std::vector<op::Operator> Inputs(const std::vector<PyOperator>& ops) {
   return out;
 }
 
-}  // namespace
+/// Binds the constructor of OdeSolver.
+void DefineOdeInit(nb::class_<PyOde>& ode) {
+  ode.def(
+      "__init__",
+      [](PyOde* self, flow::OdeMethod method, const PyOperator& h0,
+         const std::vector<PyOperator>& operators,
+         const flow::SolverOptions& solver, double ode_tolerance,
+         const flow::GeneratorOptions& generator,
+         const commutator::CommutatorOptions& comm) {
+        EnsureRuntime();
+        op::Operator h = Input(h0);
+        std::vector<op::Operator> ops = Inputs(operators);
+        auto solver_ptr = std::make_unique<flow::OdeSolver>(
+            method, std::move(h), std::move(ops), solver, ode_tolerance,
+            generator, comm);
+        new (self) PyOde();
+        self->set_solver(std::move(solver_ptr));
+      },
+      nb::arg("method"), nb::arg("h0"), nb::kw_only(),
+      nb::arg("operators") = std::vector<PyOperator>{},
+      nb::arg("solver") = flow::SolverOptions{},
+      nb::arg("ode_tolerance") = 1.0e-6,
+      nb::arg("generator") = flow::GeneratorOptions{},
+      nb::arg("commutator") = commutator::CommutatorOptions{});
+}
 
-void BindFlow(nb::module_& m) {
+/// Binds solve and the setters of OdeSolver.
+void DefineOdeSolve(nb::class_<PyOde>& ode) {
+  ode.def(
+         "solve",
+         [](PyOde& self, std::optional<nb::callable> on_status) {
+           BusyScope busy(self.busy());
+           flow::OdeSolver& s = self.get();
+           const StatusFn cb = WrapCallback(on_status);
+           GilFree r;
+           return s.Solve(cb);
+         },
+         nb::arg("on_status").none() = nb::none(),
+         "Integrates from the current s to smax (Rk4: or until converged).")
+      .def(
+          "set_generator",
+          [](PyOde& self, const flow::GeneratorOptions& g) {
+            BusyScope busy(self.busy());
+            self.get().set_generator(g);
+          },
+          "Changes the generator for the next solve (a second stage).")
+      .def(
+          "set_solver_options",
+          [](PyOde& self, const flow::SolverOptions& o) {
+            BusyScope busy(self.busy());
+            self.get().set_solver_options(o);
+          },
+          "Replaces the step options for the next solve.");
+}
+
+/// Binds the read-only accessors of OdeSolver.
+void DefineOdeAccessors(nb::class_<PyOde>& ode) {
+  ode.def_prop_ro(
+         "hamiltonian",
+         [](PyOde& self) {
+           BusyScope busy(self.busy());
+           return PyOperator(self.get().hamiltonian());
+         },
+         "A copy of H(s).")
+      .def_prop_ro("num_operators",
+                   [](PyOde& self) {
+                     BusyScope busy(self.busy());
+                     return self.get().num_operators();
+                   })
+      .def(
+          "flowing_operator",
+          [](PyOde& self, std::size_t i) {
+            BusyScope busy(self.busy());
+            flow::OdeSolver& s = self.get();
+            if (i >= s.num_operators())
+              throw imsrg::InputError("operator index out of range");
+            return PyOperator(s.flowing_operator(i));
+          },
+          nb::arg("i"), "A copy of the i-th flowing operator O_i(s).")
+      .def_prop_ro("eta",
+                   [](PyOde& self) {
+                     BusyScope busy(self.busy());
+                     return PyOperator(self.get().eta());
+                   })
+      .def_prop_ro("s", [](PyOde& self) {
+        BusyScope busy(self.busy());
+        return self.get().s();
+      });
+}
+
+/// Binds the constructor of MagnusSolver.
+void DefineMagnusInit(nb::class_<PyMagnus>& magnus) {
+  magnus.def(
+      "__init__",
+      [](PyMagnus* self, const PyOperator& h0,
+         const flow::SolverOptions& solver,
+         const flow::GeneratorOptions& generator, const flow::BchOptions& bch,
+         const commutator::CommutatorOptions& comm) {
+        EnsureRuntime();
+        op::Operator h = Input(h0);
+        // Build first: if this throws, nanobind never runs the destructor
+        // of `self`, so it must not be registered yet.
+        auto solver_ptr = std::make_unique<flow::MagnusSolver>(
+            std::move(h), solver, generator, bch, comm);
+        new (self) PyMagnus();
+        self->set_solver(std::move(solver_ptr));
+      },
+      nb::arg("h0"), nb::kw_only(), nb::arg("solver") = flow::SolverOptions{},
+      nb::arg("generator") = flow::GeneratorOptions{},
+      nb::arg("bch") = flow::BchOptions{},
+      nb::arg("commutator") = commutator::CommutatorOptions{},
+      "H0 must be scalar, Hermitian, particle rank 2 and normal ordered "
+      "with respect to the reference of its model space.");
+}
+
+/// Binds solve and transform of MagnusSolver.
+void DefineMagnusSolve(nb::class_<PyMagnus>& magnus) {
+  magnus
+      .def(
+          "solve",
+          [](PyMagnus& self, std::optional<nb::callable> on_status) {
+            BusyScope busy(self.busy());
+            flow::MagnusSolver& s = self.get();
+            const StatusFn cb = WrapCallback(on_status);
+            GilFree r;
+            return s.Solve(cb);
+          },
+          nb::arg("on_status").none() = nb::none(),
+          "Runs the Magnus loop until convergence, s >= smax or divergence. "
+          "`on_status(FlowStatus)` is called for the initial state and after "
+          "every step (with hunter_gatherer, plus one extra row after the "
+          "rebuild of H with the gathered Omega, ds = 0); an exception it "
+          "raises aborts the solve and is re-raised (the solver stays "
+          "consistent).")
+      .def(
+          "transform",
+          [](PyMagnus& self, const PyOperator& o) {
+            BusyScope busy(self.busy());
+            flow::MagnusSolver& s = self.get();
+            const op::Operator& x = Input(o);
+            GilFree r;
+            return Result(s.Transform(x));
+          },
+          nb::arg("operator"),
+          "Applies the accumulated Omega stack e^Omega O e^-Omega to an "
+          "operator on the solver's model space.");
+}
+
+/// Binds the setters of MagnusSolver.
+void DefineMagnusSetters(nb::class_<PyMagnus>& magnus) {
+  magnus
+      .def(
+          "set_generator",
+          [](PyMagnus& self, const flow::GeneratorOptions& g) {
+            BusyScope busy(self.busy());
+            self.get().set_generator(g);
+          },
+          "Changes the generator for the next solve (a second stage).")
+      .def(
+          "set_smax",
+          [](PyMagnus& self, double v) {
+            BusyScope busy(self.busy());
+            self.get().set_smax(v);
+          },
+          "Changes smax for the next solve.")
+      .def(
+          "set_solver_options",
+          [](PyMagnus& self, const flow::SolverOptions& o) {
+            BusyScope busy(self.busy());
+            self.get().set_solver_options(o);
+          },
+          "Replaces the step options for the next solve.");
+}
+
+/// Binds the read-only accessors of MagnusSolver.
+void DefineMagnusAccessors(nb::class_<PyMagnus>& magnus) {
+  magnus
+      .def_prop_ro(
+          "hamiltonian",
+          [](PyMagnus& self) {
+            BusyScope busy(self.busy());
+            return PyOperator(self.get().hamiltonian());
+          },
+          "A copy of H(s).")
+      .def_prop_ro(
+          "eta",
+          [](PyMagnus& self) {
+            BusyScope busy(self.busy());
+            return PyOperator(self.get().eta());
+          },
+          "A copy of eta(s).")
+      .def_prop_ro(
+          "omegas",
+          [](PyMagnus& self) {
+            BusyScope busy(self.busy());
+            std::vector<PyOperator> out;
+            for (const auto& o : self.get().omegas()) out.emplace_back(o);
+            return out;
+          },
+          "Copies of the Omega stack, oldest first.")
+      .def_prop_ro("s",
+                   [](PyMagnus& self) {
+                     BusyScope busy(self.busy());
+                     return self.get().s();
+                   })
+      .def_prop_ro("num_gathers",
+                   [](PyMagnus& self) {
+                     BusyScope busy(self.busy());
+                     return self.get().num_gathers();
+                   })
+      .def_prop_ro("solver_options",
+                   [](PyMagnus& self) {
+                     BusyScope busy(self.busy());
+                     return self.get().solver_options();
+                   })
+      .def_prop_ro("generator_options", [](PyMagnus& self) {
+        BusyScope busy(self.busy());
+        return self.get().generator_options();
+      });
+}
+
+/// Binds the generator, partitioning, stop-reason and ODE-method enums.
+void BindFlowEnums(nb::module_& m) {
   using flow::GeneratorKind;
   nb::enum_<GeneratorKind>(m, "GeneratorKind", "IMSRG generator types.")
       .value("White", GeneratorKind::kWhite)
@@ -113,7 +363,11 @@ void BindFlow(nb::module_& m) {
       "(adaptive Dormand-Prince 5(4)).")
       .value("Rk4", flow::OdeMethod::kRk4)
       .value("Dopri5", flow::OdeMethod::kDopri5);
+}
 
+/// Binds GeneratorOptions.
+void BindGeneratorOptions(nb::module_& m) {
+  using flow::GeneratorKind;
   nb::class_<flow::GeneratorOptions>(m, "GeneratorOptions",
                                      "Options of compute_generator.")
       .def(
@@ -162,7 +416,10 @@ void BindFlow(nb::module_& m) {
           })
       .def_rw("qtransfer_n", &flow::GeneratorOptions::qtransfer_n)
       .def_rw("only_1b_eta", &flow::GeneratorOptions::only_1b_eta);
+}
 
+/// Binds the generator functions and Denominators.
+void BindGeneratorFunctions(nb::module_& m) {
   m.def("generator_function", &flow::GeneratorFunction, nb::arg("kind"),
         nb::arg("h_od"), nb::arg("denominator"), nb::arg("qtransfer_n") = 1,
         "The generator function f(H_od, Delta) of `kind` (white: H/Delta, "
@@ -212,7 +469,10 @@ void BindFlow(nb::module_& m) {
           },
           nb::arg("a"), nb::arg("b"),
           "Unnormalized J-averaged monopole V-bar_abab.");
+}
 
+/// Binds SolverOptions.
+void BindSolverOptions(nb::module_& m) {
   nb::class_<flow::SolverOptions>(m, "SolverOptions",
                                   "Step control of the flow solvers "
                                   "(defaults of the imsrg++ executable).")
@@ -244,7 +504,10 @@ void BindFlow(nb::module_& m) {
       .def_rw("eta_criterion", &flow::SolverOptions::eta_criterion)
       .def_rw("magnus_adaptive", &flow::SolverOptions::magnus_adaptive)
       .def_rw("hunter_gatherer", &flow::SolverOptions::hunter_gatherer);
+}
 
+/// Binds BchOptions and BchReport.
+void BindBchOptions(nb::module_& m) {
   nb::class_<flow::BchOptions>(
       m, "BchOptions",
       "Options of bch_transform and bch_product (imsrg++ defaults); "
@@ -279,7 +542,10 @@ void BindFlow(nb::module_& m) {
       .def_ro("converged", &flow::BchReport::converged)
       .def_ro("factorized_corrections",
               &flow::BchReport::factorized_corrections);
+}
 
+/// Binds FlowStatus and SolveResult.
+void BindFlowStatus(nb::module_& m) {
   nb::class_<flow::FlowStatus>(m, "FlowStatus",
                                "One line of the flow log (state after a "
                                "step; istep 0 = initial state of a stage).")
@@ -311,212 +577,36 @@ void BindFlow(nb::module_& m) {
       .def_ro("norm_eta", &flow::SolveResult::norm_eta)
       .def_ro("num_gathers", &flow::SolveResult::num_gathers)
       .def_ro("reason", &flow::SolveResult::reason);
+}
 
-  nb::class_<PyMagnus>(
+/// Binds MagnusSolver.
+void BindMagnusSolver(nb::module_& m) {
+  nb::class_<PyMagnus> magnus(
       m, "MagnusSolver",
       "The Magnus IMSRG(2) solver (Euler steps on Omega through the BCH "
       "product), optionally with hunter-gatherer Omega. Operators returned "
       "by its accessors are copies (device current: call sync_to_host() "
-      "before taking numpy views).")
-      .def(
-          "__init__",
-          [](PyMagnus* self, const PyOperator& h0,
-             const flow::SolverOptions& solver,
-             const flow::GeneratorOptions& generator,
-             const flow::BchOptions& bch,
-             const commutator::CommutatorOptions& comm) {
-            EnsureRuntime();
-            op::Operator h = Input(h0);
-            // Build first: if this throws, nanobind never runs the destructor
-            // of `self`, so it must not be registered yet.
-            auto solver_ptr = std::make_unique<flow::MagnusSolver>(
-                std::move(h), solver, generator, bch, comm);
-            new (self) PyMagnus();
-            self->s = std::move(solver_ptr);
-          },
-          nb::arg("h0"), nb::kw_only(),
-          nb::arg("solver") = flow::SolverOptions{},
-          nb::arg("generator") = flow::GeneratorOptions{},
-          nb::arg("bch") = flow::BchOptions{},
-          nb::arg("commutator") = commutator::CommutatorOptions{},
-          "H0 must be scalar, Hermitian, particle rank 2 and normal ordered "
-          "with respect to the reference of its model space.")
-      .def(
-          "solve",
-          [](PyMagnus& self, std::optional<nb::callable> on_status) {
-            BusyScope busy(self.busy);
-            flow::MagnusSolver& s = self.get();
-            const StatusFn cb = WrapCallback(on_status);
-            GilFree r;
-            return s.Solve(cb);
-          },
-          nb::arg("on_status").none() = nb::none(),
-          "Runs the Magnus loop until convergence, s >= smax or divergence. "
-          "`on_status(FlowStatus)` is called for the initial state and after "
-          "every step (with hunter_gatherer, plus one extra row after the "
-          "rebuild of H with the gathered Omega, ds = 0); an exception it "
-          "raises aborts the solve and is re-raised (the solver stays "
-          "consistent).")
-      .def(
-          "transform",
-          [](PyMagnus& self, const PyOperator& o) {
-            BusyScope busy(self.busy);
-            flow::MagnusSolver& s = self.get();
-            const op::Operator& x = Input(o);
-            GilFree r;
-            return Result(s.Transform(x));
-          },
-          nb::arg("operator"),
-          "Applies the accumulated Omega stack e^Omega O e^-Omega to an "
-          "operator on the solver's model space.")
-      .def(
-          "set_generator",
-          [](PyMagnus& self, const flow::GeneratorOptions& g) {
-            BusyScope busy(self.busy);
-            self.get().set_generator(g);
-          },
-          "Changes the generator for the next solve (a second stage).")
-      .def(
-          "set_smax",
-          [](PyMagnus& self, double v) {
-            BusyScope busy(self.busy);
-            self.get().set_smax(v);
-          },
-          "Changes smax for the next solve.")
-      .def(
-          "set_solver_options",
-          [](PyMagnus& self, const flow::SolverOptions& o) {
-            BusyScope busy(self.busy);
-            self.get().set_solver_options(o);
-          },
-          "Replaces the step options for the next solve.")
-      .def_prop_ro(
-          "hamiltonian",
-          [](PyMagnus& self) {
-            BusyScope busy(self.busy);
-            return PyOperator(self.get().hamiltonian());
-          },
-          "A copy of H(s).")
-      .def_prop_ro(
-          "eta",
-          [](PyMagnus& self) {
-            BusyScope busy(self.busy);
-            return PyOperator(self.get().eta());
-          },
-          "A copy of eta(s).")
-      .def_prop_ro(
-          "omegas",
-          [](PyMagnus& self) {
-            BusyScope busy(self.busy);
-            std::vector<PyOperator> out;
-            for (const auto& o : self.get().omegas()) out.emplace_back(o);
-            return out;
-          },
-          "Copies of the Omega stack, oldest first.")
-      .def_prop_ro("s",
-                   [](PyMagnus& self) {
-                     BusyScope busy(self.busy);
-                     return self.get().s();
-                   })
-      .def_prop_ro("num_gathers",
-                   [](PyMagnus& self) {
-                     BusyScope busy(self.busy);
-                     return self.get().num_gathers();
-                   })
-      .def_prop_ro("solver_options",
-                   [](PyMagnus& self) {
-                     BusyScope busy(self.busy);
-                     return self.get().solver_options();
-                   })
-      .def_prop_ro("generator_options", [](PyMagnus& self) {
-        BusyScope busy(self.busy);
-        return self.get().generator_options();
-      });
+      "before taking numpy views).");
+  DefineMagnusInit(magnus);
+  DefineMagnusSolve(magnus);
+  DefineMagnusSetters(magnus);
+  DefineMagnusAccessors(magnus);
+}
 
-  nb::class_<PyOde>(
+/// Binds OdeSolver.
+void BindOdeSolver(nb::module_& m) {
+  nb::class_<PyOde> ode(
       m, "OdeSolver",
       "Solvers of dH/ds = [eta(H), H]: fixed-step RK4 (imsrg++ `flow_RK4`) "
       "and adaptive Dormand-Prince (imsrg++ `flow`). Operators evolve "
-      "alongside H with the same eta.")
-      .def(
-          "__init__",
-          [](PyOde* self, flow::OdeMethod method, const PyOperator& h0,
-             const std::vector<PyOperator>& operators,
-             const flow::SolverOptions& solver, double ode_tolerance,
-             const flow::GeneratorOptions& generator,
-             const commutator::CommutatorOptions& comm) {
-            EnsureRuntime();
-            op::Operator h = Input(h0);
-            std::vector<op::Operator> ops = Inputs(operators);
-            auto solver_ptr = std::make_unique<flow::OdeSolver>(
-                method, std::move(h), std::move(ops), solver, ode_tolerance,
-                generator, comm);
-            new (self) PyOde();
-            self->s = std::move(solver_ptr);
-          },
-          nb::arg("method"), nb::arg("h0"), nb::kw_only(),
-          nb::arg("operators") = std::vector<PyOperator>{},
-          nb::arg("solver") = flow::SolverOptions{},
-          nb::arg("ode_tolerance") = 1.0e-6,
-          nb::arg("generator") = flow::GeneratorOptions{},
-          nb::arg("commutator") = commutator::CommutatorOptions{})
-      .def(
-          "solve",
-          [](PyOde& self, std::optional<nb::callable> on_status) {
-            BusyScope busy(self.busy);
-            flow::OdeSolver& s = self.get();
-            const StatusFn cb = WrapCallback(on_status);
-            GilFree r;
-            return s.Solve(cb);
-          },
-          nb::arg("on_status").none() = nb::none(),
-          "Integrates from the current s to smax (Rk4: or until converged).")
-      .def(
-          "set_generator",
-          [](PyOde& self, const flow::GeneratorOptions& g) {
-            BusyScope busy(self.busy);
-            self.get().set_generator(g);
-          },
-          "Changes the generator for the next solve (a second stage).")
-      .def(
-          "set_solver_options",
-          [](PyOde& self, const flow::SolverOptions& o) {
-            BusyScope busy(self.busy);
-            self.get().set_solver_options(o);
-          },
-          "Replaces the step options for the next solve.")
-      .def_prop_ro(
-          "hamiltonian",
-          [](PyOde& self) {
-            BusyScope busy(self.busy);
-            return PyOperator(self.get().hamiltonian());
-          },
-          "A copy of H(s).")
-      .def_prop_ro("num_operators",
-                   [](PyOde& self) {
-                     BusyScope busy(self.busy);
-                     return self.get().num_operators();
-                   })
-      .def(
-          "flowing_operator",
-          [](PyOde& self, std::size_t i) {
-            BusyScope busy(self.busy);
-            flow::OdeSolver& s = self.get();
-            if (i >= s.num_operators())
-              throw imsrg::InputError("operator index out of range");
-            return PyOperator(s.flowing_operator(i));
-          },
-          nb::arg("i"), "A copy of the i-th flowing operator O_i(s).")
-      .def_prop_ro("eta",
-                   [](PyOde& self) {
-                     BusyScope busy(self.busy);
-                     return PyOperator(self.get().eta());
-                   })
-      .def_prop_ro("s", [](PyOde& self) {
-        BusyScope busy(self.busy);
-        return self.get().s();
-      });
+      "alongside H with the same eta.");
+  DefineOdeInit(ode);
+  DefineOdeSolve(ode);
+  DefineOdeAccessors(ode);
+}
 
+/// Binds bch_transform and bch_product.
+void BindBchFunctions(nb::module_& m) {
   m.def(
       "bch_transform",
       [](const PyOperator& x, const PyOperator& omega,
@@ -560,6 +650,20 @@ void BindFlow(nb::module_& m) {
       nb::arg("workspace").none() = nb::none(),
       "Z with e^Z = e^X e^Y for small X (imsrg++ BCH_Product: series in "
       "ad_Y to 8th order plus the 1/12 [[Y,X],X] term).");
+}
+
+}  // namespace
+
+void BindFlow(nb::module_& m) {
+  BindFlowEnums(m);
+  BindGeneratorOptions(m);
+  BindGeneratorFunctions(m);
+  BindSolverOptions(m);
+  BindBchOptions(m);
+  BindFlowStatus(m);
+  BindMagnusSolver(m);
+  BindOdeSolver(m);
+  BindBchFunctions(m);
 }
 
 }  // namespace imsrg::py

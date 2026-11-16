@@ -12,6 +12,35 @@ namespace imsrg::commutator::detail {
 
 namespace {
 
+/// Copies the host lists of a projector to device buffers and allocates its
+/// gathered-operand and product buffers.
+void UploadProjector(LadderProjector& proj,
+                     const std::vector<std::int32_t>& list,
+                     const std::vector<double>& w,
+                     const std::vector<std::int64_t>& list_offset,
+                     const char* tag, std::int64_t total) {
+  const std::string t = std::string("commutator::ladder_") + tag;
+  proj.list = exec::DeviceBuffer<std::int32_t>(list.size(), t + "_list");
+  if (!list.empty()) proj.list.CopyFromHost(list);
+  proj.weight = exec::DeviceBuffer<double>(w.size(), t + "_weight");
+  if (!w.empty()) proj.weight.CopyFromHost(w);
+  proj.list_offset =
+      exec::DeviceBuffer<std::int64_t>(list_offset.size(), t + "_list_offset");
+  proj.list_offset.CopyFromHost(list_offset);
+  proj.gather_offset = exec::DeviceBuffer<std::int64_t>(
+      proj.gather_offset_host.size(), t + "_gather_offset");
+  proj.gather_offset.CopyFromHost(proj.gather_offset_host);
+  proj.direct_first = exec::DeviceBuffer<std::int32_t>(
+      proj.direct_first_host.size(), t + "_direct_first");
+  if (!proj.direct_first_host.empty())
+    proj.direct_first.CopyFromHost(proj.direct_first_host);
+  const auto gsize = static_cast<std::size_t>(proj.gather_offset_host.back());
+  proj.xg = exec::DeviceBuffer<double>(gsize, t + "_xg");
+  proj.yg = exec::DeviceBuffer<double>(gsize, t + "_yg");
+  proj.product = exec::DeviceBuffer<double>(static_cast<std::size_t>(total),
+                                            t + "_product");
+}
+
 /// Fills `proj` for the weight function `weight(n_p, n_q)`; `total` is the size
 /// of a two-body operator buffer.
 template <class WeightFn>
@@ -60,26 +89,7 @@ void FillProjector(LadderProjector& proj, const basis::ModelSpace& ms,
              : static_cast<std::int64_t>(kets.size()) * count);
   }
 
-  const std::string t = std::string("commutator::ladder_") + tag;
-  proj.list = exec::DeviceBuffer<std::int32_t>(list.size(), t + "_list");
-  if (!list.empty()) proj.list.CopyFromHost(list);
-  proj.weight = exec::DeviceBuffer<double>(w.size(), t + "_weight");
-  if (!w.empty()) proj.weight.CopyFromHost(w);
-  proj.list_offset =
-      exec::DeviceBuffer<std::int64_t>(list_offset.size(), t + "_list_offset");
-  proj.list_offset.CopyFromHost(list_offset);
-  proj.gather_offset = exec::DeviceBuffer<std::int64_t>(
-      proj.gather_offset_host.size(), t + "_gather_offset");
-  proj.gather_offset.CopyFromHost(proj.gather_offset_host);
-  proj.direct_first = exec::DeviceBuffer<std::int32_t>(
-      proj.direct_first_host.size(), t + "_direct_first");
-  if (!proj.direct_first_host.empty())
-    proj.direct_first.CopyFromHost(proj.direct_first_host);
-  const auto gsize = static_cast<std::size_t>(proj.gather_offset_host.back());
-  proj.xg = exec::DeviceBuffer<double>(gsize, t + "_xg");
-  proj.yg = exec::DeviceBuffer<double>(gsize, t + "_yg");
-  proj.product = exec::DeviceBuffer<double>(static_cast<std::size_t>(total),
-                                            t + "_product");
+  UploadProjector(proj, list, w, list_offset, tag, total);
 }
 
 }  // namespace

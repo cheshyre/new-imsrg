@@ -130,6 +130,56 @@ void AbsolutizeConfig(RunConfig& c, const fs::path& base) {
   }
 }
 
+/// Fills the provenance block of a resolved config.
+void FillProvenance(RunConfig& cfg, const ConfigSources& src,
+                    const ConfigIssues& issues,
+                    std::vector<std::string> applied_rules) {
+  cfg.provenance.version = IMSRG_VERSION_STRING;
+  cfg.provenance.git_hash = IMSRG_GIT_HASH;
+  cfg.provenance.date = UtcNow();
+  cfg.provenance.command_line = src.command_line;
+  cfg.provenance.legacy_args = src.legacy_args;
+  for (const auto& i : issues) {
+    if (i.severity == Severity::kWarning) cfg.provenance.warnings.push_back(i);
+  }
+  cfg.provenance.applied_rules = std::move(applied_rules);
+}
+
+/// Reads the TOML file or text, or translates the legacy arguments, into
+/// `tree`. Returns false if the document is unreadable or unparsable (the
+/// issues then hold the reason).
+bool ReadRawTree(const ConfigSources& src, bool legacy, ConfigIssues& issues,
+                 RawTree& tree, std::vector<std::string>& applied_rules) {
+  if (src.config_file || src.config_text) {
+    Append(issues,
+           src.config_file
+               ? ReadTomlFile(*src.config_file, tree)
+               : ReadTomlString(*src.config_text, src.config_text_name, tree));
+    // An unreadable or unparsable document yields no tree: resolving it would
+    // only add consequential errors (missing required keys) to the one that
+    // matters.
+    const bool unreadable =
+        std::any_of(issues.begin(), issues.end(), [](const ConfigIssue& i) {
+          return i.code == "E-FILE" || i.code == "E-TOML-SYNTAX";
+        });
+    if (unreadable) return false;
+    // Relative paths of a TOML *file* resolve against its directory; the
+    // overrides applied below and legacy values resolve against the working
+    // directory (after `Resolve`).
+    if (src.config_file) {
+      std::error_code ec;
+      const fs::path abs = fs::absolute(*src.config_file, ec);
+      if (!ec) AbsolutizeTree(tree, abs.parent_path());
+    }
+  } else if (legacy) {
+    auto t = TranslateLegacy(std::span<const std::string>(src.legacy_args));
+    tree = std::move(t.tree);
+    Append(issues, std::move(t.issues));
+    applied_rules = std::move(t.applied_rules);
+  }
+  return true;
+}
+
 }  // namespace
 
 Expected<RunConfig, ConfigIssues> LoadConfig(const ConfigSources& src,
@@ -149,32 +199,8 @@ Expected<RunConfig, ConfigIssues> LoadConfig(const ConfigSources& src,
   std::vector<std::string> applied_rules;
   const bool legacy = !src.legacy_args.empty();
 
-  if (src.config_file || src.config_text) {
-    Append(issues,
-           src.config_file
-               ? ReadTomlFile(*src.config_file, tree)
-               : ReadTomlString(*src.config_text, src.config_text_name, tree));
-    // An unreadable or unparsable document yields no tree: resolving it would
-    // only add consequential errors (missing required keys) to the one that
-    // matters.
-    const bool unreadable =
-        std::any_of(issues.begin(), issues.end(), [](const ConfigIssue& i) {
-          return i.code == "E-FILE" || i.code == "E-TOML-SYNTAX";
-        });
-    if (unreadable) return Unexpected<ConfigIssues>{std::move(issues)};
-    // Relative paths of a TOML *file* resolve against its directory; the
-    // overrides applied below and legacy values resolve against the working
-    // directory (after `Resolve`).
-    if (src.config_file) {
-      std::error_code ec;
-      const fs::path abs = fs::absolute(*src.config_file, ec);
-      if (!ec) AbsolutizeTree(tree, abs.parent_path());
-    }
-  } else if (legacy) {
-    auto t = TranslateLegacy(std::span<const std::string>(src.legacy_args));
-    tree = std::move(t.tree);
-    Append(issues, std::move(t.issues));
-    applied_rules = std::move(t.applied_rules);
+  if (!ReadRawTree(src, legacy, issues, tree, applied_rules)) {
+    return Unexpected<ConfigIssues>{std::move(issues)};
   }
 
   for (const auto& assignment : src.set_overrides) {
@@ -188,15 +214,7 @@ Expected<RunConfig, ConfigIssues> LoadConfig(const ConfigSources& src,
 
   RunConfig cfg = std::move(resolved.config);
   AbsolutizeConfig(cfg, WorkingDirectory());
-  cfg.provenance.version = IMSRG_VERSION_STRING;
-  cfg.provenance.git_hash = IMSRG_GIT_HASH;
-  cfg.provenance.date = UtcNow();
-  cfg.provenance.command_line = src.command_line;
-  cfg.provenance.legacy_args = src.legacy_args;
-  for (const auto& i : issues) {
-    if (i.severity == Severity::kWarning) cfg.provenance.warnings.push_back(i);
-  }
-  cfg.provenance.applied_rules = std::move(applied_rules);
+  FillProvenance(cfg, src, issues, std::move(applied_rules));
   return cfg;
 }
 

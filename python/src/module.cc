@@ -43,17 +43,19 @@ void Translate(const nb::object& type) {
       type.ptr());
 }
 
-}  // namespace
-
-NB_MODULE(_core, m) {
-  m.doc() =
-      "imsrg C++ core (nanobind). Use the imsrg package, not this module.";
+/// Registers the base class of all imsrg errors; returns it.
+nb::object RegisterBaseError(nb::module_& m) {
   // Translators are tried most recently registered first: base class first,
   // derived after.
   nb::object err =
       MakeException(m, "ImsrgError", "Base class of all imsrg errors.",
                     nb::make_tuple(nb::handle(PyExc_RuntimeError)));
   Translate<imsrg::Error>(err);
+  return err;
+}
+
+/// Registers the input errors (invalid input, configuration, files).
+void RegisterInputErrors(nb::module_& m, const nb::object& err) {
   nb::object input = MakeException(
       m, "InputError", "Invalid user input: parameters, files, options.",
       nb::make_tuple(err));
@@ -71,6 +73,10 @@ NB_MODULE(_core, m) {
       "An input file exists but its content is malformed or inconsistent "
       "with the stated truncation.",
       nb::make_tuple(input)));
+}
+
+/// Registers the remaining errors (invariants, numerics, runtime, symmetry).
+void RegisterOtherErrors(nb::module_& m, const nb::object& err) {
   Translate<imsrg::InvariantError>(
       MakeException(m, "InvariantError", "A violated internal invariant.",
                     nb::make_tuple(err)));
@@ -103,6 +109,16 @@ NB_MODULE(_core, m) {
       "A host view of an operator whose host mirror is stale, or use of an "
       "operator whose device data were released.",
       nb::make_tuple(err)));
+}
+
+}  // namespace
+
+NB_MODULE(_core, m) {
+  m.doc() =
+      "imsrg C++ core (nanobind). Use the imsrg package, not this module.";
+  const nb::object err = RegisterBaseError(m);
+  RegisterInputErrors(m, err);
+  RegisterOtherErrors(m, err);
 
   imsrg::py::BindRuntime(m);
   imsrg::py::BindBasis(m);
