@@ -166,14 +166,14 @@ void ThrowIfSignalPending();
 ///     place leaves it kDeviceCurrent;
 ///   * `set_zero()` -> kDeviceCurrent; `copy` of an operator inherits the state
 ///     (after a push if kHostCurrent).
-enum class Residency : std::uint8_t {
+enum class Residency : std::int8_t {
   kHostCurrent,    ///< Host mirror has edits the device data lack.
   kDeviceCurrent,  ///< Device data are current, the host mirror may be stale.
   kBoth            ///< Both sides hold the same data.
 };
 
 /// Whether a stale host view raises (design/18 section 2.2).
-enum class ResidencyPolicy : std::uint8_t {
+enum class ResidencyPolicy : std::int8_t {
   kAuto,     ///< Strict if the device memory is not host accessible (GPU),
              ///< implicit syncing if it is (Serial/OpenMP: a fence only).
   kStrict,   ///< Always raise StaleHostError on a stale view (portable
