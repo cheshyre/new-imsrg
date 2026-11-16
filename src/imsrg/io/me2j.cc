@@ -247,8 +247,8 @@ class BinaryInput {
   void Refill() {
     const std::int64_t remaining =
         total_floats_ - (offset_ - kBinaryHeaderBytes) / 4;
-    const std::size_t want = static_cast<std::size_t>(
-        std::min<std::int64_t>(remaining, std::int64_t(kBinaryChunkFloats)));
+    const std::size_t want = static_cast<std::size_t>(std::min<std::int64_t>(
+        remaining, static_cast<std::int64_t>(kBinaryChunkFloats)));
     if (want == 0) {
       throw InputError("'" + path_.string() +
                        "': read past the end at offset " +
