@@ -114,7 +114,7 @@ peak): a follow-up.
 whole within 9e-16 (M3 form), P = 1 is bitwise equal to the whole run. The timing ratios of
 those runs (sum/whole 0.7-6.3, max/mean 1.05-1.9) are noise at these sizes; the planned
 measurement (emax 5, P = 4, 16, 64, quiet machine; targets sum/whole <= 1.10 and max/mean <= 1.10
-at P = 16) is **pending**.
+at P = 16) is done in section 8.
 
 ## 7. Review and hand-off
 
@@ -146,3 +146,89 @@ Open items, in priority order:
    `TriplesContext` build at emax 12 takes ~150 s and 4.4 GB on the host.
 6. `n7_bench --partition` holds one unused rank-3 output besides the summed and the whole Z
    (memory at emax 5); reuse it.
+
+## 8. Quiet-machine measurements (2026-11-17)
+
+Simulated row partitions of section 6, measured 04:54-05:15 JST on the idle machine (git 7a78f4d,
+`release-openmp` with `-DIMSRG_BUILD_BENCH=ON`, Apple M5 Pro, 18 threads, `OMP_PROC_BIND=false`,
+`VECLIB_MAXIMUM_THREADS=1`). O16, emax 5, E3max 12 (144,162 rows, 63,698 triples, 1.63 GB per
+operand; counts of section 4 style: 1.055e11 multiply-adds), operands `AH`, seed 1, the seven 3B
+terms of `detail::RunN7` (the 3B part of the full N7 commutator). Every run is one process with
+`--reps 5`: each part, and then the whole space, is timed as the best of 5 repetitions after a
+warm-up. A run of 3-4 minutes in total (a single whole commutator takes 6.1 s), so emax 5 was kept.
+Every run started at a 1-minute load below 6 (the loads in the table; the 5-minute loads of 8-9
+are the aftermath of the previous 18-thread run). The load average was 2.5 at the first run.
+Deviation of the summed result from the whole: bitwise for P = 1, 5.6e-16 to 8.7e-16 (M3 form) for
+all others.
+
+Commands (script outside the repository, same options for every row):
+
+```
+export OMP_PROC_BIND=false VECLIB_MAXIMUM_THREADS=1
+build/release/tools/bench/n7_bench --emax 5 --e3max 12 --count-only
+build/release/tools/bench/n7_bench --emax 5 --e3max 12 --reps 5 --partition P [--partition-contiguous]
+```
+
+Baseline: the whole space, P = 1 run: **6116.1 ms** (the other runs' wholes: 6128.9, 6148.3,
+6140.4, 6143.0, 6194.6 and, for the last run, 8407, which is an outlier: the whole of that run is
+ignored and sum/whole is taken against 6116.1 everywhere below).
+
+Balanced partition (`RowPartition::Balanced` with `N7LineWeights`, the R5 weights):
+
+| P | load at start | per-part best ms (min / mean / max) | max/mean measured | max/mean predicted (compute / memory) | sum of parts, ms | sum/whole |
+|---|---|---|---|---|---|---|
+| 1 | 2.54 | 6283.0 | 1.000 | 1.000 | 6283.0 | 1.027 |
+| 4 | 5.74 | 1434.9 / 1552.8 / 1804.3 | 1.162 | 1.020 / 1.025 | 6211.1 | 1.016 |
+| 16 | 4.89 | 328.0 / 370.8 / 486.4 | 1.312 | 1.038 / 1.064 | 5933.3 | 0.970 |
+| 64 | 5.31 | 78.4 / 94.4 / 138.1 | 1.463 | 1.044 / 1.098 | 6039.7 | 0.988 |
+
+Whole-channel (contiguous) partition (`--partition-contiguous`, P contiguous ranges of the triple
+list, cut at channel borders only):
+
+| P | load at start | per-part best ms (min / mean / max) | max/mean measured | max/mean predicted (compute) | sum of parts, ms | sum/whole |
+|---|---|---|---|---|---|---|
+| 4 | 5.27 | 827.3 / 1489.2 / 2115.9 | 1.421 | 1.469 | 5956.7 | 0.974 |
+| 16 | 5.63 | 70.1 / 373.0 / 591.5 | 1.586 | 1.737 | 5967.7 | 0.976 |
+| 64 | 5.69 | 8.4 / 101.5 / 205.0 | 2.020 | 2.451 | 6494.4 | 1.062 (outlier run) |
+
+Per-part times, balanced P = 4: 1439.2, 1434.9, 1532.6, 1804.3 ms (rows 20,803 / 24,336 / 29,008 /
+70,015; stored doubles 50.0e6 / 50.5e6 / 51.3e6 / 52.3e6). Balanced P = 16 (rows in brackets):
+337.9 (5,053), 336.8 (5,066), 343.6 (5,321), 341.9 (5,363), 328.0 (5,511), 334.2 (5,951), 361.5
+(6,366), 374.0 (6,508), 372.5 (6,786), 356.6 (7,085), 351.6 (6,845), 395.8 (8,292), 359.2 (9,313),
+447.5 (13,820), 405.6 (16,714), 486.4 (30,168). Contiguous P = 16: 171.6, 179.4, 404.6, 335.0,
+575.7, 454.9, 533.1, 580.9, 477.1, 591.5, 421.3, 421.8, 334.6, 248.0, 168.4, 70.1 ms.
+
+Predicted imbalance: computed from the same `N7LineWeights` weights the partition is built with
+(`basis::PartitionImbalance` for the balanced rows, the sums of the weights over the same triple
+ranges for the contiguous rows), with a scratch program linked against the release libraries
+(not in the repository); `max/mean` here is 1 + the printed imbalance.
+
+Reading:
+
+* **Overhead of the summed parts**: none measurable. Sum/whole is 0.97 to 1.02 for P up to 64
+  (balanced) and 0.97 for contiguous P = 4, 16; the sums are not above the whole because every part
+  works on a smaller working set, so the 3 % below one is cache effect, and the 1-3 % above one at
+  P = 1 and 4 is the noise level (P = 1 compares two identical runs: 6283 vs 6116 ms). The
+  target of at most 1.10 holds with a margin. The replicated per-part setup (halo slots, `H`/`W`
+  tables) does not show.
+* **Imbalance**: the target of max/mean <= 1.10 at P = 16 is **not met** (balanced 1.31). The
+  cost model predicts 1.04 for the balanced partition, so the R5 weights are not good enough: the
+  parts with the most rows (largest channels, the last parts) are up to 48 % slower than parts with
+  the same predicted work and the same stored size, and the time per part grows monotonically with
+  the part's row count (P = 16: 328 ms at 5.1k rows, 486 ms at 30.2k rows). The weights therefore
+  undercount something that grows with the rows of a part. For the contiguous partition the model
+  has the right shape and over-predicts by 3-18 % (1.42 vs 1.47, 1.59 vs 1.74, 2.02 vs 2.45), so
+  it is a safe upper bound there and the balanced zipper is clearly better (1.31 vs 1.59 at P = 16,
+  1.46 vs 2.02 at P = 64).
+
+Conclusion for run 4: the simulated partitions cost nothing in total work (sum/whole <= 1.02,
+checked up to P = 64 with bitwise or 9e-16 results), so row distribution is viable. The R5
+compute weights are **not yet good enough to balance the parts**: the measured max/mean is 1.16 /
+1.31 / 1.46 at P = 4 / 16 / 64 against a predicted 1.02 / 1.04 / 1.04, and the error is systematic
+(time grows with the part's number of rows at equal predicted work), so it will not average out
+across ranks. Do not hard-wire the R5 weights as the balance criterion for D-phase2: first
+calibrate the per-triple weights from the per-part times (a term proportional to the rows of a
+triple, or per-term line weights fitted to `n7_bench --terms` times at emax 5; the per-part times
+above are the data for a first fit), and then re-measure max/mean at P = 16 with the target 1.10.
+With the present weights plan for 1.3-1.5x the mean part time as the slowest rank's time; the
+memory balance of the zipper is fine (stored doubles within 5 % at P = 4). No code was changed.

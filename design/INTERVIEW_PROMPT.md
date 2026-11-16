@@ -186,7 +186,10 @@ Format: **id** - summary; *assumption taken*; what an answer changes.
    a lower cap for the last hour before a deadline)? Which cap should apply in run 4?
 3. **Weekly usage budget per run.** Run 3 used about 17 points of the weekly limit (44 % -> 61 %).
    What weekly ceiling should run 4 stay under, and should the run stop when it is reached?
-4. **The D45 imbalance at 256 ranks.** The cost model says the compute imbalance is 0-0.1 % at 22
+4. **The D45 imbalance at 256 ranks**, and the measured N7 row partition: on a quiet machine the
+   balanced N7 partition reached max/mean 1.16 / 1.31 / 1.46 at P = 4 / 16 / 64 (the R5 model
+   predicted 1.02-1.04), so the row-cost model needs per-row terms before phase 2 relies on it.
+   The IMSRG(2) side: The cost model says the compute imbalance is 0-0.1 % at 22
    ranks, 3 % at 64 ranks only at emax 12 (58 % at emax 10, 146 % at emax 8) and 310-880 % at 256
    ranks, because comm122/ph go by whole channels. Is "row panels for comm122/ph first" the right
    priority, and are 22/64/256 ranks the right targets (which emax and E3max matter at 256 ranks)?

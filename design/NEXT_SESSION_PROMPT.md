@@ -287,9 +287,12 @@ interview.
 > rows into scratch first; H runs at ~4e9 multiply-adds/s against ~1.7e10 for W at emax 4, so it is
 > the largest single-node gain left besides comm232); (2) **C15** Comm223 locality (per-tile 6j
 > slices, ket cache; M10-Q41/Q42), kept only if quiet-machine timings at emax 4-6 show a gain;
-> (3) **partition timings** at emax 5 for P = 4, 16, 64 (`n7_bench --partition`; targets sum/whole
-> <= 1.10 and max/mean <= 1.10 at P = 16) on a quiet machine, before the D-phase2 lead relies on the
-> R5 weights; (4) **`CommutatorOptions::imsrg3_batch_bytes`** (M10-Q74), after agreeing with the
+> (3) **a row-cost model that matches the measured partition timings**: the quiet-machine run at
+> the end of run 3 (O16 emax 5, `n7_bench --partition`) gave balanced max/mean 1.16 / 1.31 / 1.46
+> at P = 4 / 16 / 64 against 1.02-1.04 predicted by the R5 weights, because a part's time grows
+> with its row count (`design/benchmarks/imsrg3-n7-performance.md`, "Quiet-machine
+> measurements"); fit per-row terms, re-run the partition timings, target max/mean <= 1.10 at
+> P = 16, and do this **first**, before the D-phase2 lead relies on the weights; (4) **`CommutatorOptions::imsrg3_batch_bytes`** (M10-Q74), after agreeing with the
 > D-phase2 lead who edits `ThreeBodyTerms()`; (5) factor the duplicated group/leg table builders of
 > `commutator/triples.cc` and `three_body.cc` (M10-Q75; the `TriplesContext` build at emax 12 takes
 > ~150 s and 4.4 GB), reuse the unused rank-3 output of `n7_bench --partition`. Timing runs: schedule

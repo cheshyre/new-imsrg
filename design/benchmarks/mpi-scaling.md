@@ -204,3 +204,80 @@ ph term at 2 and 4 ranks; the term still grows with the rank count, so the rest 
 inverse transform (pair loop, 6j row lookups, the masked gather itself) and the cost of the
 whole-channel split remain (M12b-Q18). Loads were below 6 for all runs, but other jobs were
 running on the machine.
+
+## Quiet-machine measurements (2026-11-17)
+
+Recalibration of the cost-model weights `w_122` and `w_ph` (`kComm122WeightInLadderUnits`,
+`kPhWeightInLadderUnits` in `commutator/work_items.cc`) with the method of the "Joint cut" section,
+on the idle machine (05:16 JST, git 7a78f4d, `release-openmp` with `-DIMSRG_BUILD_BENCH=ON`, Apple
+M5 Pro, one rank, 16 threads). Nothing else was running; the 1-minute load average at the start of
+every invocation was 4.96-5.40 (it decays from the 18-thread N7 runs before; the loadavg is
+updated every 5 s and an invocation takes about 1 s, so it is the value before the runs, as in the
+original measurement), against 12-50 in the original measurement. The per-term minima are stable
+to 1-2 % between invocations (comm222_phss 14.75-14.81 ms, comm222_pp_hhss 10.22-10.37 ms).
+
+Command (5 invocations at emax 8, 3 at emax 6; the minimum over repetitions of each term, then
+the minimum over invocations):
+
+```
+export OMP_NUM_THREADS=16 OMP_PROC_BIND=false
+build/release/tools/bench/commutator_bench --emax 8 --reps 5     # x5
+build/release/tools/bench/commutator_bench --emax 6 --reps 20    # x3
+```
+
+Cost units (ladder = `LadderWorkItems(s, 1)` sum, comm122 = `Comm122WorkItems`, ph =
+`PhWorkItems`; `commutator_bench --model-mpi` prints the emax 8 values):
+
+| emax | term | units | minimum time, ms (best of runs) | original (shared machine), ms |
+|---|---|---|---|---|
+| 8 | comm222_pp_hhss | 5.841e9 | 10.221 | 10.59 |
+| 8 | comm122ss | 4.452e7 | 3.984 | 4.76 |
+| 8 | comm222_phss | 2.913e9 | 14.747 | 15.52 |
+| 8 | full commutator | - | 29.98 | 32.1 (this session's first run, loaded) |
+| 6 | comm222_pp_hhss | 2.934e8 | 0.7285 | - |
+| 6 | comm122ss | 4.825e6 | 0.5048 | - |
+| 6 | comm222_phss | 2.933e8 | 1.8248 | - |
+
+Weights in ladder units, w = (t_term / units_term) / (t_ladder / units_ladder):
+
+| emax | w_122 | w_ph | original (emax 8 / emax 6) |
+|---|---|---|---|
+| 8 | **51.1** | **2.89** | 59 / 2.9 (emax 6: 44 / 3.0) |
+| 6 | 42.1 | 2.51 | |
+
+Per invocation (its own minima, or its means) the emax 8 weights scatter by about 1-2 % (w_122
+50.9-52.3 and w_ph 2.86-2.91 over the five invocations). The emax 6 weights are lower because the
+smaller problem is not in the asymptotic regime (comm122 is bandwidth- and overhead-bound there);
+the cut matters at emax 8 and above, where w_122 = 51 and w_ph = 2.89 apply.
+
+Cost model with the new weights: `commutator_bench --model-mpi` takes no weights as input (they
+are compile-time constants, and the cut itself is built with them), so the table is the code's
+joint cut (built with 59 / 2.9) and the old equal cut, both evaluated with w_122 = 51.1, w_ph =
+2.89 by a scratch program (not in the repository) copying the "total" rows of `ModelMpiRow`.
+Total imbalance max / mean - 1 in %, old weights (59 / 2.9, from the Joint cut section) in
+brackets:
+
+| emax | ranks | joint cut, new weights (old) | equal cut, new weights (old) |
+|---|---|---|---|
+| 8 | 22 | 0.3 (0.1) | 18.7 (19.1) |
+| 8 | 64 | 142.5 (145.9) | 177.9 (180.5) |
+| 8 | 256 | 870.1 (883.6) | 905.4 (918.1) |
+| 10 | 22 | 0.1 (0.0) | 2.5 (2.6) |
+| 10 | 64 | 55.3 (58.2) | 104.4 (106.5) |
+| 10 | 256 | 521.0 (532.8) | 570.2 (581.1) |
+| 12 | 22 | 0.0 (0.0) | 1.5 (1.5) |
+| 12 | 64 | 0.7 (3.0) | 61.5 (63.0) |
+| 12 | 256 | 302.5 (311.9) | 363.4 (372.0) |
+
+Conclusion for run 4: on the idle machine w_ph = 2.89 reproduces the old 2.9, and w_122 = 51 is
+13 % below the old 59 (the old figure carried the 15 % error margin the loaded measurement
+announced; the emax 6 value 42-44 is the same in both measurements). The code constants are
+therefore good enough as they are: re-evaluating the cost model with the new weights changes no
+imbalance by more than 0.3 percentage points at 22 ranks and 3 points at 64 ranks (emax 12:
+3.0 % to 0.7 %), and does not change which configurations meet the 10 % goal (22 ranks all emax,
+64 ranks emax 12). If one set of weights goes into the code, use w_122 = 51 and w_ph = 2.9 (both
+from emax 8, the smallest size where the cut matters), and keep recalibrating them when the
+particle-hole and comm122 kernels change (the ph row panels of M12b next step 1 change w_ph). The
+64 and 256 rank failures at emax 8-10 are unaffected by the weights: a single whole comm122 or ph
+channel exceeds the rank's share, which only the phase-2 row splitting fixes. The mpi_scaling.sh
+rank-scaling table (1 x 16, 2 x 8, 4 x 4) was not repeated; no code was changed.
