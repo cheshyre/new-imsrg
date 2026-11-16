@@ -182,7 +182,8 @@ void CheckAgainstReference(const Term& term, int emax,
       }
     }
   }
-  if (need_nonzero) EXPECT_GT(nonzero, 0) << term.name << " is zero in every case";
+  if (need_nonzero)
+    EXPECT_GT(nonzero, 0) << term.name << " is zero in every case";
 }
 
 TEST(N7Comm132Batch, MatchesReferenceEmax1) {
@@ -229,13 +230,13 @@ TEST(N7Comm132Batch, MissingThreeBodyParts) {
   const op::Operator y2 = op::RandomOperator(
       ms, op::OperatorSpec::Scalar(2, Hermiticity::kHermitian), opt);
   double m = 0.0;
-  EXPECT_LE(BatchVsReference(kTerm132, ctx, x2, y3, kMidBudget, "O16 (A2, H3)",
-                             &m),
-            kTol);
+  EXPECT_LE(
+      BatchVsReference(kTerm132, ctx, x2, y3, kMidBudget, "O16 (A2, H3)", &m),
+      kTol);
   EXPECT_GT(m, 1.0e-6);
-  EXPECT_LE(BatchVsReference(kTerm132, ctx, x3, y2, kMidBudget, "O16 (A3, H2)",
-                             &m),
-            kTol);
+  EXPECT_LE(
+      BatchVsReference(kTerm132, ctx, x3, y2, kMidBudget, "O16 (A3, H2)", &m),
+      kTol);
   EXPECT_GT(m, 1.0e-6);
   // Two rank-2 operands: nothing is added by either term.
   op::Operator z = ZeroOutput(x2, y2, ctx);
@@ -335,10 +336,10 @@ void CheckPartitions(const Term& term, const std::string& ref) {
                                       const basis::RowSet& rows) {
       term.rows(a, b, z, ctx, rows, kMidBudget);
     };
-    testing::ExpectPartitionInvariance(
-        *ms, x, y, zero, run, kTol, false,
-        std::string("comm") + term.name + " " + ref + " (" + Letter(hx) +
-            ", " + Letter(hy) + ")");
+    testing::ExpectPartitionInvariance(*ms, x, y, zero, run, kTol, false,
+                                       std::string("comm") + term.name + " " +
+                                           ref + " (" + Letter(hx) + ", " +
+                                           Letter(hy) + ")");
   }
 }
 

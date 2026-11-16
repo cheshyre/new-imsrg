@@ -27,6 +27,7 @@
 // key's columns in plan order, and adds it, so there are no atomics and the
 // result is bitwise reproducible at a fixed batching. W is read as stored
 // (no transposed blocks are needed: the bra index is the row of W).
+
 #include <algorithm>
 #include <cstdint>
 #include <optional>
@@ -44,8 +45,8 @@
 #include "imsrg/commutator/detail/n7_common.h"
 #include "imsrg/commutator/detail/n7_terms.h"
 #include "imsrg/commutator/detail/n7_views.h"
-#include "imsrg/commutator/imsrg3.h"
 #include "imsrg/commutator/detail/three_body_impl.h"
+#include "imsrg/commutator/imsrg3.h"
 #include "imsrg/exec/device_buffer.h"
 #include "imsrg/exec/kokkos_backend.h"
 #include "imsrg/operator/pair_third.h"
@@ -272,12 +273,12 @@ void Comm132ssReference(const op::Operator& X, const op::Operator& Y,
             for (int two_j3 = lo; two_j3 <= two_J + j2b; two_j3 += 2) {
               double t = 0.0;
               if (xab != 0.0) {
-                t += xab * ThreeBodyElement(v, v.y3, two_j3, i, j, b, J,
-                                                    k, l, a, J);
+                t += xab *
+                     ThreeBodyElement(v, v.y3, two_j3, i, j, b, J, k, l, a, J);
               }
               if (yab != 0.0) {
-                t -= yab * ThreeBodyElement(v, v.x3, two_j3, i, j, b, J,
-                                                    k, l, a, J);
+                t -= yab *
+                     ThreeBodyElement(v, v.x3, two_j3, i, j, b, J, k, l, a, J);
               }
               acc += (two_j3 + 1) * t;
             }

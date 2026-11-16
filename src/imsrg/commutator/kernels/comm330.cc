@@ -156,10 +156,9 @@ void Comm330Rows(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   // pairwise); skip it to keep Z0 exactly zero.
   if (Z.hermiticity() == Hermiticity::kAntiHermitian) return;
   double total = 0.0;
-  ForEachN7Batch(v, ctx, rows, budget_bytes, N7Needs{false, false},
-                 [&total](const N7BatchInputs& in) {
-                   total += Comm330Batch(in);
-                 });
+  ForEachN7Batch(
+      v, ctx, rows, budget_bytes, N7Needs{false, false},
+      [&total](const N7BatchInputs& in) { total += Comm330Batch(in); });
   Z.zero_body() += total;
 }
 
