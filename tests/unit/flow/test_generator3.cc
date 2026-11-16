@@ -108,12 +108,12 @@ TEST(Generator3, VanishingDelta3IsFloored) {
   H.one_body().set(o0, o0, -1.0e-9);
   {
     const flow::Denominators den(H, opts);
-    EXPECT_EQ(den.three_body(o0, o0, o0, OrbitIndex{1}, OrbitIndex{1},
-                             OrbitIndex{1}),
-              -1.0e-3);
-    EXPECT_EQ(den.three_body(OrbitIndex{1}, OrbitIndex{1}, OrbitIndex{1}, o0,
-                             o0, o0),
-              1.0e-3);
+    EXPECT_EQ(
+        den.three_body(o0, o0, o0, OrbitIndex{1}, OrbitIndex{1}, OrbitIndex{1}),
+        -1.0e-3);
+    EXPECT_EQ(
+        den.three_body(OrbitIndex{1}, OrbitIndex{1}, OrbitIndex{1}, o0, o0, o0),
+        1.0e-3);
   }
   H.one_body().set_zero();
   const Operator eta_a = flow::ComputeGenerator(H, opts);

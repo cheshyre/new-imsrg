@@ -448,8 +448,8 @@ TEST(flow_bch, SplitStackCombinationFollowsTransformationOrder) {
   const Operator omega_new = flow::CombineOmegaStack(stack, bo, ws);
   Operator omega_old = stack[0];
   for (std::size_t n = 1; n < stack.size(); ++n) {
-    omega_old = flow::BchProduct(omega_old, stack[n], bo, CommutatorOptions{},
-                                 ws);
+    omega_old =
+        flow::BchProduct(omega_old, stack[n], bo, CommutatorOptions{}, ws);
   }
   Operator h_new = flow::BchTransform(flow::WithParticleRank(H0, 2),
                                       flow::WithParticleRank(omega_new, 2), bo,

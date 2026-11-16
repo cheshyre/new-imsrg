@@ -1008,3 +1008,8 @@ the orchestrator uses `O4` and up).
   perturbative triples (IT-8 is a single Omega), so the fix is validated by the BCH-level consistency
   test only, not by an end-to-end imsrg++ comparison (imsrg++ gives the old, inconsistent order).
   Say if a split-flow end-to-end triples test (split vs single Omega energy) is wanted.
+  **Correction to the owner's premise "no change for IT-8 (single Omega)":** IT-8's Magnus flows
+  have split Omega stacks, so the fix shifts the triples dE by -3.9e-4 MeV (He4 emax 2) and
+  -2.0e-3 MeV (O16 emax 3). Applied per D49 (old-code bug fix, reversible); no compatibility switch
+  (D35); the IT-8 goldens are to be regenerated from the patched reference (D42). Until then the
+  `driver_triples` IT-8 tests fail against the old goldens, by design.
