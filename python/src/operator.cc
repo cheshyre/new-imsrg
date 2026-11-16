@@ -306,7 +306,7 @@ void DefineOperatorInPlace(nb::class_<PyOperator>& cls) {
       });
 }
 
-/// Binds the norms and normal ordering of Operator.
+/// Binds the norms of Operator.
 void DefineOperatorNorms(nb::class_<PyOperator>& cls) {
   cls.def(
          "norm",
@@ -340,16 +340,20 @@ void DefineOperatorNorms(nb::class_<PyOperator>& cls) {
             GilFree r;
             return op::ThreeBodyNorm(x);
           },
-          "Norm of the three-body part (0 until the IMSRG(3) layout lands).")
-      .def(
-          "normal_ordered",
-          [](const PyOperator& o) {
-            const op::Operator& x = Input(o);
-            GilFree r;
-            return Result(op::NormalOrder(x));
-          },
-          "Normal ordering w.r.t. the model-space reference (two-body "
-          "approximation).")
+          "Norm of the three-body part (0 until the IMSRG(3) layout lands).");
+}
+
+/// Binds the normal ordering and the repr of Operator.
+void DefineOperatorNormalOrdering(nb::class_<PyOperator>& cls) {
+  cls.def(
+         "normal_ordered",
+         [](const PyOperator& o) {
+           const op::Operator& x = Input(o);
+           GilFree r;
+           return Result(op::NormalOrder(x));
+         },
+         "Normal ordering w.r.t. the model-space reference (two-body "
+         "approximation).")
       .def(
           "undo_normal_order",
           [](const PyOperator& o) {
@@ -454,6 +458,7 @@ void BindOperatorClass(nb::module_& m) {
   DefineOperatorArithmetic(cls);
   DefineOperatorInPlace(cls);
   DefineOperatorNorms(cls);
+  DefineOperatorNormalOrdering(cls);
 }
 
 /// Binds random_operator.

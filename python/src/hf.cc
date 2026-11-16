@@ -240,6 +240,10 @@ void BindNaturalOrbitals(nb::module_& m) {
       .def_prop_ro("occupations", [](const mbpt::NaturalOrbitals& n) {
         return n.occupations;
       });
+}
+
+/// Binds the density-matrix and natural-orbital functions.
+void BindNaturalOrbitalFunctions(nb::module_& m) {
   m.def(
       "mbpt2_density_matrix",
       [](PyOperator& h) {
@@ -294,6 +298,7 @@ void BindHf(nb::module_& m) {
   BindHfFunctions(m);
   BindMbpt(m);
   BindNaturalOrbitals(m);
+  BindNaturalOrbitalFunctions(m);
 }
 
 }  // namespace imsrg::py
