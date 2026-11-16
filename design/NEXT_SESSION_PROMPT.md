@@ -10,7 +10,8 @@ MS2 structural style pass, the M15 reference preparation, **N7 performance** (2.
 faster at emax 3 / 4 / 5; row-range interface; fused driver) and **M12b phase 1 plus the D7/D8 part
 of phase 2** (MPI IMSRG(2) commutator, distributed three-body storage). `develop` = **7bfba4e**.
 After run 3 comes the **owner interview** (`design/INTERVIEW_PROMPT.md`), whose answers (D61 and up;
-D60 is the N7 decision row; TODO(orchestrator): no D60 row exists in `00` on 7bfba4e, check) this prompt must reflect before the run starts. This prompt starts the
+D59 and D60 are the M12b and N7 decision rows of run 3) this prompt must reflect before the run
+starts. This prompt starts the
 fourth run. (The prompts of earlier runs are in the git history of this file.)
 
 **Owner pre-flight (once, before launching):**
