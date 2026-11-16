@@ -11,6 +11,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "imsrg/basis/model_space.h"
 #include "imsrg/driver/config/schema.h"
@@ -39,6 +40,10 @@ struct PreparedHamiltonian {
   /// basis and is what operators are transformed with. `hf` keeps the solution
   /// in the HF basis.
   std::optional<hf::HFResult> nat;
+  /// For basis.kind = "nat": the natural occupations (MBPT(2) one-body density
+  /// matrix of the HF-basis H, one per NAT orbit, indexed like the basis
+  /// orbits); empty otherwise. Reused by the OccNat3 cut of IMSRG(3).
+  std::vector<double> nat_occupations;
   /// E_HF in the basis of `hno` (HF or NAT), or the zero-body part of the
   /// normal-ordered oscillator-basis H, MeV.
   double e_reference = 0.0;

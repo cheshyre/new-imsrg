@@ -81,6 +81,7 @@ void ToNaturalOrbitalBasis(const op::Operator& H, const op::No2bThreeBody* v3,
   log::Info("NAT basis: E_HF = {:.8f} MeV (HF basis {:.8f} MeV)", r.e_hf,
             out.hf->e_hf);
   out.nat = std::move(r);
+  out.nat_occupations = nat.occupations;
 }
 
 /// Builds the oscillator model space of the configuration.

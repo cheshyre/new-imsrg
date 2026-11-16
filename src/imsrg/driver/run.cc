@@ -36,6 +36,7 @@
 #include "imsrg/flow/triples.h"
 #include "imsrg/io/valence_writers.h"
 #include "imsrg/mbpt/energies.h"
+#include "imsrg/mbpt/natural_orbitals.h"
 #include "imsrg/operator/basis_transform.h"
 #include "imsrg/operator/normal_ordering.h"
 
@@ -67,7 +68,9 @@ void RejectPlanned(const RunConfig& c) {
   if (c.imsrg.use_brueckner_bch) Planned("imsrg.use_brueckner_bch");
   if (c.imsrg.goose_tank) Planned("imsrg.goose_tank");
   if (c.imsrg.perturbative_triples && c.imsrg3.occ_nat3_cut) {
-    // imsrg++.cc:570 switches to natural orbitals for the cut.
+    // imsrg++.cc:570 switches to natural orbitals for the cut. (The IMSRG(3)
+    // flow supports the cut, see MakeFlowStart; the perturbative triples
+    // follow once flow/triples is rewritten.)
     Planned("imsrg3.occ_nat3_cut with imsrg.perturbative_triples");
   }
   if (c.imsrg.space) Planned("[imsrg.space] (IMSRG model-space truncation)");
@@ -77,7 +80,6 @@ void RejectPlanned(const RunConfig& c) {
       Planned("imsrg3.variant other than \"n7\"");
     }
     if (c.imsrg3.only_2b_omega) Planned("imsrg3.only_2b_omega");
-    if (c.imsrg3.occ_nat3_cut) Planned("imsrg3.occ_nat3_cut with IMSRG(3)");
     if (c.imsrg.perturbative_triples) {
       Planned("imsrg.perturbative_triples with imsrg3.in_flow");
     }
@@ -591,12 +593,26 @@ FlowStart MakeFlowStart(const RunConfig& config,
     cuts.e3max = config.basis.e3max;
     cuts.emax_3body = -1;
     if (config.imsrg3.de3max) cuts.de3max = *config.imsrg3.de3max;
+    if (config.imsrg3.occ_nat3_cut) {
+      // imsrg++.cc:570: natural occupations of the MBPT(2) density matrix,
+      // also in an HF-basis run; the NAT step's values are reused.
+      cuts.occnat3_cut = *config.imsrg3.occ_nat3_cut;
+      if (!ph.nat_occupations.empty()) {
+        cuts.natural_occupations = ph.nat_occupations;
+      } else {
+        op::Operator hno = ph.hno;  // Mbpt2DensityMatrix syncs its argument
+        const linalg::Matrix<double> rho = mbpt::Mbpt2DensityMatrix(hno);
+        cuts.natural_occupations =
+            mbpt::ComputeNaturalOrbitals(rho, ph.hno.model_space()).occupations;
+      }
+    }
     const std::shared_ptr<const basis::ModelSpace> ms3 =
         ph.hno.model_space_ptr()->WithThreeBody(cuts);
     log::Info(
-        "IMSRG(3)-N7: e3max = {}, dE3max = {}, 3-body states kept: {} out of "
-        "{}",
-        cuts.e3max, cuts.de3max, ms3->three_body_space()->NumRows(),
+        "IMSRG(3)-N7: e3max = {}, dE3max = {}, OccNat3Cut = {:e}, 3-body "
+        "states kept: {} out of {}",
+        cuts.e3max, cuts.de3max, cuts.occnat3_cut,
+        ms3->three_body_space()->NumRows(),
         ms3->three_body()->SumChannelKets());
     start.ms_flow = ms3;
     start.h_start = op::WithModelSpace(ph.hno, ms3);

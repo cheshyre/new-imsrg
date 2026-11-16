@@ -117,7 +117,7 @@ imsrg_add_test(NAME commutator_n7_fused
 set(_imsrg_n7_support
     "${CMAKE_CURRENT_SOURCE_DIR}/n7_test_support.cc"
     "${PROJECT_SOURCE_DIR}/tests/support/three_body_test_support.cc")
-foreach(_t n7 n7_133_132 n7_231_331 n7_232 n7_full n7_views)
+foreach(_t n7 n7_133_132 n7_231_331 n7_232 n7_full n7_occnat n7_views)
   imsrg_add_test(NAME commutator_${_t}
     SOURCES test_${_t}.cc ${_imsrg_exec_main} ${_imsrg_comm_support} ${_imsrg_n7_support}
     DEPS commutator commutator_ref operator
