@@ -110,8 +110,9 @@ detail::TwoBodyView Workspace::Impl::two_body_view(
   return v;
 }
 
-Workspace::Workspace(std::shared_ptr<const basis::ModelSpace> ms)
-    : ms_(std::move(ms)) {
+Workspace::Workspace(std::shared_ptr<const basis::ModelSpace> ms,
+                     const WorkspaceOptions& opts)
+    : ms_(std::move(ms)), comm_(opts.comm) {
   IMSRG_CHECK(ms_ != nullptr, "Workspace: model space is null");
   impl_ = std::make_unique<Impl>(ms_);
   if (ms_->three_body_space() != nullptr) {
