@@ -140,8 +140,8 @@ TriplesCounts CheckAgainstFull(const char* label, const char* ref, int emax,
   EXPECT_NE(e_full, 0.0);
   EXPECT_LE(rel, 1.0e-14);
 
-  const TriplesCounts want = RestrictedCounts(
-      *ms2, *ms3->three_body_space(), full_ctx.impl().pair_third);
+  const TriplesCounts want = RestrictedCounts(*ms2, *ms3->three_body_space(),
+                                              full_ctx.impl().pair_third);
   const TriplesCounts got = ctx.counts();
   std::printf(
       "[triples] %s: channels %lld triples %lld (hhh %lld ppp %lld) rows %lld "
@@ -149,8 +149,8 @@ TriplesCounts CheckAgainstFull(const char* label, const char* ref, int emax,
       label, static_cast<long long>(got.channels),
       static_cast<long long>(got.triples),
       static_cast<long long>(got.triples_hhh),
-      static_cast<long long>(got.triples_ppp),
-      static_cast<long long>(got.rows), static_cast<long long>(got.states),
+      static_cast<long long>(got.triples_ppp), static_cast<long long>(got.rows),
+      static_cast<long long>(got.states),
       static_cast<long long>(ctx.TableBytes()));
   EXPECT_GT(got.triples, 0);
   EXPECT_EQ(got.channels, want.channels);
@@ -189,9 +189,9 @@ TEST(TriplesContext, O16Emax3) {
 TEST(TriplesContext, DE3maxCut) {
   ThreeBodyCuts cuts;
   cuts.de3max = 4.0;
-  const TriplesCounts c = CheckAgainstFull(
-      "O16 emax 3 dE3max 4", "O16", 3, cuts, Hermiticity::kAntiHermitian,
-      Hermiticity::kHermitian);
+  const TriplesCounts c =
+      CheckAgainstFull("O16 emax 3 dE3max 4", "O16", 3, cuts,
+                       Hermiticity::kAntiHermitian, Hermiticity::kHermitian);
   EXPECT_LT(c.rows, c.rows_before_cuts);
 }
 
@@ -222,9 +222,9 @@ TEST(TriplesContext, OccNat3Cut) {
     cuts.natural_occupations.push_back(occ[i] > 0.5 ? 0.97 - 0.05 * k
                                                     : 0.02 + 0.04 * k);
   }
-  const TriplesCounts c = CheckAgainstFull(
-      "O16 emax 2 OccNat3", "O16", 2, cuts, Hermiticity::kAntiHermitian,
-      Hermiticity::kHermitian);
+  const TriplesCounts c =
+      CheckAgainstFull("O16 emax 2 OccNat3", "O16", 2, cuts,
+                       Hermiticity::kAntiHermitian, Hermiticity::kHermitian);
   EXPECT_GT(c.rows, 0);
   EXPECT_LT(c.rows, c.rows_before_cuts);
 }
@@ -242,7 +242,8 @@ TEST(TriplesContext, ErrorsAndMoves) {
   EXPECT_THROW((void)PerturbativeTriplesEnergy(X, Y, bad, ctx), InputError);
   EXPECT_THROW(TriplesContext(nullptr, cuts), InputError);
   EXPECT_GT(ctx.ScratchBytesPerTeam(), 0);
-  EXPECT_GT(ctx.TileMultiplyAdds(), 0.0);
+  EXPECT_GT(ctx.TileWork().w, 0.0);
+  EXPECT_GT(ctx.TileWork().epilogue, 0.0);
   TriplesContext moved(std::move(ctx));
   // The sum is a parallel reduction: equal up to its order.
   EXPECT_LE(Rel(PerturbativeTriplesEnergy(X, Y, eps, moved), e), 1.0e-14);

@@ -29,7 +29,7 @@ struct TriplesOptions {
 
 /// Result of `PerturbativeTriples`.
 struct TriplesResult {
-  double de = 0.0;              ///< Energy correction dE (MeV).
+  double de = 0.0;  ///< Energy correction dE (MeV).
   /// 3B rows (kets) kept by the cuts, among those the triples use: the hhh
   /// and ppp triples of the channels with an hhh triple (M10-Q75; not the
   /// whole three-body space, which is never built).

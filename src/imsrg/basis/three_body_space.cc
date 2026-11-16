@@ -87,8 +87,7 @@ ThreeBodySpace::ThreeBodySpace(std::vector<KeptChannel3> channels,
                       tr.row_begin.value() <= tr.row_end.value() &&
                       tr.row_end.value() <= kc.dim,
                   "ThreeBodySpace: triple rows outside the channel");
-      for (std::int32_t r = tr.row_begin.value(); r < tr.row_end.value();
-           ++r) {
+      for (std::int32_t r = tr.row_begin.value(); r < tr.row_end.value(); ++r) {
         row_triple_[static_cast<std::size_t>(kc.row_offset + r)] = t;
       }
     }

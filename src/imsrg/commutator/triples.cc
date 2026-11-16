@@ -70,8 +70,8 @@ void Occupations(std::span<const double> occ, std::int32_t a, std::int32_t b,
 /// 8 (3 emax_3body + 1). O(Jab range x J range).
 template <class Fn>
 void ForEachTripleRow(const basis::SingleParticleBasis& basis, std::int32_t a,
-                      std::int32_t b, std::int32_t c,
-                      std::int32_t num_channels, Fn&& fn) {
+                      std::int32_t b, std::int32_t c, std::int32_t num_channels,
+                      Fn&& fn) {
   const basis::Orbit& oa = basis.orbit(OrbitIndex{a});
   const basis::Orbit& ob = basis.orbit(OrbitIndex{b});
   const basis::Orbit& oc = basis.orbit(OrbitIndex{c});
@@ -86,7 +86,8 @@ void ForEachTripleRow(const basis::SingleParticleBasis& basis, std::int32_t a,
     const std::int32_t jlo = std::abs(2 * jpq - jr);
     const std::int32_t jhi = 2 * jpq + jr;
     for (std::int32_t two_j = jlo; two_j <= jhi; two_j += 2) {
-      const std::int32_t ch = ((two_j - 1) / 2) * 8 + parity * 4 + (two_tz + 3) / 2;
+      const std::int32_t ch =
+          ((two_j - 1) / 2) * 8 + parity * 4 + (two_tz + 3) / 2;
       if (two_j >= 1 && ch < num_channels &&
           basis::CheckChannelKet(oa, ob, oc, OrbitIndex{a}, OrbitIndex{b},
                                  OrbitIndex{c}, 2 * jpq, two_j, parity,
@@ -152,10 +153,9 @@ basis::ThreeBodySpace EnumerateReducedSpace(const basis::ModelSpace& ms,
   visit(true, [&](std::int32_t a, std::int32_t b, std::int32_t c, bool, bool,
                   bool passes) {
     if (!passes) return;
-    ForEachTripleRow(basis, a, b, c, num_channels,
-                     [&](std::int32_t ch, std::int32_t) {
-                       rr.relevant[U(ch)] = 1;
-                     });
+    ForEachTripleRow(
+        basis, a, b, c, num_channels,
+        [&](std::int32_t ch, std::int32_t) { rr.relevant[U(ch)] = 1; });
   });
 
   visit(false, [&](std::int32_t a, std::int32_t b, std::int32_t c, bool hhh,
@@ -175,8 +175,8 @@ basis::ThreeBodySpace EnumerateReducedSpace(const basis::ModelSpace& ms,
             t.a = OrbitIndex{a};
             t.b = OrbitIndex{b};
             t.c = OrbitIndex{c};
-            t.row_begin = basis::KeptRow3Index{
-                static_cast<std::int32_t>(rows.size())};
+            t.row_begin =
+                basis::KeptRow3Index{static_cast<std::int32_t>(rows.size())};
             t.row_end = t.row_begin;
             t.sym = (a == b && b == c) ? 1 : (a == b || b == c) ? 3 : 6;
             tl.push_back(t);
@@ -206,13 +206,15 @@ basis::ThreeBodySpace EnumerateReducedSpace(const basis::ModelSpace& ms,
     kc.two_tz = TwoTz{2 * (ch % 4) - 3};
     kc.dim = static_cast<std::int32_t>(rr.two_jab[U(ch)].size());
     kc.row_offset = static_cast<std::int64_t>(two_jab.size());
-    kc.triple_begin = basis::Triple3Index{static_cast<std::int32_t>(triples.size())};
+    kc.triple_begin =
+        basis::Triple3Index{static_cast<std::int32_t>(triples.size())};
     const Channel3Index new_ch{static_cast<std::int32_t>(channels.size())};
     for (basis::OrbitTriple t : tl) {
       t.channel = new_ch;
       triples.push_back(t);
     }
-    kc.triple_end = basis::Triple3Index{static_cast<std::int32_t>(triples.size())};
+    kc.triple_end =
+        basis::Triple3Index{static_cast<std::int32_t>(triples.size())};
     two_jab.insert(two_jab.end(), rr.two_jab[U(ch)].begin(),
                    rr.two_jab[U(ch)].end());
     channels.push_back(kc);
@@ -261,6 +263,7 @@ struct TriplesContext::Impl {
   std::int64_t scratch_bytes = 0;
 
   /// Host copies for the reports.
+  std::vector<std::int64_t> host_row_off;  ///< Flat first row per triple (+1).
   std::vector<std::int32_t> host_tr_channel, host_ch_two_j;
   std::vector<std::int32_t> host_tr_a, host_tr_b, host_tr_c;
   std::vector<double> host_occ;
@@ -399,11 +402,10 @@ TriplesContext::Impl::Impl(const basis::ModelSpace& ms,
           if (!li.has_value()) continue;
           const std::size_t e = (U(o) * U(num_j) + U(J)) * U(norb) + U(gp);
           p_local[e] = li->value();
-          p_factor[e] = o < a ? 1.0
-                        : o > a
-                            ? static_cast<double>(
-                                  basis::ExchangePhase(jo, ja, TwoJ{2 * J}))
-                            : constants::kSqrt2;
+          p_factor[e] = o < a   ? 1.0
+                        : o > a ? static_cast<double>(
+                                      basis::ExchangePhase(jo, ja, TwoJ{2 * J}))
+                                : constants::kSqrt2;
         }
       }
     }
@@ -493,6 +495,10 @@ TriplesContext::Impl::Impl(const basis::ModelSpace& ms,
   order_triples = Upload(order, "commutator::triples_order");
   scratch_bytes = num_triples > 0 ? detail::TeamScratchBytes(ext) : 0;
 
+  host_row_off.assign(nt + 1, 0);
+  for (std::size_t t = 0; t < nt; ++t) {
+    host_row_off[t + 1] = host_row_off[t] + (t_re[t] - t_rb[t]);
+  }
   host_tr_channel = std::move(t_ch);
   host_tr_a = std::move(t_a);
   host_tr_b = std::move(t_b);
@@ -504,20 +510,19 @@ TriplesContext::Impl::Impl(const basis::ModelSpace& ms,
   host_group_orbits = std::move(g_orb);
   host_group_j_pos = std::move(g_jpos);
 
-  table_bytes =
-      sixj.size_bytes() + pair_third.Bytes() + BufferBytes(ch_two_j) +
-      BufferBytes(ch_dim) + BufferBytes(ch_triple_begin) +
-      BufferBytes(ch_triple_end) + BufferBytes(ch_row_offset) +
-      BufferBytes(tr_a) + BufferBytes(tr_b) + BufferBytes(tr_c) +
-      BufferBytes(tr_channel) + BufferBytes(tr_row_begin) +
-      BufferBytes(tr_row_end) + BufferBytes(tr_sym) + BufferBytes(orb_n) +
-      BufferBytes(orb_l) + BufferBytes(orb_j2) + BufferBytes(orb_tz2) +
-      BufferBytes(orb_occ) + BufferBytes(group_offset) +
-      BufferBytes(group_orbits) + BufferBytes(group_j_pos) +
-      BufferBytes(pair_local) + BufferBytes(pair_factor) +
-      BufferBytes(leg_range) + BufferBytes(state_bra_base) +
-      BufferBytes(state_ket_base) + BufferBytes(state_dim) +
-      BufferBytes(order_triples);
+  table_bytes = sixj.size_bytes() + pair_third.Bytes() + BufferBytes(ch_two_j) +
+                BufferBytes(ch_dim) + BufferBytes(ch_triple_begin) +
+                BufferBytes(ch_triple_end) + BufferBytes(ch_row_offset) +
+                BufferBytes(tr_a) + BufferBytes(tr_b) + BufferBytes(tr_c) +
+                BufferBytes(tr_channel) + BufferBytes(tr_row_begin) +
+                BufferBytes(tr_row_end) + BufferBytes(tr_sym) +
+                BufferBytes(orb_n) + BufferBytes(orb_l) + BufferBytes(orb_j2) +
+                BufferBytes(orb_tz2) + BufferBytes(orb_occ) +
+                BufferBytes(group_offset) + BufferBytes(group_orbits) +
+                BufferBytes(group_j_pos) + BufferBytes(pair_local) +
+                BufferBytes(pair_factor) + BufferBytes(leg_range) +
+                BufferBytes(state_bra_base) + BufferBytes(state_ket_base) +
+                BufferBytes(state_dim) + BufferBytes(order_triples);
 }
 
 detail::TileViews TriplesContext::Impl::Views() const {
@@ -605,8 +610,8 @@ const TriplesContext::Impl& TriplesContext::impl() const {
   return *impl_;
 }
 
-double TriplesContext::TileMultiplyAdds() const {
-  if (impl_ == nullptr) return 0.0;
+TriplesWork TriplesContext::TileWork() const {
+  if (impl_ == nullptr) return {};
   const Impl& im = *impl_;
   const op::PairThirdView pv = im.pair_third.host_view();
   const std::int32_t nj = im.nj;
@@ -631,7 +636,7 @@ double TriplesContext::TileMultiplyAdds() const {
     if (te[c] == 0) tb[c] = static_cast<std::int32_t>(t);
     te[c] = static_cast<std::int32_t>(t) + 1;
   }
-  double total = 0.0;
+  TriplesWork work;
   for (std::size_t c = 0; c < nc; ++c) {
     const std::int32_t two_J = im.host_ch_two_j[c];
     const std::int32_t st0 = pv.ch_state_offset[c];
@@ -656,6 +661,16 @@ double TriplesContext::TileMultiplyAdds() const {
                     im.host_tr_c[U(tp)], o_p, u_p);
         const double num = o_t * u_p - o_p * u_t;
         if (num < detail::kTriplesSkip && num > -detail::kTriplesSkip) continue;
+        const std::int64_t row_t = im.host_row_off[U(t)];
+        const std::int64_t row_p = im.host_row_off[U(tp)];
+        const double nnz_t = static_cast<double>(
+            pv.r.ptr[im.host_row_off[U(t) + 1]] - pv.r.ptr[row_t]);
+        const double nnz_p = static_cast<double>(
+            pv.r.ptr[im.host_row_off[U(tp) + 1]] - pv.r.ptr[row_p]);
+        work.epilogue +=
+            static_cast<double>(pv.tr_state_end[t] - pv.tr_state_begin[t]) *
+                nnz_p +
+            static_cast<double>(im.host_row_off[U(tp) + 1] - row_p) * nnz_t;
         for (std::int32_t r = pv.tr_state_begin[t]; r < pv.tr_state_end[t];
              ++r) {
           const std::int32_t z = pv.st_r[st0 + r];
@@ -675,13 +690,13 @@ double TriplesContext::TileMultiplyAdds() const {
             const std::int32_t lo =
                 std::max(std::abs(two_j1 - jw), std::abs(two_j2 - jz));
             const std::int32_t hi = std::min(two_j1 + jw, two_j2 + jz);
-            total += static_cast<double>(count_in(g, lo, hi));
+            work.w += static_cast<double>(count_in(g, lo, hi));
           }
         }
       }
     }
   }
-  return total;
+  return work;
 }
 
 namespace {

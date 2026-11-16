@@ -60,6 +60,15 @@ struct TriplesCounts {
   std::int64_t states = 0;
 };
 
+/// Multiply-adds of the tiles of a `TriplesContext` (see
+/// `TriplesContext::TileWork`).
+struct TriplesWork {
+  double w = 0.0;         ///< The sums of W.
+  double epilogue = 0.0;  ///< The epilogue R W R^T.
+  /// Both parts.
+  double total() const noexcept { return w + epilogue; }
+};
+
 /// Device tables of the perturbative-triples tiles for one model space and one
 /// set of three-body cuts: the 3B 6j table, the reduced kept space (see the
 /// file comment) with its pair-third states and the recoupling map R only,
@@ -108,14 +117,15 @@ class TriplesContext {
   /// 0 for a moved-from context.
   std::int64_t ScratchBytesPerTeam() const noexcept;
 
-  /// Multiply-adds of the tiles the triples evaluate: over the tiles (T, T'),
-  /// T' < T in a channel with a nonzero occupation factor, the sum over the
-  /// pair-third states r of T and s of T' of the number of internal orbits a
-  /// that couple (the group of a, and the triangles of the 6j symbol
-  /// {j_w j_a J_r; j_z J J_s}), i.e. the work of W; the epilogue R W R^T is not
-  /// included. Host computation, O(sum over tiles of m m'): use it for
-  /// reports, not in loops. Returns 0 for a moved-from context.
-  double TileMultiplyAdds() const;
+  /// Multiply-adds of the tiles the triples evaluate, over the tiles (T, T'),
+  /// T' < T in a channel with a nonzero occupation factor (m, m' pair-third
+  /// states, k, k' kept rows): `w` is the sum over the pair-third states r of
+  /// T and s of T' of the number of internal orbits a that couple (the orbit
+  /// group of a, and the triangles of the 6j symbol {j_w j_a J_r; j_z J J_s});
+  /// `epilogue` is m nnz(R_T') + k' nnz(R_T), the work of R W R^T. Host
+  /// computation, O(sum over tiles of m m'): use it for reports, not in loops.
+  /// All zero for a moved-from context.
+  TriplesWork TileWork() const;
 
   /// Internal tables (defined in triples.cc).
   struct Impl;
@@ -143,7 +153,7 @@ class TriplesContext {
 /// @throws InvariantError if X or Y lives on a model space whose basis,
 ///         reference or partition differs from the context's, or the context
 ///         was moved from.
-/// Complexity: `TriplesContext::TileMultiplyAdds()` multiply-adds for W plus
+/// Complexity: `TriplesContext::TileWork().w` multiply-adds for W plus
 /// the gathers O((m + m') n_a) and the epilogue per tile; one team per bra
 /// triple.
 double PerturbativeTriplesEnergy(const op::Operator& X, const op::Operator& Y,
