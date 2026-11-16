@@ -29,6 +29,51 @@ JRange JRangeOf(const Orbit& a, const Orbit& b) noexcept {
   return {std::abs(a.j2.twice - b.j2.twice) / 2, (a.j2.twice + b.j2.twice) / 2};
 }
 
+// Builds the kets in imsrg++ order (lexicographic, p <= q) for n orbits.
+std::vector<Ket> BuildOrderedKets(std::int32_t n) {
+  std::vector<Ket> kets;
+  kets.reserve(static_cast<std::size_t>(n) * static_cast<std::size_t>(n + 1) /
+               2);
+  for (std::int32_t p = 0; p < n; ++p) {
+    for (std::int32_t q = p; q < n; ++q) {
+      IMSRG_CHECK(ImsrgppKetIndex(OrbitIndex{p}, OrbitIndex{q}, n).value() ==
+                      static_cast<std::int32_t>(kets.size()),
+                  "ket position differs from the imsrg++ Index2 formula");
+      kets.push_back(Ket{OrbitIndex{p}, OrbitIndex{q}});
+    }
+  }
+  return kets;
+}
+
+// Builds the nch channels in imsrg++ order, without kets.
+std::vector<TwoBodyChannel> MakeChannelSkeleton(std::int32_t nch) {
+  std::vector<TwoBodyChannel> channels(static_cast<std::size_t>(nch));
+  for (std::int32_t ch = 0; ch < nch; ++ch) {
+    TwoBodyChannel& c = channels[static_cast<std::size_t>(ch)];
+    c.two_j = TwoJ{2 * (ch / kChannelsPerJ)};
+    c.two_tz = TwoTz{2 * ((ch % kChannelsPerJ) / kNumParities - 1)};
+    c.parity = (ch % kNumParities == 0) ? Parity::kEven : Parity::kOdd;
+  }
+  return channels;
+}
+
+// Throws InputError unless `occupations` and `classes` have one entry per
+// orbit.
+void CheckSubsetInputs(std::int32_t num_orbits, std::size_t num_occupations,
+                       std::size_t num_classes) {
+  const auto n = static_cast<std::size_t>(num_orbits);
+  if (num_occupations != n) {
+    throw InputError("TwoBodyKetSubsets: occupations has size " +
+                     std::to_string(num_occupations) + ", expected " +
+                     std::to_string(n));
+  }
+  if (num_classes != n) {
+    throw InputError("TwoBodyKetSubsets: classes has size " +
+                     std::to_string(num_classes) + ", expected " +
+                     std::to_string(n));
+  }
+}
+
 }  // namespace
 
 std::string_view KetClassName(KetClass c) noexcept {
@@ -60,26 +105,10 @@ TwoBodyChannels::TwoBodyChannels(const SingleParticleBasis& basis)
       max_J_(basis.max_two_body_J()) {
   const std::int32_t n = num_orbits();
 
-  // Kets in imsrg++ order (lexicographic, p <= q).
-  kets_.reserve(static_cast<std::size_t>(n) * static_cast<std::size_t>(n + 1) /
-                2);
-  for (std::int32_t p = 0; p < n; ++p) {
-    for (std::int32_t q = p; q < n; ++q) {
-      IMSRG_CHECK(ImsrgppKetIndex(OrbitIndex{p}, OrbitIndex{q}, n).value() ==
-                      static_cast<std::int32_t>(kets_.size()),
-                  "ket position differs from the imsrg++ Index2 formula");
-      kets_.push_back(Ket{OrbitIndex{p}, OrbitIndex{q}});
-    }
-  }
+  kets_ = BuildOrderedKets(n);
 
   const std::int32_t nch = kChannelsPerJ * (max_J_ + 1);
-  channels_.resize(static_cast<std::size_t>(nch));
-  for (std::int32_t ch = 0; ch < nch; ++ch) {
-    TwoBodyChannel& c = channels_[static_cast<std::size_t>(ch)];
-    c.two_j = TwoJ{2 * (ch / kChannelsPerJ)};
-    c.two_tz = TwoTz{2 * ((ch % kChannelsPerJ) / kNumParities - 1)};
-    c.parity = (ch % kNumParities == 0) ? Parity::kEven : Parity::kOdd;
-  }
+  channels_ = MakeChannelSkeleton(nch);
 
   // One pass over the kets in ascending order: each channel list is ascending
   // (the local order).
@@ -213,17 +242,7 @@ TwoBodyKetSubsets::TwoBodyKetSubsets(const TwoBodyChannels& channels,
                                      std::span<const double> occupations,
                                      std::span<const OrbitClass> classes)
     : num_channels_(channels.num_channels()) {
-  const auto n = static_cast<std::size_t>(channels.num_orbits());
-  if (occupations.size() != n) {
-    throw InputError("TwoBodyKetSubsets: occupations has size " +
-                     std::to_string(occupations.size()) + ", expected " +
-                     std::to_string(n));
-  }
-  if (classes.size() != n) {
-    throw InputError("TwoBodyKetSubsets: classes has size " +
-                     std::to_string(classes.size()) + ", expected " +
-                     std::to_string(n));
-  }
+  CheckSubsetInputs(channels.num_orbits(), occupations.size(), classes.size());
 
   subset_offsets_.reserve(
       static_cast<std::size_t>(num_channels_) * kNumKetClasses + 1);
