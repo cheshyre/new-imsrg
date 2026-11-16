@@ -18,6 +18,7 @@
 #include "imsrg/base/constants.h"
 #include "imsrg/base/error.h"
 #include "imsrg/base/types.h"
+#include "imsrg/basis/three_body_rows.h"
 #include "imsrg/basis/three_body_space.h"
 #include "imsrg/basis/two_body_channels.h"
 #include "imsrg/commutator/detail/three_body_impl.h"
@@ -69,6 +70,61 @@ std::vector<std::int32_t> ByCost(const std::vector<double>& cost) {
                      return cost[U(x)] > cost[U(y)];
                    });
   return order;
+}
+
+/// The team work items of `rows` for mode kLowerPacked (`lower`) or
+/// kFullDense: for every range [tb, te) of a channel and every bra triple T of
+/// the channel (lower: T >= tb), {T, tb, min(te, T + 1)} resp. {T, tb, te}.
+/// Sorted by estimated work m_T sum_{tp in range} m_tp (m = pair-third states,
+/// `prefix` their prefix sums over the triples), largest first, ties by T
+/// then ket_begin. O(items log items).
+std::vector<detail::TileWorkItem> BuildTileItems(
+    const basis::ThreeBodySpace& space, const std::vector<std::int64_t>& prefix,
+    const basis::RowSet& rows, bool lower) {
+  std::vector<detail::TileWorkItem> items;
+  for (const basis::RowRange& r : rows.ranges()) {
+    const basis::KeptChannel3& kc = space.channel(r.channel);
+    const std::int32_t tb = r.triple_begin.value();
+    const std::int32_t te = r.triple_end.value();
+    const std::int32_t t_first = lower ? tb : kc.triple_begin.value();
+    for (std::int32_t t = t_first; t < kc.triple_end.value(); ++t) {
+      items.push_back({t, tb, lower ? std::min(te, t + 1) : te});
+    }
+  }
+  const auto work = [&prefix](const detail::TileWorkItem& it) {
+    const std::int64_t m =
+        prefix[U(it.bra_triple) + 1] - prefix[U(it.bra_triple)];
+    return m * (prefix[U(it.ket_end)] - prefix[U(it.ket_begin)]);
+  };
+  std::sort(
+      items.begin(), items.end(),
+      [&work](const detail::TileWorkItem& x, const detail::TileWorkItem& y) {
+        const std::int64_t wx = work(x);
+        const std::int64_t wy = work(y);
+        if (wx != wy) return wx > wy;
+        if (x.bra_triple != y.bra_triple) return x.bra_triple < y.bra_triple;
+        return x.ket_begin < y.ket_begin;
+      });
+  return items;
+}
+
+/// The items as a flat int32 array (3 per item: bra, ket begin, ket end), the
+/// element type `exec::DeviceBuffer` supports.
+std::vector<std::int32_t> Flatten(
+    const std::vector<detail::TileWorkItem>& items) {
+  std::vector<std::int32_t> flat;
+  flat.reserve(3 * items.size());
+  for (const detail::TileWorkItem& it : items) {
+    flat.insert(flat.end(), {it.bra_triple, it.ket_begin, it.ket_end});
+  }
+  return flat;
+}
+
+/// The device items of an upload made by `Flatten` (TileWorkItem is three
+/// int32 without padding).
+const detail::TileWorkItem* ItemsOf(const exec::DeviceBuffer<std::int32_t>& b) {
+  static_assert(sizeof(detail::TileWorkItem) == 3 * sizeof(std::int32_t));
+  return reinterpret_cast<const detail::TileWorkItem*>(b.device_data());
 }
 
 /// Group of the orbit `o` (see `detail::OrbitGroupsView`).
@@ -392,12 +448,11 @@ void InitStateBases(ThreeBodyContext::Impl& im, const basis::ModelSpace& ms3) {
   }
 }
 
-/// Fills the per-triple cost estimates and the tile extents (`im.ext`) from the
-/// pair-third state counts; `cost_triples` skips triple pairs without work.
+/// Fills the per-triple cost estimate of the triples mode and the tile extents
+/// (`im.ext`) from the pair-third state counts; `cost_triples` skips triple
+/// pairs without work.
 void ComputeWorkCosts(ThreeBodyContext::Impl& im, const basis::ModelSpace& ms3,
                       const op::PairThirdView& pv, const KeptHost& kh,
-                      std::vector<double>& cost_lower,
-                      std::vector<double>& cost_full,
                       std::vector<double>& cost_triples) {
   const std::size_t nc = kh.c_tb.size();
   const std::vector<std::int32_t>& c_tb = kh.c_tb;
@@ -420,16 +475,8 @@ void ComputeWorkCosts(ThreeBodyContext::Impl& im, const basis::ModelSpace& ms3,
   };
   const double loose = 0.5 * detail::kTriplesSkip;
   for (std::size_t c = 0; c < nc; ++c) {
-    double sum_all = 0.0;
-    for (std::int32_t t = c_tb[c]; t < c_te[c]; ++t) {
-      sum_all += pv.tr_state_end[t] - pv.tr_state_begin[t];
-    }
-    double running = 0.0;
     for (std::int32_t t = c_tb[c]; t < c_te[c]; ++t) {
       const double m = pv.tr_state_end[t] - pv.tr_state_begin[t];
-      running += m;
-      cost_lower[U(t)] = m * running;
-      cost_full[U(t)] = m * sum_all;
       im.ext.m_max = std::max(im.ext.m_max, static_cast<std::int32_t>(m));
       im.ext.k_max = std::max(im.ext.k_max, t_re[U(t)] - t_rb[U(t)]);
       double o_t = 0.0;
@@ -449,20 +496,28 @@ void ComputeWorkCosts(ThreeBodyContext::Impl& im, const basis::ModelSpace& ms3,
   }
 }
 
-/// Builds the tile extents and the work orders of `im`. Estimated work of bra
-/// triple t: m_t times the summed m of its ket triples (m = pair-third
-/// states).
+/// Builds the tile extents, the work items of `RowSet::Whole` and the triples
+/// order of `im`. Estimated work of a tile row of bra triple t: m_t times the
+/// summed m of its ket triples (m = pair-third states).
 void InitWorkOrders(ThreeBodyContext::Impl& im, const basis::ModelSpace& ms3,
                     const KeptHost& kh) {
   const op::PairThirdView pv = im.pair_third.host_view();
   const std::size_t nt = kh.t_a.size();
-  std::vector<double> cost_lower(nt, 0.0);
-  std::vector<double> cost_full(nt, 0.0);
   std::vector<double> cost_triples(nt, 0.0);
-  ComputeWorkCosts(im, ms3, pv, kh, cost_lower, cost_full, cost_triples);
-  im.order_lower =
-      Upload(ByCost(cost_lower), "commutator::comm223_order_lower");
-  im.order_full = Upload(ByCost(cost_full), "commutator::comm223_order_full");
+  ComputeWorkCosts(im, ms3, pv, kh, cost_triples);
+  im.state_prefix_host.assign(nt + 1, 0);
+  for (std::size_t t = 0; t < nt; ++t) {
+    im.state_prefix_host[t + 1] =
+        im.state_prefix_host[t] + (pv.tr_state_end[t] - pv.tr_state_begin[t]);
+  }
+  const basis::ThreeBodySpace& space = *ms3.three_body_space();
+  const basis::RowSet whole = basis::RowSet::Whole(space);
+  im.items_lower =
+      Upload(Flatten(BuildTileItems(space, im.state_prefix_host, whole, true)),
+             "commutator::comm223_items_lower");
+  im.items_full =
+      Upload(Flatten(BuildTileItems(space, im.state_prefix_host, whole, false)),
+             "commutator::comm223_items_full");
   const std::vector<std::int32_t> tri = ByCost(cost_triples);
   im.triples_league = static_cast<std::int32_t>(
       std::count_if(cost_triples.begin(), cost_triples.end(),
@@ -485,8 +540,8 @@ std::int64_t TableBytesOf(const ThreeBodyContext::Impl& im,
          BufferBytes(im.group_j_pos) + BufferBytes(im.pair_local) +
          BufferBytes(im.pair_factor) + BufferBytes(im.leg_range) +
          BufferBytes(im.state_bra_base) + BufferBytes(im.state_ket_base) +
-         BufferBytes(im.state_dim) + BufferBytes(im.order_lower) +
-         BufferBytes(im.order_full) + BufferBytes(im.order_triples) +
+         BufferBytes(im.state_dim) + BufferBytes(im.items_lower) +
+         BufferBytes(im.items_full) + BufferBytes(im.order_triples) +
          BufferBytes(im.row_two_jab) + BufferBytes(im.row_triple) +
          BufferBytes(im.two_body_offset) + BufferBytes(im.ob_offsets) +
          BufferBytes(im.ob_orbits) + im.comm232.Bytes();
@@ -625,15 +680,12 @@ const ThreeBodyContext::Impl& ThreeBodyContext::impl() const {
   return *impl_;
 }
 
-op::ThreeBody Comm223(const op::Operator& X, const op::Operator& Y,
-                      const ThreeBodyContext& ctx) {
-  op::ThreeBody z(ctx.model_space_ptr(), CommutatorHermiticity(X, Y));
-  detail::AddComm223(X, Y, z, ctx);
-  return z;
-}
+namespace {
 
-void detail::AddComm223(const op::Operator& X, const op::Operator& Y,
-                        op::ThreeBody& z, const ThreeBodyContext& ctx) {
+/// The checks of `AddComm223` and the kernel views for the output `z`; the
+/// mode is kLowerPacked for packed Z, else kFullDense.
+detail::TileViews Comm223Views(const op::Operator& X, const op::Operator& Y,
+                               op::ThreeBody& z, const ThreeBodyContext& ctx) {
   const ThreeBodyContext::Impl& impl = ctx.impl();
   CheckOperand("Comm223", X, "X", ctx);
   CheckOperand("Comm223", Y, "Y", ctx);
@@ -652,13 +704,46 @@ void detail::AddComm223(const op::Operator& X, const op::Operator& Y,
   v.z_row_off = z.packed() ? impl.row_off_packed.device_data()
                            : impl.row_off_dense.device_data();
   v.zero_diagonal = h == Hermiticity::kAntiHermitian ? 1 : 0;
+  return v;
+}
+
+}  // namespace
+
+op::ThreeBody Comm223(const op::Operator& X, const op::Operator& Y,
+                      const ThreeBodyContext& ctx) {
+  op::ThreeBody z(ctx.model_space_ptr(), CommutatorHermiticity(X, Y));
+  detail::AddComm223(X, Y, z, ctx);
+  return z;
+}
+
+void detail::AddComm223(const op::Operator& X, const op::Operator& Y,
+                        op::ThreeBody& z, const ThreeBodyContext& ctx) {
+  const ThreeBodyContext::Impl& impl = ctx.impl();
+  const detail::TileViews v = Comm223Views(X, Y, z, ctx);
   if (z.packed()) {
     detail::RunComm223Tiles(v, detail::TileMode::kLowerPacked,
-                            impl.order_lower.device_data(), impl.num_triples);
+                            ItemsOf(impl.items_lower), impl.num_triples);
   } else {
     detail::RunComm223Tiles(v, detail::TileMode::kFullDense,
-                            impl.order_full.device_data(), impl.num_triples);
+                            ItemsOf(impl.items_full), impl.num_triples);
   }
+}
+
+void detail::AddComm223Rows(const op::Operator& X, const op::Operator& Y,
+                            op::ThreeBody& z, const ThreeBodyContext& ctx,
+                            const basis::RowSet& rows) {
+  const ThreeBodyContext::Impl& impl = ctx.impl();
+  const detail::TileViews v = Comm223Views(X, Y, z, ctx);
+  const bool lower = z.packed();
+  const std::vector<detail::TileWorkItem> items =
+      BuildTileItems(*ctx.model_space_ptr()->three_body_space(),
+                     impl.state_prefix_host, rows, lower);
+  if (items.empty()) return;
+  const exec::DeviceBuffer<std::int32_t> dev =
+      Upload(Flatten(items), "commutator::comm223_rows_items");
+  detail::RunComm223Tiles(
+      v, lower ? detail::TileMode::kLowerPacked : detail::TileMode::kFullDense,
+      ItemsOf(dev), static_cast<std::int32_t>(items.size()));
 }
 
 double PerturbativeTriplesEnergy(const op::Operator& X, const op::Operator& Y,

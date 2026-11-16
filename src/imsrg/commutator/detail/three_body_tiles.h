@@ -11,10 +11,12 @@
 /// kernels/comm223.cc runs the tiles (design/12 section 5 device rules: the
 /// views are trivially copyable and captured by value).
 ///
-/// Work decomposition: one team per bra triple T (league in a precomputed
-/// work order, largest estimated work first, dynamic schedule). The team
-/// visits the ket triples T' of the channel (T' <= T, all T', or the
-/// triples-active T' < T, by `TileMode`) and per tile
+/// Work decomposition: one team per work item (`TileWorkItem`: a bra triple T
+/// and a range of ket triples; items in work order, largest estimated work
+/// first, dynamic schedule; the triples mode keeps a plain order of bra
+/// triples). The team visits the ket triples T' of its range (a part of
+/// T' <= T, of all T', or the triples-active T' < T, by `TileMode`) and per
+/// tile
 ///  1. gathers the bra legs X/Y_{P_r,(w a)} for the rows r of T and the
 ///     distinct thirds w of T' into a cache of `kBraSlots` slots keyed by w
 ///     (consecutive T' share thirds, so most legs are reused), and the ket
@@ -197,13 +199,26 @@ struct TileViews {
 };
 static_assert(std::is_trivially_copyable_v<TileViews>);
 
-/// Runs the tiles of mode kLowerPacked or kFullDense: one team per bra triple
-/// `order[i]`, i in [0, league), ADDING to every stored element of the layout
-/// in `v.z` (each element is written by one work item; nothing else).
+/// One team of a [2,2]->3 launch: the bra triple `bra_triple` against the ket
+/// triples [`ket_begin`, `ket_end`) of its channel. The tile (T, tp) writes
+/// the stored elements z(i, j), i in T, j in tp, i.e. the rows of the ket
+/// triple tp, so a set of items writes exactly the rows of the ket triples it
+/// covers (each stored element is written by one tile).
+struct TileWorkItem {
+  std::int32_t bra_triple;  ///< Bra triple T.
+  std::int32_t ket_begin;   ///< First ket triple (same channel as T).
+  std::int32_t ket_end;     ///< One past the last ket triple.
+};
+static_assert(std::is_trivially_copyable_v<TileWorkItem>);
+
+/// Runs the tiles of mode kLowerPacked or kFullDense: one team per item
+/// `items[i]`, i in [0, num_items), ADDING to the stored elements of the
+/// rows of its ket triples in `v.z` (nothing else is written; the items must
+/// not overlap in (T, tp) pairs). kLowerPacked requires ket_end <= T + 1.
 /// Blocking. Defined in kernels/comm223.cc. Cost: see `Comm223` in
 /// three_body.h.
 void RunComm223Tiles(const TileViews& v, TileMode mode,
-                     const std::int32_t* order, std::int32_t league);
+                     const TileWorkItem* items, std::int32_t num_items);
 
 /// Runs the tiles of mode kTriples for the bra triples `order[i]`, i in [0,
 /// league), and returns the energy sum (Kokkos sum reducer). Blocking.
