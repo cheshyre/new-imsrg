@@ -158,7 +158,7 @@ in the answers in `design/QUESTIONS.md`. The most important:
   max relative deviation 1.2e-16) pass; D48/D49 moved IT-2 HG, IT-10 and IT-8 by design (goldens
   regenerated, run-3 report §3). **CI:** on 93e2d9f 1231 unit, 69 integration, 18 MPI, 150 Python
   (1 skipped), slow suite 7/7 in 1027 s (17 min on a quiet machine); `ci.sh dev-openmp` about 2 min.
-  TODO(orchestrator): final counts on 7bfba4e (see the run-3 report §1).
+  On 7bfba4e: 1235 unit, 69 integration, 18 MPI, 150 Python (1 skipped); slow suite 7/7 in 940 s.
 * **Performance:** N7 commutator (O16, full, release) 255 -> 105 ms, 6.3 -> 1.15 s, 46.6 -> 6.2 s at
   emax 3 / 4 / 5 (about 1.7e10 multiply-adds/s); cost at emax 12 / E3max 16: 3.37e13 multiply-adds per
   commutator, 177 GB per packed operator, 673 node-seconds at 5e10/s. MPI: compute imbalance of the
