@@ -140,7 +140,10 @@ double Denominators::three_body(OrbitIndex a, OrbitIndex b, OrbitIndex c,
                                 OrbitIndex i, OrbitIndex j,
                                 OrbitIndex k) const {
   auto f = [&](OrbitIndex x) { return f_diag_[x.ToSize()]; };
-  return f(a) + f(b) + f(c) - f(i) - f(j) - f(k);
+  // Same sign-keeping floor as the one- and two-body denominators (D21,
+  // M10-Q60); imsrg++ has none here.
+  return FloorDenominator(f(a) + f(b) + f(c) - f(i) - f(j) - f(k),
+                          opts_.denominator_cutoff);
 }
 
 double Denominators::monopole(OrbitIndex a, OrbitIndex b) const {

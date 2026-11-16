@@ -37,8 +37,9 @@
 /// core: eta(bra, ket) = f(H(bra, ket), Delta3) and eta(ket, bra) =
 /// -eta(bra, ket), with Delta3 = f_aa + f_bb + f_cc - f_ii - f_jj - f_kk from
 /// the one-body diagonal of H alone (`Get3bDenominator`: no Epstein-Nesbet
-/// terms, and, as in imsrg++, NO denominator floor, no `denominator_delta`: a
-/// vanishing Delta3 gives inf/NaN for white). Kets dropped by the three-body
+/// terms; sign-keeping floor with `denominator_cutoff` as for the one- and
+/// two-body denominators (D21, M10-Q60; imsrg++ has no 3B floor and gives
+/// inf/NaN for a vanishing Delta3); no `denominator_delta`). Kets dropped by the three-body
 /// cuts do not exist.
 ///
 /// Denominators (Generator.cc:122-230), f = the one-body part of H, n =
@@ -155,8 +156,9 @@ class Denominators {
   double two_body(ChannelIndex ch, LocalKetIndex ibra,
                   LocalKetIndex iket) const;
   /// Three-body denominator f_aa + f_bb + f_cc - f_ii - f_jj - f_kk of bra
-  /// orbits (a, b, c) and ket orbits (i, j, k): one-body diagonal only, NOT
-  /// floored (imsrg++ `Get3bDenominator`).
+  /// orbits (a, b, c) and ket orbits (i, j, k): one-body diagonal only (imsrg++
+  /// `Get3bDenominator`), floored: |Delta3| < denominator_cutoff becomes
+  /// +-cutoff with the sign kept (an exact zero gives +cutoff).
   double three_body(OrbitIndex a, OrbitIndex b, OrbitIndex c, OrbitIndex i,
                     OrbitIndex j, OrbitIndex k) const;
   /// The unnormalized J-averaged monopole V-bar_abab (imsrg++
