@@ -97,6 +97,7 @@ constexpr char kUsage[] =
     "                [--herm XY] [--terms LIST] [--checksum] [--seed S]\n"
     "                [--count-only] [--triples]\n"
     "                [--partition P [--partition-contiguous]]\n"
+    "                [--row-overhead MADD]\n"
     "  XY: two letters of H, A, N (default AH); LIST: comma separated of\n"
     "  133,330,223,232,331,231,132,full\n"
     "  --partition P: simulated P-part run of the seven N7 terms (parts\n"
@@ -116,6 +117,7 @@ struct Options {
   bool triples = false;
   int partition = 0;  // 0: normal mode; P >= 1: simulated partition
   bool partition_contiguous = false;
+  double row_overhead = cm::kRowOverheadMadd;  // --row-overhead (multiply-adds)
   std::uint64_t seed = 1;
 };
 
@@ -159,6 +161,8 @@ Options ParseOptions(int argc, char** argv) {
         o.partition = std::stoi(value());
         if (o.partition < 1)
           throw std::runtime_error("--partition must be >= 1");
+      } else if (a == "--row-overhead") {
+        o.row_overhead = std::stod(value());
       } else if (a == "--partition-contiguous") {
         o.partition_contiguous = true;
       } else if (a == "--seed") {
@@ -440,13 +444,31 @@ void RunPartition(const Options& o, const op::Operator& x,
   if (o.partition_contiguous) {
     parts = ContiguousParts(space, o.partition);
   } else {
-    const bs::RowPartition rp =
-        bs::RowPartition::Balanced(space, cm::N7LineWeights(ms), o.partition);
+    const bs::RowPartition rp = bs::RowPartition::Balanced(
+        space, cm::N7LineWeights(ms, o.row_overhead), o.partition);
     for (std::int32_t p = 0; p < rp.num_parts(); ++p)
       parts.push_back(rp.part(p));
   }
   const cm::TermMask mask = cm::TermMask::Imsrg3N7().ThreeBodyTerms();
   const std::int64_t budget = cm::detail::kN7BatchBytes;
+  // Modeled multiply-adds and triples of each part (for fitting the row-cost
+  // model: t_part = alpha cost + beta rows).
+  const cm::N7CostModel cost_model(ms);
+  std::vector<double> part_cost;
+  std::vector<std::int64_t> part_triples;
+  for (const bs::RowSet& rows : parts) {
+    double c = 0.0;
+    std::int64_t nt = 0;
+    for (const bs::RowRange& r : rows.ranges()) {
+      for (std::int32_t t = r.triple_begin.value(); t < r.triple_end.value();
+           ++t) {
+        c += cost_model.triples()[static_cast<std::size_t>(t)].Total();
+        ++nt;
+      }
+    }
+    part_cost.push_back(c);
+    part_triples.push_back(nt);
+  }
   op::Operator zsum = ZeroOutput(x, y, ctx);
   op::Operator zp = ZeroOutput(x, y, ctx);
   std::printf("partition %s P %d\n",
@@ -462,8 +484,9 @@ void RunPartition(const Options& o, const op::Operator& x,
     imsrg::exec::Fence("n7_bench part");
     times.push_back(ms_p);
     std::printf("part %zu rows %" PRId64 " stored_doubles %" PRId64
-                " batches n/a best_ms %.3f\n",
-                p, rows.NumRows(), rows.StoredSize(true), ms_p);
+                " batches n/a best_ms %.3f model_ma %.6e triples %" PRId64 "\n",
+                p, rows.NumRows(), rows.StoredSize(true), ms_p, part_cost[p],
+                part_triples[p]);
     std::fflush(stdout);
   }
   const bs::RowSet whole = bs::RowSet::Whole(space);

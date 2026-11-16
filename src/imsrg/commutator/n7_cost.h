@@ -183,12 +183,24 @@ class N7CostModel {
   std::vector<N7ChannelCost> channels_;
 };
 
+/// Per-row overhead of the N7 kernels in multiply-add equivalents: the time
+/// of a part grows with its row count by more than the counted multiply-adds
+/// (loop set-up, scratch fills, the transposed output and halo traffic per
+/// line). Fitted as t_part = alpha cost_part + beta rows_part by least
+/// squares over the parts of balanced partitions P = 4, 16, 64, O16 emax 5
+/// E3max 12, Apple M5 Pro, 18 OpenMP threads (2026-11-17; the ratio beta /
+/// alpha, see design/benchmarks/imsrg3-n7-performance.md). A machine number:
+/// refit on other hardware; the partition stays correct for any value >= 0.
+inline constexpr double kRowOverheadMadd = 1.3e5;
+
 /// Per-triple weights for `basis::RowPartition::Balanced`: compute = the sum
-/// of the multiply-adds of all terms of the triple (`N7TripleCost::Total`),
-/// memory = mem_t (packed doubles). One entry per `Triple3Index`.
-/// Precondition: `ms3.three_body_space() != nullptr`. Cost as
-/// `N7CostModel`.
-basis::LineWeights N7LineWeights(const basis::ModelSpace& ms3);
+/// of the multiply-adds of all terms of the triple (`N7TripleCost::Total`)
+/// plus `row_overhead_madd` per row (line) of the triple, memory = mem_t
+/// (packed doubles). One entry per `Triple3Index`. Preconditions:
+/// `ms3.three_body_space() != nullptr`, `row_overhead_madd >= 0`
+/// (IMSRG_CHECK). Cost as `N7CostModel`.
+basis::LineWeights N7LineWeights(const basis::ModelSpace& ms3,
+                                 double row_overhead_madd = kRowOverheadMadd);
 
 }  // namespace imsrg::commutator
 

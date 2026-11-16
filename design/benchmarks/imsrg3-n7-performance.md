@@ -232,3 +232,59 @@ triple, or per-term line weights fitted to `n7_bench --terms` times at emax 5; t
 above are the data for a first fit), and then re-measure max/mean at P = 16 with the target 1.10.
 With the present weights plan for 1.3-1.5x the mean part time as the slowest rank's time; the
 memory balance of the zipper is fine (stored doubles within 5 % at P = 4). No code was changed.
+
+### Row-cost model with a per-row term (2026-11-17)
+
+Follow-up to the conclusion above (branch `feature/n7-row-cost-model`). `n7_bench --partition`
+now prints, per part, the modeled multiply-adds (`model_ma`, sum of `N7TripleCost::Total` over the
+part's triples) and the triple count next to rows, stored doubles and `best_ms`; the new option
+`--row-overhead MADD` overrides the per-row weight.
+
+Fit over all 84 parts of the balanced partitions P = 4, 16, 64 (baseline weights, `--reps 3`,
+same setup as above, 18 threads, release build), `t_part = alpha cost_part + beta rows_part`:
+
+| model | alpha, ms per multiply-add | beta, ms per row | beta / alpha | R^2 | max abs. residual |
+|---|---|---|---|---|---|
+| cost only | 5.68e-8 | - | - | 0.984 | - |
+| cost + rows | 4.79e-8 | 6.62e-3 | 1.38e5 | 0.998 | 60 ms (22 % of that part) |
+| cost + rows, fit of t/t_part (relative) | 4.87e-8 | 5.87e-3 | 1.21e5 | - | rms 7.5 %, max 23 % |
+| cost + rows + triples | 5.13e-8 | -1.1e-2 (negative) | gamma = 3.5e-2 | 0.9987 | 47 ms |
+
+A triples term does not help (the fit makes beta negative and the largest relative residual
+worse), so the model keeps two terms. Refit on the re-measured parts (new weights, `--reps 5`):
+alpha 4.97e-8, beta 6.09e-3, beta/alpha 1.23e5, R^2 0.998, so the ratio is stable under the
+change of the partition. The row term is about 20 % of the run time (1.4e5 x 144,162 rows =
+2.0e10 multiply-add equivalents against 1.05e11 counted).
+
+Weights: `N7LineWeights(ms3, row_overhead_madd = kRowOverheadMadd)` adds
+`row_overhead_madd` x rows of the triple to its compute weight; the memory weight is unchanged.
+`commutator::kRowOverheadMadd = 1.3e5` multiply-add equivalents per row, the rounded middle of the
+three ratios above (measured on this machine; refit it on other hardware, any value >= 0 keeps the
+partition valid).
+
+Before / after, balanced partition, O16 emax 5 E3max 12, best of 3 (before) and 5 (after), whole
+space 6.1-6.3 s. The 1-minute load before each run was 8-17 because of the previous 18-thread run
+of the same script (each run started right after the last, as in the 04:54 series, but not on a
+cool machine); the first run of each series started at 3.4 (before) and 10.1 (after, P = 16):
+
+| P | max/mean before | max/mean after | load before / after | sum/whole after |
+|---|---|---|---|---|
+| 4 | 1.127 (1.162 at 05:00) | 1.039 | 15.2 / 16.3 | 0.986 |
+| 16 | 1.312 | **1.068** | 3.4 / 10.1 | 0.974 |
+| 64 | 1.431 | 1.160 | 15.5 / 16.7 | 0.979 |
+
+The target of max/mean <= 1.10 at P = 16 is met (1.068; per-part times 336-398 ms for 5.2k-26.8k
+rows, the last part was 486 ms before). P = 64 improves from 1.43 to 1.16 but stays above 1.10:
+its parts are small (80-110 ms), the residual of the two-term fit (up to 23 %) and run-to-run noise
+(the load) are of the order of the remaining spread, and the slowest parts are no longer the ones
+with the most rows. Not investigated further: a per-term fit of `--terms` times. The whole
+(unpartitioned) path is untouched: `n7_bench --emax 3 --e3max 9 --checksum --terms full` prints
+the same hashes before and after (`full AH 0xe5f3b639070ccd2f`).
+
+Commands (binaries of the commit before / after; `OMP_PROC_BIND=false`,
+`VECLIB_MAXIMUM_THREADS=1`, `sysctl -n vm.loadavg` before each):
+
+```
+n7_bench --emax 5 --e3max 12 --reps {3|5} --partition {4|16|64}
+python fit: least squares of best_ms on (model_ma, rows) over all "part" lines
+```
