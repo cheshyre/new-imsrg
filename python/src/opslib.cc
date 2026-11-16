@@ -21,7 +21,7 @@ void BindOpslib(nb::module_& m) {
       "kinetic_energy",
       [](const PyModelSpace& ms) {
         EnsureRuntime();
-        return Result(opslib::KineticEnergy(ms.ms));
+        return Result(opslib::KineticEnergy(ms.model_space()));
       },
       nb::arg("model_space"),
       "Laboratory-frame kinetic energy T (one-body, MeV).");
@@ -30,7 +30,7 @@ void BindOpslib(nb::module_& m) {
       [](const PyModelSpace& ms, int mass_number) {
         EnsureRuntime();
         GilFree r;
-        return Result(opslib::TCm(ms.ms, mass_number));
+        return Result(opslib::TCm(ms.model_space(), mass_number));
       },
       nb::arg("model_space"), nb::arg("mass_number"),
       "Center-of-mass kinetic energy T_cm of a system of A nucleons (MeV).");
@@ -39,7 +39,7 @@ void BindOpslib(nb::module_& m) {
       [](const PyModelSpace& ms, int mass_number) {
         EnsureRuntime();
         GilFree r;
-        return Result(opslib::TRel(ms.ms, mass_number));
+        return Result(opslib::TRel(ms.model_space(), mass_number));
       },
       nb::arg("model_space"), nb::arg("mass_number"),
       "Intrinsic kinetic energy T_rel = T - T_cm (MeV), the kinetic term of "
@@ -49,7 +49,7 @@ void BindOpslib(nb::module_& m) {
       [](const PyModelSpace& ms, int mass_number) {
         EnsureRuntime();
         GilFree r;
-        return Result(opslib::R2Cm(ms.ms, mass_number));
+        return Result(opslib::R2Cm(ms.model_space(), mass_number));
       },
       nb::arg("model_space"), nb::arg("mass_number"),
       "Center-of-mass radius squared (fm^2).");
@@ -59,7 +59,8 @@ void BindOpslib(nb::module_& m) {
          std::optional<double> hbar_omega_trap) {
         EnsureRuntime();
         GilFree r;
-        return Result(opslib::HCm(ms.ms, mass_number, hbar_omega_trap));
+        return Result(
+            opslib::HCm(ms.model_space(), mass_number, hbar_omega_trap));
       },
       nb::arg("model_space"), nb::arg("mass_number"),
       nb::arg("hbar_omega_trap") = nb::none(),
@@ -70,7 +71,8 @@ void BindOpslib(nb::module_& m) {
       [](const PyModelSpace& ms, int mass_number, int proton_number) {
         EnsureRuntime();
         GilFree r;
-        return Result(opslib::Rp2(ms.ms, mass_number, proton_number));
+        return Result(
+            opslib::Rp2(ms.model_space(), mass_number, proton_number));
       },
       nb::arg("model_space"), nb::arg("mass_number"), nb::arg("proton_number"),
       "Intrinsic point-proton radius squared (fm^2), without the spin-orbit "
@@ -80,7 +82,8 @@ void BindOpslib(nb::module_& m) {
       [](const PyModelSpace& ms, int mass_number, int proton_number) {
         EnsureRuntime();
         GilFree r;
-        return Result(opslib::Rn2(ms.ms, mass_number, proton_number));
+        return Result(
+            opslib::Rn2(ms.model_space(), mass_number, proton_number));
       },
       nb::arg("model_space"), nb::arg("mass_number"), nb::arg("proton_number"),
       "Intrinsic point-neutron radius squared (fm^2).");
@@ -89,7 +92,7 @@ void BindOpslib(nb::module_& m) {
       [](const PyModelSpace& ms, int mass_number) {
         EnsureRuntime();
         GilFree r;
-        return Result(opslib::Rm2(ms.ms, mass_number));
+        return Result(opslib::Rm2(ms.model_space(), mass_number));
       },
       nb::arg("model_space"), nb::arg("mass_number"),
       "Intrinsic matter radius squared (fm^2).");

@@ -118,49 +118,56 @@ void BindBasis(nb::module_& m) {
           "Builds the model space as the imsrg++ driver does (emax, reference "
           "nucleus name, "
           "valence space name, hbar omega in MeV).")
-      .def_prop_ro("emax",
-                   [](const PyModelSpace& s) { return s.ms->basis().emax(); })
-      .def_prop_ro("lmax",
-                   [](const PyModelSpace& s) { return s.ms->basis().lmax(); })
       .def_prop_ro(
-          "hbar_omega",
-          [](const PyModelSpace& s) { return s.ms->basis().hbar_omega(); })
+          "emax",
+          [](const PyModelSpace& s) { return s.model_space()->basis().emax(); })
       .def_prop_ro(
-          "reference_name",
-          [](const PyModelSpace& s) { return s.ms->reference().name(); })
-      .def_prop_ro("num_orbits",
-                   [](const PyModelSpace& s) { return s.ms->num_orbits(); })
+          "lmax",
+          [](const PyModelSpace& s) { return s.model_space()->basis().lmax(); })
+      .def_prop_ro("hbar_omega",
+                   [](const PyModelSpace& s) {
+                     return s.model_space()->basis().hbar_omega();
+                   })
+      .def_prop_ro("reference_name",
+                   [](const PyModelSpace& s) {
+                     return s.model_space()->reference().name();
+                   })
       .def_prop_ro(
-          "num_kets",
-          [](const PyModelSpace& s) { return s.ms->two_body().num_kets(); })
-      .def_prop_ro(
-          "num_channels",
-          [](const PyModelSpace& s) { return s.ms->two_body().num_channels(); })
+          "num_orbits",
+          [](const PyModelSpace& s) { return s.model_space()->num_orbits(); })
+      .def_prop_ro("num_kets",
+                   [](const PyModelSpace& s) {
+                     return s.model_space()->two_body().num_kets();
+                   })
+      .def_prop_ro("num_channels",
+                   [](const PyModelSpace& s) {
+                     return s.model_space()->two_body().num_channels();
+                   })
       .def(
           "orbits",
           [](const PyModelSpace& s) {
-            const auto o = s.ms->basis().orbits();
+            const auto o = s.model_space()->basis().orbits();
             return std::vector<basis::Orbit>(o.begin(), o.end());
           },
           "List of Orbit in index order.")
       .def(
           "occupations",
           [](const PyModelSpace& s) {
-            const auto o = s.ms->reference().occupations();
+            const auto o = s.model_space()->reference().occupations();
             return std::vector<double>(o.begin(), o.end());
           },
           "Reference occupations by orbit index.")
       .def(
           "kets",
           [](const PyModelSpace& s) {
-            return KetArray(s.ms->two_body().kets());
+            return KetArray(s.model_space()->two_body().kets());
           },
           "All two-body kets as an (num_kets, 2) int32 array of orbit indices "
           "(p <= q).")
       .def(
           "channels",
           [](const PyModelSpace& s) {
-            const auto& tb = s.ms->two_body();
+            const auto& tb = s.model_space()->two_body();
             std::vector<PyChannel> out;
             for (std::int32_t i = 0; i < tb.num_channels(); ++i)
               out.push_back(MakeChannel(tb, ChannelIndex{i}));
@@ -170,7 +177,7 @@ void BindBasis(nb::module_& m) {
       .def(
           "channel",
           [](const PyModelSpace& s, int index) {
-            const auto& tb = s.ms->two_body();
+            const auto& tb = s.model_space()->two_body();
             if (index < 0 || index >= tb.num_channels())
               throw imsrg::InputError("channel index out of range");
             return MakeChannel(tb, ChannelIndex{index});
@@ -180,7 +187,7 @@ void BindBasis(nb::module_& m) {
           "find_channel",
           [](const PyModelSpace& s, int two_j, int parity,
              int two_tz) -> std::optional<PyChannel> {
-            const auto& tb = s.ms->two_body();
+            const auto& tb = s.model_space()->two_body();
             const auto ch = tb.find_channel(
                 TwoJ{two_j}, static_cast<Parity>(parity), TwoTz{two_tz});
             if (!ch) return std::nullopt;
@@ -192,7 +199,7 @@ void BindBasis(nb::module_& m) {
       .def(
           "channel_kets",
           [](const PyModelSpace& s, int index) {
-            const auto& tb = s.ms->two_body();
+            const auto& tb = s.model_space()->two_body();
             if (index < 0 || index >= tb.num_channels())
               throw imsrg::InputError("channel index out of range");
             std::vector<basis::Ket> kets;
@@ -202,10 +209,12 @@ void BindBasis(nb::module_& m) {
           },
           nb::arg("index"),
           "Kets of a channel in local order, as an (n, 2) int32 array.")
-      .def("__eq__", [](const PyModelSpace& a,
-                        const PyModelSpace& b) { return a.ms == b.ms; })
+      .def("__eq__",
+           [](const PyModelSpace& a, const PyModelSpace& b) {
+             return a.model_space() == b.model_space();
+           })
       .def("__hash__", [](const PyModelSpace& s) {
-        return std::hash<const void*>{}(s.ms.get());
+        return std::hash<const void*>{}(s.model_space().get());
       });
 }
 

@@ -248,7 +248,7 @@ void BindHf(nb::module_& m) {
          const PyModelSpace& ms) {
         const linalg::Matrix<double> rho = FromNumpy(rho_hf);
         GilFree r;
-        return mbpt::ComputeNaturalOrbitals(rho, *ms.ms);
+        return mbpt::ComputeNaturalOrbitals(rho, *ms.model_space());
       },
       nb::arg("rho_hf"), nb::arg("model_space"),
       "Diagonalizes each (l, j, tz) block of the density matrix; checks the "
@@ -258,7 +258,7 @@ void BindHf(nb::module_& m) {
       [](const nb::ndarray<const double, nb::ndim<2>>& c_ho2nat,
          const PyModelSpace& ms) {
         const linalg::Matrix<double> c = FromNumpy(c_ho2nat);
-        return ToNumpy(mbpt::ReferenceDensityHo(c, *ms.ms));
+        return ToNumpy(mbpt::ReferenceDensityHo(c, *ms.model_space()));
       },
       nb::arg("c_ho2nat"), nb::arg("model_space"),
       "Oscillator-basis reference density of the NAT basis.");

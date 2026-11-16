@@ -220,7 +220,7 @@ void BindCommutator(nb::module_& m) {
           "__init__",
           [](PyWorkspace* self, const PyModelSpace& ms) {
             EnsureRuntime();
-            new (self) PyWorkspace(ms.ms);
+            new (self) PyWorkspace(ms.model_space());
           },
           nb::arg("model_space"))
       .def_prop_ro(

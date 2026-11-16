@@ -51,7 +51,8 @@ PyOperator& AsOp(nb::handle h) {
 PyOperator CopyOf(const PyOperator& o) {
   Input(o);
   PyOperator c(static_cast<const PyOperator&>(o));
-  if (c.residency == Residency::kHostCurrent) c.residency = Residency::kBoth;
+  if (c.residency() == Residency::kHostCurrent)
+    c.set_residency(Residency::kBoth);
   return c;
 }
 
@@ -144,7 +145,8 @@ void BindOperator(nb::module_& m) {
           [](PyOperator* self, const PyModelSpace& ms,
              const op::OperatorSpec& spec) {
             EnsureRuntime();
-            new (self) PyOperator(op::Operator(ms.ms, spec), Residency::kBoth);
+            new (self) PyOperator(op::Operator(ms.model_space(), spec),
+                                  Residency::kBoth);
           },
           nb::arg("model_space"), nb::arg("spec") = op::OperatorSpec{})
       .def_prop_ro(
@@ -157,7 +159,7 @@ void BindOperator(nb::module_& m) {
           "spec", [](const PyOperator& o) { return Alive(o).spec(); },
           "Symmetry and rank labels (OperatorSpec).")
       .def_prop_ro(
-          "residency", [](const PyOperator& o) { return Alive(o).residency; },
+          "residency", [](const PyOperator& o) { return Alive(o).residency(); },
           "Which side holds the current data: Residency.HostCurrent, "
           "DeviceCurrent or Both (design/18 section 2.2).")
       .def_prop_rw(
@@ -222,12 +224,12 @@ void BindOperator(nb::module_& m) {
           "sync_to_host",
           [](nb::object self) {
             auto& o = AsOp(self);
-            if (o.residency == Residency::kDeviceCurrent) {
+            if (o.residency() == Residency::kDeviceCurrent) {
               {
                 GilFree r;
                 o.SyncToHost();
               }
-              o.residency = Residency::kBoth;
+              o.set_residency(Residency::kBoth);
             }
             return self;
           },
@@ -238,13 +240,14 @@ void BindOperator(nb::module_& m) {
           "sync_to_device",
           [](nb::object self) {
             auto& o = AsOp(self);
-            if (o.residency == Residency::kHostCurrent) {
+            if (o.residency() == Residency::kHostCurrent) {
               {
                 GilFree r;
                 o.SyncToDevice();
               }
               // With a writable view alive the host stays authoritative.
-              if (o.writable_views->load() == 0) o.residency = Residency::kBoth;
+              if (o.writable_views()->load() == 0)
+                o.set_residency(Residency::kBoth);
             }
             return self;
           },
@@ -429,7 +432,7 @@ void BindOperator(nb::module_& m) {
         opt.zero_body_scale = zero_body_scale;
         opt.one_body_scale = one_body_scale;
         opt.two_body_scale = two_body_scale;
-        return Result(op::RandomOperator(ms.ms, spec, opt));
+        return Result(op::RandomOperator(ms.model_space(), spec, opt));
       },
       nb::arg("model_space"), nb::arg("spec") = op::OperatorSpec{},
       nb::arg("seed") = 1, nb::arg("zero_body_scale") = 0.0,
@@ -469,7 +472,7 @@ void BindOperator(nb::module_& m) {
         return GuardRead(path, [&] {
           std::shared_ptr<const basis::ModelSpace> space;
           if (ms) {
-            space = ms->ms;
+            space = ms->model_space();
           } else {
             space = op::ModelSpaceForDump(op::ReadOperatorDumpHeader(path));
           }

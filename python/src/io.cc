@@ -30,7 +30,7 @@ namespace {
 const op::Operator& ForWriting(const PyOperator& o) {
   Alive(o);
   auto& m = const_cast<PyOperator&>(o);
-  if (m.residency == Residency::kDeviceCurrent) m.SyncToHost();
+  if (m.residency() == Residency::kDeviceCurrent) m.SyncToHost();
   return o;
 }
 
@@ -147,8 +147,9 @@ void BindIo(nb::module_& m) {
         opt.file = {file_e1max, file_e2max, file_lmax};
         opt.read_whole_file = read_whole_file;
         GilFree r;
-        return GuardRead(
-            path, [&] { return Result(io::ReadMe2j(path, opt, ms.ms)); });
+        return GuardRead(path, [&] {
+          return Result(io::ReadMe2j(path, opt, ms.model_space()));
+        });
       },
       nb::arg("path"), nb::arg("model_space"), nb::kw_only(),
       nb::arg("file_e1max"), nb::arg("file_e2max") = -1,
@@ -164,7 +165,7 @@ void BindIo(nb::module_& m) {
       [](const std::filesystem::path& path, const PyModelSpace& ms,
          int file_e1max, int file_e2max, int file_e3max, int e3max,
          int file_lmax, io::No2bPrecision precision, int lmax) {
-        const auto& b = ms.ms->basis();
+        const auto& b = ms.model_space()->basis();
         const int emax = b.emax();
         const int l = lmax >= 0 ? lmax : (b.lmax() >= 0 ? b.lmax() : emax);
         op::No2bThreeBody v3(

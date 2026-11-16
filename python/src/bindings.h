@@ -59,10 +59,11 @@ namespace imsrg::py {
 
 /// Python-side ModelSpace: a handle to the immutable C++ model space (value
 /// semantics, shared).
-struct PyModelSpace {
+class PyModelSpace {
+ public:
   /// Wraps a model space.
   explicit PyModelSpace(std::shared_ptr<const basis::ModelSpace> p)
-      : ms(std::move(p)) {}
+      : ms_(std::move(p)) {}
   PyModelSpace(const PyModelSpace&) = default;
   PyModelSpace(PyModelSpace&&) = default;
   PyModelSpace& operator=(const PyModelSpace&) = default;
@@ -70,7 +71,14 @@ struct PyModelSpace {
   /// Drops the handle; then frees commutator workspaces nobody else uses, so
   /// that `del ms` frees the model space (design/18 section 4.3).
   ~PyModelSpace();
-  std::shared_ptr<const basis::ModelSpace> ms;
+
+  /// The shared model space.
+  const std::shared_ptr<const basis::ModelSpace>& model_space() const {
+    return ms_;
+  }
+
+ private:
+  std::shared_ptr<const basis::ModelSpace> ms_;
 };
 
 /// Frees the cached commutator workspaces whose model space nothing else
@@ -213,40 +221,52 @@ int ReleaseAllLive() noexcept;
 
 /// An `op::Operator` that counts itself as a live object and carries its
 /// residency state.
-struct PyOperator : op::Operator, Releasable {
+class PyOperator : public op::Operator, public Releasable {
+ public:
   /// Wraps (moves) a library result: the device data are current.
   explicit PyOperator(op::Operator&& o, Residency r = Residency::kDeviceCurrent)
-      : op::Operator(std::move(o)), residency(r) {}
+      : op::Operator(std::move(o)), residency_(r) {}
   /// Copies an operator (library result, device current).
   explicit PyOperator(const op::Operator& o,
                       Residency r = Residency::kDeviceCurrent)
-      : op::Operator(o), residency(r) {}
+      : op::Operator(o), residency_(r) {}
   PyOperator(const PyOperator& o)
-      : op::Operator(o), Releasable(o), residency(o.residency) {}
+      : op::Operator(o), Releasable(o), residency_(o.residency_) {}
   PyOperator(PyOperator&& o) noexcept
-      : op::Operator(std::move(o)), Releasable(o), residency(o.residency) {}
+      : op::Operator(std::move(o)), Releasable(o), residency_(o.residency_) {}
   PyOperator& operator=(const PyOperator& o) {
     op::Operator::operator=(o);
-    residency = o.residency;
+    residency_ = o.residency_;
     return *this;
   }
   PyOperator& operator=(PyOperator&& o) noexcept {
     op::Operator::operator=(std::move(o));
-    residency = o.residency;
+    residency_ = o.residency_;
     return *this;
   }
   ~PyOperator() override = default;
 
-  bool CanRelease() const noexcept override { return views->load() == 0; }
+  bool CanRelease() const noexcept override { return views_->load() == 0; }
   void Release() noexcept override { op::Operator::operator=(op::Operator()); }
 
-  Residency residency = Residency::kBoth;  ///< See `Residency`.
-  /// Number of live numpy views of this operator's host storage.
-  std::shared_ptr<std::atomic<int>> views =
-      std::make_shared<std::atomic<int>>(0);
+  /// Which side holds the current data; see `Residency`.
+  Residency residency() const { return residency_; }
+  /// Sets the residency state.
+  void set_residency(Residency r) { residency_ = r; }
+  /// Number of live numpy views of this operator's host storage (shared with
+  /// the view guards).
+  const std::shared_ptr<std::atomic<int>>& views() const { return views_; }
   /// Number of those views that are writable: while one lives the operator
   /// stays HostCurrent (every compute call pushes first).
-  std::shared_ptr<std::atomic<int>> writable_views =
+  const std::shared_ptr<std::atomic<int>>& writable_views() const {
+    return writable_views_;
+  }
+
+ private:
+  Residency residency_ = Residency::kBoth;
+  std::shared_ptr<std::atomic<int>> views_ =
+      std::make_shared<std::atomic<int>>(0);
+  std::shared_ptr<std::atomic<int>> writable_views_ =
       std::make_shared<std::atomic<int>>(0);
 };
 
