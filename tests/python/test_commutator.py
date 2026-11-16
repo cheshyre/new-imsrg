@@ -128,7 +128,9 @@ def test_non_hermitian_operands(he4):
     x = he4["random_A1"].copy()
     ms = x.model_space
     nh = imsrg.Operator(ms, imsrg.OperatorSpec(hermiticity=imsrg.Hermiticity.NonHermitian))
-    nh.one_body_view(writable=True)[:] = x.one_body + he4["random_H1"].one_body
+    h1 = he4["random_H1"].sync_to_host()  # library results are device-current (GPU-portable)
+    x.sync_to_host()
+    nh.one_body_view(writable=True)[:] = x.one_body + h1.one_body
     z = comm.commutator(nh, x)
     assert z.spec.hermiticity == imsrg.Hermiticity.NonHermitian
     assert z.norm() > 0.0

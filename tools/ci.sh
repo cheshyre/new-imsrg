@@ -148,7 +148,10 @@ step_mpi() {
 
 step_python() {
   # The extension was built (the step only runs then): a missing _core must fail, not skip.
-  IMSRG_REQUIRE_PYTHON_EXT=1 IMSRG_TEST_DATA_DIR="$(cache_value IMSRG_TEST_DATA_DIR)" \
+  # The whole suite runs under strict residency (D51): a test that reads a library result
+  # without sync_to_host() fails here although it would pass on the CPU, so the scripts stay
+  # portable to GPU builds. The user default (Auto) is exercised by tests that set it explicitly.
+  IMSRG_RESIDENCY=strict IMSRG_REQUIRE_PYTHON_EXT=1 IMSRG_TEST_DATA_DIR="$(cache_value IMSRG_TEST_DATA_DIR)" \
     PYTHONPATH="$build_dir/python" "$python" -m pytest -q tests/python
 }
 

@@ -30,7 +30,7 @@ def test_dump_without_model_space(golden):
 
 
 def test_numpy_view_round_trip(o16_emax2):
-    o = imsrg.random_operator(o16_emax2, seed=7)
+    o = imsrg.random_operator(o16_emax2, seed=7).sync_to_host()
     v = o.one_body
     assert v.shape == (12, 12) and v.flags["F_CONTIGUOUS"]
     assert not v.flags.writeable
@@ -44,7 +44,7 @@ def test_numpy_view_round_trip(o16_emax2):
     blk = o.two_body_block(0)
     assert blk.shape[0] == blk.shape[1] == o16_emax2.channel(0).num_kets
     # the view keeps the operator alive
-    view = imsrg.random_operator(o16_emax2, seed=2).one_body
+    view = imsrg.random_operator(o16_emax2, seed=2).sync_to_host().one_body
     assert np.isfinite(view).all()
 
 
