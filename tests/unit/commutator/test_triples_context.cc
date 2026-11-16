@@ -9,6 +9,7 @@
 // equal those of the full space restricted to the channels with an hhh triple
 // and the hhh/ppp triples in them.
 #include <algorithm>
+#include <cinttypes>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -143,15 +144,11 @@ TriplesCounts CheckAgainstFull(const char* label, const char* ref, int emax,
   const TriplesCounts want = RestrictedCounts(*ms2, *ms3->three_body_space(),
                                               full_ctx.impl().pair_third);
   const TriplesCounts got = ctx.counts();
-  std::printf(
-      "[triples] %s: channels %lld triples %lld (hhh %lld ppp %lld) rows %lld "
-      "states %lld bytes %lld\n",
-      label, static_cast<long long>(got.channels),
-      static_cast<long long>(got.triples),
-      static_cast<long long>(got.triples_hhh),
-      static_cast<long long>(got.triples_ppp), static_cast<long long>(got.rows),
-      static_cast<long long>(got.states),
-      static_cast<long long>(ctx.TableBytes()));
+  std::printf("[triples] %s: channels %" PRId64 " triples %" PRId64
+              " (hhh %" PRId64 " ppp %" PRId64 ") rows %" PRId64
+              " states %" PRId64 " bytes %" PRId64 "\n",
+              label, got.channels, got.triples, got.triples_hhh,
+              got.triples_ppp, got.rows, got.states, ctx.TableBytes());
   EXPECT_GT(got.triples, 0);
   EXPECT_EQ(got.channels, want.channels);
   EXPECT_EQ(got.triples, want.triples);
