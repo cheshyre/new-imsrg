@@ -958,6 +958,10 @@ settled the decisions for run 3 and later: D44–D54 in `00-requirements-and-dec
   and storing the Magnus operators for efficient evaluation of a large amount of extra operators."
   On the restated summary: "Correct except that gzip should be implemented for me2jp and me3jp as
   well. This goes after tensor ops."
+* **ME2JP getter J range (follow-up):** after the explanation of the jIMSRG reader's `std::max` upper
+  J bound (`19-mexj-formats.md` §5), verbatim: "Your understanding is correct. Make absolutely sure
+  this is implemented properly in the new ME2JP and ME3JP implementations." Recorded as D55: the
+  rules and mandatory tests of `19` §8.
 
 ## Added during run 3
 

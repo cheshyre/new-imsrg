@@ -30,7 +30,7 @@ to one `imsrg-implementer`/`imsrg-mechanic`, without a lead agent.
 | M14 | GPU builds and tuning (CUDA/HIP; after M12, D40) | M12b | — | opus / sonnet |
 | MS2 | Structural Google-style pass (D50: structs with invariants → classes, unsigned → signed, long functions split, long inline header functions out of line); first in run 3, alone, time-boxed | MS | none (alone) | opus / sonnet, haiku |
 | M15 | Tensor operators (D53): E2 and other electric multipoles, M1, Gamow–Teller/Fermi (ΔTz = ±1), 0νββ (ΔTz = ±2); scalar–tensor commutators, transformation with the Magnus Omega only; validation against the patched imsrg++ build and an m-scheme brute force for tensors | M10, M12b | — | opus / sonnet |
-| M16 | ME1J/ME2JP/ME3JP readers and writers (text, gzip, later binary; `19-mexj-formats.md`), stored Omega with a `transform` task, checkpoint/restart (D54) | M15 | — | opus / sonnet |
+| M16 | ME1J/ME2JP/ME3JP readers and writers (text, gzip, later binary; `19-mexj-formats.md`), stored Omega with a `transform` task, checkpoint/restart (D54); acceptance includes the J-range safety rules and sentinel tests of `19` §8 (D55) | M15 | — | opus / sonnet |
 | M17+ | Further extensions: me3j, Navratil/Miyagi files, dagger, DM (order open, D39) | M15 | — | opus / sonnet |
 
 Run 1 (2026-11-11/12) finished M0–M9 and M11 phase 1. **Run-2 order (owner, 2026-11-15, D38/D39):**

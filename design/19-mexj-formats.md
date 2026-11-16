@@ -109,7 +109,8 @@ only (its gzip and binary readers are deleted).
 Note on the jIMSRG reader (not a format issue): `ME2JPFile::Get2BMatrixElement` computes `jj_max`
 with `std::max` where the file layout uses `std::min`, so a J outside the coupling range of one of
 the two pairs reads the neighbouring record (or past the end of the array) instead of 0; queries
-with a J valid for both pairs are unaffected. Our reader returns 0 for such a J.
+with a J valid for both pairs are unaffected. Our reader returns 0 for such a J (owner requirement
+D55, §8).
 
 ## 6. ME3JP
 
@@ -134,7 +135,8 @@ for p in basis:
 * Every J_pq and J_st is listed, also when orbits coincide (overcomplete; Pauli-forbidden
   combinations are zero). These are the canonical kets of imsrg++ and of our layout A (D43), but
   ordered p ≥ q ≥ r in NLJJT indices instead of a ≤ b ≤ c in our orbit order, so converting
-  between the file and our storage needs the recoupling below.
+  between the file and our storage needs the recoupling below. The same J-range rules (§8) apply to
+  J_pq, J_st and J: a value outside a record's stored ranges is 0.0, never another record's entry.
 * **Symmetries** (jIMSRG getter; re-derived on 2026-11-16 for antisymmetrized, unnormalized
   states, with Ĵ = √(2J + 1)): a pair swap gives −(−1)^(j_a + j_b − J_ab); exchanging the second
   and the third orbit gives
@@ -164,4 +166,59 @@ for p in basis:
   operators; `[output] omega = "me2jp"` stores the Omega stack; `run.task = "transform"` reads a
   stored Omega and transforms a list of operators; `[checkpoint]` (interval, directory) writes H(s),
   the Omega stack and the solver state (s, step, stage, ds, gather count) and restarts from them.
+* **J-range safety (D55):** the rules and tests of §8 are part of the acceptance.
 * Open, from the owner: the binary header and value type of `.bin`.
+
+## 8. J-range safety (owner requirement, D55)
+
+The owner confirmed the jIMSRG finding of §5 and asked (2026-11-16, verbatim): "Make absolutely sure
+this is implemented properly in the new ME2JP and ME3JP implementations." The failure mode: a J
+that lies inside the coupling range of one pair (or, in ME3JP, a J_pq, J_st or J allowed for one
+side) but outside the record's **stored** range passes a wrong bound check, and the offset reads a
+neighbouring record, or past the end of the value array for the last record. The value looks
+plausible, so nothing downstream notices. Our implementation makes this impossible by construction
+and proves it by tests.
+
+**Rules** (binding for the readers, the writers and every random-access getter):
+
+1. **One source of truth for the ranges.** Each format has one function that computes a record's
+   J ranges: ME2JP J ∈ [max(|j_p − j_q|, |j_r − j_s|), min(j_p + j_q, j_r + j_s)]; ME3JP
+   J_pq ∈ [|j_p − j_q|, j_p + j_q], J_st ∈ [|j_s − j_t|, j_s + j_t] and, for each (J_pq, J_st),
+   J ∈ [max(|J_pq − j_r|, |J_st − j_u|), min(J_pq + j_r, J_st + j_u)]. The record enumerator, the
+   value count, the writer, the reader and the lookup table all call it. The lookup table stores
+   each record's offset **together with its ranges** (as jIMSRG's `ME3JPBlockInfo` does for
+   ME3JP), and the getter uses the stored ranges; it never recomputes a bound.
+2. **Outside the stored ranges the answer is exactly 0.0.** Such a state does not exist on at
+   least one side. The getter returns 0.0 before it computes any offset.
+3. **Every offset is checked.** The raw access layer checks `offset < block size` of the record
+   with `IMSRG_CHECK` (negligible next to the hash lookup), so a future range error throws instead
+   of returning another record's value.
+4. **Two layers.** The raw file layer (records, values, getter with the pair-swap phases,
+   hermiticity and, for ME3JP, the recoupling of §6) is separate from the conversion into our
+   operators. Rules 1–3 and the tests below apply to the raw layer; the ME3JP recoupling sums call
+   the raw getter for every intermediate J, so they inherit the guard.
+
+**Required tests** (part of the milestone's acceptance; none may be skipped or weakened):
+
+* **Sentinel files against an independent oracle.** The test writes files with its own naive loops
+  (not the production enumerator), giving every stored entry a unique nonzero value (its ordinal
+  + 1): ME2JP at emax 2 and 3, ME3JP at emax 1 (E3max 3) and emax 2 (E3max 6). For every record and
+  every J in the **union** of both sides' ranges (ME3JP: every J_pq, J_st and J from the union of
+  the two triples' ranges), the production getter must return the sentinel for a stored entry and
+  **exactly 0.0** for every other J. Queries in canonical order check the sentinels directly;
+  queries in every other orbit order (p↔q, r↔s and bra↔ket for ME2JP; all orderings of both triples
+  for ME3JP) must equal the test's own evaluation of the phases (§5) or of the recoupling formula
+  (§6) from the sentinels, and must be 0.0 whenever the query's own J values are out of range. Files
+  of zeros or of physics values cannot detect this class of bug, so the sentinels are mandatory.
+* **The owner's example** at emax 2: ⟨0d5/2π 0d5/2ν; J=3| O |1s1/2π 1s1/2ν; J=3⟩ = 0.0. jIMSRG's
+  getter returns the J = 2 entry of the next record, ⟨0d5/2π 0d5/2ν; 2| O |0d3/2ν 0s1/2π; 2⟩.
+* **The last record of a file:** a query with an out-of-range J returns 0.0 (jIMSRG would read past
+  the end of the array).
+* **Lower bounds too:** the union ranges include J below the larger of the two minima; these return
+  0.0 as well.
+* **AddressSanitizer:** the tests above also run in the `asan` preset before the merge, so any
+  out-of-bounds read aborts.
+* **Counts and round trips:** the production enumerator's record and value counts equal the
+  oracle's for ME1J, ME2JP and ME3JP at several emax and E3max; write → read round trips are bit
+  for bit (text and gzip).
+* **Review:** the Opus review of the milestone checks rules 1–4 explicitly and reports on them.

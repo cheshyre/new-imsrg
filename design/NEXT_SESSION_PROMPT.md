@@ -302,7 +302,13 @@ in the answers in `design/QUESTIONS.md`. The most important:
 > ME3JP; the binary `.bin` variant waits for the owner's header specification, so keep the record
 > enumeration separate from the value I/O); the evolved H by default; storing the Omega stack and a
 > `run.task = "transform"`; checkpoint/restart from these files plus a solver-state file. Write a
-> full brief from §7 of the specification when the time comes.
+> full brief from §7 of the specification when the time comes. **Non-negotiable (owner, D55):** the
+> J-range rules and tests of `19-mexj-formats.md` §8 go into that brief verbatim: per-record J ranges
+> from one function and stored in the lookup table, exactly 0.0 outside them before any offset is
+> computed, `IMSRG_CHECK` on every offset, sentinel-value tests against an independent oracle for
+> all J in the union of both sides' ranges and all orbit orderings (with the owner's emax-2 example
+> and the last record of a file), the same tests under the `asan` preset, and an Opus review that
+> reports on these rules.
 
 ## Brief G — M12a follow-ups (filler)
 
