@@ -7,12 +7,13 @@
 #include <type_traits>
 
 #include "imsrg/commutator/detail/n7_common.h"
+#include "imsrg/commutator/detail/n7_terms.h"
 #include "imsrg/commutator/detail/n7_views.h"
 #include "imsrg/commutator/detail/three_body_impl.h"
 #include "imsrg/commutator/imsrg3.h"
 #include "imsrg/exec/kokkos_backend.h"
 
-namespace imsrg::commutator::terms {
+namespace imsrg::commutator {
 
 namespace {
 
@@ -40,9 +41,11 @@ IMSRG_INLINE_FUNCTION RowOcc RowOccupation(const detail::N7Views& v,
 
 }  // namespace
 
-void Comm330ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
-               const ThreeBodyContext& ctx) {
-  const detail::N7Views v = detail::PrepareN7("Comm330ss", X, Y, Z, ctx);
+namespace detail {
+
+void Comm330ssReference(const op::Operator& X, const op::Operator& Y,
+                        op::Operator& Z, const ThreeBodyContext& ctx) {
+  const N7Views v = PrepareN7("Comm330ss", X, Y, Z, ctx);
   if (v.x3.local == nullptr || v.y3.local == nullptr) return;
   // The scalar part of an anti-Hermitian Z vanishes (the sum below cancels
   // pairwise); skip it to keep Z0 exactly zero.
@@ -51,7 +54,7 @@ void Comm330ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
       ctx.model_space_ptr()->three_body_space()->NumRows());
   double sum = 0.0;
   exec::ParallelReduce(
-      "commutator::comm330ss", nrows,
+      "commutator::comm330ss_reference", nrows,
       IMSRG_LAMBDA(const exec::Index r, double& partial) {
         const int t = v.row_triple[r];
         const int ch = v.sp.tr_channel[t];
@@ -65,8 +68,8 @@ void Comm330ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
           const RowOcc oj = RowOccupation(v, base + j);
           const double occ = oi.n * oj.nbar - oi.nbar * oj.n;
           if (occ == 0.0) continue;
-          acc += oj.sym6 * occ * detail::ThreeBodyLocal(v.x3, v.sp, ch, i, j) *
-                 detail::ThreeBodyLocal(v.y3, v.sp, ch, j, i);
+          acc += oj.sym6 * occ * ThreeBodyLocal(v.x3, v.sp, ch, i, j) *
+                 ThreeBodyLocal(v.y3, v.sp, ch, j, i);
         }
         partial += (v.sp.ch_two_j[ch] + 1) * oi.sym6 * acc;
       },
@@ -74,4 +77,15 @@ void Comm330ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   Z.zero_body() += sum;
 }
 
-}  // namespace imsrg::commutator::terms
+}  // namespace detail
+
+namespace terms {
+
+void Comm330ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+               const ThreeBodyContext& ctx) {
+  detail::Comm330ssReference(X, Y, Z, ctx);
+}
+
+}  // namespace terms
+
+}  // namespace imsrg::commutator

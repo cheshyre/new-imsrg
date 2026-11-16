@@ -17,23 +17,26 @@
 #include "imsrg/base/assert.h"
 #include "imsrg/base/constants.h"
 #include "imsrg/commutator/detail/n7_common.h"
+#include "imsrg/commutator/detail/n7_terms.h"
 #include "imsrg/commutator/detail/n7_views.h"
 #include "imsrg/commutator/imsrg3.h"
 #include "imsrg/exec/kokkos_backend.h"
 
-namespace imsrg::commutator::terms {
+namespace imsrg::commutator {
 
-void Comm132ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
-               const ThreeBodyContext& ctx) {
-  const detail::N7Views v = detail::PrepareN7("Comm132ss", X, Y, Z, ctx);
-  const detail::TwoBodyOutView out = detail::TwoBodyOut("Comm132ss", Z, ctx);
+namespace detail {
+
+void Comm132ssReference(const op::Operator& X, const op::Operator& Y,
+                        op::Operator& Z, const ThreeBodyContext& ctx) {
+  const N7Views v = PrepareN7("Comm132ss", X, Y, Z, ctx);
+  const TwoBodyOutView out = TwoBodyOut("Comm132ss", Z, ctx);
   if (v.x3.local == nullptr && v.y3.local == nullptr) return;
   const std::int64_t total = Z.two_body().matrix().total_size();
   const basis::TwoBodyTableView tb = v.x2.tb;
   exec::ParallelFor(
-      "commutator::comm132ss", static_cast<exec::Index>(total),
+      "commutator::comm132ss_reference", static_cast<exec::Index>(total),
       IMSRG_LAMBDA(const exec::Index e) {
-        const int ch = detail::FindBlock(out.block_offset, tb.num_channels, e);
+        const int ch = FindBlock(out.block_offset, tb.num_channels, e);
         const std::int64_t n = tb.channel_num_kets[ch];
         const std::int64_t idx = e - out.block_offset[ch];
         const int ib = static_cast<int>(idx % n);
@@ -54,8 +57,8 @@ void Comm132ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
             const int b = v.ob_ch.orbits[m];
             const double dn = na - v.ob.occupation[b];
             if (dn == 0.0) continue;
-            const double xab = detail::OneBodyElement(v.x1, v.norb, a, b);
-            const double yab = detail::OneBodyElement(v.y1, v.norb, a, b);
+            const double xab = OneBodyElement(v.x1, v.norb, a, b);
+            const double yab = OneBodyElement(v.y1, v.norb, a, b);
             if (xab == 0.0 && yab == 0.0) continue;
             const int j2b = v.ob.j2[b];
             const int lo = two_J > j2b ? two_J - j2b : j2b - two_J;
@@ -63,11 +66,11 @@ void Comm132ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
             for (int two_j3 = lo; two_j3 <= two_J + j2b; two_j3 += 2) {
               double t = 0.0;
               if (xab != 0.0) {
-                t += xab * detail::ThreeBodyElement(v, v.y3, two_j3, i, j, b, J,
+                t += xab * ThreeBodyElement(v, v.y3, two_j3, i, j, b, J,
                                                     k, l, a, J);
               }
               if (yab != 0.0) {
-                t -= yab * detail::ThreeBodyElement(v, v.x3, two_j3, i, j, b, J,
+                t -= yab * ThreeBodyElement(v, v.x3, two_j3, i, j, b, J,
                                                     k, l, a, J);
               }
               acc += (two_j3 + 1) * t;
@@ -80,7 +83,18 @@ void Comm132ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
         if (k == l) z /= constants::kSqrt2;
         out.data[e] += z;
       });
-  exec::Fence("commutator::comm132ss");
+  exec::Fence("commutator::comm132ss_reference");
 }
 
-}  // namespace imsrg::commutator::terms
+}  // namespace detail
+
+namespace terms {
+
+void Comm132ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+               const ThreeBodyContext& ctx) {
+  detail::Comm132ssReference(X, Y, Z, ctx);
+}
+
+}  // namespace terms
+
+}  // namespace imsrg::commutator
