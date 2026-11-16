@@ -995,3 +995,16 @@ the orchestrator uses `O4` and up).
   listed once in a "not implemented" section instead of kept as design text; the old old-`pyIMSRG`
   mapping table was dropped (it lives in git history). Say if the table should be kept for the
   term-by-term milestone.
+* **IT3-Q7** (2026-11-16, run 3 brief A part 3, D49 / M10-Q60) - Delta3 floor. `Denominators::three_body`
+  now uses `FloorDenominator` (sign-keeping, an exact zero gives +cutoff, as the 1B/2B code) with
+  `denominator_cutoff`; no `denominator_delta`. **Assumed:** the cutoff is the same value for 1B, 2B
+  and 3B; a separate 3B cutoff can be added if wanted. IT-9 unchanged.
+* **IT3-Q8** (2026-11-16, run 3 brief A part 3, D49 / M10-Q40) - Split-stack order. Added the public
+  helper `flow::CombineOmegaStack` (triples.h) so the order is unit-testable; it uses
+  `BchProduct(Omega_n, omega)`. **Assumed:** Magnus `Transform` applies Omega_0 first (checked in
+  magnus.cc), so this is the transformation order. The `BchProduct` itself keeps the imsrg++ truncation
+  (no -1/24 term), so the combined omega is correct to the BCH truncation only.
+* **IT3-Q9** (2026-11-16, run 3 brief A part 3) - No IT golden has a split Omega stack in the
+  perturbative triples (IT-8 is a single Omega), so the fix is validated by the BCH-level consistency
+  test only, not by an end-to-end imsrg++ comparison (imsrg++ gives the old, inconsistent order).
+  Say if a split-flow end-to-end triples test (split vs single Omega energy) is wanted.

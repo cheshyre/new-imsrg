@@ -7,6 +7,7 @@
 #include <memory>
 #include <vector>
 
+#include "imsrg/base/assert.h"
 #include "imsrg/basis/model_space.h"
 #include "imsrg/basis/three_body_channels.h"
 #include "imsrg/basis/three_body_space.h"
@@ -14,15 +15,24 @@
 
 namespace imsrg::flow {
 
+op::Operator CombineOmegaStack(const std::vector<op::Operator>& omegas,
+                               const BchOptions& options,
+                               commutator::Workspace& workspace) {
+  IMSRG_CHECK(!omegas.empty(), "CombineOmegaStack: empty Omega stack");
+  op::Operator omega = omegas.front();
+  for (std::size_t n = 1; n < omegas.size(); ++n) {
+    omega = BchProduct(omegas[n], omega, options,
+                       commutator::CommutatorOptions{}, workspace);
+  }
+  return omega;
+}
+
 TriplesResult PerturbativeTriples(MagnusSolver& solver,
                                   const TriplesOptions& options) {
   const std::vector<op::Operator>& omegas = solver.omegas();
-  // imsrg++ combines the pieces as BCH_Product(omega, Omega[n]) (M10-Q40).
-  op::Operator omega = omegas.front();
-  for (std::size_t n = 1; n < omegas.size(); ++n) {
-    omega = BchProduct(omega, omegas[n], solver.bch_options(),
-                       commutator::CommutatorOptions{}, solver.workspace());
-  }
+  // Transformation order (D49, M10-Q40): not imsrg++'s BchProduct(omega, n).
+  const op::Operator omega = CombineOmegaStack(
+      omegas, solver.bch_options(), solver.workspace());
 
   BchOptions skip = solver.bch_options();
   skip.skip_first_commutator = true;
