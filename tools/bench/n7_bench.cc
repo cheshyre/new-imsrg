@@ -385,7 +385,7 @@ void RunTriples(const Options& o) {
   const cm::TriplesContext ctx(ms, cuts);
   imsrg::exec::Fence("n7_bench triples context");
   const double ctx_ms = ElapsedMs(t1);
-  const cm::TriplesCounts& c = ctx.counts();
+  const cm::TriplesCounts& c = ctx.Counts();
   std::printf("# n7_bench --triples%s git %s\n",
               o.count_only ? " --count-only" : "", IMSRG_BENCH_GIT_HASH);
   std::printf("emax %d e3max %d reference %s\n", o.emax, o.e3max,
@@ -404,7 +404,7 @@ void RunTriples(const Options& o) {
   const auto t2 = Clock::now();
   const cm::TriplesWork work = ctx.TileWork();
   std::printf("tile_multiply_adds %.3e (W %.3e epilogue %.3e) count_ms %.0f\n",
-              work.total(), work.w, work.epilogue, ElapsedMs(t2));
+              work.Total(), work.w, work.epilogue, ElapsedMs(t2));
   if (o.count_only) return;
   const op::Operator x = imsrg::op::RandomOperator(
       ms, op::OperatorSpec::Scalar(2, HermFromLetter(o.herm[0])),

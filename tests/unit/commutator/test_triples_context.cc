@@ -143,7 +143,7 @@ TriplesCounts CheckAgainstFull(const char* label, const char* ref, int emax,
 
   const TriplesCounts want = RestrictedCounts(*ms2, *ms3->three_body_space(),
                                               full_ctx.impl().pair_third);
-  const TriplesCounts got = ctx.counts();
+  const TriplesCounts got = ctx.Counts();
   std::printf("[triples] %s: channels %" PRId64 " triples %" PRId64
               " (hhh %" PRId64 " ppp %" PRId64 ") rows %" PRId64
               " states %" PRId64 " bytes %" PRId64 "\n",
@@ -202,9 +202,9 @@ TEST(TriplesContext, RowsBeforeCutsAreTheUncutRows) {
   cut.de3max = 4.0;
   const TriplesContext a(ms2, uncut);
   const TriplesContext b(ms2, cut);
-  EXPECT_EQ(a.counts().rows, a.counts().rows_before_cuts);
-  EXPECT_EQ(b.counts().rows_before_cuts, a.counts().rows);
-  EXPECT_LT(b.counts().rows, a.counts().rows);
+  EXPECT_EQ(a.Counts().rows, a.Counts().rows_before_cuts);
+  EXPECT_EQ(b.Counts().rows_before_cuts, a.Counts().rows);
+  EXPECT_LT(b.Counts().rows, a.Counts().rows);
 }
 
 /// OccNat3 cut with synthetic natural occupations (the product n (1 - n) of a

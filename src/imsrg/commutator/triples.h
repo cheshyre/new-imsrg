@@ -66,7 +66,7 @@ struct TriplesWork {
   double w = 0.0;         ///< The sums of W.
   double epilogue = 0.0;  ///< The epilogue R W R^T.
   /// Both parts.
-  double total() const noexcept { return w + epilogue; }
+  double Total() const noexcept { return w + epilogue; }
 };
 
 /// Device tables of the perturbative-triples tiles for one model space and one
@@ -106,7 +106,7 @@ class TriplesContext {
   /// The cuts used, with `emax_3body` resolved.
   const basis::ThreeBodyCuts& cuts() const noexcept { return cuts_; }
   /// The sizes of the reduced space. O(1).
-  const TriplesCounts& counts() const noexcept { return counts_; }
+  const TriplesCounts& Counts() const noexcept { return counts_; }
 
   /// Bytes of the device tables owned by the context (6j table, pair-third
   /// states with R, reduced-space tables, orbit groups, leg gather tables,

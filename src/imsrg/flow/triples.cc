@@ -61,8 +61,8 @@ TriplesResult PerturbativeTriples(MagnusSolver& solver,
   TriplesResult result;
   result.de =
       commutator::PerturbativeTriplesEnergy(omega, htilde, epsilon, ctx);
-  result.kept_rows = ctx.counts().rows;
-  result.total_kets = ctx.counts().rows_before_cuts;
+  result.kept_rows = ctx.Counts().rows;
+  result.total_kets = ctx.Counts().rows_before_cuts;
   return result;
 }
 
