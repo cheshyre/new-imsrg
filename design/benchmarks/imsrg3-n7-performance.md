@@ -128,6 +128,12 @@ reinterpretation, the triples test in the M3 form with a fractional case, the Oc
 asserting fewer kept rows. `imsrg3.occ_nat3_cut` also works with the perturbative triples (C13b;
 `results.json` gained `perturbative_triples.kept_kets`/`total_kets`).
 
+A second short Opus review (C4 and the partition mode, 93e2d9f..338b0b9) found no blocker; its
+major item (vector length AUTO was built as 1 in the facade; no effect on Serial/OpenMP) and the
+minor items (level-0 scratch for the old `TeamFor` overload, one launch-options object per comm223
+launch, `InvariantError` in the facade test, NaN-safe partition check, no partitions with a dense
+Z) are fixed in 6cc1d57 and c3218b4 (checksums unchanged).
+
 Open items, in priority order:
 1. `CommutatorOptions::imsrg3_batch_bytes` after the M12b merge (M10-Q74).
 2. C15 (223 locality, M10-Q41/Q42; needs quiet-machine timings at emax 4-6).
@@ -138,3 +144,5 @@ Open items, in priority order:
    H build (load the tile's rows into scratch first) is the next kernel optimization to try.
 5. Factor the group/leg table builders duplicated in `commutator/triples.cc` (M10-Q75 note); the
    `TriplesContext` build at emax 12 takes ~150 s and 4.4 GB on the host.
+6. `n7_bench --partition` holds one unused rank-3 output besides the summed and the whole Z
+   (memory at emax 5); reuse it.
