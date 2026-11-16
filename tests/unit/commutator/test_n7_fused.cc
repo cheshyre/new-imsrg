@@ -347,7 +347,7 @@ TEST(N7Fused, MissingThreeBodyParts) {
 void CheckPartitions(
     const std::string& ref, TermMask terms,
     const std::vector<std::pair<Hermiticity, Hermiticity>>& pairs,
-    const std::string& what) {
+    const std::string& what, bool ownership = false) {
   const auto ms = testing::MakeThreeBodySpace(2, ref, {.e3max = 6});
   const ThreeBodyContext ctx(ms);
   std::uint64_t seed = 70;
@@ -363,7 +363,8 @@ void CheckPartitions(
     };
     testing::ExpectPartitionInvariance(
         *ms, x, y, zero, run, kTol, false,
-        "RunN7 " + what + " " + ref + " " + PairLabel(hx, hy));
+        "RunN7 " + what + " " + ref + " " + PairLabel(hx, hy),
+        {.ownership = ownership});
   }
 }
 
@@ -388,7 +389,21 @@ TEST(N7Fused, PartitionInvarianceDenseZ) {
   without133.reset(Term::kComm133ss);
   CheckPartitions("O16", without133,
                   {{Hermiticity::kNonHermitian, Hermiticity::kHermitian}},
-                  "all but 133");
+                  "all but 133", true);
+}
+
+// Output ownership (design/14 section 6.5): without 133 (whose transposed
+// ket side lands in other rows), Z3 holds only 223, and a part writes Z3
+// only in its own rows, in every partition.
+TEST(N7Fused, OutputOwnershipWithout133) {
+  TermMask without133 = kAllN7;
+  without133.reset(Term::kComm133ss);
+  for (const char* ref : {"He4", "O16"}) {
+    CheckPartitions(ref, without133,
+                    {{Hermiticity::kAntiHermitian, Hermiticity::kHermitian},
+                     {Hermiticity::kHermitian, Hermiticity::kHermitian}},
+                    "all but 133", true);
+  }
 }
 
 // The checks: an empty selection does nothing, N8/N9 terms throw, 133 into a

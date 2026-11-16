@@ -62,18 +62,41 @@ OperatorDiff CompareOperators(const op::Operator& a, const op::Operator& ref);
 /// part stays missing.
 op::Operator MaskedCopy(const op::Operator& x, const basis::RowSet& rows);
 
+/// Single-triple `RowSet`s (a single triple is always one batch) of `s`: all
+/// triples if there are at most `max_triples`, else a deterministic sample of
+/// about `max_triples` triples spread over all channels (the first and the
+/// last triple of every nonempty channel are always included). O(triples).
+std::vector<basis::RowSet> SingleTripleSets(const basis::ThreeBodySpace& s,
+                                            std::int32_t max_triples);
+
+/// Which checks `ExpectPartitionInvariance` runs besides the partition sums.
+struct PartitionChecks {
+  /// Masked operands per single triple (`SingleTripleSets`, at most
+  /// `max_batch_triples` triples): a part holds several batches, and a read
+  /// of another batch's lines in the same part is only caught at this
+  /// granularity (in M12b only the current batch's data is resident).
+  bool per_batch = true;
+  std::int32_t max_batch_triples = 64;  ///< Sample size of the per-batch check.
+  /// Output ownership (design/14 section 6.5): a part run into a zeroed Z
+  /// writes Z3 only in the rows of the part (`OnlyRowsNonzero`). Off for a
+  /// term that places output outside its rows (133 through `Comm133Rows`).
+  bool ownership = false;
+};
+
 /// The partition-invariance and masked-operand checks (file comment) for
 /// `run`, with `zero()` creating a zeroed output Z. For every standard
 /// partition: Z_parts = sum over the parts of run(part) (into one Z) against
 /// Z_whole = run(Whole): bitwise if `bitwise`, else max|dZ| <= tol max(1,
 /// max|Z|); for every part p: run(MaskedCopy(X, p), MaskedCopy(Y, p), p)
-/// bitwise equal to run(X, Y, p) and free of NaN. Prints the worst deviation
+/// bitwise equal to run(X, Y, p) and free of NaN; per `checks`, the same for
+/// single triples and the output-ownership check. Prints the worst deviation
 /// with `tag`. Precondition: `ms` is the model space of X, Y and Z.
 void ExpectPartitionInvariance(const basis::ModelSpace& ms,
                                const op::Operator& X, const op::Operator& Y,
                                const std::function<op::Operator()>& zero,
                                const N7RowsFn& run, double tol, bool bitwise,
-                               const std::string& tag);
+                               const std::string& tag,
+                               const PartitionChecks& checks = {});
 
 }  // namespace imsrg::testing
 
