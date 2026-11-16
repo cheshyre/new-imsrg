@@ -119,6 +119,14 @@ foreach(_ranks 2 4)
   endif()
 endforeach()
 
+# CheckReplicatedSetup (M12b review): equal setups pass, rank-dependent occupations or thread counts throw
+# on every rank.
+foreach(_ranks 2 4)
+  imsrg_add_test(NAME driver_mpi_check_${_ranks}ranks
+    SOURCES test_mpi_replicated_check.cc ${PROJECT_SOURCE_DIR}/tests/support/mpi_test_main.cc
+    DEPS driver comm LABELS mpi MPI_RANKS ${_ranks} NO_GTEST_MAIN TIMEOUT 300)
+endforeach()
+
 # IT-11 (M12b D5): end-to-end MPI invariance. Flows on 2 and 4 ranks reproduce the serial run (results.json
 # and .snt to 1e-12 max(1, |ref|), identical step counts), and all ranks hold identical bits of H(s) after every
 # step. The slow variant (same source, IMSRG_IT11_SLOW) holds N7 and the perturbative triples; it uses the
