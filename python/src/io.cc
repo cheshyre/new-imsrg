@@ -34,9 +34,8 @@ const op::Operator& ForWriting(const PyOperator& o) {
   return o;
 }
 
-}  // namespace
-
-void BindIo(nb::module_& m) {
+/// Binds No2bPrecision and No2bThreeBody.
+void BindNo2b(nb::module_& m) {
   nb::enum_<io::No2bPrecision>(m, "No2bPrecision",
                                "Value type of a binary NO2B file.")
       .value("Single", io::No2bPrecision::kSingle)
@@ -75,7 +74,10 @@ void BindIo(nb::module_& m) {
       .def_prop_ro("num_channels", &op::No2bThreeBody::num_channels)
       .def_prop_ro("size", &op::No2bThreeBody::size,
                    "Number of stored values.");
+}
 
+/// Binds ValenceWriteOptions.
+void BindValenceWriteOptions(nb::module_& m) {
   nb::class_<io::ValenceWriteOptions>(
       m, "ValenceWriteOptions",
       "Header information and mode of the valence-space writers (comment "
@@ -117,7 +119,10 @@ void BindIo(nb::module_& m) {
       .def_rw("z_ref", &io::ValenceWriteOptions::z_ref)
       .def_rw("a_target", &io::ValenceWriteOptions::a_target)
       .def_rw("version", &io::ValenceWriteOptions::version);
+}
 
+/// Binds the value-count functions.
+void BindValueCounts(nb::module_& m) {
   m.def(
       "me2j_value_count",
       [](int e1max, int e2max, int lmax, int emax_read) {
@@ -137,7 +142,10 @@ void BindIo(nb::module_& m) {
       nb::arg("file_e1max"), nb::arg("file_e2max"), nb::arg("file_e3max"),
       nb::arg("file_lmax") = -1,
       "Number of values of a whole NO2B file of the given truncation.");
+}
 
+/// Binds the me2j and no2b readers.
+void BindReaders(nb::module_& m) {
   m.def(
       "read_me2j",
       [](const std::filesystem::path& path, const PyModelSpace& ms,
@@ -189,7 +197,10 @@ void BindIo(nb::module_& m) {
       "= min(lmax or emax, emax)) and `e3max`. A file name containing "
       "'stream.bin' is binary (raw little-endian values of `precision`), "
       "otherwise text (plain or gzip).");
+}
 
+/// Binds the Tokyo and NuShellX writers.
+void BindWriters(nb::module_& m) {
   m.def(
       "write_tokyo",
       [](const std::filesystem::path& path, const PyOperator& o,
@@ -222,6 +233,16 @@ void BindIo(nb::module_& m) {
       },
       nb::arg("path"), nb::arg("operator"),
       "Writes the valence model space in the NuShellX .sp format.");
+}
+
+}  // namespace
+
+void BindIo(nb::module_& m) {
+  BindNo2b(m);
+  BindValenceWriteOptions(m);
+  BindValueCounts(m);
+  BindReaders(m);
+  BindWriters(m);
 }
 
 }  // namespace imsrg::py

@@ -91,8 +91,13 @@ void ClearWorkspaceCache() {
   }
 }
 
-void BindCommutator(nb::module_& m) {
-  using commutator::Term;
+namespace {
+
+using commutator::Term;
+using commutator::TermMask;
+
+/// Binds the commutator Term enum and its name functions.
+void BindTerm(nb::module_& m) {
   nb::enum_<Term>(m, "Term",
                   "The scalar commutator terms, named as in imsrg++ "
                   "(`commABCss`: A-body part of X and B-body part of Y to the "
@@ -126,8 +131,10 @@ void BindCommutator(nb::module_& m) {
       "term_from_name",
       [](const std::string& name) { return commutator::TermFromName(name); },
       nb::arg("name"), "Inverse of term_name; None for an unknown name.");
+}
 
-  using commutator::TermMask;
+/// Binds TermMask.
+void BindTermMask(nb::module_& m) {
   nb::class_<TermMask>(m, "TermMask", "A set of commutator Terms (value type).")
       .def(nb::init<>(), "The empty set.")
       .def_static("none", &TermMask::None, "The empty set.")
@@ -180,7 +187,10 @@ void BindCommutator(nb::module_& m) {
         }
         return s + "])";
       });
+}
 
+/// Binds CommutatorOptions and FactorizedOptions.
+void BindCommutatorOptions(nb::module_& m) {
   nb::class_<commutator::CommutatorOptions>(
       m, "CommutatorOptions", "Options of the commutator (term selection).")
       .def(
@@ -209,7 +219,10 @@ void BindCommutator(nb::module_& m) {
       .def_rw("two_body_intermediates",
               &commutator::FactorizedOptions::two_body_intermediates,
               "Not implemented: True raises NotImplementedError.");
+}
 
+/// Binds Workspace and its cache.
+void BindWorkspace(nb::module_& m) {
   nb::class_<PyWorkspace>(
       m, "CommutatorWorkspace",
       "Precomputed tables and scratch buffers of the commutator kernels for "
@@ -233,7 +246,10 @@ void BindCommutator(nb::module_& m) {
 
   m.def("clear_workspace_cache", &ClearWorkspaceCache,
         "Drops the workspaces cached by commutator() and the BCH functions.");
+}
 
+/// Binds commutator and factorized_double_commutator.
+void BindCommutatorFunctions(nb::module_& m) {
   m.def(
       "commutator",
       [](const PyOperator& x, const PyOperator& y,
@@ -284,6 +300,16 @@ void BindCommutator(nb::module_& m) {
       "The factorized double commutator F(eta, gamma) of IMSRG(3f2): the "
       "part of [eta, [eta, gamma]_3b] that imsrg++ evaluates with one-body "
       "intermediates. eta must be anti-Hermitian.");
+}
+
+}  // namespace
+
+void BindCommutator(nb::module_& m) {
+  BindTerm(m);
+  BindTermMask(m);
+  BindCommutatorOptions(m);
+  BindWorkspace(m);
+  BindCommutatorFunctions(m);
 }
 
 }  // namespace imsrg::py

@@ -64,91 +64,17 @@ PyOperator Apply(const PyOperator& o, F&& f) {
   return Result(f(in));
 }
 
-}  // namespace
-
-void BindOperator(nb::module_& m) {
-  nb::enum_<Parity>(m, "Parity")
-      .value("Even", Parity::kEven)
-      .value("Odd", Parity::kOdd);
-  nb::enum_<Residency>(m, "Residency",
-                       "Which side of an Operator holds the current data "
-                       "(design/18 section 2.2).")
-      .value("HostCurrent", Residency::kHostCurrent)
-      .value("DeviceCurrent", Residency::kDeviceCurrent)
-      .value("Both", Residency::kBoth);
-  nb::enum_<ResidencyPolicy>(m, "ResidencyPolicy",
-                             "Whether a stale host view raises.")
-      .value("Auto", ResidencyPolicy::kAuto)
-      .value("Strict", ResidencyPolicy::kStrict)
-      .value("Implicit", ResidencyPolicy::kImplicit);
-  m.def("set_residency_policy", &SetResidencyPolicy, nb::arg("policy"),
-        "Sets the process-wide residency policy: Auto (default: strict on "
-        "GPU builds, implicit syncing where the host mirror aliases the "
-        "device data), Strict (a host view of a DeviceCurrent operator raises "
-        "StaleHostError; use it to write scripts that are portable to GPU "
-        "nodes) or Implicit (never raises).");
-  m.def("residency_policy", &GetResidencyPolicy,
-        "The process-wide residency policy.");
-  m.def("residency_enforced", &ResidencyEnforced,
-        "True if a host view of a DeviceCurrent operator raises "
-        "StaleHostError at the moment (policy Strict, or Auto on a GPU "
-        "build).");
-
-  nb::enum_<Hermiticity>(m, "Hermiticity")
-      .value("Hermitian", Hermiticity::kHermitian)
-      .value("AntiHermitian", Hermiticity::kAntiHermitian)
-      .value("NonHermitian", Hermiticity::kNonHermitian);
-
-  nb::class_<op::OperatorSpec>(m, "OperatorSpec",
-                               "Symmetry and rank labels of an operator.")
-      .def(
-          "__init__",
-          [](op::OperatorSpec* self, int particle_rank, int rank_J,
-             Parity parity, int delta_Tz, Hermiticity herm,
-             int delta_particle_number) {
-            op::OperatorSpec s;
-            s.particle_rank = particle_rank;
-            s.rank_J = rank_J;
-            s.parity = parity;
-            s.delta_Tz = delta_Tz;
-            s.hermiticity = herm;
-            s.delta_particle_number = delta_particle_number;
-            new (self) op::OperatorSpec(s);
-          },
-          nb::arg("particle_rank") = 2, nb::arg("rank_J") = 0,
-          nb::arg("parity") = Parity::kEven, nb::arg("delta_Tz") = 0,
-          nb::arg("hermiticity") = Hermiticity::kHermitian,
-          nb::arg("delta_particle_number") = 0)
-      .def_static("scalar", &op::OperatorSpec::Scalar,
-                  nb::arg("particle_rank") = 2,
-                  nb::arg("hermiticity") = Hermiticity::kHermitian,
-                  "A scalar, number-conserving, even-parity spec.")
-      .def_rw("particle_rank", &op::OperatorSpec::particle_rank)
-      .def_rw("rank_J", &op::OperatorSpec::rank_J)
-      .def_rw("parity", &op::OperatorSpec::parity)
-      .def_rw("delta_Tz", &op::OperatorSpec::delta_Tz)
-      .def_rw("hermiticity", &op::OperatorSpec::hermiticity)
-      .def_rw("delta_particle_number", &op::OperatorSpec::delta_particle_number)
-      .def_prop_ro("is_scalar", &op::OperatorSpec::is_scalar)
-      .def("__repr__", [](const op::OperatorSpec& s) {
-        return "OperatorSpec(particle_rank=" + std::to_string(s.particle_rank) +
-               ", rank_J=" + std::to_string(s.rank_J) +
-               ", parity=" + (s.parity == Parity::kEven ? "Even" : "Odd") +
-               ", delta_Tz=" + std::to_string(s.delta_Tz) + ")";
-      });
-
-  nb::class_<PyOperator>(
-      m, "Operator",
-      "Zero-, one- and two-body operator on a ModelSpace (value semantics).")
-      .def(
-          "__init__",
-          [](PyOperator* self, const PyModelSpace& ms,
-             const op::OperatorSpec& spec) {
-            EnsureRuntime();
-            new (self) PyOperator(op::Operator(ms.model_space(), spec),
-                                  Residency::kBoth);
-          },
-          nb::arg("model_space"), nb::arg("spec") = op::OperatorSpec{})
+/// Binds the constructor and the properties of Operator.
+void DefineOperatorProperties(nb::class_<PyOperator>& cls) {
+  cls.def(
+         "__init__",
+         [](PyOperator* self, const PyModelSpace& ms,
+            const op::OperatorSpec& spec) {
+           EnsureRuntime();
+           new (self) PyOperator(op::Operator(ms.model_space(), spec),
+                                 Residency::kBoth);
+         },
+         nb::arg("model_space"), nb::arg("spec") = op::OperatorSpec{})
       .def_prop_ro(
           "model_space",
           [](const PyOperator& o) {
@@ -180,25 +106,29 @@ void BindOperator(nb::module_& m) {
           },
           "Read-only zero-copy numpy view (column-major) of the one-body "
           "matrix (host mirror). Raises StaleHostError if the host mirror is "
-          "stale and residency is enforced: call sync_to_host() first.")
-      .def(
-          "one_body_view",
-          [](nb::object self, bool writable) {
-            auto& o = AsOp(self);
-            PrepareHostAccess(o, writable);
-            if (!writable) {
-              auto v = std::as_const(o).one_body().host_view();
-              return NumpyMatrixView<const double>(v.data, v.rows, v.cols, v.ld,
-                                                   MakeViewGuard(self));
-            }
-            auto v = o.one_body().host_view();
-            return NumpyMatrixView<double>(v.data, v.rows, v.cols, v.ld,
-                                           MakeViewGuard(self, true));
-          },
-          nb::arg("writable") = false,
-          "Zero-copy view of the one-body matrix. A writable view marks the "
-          "device data stale (residency HostCurrent); compute calls push the "
-          "edits to the device by themselves, or call sync_to_device().")
+          "stale and residency is enforced: call sync_to_host() first.");
+}
+
+/// Binds the numpy host views of Operator.
+void DefineOperatorHostViews(nb::class_<PyOperator>& cls) {
+  cls.def(
+         "one_body_view",
+         [](nb::object self, bool writable) {
+           auto& o = AsOp(self);
+           PrepareHostAccess(o, writable);
+           if (!writable) {
+             auto v = std::as_const(o).one_body().host_view();
+             return NumpyMatrixView<const double>(v.data, v.rows, v.cols, v.ld,
+                                                  MakeViewGuard(self));
+           }
+           auto v = o.one_body().host_view();
+           return NumpyMatrixView<double>(v.data, v.rows, v.cols, v.ld,
+                                          MakeViewGuard(self, true));
+         },
+         nb::arg("writable") = false,
+         "Zero-copy view of the one-body matrix. A writable view marks the "
+         "device data stale (residency HostCurrent); compute calls push the "
+         "edits to the device by themselves, or call sync_to_device().")
       .def(
           "two_body_block",
           [](nb::object self, int channel, bool writable) {
@@ -219,23 +149,27 @@ void BindOperator(nb::module_& m) {
           },
           nb::arg("channel"), nb::arg("writable") = false,
           "Zero-copy numpy view of the two-body block of a channel "
-          "(column-major); residency rules as for one_body_view.")
-      .def(
-          "sync_to_host",
-          [](nb::object self) {
-            auto& o = AsOp(self);
-            if (o.residency() == Residency::kDeviceCurrent) {
-              {
-                GilFree r;
-                o.SyncToHost();
-              }
-              o.set_residency(Residency::kBoth);
-            }
-            return self;
-          },
-          "Refreshes the host mirror from the device data "
-          "(DeviceCurrent -> Both); a no-op if the host mirror holds edits "
-          "(HostCurrent). Returns the operator.")
+          "(column-major); residency rules as for one_body_view.");
+}
+
+/// Binds the residency synchronization and copies of Operator.
+void DefineOperatorSync(nb::class_<PyOperator>& cls) {
+  cls.def(
+         "sync_to_host",
+         [](nb::object self) {
+           auto& o = AsOp(self);
+           if (o.residency() == Residency::kDeviceCurrent) {
+             {
+               GilFree r;
+               o.SyncToHost();
+             }
+             o.set_residency(Residency::kBoth);
+           }
+           return self;
+         },
+         "Refreshes the host mirror from the device data "
+         "(DeviceCurrent -> Both); a no-op if the host mirror holds edits "
+         "(HostCurrent). Returns the operator.")
       .def(
           "sync_to_device",
           [](nb::object self) {
@@ -268,8 +202,12 @@ void BindOperator(nb::module_& m) {
           "Sets all parts to zero.")
       .def(
           "copy", [](const PyOperator& o) { return CopyOf(o); },
-          "Deep copy; the copy inherits the residency state.")
-      .def("__copy__", [](const PyOperator& o) { return CopyOf(o); })
+          "Deep copy; the copy inherits the residency state.");
+}
+
+/// Binds the copy protocol and arithmetic operators of Operator.
+void DefineOperatorArithmetic(nb::class_<PyOperator>& cls) {
+  cls.def("__copy__", [](const PyOperator& o) { return CopyOf(o); })
       .def("__deepcopy__",
            [](const PyOperator& o, nb::handle) { return CopyOf(o); })
       .def("__add__",
@@ -306,29 +244,32 @@ void BindOperator(nb::module_& m) {
              GilFree r;
              return Result(op::operator*(c, x));
            })
-      .def("__truediv__",
-           [](const PyOperator& a, double c) {
-             const op::Operator& x = Input(a);
+      .def("__truediv__", [](const PyOperator& a, double c) {
+        const op::Operator& x = Input(a);
+        GilFree r;
+        return Result(op::operator/(x, c));
+      });
+}
+
+/// Binds the in-place arithmetic operators of Operator.
+void DefineOperatorInPlace(nb::class_<PyOperator>& cls) {
+  cls.def(
+         "__iadd__",
+         [](nb::object self, const PyOperator& b) {
+           auto& a = AsOp(self);
+           Input(a);
+           const op::Operator& y = Input(b);
+           RequireSameModelSpace(a, y);
+           {
              GilFree r;
-             return Result(op::operator/(x, c));
-           })
-      .def(
-          "__iadd__",
-          [](nb::object self, const PyOperator& b) {
-            auto& a = AsOp(self);
-            Input(a);
-            const op::Operator& y = Input(b);
-            RequireSameModelSpace(a, y);
-            {
-              GilFree r;
-              op::operator+=(a, y);
-            }
-            MarkModifiedInPlace(a);
-            return self;
-          },
-          "In-place sum. Not synchronized with numpy views of the operator "
-          "that other threads read at the same time: use an operator from "
-          "one thread at a time (design/18 section 4.1).")
+             op::operator+=(a, y);
+           }
+           MarkModifiedInPlace(a);
+           return self;
+         },
+         "In-place sum. Not synchronized with numpy views of the operator "
+         "that other threads read at the same time: use an operator from "
+         "one thread at a time (design/18 section 4.1).")
       .def("__isub__",
            [](nb::object self, const PyOperator& b) {
              auto& a = AsOp(self);
@@ -353,26 +294,29 @@ void BindOperator(nb::module_& m) {
              MarkModifiedInPlace(a);
              return self;
            })
-      .def("__itruediv__",
-           [](nb::object self, double c) {
-             auto& a = AsOp(self);
-             Input(a);
-             {
-               GilFree r;
-               op::operator/=(a, c);
-             }
-             MarkModifiedInPlace(a);
-             return self;
-           })
-      .def(
-          "norm",
-          [](const PyOperator& o) {
-            const op::Operator& x = Input(o);
-            GilFree r;
-            return op::Norm(x);
-          },
-          "Frobenius-type total norm (a device reduction; no host sync "
-          "needed).")
+      .def("__itruediv__", [](nb::object self, double c) {
+        auto& a = AsOp(self);
+        Input(a);
+        {
+          GilFree r;
+          op::operator/=(a, c);
+        }
+        MarkModifiedInPlace(a);
+        return self;
+      });
+}
+
+/// Binds the norms and normal ordering of Operator.
+void DefineOperatorNorms(nb::class_<PyOperator>& cls) {
+  cls.def(
+         "norm",
+         [](const PyOperator& o) {
+           const op::Operator& x = Input(o);
+           GilFree r;
+           return op::Norm(x);
+         },
+         "Frobenius-type total norm (a device reduction; no host sync "
+         "needed).")
       .def(
           "one_body_norm",
           [](const PyOperator& o) {
@@ -420,7 +364,100 @@ void BindOperator(nb::module_& m) {
                ", norb=" + std::to_string(o.model_space_ptr()->num_orbits()) +
                ")";
       });
+}
 
+/// Binds the Parity, Residency and Hermiticity enums and the residency policy
+/// functions.
+void BindOperatorEnums(nb::module_& m) {
+  nb::enum_<Parity>(m, "Parity")
+      .value("Even", Parity::kEven)
+      .value("Odd", Parity::kOdd);
+  nb::enum_<Residency>(m, "Residency",
+                       "Which side of an Operator holds the current data "
+                       "(design/18 section 2.2).")
+      .value("HostCurrent", Residency::kHostCurrent)
+      .value("DeviceCurrent", Residency::kDeviceCurrent)
+      .value("Both", Residency::kBoth);
+  nb::enum_<ResidencyPolicy>(m, "ResidencyPolicy",
+                             "Whether a stale host view raises.")
+      .value("Auto", ResidencyPolicy::kAuto)
+      .value("Strict", ResidencyPolicy::kStrict)
+      .value("Implicit", ResidencyPolicy::kImplicit);
+  m.def("set_residency_policy", &SetResidencyPolicy, nb::arg("policy"),
+        "Sets the process-wide residency policy: Auto (default: strict on "
+        "GPU builds, implicit syncing where the host mirror aliases the "
+        "device data), Strict (a host view of a DeviceCurrent operator raises "
+        "StaleHostError; use it to write scripts that are portable to GPU "
+        "nodes) or Implicit (never raises).");
+  m.def("residency_policy", &GetResidencyPolicy,
+        "The process-wide residency policy.");
+  m.def("residency_enforced", &ResidencyEnforced,
+        "True if a host view of a DeviceCurrent operator raises "
+        "StaleHostError at the moment (policy Strict, or Auto on a GPU "
+        "build).");
+
+  nb::enum_<Hermiticity>(m, "Hermiticity")
+      .value("Hermitian", Hermiticity::kHermitian)
+      .value("AntiHermitian", Hermiticity::kAntiHermitian)
+      .value("NonHermitian", Hermiticity::kNonHermitian);
+}
+
+/// Binds OperatorSpec.
+void BindOperatorSpec(nb::module_& m) {
+  nb::class_<op::OperatorSpec>(m, "OperatorSpec",
+                               "Symmetry and rank labels of an operator.")
+      .def(
+          "__init__",
+          [](op::OperatorSpec* self, int particle_rank, int rank_J,
+             Parity parity, int delta_Tz, Hermiticity herm,
+             int delta_particle_number) {
+            op::OperatorSpec s;
+            s.particle_rank = particle_rank;
+            s.rank_J = rank_J;
+            s.parity = parity;
+            s.delta_Tz = delta_Tz;
+            s.hermiticity = herm;
+            s.delta_particle_number = delta_particle_number;
+            new (self) op::OperatorSpec(s);
+          },
+          nb::arg("particle_rank") = 2, nb::arg("rank_J") = 0,
+          nb::arg("parity") = Parity::kEven, nb::arg("delta_Tz") = 0,
+          nb::arg("hermiticity") = Hermiticity::kHermitian,
+          nb::arg("delta_particle_number") = 0)
+      .def_static("scalar", &op::OperatorSpec::Scalar,
+                  nb::arg("particle_rank") = 2,
+                  nb::arg("hermiticity") = Hermiticity::kHermitian,
+                  "A scalar, number-conserving, even-parity spec.")
+      .def_rw("particle_rank", &op::OperatorSpec::particle_rank)
+      .def_rw("rank_J", &op::OperatorSpec::rank_J)
+      .def_rw("parity", &op::OperatorSpec::parity)
+      .def_rw("delta_Tz", &op::OperatorSpec::delta_Tz)
+      .def_rw("hermiticity", &op::OperatorSpec::hermiticity)
+      .def_rw("delta_particle_number", &op::OperatorSpec::delta_particle_number)
+      .def_prop_ro("is_scalar", &op::OperatorSpec::is_scalar)
+      .def("__repr__", [](const op::OperatorSpec& s) {
+        return "OperatorSpec(particle_rank=" + std::to_string(s.particle_rank) +
+               ", rank_J=" + std::to_string(s.rank_J) +
+               ", parity=" + (s.parity == Parity::kEven ? "Even" : "Odd") +
+               ", delta_Tz=" + std::to_string(s.delta_Tz) + ")";
+      });
+}
+
+/// Binds Operator.
+void BindOperatorClass(nb::module_& m) {
+  nb::class_<PyOperator> cls(
+      m, "Operator",
+      "Zero-, one- and two-body operator on a ModelSpace (value semantics).");
+  DefineOperatorProperties(cls);
+  DefineOperatorHostViews(cls);
+  DefineOperatorSync(cls);
+  DefineOperatorArithmetic(cls);
+  DefineOperatorInPlace(cls);
+  DefineOperatorNorms(cls);
+}
+
+/// Binds random_operator.
+void BindRandomOperator(nb::module_& m) {
   m.def(
       "random_operator",
       [](const PyModelSpace& ms, const op::OperatorSpec& spec,
@@ -438,7 +475,10 @@ void BindOperator(nb::module_& m) {
       nb::arg("seed") = 1, nb::arg("zero_body_scale") = 0.0,
       nb::arg("one_body_scale") = 1.0, nb::arg("two_body_scale") = 1.0,
       "Seeded, platform-reproducible random operator.");
+}
 
+/// Binds read_operator_dump_header and read_operator_dump.
+void BindOperatorDumpReaders(nb::module_& m) {
   m.def(
       "read_operator_dump_header",
       [](const std::filesystem::path& path) {
@@ -485,7 +525,10 @@ void BindOperator(nb::module_& m) {
       nb::arg("check_occupations") = true,
       "Reads an OperatorDump v1; builds the model space from the header if "
       "none is given.");
+}
 
+/// Binds write_operator_dump.
+void BindOperatorDumpWriter(nb::module_& m) {
   m.def(
       "write_operator_dump",
       [](const std::filesystem::path& path, const PyOperator& o,
@@ -501,6 +544,17 @@ void BindOperator(nb::module_& m) {
       nb::arg("reference") = "",
       "Writes the operator as an OperatorDump v1 file (device-resident "
       "operators need no sync).");
+}
+
+}  // namespace
+
+void BindOperator(nb::module_& m) {
+  BindOperatorEnums(m);
+  BindOperatorSpec(m);
+  BindOperatorClass(m);
+  BindRandomOperator(m);
+  BindOperatorDumpReaders(m);
+  BindOperatorDumpWriter(m);
 }
 
 }  // namespace imsrg::py

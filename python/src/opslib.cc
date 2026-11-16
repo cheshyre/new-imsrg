@@ -16,7 +16,10 @@ namespace imsrg::py {
 
 namespace nb = nanobind;
 
-void BindOpslib(nb::module_& m) {
+namespace {
+
+/// Binds the kinetic-energy and center-of-mass kinetic operators.
+void BindKineticOperators(nb::module_& m) {
   m.def(
       "kinetic_energy",
       [](const PyModelSpace& ms) {
@@ -53,6 +56,10 @@ void BindOpslib(nb::module_& m) {
       },
       nb::arg("model_space"), nb::arg("mass_number"),
       "Center-of-mass radius squared (fm^2).");
+}
+
+/// Binds the center-of-mass Hamiltonian and the radius operators.
+void BindRadiusOperators(nb::module_& m) {
   m.def(
       "h_cm",
       [](const PyModelSpace& ms, int mass_number,
@@ -96,6 +103,13 @@ void BindOpslib(nb::module_& m) {
       },
       nb::arg("model_space"), nb::arg("mass_number"),
       "Intrinsic matter radius squared (fm^2).");
+}
+
+}  // namespace
+
+void BindOpslib(nb::module_& m) {
+  BindKineticOperators(m);
+  BindRadiusOperators(m);
 }
 
 }  // namespace imsrg::py

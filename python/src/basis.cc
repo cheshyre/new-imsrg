@@ -51,73 +51,29 @@ PyChannel MakeChannel(const basis::TwoBodyChannels& tb, ChannelIndex ch) {
           c.two_tz.twice, c.num_kets};
 }
 
-}  // namespace
-
-void BindBasis(nb::module_& m) {
-  nb::class_<basis::Orbit>(
-      m, "Orbit", "A single-particle orbit (n, l, 2j, 2tz); tz2 = -1 proton.")
-      .def(
-          "__init__",
-          [](basis::Orbit* self, int n, int l, int two_j, int two_tz) {
-            new (self) basis::Orbit{n, l, TwoJ{two_j}, TwoTz{two_tz}};
-          },
-          nb::arg("n"), nb::arg("l"), nb::arg("two_j"), nb::arg("two_tz"))
-      .def_prop_ro("n", [](const basis::Orbit& o) { return o.n; })
-      .def_prop_ro("l", [](const basis::Orbit& o) { return o.l; })
-      .def_prop_ro("two_j", [](const basis::Orbit& o) { return o.j2.twice; })
-      .def_prop_ro("two_tz", [](const basis::Orbit& o) { return o.tz2.twice; })
-      .def_prop_ro("e", &basis::Orbit::e)
-      .def_prop_ro("is_proton", &basis::Orbit::is_proton)
-      .def_prop_ro("label",
-                   [](const basis::Orbit& o) { return basis::OrbitLabel(o); })
-      .def("__eq__",
-           [](const basis::Orbit& a, const basis::Orbit& b) { return a == b; })
-      .def("__hash__",
-           [](const basis::Orbit& o) {
-             return (((o.n * 31 + o.l) * 31 + o.j2.twice) * 31) + o.tz2.twice;
-           })
-      .def("__repr__", [](const basis::Orbit& o) {
-        return "Orbit(" + basis::OrbitLabel(o) + ")";
-      });
-
-  nb::class_<PyChannel>(m, "Channel", "A two-body channel (2J, parity, 2Tz).")
-      .def_ro("index", &PyChannel::index)
-      .def_ro("two_j", &PyChannel::two_j)
-      .def_ro("parity", &PyChannel::parity, "0 even, 1 odd")
-      .def_ro("two_tz", &PyChannel::two_tz)
-      .def_ro("num_kets", &PyChannel::num_kets)
-      .def("__repr__", [](const PyChannel& c) {
-        return "Channel(index=" + std::to_string(c.index) +
-               ", two_j=" + std::to_string(c.two_j) +
-               ", parity=" + std::to_string(c.parity) +
-               ", two_tz=" + std::to_string(c.two_tz) +
-               ", num_kets=" + std::to_string(c.num_kets) + ")";
-      });
-
-  nb::class_<PyModelSpace>(
-      m, "ModelSpace",
-      "Immutable model space: orbits, reference, valence space, 2B channels.")
-      .def(
-          "__init__",
-          [](PyModelSpace* self, int emax, const std::string& reference,
-             const std::string& valence_space, double hw, int lmax,
-             int emax_unocc, int lmax_unocc) {
-            EnsureRuntime();
-            basis::BasisTruncation t;
-            t.emax = emax;
-            t.lmax = lmax;
-            t.emax_unocc = emax_unocc;
-            t.lmax_unocc = lmax_unocc;
-            new (self) PyModelSpace{
-                basis::ModelSpace::FromNames(t, hw, reference, valence_space)};
-          },
-          nb::arg("emax"), nb::arg("reference") = "default",
-          nb::arg("valence_space") = "default", nb::arg("hw") = 0.0,
-          nb::arg("lmax") = -1, nb::arg("emax_unocc") = -1,
-          nb::arg("lmax_unocc") = -1,
-          "Builds the model space as the imsrg++ driver does (emax, reference "
-          "nucleus name, "
-          "valence space name, hbar omega in MeV).")
+/// Binds the constructor and the size properties of ModelSpace.
+void DefineModelSpaceProperties(nb::class_<PyModelSpace>& cls) {
+  cls.def(
+         "__init__",
+         [](PyModelSpace* self, int emax, const std::string& reference,
+            const std::string& valence_space, double hw, int lmax,
+            int emax_unocc, int lmax_unocc) {
+           EnsureRuntime();
+           basis::BasisTruncation t;
+           t.emax = emax;
+           t.lmax = lmax;
+           t.emax_unocc = emax_unocc;
+           t.lmax_unocc = lmax_unocc;
+           new (self) PyModelSpace{
+               basis::ModelSpace::FromNames(t, hw, reference, valence_space)};
+         },
+         nb::arg("emax"), nb::arg("reference") = "default",
+         nb::arg("valence_space") = "default", nb::arg("hw") = 0.0,
+         nb::arg("lmax") = -1, nb::arg("emax_unocc") = -1,
+         nb::arg("lmax_unocc") = -1,
+         "Builds the model space as the imsrg++ driver does (emax, reference "
+         "nucleus name, "
+         "valence space name, hbar omega in MeV).")
       .def_prop_ro(
           "emax",
           [](const PyModelSpace& s) { return s.model_space()->basis().emax(); })
@@ -139,17 +95,20 @@ void BindBasis(nb::module_& m) {
                    [](const PyModelSpace& s) {
                      return s.model_space()->two_body().num_kets();
                    })
-      .def_prop_ro("num_channels",
-                   [](const PyModelSpace& s) {
-                     return s.model_space()->two_body().num_channels();
-                   })
-      .def(
-          "orbits",
-          [](const PyModelSpace& s) {
-            const auto o = s.model_space()->basis().orbits();
-            return std::vector<basis::Orbit>(o.begin(), o.end());
-          },
-          "List of Orbit in index order.")
+      .def_prop_ro("num_channels", [](const PyModelSpace& s) {
+        return s.model_space()->two_body().num_channels();
+      });
+}
+
+/// Binds the orbit and occupation and ket tables of ModelSpace.
+void DefineModelSpaceTables(nb::class_<PyModelSpace>& cls) {
+  cls.def(
+         "orbits",
+         [](const PyModelSpace& s) {
+           const auto o = s.model_space()->basis().orbits();
+           return std::vector<basis::Orbit>(o.begin(), o.end());
+         },
+         "List of Orbit in index order.")
       .def(
           "occupations",
           [](const PyModelSpace& s) {
@@ -163,17 +122,21 @@ void BindBasis(nb::module_& m) {
             return KetArray(s.model_space()->two_body().kets());
           },
           "All two-body kets as an (num_kets, 2) int32 array of orbit indices "
-          "(p <= q).")
-      .def(
-          "channels",
-          [](const PyModelSpace& s) {
-            const auto& tb = s.model_space()->two_body();
-            std::vector<PyChannel> out;
-            for (std::int32_t i = 0; i < tb.num_channels(); ++i)
-              out.push_back(MakeChannel(tb, ChannelIndex{i}));
-            return out;
-          },
-          "List of Channel in index order.")
+          "(p <= q).");
+}
+
+/// Binds the channel lookups and the equality of ModelSpace.
+void DefineModelSpaceChannels(nb::class_<PyModelSpace>& cls) {
+  cls.def(
+         "channels",
+         [](const PyModelSpace& s) {
+           const auto& tb = s.model_space()->two_body();
+           std::vector<PyChannel> out;
+           for (std::int32_t i = 0; i < tb.num_channels(); ++i)
+             out.push_back(MakeChannel(tb, ChannelIndex{i}));
+           return out;
+         },
+         "List of Channel in index order.")
       .def(
           "channel",
           [](const PyModelSpace& s, int index) {
@@ -216,6 +179,66 @@ void BindBasis(nb::module_& m) {
       .def("__hash__", [](const PyModelSpace& s) {
         return std::hash<const void*>{}(s.model_space().get());
       });
+}
+
+/// Binds Orbit and Channel.
+void BindOrbitAndChannel(nb::module_& m) {
+  nb::class_<basis::Orbit>(
+      m, "Orbit", "A single-particle orbit (n, l, 2j, 2tz); tz2 = -1 proton.")
+      .def(
+          "__init__",
+          [](basis::Orbit* self, int n, int l, int two_j, int two_tz) {
+            new (self) basis::Orbit{n, l, TwoJ{two_j}, TwoTz{two_tz}};
+          },
+          nb::arg("n"), nb::arg("l"), nb::arg("two_j"), nb::arg("two_tz"))
+      .def_prop_ro("n", [](const basis::Orbit& o) { return o.n; })
+      .def_prop_ro("l", [](const basis::Orbit& o) { return o.l; })
+      .def_prop_ro("two_j", [](const basis::Orbit& o) { return o.j2.twice; })
+      .def_prop_ro("two_tz", [](const basis::Orbit& o) { return o.tz2.twice; })
+      .def_prop_ro("e", &basis::Orbit::e)
+      .def_prop_ro("is_proton", &basis::Orbit::is_proton)
+      .def_prop_ro("label",
+                   [](const basis::Orbit& o) { return basis::OrbitLabel(o); })
+      .def("__eq__",
+           [](const basis::Orbit& a, const basis::Orbit& b) { return a == b; })
+      .def("__hash__",
+           [](const basis::Orbit& o) {
+             return (((o.n * 31 + o.l) * 31 + o.j2.twice) * 31) + o.tz2.twice;
+           })
+      .def("__repr__", [](const basis::Orbit& o) {
+        return "Orbit(" + basis::OrbitLabel(o) + ")";
+      });
+
+  nb::class_<PyChannel>(m, "Channel", "A two-body channel (2J, parity, 2Tz).")
+      .def_ro("index", &PyChannel::index)
+      .def_ro("two_j", &PyChannel::two_j)
+      .def_ro("parity", &PyChannel::parity, "0 even, 1 odd")
+      .def_ro("two_tz", &PyChannel::two_tz)
+      .def_ro("num_kets", &PyChannel::num_kets)
+      .def("__repr__", [](const PyChannel& c) {
+        return "Channel(index=" + std::to_string(c.index) +
+               ", two_j=" + std::to_string(c.two_j) +
+               ", parity=" + std::to_string(c.parity) +
+               ", two_tz=" + std::to_string(c.two_tz) +
+               ", num_kets=" + std::to_string(c.num_kets) + ")";
+      });
+}
+
+/// Binds ModelSpace.
+void BindModelSpace(nb::module_& m) {
+  nb::class_<PyModelSpace> cls(
+      m, "ModelSpace",
+      "Immutable model space: orbits, reference, valence space, 2B channels.");
+  DefineModelSpaceProperties(cls);
+  DefineModelSpaceTables(cls);
+  DefineModelSpaceChannels(cls);
+}
+
+}  // namespace
+
+void BindBasis(nb::module_& m) {
+  BindOrbitAndChannel(m);
+  BindModelSpace(m);
 }
 
 }  // namespace imsrg::py
