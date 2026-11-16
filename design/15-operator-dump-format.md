@@ -59,3 +59,112 @@ end
   choose. Converters to and from the chosen layout are part of M10.
 * A tiny Python reader (`tools/reference/opdump.py`, numpy-based) is useful for ad-hoc comparisons
   and for the brute-force m-scheme tests.
+
+## Tensor reference dumps (raw, run 3 prep)
+
+Status: **provisional**. The tensor reference data for the future tensor-operator milestone
+(D53, M15) were produced in run 3 before the OperatorDump v2 design exists, so they use a raw
+labelled text format that does not pre-empt it (`# imsrg-tensor-dump raw v0`, files `*.tdump`,
+writer `tools/reference/rh_tensor.cpp`, data `tests/golden/tensor/`, script
+`tools/reference/gen_golden_tensor.sh`). The scalar OperatorDump v1 above is unchanged; the
+inputs `X` of the commutator goldens are v1 files.
+
+### Layout
+
+```
+# imsrg-tensor-dump raw v0 ...                 first line
+source / command / operator / basis ...         provenance (patch stamp, harness command line)
+spec rank_J <λ> parity <0|1> delta_Tz <|ΔTz|> hermiticity <H|A|N> particle_rank 2 reduced <0|1>
+convention ... / columns ...                    conventions and column names, in the file
+norbits N, N × `orbit i n l 2j 2tz occ`         orbit list (2tz = -1 proton)
+zero_body <v>
+one_body <count>, count × `1b a b value`        value = <a||O||b> = imsrg++ OneBody(a,b); all nonzero (a,b) of the N×N matrix
+two_body <count> blocks <nblocks>
+  block ch_bra J_bra parity_bra Tz_bra ch_ket J_ket parity_ket Tz_ket <count>
+  count × `2b p q r s value`                    value = <pq;J_bra||O||rs;J_ket>, p<=q, r<=s
+end
+```
+
+* A block is one stored matrix `TwoBody.MatEl[{ch_bra, ch_ket}]`; **only `ch_bra <= ch_ket`
+  blocks exist** (`TwoBodyME::Allocate`, `TwoBodyME.cc:94-113`: triangle `|J_bra-J_ket| <= λ <= J_bra+J_ket`,
+  `|Tz_bra-Tz_ket| == ΔTz`, `parity_bra + parity_ket + parity(O)` even). Within a block, every nonzero
+  entry of the full matrix is listed (diagonal blocks list both triangles). Blocks with no nonzero
+  entry are omitted. The block line groups the channel labels (instead of repeating them on every
+  `2b` line) to keep the files below the golden size limit.
+* Channel labels: `ch = 6J + 2(Tz+1) + parity`, `Tz = (2tz_p + 2tz_q)/2 ∈ {-1,0,1}` (proton-proton
+  = -1). Pairs are `p <= q` in imsrg++'s ket order, **normalized antisymmetrized** (`GetTBME_norm`,
+  not the `√2`-scaled `GetTBME`).
+* Values are `%.17g`; exact zeros are not listed.
+* Files that come from `commutator-tensor` are written with the hermiticity flag of the
+  `CommutatorScalarTensor` result; **single terms need not obey it** before the final
+  `Symmetrize/AntiSymmetrize` (`Commutator.cc:605-608`, only `Z_all` does; checked to 1e-16).
+* `tests/golden/tensor/result.json` holds the patch stamp, the harness commands, the norms of every
+  run (imsrg++ `Operator::*Norm`), the file sizes and the checks that `gen_golden_tensor.sh` ran
+  (hermiticity of every operator and `Z_all`, the sum rule `Z_all = Σ terms`, equality of the X inputs
+  with the earlier goldens).
+
+### What imsrg++'s tensor conventions are (found while producing the data)
+
+1. **Reduced everywhere for tensors, and for channel-changing scalars.** `Operator(ms, J, T, p, rank)`
+   sets `is_reduced = (J>0 or T>0 or p>0)` (`Operator.cc:66-80`): `E1..E6`, `M1..`, `Fermi`, `GamowTeller`,
+   `M0nu_*`, `DGT` are all built reduced. `MakeReduced` multiplies 1B rows by `√(2j_a+1)` and every
+   2B block by `√(2J_bra+1)` (`Operator.cc:1051-1070`, `TwoBodyME.cc:145-155`); it refuses `rank_J > 0`.
+   For a scalar of ΔTz or parity ≠ 0 `imsrg++.cc:815-818` makes it **not reduced before** the HF
+   transformation and normal ordering (`DoNormalOrdering2` has a reduced path with a 6j,
+   `Operator.cc:526-557`, but the executable does not use it for J=0); `dump-tensor basis=HF` follows
+   that pipeline and then reduces again, so **every dump has `reduced 1`**.
+2. **Phase/normalization of the reduced element (empirical, checked against sympy).** The 1B
+   builders are closed forms: `ElectricMultipoleOp` (`imsrg_util.cc:2026-2049`) uses
+   `(-1)^{j_b+L-1/2} √((2j_a+1)(2j_b+1)(2L+1)/4π) (j_a j_b L; ½ -½ 0) ∫R_a r^L R_b`, only proton orbits,
+   units e fm^L, HO length `b = √(ħ²/(m ħω))` with `m` the mean nucleon mass; `E1` has no CM correction.
+   `AllowedGamowTeller_Op` (`:2483-2503`) is `⟨a‖σ‖b‖` (**without** `g_A`, and with `⟨p|τ_±|n⟩ = 1`, not
+   `√2`) from `2(-1)^{l+j_a+3/2} √((2j_a+1)(2j_b+1)) √(3/2) {½ ½ 1; j_b j_a l}` (`⟨s‖σ‖s⟩ = √6`);
+   `AllowedFermi_Op` (`:2453-2475`) is `√(2j+1)` on `(a,b) = (p,n)` of the same `(n,l,j)` and `(n,p)`.
+   `MagneticMultipoleOp_pn` (`:2083-2128`) is Suhonen (6.24) in μ_N fm^{L-1} with `g_l = 1` (proton)
+   / 0 and `g_s = PROTON_SPIN_G = 5.585690569`, `NEUTRON_SPIN_G = -3.826085` (`PhysicalConstants.hh:22-23`).
+   Compared with the standard Edmonds convention `⟨j'm'|T_μ|jm⟩ = (-1)^{j'-m'} (j' λ j; -m' μ m) ⟨j'‖T‖j⟩`
+   (bra `j'`), the imsrg++ elements for σ and for E2 equal `(-1)^{j_bra - j_ket}` times the Edmonds
+   value (`(-1)^{j_bra-j_ket+λ}` for the electric multipoles), tested at `0p3/2, 0p1/2` with sympy 3j/6j
+   (`tools/reference/tensor_convention_check.py`, ratios exactly ±1; E1, E3, M1 not tested, derived
+   from the closed forms only). This is a pure bra/ket "gauge" `(-1)^{J_bra} (-1)^{-J_ket}`,
+   which telescopes in `[scalar, tensor]` commutators, but the new code must either reproduce the
+   closed forms above or convert at the edges (question M15-Q1).
+3. **Hermiticity.** All of these are flagged Hermitian and `OneBody(b,a) = (-1)^{(2j_a-2j_b)/2} OneBody(a,b)`
+   (`Operator::Symmetrize`, `Operator.cc:1833-1850`; the same relation holds for the reduced 2B elements,
+   `TwoBodyME::AddToTBME` swaps `ch_bra > ch_ket` with `phase(J_new_bra - J_new_ket)`, `TwoBodyME.cc:307-316`;
+   anti-Hermitian adds a sign in the Symmetrize path only). It holds to 1e-16 in every dump. Diagonal
+   2B blocks of a Hermitian tensor are symmetric matrices.
+4. **Isospin-changing operators are stored as `O + O†`.** ΔTz is `rank_T` and means `|ΔTz|`
+   (`TwoBodyME.cc:107`; "we don't couple to T"). `GamowTeller` and `Fermi` list both `(p,n)` and `(n,p)`
+   one-body elements (the code fills every `(i,j)` of `OneBodyChannels`, `Fermi` copies `(j,i) = (i,j)`),
+   so the object is hermitian although τ_+ alone is not. For ΔTz = 2 the stored 2B blocks are those with
+   `ch_bra <= ch_ket`, i.e. bra `Tz=-1` (pp) and ket `Tz=+1` (nn) at equal J and parity; the transposed
+   `(nn, pp)` block is implied by hermiticity. For ΔTz = 1 the bra channel can have the larger `Tz`
+   because the channel index orders J first (e.g. bra `(J=0, Tz=0)` with ket `(J=1, Tz=-1)`).
+   One-body `OneBodyChannels` for tensors are `(l', j', tz')` with `|tz_a - tz'| = 2 ΔTz` (`Operator.cc:251-290`).
+5. **0νββ operators that exist** (`imsrg_util.cc:324-460, 130`; `M0nu.cc`): `M0nu_GT_<Ec>_<src>[_<ff>]`,
+   `M0nu_F_...`, `M0nu_T_...` (the three neutrino-potential parts, closure energy `Ec`, short-range
+   correlation `src` as a name, form factors AA/AP/PP/MM for GT and T), `M0nu_C_<cutoff>_<power>` (contact),
+   `M0nuHeavy_{GT,F,T}_<src>_<ff>`, and `DGT` (double Gamow-Teller). All are `J=0, ΔTz=2, parity 0`,
+   2-body only (particle rank 2, `is_reduced = true` set by hand, `M0nu.cc:395-402`), Hermitian. They
+   carry `R0 A^{1/3}` of the **target mass** of the model space, so the He4 and O16 HO operators differ
+   by a factor. The goldens use `Ec = 7.72`, `src = none`, contact `(500, 3)`.
+6. **Scalar-tensor commutator conventions.** `Commutator::Commutator(X,Y)` routes `X` scalar, `Y`
+   rank > 0 to `CommutatorScalarTensor(X_not_reduced, Y_reduced)`, `Z` takes `Y`'s J, ΔTz, particle rank
+   and parity `(πX + πY)`, hermiticity from the pair (`Commutator.cc:221-315, 491-611`); a tensor `X`
+   with a scalar `Y` is `-CommutatorScalarTensor(Y, X)`; tensor-tensor `exit()`s. `X` must be **not
+   reduced** (the harness uses the HF normal-ordered H and a random anti-Hermitian scalar). The terms
+   run: `comm111st`, `comm121st`, `comm122st`, the fused `comm222_pp_hh_221st` (its two halves
+   `comm221st` = 1B part and `comm222_pp_hhst` = 2B part are wrappers that save and restore the other
+   half of Z, valid only on a zero Z), `comm222_phst`. The first call for a `(λ, πX, πY)` key runs
+   single-threaded (6j/9j caches). For a **one-body Y only `comm111st`, `comm121st` (1B) and `comm122st`
+   (2B) are nonzero**; every term is exercised only by a Y with a two-body part, hence the seeded random
+   tensors `rand_<J>_<ΔTz>_<parity>_<H|A>_<seed>` (UnitTest::RandomOp) at emax 1. `comm222_pp_hh_221st`
+   `exit()`s for an isospin-changing scalar X (`TensorCommutators.cc:359-363`).
+
+### Reproducing
+
+`tools/reference/build_imsrg_devel.sh patched-harness` (`FRESH=1` when the CMake cache points at
+another checkout), then `tools/reference/gen_golden_tensor.sh` (about 20 s; writes
+`tests/golden/tensor/` from scratch and fails on any check). Subcommands: `refharness dump-tensor`,
+`commutator-tensor`, `bch-tensor` (`tools/reference/refharness.cpp` header lists the keys).

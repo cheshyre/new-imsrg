@@ -25,6 +25,9 @@
 //   flow [--factorized]     full IMSRG pipeline with %.17g trajectory  (rh_flow.cpp)
 //   factorized PART ETA GAMMA Z   factorized double commutator parts   (rh_factorized.cpp)
 //   bch transform|product A B OUT [scale_a= scale_b= --factorized ...]  (rh_factorized.cpp)
+//   dump-tensor ops=E2,GamowTeller basis=HO|HF out=DIR   raw tensor-operator dumps (M15 prep)
+//   commutator-tensor X=H,A Y=E2,GamowTeller out=DIR    CommutatorScalarTensor terms (rh_tensor.cpp)
+//   bch-tensor Y=E2 omega_norm=X out=DIR                BCH_Transform of a tensor operator (rh_tensor.cpp)
 //
 // Common keys (imsrg++ names): emax e3max lmax hw reference valence_space A
 //   2bme file2e1max file2e2max file2lmax 3bme 3bme_type file3e1max file3e2max file3e3max
@@ -278,6 +281,9 @@ int main(int argc, char** argv) {
     if (c == "flow") return rh::cmd_flow(a);
     if (c == "factorized") return rh::cmd_factorized(a);
     if (c == "bch") return rh::cmd_bch(a);
+    if (c == "dump-tensor") return rh::cmd_dump_tensor(a);
+    if (c == "commutator-tensor") return rh::cmd_commutator_tensor(a);
+    if (c == "bch-tensor") return rh::cmd_bch_tensor(a);
     std::cerr << "refharness: unknown subcommand '" << c << "'\n";
     return 2;
   } catch (const std::exception& e) {

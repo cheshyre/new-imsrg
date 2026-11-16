@@ -202,7 +202,8 @@ on the sd-shell valence space, plain and isospin-averaged (`op`) mode. See `io/R
 ## Missing (not produced in M1)
 
 * IMSRG(3) commutator-term goldens: OperatorDump has no 3B section yet (reserved for M10).
-* Tensor operators are not dumped (reduced-ME convention still open, design/15).
+* Tensor operators are not in OperatorDump v1 (reduced-ME convention still open, design/15); the raw
+  tensor reference dumps of run 3 are in `tensor/` (below).
 
 **Commutator, emax 1 (M7-T2).** `commutator/emax1_He4/` (closed shell He4) and
 `commutator/emax1_He6/` (open shell He6, neutron 0p3/2 occupation 0.5) add the term-by-term
@@ -218,3 +219,21 @@ Script: `tools/reference/gen_golden_commutator_extra.sh`.
 triples energies) and `e2e/IT-8/*/harness_triples.json` (`refharness flow --perturbative-triples`,
 %.17g) come from `tools/reference/gen_golden_imsrg3.sh`; see `imsrg3/README.md`. `IT-8/He4_emax2` and
 `IT-8/emax3` were regenerated from the patched build (identical to 8 decimals).
+
+## Tensor reference data (M15 preparation, run 3)
+
+`tensor/` (about 1.0 MB, largest file 110 KB) from `tools/reference/gen_golden_tensor.sh` (about 20 s; D35-patched
+build, stamp `ddcbf1af...+d35-patch:3b0ff5eed6806a72`, `result.json` holds the commands, norms and the checks).
+Raw labelled format `# imsrg-tensor-dump raw v0` (`*.tdump`), described with imsrg++'s tensor conventions in
+`design/15-operator-dump-format.md`, "Tensor reference dumps (raw, run 3 prep)". Not read by any test yet.
+
+| Directory | Content |
+|-----------|---------|
+| `emax2_He4/{HO,HF}`, `emax2_O16/{HO,HF}` | `E1 E2 E3 M1 Fermi GamowTeller` and the 0νββ operators `M0nu_GT_7.72_none M0nu_F_7.72_none M0nu_T_7.72_none M0nu_C_500_3 DGT` (HF: all; HO: He4 `E1..GamowTeller M0nu_GT M0nu_F DGT`, O16 `E2 M1 Fermi GamowTeller M0nu_GT M0nu_F`); HF = imsrg++.cc pipeline (HF transformation, normal ordering) |
+| `emax2_Ne20/HF` | open shell (0d5/2 occupation 1/3): `E2 M1 Fermi GamowTeller` |
+| `emax2_{He4,O16}/commutator` | `CommutatorScalarTensor` terms for X = HF-basis H (O16 also reuses `hf/emax2_O16_2N/HNO.dump`) or seeded random anti-Hermitian A (He4: `emax2_He4/inputs/H_HF.dump`, A = `commutator/emax2_O16/random_A.dump`), Y = E2, GamowTeller: `comm111st comm121st all` (identically zero terms are not written, see `result.json`) |
+| `emax1_He4/commutator` | all seven terms and `all` for X in {H, A} and seeded random tensors Y (`rand_J_dTz_parity_H|A_seed`; every 2B term nonzero), the four hermiticity pairs |
+| `emax{1,2}_He4/bch` | `BCH::BCH_Transform(Y, Omega)`, Omega = s random_A, \|Omega\| = 0.3 (Y = E2 at emax 2; E2 and two random tensors at emax 1) |
+
+New refharness subcommands: `dump-tensor`, `commutator-tensor`, `bch-tensor` (`tools/reference/rh_tensor.cpp`). Rebuild the patched harness with
+`FRESH=1 tools/reference/build_imsrg_devel.sh patched-harness` when its CMake cache points at another checkout.
