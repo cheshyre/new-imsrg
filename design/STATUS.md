@@ -38,9 +38,8 @@
   (MPI 2 and 4 ranks vs serial: identical steps, max relative deviation 1.2e-16).
   **CI:** the last complete CI log of run 3 (93e2d9f, the combined N7 + M12b merge): 1231 unit, 69
   integration, 18 MPI, 150 Python (1 skipped); the slow suite 7/7 passed in 1027 s (IT-9 emax 3: He4
-  490 s, O16 311 s). 7bfba4e only added C4 and `n7_bench --partition`; its CI (1235 unit, 69
-  integration, 18 MPI at the time of writing) is recorded in the 04:05 log row. TODO(orchestrator):
-  confirm the final counts of `tools/ci.sh dev-openmp` and the slow suite on 7bfba4e.
+  490 s, O16 311 s). 7bfba4e only added C4 and `n7_bench --partition`; `ci.sh dev-openmp` on its content PASS: 1235 unit, 69
+  integration, 18 MPI, 150 Python (1 skipped). TODO(orchestrator): confirm the slow suite on 7bfba4e.
 * **Performance** (`design/benchmarks/`): IMSRG(2) commutator 3.6-4x faster than imsrg++ at emax 6-8
   (run 2). **N7 (run 3, O16, full N7 commutator, release, best of 5):** 255 -> 105 ms at emax 3
   (2.4x), 6289 -> 1147 ms at emax 4 (5.5x), 46.6 -> 6.2 s at emax 5 (7.5x), ~1.7e10 multiply-adds/s;
