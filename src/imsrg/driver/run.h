@@ -6,6 +6,7 @@
 /// @file
 /// The pipeline entry point of the `imsrg` executable and the Python bindings.
 
+#include "imsrg/comm/communicator.h"
 #include "imsrg/driver/config/schema.h"
 
 namespace imsrg::driver {
@@ -25,11 +26,24 @@ namespace imsrg::driver {
 /// of H, eta and the current Omega, Omega count, wall time), the valence-space
 /// interaction `<stem>.snt` (tokyo; `.int`/`.sp` for nushellx) and one
 /// `<stem>_<operator>.snt` per operator. Needs an initialized exec::Runtime.
+///
+/// Collective over `comm` (M12b phase 1): every rank must call it with the
+/// same `config` and runs the whole pipeline (inputs, HF, normal ordering,
+/// flow) on replicated data; the flow solvers get the commutator
+/// `WorkspaceOptions{comm}`. After the Hamiltonian preparation rank 0
+/// broadcasts H and every operator that is transformed, so all ranks start
+/// from identical bits. Only rank 0 writes files and directories (including
+/// resolved_config.toml) and prints (`Logger::set_rank(comm.rank())`: info
+/// lines and warnings of rank 0 only). Values that are printed or written are
+/// computed on all ranks. An exception on one rank must end the job (`main`
+/// aborts it); the other ranks would block in the next collective. With the
+/// default serial communicator the behavior is that of the single-process
+/// run.
 /// @throws ConfigError ("E-PLANNED ...") for options not implemented yet
 ///         (checked before any work: methods other than magnus, IMSRG(3), NAT
 ///         basis, ...); InputError for unreadable inputs or unwritable outputs;
 ///         NumericalError if the flow diverged (after writing results.json).
-void Run(const RunConfig& config);
+void Run(const RunConfig& config, const comm::Communicator& comm = {});
 
 }  // namespace imsrg::driver
 

@@ -441,6 +441,7 @@ imsrg 2bme=... emax=6 hw=16 reference=O16 valence_space=O16 ...      # legacy fo
 * Legacy mode is selected when no `--config` is given and at least one positional token contains `=`. Mixing `--config` with legacy tokens is an error (`E-CLI-MIX`) so provenance stays unambiguous. Legacy `help`, `-help`, `--help` print the CLI11 help plus a pointer to `--legacy-keys` (table of old keys with new names).
 * Exit codes: 0 ok, 2 configuration/validation error, 3 input file error, 1 runtime failure.
 * Legacy quirks removed in the parser: `key=` (empty value) is an error rather than "keep default"; a token without `=` is an error; scalar keys given twice: last wins plus warning; vector keys given twice append (old behaviour, kept); integers must parse completely (`emax=4.5` is an error, old truncated); booleans must be `true`/`false` (old: anything else silently false).
+* MPI (M12b): `mpirun -n N imsrg <config>` runs on N ranks. Every rank reads the inputs (M12b-Q6) and runs the whole pipeline on replicated data (rank 0 broadcasts the starting operators so all ranks start the flow from identical bits); rank 0 alone writes all outputs (resolved config, `results.json`, flow CSV, `.snt` files) and prints. Use the same `OMP_NUM_THREADS` on every rank. A failure on any rank aborts the whole job with the usual exit code (the message carries the rank), so no rank is left blocked in a collective. The command-line and configuration errors of the first part are detected on every rank before MPI starts.
 
 ---
 

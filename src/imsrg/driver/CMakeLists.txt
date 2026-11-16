@@ -20,6 +20,7 @@ imsrg_add_module(NAME driver
     operators/operator_request.cc
     pipeline/charge_radius.cc
     pipeline/hamiltonian.cc
+    pipeline/mpi_sync.cc
     run.cc
   DEPS base exec comm basis operator io opslib hf mbpt commutator flow
   PRIVATE_LIBS tomlplusplus::tomlplusplus)

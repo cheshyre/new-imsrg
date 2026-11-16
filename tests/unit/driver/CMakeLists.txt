@@ -105,3 +105,16 @@ imsrg_add_test(NAME driver_imsrg3_n7_slow
 target_compile_definitions(driver_imsrg3_n7_slow PRIVATE IMSRG_IT9_SLOW
   "IMSRG_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden\""
   "IMSRG_TEST_DATA_DIR=\"${IMSRG_TEST_DATA_DIR}\"")
+
+# driver::Run on several MPI ranks (M12b phase 1, D4): He4 emax 2 gives the serial results, only
+# rank 0 writes files. One source, two rank counts; the shared MPI main provides the Kokkos runtime.
+foreach(_ranks 2 4)
+  imsrg_add_test(NAME driver_mpi_${_ranks}ranks
+    SOURCES ${_it_support} test_mpi_driver.cc ${PROJECT_SOURCE_DIR}/tests/support/mpi_test_main.cc
+    DEPS driver comm LABELS mpi MPI_RANKS ${_ranks} NO_GTEST_MAIN TIMEOUT 600)
+  if(TARGET driver_mpi_${_ranks}ranks)
+    target_compile_definitions(driver_mpi_${_ranks}ranks PRIVATE
+      "IMSRG_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden\""
+      "IMSRG_TEST_DATA_DIR=\"${IMSRG_TEST_DATA_DIR}\"")
+  endif()
+endforeach()
