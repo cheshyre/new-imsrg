@@ -31,3 +31,11 @@ imsrg_add_test(NAME flow_generator3
   NO_GTEST_MAIN)
 target_compile_definitions(flow_generator3 PRIVATE
   IMSRG_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/tests/golden")
+
+# The device kernel of the three-body generator against the former host loop.
+imsrg_add_test(NAME flow_generator3_kernel
+  SOURCES test_generator3_kernel.cc ${_imsrg_exec_main}
+          "${PROJECT_SOURCE_DIR}/tests/support/three_body_test_support.cc"
+  DEPS flow commutator operator
+  LABELS unit
+  NO_GTEST_MAIN)
