@@ -7,9 +7,10 @@
 /// @file
 /// The batch interface of the row-tiled IMSRG(3)-N7 terms (design/14 section
 /// 6.3): the inputs of one batch (operand views, tables, the batch's tiles and
-/// the H and W intermediates of the three-body operands), the batch loop, and
-/// the per-term batch kernels with their element-wise references. Internal to
-/// the commutator module and its tests; no Kokkos.
+/// the H and W intermediates of the three-body operands), the batch loop, the
+/// per-term batch kernels with their element-wise references, and the fused
+/// driver of all N7 terms (`RunN7`). Internal to the commutator module and its
+/// tests; no Kokkos.
 ///
 /// Contract of every batch kernel: it adds the contribution of exactly the
 /// lines of its batch (design/14 section 6.3 attribution) to the output, reads
@@ -27,6 +28,7 @@
 #include "imsrg/commutator/detail/n7_batch.h"
 #include "imsrg/commutator/detail/n7_common.h"
 #include "imsrg/commutator/detail/n7_views.h"
+#include "imsrg/commutator/options.h"
 #include "imsrg/commutator/three_body.h"
 #include "imsrg/operator/operator.h"
 #include "imsrg/operator/pair_third.h"
@@ -160,6 +162,59 @@ void Comm330Rows(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
 void Comm133Rows(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                  const ThreeBodyContext& ctx, const basis::RowSet& rows,
                  std::int64_t budget_bytes);
+
+// ---------------------------------------------------------------------------
+// The fused batch driver (defined in n7_batches.cc).
+
+/// Adds the N7 terms of `terms` of [X, Y] (any subset of the seven,
+/// kComm133ss..kComm132ss; IMSRG(2) terms in the set are ignored, so the
+/// mask of a `Commutator` call can be passed as is), restricted to the lines
+/// of `rows`, into Z (design/14 section 6.3): the batch driver of
+/// `Commutator()`.
+///
+/// ONE `ForEachN7Batch` whose `N7Needs` is the union of the needs of the
+/// selected terms that contribute (H for 133 and 331, W for 232, 231 and
+/// 132), so H and W are built once per batch and shared by the terms. Per
+/// batch, in this order: 133 (`Comm133Batch`, then `AddTransposeOut` into
+/// Z's rows: all rows are local in serial code), 232, 132, 331, 231, 330
+/// (the partial Z0 of the batches summed on the host in batch order). After
+/// the loop: 223 (`AddComm223Rows` on `rows`, so every Z3 element gets 133
+/// before 223, as in imsrg++), then Z0 += the 330 sum. Per output part this
+/// keeps imsrg++'s relative order (Z3: 133 then 223; Z2: 232 then 132; Z1:
+/// 331 then 231), so the result equals the sequence of the single-term
+/// `terms::` calls (imsrg++ order) bitwise if both plan the same single
+/// batch, and up to rounding (the interleaving of the per-batch partial
+/// sums of different terms, and a different batching) otherwise (M10-Q79).
+/// Each kernel sees the inputs its single-term loop would give it (232 and
+/// 132 without the three-body part whose two- or one-body partner is
+/// missing); the batch plan is that of the full operands.
+///
+/// A dense (non-Hermitian) Z3 with 133 selected: 133 through
+/// `Comm133ssReference` before the loop, which needs `rows` to cover the
+/// whole kept space (M12b never distributes dense operands). An operand
+/// without a three-body part skips, term by term, what the single-term
+/// functions skip (their early returns): 330 and 331 need both three-body
+/// parts, 133 and 231 at least one, 232 and 132 a three-body part whose
+/// two- (232) or one-body (132) partner in the other operand is present, 223
+/// both two-body parts; 330 adds nothing to an anti-Hermitian Z.
+///
+/// Checks once, before any work, what the single-term functions check
+/// (`PrepareN7`; Z's three-body part if 133 or 223 is selected, its two-body
+/// part if 232 or 132 is), with the same exceptions; a message names the
+/// first selected term (imsrg++ order) that makes the check. An empty
+/// selection does nothing (no checks).
+/// @throws NotImplementedError for an N8/N9 term in `terms`, and as
+///         `PrepareN7`.
+/// @throws InputError as `PrepareN7`.
+/// @throws InvariantError as `PrepareN7`, `ThreeBodyOut` and `TwoBodyOut`,
+///         and for a dense Z3 with 133 selected if `rows` does not cover the
+///         whole kept space.
+/// Preconditions: `rows` built on the context's three-body space;
+/// `budget_bytes` >= 0 (`PlanBatches`). Host only. Cost: the H/W builds once
+/// per batch, the selected batch kernels, and the 223 work items of `rows`.
+void RunN7(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+           const ThreeBodyContext& ctx, TermMask terms,
+           const basis::RowSet& rows, std::int64_t budget_bytes);
 
 // ---------------------------------------------------------------------------
 // Element-wise references (the kernels before the row tiling, kept for tests

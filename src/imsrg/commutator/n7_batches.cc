@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright 2026 The imsrg authors
 
-// Batch planner, device upload of the line tiles and the batch loop of the
-// row-tiled IMSRG(3)-N7 terms (detail/n7_batch.h, detail/n7_terms.h). Host
-// code.
+// Batch planner, device upload of the line tiles, the batch loop of the
+// row-tiled IMSRG(3)-N7 terms and their fused driver `RunN7`
+// (detail/n7_batch.h, detail/n7_terms.h). Host code.
 
 #include <algorithm>
 #include <cstddef>
@@ -13,10 +13,19 @@
 #include <vector>
 
 #include "imsrg/base/assert.h"
+#include "imsrg/base/error.h"
+#include "imsrg/base/types.h"
+#include "imsrg/basis/model_space.h"
+#include "imsrg/basis/three_body_rows.h"
+#include "imsrg/basis/three_body_space.h"
 #include "imsrg/commutator/detail/n7_batch.h"
+#include "imsrg/commutator/detail/n7_common.h"
 #include "imsrg/commutator/detail/n7_terms.h"
+#include "imsrg/commutator/detail/n7_views.h"
 #include "imsrg/commutator/detail/three_body_impl.h"
+#include "imsrg/commutator/options.h"
 #include "imsrg/exec/device_buffer.h"
+#include "imsrg/operator/operator.h"
 
 namespace imsrg::commutator::detail {
 
@@ -290,6 +299,165 @@ void ForEachN7Batch(const N7Views& v, const ThreeBodyContext& ctx,
                 in.wy, in.wyt, in.syt);
     body(in);
   }
+}
+
+namespace {
+
+/// An N7 term and the name of its single-term function (check messages).
+struct N7TermName {
+  Term term;
+  const char* name;
+};
+
+/// The N7 terms in imsrg++'s call order (Commutator.cc:403-430).
+constexpr N7TermName kN7CallOrder[] = {
+    {Term::kComm133ss, "Comm133ss"}, {Term::kComm330ss, "Comm330ss"},
+    {Term::kComm223ss, "Comm223ss"}, {Term::kComm232ss, "Comm232ss"},
+    {Term::kComm331ss, "Comm331ss"}, {Term::kComm231ss, "Comm231ss"},
+    {Term::kComm132ss, "Comm132ss"}};
+
+/// The name of the first term of `kN7CallOrder` in both `terms` and `among`
+/// (the single-term function that would make a check first), or "RunN7".
+const char* FirstTermName(TermMask terms, TermMask among) {
+  for (const N7TermName& t : kN7CallOrder) {
+    if (terms.test(t.term) && among.test(t.term)) return t.name;
+  }
+  return "RunN7";
+}
+
+/// The line offsets of the `TransposeOut` of `plan` (its layout): num_lines +
+/// 1 entries, line l (row L) at [off[l], off[l] + L + 1), the last entry the
+/// total size. O(lines).
+std::vector<std::int64_t> TransposeLineOffsets(const LineBatch& plan) {
+  std::vector<std::int64_t> off;
+  off.reserve(static_cast<std::size_t>(plan.num_lines) + 1);
+  std::int64_t n = 0;
+  for (const LineTile& t : plan.tiles) {
+    for (std::int32_t L = t.row_begin; L < t.row_end; ++L) {
+      off.push_back(n);
+      n += L + 1;
+    }
+  }
+  off.push_back(n);
+  return off;
+}
+
+/// `in` without the three-body part of X (`drop_x3`) and/or Y (`drop_y3`):
+/// view, intermediates and sign, as they reach the kernel of a single-term
+/// loop that removes the part from its views before the batch loop
+/// (`Comm232Rows`, `Comm132Rows`). O(1).
+N7BatchInputs WithoutParts(N7BatchInputs in, bool drop_x3, bool drop_y3) {
+  if (drop_x3) {
+    in.v.x3 = ThreeBodyPartView{};
+    in.hx = in.hxt = in.wx = in.wxt = nullptr;
+    in.sxt = 1.0;
+  }
+  if (drop_y3) {
+    in.v.y3 = ThreeBodyPartView{};
+    in.hy = in.hyt = in.wy = in.wyt = nullptr;
+    in.syt = 1.0;
+  }
+  return in;
+}
+
+}  // namespace
+
+void RunN7(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+           const ThreeBodyContext& ctx, TermMask terms,
+           const basis::RowSet& rows, std::int64_t budget_bytes) {
+  const TermMask n7_all = TermMask::Imsrg3N7().ThreeBodyTerms();
+  if ((terms.ThreeBodyTerms() | n7_all) != n7_all) {
+    throw NotImplementedError(
+        "RunN7: only the N7 IMSRG(3) terms are implemented (the N8/N9 terms "
+        "of the full IMSRG(3) are not)");
+  }
+  const TermMask n7 = terms & n7_all;
+  if (n7.empty()) return;
+  const auto selected = [n7](Term t) { return n7.test(t); };
+
+  // The checks of the single-term functions, once and before any work.
+  const N7Views v = PrepareN7(FirstTermName(n7, n7_all), X, Y, Z, ctx);
+  const TermMask z3_terms =
+      TermMask::Only(Term::kComm133ss) | TermMask::Only(Term::kComm223ss);
+  const TermMask z2_terms =
+      TermMask::Only(Term::kComm232ss) | TermMask::Only(Term::kComm132ss);
+  ThreeBodyOutView z3;
+  if (!(n7 & z3_terms).empty()) {
+    z3 = ThreeBodyOut(FirstTermName(n7, z3_terms), Z, ctx);
+  }
+  TwoBodyOutView z2;
+  if (!(n7 & z2_terms).empty()) {
+    z2 = TwoBodyOut(FirstTermName(n7, z2_terms), Z, ctx);
+  }
+  const bool dense133 = selected(Term::kComm133ss) && z3.packed == 0;
+  IMSRG_CHECK(
+      !dense133 || rows.NumRows() ==
+                       ctx.model_space_ptr()->three_body_space()->NumRows(),
+      "RunN7: comm133ss into a dense (non-Hermitian) Z3 runs only on "
+      "the whole kept space (Comm133ssReference)");
+
+  // The terms that contribute: the early returns of the single-term loops.
+  const bool x3 = v.x3.local != nullptr;
+  const bool y3 = v.y3.local != nullptr;
+  const bool do133 = selected(Term::kComm133ss) && !dense133 && (x3 || y3);
+  // [X2, Y3] needs X2, [Y2, X3] needs Y2; [X1, Y3] needs X1, [X3, Y1] Y1.
+  const bool drop232_x3 = v.y2.data == nullptr;
+  const bool drop232_y3 = v.x2.data == nullptr;
+  const bool do232 = selected(Term::kComm232ss) &&
+                     ((x3 && !drop232_x3) || (y3 && !drop232_y3));
+  const bool drop132_x3 = v.y1 == nullptr;
+  const bool drop132_y3 = v.x1 == nullptr;
+  const bool do132 = selected(Term::kComm132ss) &&
+                     ((x3 && !drop132_x3) || (y3 && !drop132_y3));
+  const bool do331 = selected(Term::kComm331ss) && x3 && y3 && v.norb > 0 &&
+                     v.sp.num_channels > 0;
+  const bool do231 = selected(Term::kComm231ss) && (x3 || y3) && v.norb > 0 &&
+                     v.x2.tb.num_channels > 0;
+  // The scalar part of an anti-Hermitian Z vanishes (the sum cancels
+  // pairwise); it is skipped to keep Z0 exactly zero (as Comm330Rows).
+  const bool do330 = selected(Term::kComm330ss) && x3 && y3 &&
+                     Z.hermiticity() != Hermiticity::kAntiHermitian;
+  const bool do223 = selected(Term::kComm223ss) && X.two_body().allocated() &&
+                     Y.two_body().allocated();
+
+  if (dense133) Comm133ssReference(X, Y, Z, ctx);
+  double z0 = 0.0;
+  if (do133 || do232 || do132 || do331 || do231 || do330) {
+    N7Needs needs;
+    needs.h = do133 || do331;
+    needs.w = do232 || do231 || do132;
+    double* z1 = (do331 || do231) ? OneBodyOut(Z) : nullptr;
+    // One TransposeOut value buffer for all batches, grown on demand (every
+    // value of a batch is written by Comm133Batch before it is read).
+    exec::DeviceBuffer<double> tout_data;
+    ForEachN7Batch(
+        v, ctx, rows, budget_bytes, needs, [&](const N7BatchInputs& in) {
+          if (do133) {
+            const std::vector<std::int64_t> off =
+                TransposeLineOffsets(*in.plan);
+            const auto need = static_cast<std::size_t>(off.back());
+            if (tout_data.size() < need) {
+              tout_data = exec::DeviceBuffer<double>(
+                  need, "commutator::n7_transpose_out");
+            }
+            exec::DeviceBuffer<std::int64_t> line_off(
+                off.size(), "commutator::n7_transpose_line_off");
+            line_off.CopyFromHost(off);
+            TransposeOut tout;
+            tout.data = tout_data.device_data();
+            tout.line_off = line_off.device_data();
+            Comm133Batch(in, z3, tout);
+            AddTransposeOut(in, tout, z3);
+          }
+          if (do232) Comm232Batch(WithoutParts(in, drop232_x3, drop232_y3), z2);
+          if (do132) Comm132Batch(WithoutParts(in, drop132_x3, drop132_y3), z2);
+          if (do331) Comm331Batch(in, z1);
+          if (do231) Comm231Batch(in, z1);
+          if (do330) z0 += Comm330Batch(in);
+        });
+  }
+  if (do223) AddComm223Rows(X, Y, *Z.three_body(), ctx, rows);
+  if (do330) Z.zero_body() += z0;
 }
 
 }  // namespace imsrg::commutator::detail
