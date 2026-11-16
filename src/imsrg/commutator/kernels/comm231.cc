@@ -7,11 +7,12 @@
 #include <cstdint>
 
 #include "imsrg/commutator/detail/n7_common.h"
+#include "imsrg/commutator/detail/n7_terms.h"
 #include "imsrg/commutator/detail/n7_views.h"
 #include "imsrg/commutator/imsrg3.h"
 #include "imsrg/exec/kokkos_backend.h"
 
-namespace imsrg::commutator::terms {
+namespace imsrg::commutator {
 
 namespace {
 
@@ -85,9 +86,11 @@ IMSRG_INLINE_FUNCTION double Comm231Channel(const detail::N7Views& v, int ch2,
 
 }  // namespace
 
-void Comm231ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
-               const ThreeBodyContext& ctx) {
-  const detail::N7Views v = detail::PrepareN7("Comm231ss", X, Y, Z, ctx);
+namespace detail {
+
+void Comm231ssReference(const op::Operator& X, const op::Operator& Y,
+                        op::Operator& Z, const ThreeBodyContext& ctx) {
+  const detail::N7Views v = PrepareN7("Comm231ss", X, Y, Z, ctx);
   if (v.x3.local == nullptr && v.y3.local == nullptr) return;
   const exec::Index norb = v.norb;
   const exec::Index nch = v.x2.tb.num_channels;
@@ -97,7 +100,7 @@ void Comm231ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
       static_cast<std::size_t>(norb * norb * nch), "commutator::comm231_part");
   const exec::DeviceView<double> part = exec::View(partial);
   exec::ParallelFor(
-      "commutator::comm231ss_channels", norb * norb * nch,
+      "commutator::comm231ss_reference_channels", norb * norb * nch,
       IMSRG_LAMBDA(const exec::Index w) {
         const int ch2 = static_cast<int>(w % nch);
         const exec::Index pair = w / nch;
@@ -108,9 +111,9 @@ void Comm231ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
         part(w) = value;
       });
   // Pass 2: ordered reduction over the channels, added to Z1.
-  double* z1 = detail::OneBodyOut(Z);
+  double* z1 = OneBodyOut(Z);
   exec::ParallelFor(
-      "commutator::comm231ss_reduce", norb * norb,
+      "commutator::comm231ss_reference_reduce", norb * norb,
       IMSRG_LAMBDA(const exec::Index pair) {
         const int i = static_cast<int>(pair % norb);
         const int j = static_cast<int>(pair / norb);
@@ -119,7 +122,18 @@ void Comm231ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
         for (exec::Index ch = 0; ch < nch; ++ch) sum += part(pair * nch + ch);
         z1[pair] += sum / (v.ob.j2[i] + 1);
       });
-  exec::Fence("commutator::comm231ss");
+  exec::Fence("commutator::comm231ss_reference");
 }
 
-}  // namespace imsrg::commutator::terms
+}  // namespace detail
+
+namespace terms {
+
+void Comm231ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+               const ThreeBodyContext& ctx) {
+  detail::Comm231ssReference(X, Y, Z, ctx);
+}
+
+}  // namespace terms
+
+}  // namespace imsrg::commutator
