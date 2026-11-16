@@ -99,6 +99,18 @@ imsrg_add_test(NAME commutator_n7_132_330_batch
   LABELS unit
   NO_GTEST_MAIN)
 
+# The fused N7 batch driver (detail::RunN7: all seven terms in one batch loop)
+# against the per-term sequence, single terms, partition invariance with
+# masked operands, its checks, and the dispatch from Commutator().
+imsrg_add_test(NAME commutator_n7_fused
+  SOURCES test_n7_fused.cc ${_imsrg_exec_main} ${_imsrg_comm_support}
+          "${PROJECT_SOURCE_DIR}/tests/support/three_body_test_support.cc"
+          "${PROJECT_SOURCE_DIR}/tests/support/row_mask.cc"
+          "${PROJECT_SOURCE_DIR}/tests/support/n7_partition_support.cc"
+  DEPS commutator operator
+  LABELS unit
+  NO_GTEST_MAIN)
+
 # The IMSRG(3)-N7 terms (design/14 section 4 item 2) against the m-scheme brute
 # force (commutator_ref::mscheme, emax 1) and the imsrg-devel goldens of
 # tests/golden/n7 (emax 2). One target per group of terms.
