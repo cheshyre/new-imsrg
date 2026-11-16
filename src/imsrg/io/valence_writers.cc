@@ -154,25 +154,24 @@ void WriteProvenance(std::ostream& out, const ValenceWriteOptions& o) {
       << "  A_for_kinetic_energy: " << o.a_target << "\n";
 }
 
-}  // namespace
+/// A one-body element in file numbering.
+struct Row1 {
+  std::int32_t a, b;
+  double v;
+};
 
-void WriteTokyo(const std::filesystem::path& path, const op::Operator& op,
-                const TokyoWriteOptions& options) {
+/// A two-body element in file numbering.
+struct Row2 {
+  std::int32_t a, b, c, d, J;
+  double v;
+};
+
+/// Returns the one-body elements (a >= b over the ascending valence orbits)
+/// that survive the threshold.
+std::vector<Row1> CollectTokyoOneBody(const op::Operator& op,
+                                      const ValenceNumbering& num,
+                                      double norm1b) {
   const ModelSpace& ms = op.model_space();
-  const auto& basis = ms.basis();
-  const ValenceNumbering num = NumberValenceOrbits(ms);
-  const std::vector<bool> is_valence = ValenceMask(ms);
-  const std::int32_t Zcore = RoundToInt(ms.partition().Z_core());
-  const std::int32_t Ncore = RoundToInt(ms.partition().A_core()) - Zcore;
-  const double norm1b = op::OneBodyNorm(op);
-  const double norm2b = op::TwoBodyNorm(op);
-
-  // One-body elements (a >= b over the ascending valence orbits) that survive
-  // the threshold.
-  struct Row1 {
-    std::int32_t a, b;
-    double v;
-  };
   std::vector<Row1> one;
   for (const OrbitIndex a : ms.partition().valence())
     for (const OrbitIndex b : ms.partition().valence()) {
@@ -183,14 +182,19 @@ void WriteTokyo(const std::filesystem::path& path, const op::Operator& op,
                      num.file_index[static_cast<std::size_t>(b.value())],
                      obme});
     }
+  return one;
+}
 
-  struct Row2 {
-    std::int32_t a, b, c, d, J;
-    double v;
-  };
+/// Returns the two-body elements that survive the threshold, in imsrg++
+/// iteration order.
+std::vector<Row2> CollectTokyoTwoBody(const op::Operator& op,
+                                      ValenceWriteMode mode,
+                                      const ValenceNumbering& num,
+                                      const std::vector<bool>& is_valence,
+                                      double norm2b) {
   std::vector<Row2> two;
   if (norm2b >= 1.0e-7) {
-    ForEachValenceTbme(op, options.mode, is_valence, [&](const TbmeRecord& r) {
+    ForEachValenceTbme(op, mode, is_valence, [&](const TbmeRecord& r) {
       if (std::abs(r.value) < norm2b * 1.0e-7) return;
       auto idx = [&](OrbitIndex o) {
         return num.file_index[static_cast<std::size_t>(o.value())];
@@ -199,9 +203,15 @@ void WriteTokyo(const std::filesystem::path& path, const op::Operator& op,
           {idx(r.a), idx(r.b), idx(r.c), idx(r.d), r.ch->J(), r.value});
     });
   }
+  return two;
+}
 
-  std::ofstream out = OpenForWriting(path);
-  WriteProvenance(out, options);
+/// Writes the `! Zero body term` line and the model-space block of a .snt
+/// file.
+void WriteTokyoModelSpace(std::ostream& out, const op::Operator& op,
+                          const ValenceNumbering& num, std::int32_t Zcore,
+                          std::int32_t Ncore) {
+  const auto& basis = op.model_space().basis();
   out << "! Zero body term: " << std::setprecision(9) << op.zero_body() << "\n";
   out << "! \n";
   out << "! model space\n";
@@ -214,6 +224,92 @@ void WriteTokyo(const std::filesystem::path& path, const op::Operator& op,
         << std::setw(kWint) << oi.l << std::setw(kWint) << oi.j2.twice
         << std::setw(kWint) << oi.tz2.twice << "\n";
   }
+}
+
+/// Writes the NuShellX .int header: provenance, zero-body term, orbit list
+/// and the single-particle energies line.
+void WriteNushellxHeader(std::ostream& out, const op::Operator& op,
+                         const ValenceNumbering& num,
+                         const NushellxWriteOptions& options) {
+  const auto& basis = op.model_space().basis();
+  const std::int32_t Acore = RoundToInt(op.model_space().partition().A_core());
+  WriteProvenance(out, options);
+  out << "! Zero body term: " << op.zero_body() << "\n";
+  out << "! Index   n l j tz\n";
+  for (std::size_t k = 0; k < num.orbits.size(); ++k) {
+    const auto& oi = basis.orbit(num.orbits[k]);
+    out << "!  " << k + 1 << "   " << oi.n << " " << oi.l << " " << oi.j2.twice
+        << "/2" << " " << oi.tz2.twice << "/2\n";
+  }
+  out << "!\n";
+  out << "-999  ";
+  for (const OrbitIndex a : num.orbits) out << op.one_body().get(a, a) << "  ";
+  out << "  " << Acore << "  " << Acore + 2 << "  0.00000 \n";
+}
+
+/// Writes one two-body line of a NuShellX .int file (nothing if the element
+/// is below the threshold).
+void WriteNushellxRecord(std::ostream& out,
+                         const basis::SingleParticleBasis& basis,
+                         const ValenceNumbering& num, const TbmeRecord& r) {
+  auto idx = [&](OrbitIndex o) {
+    return num.file_index[static_cast<std::size_t>(o.value())];
+  };
+  const auto& oa = basis.orbit(r.a);
+  const auto& ob = basis.orbit(r.b);
+  const auto& oc = basis.orbit(r.c);
+  const auto& od = basis.orbit(r.d);
+  std::int32_t a_ind = idx(r.a), b_ind = idx(r.b), c_ind = idx(r.c),
+               d_ind = idx(r.d);
+  std::int32_t T = std::abs(r.ch->Tz());
+  double tbme = r.value;
+  if (std::abs(tbme) < 1.0e-6) return;
+  if (T == 0) {
+    if (oa.j2 != ob.j2 || oa.l != ob.l || oa.n != ob.n)
+      tbme *= constants::kSqrt2;
+    if (oc.j2 != od.j2 || oc.l != od.l || oc.n != od.n)
+      tbme *= constants::kSqrt2;
+    T = (r.ch->J() + 1) % 2;
+  }
+  // NuShellX wants the proton orbit first: ascending bra and ket indices.
+  if (a_ind > b_ind) {
+    std::swap(a_ind, b_ind);
+    tbme *= basis::ExchangePhase(oa.j2, ob.j2, r.ch->two_j);
+  }
+  if (c_ind > d_ind) {
+    std::swap(c_ind, d_ind);
+    tbme *= basis::ExchangePhase(oc.j2, od.j2, r.ch->two_j);
+  }
+  if (a_ind > c_ind || (c_ind == a_ind && b_ind > d_ind)) {
+    std::swap(a_ind, c_ind);
+    std::swap(b_ind, d_ind);
+  }
+  out << std::setw(kWint) << a_ind << std::setw(kWint) << b_ind
+      << std::setw(kWint) << c_ind << std::setw(kWint) << d_ind << "    "
+      << std::setw(kWint) << r.ch->J() << " " << std::setw(kWint) << T
+      << "       " << std::setw(12) << std::setiosflags(std::ios::fixed)
+      << std::setprecision(6) << tbme << "\n";
+}
+
+}  // namespace
+
+void WriteTokyo(const std::filesystem::path& path, const op::Operator& op,
+                const TokyoWriteOptions& options) {
+  const ModelSpace& ms = op.model_space();
+  const ValenceNumbering num = NumberValenceOrbits(ms);
+  const std::vector<bool> is_valence = ValenceMask(ms);
+  const std::int32_t Zcore = RoundToInt(ms.partition().Z_core());
+  const std::int32_t Ncore = RoundToInt(ms.partition().A_core()) - Zcore;
+  const double norm1b = op::OneBodyNorm(op);
+  const double norm2b = op::TwoBodyNorm(op);
+
+  const std::vector<Row1> one = CollectTokyoOneBody(op, num, norm1b);
+  const std::vector<Row2> two =
+      CollectTokyoTwoBody(op, options.mode, num, is_valence, norm2b);
+
+  std::ofstream out = OpenForWriting(path);
+  WriteProvenance(out, options);
+  WriteTokyoModelSpace(out, op, num, Zcore, Ncore);
 
   out << "! interaction\n";
   out << one.size() << " " << 0 << " " << options.hbar_omega << "\n";
@@ -238,60 +334,12 @@ void WriteNushellxInt(const std::filesystem::path& path, const op::Operator& op,
   const auto& basis = ms.basis();
   const ValenceNumbering num = NumberValenceOrbits(ms);
   const std::vector<bool> is_valence = ValenceMask(ms);
-  const std::int32_t Acore = RoundToInt(ms.partition().A_core());
 
   std::ofstream out = OpenForWriting(path);
-  WriteProvenance(out, options);
-  out << "! Zero body term: " << op.zero_body() << "\n";
-  out << "! Index   n l j tz\n";
-  for (std::size_t k = 0; k < num.orbits.size(); ++k) {
-    const auto& oi = basis.orbit(num.orbits[k]);
-    out << "!  " << k + 1 << "   " << oi.n << " " << oi.l << " " << oi.j2.twice
-        << "/2" << " " << oi.tz2.twice << "/2\n";
-  }
-  out << "!\n";
-  out << "-999  ";
-  for (const OrbitIndex a : num.orbits) out << op.one_body().get(a, a) << "  ";
-  out << "  " << Acore << "  " << Acore + 2 << "  0.00000 \n";
+  WriteNushellxHeader(out, op, num, options);
 
   ForEachValenceTbme(op, options.mode, is_valence, [&](const TbmeRecord& r) {
-    auto idx = [&](OrbitIndex o) {
-      return num.file_index[static_cast<std::size_t>(o.value())];
-    };
-    const auto& oa = basis.orbit(r.a);
-    const auto& ob = basis.orbit(r.b);
-    const auto& oc = basis.orbit(r.c);
-    const auto& od = basis.orbit(r.d);
-    std::int32_t a_ind = idx(r.a), b_ind = idx(r.b), c_ind = idx(r.c),
-                 d_ind = idx(r.d);
-    std::int32_t T = std::abs(r.ch->Tz());
-    double tbme = r.value;
-    if (std::abs(tbme) < 1.0e-6) return;
-    if (T == 0) {
-      if (oa.j2 != ob.j2 || oa.l != ob.l || oa.n != ob.n)
-        tbme *= constants::kSqrt2;
-      if (oc.j2 != od.j2 || oc.l != od.l || oc.n != od.n)
-        tbme *= constants::kSqrt2;
-      T = (r.ch->J() + 1) % 2;
-    }
-    // NuShellX wants the proton orbit first: ascending bra and ket indices.
-    if (a_ind > b_ind) {
-      std::swap(a_ind, b_ind);
-      tbme *= basis::ExchangePhase(oa.j2, ob.j2, r.ch->two_j);
-    }
-    if (c_ind > d_ind) {
-      std::swap(c_ind, d_ind);
-      tbme *= basis::ExchangePhase(oc.j2, od.j2, r.ch->two_j);
-    }
-    if (a_ind > c_ind || (c_ind == a_ind && b_ind > d_ind)) {
-      std::swap(a_ind, c_ind);
-      std::swap(b_ind, d_ind);
-    }
-    out << std::setw(kWint) << a_ind << std::setw(kWint) << b_ind
-        << std::setw(kWint) << c_ind << std::setw(kWint) << d_ind << "    "
-        << std::setw(kWint) << r.ch->J() << " " << std::setw(kWint) << T
-        << "       " << std::setw(12) << std::setiosflags(std::ios::fixed)
-        << std::setprecision(6) << tbme << "\n";
+    WriteNushellxRecord(out, basis, num, r);
   });
   CheckWritten(out, path);
 }
