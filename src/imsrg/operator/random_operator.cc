@@ -53,6 +53,49 @@ void DrawMatrix(SplitMix64& rng, std::int32_t n, Hermiticity h, double scale,
   }
 }
 
+/// Draws the one-body part (only between orbits with equal (l, 2j, tz2)).
+void DrawOneBody(SplitMix64& rng, Operator& op, double scale) {
+  const Hermiticity h = op.spec().hermiticity;
+  const basis::SingleParticleBasis& sp = op.model_space().basis();
+  struct Ctx {
+    const basis::SingleParticleBasis* sp;
+  } ctx{&sp};
+  auto same_class = [](void* c, std::int32_t a, std::int32_t b) {
+    const auto& basis = *static_cast<Ctx*>(c)->sp;
+    const auto& oa = basis.orbit(OrbitIndex{a});
+    const auto& ob = basis.orbit(OrbitIndex{b});
+    return oa.l == ob.l && oa.j2 == ob.j2 && oa.tz2 == ob.tz2;
+  };
+  DrawMatrix(rng, sp.num_orbits(), h, scale, same_class, &ctx,
+             [&](std::int32_t a, std::int32_t b, double v) {
+               op.one_body().set_element(OrbitIndex{a}, OrbitIndex{b}, v);
+               if (a != b && h != Hermiticity::kNonHermitian) {
+                 op.one_body().set_element(
+                     OrbitIndex{b}, OrbitIndex{a},
+                     static_cast<double>(HermiticitySign(h)) * v);
+               }
+             });
+}
+
+/// Draws the two-body part, channel block by channel block.
+void DrawTwoBody(SplitMix64& rng, Operator& op, double scale) {
+  const Hermiticity h = op.spec().hermiticity;
+  const basis::TwoBodyChannels& chans = op.two_body().channels();
+  for (std::int32_t c = 0; c < chans.num_channels(); ++c) {
+    const ChannelIndex ch{c};
+    const std::int32_t n = chans.channel(ch).num_kets;
+    DrawMatrix(
+        rng, n, h, scale, nullptr, nullptr,
+        [&](std::int32_t i, std::int32_t j, double v) {
+          op.two_body().set(ch, ch, LocalKetIndex{i}, LocalKetIndex{j}, v);
+          if (i != j && h != Hermiticity::kNonHermitian) {
+            op.two_body().set(ch, ch, LocalKetIndex{j}, LocalKetIndex{i},
+                              static_cast<double>(HermiticitySign(h)) * v);
+          }
+        });
+  }
+}
+
 }  // namespace
 
 Operator RandomOperator(std::shared_ptr<const basis::ModelSpace> ms,
@@ -71,43 +114,9 @@ Operator RandomOperator(std::shared_ptr<const basis::ModelSpace> ms,
     op.zero_body() = rng.Uniform(options.zero_body_scale);
   }
 
-  // One-body: only between orbits with equal (l, 2j, tz2).
-  const basis::SingleParticleBasis& sp = op.model_space().basis();
-  struct Ctx {
-    const basis::SingleParticleBasis* sp;
-  } ctx{&sp};
-  auto same_class = [](void* c, std::int32_t a, std::int32_t b) {
-    const auto& basis = *static_cast<Ctx*>(c)->sp;
-    const auto& oa = basis.orbit(OrbitIndex{a});
-    const auto& ob = basis.orbit(OrbitIndex{b});
-    return oa.l == ob.l && oa.j2 == ob.j2 && oa.tz2 == ob.tz2;
-  };
-  DrawMatrix(rng, sp.num_orbits(), h, options.one_body_scale, same_class, &ctx,
-             [&](std::int32_t a, std::int32_t b, double v) {
-               op.one_body().set_element(OrbitIndex{a}, OrbitIndex{b}, v);
-               if (a != b && h != Hermiticity::kNonHermitian) {
-                 op.one_body().set_element(
-                     OrbitIndex{b}, OrbitIndex{a},
-                     static_cast<double>(HermiticitySign(h)) * v);
-               }
-             });
-
-  // Two-body: every channel block.
+  DrawOneBody(rng, op, options.one_body_scale);
   if (op.two_body().allocated()) {
-    const basis::TwoBodyChannels& chans = op.two_body().channels();
-    for (std::int32_t c = 0; c < chans.num_channels(); ++c) {
-      const ChannelIndex ch{c};
-      const std::int32_t n = chans.channel(ch).num_kets;
-      DrawMatrix(
-          rng, n, h, options.two_body_scale, nullptr, nullptr,
-          [&](std::int32_t i, std::int32_t j, double v) {
-            op.two_body().set(ch, ch, LocalKetIndex{i}, LocalKetIndex{j}, v);
-            if (i != j && h != Hermiticity::kNonHermitian) {
-              op.two_body().set(ch, ch, LocalKetIndex{j}, LocalKetIndex{i},
-                                static_cast<double>(HermiticitySign(h)) * v);
-            }
-          });
-    }
+    DrawTwoBody(rng, op, options.two_body_scale);
   }
   op.SyncToDevice();
   return op;

@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <span>
 #include <vector>
 
 #include "imsrg/base/assert.h"
@@ -14,30 +15,16 @@
 
 namespace imsrg::op {
 
-Operator NormalOrder(const Operator& op, const No2bThreeBody& v3,
-                     std::span<const double> occupations,
-                     NormalOrderDirection direction) {
-  IMSRG_CHECK(!op.empty(), "normal_order(NO2B): empty operator");
-  if (op.three_body()) {
-    throw NotImplementedError(
-        "normal_order(NO2B): operators with a three-body part (particle_rank "
-        "3) are not "
-        "supported");
-  }
-  IMSRG_CHECK(op.hermiticity() == Hermiticity::kHermitian,
-              "normal_order(NO2B): the operator must be Hermitian");
-  const basis::ModelSpace& ms = op.model_space();
-  const basis::SingleParticleBasis& sp = ms.basis();
-  IMSRG_CHECK(static_cast<std::int32_t>(occupations.size()) == sp.num_orbits(),
-              "normal_order(NO2B): one occupation per orbit required");
+namespace {
 
-  const double s = direction == NormalOrderDirection::kToReference ? 1.0 : -1.0;
-  std::vector<std::int32_t> occupied;
-  for (std::int32_t k = 0; k < sp.num_orbits(); ++k) {
-    if (occupations[static_cast<std::size_t>(k)] >= basis::kOccupationCut) {
-      occupied.push_back(k);
-    }
-  }
+/// Builds the two-body operator gamma, the occupation-weighted contraction of
+/// the NO2B three-body part `v3` with the occupied orbits (not yet divided
+/// into the 1/3 and 1/2 normal-ordering weights).
+Operator BuildContractedThreeBody(const Operator& op, const No2bThreeBody& v3,
+                                  std::span<const double> occupations,
+                                  const std::vector<std::int32_t>& occupied,
+                                  double s) {
+  const basis::SingleParticleBasis& sp = op.model_space().basis();
   const std::int32_t e3max = v3.truncation().e3max;
 
   Operator gamma(op.model_space_ptr(),
@@ -74,6 +61,37 @@ Operator NormalOrder(const Operator& op, const No2bThreeBody& v3,
     }
   }
   gamma.two_body().SyncToDevice();
+  return gamma;
+}
+
+}  // namespace
+
+Operator NormalOrder(const Operator& op, const No2bThreeBody& v3,
+                     std::span<const double> occupations,
+                     NormalOrderDirection direction) {
+  IMSRG_CHECK(!op.empty(), "normal_order(NO2B): empty operator");
+  if (op.three_body()) {
+    throw NotImplementedError(
+        "normal_order(NO2B): operators with a three-body part (particle_rank "
+        "3) are not "
+        "supported");
+  }
+  IMSRG_CHECK(op.hermiticity() == Hermiticity::kHermitian,
+              "normal_order(NO2B): the operator must be Hermitian");
+  const basis::ModelSpace& ms = op.model_space();
+  const basis::SingleParticleBasis& sp = ms.basis();
+  IMSRG_CHECK(static_cast<std::int32_t>(occupations.size()) == sp.num_orbits(),
+              "normal_order(NO2B): one occupation per orbit required");
+
+  const double s = direction == NormalOrderDirection::kToReference ? 1.0 : -1.0;
+  std::vector<std::int32_t> occupied;
+  for (std::int32_t k = 0; k < sp.num_orbits(); ++k) {
+    if (occupations[static_cast<std::size_t>(k)] >= basis::kOccupationCut) {
+      occupied.push_back(k);
+    }
+  }
+  const Operator gamma =
+      BuildContractedThreeBody(op, v3, occupations, occupied, s);
 
   Operator result = NormalOrder(gamma, occupations, direction);
   result.zero_body() *= 1.0 / 3.0;

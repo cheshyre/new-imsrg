@@ -103,6 +103,105 @@ void AppendRow(std::vector<std::pair<std::int32_t, double>>* row,
   row->clear();
 }
 
+/// CSR arrays under construction on the host.
+struct CsrBuilder {
+  std::vector<std::int64_t> ptr{0};
+  std::vector<std::int32_t> col;
+  std::vector<double> val;
+};
+
+/// Everything the row builders need about one triple (a <= b <= c) of a
+/// channel and its pair-third states.
+struct TripleContext {
+  const basis::ThreeBodySpace& space;
+  const basis::KeptChannel3& kc;
+  std::span<const basis::Orbit> orbits;
+  int a;
+  int b;
+  int c;
+  TwoJ tj;
+  const angmom::SixJ3View& sj;
+  const std::vector<State>& states;
+  std::int32_t base;  // channel-local index of the first state
+  std::int32_t row0;
+  std::int32_t row1;
+};
+
+/// Returns the channel-local index of the state (p, q, r, two_jpq) of the
+/// triple, or -1.
+std::int32_t FindState(const TripleContext& t, int p, int q, int r,
+                       int two_jpq) {
+  for (std::size_t k = 0; k < t.states.size(); ++k) {
+    if (t.states[k].p == p && t.states[k].q == q && t.states[k].r == r &&
+        t.states[k].two_jpq == two_jpq) {
+      return t.base + static_cast<std::int32_t>(k);
+    }
+  }
+  return static_cast<std::int32_t>(-1);
+}
+
+/// R: appends one row per kept row of the triple (flat row order) to `r`;
+/// `row` is scratch.
+void AppendRRows(const TripleContext& t,
+                 std::vector<std::pair<std::int32_t, double>>* row,
+                 CsrBuilder* r) {
+  const TwoJ ja = t.orbits[U(t.a)].j2;
+  const TwoJ jb = t.orbits[U(t.b)].j2;
+  const TwoJ jc = t.orbits[U(t.c)].j2;
+  for (std::int32_t lr = t.row0; lr < t.row1; ++lr) {
+    const int j1 = t.space.row_two_jab(t.kc.row_offset + lr).twice / 2;
+    for (const ThreeBodyPerm perm :
+         {ThreeBodyPerm::kABC, ThreeBodyPerm::kCBA, ThreeBodyPerm::kACB}) {
+      int i1 = 0;
+      int i2 = 0;
+      int i3 = 0;
+      Permute(perm, t.a, t.b, t.c, i1, i2, i3);
+      const int jo1 = t.orbits[U(i1)].j2.twice;
+      const int jo2 = t.orbits[U(i2)].j2.twice;
+      const bool abc = perm == ThreeBodyPerm::kABC;
+      const int lo = abc ? j1 : std::abs(jo1 - jo2) / 2;
+      const int hi = abc ? j1 : (jo1 + jo2) / 2;
+      for (int j1p = lo; j1p <= hi; ++j1p) {
+        const std::int32_t col =
+            FindState(t, std::min(i1, i2), std::max(i1, i2), i3, 2 * j1p);
+        if (col < 0) continue;
+        double v = PermutationPhase(perm) *
+                   RecouplingCoefficient(perm, ja, jb, jc, j1p, j1, t.tj, t.sj);
+        if (i1 > i2) v *= -Phase((jo1 + jo2) / 2 - j1p);
+        if (i1 == i2) v *= constants::kSqrt2;
+        row->emplace_back(col, v);
+      }
+    }
+    AppendRow(row, &r->col, &r->val);
+    r->ptr.push_back(static_cast<std::int64_t>(r->col.size()));
+  }
+}
+
+/// E: appends one row per state of the triple to `e`; `row` is scratch.
+void AppendERows(const TripleContext& t,
+                 std::vector<std::pair<std::int32_t, double>>* row,
+                 CsrBuilder* e) {
+  const TwoJ ja = t.orbits[U(t.a)].j2;
+  const TwoJ jb = t.orbits[U(t.b)].j2;
+  const TwoJ jc = t.orbits[U(t.c)].j2;
+  for (const State& s : t.states) {
+    int sa = 0;
+    int sb = 0;
+    int sc = 0;
+    const ThreeBodyPerm perm = SortOrbits(s.p, s.q, s.r, sa, sb, sc);
+    const int jpq = s.two_jpq / 2;
+    for (std::int32_t lr = t.row0; lr < t.row1; ++lr) {
+      const int jab = t.space.row_two_jab(t.kc.row_offset + lr).twice / 2;
+      const double v =
+          PermutationPhase(perm) *
+          RecouplingCoefficient(perm, ja, jb, jc, jpq, jab, t.tj, t.sj);
+      row->emplace_back(lr, v);
+    }
+    AppendRow(row, &e->col, &e->val);
+    e->ptr.push_back(static_cast<std::int64_t>(e->col.size()));
+  }
+}
+
 std::int64_t SizeBytes(const exec::DeviceBuffer<std::int32_t>& b) {
   return static_cast<std::int64_t>(b.size() * sizeof(std::int32_t));
 }
@@ -155,12 +254,8 @@ PairThirdSpace::PairThirdSpace(const basis::ThreeBodySpace& space,
   std::vector<std::int32_t> pq;
   std::vector<std::int32_t> pr;
   std::vector<std::int32_t> pj;
-  std::vector<std::int64_t> r_ptr{0};
-  std::vector<std::int32_t> r_col;
-  std::vector<double> r_val;
-  std::vector<std::int64_t> e_ptr{0};
-  std::vector<std::int32_t> e_col;
-  std::vector<double> e_val;
+  CsrBuilder r_csr;
+  CsrBuilder e_csr;
   std::vector<std::pair<std::int32_t, double>> row;
   std::vector<State> states;
   std::int64_t flat = 0;
@@ -177,9 +272,6 @@ PairThirdSpace::PairThirdSpace(const basis::ThreeBodySpace& space,
       const int a = tr.a.value();
       const int b = tr.b.value();
       const int c = tr.c.value();
-      const TwoJ ja = orbits[U(a)].j2;
-      const TwoJ jb = orbits[U(b)].j2;
-      const TwoJ jc = orbits[U(c)].j2;
       states.clear();
       AppendTripleStates(orbits, a, b, c, two_j, &states);
       const std::int32_t base = local;
@@ -192,64 +284,20 @@ PairThirdSpace::PairThirdSpace(const basis::ThreeBodySpace& space,
       }
       local += static_cast<std::int32_t>(states.size());
       tr_end[U(t)] = local;
-      const auto find_state = [&](int p, int q, int r, int two_jpq) {
-        for (std::size_t k = 0; k < states.size(); ++k) {
-          if (states[k].p == p && states[k].q == q && states[k].r == r &&
-              states[k].two_jpq == two_jpq) {
-            return base + static_cast<std::int32_t>(k);
-          }
-        }
-        return static_cast<std::int32_t>(-1);
-      };
-      const std::int32_t row0 = tr.row_begin.value();
-      const std::int32_t row1 = tr.row_end.value();
-
-      // R: one row per kept row of the triple (flat row order).
-      for (std::int32_t lr = row0; lr < row1; ++lr) {
-        const int j1 = space.row_two_jab(kc.row_offset + lr).twice / 2;
-        for (const ThreeBodyPerm perm :
-             {ThreeBodyPerm::kABC, ThreeBodyPerm::kCBA, ThreeBodyPerm::kACB}) {
-          int i1 = 0;
-          int i2 = 0;
-          int i3 = 0;
-          Permute(perm, a, b, c, i1, i2, i3);
-          const int jo1 = orbits[U(i1)].j2.twice;
-          const int jo2 = orbits[U(i2)].j2.twice;
-          const bool abc = perm == ThreeBodyPerm::kABC;
-          const int lo = abc ? j1 : std::abs(jo1 - jo2) / 2;
-          const int hi = abc ? j1 : (jo1 + jo2) / 2;
-          for (int j1p = lo; j1p <= hi; ++j1p) {
-            const std::int32_t col =
-                find_state(std::min(i1, i2), std::max(i1, i2), i3, 2 * j1p);
-            if (col < 0) continue;
-            double v = PermutationPhase(perm) *
-                       RecouplingCoefficient(perm, ja, jb, jc, j1p, j1, tj, sj);
-            if (i1 > i2) v *= -Phase((jo1 + jo2) / 2 - j1p);
-            if (i1 == i2) v *= constants::kSqrt2;
-            row.emplace_back(col, v);
-          }
-        }
-        AppendRow(&row, &r_col, &r_val);
-        r_ptr.push_back(static_cast<std::int64_t>(r_col.size()));
-      }
-
-      // E: one row per state.
-      for (const State& s : states) {
-        int sa = 0;
-        int sb = 0;
-        int sc = 0;
-        const ThreeBodyPerm perm = SortOrbits(s.p, s.q, s.r, sa, sb, sc);
-        const int jpq = s.two_jpq / 2;
-        for (std::int32_t lr = row0; lr < row1; ++lr) {
-          const int jab = space.row_two_jab(kc.row_offset + lr).twice / 2;
-          const double v =
-              PermutationPhase(perm) *
-              RecouplingCoefficient(perm, ja, jb, jc, jpq, jab, tj, sj);
-          row.emplace_back(lr, v);
-        }
-        AppendRow(&row, &e_col, &e_val);
-        e_ptr.push_back(static_cast<std::int64_t>(e_col.size()));
-      }
+      const TripleContext ctx{space,
+                              kc,
+                              orbits,
+                              a,
+                              b,
+                              c,
+                              tj,
+                              sj,
+                              states,
+                              base,
+                              tr.row_begin.value(),
+                              tr.row_end.value()};
+      AppendRRows(ctx, &row, &r_csr);
+      AppendERows(ctx, &row, &e_csr);
     }
     ch_num[U(ch)] = local;
     flat += local;
@@ -265,8 +313,8 @@ PairThirdSpace::PairThirdSpace(const basis::ThreeBodySpace& space,
   st_q_ = ToBuffer(pq);
   st_r_ = ToBuffer(pr);
   st_two_jpq_ = ToBuffer(pj);
-  r_ = PairThirdCsr::FromHost(r_ptr, r_col, r_val);
-  e_ = PairThirdCsr::FromHost(e_ptr, e_col, e_val);
+  r_ = PairThirdCsr::FromHost(r_csr.ptr, r_csr.col, r_csr.val);
+  e_ = PairThirdCsr::FromHost(e_csr.ptr, e_csr.col, e_csr.val);
 }
 
 std::int32_t PairThirdSpace::num_states(Channel3Index ch) const {
