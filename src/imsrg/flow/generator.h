@@ -163,7 +163,7 @@ class Denominators {
   double three_body(OrbitIndex a, OrbitIndex b, OrbitIndex c, OrbitIndex i,
                     OrbitIndex j, OrbitIndex k) const;
   /// The one-body diagonal f_aa per orbit (MeV), indexed by orbit.
-  std::span<const double> OneBodyDiagonal() const noexcept { return f_diag_; }
+  std::span<const double> one_body_diagonal() const noexcept { return f_diag_; }
   /// The unnormalized J-averaged monopole V-bar_abab (imsrg++
   /// `GetTBMEmonopole(a,b,a,b)`).
   double monopole(OrbitIndex a, OrbitIndex b) const;
@@ -185,12 +185,18 @@ op::OperatorSpec GeneratorSpec(const op::OperatorSpec& h, GeneratorKind kind);
 /// the blocks of the file comment). If `eta` is empty or its spec or model
 /// space differs from (GeneratorSpec(H.spec(), kind), H's model space) it is
 /// replaced by a new operator; otherwise it is reused without allocation (the
-/// flow-loop case). Host computation on copies of H's device data; eta's device
-/// data are current on return. Preconditions: H scalar, number conserving,
-/// particle_rank 2 or 3 (InvariantError; rank 3 needs a three-body part).
+/// flow-loop case). The one- and two-body parts are computed on host copies
+/// of H's device data; the three-body part is a device kernel over the stored
+/// elements of the rows of H's three-body space (this rank's rows if the
+/// space is distributed). eta's device data are current on return.
+/// Preconditions: H scalar, number conserving, particle_rank 2 or 3
+/// (InvariantError; rank 3 needs a three-body part, which must be Hermitian:
+/// the kernel checks it).
 /// @throws NotImplementedError for ShellModelAtanNpnh and OnePa, and for the
 ///         shell-model kinds and hartree-fock with a rank-3 H.
-/// Complexity: O(norb^2 J) for the tables plus O(#decoupled elements).
+/// Complexity: O(norb^2 J) for the tables plus O(#decoupled elements) for the
+/// 1B/2B parts, and O(stored elements of the model space's three-body rows)
+/// for the three-body kernel.
 void ComputeGenerator(const op::Operator& H, op::Operator& eta,
                       const GeneratorOptions& opts);
 

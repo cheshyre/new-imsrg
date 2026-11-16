@@ -9,12 +9,15 @@
 #include <cstring>
 #include <memory>
 #include <span>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
 
 #include "imsrg/base/types.h"
 #include "imsrg/basis/model_space.h"
+#include "imsrg/basis/partition.h"
+#include "imsrg/basis/reference.h"
 #include "imsrg/basis/three_body_channels.h"
 #include "imsrg/commutator/three_body.h"
 #include "imsrg/flow/generator.h"
@@ -120,6 +123,76 @@ void CheckBitwise(const Case& c) {
 TEST(GeneratorThreeBodyKernel, BitwiseHe4Emax2) { CheckBitwise({"He4", 2, 6}); }
 TEST(GeneratorThreeBodyKernel, BitwiseO16Emax2) { CheckBitwise({"O16", 2, 6}); }
 TEST(GeneratorThreeBodyKernel, BitwiseO16Emax3) { CheckBitwise({"O16", 3, 9}); }
+
+// A model space (He4 occupations, emax 2) whose core orbits are the 0p3/2
+// proton and neutron (indices 2 and 3) instead of the lowest ones: the 0s1/2
+// orbits (indices 0, 1) are q-space and lie BELOW the core, so that
+// (particle-orbit energy - core-orbit energy) takes both signs and the `-v`
+// branch (core triple as the bra of the stored element) is exercised.
+std::shared_ptr<const basis::ModelSpace> MakeCoreAboveSpace() {
+  basis::ThreeBodyCuts cuts;
+  cuts.e3max = 6;
+  const auto ms = testing::MakeThreeBodySpace(2, "He4", cuts);
+  std::vector<basis::OrbitClass> classes(
+      static_cast<std::size_t>(ms->num_orbits()), basis::OrbitClass::kQSpace);
+  classes[2] = basis::OrbitClass::kCore;
+  classes[3] = basis::OrbitClass::kCore;
+  return ms->WithReferenceAndPartition(
+      basis::Reference(ms->reference()),
+      basis::Partition::FromClasses(ms->basis(), classes));
+}
+
+void CheckBitwiseOnSpace(std::shared_ptr<const basis::ModelSpace> ms,
+                         double cutoff, bool expect_negative_floor) {
+  const commutator::ThreeBodyContext ctx(std::move(ms));
+  const Operator H =
+      testing::RandomThreeBodyOperator(ctx, Hermiticity::kHermitian, 31);
+  for (GeneratorKind kind : kKinds) {
+    GeneratorOptions opts;
+    opts.kind = kind;
+    opts.qtransfer_n = 2;
+    opts.denominator_cutoff = cutoff;
+    if (expect_negative_floor) {
+      // Both signs of the floored denominator occur among the pairs.
+      const flow::Denominators den(H, opts);
+      const basis::ThreeBodySpace& ts = *H.model_space().three_body_space();
+      bool neg = false, pos = false;
+      for (std::int32_t t1 = 0; t1 < ts.num_triples(); ++t1) {
+        for (std::int32_t t2 = 0; t2 < ts.num_triples(); ++t2) {
+          const auto& a = ts.triple(basis::Triple3Index{t1});
+          const auto& b = ts.triple(basis::Triple3Index{t2});
+          const double d = den.three_body(a.a, a.b, a.c, b.a, b.b, b.c);
+          neg = neg || d < 0.0;
+          pos = pos || d > 0.0;
+        }
+      }
+      EXPECT_TRUE(neg && pos);
+    }
+    Operator eta_new = flow::ComputeGenerator(H, opts);
+    Operator eta_ref(H.model_space_ptr(), flow::GeneratorSpec(H.spec(), kind));
+    eta_ref.set_zero();
+    HostReferenceEta3(H, opts, eta_ref);
+    eta_new.SyncToHost();
+    const auto zn = eta_new.three_body()->host_span();
+    const auto zr = eta_ref.three_body()->host_span();
+    ASSERT_EQ(zn.size(), zr.size());
+    bool any = false;
+    for (double x : zr) any = any || x != 0.0;
+    EXPECT_TRUE(any) << "reference is trivially zero";
+    EXPECT_TRUE(BitwiseEqual(zn, zr)) << "kind " << static_cast<int>(kind);
+  }
+}
+
+TEST(GeneratorThreeBodyKernel, BitwiseCoreOrbitsNotLowest) {
+  CheckBitwiseOnSpace(MakeCoreAboveSpace(), 1.0e-6, true);
+}
+
+// A floor so large that it replaces most denominators: the floor keeps the
+// sign of the denominator, so both signs occur (the negative side of
+// FloorDen runs).
+TEST(GeneratorThreeBodyKernel, BitwiseLargeFloorBothSigns) {
+  CheckBitwiseOnSpace(MakeCoreAboveSpace(), 0.75, true);
+}
 
 // The row-subset behaviour (a rank writes only its rows, addressed through the
 // local row offsets) is tested on distributed storage in

@@ -337,7 +337,7 @@ void FillThreeBodyEta(const op::Operator& Hh, const Denominators& den,
         part.orbit_class(OrbitIndex{o}) == basis::OrbitClass::kCore ? 1 : 0;
   }
   detail::FillThreeBodyGenerator(
-      *Hh.three_body(), *eta.three_body(), ts, rows, den.OneBodyDiagonal(),
+      *Hh.three_body(), *eta.three_body(), ts, rows, den.one_body_diagonal(),
       is_core, opts.denominator_cutoff, opts.kind, opts.qtransfer_n);
 }
 
