@@ -7,7 +7,9 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <span>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -276,21 +278,39 @@ ThreeBody GatherToRoot(const ThreeBody& t) {
   t.SyncToHost();
   const std::span<const double> local = t.host_span();
 
+  // The partition is replicated: every rank checks every part and the total
+  // against the int counts/displacements of the collective, so that all ranks
+  // throw together (no rank is left waiting in Alltoallv).
+  std::vector<std::int64_t> part_sizes(static_cast<std::size_t>(size));
+  std::int64_t total = 0;
+  for (int r = 0; r < size; ++r) {
+    const std::int64_t cnt = dist.partition->part(r).StoredSize(packed);
+    part_sizes[static_cast<std::size_t>(r)] = cnt;
+    total += cnt;
+    if (cnt > std::numeric_limits<int>::max() ||
+        total > std::numeric_limits<int>::max()) {
+      throw RuntimeError(
+          "GatherToRoot: the three-body part has more than 2^31 - 1 stored "
+          "doubles (part " +
+          std::to_string(r) + " or the total); too large for one gather");
+    }
+  }
   std::vector<int> send_counts(static_cast<std::size_t>(size), 0);
   std::vector<int> send_displs(static_cast<std::size_t>(size), 0);
   std::vector<int> recv_counts(static_cast<std::size_t>(size), 0);
   std::vector<int> recv_displs(static_cast<std::size_t>(size), 0);
   send_counts[0] = static_cast<int>(local.size());
-  std::int64_t total = 0;
   if (comm.is_root()) {
+    std::int64_t displ = 0;
     for (int r = 0; r < size; ++r) {
-      const std::int64_t cnt = dist.partition->part(r).StoredSize(packed);
-      recv_displs[static_cast<std::size_t>(r)] = static_cast<int>(total);
-      recv_counts[static_cast<std::size_t>(r)] = static_cast<int>(cnt);
-      total += cnt;
+      recv_displs[static_cast<std::size_t>(r)] = static_cast<int>(displ);
+      recv_counts[static_cast<std::size_t>(r)] =
+          static_cast<int>(part_sizes[static_cast<std::size_t>(r)]);
+      displ += part_sizes[static_cast<std::size_t>(r)];
     }
   }
-  std::vector<double> recv(static_cast<std::size_t>(total));
+  std::vector<double> recv(comm.is_root() ? static_cast<std::size_t>(total)
+                                          : std::size_t{0});
   comm.Alltoallv(local, send_counts, send_displs, recv, recv_counts,
                  recv_displs);
   if (!comm.is_root()) return ThreeBody();

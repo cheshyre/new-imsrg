@@ -213,9 +213,11 @@ double ImsrgppNorm(const ThreeBody& t);
 /// other rank receives an EMPTY part (`empty()`), to keep the memory of the
 /// gather on one rank. For a part that is not distributed it is a local copy
 /// on every rank (no communication). For tests and dumps: the whole part must
-/// fit on rank 0, and each per-rank message must hold fewer than 2^31 doubles
-/// (checked by `Communicator::Alltoallv`). Host mirrors are used (the local
-/// part is synchronized to the host first). O(size).
+/// fit on rank 0, and the total number of stored doubles (hence every
+/// per-rank message) must not exceed INT_MAX: checked on EVERY rank before the
+/// collective (the partition is replicated), all ranks throw `RuntimeError`.
+/// Host mirrors are used (the local part is synchronized to the host first).
+/// O(size).
 ThreeBody GatherToRoot(const ThreeBody& t);
 
 }  // namespace imsrg::op
