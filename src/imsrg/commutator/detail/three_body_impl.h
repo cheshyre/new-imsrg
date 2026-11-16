@@ -15,6 +15,7 @@
 #include "imsrg/angmom/sixj3_table.h"
 #include "imsrg/basis/device_tables.h"
 #include "imsrg/basis/model_space.h"
+#include "imsrg/basis/three_body_rows.h"
 #include "imsrg/commutator/detail/comm232.h"
 #include "imsrg/commutator/detail/n7_views.h"
 #include "imsrg/commutator/detail/three_body_tiles.h"
@@ -66,11 +67,14 @@ struct ThreeBodyContext::Impl {
   exec::DeviceBuffer<std::int32_t> state_dim;
   std::int32_t num_j = 0;  ///< 2 emax + 2.
 
-  /// Team work orders (bra triples, largest estimated work first): all
-  /// triples for the tiles T' <= T (`order_lower`) and for all tiles
-  /// (`order_full`); the first `triples_league` entries of `order_triples`
-  /// are the bra triples with at least one triples tile.
-  exec::DeviceBuffer<std::int32_t> order_lower, order_full, order_triples;
+  /// Team work items of `RowSet::Whole`, largest estimated work first
+  /// (`BuildTileItems`): one per bra triple for the tiles T' <= T
+  /// (`items_lower`) and for all tiles (`items_full`), `num_triples` each, as
+  /// `TileWorkItem`s;
+  /// the first `triples_league` entries of `order_triples` are the bra
+  /// triples with at least one triples tile (largest estimated work first).
+  exec::DeviceBuffer<detail::TileWorkItem> items_lower, items_full;
+  exec::DeviceBuffer<std::int32_t> order_triples;
   std::int32_t num_triples = 0;     ///< Triples of the kept space.
   std::int32_t triples_league = 0;  ///< Bra triples with triples work.
 
@@ -87,6 +91,10 @@ struct ThreeBodyContext::Impl {
 
   /// The sorted pair-third tables of comm232ss (detail/comm232.h).
   detail::Comm232Tables comm232;
+
+  /// Pair-third states per triple, prefix sums over the triples (num_triples
+  /// + 1 entries; the estimated work of a tile is a product of such sums).
+  std::vector<std::int64_t> state_prefix_host;
 
   /// The kernel views of the tables (operands, output and epsilon unset).
   /// O(1).
@@ -107,6 +115,15 @@ namespace detail {
 /// (InvariantError otherwise).
 void AddComm223(const op::Operator& X, const op::Operator& Y, op::ThreeBody& z,
                 const ThreeBodyContext& ctx);
+
+/// As `AddComm223`, but adds the term into the stored rows of `rows` only (a
+/// `basis::RowSet` of the context's kept space; no other element of `z` is
+/// written, and the rows of `rows` receive bitwise what `AddComm223` adds).
+/// Builds the work items of `rows` (host, O(triples + items log items)) and
+/// uploads them. Preconditions and checks as `AddComm223`.
+void AddComm223Rows(const op::Operator& X, const op::Operator& Y,
+                    op::ThreeBody& z, const ThreeBodyContext& ctx,
+                    const basis::RowSet& rows);
 
 }  // namespace detail
 

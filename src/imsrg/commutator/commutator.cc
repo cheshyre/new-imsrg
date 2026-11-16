@@ -8,7 +8,10 @@
 
 #include "imsrg/base/assert.h"
 #include "imsrg/base/error.h"
+#include "imsrg/basis/model_space.h"
+#include "imsrg/basis/three_body_rows.h"
 #include "imsrg/comm/communicator.h"
+#include "imsrg/commutator/detail/n7_terms.h"
 #include "imsrg/commutator/detail/work_items.h"
 #include "imsrg/commutator/detail/workspace_impl.h"
 #include "imsrg/commutator/imsrg3.h"
@@ -86,7 +89,9 @@ void CheckTermSet(const op::Operator& X, const op::Operator& Y,
     if (ws.three_body_context() == nullptr)
       throw InputError(
           "commutator: the IMSRG(3) terms need a workspace on a model space "
-          "with a three-body space (ModelSpace::WithThreeBody)");
+          "with a three-body space (ModelSpace::WithThreeBody), or a workspace "
+          "built with WorkspaceOptions::three_body_context = kSkip: call "
+          "Workspace::BuildThreeBodyContext() first");
   } else if (X.three_body().has_value() || Y.three_body().has_value()) {
     // Refuse three-body operands instead of silently dropping them.
     throw NotImplementedError(
@@ -166,19 +171,18 @@ bool ThreeBodyGateOpen(const op::Operator& X, const op::Operator& Y,
            (op::Norm(X) <= threshold || op::Norm(Y) <= threshold));
 }
 
-/// Adds the IMSRG(3) terms selected by `m` to Z, in imsrg++'s order
-/// (Commutator.cc:403-430). Precondition: the workspace has a three-body
-/// context (checked by CheckTermSet).
+/// Adds the IMSRG(3) terms selected by `m` to Z through the fused N7 batch
+/// driver (`detail::RunN7` on the whole kept space, one batch loop sharing H
+/// and W), which keeps imsrg++'s order (Commutator.cc:403-430) per output
+/// part. Precondition: the workspace has a three-body context (checked by
+/// CheckTermSet).
 void ThreeBodyTerms(const op::Operator& X, const op::Operator& Y,
                     op::Operator& Z, const TermMask m, const Workspace& ws) {
   const ThreeBodyContext& ctx = *ws.three_body_context();
-  if (m.test(Term::kComm133ss)) terms::Comm133ss(X, Y, Z, ctx);
-  if (m.test(Term::kComm330ss)) terms::Comm330ss(X, Y, Z, ctx);
-  if (m.test(Term::kComm223ss)) terms::Comm223ss(X, Y, Z, ctx);
-  if (m.test(Term::kComm232ss)) terms::Comm232ss(X, Y, Z, ctx);
-  if (m.test(Term::kComm331ss)) terms::Comm331ss(X, Y, Z, ctx);
-  if (m.test(Term::kComm231ss)) terms::Comm231ss(X, Y, Z, ctx);
-  if (m.test(Term::kComm132ss)) terms::Comm132ss(X, Y, Z, ctx);
+  detail::RunN7(
+      X, Y, Z, ctx, m,
+      basis::RowSet::Whole(*ctx.model_space_ptr()->three_body_space()),
+      detail::kN7BatchBytes);
 }
 
 }  // namespace

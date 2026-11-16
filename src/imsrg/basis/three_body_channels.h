@@ -92,6 +92,29 @@ struct ThreeBodyChannel {
 };
 static_assert(std::is_trivially_copyable_v<ThreeBodyChannel>);
 
+/// Channel membership of a ket |(a b) Jpq, c> of orbits `oa`, `ob`, `oc`
+/// (orbit indices a, b, c) in the channel (`two_j`, `parity` in {0, 1},
+/// `two_tz`), by `ThreeBodyChannel::CheckChannel_ket` (ThreeBodyChannel.cc:
+/// 53-70): parity of l_a + l_b + l_c, the tz2 sum, the triangle rule between
+/// Jpq (`two_jpq` = 2 Jpq) and j_c, and imsrg++'s stretched-state rules,
+/// including the redundant ones. The rule `ThreeBodyChannels` uses for its
+/// membership; exposed so that reduced enumerations agree with it. O(1).
+bool CheckChannelKet(const Orbit& oa, const Orbit& ob, const Orbit& oc,
+                     OrbitIndex a, OrbitIndex b, OrbitIndex c,
+                     std::int32_t two_jpq, std::int32_t two_j,
+                     std::int32_t parity, std::int32_t two_tz);
+
+/// The configuration cut of `ThreeBodyChannels::PassesConfigurationCut` for the
+/// orbit triple (p, q, r) (it depends on the orbits only): true if sum_i
+/// |e_i - e_fermi(tz_i)| <= `de3max` and prod_i n_i (1 - n_i) >= `occnat3_cut`,
+/// with n_i from `natural_occupations` if non-empty (one per orbit), else
+/// from `ref`. Precondition: `ref` belongs to `basis` (IMSRG_ASSERT). O(1).
+bool PassesConfigurationCut(OrbitIndex p, OrbitIndex q, OrbitIndex r,
+                            const SingleParticleBasis& basis,
+                            const Reference& ref, double de3max,
+                            double occnat3_cut,
+                            std::span<const double> natural_occupations = {});
+
 /// Immutable three-body ket and channel structure of a single-particle basis.
 /// Value type.
 class ThreeBodyChannels {

@@ -14,7 +14,9 @@
 // part with the golden `intRp2.snt` of the patched imsrg++ (1e-6 fm^2 as
 // IT-6). Skips without the 2N input file.
 #include <chrono>
+#include <cinttypes>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <filesystem>
 #include <sstream>
@@ -122,6 +124,92 @@ TEST(Imsrg3N7, O16Emax3) { RunCase("O16", 3, "O16_emax3"); }
 TEST(Imsrg3N7, He4Emax2) { RunCase("He4", 2, "He4_emax2", true); }
 
 TEST(Imsrg3N7, O16Emax2) { RunCase("O16", 2, "O16_emax2", true); }
+
+/// Result of one He4 emax-2 IMSRG(3)-N7 run for the OccNat3Cut test.
+struct CutRun {
+  int steps = 0;
+  double e0 = 0.0;
+  std::int64_t kept = -1;   ///< Three-body rows kept ("3-body states kept").
+  std::int64_t total = -1;  ///< Rows before the cuts ("out of").
+};
+
+/// Parses "3-body states kept: <kept> out of <total>" of the IMSRG(3)-N7 log
+/// line in `log` into `run` (left at -1 if the line is missing).
+void ParseKept(const std::string& log, CutRun& run) {
+  const std::string key = "IMSRG(3)-N7:";
+  const std::size_t at = log.find(key);
+  if (at == std::string::npos) return;
+  const std::string tail = log.substr(at);
+  const std::size_t k = tail.find("3-body states kept: ");
+  if (k == std::string::npos) return;
+  std::int64_t kept = -1;
+  std::int64_t total = -1;
+  if (std::sscanf(tail.c_str() + k,
+                  "3-body states kept: %" SCNd64 " out of %" SCNd64, &kept,
+                  &total) == 2) {
+    run.kept = kept;
+    run.total = total;
+  }
+}
+
+/// He4 emax 2, atan, Magnus, N7. `toml_cut` (> 0) adds `imsrg3.occ_nat3_cut`
+/// to the TOML; empty means no cut (the key is absent; the legacy layer maps
+/// `OccNat3Cut <= 0` to an absent key, test_legacy_parameters).
+CutRun RunCut(const std::string& tag, const std::string& toml_cut) {
+  const auto dir = FreshDir("imsrg3n7cut_" + tag);
+  std::ostringstream t;
+  t << "[basis]\nemax = 2\nhw = 16.0\n\n[reference]\nnucleus = \"He4\"\n\n"
+    << "[interaction.two_body]\nfile = \"" << DataFile(TwoBodyName()).string()
+    << "\"\ne1max = 14\ne2max = 28\nlmax = 14\n\n"
+    << "[hartree_fock]\nmixing = \"linear\"\n\n"
+    << "[imsrg]\nmethod = \"magnus\"\n\n[imsrg.step]\nsmax = 200\n\n"
+    << "[imsrg3]\nin_flow = true\nvariant = \"n7\"\n"
+    << (toml_cut.empty() ? "" : "occ_nat3_cut = " + toml_cut + "\n")
+    << "\n[output]\ndirectory = \"" << dir.string() << "\"\n";
+  driver::ConfigSources src;
+  src.config_text = t.str();
+  testing::internal::CaptureStdout();
+  RunResult r;
+  try {
+    r = Execute(src, dir);
+  } catch (...) {
+    (void)testing::internal::GetCapturedStdout();
+    throw;
+  }
+  CutRun out;
+  ParseKept(testing::internal::GetCapturedStdout(), out);
+  if (r.planned) ADD_FAILURE() << r.note;
+  out.steps = static_cast<int>(
+      r.results["imsrg"]["stages"].items.at(0)["steps"].number);
+  out.e0 = r.results["imsrg"]["e0"].number;
+  return out;
+}
+
+/// imsrg3.occ_nat3_cut through the IMSRG(3) flow: no cut (absent key) is
+/// reproducible bitwise; a positive cut
+/// drops three-body kets (see the log line "3-body states kept") and moves E0
+/// by a small amount.
+TEST(Imsrg3N7, He4Emax2OccNat3Cut) {
+  if (!std::filesystem::exists(DataFile(TwoBodyName())))
+    GTEST_SKIP() << "missing 2N input file";
+  const CutRun cut = RunCut("cut", "1.0e-9");
+  const CutRun uncut = RunCut("none", "");
+  const CutRun again = RunCut("again", "");
+  std::printf("[OccNat3Cut] uncut  steps %d E0 %.17g\n", uncut.steps, uncut.e0);
+  std::printf("[OccNat3Cut] again  steps %d E0 %.17g\n", again.steps, again.e0);
+  std::printf("[OccNat3Cut] cut    steps %d E0 %.17g  dE0 %.3e\n", cut.steps,
+              cut.e0, cut.e0 - uncut.e0);
+  EXPECT_EQ(again.steps, uncut.steps);
+  EXPECT_EQ(again.e0, uncut.e0);
+  EXPECT_NE(cut.e0, uncut.e0);
+  std::printf("[OccNat3Cut] 3-body rows kept: cut %" PRId64 " of %" PRId64
+              ", uncut %" PRId64 " of %" PRId64 "\n",
+              cut.kept, cut.total, uncut.kept, uncut.total);
+  ASSERT_GT(uncut.kept, 0) << "log line not found";
+  ASSERT_GT(cut.kept, 0) << "log line not found";
+  EXPECT_LT(cut.kept, uncut.kept);
+  EXPECT_LE(std::abs(cut.e0 - uncut.e0), 1.0e-1);
+}
 
 #endif
 

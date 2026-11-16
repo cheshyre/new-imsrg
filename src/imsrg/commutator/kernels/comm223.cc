@@ -16,6 +16,13 @@
 #include "imsrg/exec/kokkos_backend.h"
 #include "imsrg/operator/three_body.h"
 
+namespace imsrg::exec {
+// The one instantiation of the buffer of the work items (a POD of this
+// module, see imsrg/exec/device_buffer.h); needs the impl header, hence this
+// kernel TU.
+template class DeviceBuffer<commutator::detail::TileWorkItem>;
+}  // namespace imsrg::exec
+
 namespace imsrg::commutator::detail {
 
 namespace {
@@ -184,13 +191,15 @@ IMSRG_INLINE_FUNCTION double TileSum(const std::int32_t* jp, std::int32_t ij_lo,
   return acc;
 }
 
-/// The work of one team: bra triple `T` against its ket triples (by `mode`),
-/// adding the triples energy of the team to `acc` (kTriples) or writing Z.
+/// The work of one team: bra triple `T` against the ket triples [`tp_begin`,
+/// `tp_end`) of its channel, adding the triples energy of the team to `acc`
+/// (kTriples) or writing Z.
 /// Barriers separate the phases of a tile (design/12 section 5), so any team
 /// size is correct; with team size 1 they are no-ops.
 IMSRG_INLINE_FUNCTION void TeamTiles(const Member& team, const TileViews& v,
-                                     TileMode mode, std::int32_t T, int level,
-                                     double& acc) {
+                                     TileMode mode, std::int32_t T,
+                                     std::int32_t tp_begin, std::int32_t tp_end,
+                                     int level, double& acc) {
   const TileScratch sc = CarveScratch(team, level, v.ext);
   const std::int32_t S = v.ext.s_max;
   const std::int64_t leg = 2 * static_cast<std::int64_t>(S);
@@ -243,10 +252,6 @@ IMSRG_INLINE_FUNCTION void TeamTiles(const Member& team, const TileViews& v,
   }
   std::int32_t tick = 0;
 
-  const std::int32_t tp_begin = v.sp.ch_triple_begin[c];
-  const std::int32_t tp_end = mode == TileMode::kFullDense
-                                  ? v.sp.ch_triple_end[c]
-                                  : (mode == TileMode::kTriples ? T : T + 1);
   const std::int64_t r_row_t = v.sp.ch_row_offset[c] + v.sp.tr_row_begin[T];
   const std::int32_t kt = v.sp.tr_row_end[T] - v.sp.tr_row_begin[T];
   for (std::int32_t tp = tp_begin; tp < tp_end; ++tp) {
@@ -474,19 +479,26 @@ IMSRG_INLINE_FUNCTION void TeamTiles(const Member& team, const TileViews& v,
   }
 }
 
-/// The launched functor: one team per entry of `order` (trivially copyable).
+/// The launched functor: one team per work item (`items`, the [2,2]->3 modes)
+/// or per entry of `order` (kTriples; ket triples [first of the channel, T)).
+/// Trivially copyable.
 struct TileFunctor {
   TileViews v;
+  const TileWorkItem* items = nullptr;
   const std::int32_t* order = nullptr;
   TileMode mode = TileMode::kLowerPacked;
   int level = 0;
 
   IMSRG_FUNCTION void operator()(const Member& team) const {
     double unused = 0.0;
-    TeamTiles(team, v, mode, order[team.league_rank()], level, unused);
+    const TileWorkItem it = items[team.league_rank()];
+    TeamTiles(team, v, mode, it.bra_triple, it.ket_begin, it.ket_end, level,
+              unused);
   }
   IMSRG_FUNCTION void operator()(const Member& team, double& acc) const {
-    TeamTiles(team, v, mode, order[team.league_rank()], level, acc);
+    const std::int32_t T = order[team.league_rank()];
+    TeamTiles(team, v, mode, T, v.sp.ch_triple_begin[v.sp.tr_channel[T]], T,
+              level, acc);
   }
 };
 static_assert(std::is_trivially_copyable_v<TileFunctor>);
@@ -523,19 +535,19 @@ std::int64_t TeamScratchBytes(const TileExtents& ext) {
 }
 
 void RunComm223Tiles(const TileViews& v, TileMode mode,
-                     const std::int32_t* order, std::int32_t league) {
+                     const TileWorkItem* items, std::int32_t num_items) {
   IMSRG_CHECK(mode != TileMode::kTriples,
               "RunComm223Tiles: use RunTriplesTiles for the triples");
-  if (league <= 0) return;
+  if (num_items <= 0) return;
   const std::int64_t bytes = TeamScratchBytes(v.ext);
   const int level = ScratchLevel(v, bytes);
   TileFunctor f;
   f.v = v;
-  f.order = order;
+  f.items = items;
   f.mode = mode;
   f.level = level;
   Kokkos::parallel_for("commutator::comm223_tiles",
-                       MakePolicy(league, bytes, level), f);
+                       MakePolicy(num_items, bytes, level), f);
   exec::Fence("commutator::comm223_tiles");
 }
 

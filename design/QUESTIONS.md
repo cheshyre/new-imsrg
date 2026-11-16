@@ -1136,3 +1136,35 @@ the orchestrator uses `O4` and up).
 * **M12b-Q17** (2026-11-17, run 3 brief D) - One-node scaling: at fixed ranks x threads = 16, emax 8 full commutator 30.5 ms (1x16), 43.5 (2x8), 61.8 (4x4); combine 3.7 ms (2x8) and 12.3 ms (4x4), see `design/benchmarks/mpi-scaling.md`; ph term 15.0/21.9/31.0 ms. **Assumed:** MPI only across nodes; no warning for several ranks on one node.
 * **M12b-Q18** (2026-11-17, run 3 brief D) - The ph inverse transform is only partly distributed: every rank loops over all pair x J x J' (only the zbar reads are masked); with the pair-skip and J'-trim in distributed mode the cost drops but is not split. **Assumed:** acceptable; ph row panels with a per-(J', panel) inverse mask later (plan review note m6).
 * **M12b-Q19** (2026-11-17, run 3 brief D) - `CheckReplicatedSetup` requires equal thread counts on all ranks, so heterogeneous nodes fail. **Assumed:** keep; bitwise identity across ranks needs the same reduction order.
+* **M10-Q75** (2026-11-17, C12 triples) - `TriplesResult::kept_rows` / `total_kets` after the move of the perturbative
+  triples to the reduced `commutator::TriplesContext` (M10-Q46). The full three-body space is no longer built, so the
+  old meanings (all kept rows of the space; all channel kets before the cuts) cannot be counted cheaply. Nothing
+  compares them (only the driver log line "3-body states kept: X out of Y"). **Assumed:** `kept_rows` = kets of the
+  triples the context holds (hhh/ppp triples of the channels with an hhh triple, after the dE3max/OccNat3 cuts),
+  `total_kets` = the same triples' kets before those cuts. Both are documented in `flow/triples.h`; the log text
+  in `driver/run.cc` (not touched, another worker) still reads "out of", which stays correct. Also: the leg/group
+  table builders of `ThreeBodyContext::Impl` (three_body.cc) are duplicated in `commutator/triples.cc` because
+  three_body.cc was outside this task's files; a later cleanup can factor them into one internal header.
+* **M10-Q70..Q74, Q76..Q79** (2026-11-17, brief C, N7 performance; proposals of the plan
+  `new-imsrg-reference/plans/m10-n7-perf-plan.md` section 8, taken as proposed unless noted):
+  * **Q70** Row = today's stored segment z(m >= k, k); the packed storage, dumps and Python views are unchanged.
+  * **Q71** Line attribution (a batch owns whole matrix rows; transpose parts read through the views) for every
+    term; the zipper `RowPartition::Balanced` balances compute and memory together.
+  * **Q72** 133, 331, 231, 132 rewritten on the pair-third intermediates H and W; the element-wise kernels stay as
+    `detail::Comm<term>ssReference` (tests; dense-Z path of 133). Measured deviations <= 3e-14 in the M3 form.
+  * **Q73** One fused batch loop (`detail::RunN7`) in `Commutator()`; the `terms::` functions stay single-term and
+    rebuild H/W per call.
+  * **Q74** Batch budget `detail::kN7BatchBytes` = 512 MiB; it bounds H + W of one batch (allocation max(H) +
+    max(W) over the batches, at most twice the budget, plus TransposeOut and the 133 slot tables).
+    `CommutatorOptions::imsrg3_batch_bytes` is **not** added yet: passing it to `ThreeBodyTerms()` changes a
+    signature in `commutator.cc` that the M12b lead edits at the same time. **Assumed:** add the option after the
+    M12b merge (one-line plumbing).
+  * **Q76** OccNat3Cut occupations: the MBPT(2) natural occupations (the NAT step's values for `basis.kind = "nat"`,
+    computed in an HF-basis run too, as imsrg++.cc:570), for the IMSRG(3) flow and the perturbative triples.
+  * **Q77** Facade scope (C4) still open: not implemented in run 3 (see the hand-off of
+    `design/benchmarks/imsrg3-n7-performance.md`).
+  * **Q78** `WorkspaceOptions::three_body_context` (kAuto/kSkip) plus an explicit
+    `Workspace::BuildThreeBodyContext()`; the exception type for a missing context stays `InputError`.
+  * **Q79** Additions per output part keep imsrg++'s order (Z3 133 -> 223, Z2 232 -> 132, Z1 331 -> 231). The fused
+    driver equals the per-term sequence bitwise when a commutator fits one batch (all emax <= 2 cases) and differs
+    at 8e-17 in Z1/Z2 at emax 3 (two batches); IT-9 step counts and E0 are unchanged at emax 2 and 3.

@@ -238,7 +238,7 @@ std::int64_t PairThirdCsr::Bytes() const noexcept {
 
 PairThirdSpace::PairThirdSpace(const basis::ThreeBodySpace& space,
                                const basis::SingleParticleBasis& basis,
-                               const angmom::SixJ3Table& sixj) {
+                               const angmom::SixJ3Table& sixj, bool build_e) {
   IMSRG_CHECK(sixj.emax() >= basis.emax(),
               "SixJ3Table does not cover the emax of the basis");
   const angmom::SixJ3View sj = sixj.host_view();
@@ -297,7 +297,7 @@ PairThirdSpace::PairThirdSpace(const basis::ThreeBodySpace& space,
                               tr.row_begin.value(),
                               tr.row_end.value()};
       AppendRRows(ctx, &row, &r_csr);
-      AppendERows(ctx, &row, &e_csr);
+      if (build_e) AppendERows(ctx, &row, &e_csr);
     }
     ch_num[U(ch)] = local;
     flat += local;
@@ -314,7 +314,7 @@ PairThirdSpace::PairThirdSpace(const basis::ThreeBodySpace& space,
   st_r_ = ToBuffer(pr);
   st_two_jpq_ = ToBuffer(pj);
   r_ = PairThirdCsr::FromHost(r_csr.ptr, r_csr.col, r_csr.val);
-  e_ = PairThirdCsr::FromHost(e_csr.ptr, e_csr.col, e_csr.val);
+  if (build_e) e_ = PairThirdCsr::FromHost(e_csr.ptr, e_csr.col, e_csr.val);
 }
 
 std::int32_t PairThirdSpace::num_states(Channel3Index ch) const {

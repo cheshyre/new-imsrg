@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "imsrg/base/assert.h"
+#include "imsrg/base/error.h"
 #include "imsrg/commutator/detail/work_items.h"
 #include "imsrg/commutator/detail/workspace_impl.h"
 #include "imsrg/commutator/three_body.h"
@@ -118,9 +119,19 @@ Workspace::Workspace(std::shared_ptr<const basis::ModelSpace> ms,
   impl_ = std::make_unique<Impl>(ms_);
   detail::AssignWork(*this, static_cast<std::int32_t>(comm_.rank()),
                      static_cast<std::int32_t>(comm_.size()));
-  if (ms_->three_body_space() != nullptr) {
-    three_body_ = std::make_unique<ThreeBodyContext>(ms_);
+  if (opts.three_body_context == ThreeBodyContextMode::kAuto &&
+      ms_->three_body_space() != nullptr) {
+    BuildThreeBodyContext();
   }
+}
+
+void Workspace::BuildThreeBodyContext() {
+  if (three_body_ != nullptr) return;
+  if (ms_->three_body_space() == nullptr)
+    throw InputError(
+        "Workspace::BuildThreeBodyContext: the model space has no three-body "
+        "space (ModelSpace::WithThreeBody)");
+  three_body_ = std::make_unique<ThreeBodyContext>(ms_);
 }
 
 Workspace::~Workspace() = default;

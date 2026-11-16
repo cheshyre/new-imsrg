@@ -13,13 +13,8 @@
 
 namespace imsrg::basis {
 
-namespace {
-
-// ThreeBodyChannel::CheckChannel_ket (ThreeBodyChannel.cc:53-70) for a ket of
-// orbits (a, b, c) with twice-j values (ja, jb, jc), l and tz2 given through
-// the orbit list, coupled to 2 Jpq = two_jpq, and a channel (two_j, parity,
-// two_tz). All rules are copied exactly, including the ones imsrg++ marks as
-// redundant.
+// ThreeBodyChannel::CheckChannel_ket (ThreeBodyChannel.cc:53-70); see the
+// declaration in the header.
 bool CheckChannelKet(const Orbit& oa, const Orbit& ob, const Orbit& oc,
                      OrbitIndex a, OrbitIndex b, OrbitIndex c,
                      std::int32_t two_jpq, std::int32_t two_j,
@@ -39,6 +34,8 @@ bool CheckChannelKet(const Orbit& oa, const Orbit& ob, const Orbit& oc,
   if (a == b && a == c && two_j > (3 * ja - 3)) return false;
   return true;
 }
+
+namespace {
 
 // Builds the global kets of the three-body space, in the loop order of
 // Setup3bKets (p <= q <= r, ascending orbit index, then Jpq).
@@ -230,24 +227,33 @@ std::optional<LocalKet3Index> ThreeBodyChannels::local_index(
   return LocalKet3Index{local};
 }
 
-bool ThreeBodyChannels::PassesConfigurationCut(
-    Ket3Index k, const SingleParticleBasis& basis, const Reference& ref,
-    double de3max, double occnat3_cut,
-    std::span<const double> natural_occupations) const {
-  const Ket3& kt = ket(k);
+bool PassesConfigurationCut(OrbitIndex p, OrbitIndex q, OrbitIndex r,
+                            const SingleParticleBasis& basis,
+                            const Reference& ref, double de3max,
+                            double occnat3_cut,
+                            std::span<const double> natural_occupations) {
   const std::span<const double> occ =
       natural_occupations.empty() ? ref.occupations() : natural_occupations;
   IMSRG_ASSERT(static_cast<std::int32_t>(occ.size()) == basis.num_orbits(),
                "occupation count differs from the orbit count");
   double de = 0.0;
   double prod = 1.0;
-  for (const OrbitIndex i : {kt.p, kt.q, kt.r}) {
+  for (const OrbitIndex i : {p, q, r}) {
     const Orbit& o = basis.orbit(i);
     de += std::abs(static_cast<double>(o.e()) - ref.e_fermi(o.tz2));
     const double n = occ[static_cast<std::size_t>(i.value())];
     prod *= n * (1.0 - n);
   }
   return de <= de3max && prod >= occnat3_cut;
+}
+
+bool ThreeBodyChannels::PassesConfigurationCut(
+    Ket3Index k, const SingleParticleBasis& basis, const Reference& ref,
+    double de3max, double occnat3_cut,
+    std::span<const double> natural_occupations) const {
+  const Ket3& kt = ket(k);
+  return basis::PassesConfigurationCut(kt.p, kt.q, kt.r, basis, ref, de3max,
+                                       occnat3_cut, natural_occupations);
 }
 
 }  // namespace imsrg::basis

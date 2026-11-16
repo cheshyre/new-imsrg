@@ -17,8 +17,8 @@ namespace imsrg::testing {
 /// Sets every stored element of `b` that is on no line of `lines` to a quiet
 /// NaN. An element (i, j) of a channel (packed: i >= j; dense: any) is on a
 /// line of a set S iff row i or row j of that channel is in S. Host
-/// operation on the host mirror (the host mirror is NOT synchronised from the
-/// device first), followed by `SyncToDevice()`. Precondition: `b` is laid out
+/// operation on the host mirror (synchronised from the device first with
+/// `SyncToHost()`), followed by `SyncToDevice()`. Precondition: `b` is laid out
 /// on the same `ThreeBodySpace` as `lines` was built for (IMSRG_CHECK on the
 /// channel dimensions). O(size).
 void MaskOutsideLines(op::ThreeBody& b, const basis::RowSet& lines);
