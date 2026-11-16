@@ -22,6 +22,7 @@
 #include "imsrg/base/error.h"
 #include "imsrg/base/types.h"
 #include "imsrg/basis/model_space.h"
+#include "imsrg/basis/reference.h"
 #include "imsrg/basis/three_body_space.h"
 #include "imsrg/commutator/detail/three_body_impl.h"
 #include "imsrg/commutator/three_body.h"
@@ -120,11 +121,10 @@ TriplesCounts RestrictedCounts(const ModelSpace& ms,
 /// operands; checks the 1e-14 agreement and that the energy is nonzero, and
 /// the counts against the restricted full space. Returns the reduced
 /// context's counts.
-TriplesCounts CheckAgainstFull(const char* label, const char* ref, int emax,
-                               const ThreeBodyCuts& cuts_in, Hermiticity hx,
-                               Hermiticity hy) {
+TriplesCounts CheckAgainstFullSpace(
+    const char* label, const std::shared_ptr<const ModelSpace>& ms2, int emax,
+    const ThreeBodyCuts& cuts_in, Hermiticity hx, Hermiticity hy) {
   SCOPED_TRACE(label);
-  const auto ms2 = PlainSpace(ref, emax);
   ThreeBodyCuts cuts = cuts_in;
   cuts.e3max = 3 * emax;
   const auto ms3 = ms2->WithThreeBody(cuts);
@@ -135,11 +135,13 @@ TriplesCounts CheckAgainstFull(const char* label, const char* ref, int emax,
   const std::vector<double> eps = BenchEpsilon(*ms2);
   const double e_full = PerturbativeTriplesEnergy(X, Y, eps, full_ctx);
   const double e_new = PerturbativeTriplesEnergy(X, Y, eps, ctx);
-  const double rel = Rel(e_new, e_full);
-  std::printf("[triples] %s: full %.17g new %.17g rel %.2e\n", label, e_full,
-              e_new, rel);
+  // design/30 section 2 (M3): |dE| <= 1e-12 max(1, |E|); the energy is a
+  // parallel reduction, so only its order may differ.
+  const double dev = std::abs(e_new - e_full) / std::max(1.0, std::abs(e_full));
+  std::printf("[triples] %s: full %.17g new %.17g |dE|/max(1,|E|) %.2e\n",
+              label, e_full, e_new, dev);
   EXPECT_NE(e_full, 0.0);
-  EXPECT_LE(rel, 1.0e-14);
+  EXPECT_LE(dev, 1.0e-12);
 
   const TriplesCounts want = RestrictedCounts(*ms2, *ms3->three_body_space(),
                                               full_ctx.impl().pair_third);
@@ -159,6 +161,14 @@ TriplesCounts CheckAgainstFull(const char* label, const char* ref, int emax,
   // The reduced context is smaller than the full one.
   EXPECT_LT(ctx.TableBytes(), full_ctx.TableBytes());
   return got;
+}
+
+/// `CheckAgainstFullSpace` on the plain (integer-occupation) space of `ref`.
+TriplesCounts CheckAgainstFull(const char* label, const char* ref, int emax,
+                               const ThreeBodyCuts& cuts, Hermiticity hx,
+                               Hermiticity hy) {
+  return CheckAgainstFullSpace(label, PlainSpace(ref, emax), emax, cuts, hx,
+                               hy);
 }
 
 TEST(TriplesContext, He4Emax2) {
@@ -190,6 +200,46 @@ TEST(TriplesContext, DE3maxCut) {
       CheckAgainstFull("O16 emax 3 dE3max 4", "O16", 3, cuts,
                        Hermiticity::kAntiHermitian, Hermiticity::kHermitian);
   EXPECT_LT(c.rows, c.rows_before_cuts);
+}
+
+/// Fractional occupations (an ensemble reference with several partially
+/// occupied orbits on both sides of the Fermi surface): the hhh/ppp triple
+/// selection (o = na nb nc, u = (1-na)(1-nb)(1-nc) against the threshold)
+/// keeps mixed triples, and the reduced context still matches the full one.
+TEST(TriplesContext, FractionalOccupations) {
+  const auto plain = PlainSpace("O16", 2);
+  const basis::Reference& ref = plain->reference();
+  std::vector<double> frac(ref.occupations().begin(), ref.occupations().end());
+  for (const int tz2 : {-1, +1}) {
+    const auto species = [&](OrbitIndex a) {
+      return plain->basis().orbit(a).tz2.twice == tz2;
+    };
+    OrbitIndex last_hole{-1};
+    for (const OrbitIndex h : ref.holes())
+      if (species(h)) last_hole = h;
+    OrbitIndex first_particle{-1};
+    for (const OrbitIndex p : ref.particles())
+      if (species(p)) {
+        first_particle = p;
+        break;
+      }
+    ASSERT_GE(last_hole.value(), 0);
+    ASSERT_GE(first_particle.value(), 0);
+    frac[static_cast<std::size_t>(last_hole.value())] = tz2 < 0 ? 0.6 : 0.7;
+    frac[static_cast<std::size_t>(first_particle.value())] =
+        tz2 < 0 ? 0.25 : 0.15;
+  }
+  const auto ms2 = plain->WithReference(
+      basis::Reference::FromOccupations(plain->basis(), frac, "fractional"));
+  const auto occ = ms2->reference().occupations();
+  bool fractional = false;
+  for (const double n : occ) fractional = fractional || (n > 0.01 && n < 0.99);
+  ASSERT_TRUE(fractional);
+  const TriplesCounts c = CheckAgainstFullSpace("fractional O16 emax 2", ms2, 2,
+                                                {}, Hermiticity::kAntiHermitian,
+                                                Hermiticity::kHermitian);
+  EXPECT_GT(c.triples_hhh, 0);
+  EXPECT_GT(c.triples_ppp, 0);
 }
 
 /// The kets before the cuts of the cut context equal the rows of the uncut

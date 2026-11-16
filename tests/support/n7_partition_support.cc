@@ -70,12 +70,16 @@ double CheckOnePartition(const op::Operator& X, const op::Operator& Y,
                          const std::function<op::Operator()>& zero,
                          const N7RowsFn& run, const op::Operator& whole,
                          const std::vector<basis::RowSet>& parts, bool bitwise,
-                         const std::string& tag) {
+                         const std::string& tag, bool ownership) {
   op::Operator sum = zero();
   for (std::size_t p = 0; p < parts.size(); ++p) {
     run(X, Y, sum, parts[p]);
     op::Operator plain = zero();
     run(X, Y, plain, parts[p]);
+    if (ownership && plain.three_body().has_value()) {
+      EXPECT_TRUE(OnlyRowsNonzero(*plain.three_body(), parts[p]))
+          << tag << " part " << p << ": Z3 written outside the part's rows";
+    }
     op::Operator masked = zero();
     run(MaskedCopy(X, parts[p]), MaskedCopy(Y, parts[p]), masked, parts[p]);
     const OperatorDiff dm = CompareOperators(masked, plain);
@@ -91,7 +95,63 @@ double CheckOnePartition(const op::Operator& X, const op::Operator& Y,
   return d.max_abs_diff / std::max(1.0, d.max_abs_ref);
 }
 
+/// The per-batch masked check: for each single-triple set `t`,
+/// run(MaskedCopy(X, t), MaskedCopy(Y, t), t) is bitwise equal to run(X, Y, t)
+/// and NaN-free.
+void CheckSingleTriples(const op::Operator& X, const op::Operator& Y,
+                        const std::function<op::Operator()>& zero,
+                        const N7RowsFn& run,
+                        const std::vector<basis::RowSet>& triples,
+                        const std::string& tag) {
+  for (std::size_t i = 0; i < triples.size(); ++i) {
+    op::Operator plain = zero();
+    run(X, Y, plain, triples[i]);
+    op::Operator masked = zero();
+    run(MaskedCopy(X, triples[i]), MaskedCopy(Y, triples[i]), masked,
+        triples[i]);
+    const OperatorDiff dm = CompareOperators(masked, plain);
+    EXPECT_TRUE(dm.bitwise_equal && Finite(masked))
+        << tag << " triple set " << i << " of " << triples.size()
+        << ": masked operands change the output (max " << dm.max_abs_diff
+        << ")";
+  }
+}
+
 }  // namespace
+
+std::vector<basis::RowSet> SingleTripleSets(const basis::ThreeBodySpace& s,
+                                            std::int32_t max_triples) {
+  const std::int32_t nt = s.num_triples();
+  std::vector<char> pick(static_cast<std::size_t>(nt), 0);
+  if (nt <= max_triples) {
+    std::fill(pick.begin(), pick.end(), 1);
+  } else {
+    for (std::int32_t c = 0; c < s.num_channels(); ++c) {
+      const basis::KeptChannel3& info = s.channel(Channel3Index{c});
+      if (info.triple_end.value() <= info.triple_begin.value()) continue;
+      pick[static_cast<std::size_t>(info.triple_begin.value())] = 1;
+      pick[static_cast<std::size_t>(info.triple_end.value() - 1)] = 1;
+    }
+    const std::int32_t have =
+        static_cast<std::int32_t>(std::count(pick.begin(), pick.end(), 1));
+    const std::int32_t extra = std::max(0, max_triples - have);
+    for (std::int32_t k = 0; k < extra; ++k) {
+      const auto t = static_cast<std::int32_t>(
+          (static_cast<std::int64_t>(k) * 2 + 1) * nt / (2 * extra));
+      pick[static_cast<std::size_t>(t)] = 1;
+    }
+  }
+  std::vector<basis::RowSet> out;
+  for (std::int32_t t = 0; t < nt; ++t) {
+    if (!pick[static_cast<std::size_t>(t)]) continue;
+    const basis::OrbitTriple& tr = s.triple(basis::Triple3Index{t});
+    out.push_back(basis::RowSet::FromRanges(
+        s, {basis::RowRange{tr.channel, basis::Triple3Index{t},
+                            basis::Triple3Index{t + 1}, tr.row_begin,
+                            tr.row_end}}));
+  }
+  return out;
+}
 
 std::vector<basis::RowSet> ContiguousParts(const basis::ThreeBodySpace& s,
                                            std::int32_t parts) {
@@ -157,15 +217,22 @@ void ExpectPartitionInvariance(const basis::ModelSpace& ms,
                                const op::Operator& X, const op::Operator& Y,
                                const std::function<op::Operator()>& zero,
                                const N7RowsFn& run, double tol, bool bitwise,
-                               const std::string& tag) {
+                               const std::string& tag,
+                               const PartitionChecks& checks) {
   op::Operator whole = zero();
   run(X, Y, whole, basis::RowSet::Whole(*ms.three_body_space()));
   double worst = 0.0;
   for (const auto& [label, parts] : StandardPartitions(ms)) {
     const double dev = CheckOnePartition(X, Y, zero, run, whole, parts, bitwise,
-                                         tag + " " + label);
+                                         tag + " " + label, checks.ownership);
     EXPECT_LE(dev, tol) << tag << " " << label;
     worst = std::max(worst, dev);
+  }
+  if (checks.per_batch) {
+    CheckSingleTriples(
+        X, Y, zero, run,
+        SingleTripleSets(*ms.three_body_space(), checks.max_batch_triples),
+        tag);
   }
   std::printf("[partition] %s: max |dZ| / max(1, max|Z|) = %.3e\n", tag.c_str(),
               worst);

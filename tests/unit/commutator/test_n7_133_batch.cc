@@ -14,8 +14,12 @@
 //   element-wise atan generator of the IMSRG(3) flow produces them);
 // * the dispatch of the public term: packed Z through the batch path, dense
 //   Z (a non-Hermitian operand) through the reference;
-// * partition invariance with masked operands
-//   (tests/support/n7_partition_support.h).
+// * partition invariance with masked operands, per part and per single triple
+//   (tests/support/n7_partition_support.h);
+// * output ownership (design/14 section 6.5): driving ForEachN7Batch and
+//   Comm133Batch per part with the TransposeOut kept in its own buffer, the
+//   bra side writes only the part's rows of Z3; placing the transpose outputs
+//   of all parts then reproduces the whole term.
 
 #include <algorithm>
 #include <cinttypes>
@@ -36,9 +40,11 @@
 #include "imsrg/basis/three_body_rows.h"
 #include "imsrg/basis/three_body_space.h"
 #include "imsrg/commutator/commutator.h"
+#include "imsrg/commutator/detail/n7_common.h"
 #include "imsrg/commutator/detail/n7_terms.h"
 #include "imsrg/commutator/imsrg3.h"
 #include "imsrg/commutator/three_body.h"
+#include "imsrg/exec/device_buffer.h"
 #include "imsrg/operator/arithmetic.h"
 #include "imsrg/operator/norms.h"
 #include "imsrg/operator/operator.h"
@@ -47,6 +53,7 @@
 #include "imsrg/operator/three_body.h"
 #include "tests/support/commutator_test_support.h"
 #include "tests/support/n7_partition_support.h"
+#include "tests/support/row_mask.h"
 #include "tests/support/three_body_test_support.h"
 
 namespace imsrg::commutator::detail {
@@ -361,6 +368,90 @@ void CheckPartitions(const std::string& ref) {
         "comm133 " + ref + " (" + Letter(hx) + ", " + Letter(hy) + ")");
   }
 }
+
+/// Runs the batch driver of 133 on `rows` as `Comm133Rows` does, but keeps the
+/// ket side apart: Comm133Batch writes the bra side into `bra` (Z3 rows of the
+/// lines only) and the TransposeOut of each batch (own buffer, offsets as the
+/// kernel's `TransposeOutOffsets`) is placed by `AddTransposeOut` into
+/// `placed` (zeroed by the caller, accumulates over calls).
+void RunBraAndPlace(const op::Operator& x, const op::Operator& y,
+                    op::Operator& bra, op::Operator& placed,
+                    const ThreeBodyContext& ctx, const basis::RowSet& rows,
+                    std::int64_t budget) {
+  const N7Views v = PrepareN7("Comm133ss", x, y, bra, ctx);
+  const ThreeBodyOutView out_bra = ThreeBodyOut("Comm133ss", bra, ctx);
+  const ThreeBodyOutView out_placed = ThreeBodyOut("Comm133ss", placed, ctx);
+  exec::DeviceBuffer<double> tout_data;
+  ForEachN7Batch(
+      v, ctx, rows, budget, N7Needs{true, false}, [&](const N7BatchInputs& in) {
+        std::vector<std::int64_t> off;
+        std::int64_t n = 0;
+        for (const LineTile& t : in.plan->tiles) {
+          for (std::int32_t L = t.row_begin; L < t.row_end; ++L) {
+            off.push_back(n);
+            n += L + 1;
+          }
+        }
+        off.push_back(n);
+        if (tout_data.size() < static_cast<std::size_t>(n)) {
+          tout_data = exec::DeviceBuffer<double>(static_cast<std::size_t>(n),
+                                                 "test::comm133_transpose_out");
+        }
+        exec::DeviceBuffer<std::int64_t> line_off(off.size(),
+                                                  "test::comm133_line_off");
+        line_off.CopyFromHost(off);
+        TransposeOut tout;
+        tout.data = tout_data.device_data();
+        tout.line_off = line_off.device_data();
+        Comm133Batch(in, out_bra, tout);
+        AddTransposeOut(in, tout, out_placed);
+      });
+}
+
+/// Output ownership of 133 and the M3 form of the placed sum, on `ref` at
+/// emax 2, E3max 6, for the packed pairs (A, H) and (H, H).
+void CheckOwnership(const std::string& ref) {
+  const auto ms = testing::MakeThreeBodySpace(2, ref, {.e3max = 6});
+  const ThreeBodyContext ctx(ms);
+  const std::pair<Hermiticity, Hermiticity> pairs[] = {
+      {Hermiticity::kAntiHermitian, Hermiticity::kHermitian},
+      {Hermiticity::kHermitian, Hermiticity::kHermitian}};
+  std::uint64_t seed = 90;
+  for (const auto& [hx, hy] : pairs) {
+    const op::Operator x = testing::RandomThreeBodyOperator(ctx, hx, seed);
+    const op::Operator y = testing::RandomThreeBodyOperator(ctx, hy, seed + 1);
+    seed += 2;
+    op::Operator whole = ZeroOutput(x, y, ctx);
+    Comm133Rows(x, y, whole, ctx, basis::RowSet::Whole(*ms->three_body_space()),
+                kMidBudget);
+    const double norm = op::ThreeBodyNorm(whole);
+    EXPECT_GT(norm, 1.0e-3);
+    double worst = 0.0;
+    for (const auto& [label, parts] : testing::StandardPartitions(*ms)) {
+      op::Operator total = ZeroOutput(x, y, ctx);
+      op::Operator placed = ZeroOutput(x, y, ctx);
+      for (std::size_t p = 0; p < parts.size(); ++p) {
+        op::Operator bra = ZeroOutput(x, y, ctx);
+        RunBraAndPlace(x, y, bra, placed, ctx, parts[p], kMidBudget);
+        EXPECT_TRUE(testing::OnlyRowsNonzero(*bra.three_body(), parts[p]))
+            << ref << " " << Letter(hx) << Letter(hy) << " " << label
+            << " part " << p << ": the bra side leaves the part's rows";
+        total += bra;
+      }
+      total += placed;
+      const double dev = Deviation(total, whole);
+      EXPECT_LE(dev, kTol) << ref << " " << label;
+      worst = std::max(worst, dev);
+    }
+    std::printf(
+        "[133 ownership] %s (%s, %s): max|dZ| / max(1, max|Z|) = %.3e\n",
+        ref.c_str(), Letter(hx), Letter(hy), worst);
+  }
+}
+
+TEST(N7Comm133Batch, OutputOwnershipHe4) { CheckOwnership("He4"); }
+
+TEST(N7Comm133Batch, OutputOwnershipO16) { CheckOwnership("O16"); }
 
 TEST(N7Comm133Batch, PartitionInvarianceHe4) { CheckPartitions("He4"); }
 
