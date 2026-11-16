@@ -247,10 +247,12 @@ SolveResult MagnusSolver::Solve(const StatusCallback& on_status) {
       // eta(s) and the reported norms belong to the rebuilt H as well. The
       // flow does NOT continue (steps and gathers stay as decided in D48);
       // ||eta|| of the rebuilt H is usually far above eta_criterion (1e-3
-      // against 1e-6 in the IT-2 hunter-gatherer cases), so warn.
+      // against 1e-6 in the IT-2 hunter-gatherer cases), so warn when the loop
+      // stopped on the eta criterion (not at smax).
       ComputeGenerator(h_, eta_, generator_);
       const double norm_eta_rebuilt = op::Norm(eta_);
-      if (!(norm_eta_rebuilt < eta_criterion)) {
+      if (result.reason == StopReason::kConverged &&
+          !(norm_eta_rebuilt < eta_criterion)) {
         log::Warn(
             "hunter-gatherer: ||eta|| = {} of the H rebuilt with the gathered "
             "Omega exceeds eta_criterion = {} (the flow stopped on the "

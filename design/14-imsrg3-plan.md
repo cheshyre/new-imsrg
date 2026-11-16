@@ -89,9 +89,9 @@ imsrg++ IMSRG(3) bugs and quirks (section 1 list, re-checked, plus new findings)
 * NEW (harness): `comm331ss` and `comm231ss` abort with "Updating SixJList inside a parallel
   loop" unless the 6j cache was filled before (they rely on an earlier `comm223ss` or the first
   pass); `refharness comm3` calls `PreCalculateSixJ()` first.
-* NEW: the three-body denominator has no floor and no `denominator_delta` (M10-Q60); copied.
-  **To change (owner, D49):** the sign-keeping floor of D21 is extended to the 3B denominator
-  (no `denominator_delta`); no golden changes, a deviation entry in `30` §6.
+* NEW: the three-body denominator has no floor and no `denominator_delta` in imsrg++ (M10-Q60).
+  **Changed (owner, D49):** the sign-keeping floor of D21 now applies to the 3B denominator
+  (no `denominator_delta`); no golden changes, row M10-D49-1 in `30` §6.
 * `comm233_pp_hhss` cut copy-paste and the failing `comm233_phss_tz`: N8 terms, not implemented.
 * The factorized kernels assume an anti-Hermitian eta and apply no 3B truncation: the 3f2 track
   (D32), unchanged.

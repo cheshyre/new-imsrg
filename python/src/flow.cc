@@ -353,8 +353,10 @@ void BindFlow(nb::module_& m) {
           nb::arg("on_status").none() = nb::none(),
           "Runs the Magnus loop until convergence, s >= smax or divergence. "
           "`on_status(FlowStatus)` is called for the initial state and after "
-          "every step; an exception it raises aborts the solve and is "
-          "re-raised (the solver stays consistent).")
+          "every step (with hunter_gatherer, plus one extra row after the "
+          "rebuild of H with the gathered Omega, ds = 0); an exception it "
+          "raises aborts the solve and is re-raised (the solver stays "
+          "consistent).")
       .def(
           "transform",
           [](PyMagnus& self, const PyOperator& o) {
