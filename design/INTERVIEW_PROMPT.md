@@ -4,7 +4,7 @@
 > interviews so far: 2026-11-13 (D25-D29), 2026-11-15 (D30-D42), 2026-11-16 (D44-D54, report
 > `design/reports/2026-11-16-owner-interview.md`). Run 3 added D55-D60 (check `00` for the next free
 > number). Every run-3 question below carries the assumption the run made, so the owner can
-> answer with one word. Run 3's report: `design/reports/2026-11-16-run3.md`; `develop` = 7bfba4e.
+> answer with one word. Run 3's report: `design/reports/2026-11-16-run3.md`; `develop` = 7a78f4d.
 > Method additions kept from the last interview: show the owner a progress bar of the agenda after
 > each round (owner request), and measure a numeric consequence live (a worker in a throwaway
 > worktree) when a decision hinges on it.
@@ -71,7 +71,8 @@ Format: **id** - summary; *assumption taken*; what an answer changes.
 * **Main checkout:** was it re-synced (`git -C /Users/cheshyre/Downloads/new-imsrg reset --hard` when it
   has no local edits) and `tools/reference/gen_golden_generated.sh` run there? (QUESTIONS O1/O3.)
 * **Optional end-to-end check of D57:** does imsrg++ read a `.me2j.bin` written by our rule (255-byte
-  header, float32)? A. Tichai's reader was the source of the rule.
+  header, float32)? A. Tichai's reader was the source of the rule. Our reader is merged; the
+  converter `tools/reference/me2j_text_to_bin.py` and the refharness make the check easy.
 * **Full N2LO 3N file** (D33): available yet? It would give full-flow goldens for IT-4/IT-5/IT-9.
 
 **B. Flow and IMSRG(3) (IT3; high impact, focused questions)**
@@ -178,8 +179,7 @@ Format: **id** - summary; *assumption taken*; what an answer changes.
 1. **Order of run 4.** Proposal: (1) M12b phase 2 completion (row panels for comm122/ph, D9, D10 and
    lifting the D7 guard, D11, D12, weight recalibration); (2) N7 follow-ups (tiled `BuildH`, C15,
    partition timings, `imsrg3_batch_bytes`); (3) M15 tensor operators after M15-Q1..Q5 (goldens
-   exist); (4) M16 formats; (5) fillers (Python hooks D51, `.me2j.bin` reader if not merged, run-2
-   section 7 cleanup). Is the order right? Should M15 go before M12b phase 2?
+   exist); (4) M16 formats; (5) fillers (Python hooks D51, run-2 section 7 cleanup). Is the order right? Should M15 go before M12b phase 2?
 2. **Pause and cap rules after the breach.** In run 3 an N7 lead ignored the 21:35 pause message and
    the window reached 97 % at 22:00 against the 90 % cap (D58); the lead was stopped at 22:01.
    Should the rules be stricter (pause message earlier, a mandatory TaskStop backstop for leads,

@@ -8,7 +8,7 @@ M12a. The owner interview of 2026-11-16 (D44-D54) answered every run-2 question.
 (2026-11-16/17, `design/reports/2026-11-16-run3.md`) did the interview tasks (D47-D49, D50, D51), the
 MS2 structural style pass, the M15 reference preparation, **N7 performance** (2.4x / 5.5x / 7.5x
 faster at emax 3 / 4 / 5; row-range interface; fused driver) and **M12b phase 1 plus the D7/D8 part
-of phase 2** (MPI IMSRG(2) commutator, distributed three-body storage). `develop` = **7bfba4e**.
+of phase 2** (MPI IMSRG(2) commutator, distributed three-body storage). `develop` = **7a78f4d**.
 After run 3 comes the **owner interview** (`design/INTERVIEW_PROMPT.md`), whose answers (D61 and up;
 D59 and D60 are the M12b and N7 decision rows of run 3) this prompt must reflect before the run
 starts. This prompt starts the
@@ -145,8 +145,8 @@ in the answers in `design/QUESTIONS.md`. The most important:
 
 ## State at hand-off (details: `design/STATUS.md`)
 
-* **`develop` = 7bfba4e** (run 3 merges: 7fc0457, f40aa47, e6a59c0, cb07036, e739622, e9f156d,
-  538a82c, 3309163, 93e2d9f, 7bfba4e; table in the run-3 report §1). Update this hash from
+* **`develop` = 7a78f4d** at the last code merge (run 3 merges: 7fc0457, f40aa47, e6a59c0, cb07036,
+  e739622, e9f156d, 538a82c, 3309163, 93e2d9f, 7bfba4e, fe3181b, 7a78f4d; table in the run-3 report §1). Update this hash from
   `STATUS.md` after the interview merge. Preflight: `git merge --ff-only develop` in the worktree.
 * **Complete:** M0-M9, M10 (layout A, 3f2, triples, N7 and its performance work except C15), M11,
   M12a, MS and MS2, the interview tasks D47-D51. **Partial:** M12b: phase 1 (IMSRG(2) distributed,
@@ -180,8 +180,8 @@ in the answers in `design/QUESTIONS.md`. The most important:
    exist.
 4. **M16 formats** (brief F).
 5. **Fillers** (brief G and others): M12a follow-ups, Python hooks (D51), the cleanup items of run-2
-   report §7, the `.me2j.bin` reader for D57 if it was not merged at the end of run 3 (check
-   `STATUS.md`), a deterministic reduction for the perturbative triples (MS2-Q3).
+   report §7, a check that imsrg++ reads our `.me2j.bin` (converter script and refharness), a
+   deterministic reduction for the perturbative triples (MS2-Q3).
 6. At the end: the definition of done below. M13 and M14 only if everything above is done.
 
 ## Lessons from runs 1, 2 and 3 (follow them)
@@ -246,12 +246,12 @@ in the answers in `design/QUESTIONS.md`. The most important:
 
 Briefs A (interview tasks), B (MS2), C (N7 performance) and D phase 1 (M12b phase 1) are merged
 (`design/reports/2026-11-16-run3.md`); their text is in the git history of this file. The briefs below
-continue them. All hashes say `develop` = **7bfba4e**: replace by the hash in `STATUS.md` after the
+continue them. All hashes say `develop` = **7a78f4d**: replace by the hash in `STATUS.md` after the
 interview.
 
 ## Brief D-phase2 — M12b phase 2, rest (starts first)
 
-> You lead **M12b phase 2, rest** on `feature/m12b-mpi-3` (`develop` = 7bfba4e). Ids `M12b-Q20..Q39`.
+> You lead **M12b phase 2, rest** on `feature/m12b-mpi-3` (`develop` = 7a78f4d). Ids `M12b-Q20..Q39`.
 > **Golden rule 10** applies. emax <= 6 in tests, IMSRG(3) only at emax 2-3; cost-model and timing
 > runs as in D52. Read `AGENTS.md`, `00` D14, D45, D59, `12` §6, `14` §1.1 and §4 item 4,
 > `design/benchmarks/mpi-scaling.md` (section "Hand-off": the row-panel sketch and the acceptance
@@ -278,7 +278,7 @@ interview.
 
 ## Brief C-followup — N7 follow-ups (in parallel with D-phase2, a different lead)
 
-> You lead the **N7 follow-ups** on `feature/m10-n7-perf-3` (`develop` = 7bfba4e). Ids
+> You lead the **N7 follow-ups** on `feature/m10-n7-perf-3` (`develop` = 7a78f4d). Ids
 > `M10-Q80..Q89`. **Golden rule 10** applies. emax <= 6 in tests, IMSRG(3) at emax 2-3; **timing-only
 > kernel runs at emax 4-6** with one operator under ~8 GB (D52; `n7_bench --count-only` first; never
 > in CI). Read `AGENTS.md`, `design/benchmarks/imsrg3-n7-performance.md` (§3 timings, §6 partitions, §7
@@ -301,7 +301,7 @@ interview.
 
 ## Brief E — M15 tensor operators (after the owner answered M15-Q1..Q5)
 
-> You lead **M15 — tensor operators** on `feature/m15-tensor` (`develop` = 7bfba4e). Ids `M15-Q6..Q29`
+> You lead **M15 — tensor operators** on `feature/m15-tensor` (`develop` = 7a78f4d). Ids `M15-Q6..Q29`
 > (Q1-Q5 exist, with the owner's answers). **Golden rule 10** applies. Read `AGENTS.md`, `00` D25,
 > D39, D53, `13` §2 and §6, `15` ("Tensor reference dumps"), `reference/02` (tensor commutators),
 > `reference/05` (operator catalog), QUESTIONS M15-Q1..Q5 and the tensor goldens
@@ -325,7 +325,7 @@ interview.
 > otherwise). Readers and writers (text, gzip, binary for ME2JP and ME3JP); the evolved H by default;
 > storing the Omega stack and a `run.task = "transform"`; checkpoint/restart from these files plus a
 > solver-state file. Write a full brief from §7 of the specification when the time comes (`develop` =
-> 7bfba4e). **Non-negotiable (owner, D55):** the J-range rules and tests of `19-mexj-formats.md` §8
+> 7a78f4d). **Non-negotiable (owner, D55):** the J-range rules and tests of `19-mexj-formats.md` §8
 > go into that brief verbatim: per-record J ranges from one function and stored in the lookup table,
 > exactly 0.0 outside them before any offset is computed, `IMSRG_CHECK` on every offset,
 > sentinel-value tests against an independent oracle for all J in the union of both sides' ranges and
@@ -334,15 +334,14 @@ interview.
 
 ## Brief G — fillers (M12a follow-ups, Python hooks, cleanup)
 
-> On `feature/m12a-perf2` (`develop` = 7bfba4e), ids `M12-Q10..Q19`, **golden rule 10** applies.
+> On `feature/m12a-perf2` (`develop` = 7a78f4d), ids `M12-Q10..Q19`, **golden rule 10** applies.
 > Known items: `dsyr2k` for the Hermitian ladder, BCH temporaries kept across steps, launch overhead
 > at small emax (emax 4 at 18 threads is only 1.1x imsrg++), the `Denominators` copy of H, cached
 > norm buffers (M12-Q2), `get_pn` hash lookups (M12-Q1). Benchmarks: emax 4, 6, 8 against imsrg++
 > and **single IMSRG(2) commutators at emax 10-12** (D52; never in CI, no full flows), results in
 > `design/benchmarks/imsrg2-performance.md`. Other fillers, one small Sonnet worker each: the Python
-> hooks of D51; the cleanup items of run-2 report §7; the `.me2j.bin` reader (D57: 255-byte header,
-> float32, same record order as the text file; only if not merged at the end of run 3, see
-> `STATUS.md`; the J-range rules of D55 apply); a deterministic reduction for the perturbative
+> hooks of D51; the cleanup items of run-2 report §7; the `.me2j.bin` cross-check with imsrg++ (the reader
+> is merged; `tools/reference/me2j_text_to_bin.py` plus the refharness `2bme=<path>.bin`); a deterministic reduction for the perturbative
 > triples (MS2-Q3); `PrintTo` for the parameterized basis tests (MS2-Q4). Acceptance: no golden
 > regression, before/after table where timed, CI PASS. Report <= 200 words.
 

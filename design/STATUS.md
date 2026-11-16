@@ -3,7 +3,7 @@
 ## Current state (keep this section up to date)
 
 * **Phase:** **run 3 done** (2026-11-16 12:40 to 2026-11-17 ~04:10 JST; report
-  `design/reports/2026-11-16-run3.md`). `develop` = **7bfba4e** (the owner re-syncs the main
+  `design/reports/2026-11-16-run3.md`). `develop` = **7a78f4d** at the last code merge (the owner re-syncs the main
   checkout, see below). Next: the **owner interview after run 3** (`design/INTERVIEW_PROMPT.md`,
   every open run-3 question with its assumption), then **run 4** (`design/NEXT_SESSION_PROMPT.md`).
   Earlier: run 2 ended 2026-11-16 ~07:30 (report `design/reports/2026-11-15-run2.md`), run 1
@@ -21,7 +21,7 @@
   methods, IMSRG(3f2), layout decision D43, M10 steps 2-3 (3B storage, `Comm223`, perturbative
   triples, IMSRG(3)-N7), M11 phase 2, M12a, license D46. **Run 3:** brief A (D47 stage-2 range and
   double `eta_criterion`, D48 hunter-gatherer H(s) rebuild, D49 three-body denominator floor and
-  triples Omega-stack order, D50/D51 lint and strict Python residency, IT-9 Rp2 golden); D57
+  triples Omega-stack order, D50/D51 lint and strict Python residency, IT-9 Rp2 golden); the `.me2j.bin` reader (D57 follow-up); D57
   binary ME2JP/ME3JP layout (docs); M15 reference preparation (tensor goldens only, no library
   code); **MS2** structural style pass; **M10 step 4, N7 performance (brief C, D60): complete
   except C15 and the follow-ups below**; **M12b phase 1 (D1-D5, D59) and the D7/D8 part of phase 2**.
@@ -52,7 +52,7 @@
   for comm122/ph, D9, D10 and lifting the D7 guard, D11, D12, weights recalibrated on an idle
   machine); N7 follow-ups (tiled `BuildH`, C15 Comm223 locality, partition timings at emax 5,
   `CommutatorOptions::imsrg3_batch_bytes`, factoring the duplicated triples table builders); M15
-  tensor operators after M15-Q1..Q5; M16 formats; fillers (Python hooks D51, `.me2j.bin` reader,
+  tensor operators after M15-Q1..Q5; M16 formats; fillers (Python hooks D51,
   run-2 section 7 cleanup); M13, M14 (GPU after M12b). 3f2 2b intermediates stay E-PLANNED.
 * **Interruptions:** run 3 (windows reset at 14:10, 19:10, 00:10, 05:10 JST): 83 % at 18:29; the
   19:10 window reached **97 % at 22:00 against the 90 % cap of D58** (an N7 lead ignored the 21:35
