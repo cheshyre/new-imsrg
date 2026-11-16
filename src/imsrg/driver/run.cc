@@ -407,7 +407,7 @@ bool NeedsRenormalOrdering(const basis::ModelSpace& ms) {
   return false;
 }
 
-/// Undo the normal ordering w.r.t. the reference, then normal order w.r.t.
+/// Undoes the normal ordering w.r.t. the reference, then normal order w.r.t.
 /// the core.
 op::Operator RenormalOrderToCore(const op::Operator& O) {
   const op::Operator vacuum = op::UndoNormalOrder(O);
