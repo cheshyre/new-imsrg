@@ -35,6 +35,53 @@ struct OneBodyArgs {
 };
 static_assert(std::is_trivially_copyable_v<OneBodyArgs>);
 
+/// POD bundle of the general (non-Hermitian) comm122ss kernels.
+struct Comm122GeneralArgs {
+  MatrixView<const double> x1;
+  MatrixView<const double> y1;
+  const double* xd = nullptr;  ///< Two-body data of X (null: unallocated).
+  const double* yd = nullptr;  ///< Two-body data of Y (null: unallocated).
+  const std::int64_t* block_offset = nullptr;
+  const std::int32_t* num_kets = nullptr;
+  const std::int32_t* row_base = nullptr;
+  const std::int32_t* entry_offset = nullptr;
+  const std::int32_t* lm = nullptr;
+  const std::int32_t* lfrom = nullptr;
+  const std::int32_t* lto = nullptr;
+  const double* lcoef = nullptr;
+
+  /// The element (r, c) of block `ch` of [X, Y]_122 without symmetry: the
+  /// bra part B(r, c) is the lifted one-body list of row r acting on column c
+  /// of X, Y; the ket part K(r, c) = sum_a (Y_ij,al X_ak + Y_ij,ka X_al) -
+  /// (X and Y exchanged) is the list of row c acting on row r of X, Y with the
+  /// one-body matrix transposed (coef is shared: it depends only on the lifted
+  /// ket and on the normalization of the row or column). Returns B - K.
+  /// O(lifted entries of rows r and c).
+  IMSRG_INLINE_FUNCTION double Element(int ch, int r, int c) const {
+    const std::int64_t off = block_offset[ch];
+    const int n = num_kets[ch];
+    const int rb = row_base[ch];
+    double bra = 0.0;
+    for (int t = entry_offset[rb + r]; t < entry_offset[rb + r + 1]; ++t) {
+      const std::int64_t idx = off + lm[t] + static_cast<std::int64_t>(c) * n;
+      double v = 0.0;
+      if (yd != nullptr) v += x1(lfrom[t], lto[t]) * yd[idx];
+      if (xd != nullptr) v -= y1(lfrom[t], lto[t]) * xd[idx];
+      bra += lcoef[t] * v;
+    }
+    double ket = 0.0;
+    for (int t = entry_offset[rb + c]; t < entry_offset[rb + c + 1]; ++t) {
+      const std::int64_t idx = off + r + static_cast<std::int64_t>(lm[t]) * n;
+      double v = 0.0;
+      if (yd != nullptr) v += x1(lto[t], lfrom[t]) * yd[idx];
+      if (xd != nullptr) v -= y1(lto[t], lfrom[t]) * xd[idx];
+      ket += lcoef[t] * v;
+    }
+    return bra - ket;
+  }
+};
+static_assert(std::is_trivially_copyable_v<Comm122GeneralArgs>);
+
 }  // namespace
 
 void Comm110ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
@@ -226,6 +273,13 @@ void Comm122ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   const double* lcoef = impl.lifted.coef.device_data();
   const int nch = xv.tb.num_channels;
   const exec::Index total = static_cast<exec::Index>(impl.two_body_size);
+  const bool owned = impl.work.distributed();
+  // Distributed: only the columns of the owned comm122 channels (the blocks of
+  // the other channels are not written; the scratch of the ket pass is
+  // overwritten in the owned blocks before it is read).
+  const std::int32_t* owned_columns =
+      owned ? impl.work_device.comm122_columns.device_data() : nullptr;
+  if (owned && impl.work_device.comm122_columns.size() == 0) return;
   if (detail::IsGeneral(X, Y)) {
     // General X or Y: no symmetry is used. One thread per element (r, c) of
     // every block: the bra part B(r, c) is the lifted one-body list of row r
@@ -233,38 +287,47 @@ void Comm122ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
     // Y_ij,ka X_al) - (X <-> Y) is the list of row c acting on row r of X, Y
     // with the one-body matrix transposed (coef is shared: it depends only on
     // the lifted ket and on the normalization of the row or column).
-    exec::ParallelFor(
-        "commutator::comm122ss_general", total,
-        IMSRG_LAMBDA(const exec::Index e) {
-          const int ch = detail::FindBlock(block_offset, nch, e);
-          const std::int64_t off = block_offset[ch];
-          const std::int64_t local = e - off;
-          const int n = num_kets[ch];
-          const int r = static_cast<int>(local % n);
-          const int c = static_cast<int>(local / n);
-          const int rb = row_base[ch];
-          double bra = 0.0;
-          for (int t = entry_offset[rb + r]; t < entry_offset[rb + r + 1];
-               ++t) {
-            const std::int64_t idx =
-                off + lm[t] + static_cast<std::int64_t>(c) * n;
-            double v = 0.0;
-            if (yd != nullptr) v += x1(lfrom[t], lto[t]) * yd[idx];
-            if (xd != nullptr) v -= y1(lfrom[t], lto[t]) * xd[idx];
-            bra += lcoef[t] * v;
-          }
-          double ket = 0.0;
-          for (int t = entry_offset[rb + c]; t < entry_offset[rb + c + 1];
-               ++t) {
-            const std::int64_t idx =
-                off + r + static_cast<std::int64_t>(lm[t]) * n;
-            double v = 0.0;
-            if (yd != nullptr) v += x1(lto[t], lfrom[t]) * yd[idx];
-            if (xd != nullptr) v -= y1(lto[t], lfrom[t]) * xd[idx];
-            ket += lcoef[t] * v;
-          }
-          z2[e] += bra - ket;
-        });
+    Comm122GeneralArgs g;
+    g.x1 = x1;
+    g.y1 = y1;
+    g.xd = xd;
+    g.yd = yd;
+    g.block_offset = block_offset;
+    g.num_kets = num_kets;
+    g.row_base = row_base;
+    g.entry_offset = entry_offset;
+    g.lm = lm;
+    g.lfrom = lfrom;
+    g.lto = lto;
+    g.lcoef = lcoef;
+    if (owned) {
+      // One item per owned column; the rows are looped inside.
+      const std::int32_t* entry_channel = impl.entry_channel.device_data();
+      const std::int32_t* ket_offset = xv.tb.channel_ket_offset;
+      exec::ParallelForDynamic(
+          "commutator::comm122ss_general_owned",
+          static_cast<exec::Index>(impl.work_device.comm122_columns.size()),
+          IMSRG_LAMBDA(const exec::Index idx) {
+            const int e = owned_columns[idx];
+            const int ch = entry_channel[e];
+            const int c = e - ket_offset[ch];
+            const int n = num_kets[ch];
+            const std::int64_t off = block_offset[ch];
+            for (int r = 0; r < n; ++r)
+              z2[off + r + static_cast<std::int64_t>(c) * n] +=
+                  g.Element(ch, r, c);
+          });
+    } else {
+      exec::ParallelFor(
+          "commutator::comm122ss_general", total,
+          IMSRG_LAMBDA(const exec::Index e) {
+            const int ch = detail::FindBlock(block_offset, nch, e);
+            const std::int64_t local = e - block_offset[ch];
+            const int n = num_kets[ch];
+            z2[e] += g.Element(ch, static_cast<int>(local % n),
+                               static_cast<int>(local / n));
+          });
+    }
     exec::Fence("commutator::comm122ss");
     return;
   }
@@ -285,9 +348,14 @@ void Comm122ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   double* bsc = ws.impl().ladder.pp.product.device_data();
   const std::int32_t* entry_channel = impl.entry_channel.device_data();
   const std::int32_t* channel_ket_offset = xv.tb.channel_ket_offset;
-  const auto columns = static_cast<exec::Index>(impl.entry_channel.size());
+  const auto columns =
+      static_cast<exec::Index>(owned ? impl.work_device.comm122_columns.size()
+                                     : impl.entry_channel.size());
   exec::ParallelForDynamic(
-      "commutator::comm122ss::bra", columns, IMSRG_LAMBDA(const exec::Index e) {
+      "commutator::comm122ss::bra", columns,
+      IMSRG_LAMBDA(const exec::Index col) {
+        const exec::Index e =
+            owned_columns != nullptr ? owned_columns[col] : col;
         const int ch = entry_channel[e];
         const int c = static_cast<int>(e - channel_ket_offset[ch]);
         const std::int64_t off = block_offset[ch];
@@ -309,7 +377,9 @@ void Comm122ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
       });
   exec::Fence("commutator::comm122ss::bra");
   exec::ParallelForDynamic(
-      "commutator::comm122ss", columns, IMSRG_LAMBDA(const exec::Index e) {
+      "commutator::comm122ss", columns, IMSRG_LAMBDA(const exec::Index col) {
+        const exec::Index e =
+            owned_columns != nullptr ? owned_columns[col] : col;
         const int ch = entry_channel[e];
         const std::int64_t c = e - channel_ket_offset[ch];
         const std::int64_t off = block_offset[ch];
