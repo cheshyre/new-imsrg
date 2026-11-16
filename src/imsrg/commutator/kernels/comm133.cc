@@ -520,8 +520,8 @@ void Comm133Batch(const N7BatchInputs& in, const ThreeBodyOutView& z3,
                        sc.has_hx != has_hx || sc.channels != chans;
   if (rebuild) {
     sc.valid = false;
-    sc.rows = exec::DeviceBuffer<std::int32_t>(entries,
-                                               "commutator::comm133_slots");
+    sc.rows =
+        exec::DeviceBuffer<std::int32_t>(entries, "commutator::comm133_slots");
     sc.coef =
         exec::DeviceBuffer<double>(4 * entries, "commutator::comm133_coef");
     sc.channels = chans;
