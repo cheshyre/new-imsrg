@@ -121,19 +121,25 @@ endforeach()
 
 # IT-11 (M12b D5): end-to-end MPI invariance. Flows on 2 and 4 ranks reproduce the serial run (results.json
 # and .snt to 1e-12 max(1, |ref|), identical step counts), and all ranks hold identical bits of H(s) after every
-# step. The slow variant (same source, IMSRG_IT11_SLOW) holds N7 and the perturbative triples.
+# step. The slow variant (same source, IMSRG_IT11_SLOW) holds N7 and the perturbative triples; it uses the
+# whole machine (ranks x threads = 18 and 16): in phase 1 the N7 terms run on rank 0 only, and rank 0 also
+# runs the serial reference, so its thread count sets the wall time (the case list and its coverage
+# argument are in test_mpi_it11.cc).
 foreach(_variant "" "_slow")
   foreach(_ranks 2 4)
     if(_variant STREQUAL "")
       set(_labels mpi)
       set(_timeout 900)
+      math(EXPR _threads "8 / ${_ranks}")
     else()
       set(_labels mpi slow)
-      set(_timeout 14400)
+      set(_timeout 3600)
+      math(EXPR _threads "18 / ${_ranks}")
     endif()
     imsrg_add_test(NAME driver_mpi_it11${_variant}_${_ranks}ranks
       SOURCES ${_it_support} test_mpi_it11.cc ${PROJECT_SOURCE_DIR}/tests/support/mpi_test_main.cc
-      DEPS driver comm LABELS ${_labels} MPI_RANKS ${_ranks} NO_GTEST_MAIN TIMEOUT ${_timeout})
+      DEPS driver comm LABELS ${_labels} MPI_RANKS ${_ranks} THREADS ${_threads} NO_GTEST_MAIN
+      TIMEOUT ${_timeout})
     if(TARGET driver_mpi_it11${_variant}_${_ranks}ranks)
       target_compile_definitions(driver_mpi_it11${_variant}_${_ranks}ranks PRIVATE
         "IMSRG_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden\""

@@ -360,7 +360,27 @@ const char kN7[] =
     "[imsrg.step]\nsmax = 200\n\n[imsrg3]\nin_flow = true\nvariant = "
     "\"n7\"\n\n[operators]\nlist = [\"Rp2\"]\n\n";
 
-TEST(DriverMpiIt11Slow, He4Emax2N7) { RunCase("He4_emax2_N7", "He4", 2, kN7); }
+// The first three steps of the O16 emax-3 N7 flow (smax 1.5 at ds 0.5): the
+// emax-3 three-body space under MPI end to end at a few percent of the full
+// flow (173 steps, about 40 min of the slow suite on 2 ranks before).
+const char kN7Short[] =
+    "[hartree_fock]\nmixing = \"linear\"\n\n[imsrg]\nmethod = \"magnus\"\n\n"
+    "[imsrg.step]\nsmax = 1.5\n\n[imsrg3]\nin_flow = true\nvariant = "
+    "\"n7\"\n\n[operators]\nlist = [\"Rp2\"]\n\n";
+
+// Case list and coverage (the slow suite has to stay near 50 min; rank 0 runs
+// the serial reference after each MPI run, and in phase 1 it also computes
+// all N7 terms, so each N7 case costs about two serial flows on rank 0):
+//  * 2 ranks: He4 and O16 emax-2 N7 flows (all steps), the triples, and the
+//    first steps of O16 emax 3 (larger three-body space, more 2B channels).
+//  * 4 ranks: O16 emax-2 N7 and the triples only. He4 N7 adds nothing there:
+//    the N7 terms take the rank-0 path of the 2-rank cases, and the 4-rank
+//    split of the IMSRG(2) terms of He4/O16 is covered by the fast cases and
+//    by commutator_mpi_4ranks (N7 commutators at emax 2 included).
+TEST(DriverMpiIt11Slow, He4Emax2N7TwoRanksOnly) {
+  if (TestWorld().size() != 2) GTEST_SKIP() << "2 ranks only";
+  RunCase("He4_emax2_N7", "He4", 2, kN7);
+}
 
 TEST(DriverMpiIt11Slow, O16Emax2N7) { RunCase("O16_emax2_N7", "O16", 2, kN7); }
 
@@ -370,9 +390,9 @@ TEST(DriverMpiIt11Slow, He4Emax2PerturbativeTriples) {
           "\"magnus\"\nperturbative_triples = true\n\n");
 }
 
-TEST(DriverMpiIt11Slow, O16Emax3N7TwoRanksOnly) {
+TEST(DriverMpiIt11Slow, O16Emax3N7FirstStepsTwoRanksOnly) {
   if (TestWorld().size() != 2) GTEST_SKIP() << "2 ranks only";
-  RunCase("O16_emax3_N7", "O16", 3, kN7);
+  RunCase("O16_emax3_N7_short", "O16", 3, kN7Short);
 }
 
 #endif  // IMSRG_IT11_SLOW
