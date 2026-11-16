@@ -88,15 +88,34 @@ struct LadderData {
 /// O(number of kets + buffer sizes).
 LadderData BuildLadderData(const basis::ModelSpace& ms);
 
+/// Which part of the ladder products a call computes.
+enum class LadderScope {
+  /// All channels, whatever the work assignment (the replicated 3f2 path).
+  kAll,
+  /// Only this part's share when `impl.work.distributed()`: the owned row
+  /// blocks of the active channels (`WorkAssignment::ladder_blocks`); all
+  /// channels otherwise. Rows of an active channel outside the owned blocks
+  /// are zero afterwards; the other channels are not written.
+  kOwned,
+};
+
 /// The raw ladder products W_pp = X P_pp Y and W_hh = X P_hh Y (no
 /// antisymmetrization) of every channel, written into
 /// `impl.ladder.{pp,hh}.product` (layout of `op::TwoBody`). X and Y must have
 /// an allocated two-body part and live on the workspace's model space. Shared
-/// by the ladder terms (which then antisymmetrize, kernels/ladder.cc) and the
-/// factorized double commutator. The products are complete when it returns
-/// (host BLAS). Complexity: grouped gemms of sum_c N_c^2 (|Kp| + |Kh|) flops.
+/// by the ladder terms (which then antisymmetrize, kernels/ladder.cc, with
+/// `LadderScope::kOwned`) and the factorized double commutator (`kAll`). With
+/// `kOwned` on a distributed workspace: the full blocks of the active channels
+/// are zeroed in both product buffers, Xg and Yg are gathered for the active
+/// non-direct channels only, and each owned row block [r0, r1) of channel c is
+/// one gemm problem per projector computing rows [r0, r1) of the block (row
+/// panel; the rows outside stay zero); no allocation (the problem capacity is
+/// reserved by `AttachLadderWork`). The products are complete when it returns
+/// (host BLAS). Complexity: grouped gemms of sum_c N_c^2 (|Kp| + |Kh|) flops
+/// (`kOwned`: only the owned rows).
 void LadderProducts(const op::Operator& X, const op::Operator& Y,
-                    Workspace::Impl& impl);
+                    Workspace::Impl& impl,
+                    LadderScope scope = LadderScope::kAll);
 
 /// General (non-Hermitian) form of the ladder intermediates: afterwards
 /// `impl.ladder.{pp,hh}.product` hold Mpp = X P_pp Y - Y P_pp X and Mhh = X
@@ -104,9 +123,16 @@ void LadderProducts(const op::Operator& X, const op::Operator& Y,
 /// `LadderProducts`. Needs no extra scratch (the second product accumulates
 /// into the first with alpha = -1). The
 /// results are complete when it returns. Complexity: twice that of
-/// `LadderProducts` plus one elementwise pass.
+/// `LadderProducts` plus one elementwise pass. `scope` as for `LadderProducts`
+/// (the second product accumulates on the same row panels).
 void LadderProductsGeneral(const op::Operator& X, const op::Operator& Y,
-                           Workspace::Impl& impl);
+                           Workspace::Impl& impl,
+                           LadderScope scope = LadderScope::kAll);
+
+/// Reserves the gemm problem capacity of `impl.ladder` for the work assigned
+/// in `impl.work` (2 x max(channels, owned row blocks), so the ladder products
+/// never allocate). Called at the end of `AssignWork`; host code, O(1).
+void AttachLadderWork(Workspace::Impl& impl);
 
 }  // namespace imsrg::commutator::detail
 

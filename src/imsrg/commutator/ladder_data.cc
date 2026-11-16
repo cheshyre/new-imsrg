@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright 2026 The imsrg authors
 
+#include <algorithm>
 #include <cstddef>
 #include <span>
 #include <string>
 #include <vector>
 
 #include "imsrg/commutator/detail/ladder.h"
+#include "imsrg/commutator/detail/workspace_impl.h"
 
 namespace imsrg::commutator::detail {
 
@@ -106,6 +108,13 @@ LadderData BuildLadderData(const basis::ModelSpace& ms) {
   d.problems.reserve(2 *
                      static_cast<std::size_t>(ms.two_body().num_channels()));
   return d;
+}
+
+void AttachLadderWork(Workspace::Impl& impl) {
+  const std::size_t nch =
+      impl.block_offsets_host.empty() ? 0 : impl.block_offsets_host.size() - 1;
+  const std::size_t n = std::max(nch, impl.work.ladder_blocks().size());
+  impl.ladder.problems.reserve(2 * n);
 }
 
 }  // namespace imsrg::commutator::detail

@@ -46,6 +46,7 @@ struct GatherArgs {
   const std::int32_t* ket_offset = nullptr;
   const std::int32_t* entry_channel = nullptr;
   const std::int32_t* num_kets = nullptr;
+  const std::int32_t* columns = nullptr;  ///< Active columns (null: all).
   const double* x = nullptr;
   const double* y = nullptr;
   double* xg = nullptr;
@@ -61,11 +62,15 @@ static_assert(std::is_trivially_copyable_v<GatherArgs>);
 /// column K_j of X). Every element of Xg and Yg is written by exactly one item;
 /// direct channels (`direct_first >= 0`) are skipped (the gemm reads X and Y in
 /// place). Dynamic scheduling: the
-/// column costs differ by channel. Complexity O(sum_c N_c (N_c + k_c)).
+/// column costs differ by channel. If `columns` is not null only those global
+/// columns (ascending, `num_columns` of them) are processed, the others of Xg
+/// and Yg are left as they are. Complexity O(sum_c N_c (N_c + k_c)) over the
+/// processed channels.
 void Gather(const char* name, LadderProjector& p, const Workspace::Impl& impl,
-            const TwoBodyView& xv, const TwoBodyView& yv) {
+            const TwoBodyView& xv, const TwoBodyView& yv,
+            const std::int32_t* columns, std::int64_t num_columns) {
   const std::int64_t total = p.gather_offset_host.back();
-  if (total == 0) return;
+  if (total == 0 || num_columns == 0) return;
   GatherArgs a;
   a.gather_offset = p.gather_offset.device_data();
   a.list_offset = p.list_offset.device_data();
@@ -76,13 +81,15 @@ void Gather(const char* name, LadderProjector& p, const Workspace::Impl& impl,
   a.ket_offset = xv.tb.channel_ket_offset;
   a.entry_channel = impl.entry_channel.device_data();
   a.num_kets = xv.tb.channel_num_kets;
+  a.columns = columns;
   a.x = xv.data;
   a.y = yv.data;
   a.xg = p.xg.device_data();
   a.yg = p.yg.device_data();
   exec::ParallelForDynamic(
-      name, static_cast<exec::Index>(impl.entry_channel.size()),
-      IMSRG_LAMBDA(const exec::Index e) {
+      name, static_cast<exec::Index>(num_columns),
+      IMSRG_LAMBDA(const exec::Index idx) {
+        const exec::Index e = a.columns != nullptr ? a.columns[idx] : idx;
         const int ch = a.entry_channel[e];
         const std::int64_t k = a.list_offset[ch + 1] - a.list_offset[ch];
         if (k == 0 || a.direct_first[ch] >= 0) return;  // direct: in place
@@ -116,9 +123,28 @@ struct SymArgs {
   double* mpp = nullptr;
   double* mhh = nullptr;
   double* z2 = nullptr;  ///< Optional: Z2 += Mpp - Mhh (nullptr: skip).
+  const std::int32_t* columns = nullptr;  ///< Active columns (null: all).
   double h_z = 1.0;
 };
 static_assert(std::is_trivially_copyable_v<SymArgs>);
+
+/// POD bundle of the zeroing kernel.
+struct ZeroArgs {
+  const std::int64_t* block_offset = nullptr;
+  const std::int32_t* ket_offset = nullptr;
+  const std::int32_t* entry_channel = nullptr;
+  const std::int32_t* num_kets = nullptr;
+  const std::int32_t* columns = nullptr;
+  double* mpp = nullptr;
+  double* mhh = nullptr;
+};
+static_assert(std::is_trivially_copyable_v<ZeroArgs>);
+
+/// True if the distributed work assignment of `impl` applies to a call with
+/// `scope`.
+bool UseOwned(const Workspace::Impl& impl, detail::LadderScope scope) {
+  return scope == detail::LadderScope::kOwned && impl.work.distributed();
+}
 
 }  // namespace
 
@@ -126,59 +152,111 @@ namespace detail {
 
 namespace {
 
+/// Zeroes the full blocks of the active ladder channels in both product
+/// buffers (one work item per active column). Needed on every distributed call
+/// because the antisymmetrization writes transposes (rows of other parts) and
+/// the rows outside the owned blocks are never written by the gemms.
+/// Complexity O(sum over active channels of N_c^2).
+void ZeroActiveBlocks(Workspace::Impl& impl, const TwoBodyView& xv) {
+  const auto& cols = impl.work_device.ladder_columns;
+  if (cols.size() == 0) return;
+  ZeroArgs z;
+  z.block_offset = impl.block_offsets.device_data();
+  z.ket_offset = xv.tb.channel_ket_offset;
+  z.entry_channel = impl.entry_channel.device_data();
+  z.num_kets = xv.tb.channel_num_kets;
+  z.columns = cols.device_data();
+  z.mpp = impl.ladder.pp.product.device_data();
+  z.mhh = impl.ladder.hh.product.device_data();
+  exec::ParallelFor(
+      "commutator::ladder_zero_active", static_cast<exec::Index>(cols.size()),
+      IMSRG_LAMBDA(const exec::Index idx) {
+        const int ch = z.entry_channel[z.columns[idx]];
+        const std::int64_t n = z.num_kets[ch];
+        const std::int64_t j = z.columns[idx] - z.ket_offset[ch];
+        const std::int64_t base = z.block_offset[ch] + j * n;
+        for (std::int64_t i = 0; i < n; ++i) {
+          z.mpp[base + i] = 0.0;
+          z.mhh[base + i] = 0.0;
+        }
+      });
+  exec::Fence("commutator::ladder_zero_active");
+}
+
+/// Number of kets N_c of channel `ch` from the block size N_c^2 (0 if empty).
+std::int64_t BlockDim(const Workspace::Impl& impl, int ch) {
+  const auto c = static_cast<std::size_t>(ch);
+  const std::int64_t n =
+      impl.block_offsets_host[c + 1] - impl.block_offsets_host[c];
+  std::int64_t dim = 0;
+  while (dim * dim < n) ++dim;
+  return dim;
+}
+
+/// Appends the gemm C(r0:r1, :) = alpha Xg(r0:r1, :) Yg + beta C(r0:r1, :) of
+/// channel `ch` and projector `p` to `lad.problems`; skips channels without
+/// listed kets (their blocks stay zero) and empty row ranges. `dim` = N_c;
+/// rows [0, dim) give the whole block. Direct channels read X and Y in place.
+void AppendGemm(detail::LadderData& lad, const Workspace::Impl& impl,
+                LadderProjector& p, const TwoBodyView& xv,
+                const TwoBodyView& yv, int ch, std::int64_t r0, std::int64_t r1,
+                double alpha, double beta) {
+  const auto c = static_cast<std::size_t>(ch);
+  const std::int64_t k = p.count_host[c];
+  if (k == 0 || r1 <= r0) return;
+  const std::int64_t off = impl.block_offsets_host[c];
+  const std::int64_t dim = BlockDim(impl, ch);
+  linalg::GemmProblem g;
+  g.alpha = alpha;
+  const std::int32_t k0 = p.direct_first_host[c];
+  const std::int64_t rows = r1 - r0;
+  if (k0 >= 0) {
+    // Direct channel: Xg = X(:, K0 .. K0 + k - 1), Yg = Y(K0 .. , :).
+    g.A = MatrixView<const double>{xv.data + off + k0 * dim + r0, rows, k, dim};
+    g.B = MatrixView<const double>{yv.data + off + k0, k, dim, dim};
+  } else {
+    const std::int64_t goff = p.gather_offset_host[c];
+    g.A =
+        MatrixView<const double>{p.xg.device_data() + goff + r0, rows, k, dim};
+    g.B = MatrixView<const double>{p.yg.device_data() + goff, k, dim, k};
+  }
+  g.beta = beta;
+  g.C = MatrixView<double>{p.product.device_data() + off + r0, rows, dim, dim};
+  lad.problems.push_back(g);
+}
+
 /// product = alpha X P Y + beta product per channel and projector for the
-/// gathered operands (beta = 0: overwrite, beta = 1: accumulate). See
-/// `LadderProducts`.
+/// gathered operands (beta = 0: overwrite, beta = 1: accumulate). With `owned`
+/// only the active channels are gathered and only the owned row blocks are
+/// multiplied. See `LadderProducts`.
 void ProductsInto(const op::Operator& X, const op::Operator& Y,
-                  Workspace::Impl& impl, double alpha, double beta) {
+                  Workspace::Impl& impl, double alpha, double beta,
+                  bool owned) {
   auto& lad = impl.ladder;
   const TwoBodyView xv = impl.two_body_view(X);
   const TwoBodyView yv = impl.two_body_view(Y);
-  Gather("commutator::ladder_gather_pp", lad.pp, impl, xv, yv);
-  Gather("commutator::ladder_gather_hh", lad.hh, impl, xv, yv);
+  const std::int32_t* cols =
+      owned ? impl.work_device.ladder_columns.device_data() : nullptr;
+  const auto ncols =
+      static_cast<std::int64_t>(owned ? impl.work_device.ladder_columns.size()
+                                      : impl.entry_channel.size());
+  Gather("commutator::ladder_gather_pp", lad.pp, impl, xv, yv, cols, ncols);
+  Gather("commutator::ladder_gather_hh", lad.hh, impl, xv, yv, cols, ncols);
   exec::Fence("commutator::ladder_gather");
 
   // W = Xg Yg per channel and projector. A channel without listed kets (k == 0)
   // is skipped: its product block stays zero (zero-initialized at construction,
   // written only by these gemms and the symmetrization, which maps 0 to 0).
   lad.problems.clear();
-  const int nch = xv.tb.num_channels;
   for (LadderProjector* p : {&lad.pp, &lad.hh}) {
-    double* prod = p->product.device_data();
-    const double* xg = p->xg.device_data();
-    const double* yg = p->yg.device_data();
-    for (int ch = 0; ch < nch; ++ch) {
-      const std::int64_t n =
-          impl.block_offsets_host[static_cast<std::size_t>(ch) + 1] -
-          impl.block_offsets_host[static_cast<std::size_t>(ch)];
-      if (n == 0) continue;
-      std::int64_t dim = 1;
-      while (dim * dim < n) ++dim;  // block size n = N^2
-      const std::int64_t k = p->count_host[static_cast<std::size_t>(ch)];
-      if (k == 0) continue;
-      const std::int64_t goff =
-          p->gather_offset_host[static_cast<std::size_t>(ch)];
-      linalg::GemmProblem g;
-      g.alpha = alpha;
-      const std::int32_t k0 =
-          p->direct_first_host[static_cast<std::size_t>(ch)];
-      if (k0 >= 0) {
-        // Direct channel: Xg = X(:, K0 .. K0 + k - 1), Yg = Y(K0 .. , :).
-        const double* xb =
-            xv.data + impl.block_offsets_host[static_cast<std::size_t>(ch)];
-        const double* yb =
-            yv.data + impl.block_offsets_host[static_cast<std::size_t>(ch)];
-        g.A = MatrixView<const double>{xb + k0 * dim, dim, k, dim};
-        g.B = MatrixView<const double>{yb + k0, k, dim, dim};
-      } else {
-        g.A = MatrixView<const double>{xg + goff, dim, k, dim};
-        g.B = MatrixView<const double>{yg + goff, k, dim, k};
-      }
-      g.beta = beta;
-      g.C = MatrixView<double>{
-          prod + impl.block_offsets_host[static_cast<std::size_t>(ch)], dim,
-          dim, dim};
-      lad.problems.push_back(g);
+    if (owned) {
+      for (const detail::RowBlock& b : impl.work.ladder_blocks())
+        AppendGemm(lad, impl, *p, xv, yv, b.channel, b.row_begin, b.row_end,
+                   alpha, beta);
+    } else {
+      for (int ch = 0; ch < xv.tb.num_channels; ++ch)
+        AppendGemm(lad, impl, *p, xv, yv, ch, 0, BlockDim(impl, ch), alpha,
+                   beta);
     }
   }
   // Host BLAS only; device backends need a device gemm (design/12 section 3).
@@ -191,16 +269,20 @@ void ProductsInto(const op::Operator& X, const op::Operator& Y,
 }  // namespace
 
 void LadderProducts(const op::Operator& X, const op::Operator& Y,
-                    Workspace::Impl& impl) {
-  ProductsInto(X, Y, impl, 1.0, 0.0);
+                    Workspace::Impl& impl, LadderScope scope) {
+  const bool owned = UseOwned(impl, scope);
+  if (owned) ZeroActiveBlocks(impl, impl.two_body_view(X));
+  ProductsInto(X, Y, impl, 1.0, 0.0, owned);
 }
 
 void LadderProductsGeneral(const op::Operator& X, const op::Operator& Y,
-                           Workspace::Impl& impl) {
+                           Workspace::Impl& impl, LadderScope scope) {
   // M = X P Y - Y P X: the second grouped gemm accumulates with alpha = -1.
   // Blocks without listed kets are skipped by both: they stay zero.
-  ProductsInto(X, Y, impl, 1.0, 0.0);
-  ProductsInto(Y, X, impl, -1.0, 1.0);
+  const bool owned = UseOwned(impl, scope);
+  if (owned) ZeroActiveBlocks(impl, impl.two_body_view(X));
+  ProductsInto(X, Y, impl, 1.0, 0.0, owned);
+  ProductsInto(Y, X, impl, -1.0, 1.0, owned);
 }
 
 }  // namespace detail
@@ -220,6 +302,33 @@ void AddLadderTwoBody(double* z2, Workspace::Impl& impl) {
   exec::Fence("commutator::comm222_pp_hhss");
 }
 
+/// Distributed form of `AddLadderTwoBody`: only the columns of the active
+/// channels (`work_device.ladder_columns`); the other blocks of the product
+/// buffers may hold stale data. One work item per column,
+/// O(sum over active channels of N_c^2).
+void AddLadderTwoBodyOwned(double* z2, Workspace::Impl& impl) {
+  const double* mpp = impl.ladder.pp.product.device_data();
+  const double* mhh = impl.ladder.hh.product.device_data();
+  const std::int64_t* block_offset = impl.block_offsets.device_data();
+  const std::int32_t* entry_channel = impl.entry_channel.device_data();
+  const auto tb = impl.tables.two_body();
+  const std::int32_t* ket_offset = tb.channel_ket_offset;
+  const std::int32_t* num_kets = tb.channel_num_kets;
+  const std::int32_t* columns = impl.work_device.ladder_columns.device_data();
+  exec::ParallelForDynamic(
+      "commutator::comm222_pp_hhss_owned",
+      static_cast<exec::Index>(impl.work_device.ladder_columns.size()),
+      IMSRG_LAMBDA(const exec::Index idx) {
+        const int e = columns[idx];
+        const int ch = entry_channel[e];
+        const std::int64_t n = num_kets[ch];
+        const std::int64_t base = block_offset[ch] + (e - ket_offset[ch]) * n;
+        for (std::int64_t i = 0; i < n; ++i)
+          z2[base + i] += mpp[base + i] - mhh[base + i];
+      });
+  exec::Fence("commutator::comm222_pp_hhss_owned");
+}
+
 /// Computes Mpp and Mhh for X and Y into `impl.ladder.{pp,hh}.product`. X and Y
 /// must have an allocated two-body part. If `z2` is not null, also adds
 /// Z2 += Mpp - Mhh there (fused into the antisymmetrization on the Hermitian
@@ -229,13 +338,20 @@ void AddLadderTwoBody(double* z2, Workspace::Impl& impl) {
 /// Complexity: two grouped gemms of sum_c N_c^2 (|Kp| + |Kh|) flops.
 void ComputeIntermediates(const op::Operator& X, const op::Operator& Y,
                           Workspace::Impl& impl, double* z2) {
+  const bool owned = impl.work.distributed();
   if (detail::IsGeneral(X, Y)) {
-    detail::LadderProductsGeneral(X, Y, impl);
-    if (z2 != nullptr) AddLadderTwoBody(z2, impl);
+    detail::LadderProductsGeneral(X, Y, impl, detail::LadderScope::kOwned);
+    if (z2 == nullptr) return;
+    if (owned) {
+      AddLadderTwoBodyOwned(z2, impl);
+    } else {
+      AddLadderTwoBody(z2, impl);
+    }
     return;
   }
   const int h_z = detail::CommutatorHermiticitySign(X, Y);
-  detail::LadderProducts(X, Y, impl);  // W = X P Y for P = P_pp, P_hh
+  // W = X P Y for P = P_pp, P_hh
+  detail::LadderProducts(X, Y, impl, detail::LadderScope::kOwned);
 
   auto& lad = impl.ladder;
   const TwoBodyView xv = impl.two_body_view(X);
@@ -247,14 +363,17 @@ void ComputeIntermediates(const op::Operator& X, const op::Operator& Y,
   s.mpp = lad.pp.product.device_data();
   s.mhh = lad.hh.product.device_data();
   s.z2 = z2;
+  s.columns = owned ? impl.work_device.ladder_columns.device_data() : nullptr;
   s.h_z = static_cast<double>(h_z);
   // One item per column j of every block; it owns the pairs (i, j) and (j, i)
   // for i <= j, so every element is read and written by exactly one item. The
   // optional Z2 update uses the final values of both elements.
   exec::ParallelForDynamic(
       "commutator::ladder_antisymmetrize",
-      static_cast<exec::Index>(impl.entry_channel.size()),
-      IMSRG_LAMBDA(const exec::Index e) {
+      static_cast<exec::Index>(owned ? impl.work_device.ladder_columns.size()
+                                     : impl.entry_channel.size()),
+      IMSRG_LAMBDA(const exec::Index idx) {
+        const exec::Index e = s.columns != nullptr ? s.columns[idx] : idx;
         const int ch = s.entry_channel[e];
         const std::int64_t n = s.num_kets[ch];
         const std::int64_t j = e - s.ket_offset[ch];
@@ -291,13 +410,26 @@ struct Ladder221Args {
   const std::int32_t* j2 = nullptr;
   const std::int32_t* owner = nullptr;
   const std::int32_t* orbits = nullptr;
+  const std::int32_t* active = nullptr;  ///< Active channels (null: all).
   MatrixView<double> z1;
   int num_orbits = 0;
 };
 static_assert(std::is_trivially_copyable_v<Ladder221Args>);
 
+/// Channel of the bra pair (c, i) coupled to 2J = `two_J` (the pair in either
+/// order), or -1 if that ket does not exist (the element is then zero). O(1).
+IMSRG_INLINE_FUNCTION int BraChannel(const TwoBodyView& v, int c, int i,
+                                     int two_J) {
+  const int a = c < i ? c : i;
+  const int b = c < i ? i : c;
+  const std::int32_t ib = v.tb.local_index(
+      v.tb.ket_index(OrbitIndex{a}, OrbitIndex{b}), TwoJ{two_J});
+  if (ib < 0) return -1;
+  return v.tb.channel_of(OrbitIndex{a}, OrbitIndex{b}, TwoJ{two_J}).value();
+}
+
 /// Z1 += sum_c sum_J (2J + 1) / (2 j_i + 1) (n_c Mpp~(ci,cj;J) + (1 - n_c)
-/// Mhh~(ci,cj;J)).
+/// Mhh~(ci,cj;J)). Distributed: only the (c, J) of active channels.
 void Add221(op::Operator& Z, Workspace::Impl& impl, const op::Operator& X) {
   Ladder221Args a;
   a.mpp = impl.two_body_view(X);
@@ -308,6 +440,8 @@ void Add221(op::Operator& Z, Workspace::Impl& impl, const op::Operator& X) {
   a.j2 = impl.tables.orbits().j2;
   a.owner = impl.ob_owner.device_data();
   a.orbits = impl.ob_orbits.device_data();
+  if (impl.work.distributed())
+    a.active = impl.work_device.ladder_active.device_data();
   a.z1 = Z.one_body().device_view();
   a.num_orbits = impl.tables.orbits().num_orbits;
   exec::ParallelFor(
@@ -329,6 +463,11 @@ void Add221(op::Operator& Z, Workspace::Impl& impl, const op::Operator& X) {
           const int hi2 = jc + jj;
           const int hi = hi1 < hi2 ? hi1 : hi2;
           for (int two_J = lo; two_J <= hi; two_J += 2) {
+            if (a.active != nullptr) {
+              // Distributed: channels without owned blocks hold stale data.
+              const int ch = BraChannel(a.mpp, c, i, two_J);
+              if (ch < 0 || a.active[ch] == 0) continue;
+            }
             double s = 0.0;
             if (wp != 0.0) s += wp * a.mpp.get_unnormalized(c, i, c, j, two_J);
             if (wh != 0.0) s += wh * a.mhh.get_unnormalized(c, i, c, j, two_J);
