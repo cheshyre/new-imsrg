@@ -382,6 +382,7 @@ void RunBraAndPlace(const op::Operator& x, const op::Operator& y,
   const ThreeBodyOutView out_bra = ThreeBodyOut("Comm133ss", bra, ctx);
   const ThreeBodyOutView out_placed = ThreeBodyOut("Comm133ss", placed, ctx);
   exec::DeviceBuffer<double> tout_data;
+  Comm133Cache cache;  // Per call, as in Comm133Rows.
   ForEachN7Batch(
       v, ctx, rows, budget, N7Needs{true, false}, [&](const N7BatchInputs& in) {
         std::vector<std::int64_t> off;
@@ -403,7 +404,7 @@ void RunBraAndPlace(const op::Operator& x, const op::Operator& y,
         TransposeOut tout;
         tout.data = tout_data.device_data();
         tout.line_off = line_off.device_data();
-        Comm133Batch(in, out_bra, tout);
+        Comm133Batch(in, out_bra, tout, cache);
         AddTransposeOut(in, tout, out_placed);
       });
 }
