@@ -279,9 +279,11 @@ void ForEachN7Batch(const N7Views& v, const ThreeBodyContext& ctx,
   in.v = v;
   in.pt = im.pair_third.device_view();
   in.tab = im.comm232.View();
+  in.ctx = &ctx;
   for (const LineBatch& b : batches) {
     const LineBatchDevice dev(b, v.sp.num_channels);
     in.batch = dev.view();
+    in.plan = &b;
     BuildBlocks(v, in.pt, in.tab, v.x3, needs, in.batch, xb, in.hx, in.hxt,
                 in.wx, in.wxt, in.sxt);
     BuildBlocks(v, in.pt, in.tab, v.y3, needs, in.batch, yb, in.hy, in.hyt,

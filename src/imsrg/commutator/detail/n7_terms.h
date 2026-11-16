@@ -70,6 +70,10 @@ struct N7BatchInputs {
   const double* wyt = nullptr;  ///< W(Y3^T) up to `syt`.
   double sxt = 1.0;             ///< Sign of the X3^T blocks.
   double syt = 1.0;             ///< Sign of the Y3^T blocks.
+  /// HOST pointers for the host part of a batch kernel (per-batch work
+  /// lists); never dereferenced in device code.
+  const ThreeBodyContext* ctx = nullptr;  ///< The context of the loop.
+  const LineBatch* plan = nullptr;        ///< Host copy of the batch.
 };
 static_assert(std::is_trivially_copyable_v<N7BatchInputs>);
 
@@ -129,6 +133,33 @@ void Comm133Batch(const N7BatchInputs& in, const ThreeBodyOutView& z3,
 /// batch `in.batch`) into the stored elements z(m, r) of `z3`. Blocking.
 void AddTransposeOut(const N7BatchInputs& in, const TransposeOut& tout,
                      const ThreeBodyOutView& z3);
+
+// ---------------------------------------------------------------------------
+// Single-term batch loops (defined next to the batch kernels): the term
+// restricted to the lines of `rows`, batches planned with `budget_bytes`,
+// added into Z; the public `terms::` function of the term is the call with
+// `RowSet::Whole` and `kN7BatchBytes`. Same checks and contract as the
+// `terms::` functions (`PrepareN7`). For 133 the transpose outputs are
+// placed into Z's rows (all rows are local in serial code).
+
+void Comm232Rows(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+                 const ThreeBodyContext& ctx, const basis::RowSet& rows,
+                 std::int64_t budget_bytes);
+void Comm231Rows(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+                 const ThreeBodyContext& ctx, const basis::RowSet& rows,
+                 std::int64_t budget_bytes);
+void Comm331Rows(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+                 const ThreeBodyContext& ctx, const basis::RowSet& rows,
+                 std::int64_t budget_bytes);
+void Comm132Rows(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+                 const ThreeBodyContext& ctx, const basis::RowSet& rows,
+                 std::int64_t budget_bytes);
+void Comm330Rows(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+                 const ThreeBodyContext& ctx, const basis::RowSet& rows,
+                 std::int64_t budget_bytes);
+void Comm133Rows(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+                 const ThreeBodyContext& ctx, const basis::RowSet& rows,
+                 std::int64_t budget_bytes);
 
 // ---------------------------------------------------------------------------
 // Element-wise references (the kernels before the row tiling, kept for tests
