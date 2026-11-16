@@ -106,6 +106,48 @@ void PrepareOutput(const op::Operator& X, const op::Operator& Y, bool imsrg3,
   }
 }
 
+/// Adds the IMSRG(2) terms selected by `m` to Z (Z0, Z1 and Z2 only).
+void TwoBodyTerms(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+                  const TermMask m, Workspace& ws) {
+  if (m.test(Term::kComm110ss)) terms::Comm110ss(X, Y, Z, ws);
+  if (m.test(Term::kComm220ss)) terms::Comm220ss(X, Y, Z, ws);
+  if (m.test(Term::kComm111ss)) terms::Comm111ss(X, Y, Z, ws);
+  if (m.test(Term::kComm121ss)) terms::Comm121ss(X, Y, Z, ws);
+  if (m.test(Term::kComm122ss)) terms::Comm122ss(X, Y, Z, ws);
+  if (m.test(Term::kComm222PpHhss) && m.test(Term::kComm221ss)) {
+    terms::Comm222PpHh221ss(X, Y, Z, ws);
+  } else {
+    if (m.test(Term::kComm221ss)) terms::Comm221ss(X, Y, Z, ws);
+    if (m.test(Term::kComm222PpHhss)) terms::Comm222PpHhss(X, Y, Z, ws);
+  }
+  if (m.test(Term::kComm222Phss)) terms::Comm222Phss(X, Y, Z, ws);
+}
+
+/// True if the IMSRG(3) block runs. imsrg++ evaluates it iff ||X|| >
+/// threshold and ||Y|| > threshold (Commutator.cc:396); with the default
+/// threshold 0 that only skips an exactly zero operand, whose terms vanish
+/// anyway. The norms are computed only for a positive threshold.
+bool ThreeBodyGateOpen(const op::Operator& X, const op::Operator& Y,
+                       const double threshold) {
+  return !(threshold > 0.0 &&
+           (op::Norm(X) <= threshold || op::Norm(Y) <= threshold));
+}
+
+/// Adds the IMSRG(3) terms selected by `m` to Z, in imsrg++'s order
+/// (Commutator.cc:403-430). Precondition: the workspace has a three-body
+/// context (checked by CheckTermSet).
+void ThreeBodyTerms(const op::Operator& X, const op::Operator& Y,
+                    op::Operator& Z, const TermMask m, const Workspace& ws) {
+  const ThreeBodyContext& ctx = *ws.three_body_context();
+  if (m.test(Term::kComm133ss)) terms::Comm133ss(X, Y, Z, ctx);
+  if (m.test(Term::kComm330ss)) terms::Comm330ss(X, Y, Z, ctx);
+  if (m.test(Term::kComm223ss)) terms::Comm223ss(X, Y, Z, ctx);
+  if (m.test(Term::kComm232ss)) terms::Comm232ss(X, Y, Z, ctx);
+  if (m.test(Term::kComm331ss)) terms::Comm331ss(X, Y, Z, ctx);
+  if (m.test(Term::kComm231ss)) terms::Comm231ss(X, Y, Z, ctx);
+  if (m.test(Term::kComm132ss)) terms::Comm132ss(X, Y, Z, ctx);
+}
+
 }  // namespace
 
 void Commutator(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
@@ -122,36 +164,11 @@ void Commutator(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   CheckTermSet(X, Y, m3, ws);
   PrepareOutput(X, Y, imsrg3, ws, Z);
 
-  if (m.test(Term::kComm110ss)) terms::Comm110ss(X, Y, Z, ws);
-  if (m.test(Term::kComm220ss)) terms::Comm220ss(X, Y, Z, ws);
-  if (m.test(Term::kComm111ss)) terms::Comm111ss(X, Y, Z, ws);
-  if (m.test(Term::kComm121ss)) terms::Comm121ss(X, Y, Z, ws);
-  if (m.test(Term::kComm122ss)) terms::Comm122ss(X, Y, Z, ws);
-  if (m.test(Term::kComm222PpHhss) && m.test(Term::kComm221ss)) {
-    terms::Comm222PpHh221ss(X, Y, Z, ws);
-  } else {
-    if (m.test(Term::kComm221ss)) terms::Comm221ss(X, Y, Z, ws);
-    if (m.test(Term::kComm222PpHhss)) terms::Comm222PpHhss(X, Y, Z, ws);
-  }
-  if (m.test(Term::kComm222Phss)) terms::Comm222Phss(X, Y, Z, ws);
-
-  if (!imsrg3) return;
-  // imsrg++ evaluates the IMSRG(3) block iff ||X|| > threshold and ||Y|| >
-  // threshold (Commutator.cc:396); with the default threshold 0 that only
-  // skips an exactly zero operand, whose terms vanish anyway.
-  if (opts.threebody_threshold > 0.0 &&
-      (op::Norm(X) <= opts.threebody_threshold ||
-       op::Norm(Y) <= opts.threebody_threshold))
-    return;
-  const ThreeBodyContext& ctx = *ws.three_body_context();
-  // imsrg++'s order (Commutator.cc:403-430).
-  if (m.test(Term::kComm133ss)) terms::Comm133ss(X, Y, Z, ctx);
-  if (m.test(Term::kComm330ss)) terms::Comm330ss(X, Y, Z, ctx);
-  if (m.test(Term::kComm223ss)) terms::Comm223ss(X, Y, Z, ctx);
-  if (m.test(Term::kComm232ss)) terms::Comm232ss(X, Y, Z, ctx);
-  if (m.test(Term::kComm331ss)) terms::Comm331ss(X, Y, Z, ctx);
-  if (m.test(Term::kComm231ss)) terms::Comm231ss(X, Y, Z, ctx);
-  if (m.test(Term::kComm132ss)) terms::Comm132ss(X, Y, Z, ctx);
+  TwoBodyTerms(X, Y, Z, m, ws);
+  if (imsrg3 && ThreeBodyGateOpen(X, Y, opts.threebody_threshold))
+    ThreeBodyTerms(X, Y, Z, m, ws);
+  // Single exit (M12b review note m2): every call, IMSRG(2)-only or gated,
+  // reaches this point, where the MPI combine of the partial results goes.
 }
 
 op::Operator Commutator(const op::Operator& X, const op::Operator& Y,

@@ -12,11 +12,22 @@
 #include <memory>
 
 #include "imsrg/basis/model_space.h"
+#include "imsrg/comm/communicator.h"
 #include "imsrg/operator/operator.h"
 
 namespace imsrg::commutator {
 
 class ThreeBodyContext;
+
+/// Construction options of a `Workspace`.
+struct WorkspaceOptions {
+  /// The ranks that share the commutator work (design/12 section 6, D14 phase
+  /// 1): every rank holds the full one- and two-body operators, and a
+  /// workspace on more than one rank lets the expensive terms compute this
+  /// rank's share, which `Commutator()` combines (a collective over `comm`).
+  /// The default, the serial communicator, distributes nothing.
+  comm::Communicator comm;
+};
 
 /// Everything the IMSRG(2) kernels need besides X, Y and Z, built once per
 /// model space and reused by every commutator call on that model space (a flow
@@ -48,9 +59,11 @@ class Workspace {
   /// place, not gathered; 3.5x and 3.8x before) and the Pandya term about 3.5
   /// to 4.5 (4.3x at emax 4, 3.5x at emax 6: no ZB buffer and half of YK; 8.0x
   /// and 6.6x before) two-body operators of memory; the exact bytes are printed
-  /// by the `commutator_robustness.scratch_footprint` test.
+  /// by the `commutator_robustness.scratch_footprint` test. `opts.comm` is
+  /// kept (see `WorkspaceOptions`); construction itself is not collective.
   /// @throws InvariantError if `ms` is null.
-  explicit Workspace(std::shared_ptr<const basis::ModelSpace> ms);
+  explicit Workspace(std::shared_ptr<const basis::ModelSpace> ms,
+                     const WorkspaceOptions& opts = {});
 
   ~Workspace();
   Workspace(Workspace&&) noexcept;
@@ -72,6 +85,9 @@ class Workspace {
   /// same object.
   bool Compatible(const op::Operator& op) const noexcept;
 
+  /// The communicator of `WorkspaceOptions::comm` (serial by default).
+  const comm::Communicator& comm() const noexcept { return comm_; }
+
   /// The tables of the IMSRG(3) terms (`ThreeBodyContext`, three_body.h),
   /// built by the constructor iff the model space has a three-body space
   /// (`ModelSpace::WithThreeBody`); null otherwise.
@@ -89,6 +105,7 @@ class Workspace {
 
  private:
   std::shared_ptr<const basis::ModelSpace> ms_;
+  comm::Communicator comm_;
   std::unique_ptr<Impl> impl_;
   std::unique_ptr<ThreeBodyContext> three_body_;
 };
