@@ -4,7 +4,7 @@
 // n7_bench -- IMSRG(3)-N7 timing and checksum benchmark (design/30 section 5).
 //
 //   n7_bench --emax E [--e3max M] [--reference R] [--reps N] [--herm XY]
-//            [--terms LIST] [--checksum] [--seed S]
+//            [--terms LIST] [--checksum] [--seed S] [--count-only]
 //
 // Operands X, Y = RandomThreeBodyOperator(ctx, h, S) and (ctx, h, S + 1) on
 // MakeThreeBodySpace(E, R, {e3max = M}); `--herm` gives the hermiticities of X
@@ -17,6 +17,11 @@
 // bytes of Z (zero-body value, one-, two-, three-body buffers) is printed, and
 // the same hash of X and Y (are the inputs themselves reproducible?). This
 // is the "before" tool of milestone M10 (N7 performance).
+//
+// `--count-only` builds neither a context nor an operator: it prints the
+// exact counts of the kept space (rows, triples, pair-third states, packed
+// size) and the per-term multiply-add totals of `commutator::N7CostModel`
+// with the time at two sustained rates and the memory of six operators.
 
 #include <algorithm>
 #include <chrono>
@@ -39,6 +44,7 @@
 #include "imsrg/basis/three_body_channels.h"
 #include "imsrg/commutator/commutator.h"
 #include "imsrg/commutator/imsrg3.h"
+#include "imsrg/commutator/n7_cost.h"
 #include "imsrg/commutator/options.h"
 #include "imsrg/commutator/three_body.h"
 #include "imsrg/commutator/workspace.h"
@@ -73,6 +79,7 @@ struct Options {
   std::string herm = "AH";
   std::string terms = "133,330,223,232,331,231,132,full";
   bool checksum = false;
+  bool count_only = false;
   std::uint64_t seed = 1;
 };
 
@@ -108,6 +115,8 @@ Options ParseOptions(int argc, char** argv) {
         o.terms = value();
       } else if (a == "--checksum") {
         o.checksum = true;
+      } else if (a == "--count-only") {
+        o.count_only = true;
       } else if (a == "--seed") {
         o.seed = std::stoull(value());
       } else {
@@ -269,6 +278,51 @@ void ChecksumTerm(const Term& t, const Options& o, const op::Operator& x,
               o.herm.c_str(), Checksum(z));
 }
 
+/// `--count-only`: counts and cost model, without context or operators.
+void RunCountOnly(const Options& o) {
+  imsrg::basis::ThreeBodyCuts cuts;
+  cuts.e3max = o.e3max;
+  const auto t0 = Clock::now();
+  const auto ms = imsrg::testing::MakeThreeBodySpace(o.emax, o.reference, cuts);
+  const double space_ms = ElapsedMs(t0);
+  const auto t1 = Clock::now();
+  const cm::N7CostModel model(*ms);
+  const double model_ms = ElapsedMs(t1);
+  std::printf("# n7_bench --count-only git %s\n", IMSRG_BENCH_GIT_HASH);
+  std::printf("emax %d e3max %d reference %s\n", o.emax, o.e3max,
+              o.reference.c_str());
+  std::printf("space_build_ms %.0f model_build_ms %.0f\n", space_ms, model_ms);
+  std::printf("orbits %d onebody_mean %.3f\n", model.num_orbits(),
+              model.OneBodyMean());
+  std::printf("rows %" PRId64 " triples %" PRId64 " states %" PRId64
+              " active_states %" PRId64 " max_N %d max_channel_states %" PRId64
+              "\n",
+              model.num_rows(), model.num_triples(), model.num_states(),
+              model.NumActive(), model.MaxDim(), model.max_channel_states());
+  std::printf("packed_doubles %" PRId64 " packed_GB_per_operand %.3f\n",
+              model.PackedDoubles(), model.PackedBytes() / 1.0e9);
+  const double twobody_gb =
+      8.0e-9 * static_cast<double>(model.TwoBodyDoubles());
+  std::printf("twobody_doubles %" PRId64 " twobody_GB %.3f\n",
+              model.TwoBodyDoubles(), twobody_gb);
+  const auto tot = model.TermTotals();
+  const auto p223 = model.Comm223Parts();
+  const double total = model.TotalMultiplyAdds();
+  const double plan_total = total - p223[1];
+  std::printf("multiply-adds per commutator (3B parts in X and Y):\n");
+  std::printf("  223(W sums) H W 232 331 133 330 231+132 (plan layout)\n");
+  std::printf("  %.3e %.3e %.3e %.3e %.3e %.3e %.3e %.3e\n", p223[0], tot[1],
+              tot[2], tot[3], tot[4], tot[5], tot[6], tot[7]);
+  std::printf("  223 epilogue %.3e (in 223 below)\n", p223[1]);
+  std::printf("  223 total    %.3e\n", tot[0]);
+  std::printf("  total        %.3e (without 223 epilogue %.3e)\n", total,
+              plan_total);
+  std::printf("time_per_commutator_s at 5e10/s %.1f at 2.5e11/s %.1f\n",
+              total / 5.0e10, total / 2.5e11);
+  std::printf("memory_six_operators_GB %.1f (packed 3B) + 2B %.2f\n",
+              6.0 * model.PackedBytes() / 1.0e9, 6.0 * twobody_gb);
+}
+
 /// Builds the operands and runs the selected terms.
 void Run(const Options& o) {
   imsrg::basis::ThreeBodyCuts cuts;
@@ -315,7 +369,11 @@ int main(int argc, char** argv) {
   }
   try {
     imsrg::exec::Runtime runtime(argc, argv);
-    Run(o);
+    if (o.count_only) {
+      RunCountOnly(o);
+    } else {
+      Run(o);
+    }
     return 0;
   } catch (const std::exception& e) {
     std::fprintf(stderr, "n7_bench: %s\n", e.what());
