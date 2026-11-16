@@ -117,11 +117,12 @@ TEST(MagnusSolver, ReplayOfOmegaStackReproducesH) {
       << d.zero_body << " " << d.one_body << " " << d.two_body;
 }
 
-// Hunter-gatherer (imsrg++ GatherOmega semantics, D32): the stack is
-// {gatherer, hunter}, the final gather leaves H(s) untouched, so H(s) differs
-// from the replay of the gathered Omega on H_0 at the truncation level of the
-// BCH product/transform (unlike the split stack, see the test above).
-TEST(MagnusSolver, HunterGathererDocumentsImsrgSemantics) {
+// Hunter-gatherer (imsrg++ GatherOmega semantics, D32, and D48): the stack is
+// {gatherer, hunter}; after the final gather H(s) is the H rebuilt with the
+// gathered Omega, so H(s) == Transform(H_0) with the final Omega (imsrg++ left
+// H(s) at the last hunter step; design/30 section 6). A gather inside the loop
+// leaves H(s) alone (the status lines are those of the loop).
+TEST(MagnusSolver, HunterGathererHamiltonianIsRebuiltWithGatheredOmega) {
   op::Operator h0 = Emax2Hno();
   flow::SolverOptions o = ShortFlow(1.5);
   o.hunter_gatherer = true;
@@ -147,16 +148,20 @@ TEST(MagnusSolver, HunterGathererDocumentsImsrgSemantics) {
   for (const auto& st : lines) EXPECT_LE(st.num_omegas, 2u);
   EXPECT_EQ(op::Norm(solver.omegas().back()), 0.0);
   EXPECT_GT(op::Norm(solver.omegas().front()), 0.25);
-  // H(s) is untouched by the final gather.
-  EXPECT_EQ(solver.hamiltonian().zero_body(), lines.back().e0);
-  EXPECT_EQ(r.e0, lines.back().e0);
-  // Replay of the gathered Omega: close to, but not equal to, H(s).
+  // D48: H(s) is the replay of the gathered Omega on H_0 (the loop's last line
+  // still shows the hunter-step H; the rebuilt one differs from it).
   const op::Operator replayed = solver.Transform(h0);
   const op::PartMaxima d = op::MaxAbsDifference(replayed, solver.hamiltonian());
+  const double scale = std::max(1.0, op::Norm(solver.hamiltonian()));
   std::printf(
-      "[magnus HG] %d gathers; replay vs H(s): E0 %.3e, 1b %.3e, 2b %.3e\n",
-      r.num_gathers, d.zero_body, d.one_body, d.two_body);
-  EXPECT_LT(d.max(), 1.0e-2);
+      "[magnus HG] %d gathers; replay vs H(s): E0 %.3e, 1b %.3e, 2b %.3e; "
+      "E0 %.9f (last loop line %.9f, shift %.3e)\n",
+      r.num_gathers, d.zero_body, d.one_body, d.two_body, r.e0, lines.back().e0,
+      r.e0 - lines.back().e0);
+  EXPECT_LT(d.max(), 1.0e-10 * scale);
+  EXPECT_EQ(r.e0, solver.hamiltonian().zero_body());
+  EXPECT_NE(r.e0, lines.back().e0);  // the rebuild moves E0 (BCH truncation)
+  EXPECT_LT(std::abs(r.e0 - lines.back().e0), 1.0e-1);
   // A second stage gathers nothing in set_generator (the hunter is zero) and
   // keeps the stack at two entries.
   solver.set_generator(flow::GeneratorOptions{});
