@@ -9,6 +9,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -26,6 +27,7 @@
 #include "imsrg/basis/orbit.h"
 #include "imsrg/io/input_stream.h"
 #include "imsrg/io/me2j.h"
+#include "tests/support/scratch_dir.h"
 
 namespace imsrg::io {
 namespace {
@@ -324,6 +326,144 @@ TEST_F(Me2jSynthetic, MalformedTokenAndMissingFileThrowInputError) {
                         {.file = {1, 2, 1}}, ms_),
                InputError);
   EXPECT_THROW(ReadMe2j(path_, {.file = {1, 2, 1}}, nullptr), InputError);
+}
+
+// -----------------------------------------------------------------------------
+// Binary .me2j.bin files (D57): 255 header bytes, then binary32 values.
+
+/// Writes `header_fill` * 255 bytes and then the float32 values of the
+/// whitespace-separated tokens of `text` (after its first line) to `p`;
+/// `extra`/`drop` append zero bytes to / remove bytes from the end.
+void WriteBinary(const fs::path& p, const std::string& text,
+                 unsigned char header_fill, int extra_bytes, int drop_bytes) {
+  std::istringstream is(text);
+  std::string line;
+  std::getline(is, line);  // the text header line is replaced by 255 bytes
+  std::vector<float> values;
+  double v = 0.0;
+  while (is >> v) values.push_back(static_cast<float>(v));
+  std::string bytes(255, static_cast<char>(header_fill));
+  bytes.append(reinterpret_cast<const char*>(values.data()),
+               values.size() * sizeof(float));
+  bytes.append(static_cast<std::size_t>(extra_bytes), '\0');
+  bytes.resize(bytes.size() - static_cast<std::size_t>(drop_bytes));
+  std::ofstream f(p, std::ios::binary);
+  f.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+}
+
+/// The synthetic text with distinct, non-float-representable values in every
+/// slot, so that the float rounding is exercised.
+std::string RoundingText() {
+  std::ostringstream os;
+  os << "header\n";
+  for (int i = 0; i < 100; ++i) {
+    os.precision(17);
+    os << (0.1 * (i + 1) + 1.0e-9 * i) << (i % 4 == 3 ? '\n' : ' ');
+  }
+  return os.str();
+}
+
+/// Max over all two-body matrix elements of the difference between a and b
+/// (both on the e1max = 1 space).
+void ExpectSameTwoBody(const op::Operator& a, const op::Operator& b,
+                       const basis::ModelSpace& ms) {
+  const std::int32_t n = ms.basis().num_orbits();
+  for (std::int32_t i = 0; i < n; ++i) {
+    for (std::int32_t j = i; j < n; ++j) {
+      for (std::int32_t k = 0; k < n; ++k) {
+        for (std::int32_t l = k; l < n; ++l) {
+          for (int J = 0; J <= 2; ++J) {
+            const OrbitIndex p{i}, q{j}, r{k}, t{l};
+            EXPECT_EQ(a.two_body().get_normalized(p, q, r, t, TwoJ{2 * J}),
+                      b.two_body().get_normalized(p, q, r, t, TwoJ{2 * J}));
+          }
+        }
+      }
+    }
+  }
+}
+
+TEST(Me2jBinary, RoundTripEqualsFloatRoundedText) {
+  test_support::ScratchDir dir;
+  const auto ms = MakeModelSpace(1);
+  const std::string text = RoundingText();
+  // The text file with values pre-rounded to float: reading it as text gives
+  // static_cast<double>(static_cast<float>(value)) exactly, as does the .bin.
+  const fs::path txt = dir.path() / "a.me2j";
+  {
+    std::ofstream f(txt);
+    f << text;
+  }
+  const fs::path bin = dir.path() / "a.me2j.bin";
+  WriteBinary(bin, text, 0x41, 0, 0);
+  Me2jReadReport rep;
+  const op::Operator hb = ReadMe2j(bin, {.file = {1, 2, 1}}, ms, &rep);
+  EXPECT_EQ(rep.values_read, 100);
+  const op::Operator ht = ReadMe2j(txt, {.file = {1, 2, 1}}, ms);
+  ExpectSameTwoBody(hb, ht, *ms);
+  // Element check against static_cast<double>(static_cast<float>(text value)):
+  // the first record is (s s s s, J = 0) with values {v0, v1, v2, v3}; the pp
+  // element is v3 / sqrt2 / sqrt2 (identical pairs on both sides).
+  std::istringstream is(text);
+  std::string line;
+  std::getline(is, line);
+  double v[4];
+  is >> v[0] >> v[1] >> v[2] >> v[3];
+  const double pp = static_cast<double>(static_cast<float>(v[3]));
+  const OrbitIndex sp = Orbit(*ms, 0, 0, 1, -1);
+  EXPECT_NEAR(hb.two_body().get_normalized(sp, sp, sp, sp, TwoJ{0}), pp / 2.0,
+              1.0e-15);
+  // Whole-file mode on a smaller model space also works.
+  EXPECT_NO_THROW(ReadMe2j(bin, {.file = {1, 2, 1}, .read_whole_file = true},
+                           MakeModelSpace(0)));
+}
+
+TEST(Me2jBinary, PrefixReadOfABinaryFile) {
+  test_support::ScratchDir dir;
+  const fs::path bin = dir.path() / "p.me2j.bin";
+  WriteBinary(bin, RoundingText(), 0, 0, 0);
+  Me2jReadReport rep;
+  (void)ReadMe2j(bin, {.file = {1, 2, 1}}, MakeModelSpace(0), &rep);
+  EXPECT_EQ(rep.values_read, 8);
+}
+
+TEST(Me2jBinary, WrongFileSizeThrowsInputError) {
+  test_support::ScratchDir dir;
+  const auto ms = MakeModelSpace(1);
+  const std::string text = RoundingText();
+  struct Case {
+    const char* name;
+    int extra, drop;
+  };
+  for (const Case c : {Case{"short1", 0, 1}, Case{"long1", 1, 0},
+                       Case{"long4", 4, 0}, Case{"short4", 0, 4}}) {
+    const fs::path bin = dir.path() / (std::string(c.name) + ".me2j.bin");
+    WriteBinary(bin, text, 0, c.extra, c.drop);
+    EXPECT_THROW(ReadMe2j(bin, {.file = {1, 2, 1}}, ms), InputError) << c.name;
+  }
+  // A header-only file.
+  const fs::path hdr = dir.path() / "hdr.me2j.bin";
+  {
+    std::ofstream f(hdr, std::ios::binary);
+    f << std::string(255, 'x');
+  }
+  EXPECT_THROW(ReadMe2j(hdr, {.file = {1, 2, 1}}, ms), InputError);
+  // Missing file.
+  EXPECT_THROW(ReadMe2j(dir.path() / "none.me2j.bin", {.file = {1, 2, 1}}, ms),
+               InputError);
+}
+
+TEST(Me2jBinary, HeaderContentIsIgnored) {
+  test_support::ScratchDir dir;
+  const auto ms = MakeModelSpace(1);
+  const std::string text = RoundingText();
+  const fs::path zero = dir.path() / "zero.me2j.bin";
+  const fs::path junk = dir.path() / "junk.me2j.bin";
+  WriteBinary(zero, text, 0x00, 0, 0);
+  WriteBinary(junk, text, 0xFF, 0, 0);
+  const op::Operator a = ReadMe2j(zero, {.file = {1, 2, 1}}, ms);
+  const op::Operator b = ReadMe2j(junk, {.file = {1, 2, 1}}, ms);
+  ExpectSameTwoBody(a, b, *ms);
 }
 
 }  // namespace
