@@ -70,10 +70,10 @@ struct ThreeBodyContext::Impl {
   /// Team work items of `RowSet::Whole`, largest estimated work first
   /// (`BuildTileItems`): one per bra triple for the tiles T' <= T
   /// (`items_lower`) and for all tiles (`items_full`), `num_triples` each, as
-  /// flat `TileWorkItem` triples of int32;
+  /// `TileWorkItem`s;
   /// the first `triples_league` entries of `order_triples` are the bra
   /// triples with at least one triples tile (largest estimated work first).
-  exec::DeviceBuffer<std::int32_t> items_lower, items_full;  // 3 per item
+  exec::DeviceBuffer<detail::TileWorkItem> items_lower, items_full;
   exec::DeviceBuffer<std::int32_t> order_triples;
   std::int32_t num_triples = 0;     ///< Triples of the kept space.
   std::int32_t triples_league = 0;  ///< Bra triples with triples work.
