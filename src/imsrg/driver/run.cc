@@ -715,67 +715,41 @@ ChargeRadiusRecord MakeChargeRadiusRecord(
   return rr;
 }
 
-}  // namespace
-
-void Run(const RunConfig& config) {
-  const fs::path dir(config.output.directory);
-  WriteResolvedConfig(config, dir / "resolved_config.toml");
-  RejectPlanned(config);
-
-  const pipeline::PreparedHamiltonian ph = pipeline::PrepareHamiltonian(config);
-  if (config.run.task == Task::kHf) {
-    WriteResults(dir / "results.json", ph, {}, ph.e_reference, 0, 0, {}, "");
-    return;
-  }
-  const basis::ModelSpace& ms = ph.hno.model_space();
-
-  // ---- IMSRG flow: stage 1 with the core generator, stage 2 (valence) with a
-  // new Omega.
-  const StepConfig& step = config.imsrg.step;
+/// Builds the stage-1 solver engine: Magnus from the flow start, or the ODE
+/// solver evolving the `prepared` operators alongside H.
+Engine MakeEngine(const RunConfig& config,
+                  const pipeline::PreparedHamiltonian& ph,
+                  const FlowStart& start,
+                  const std::vector<op::Operator>& prepared,
+                  const commutator::CommutatorOptions& copts) {
   const flow::SolverOptions so = MakeSolverOptions(config);
-  const Generator core_gen = config.imsrg.generator.core;
-
-  const bool imsrg3 = config.imsrg3.in_flow;
-  FlowLog flow_log(config.output.flow_file.empty()
-                       ? dir / "flow.csv"
-                       : fs::path(config.output.flow_file),
-                   imsrg3);
-  // The ODE methods evolve the requested operators alongside H, so these are
-  // built first (imsrg++.cc:1074); Magnus replays its Omega stack afterwards.
-  const bool magnus = config.imsrg.method == Method::kMagnus;
-  // The charge radius (D35) needs Rso next to Rp2: an Rso that was not
-  // requested is evaluated internally as one more operator after the requested
-  // ones (flowing alongside H for the ODE methods); it gets no file and no
-  // `operators` entry.
-  std::vector<OperatorRequest> requests = config.operators.list;
-  const std::optional<ChargeRadiusSlots> radius_slots =
-      PlanChargeRadius(config, requests);
-  std::vector<op::Operator> prepared;
-  std::vector<OperatorRecord> ops;
-  if (!magnus) prepared = PrepareFlowingOperators(requests, ph, config, ops);
   const flow::BchOptions bch = MakeBchOptions(config);
-  const flow::GeneratorOptions core_opts =
-      MakeGeneratorOptions(config, core_gen, ms);
-  commutator::CommutatorOptions copts;
-  const FlowStart start = MakeFlowStart(config, ph, copts);
-  Engine solver =
-      magnus
-          ? Engine(flow::MagnusSolver(start.h_start, so, core_opts, bch, copts))
-          : Engine(flow::OdeSolver(config.imsrg.method == Method::kFlowRk4
-                                       ? flow::OdeMethod::kRk4
-                                       : flow::OdeMethod::kDopri5,
-                                   ph.hno, prepared, so, step.ode_tolerance,
-                                   core_opts));
-  flow_log.set_hamiltonian(
-      [&solver]() -> const op::Operator& { return solver.hamiltonian(); });
-  std::vector<StageRecord> stages;
+  const flow::GeneratorOptions core_opts = MakeGeneratorOptions(
+      config, config.imsrg.generator.core, ph.hno.model_space());
+  const bool magnus = config.imsrg.method == Method::kMagnus;
+  return magnus ? Engine(flow::MagnusSolver(start.h_start, so, core_opts, bch,
+                                            copts))
+                : Engine(flow::OdeSolver(config.imsrg.method == Method::kFlowRk4
+                                             ? flow::OdeMethod::kRk4
+                                             : flow::OdeMethod::kDopri5,
+                                         ph.hno, prepared, so,
+                                         config.imsrg.step.ode_tolerance,
+                                         core_opts));
+}
+
+/// Runs stage 1, the perturbative triples and the optional valence stage,
+/// appending the stage records and logging their summary.
+void RunStages(Engine& solver, FlowLog& flow_log, const RunConfig& config,
+               const basis::ModelSpace& ms, bool magnus,
+               std::vector<StageRecord>& stages,
+               std::optional<TriplesRecord>& triples) {
+  const Generator core_gen = config.imsrg.generator.core;
   log::Info("Setting generator to {}", ToString(core_gen));
   stages.push_back(
       {1, std::string(ToString(core_gen)), solver.Solve(std::ref(flow_log))});
 
   // ---- Perturbative triples after stage 1 (imsrg++.cc:1100-1108, before the
   // second stage; H(s) and the Omega stack are those of stage 1).
-  std::optional<TriplesRecord> triples;
   if (config.imsrg.perturbative_triples && magnus &&
       stages.back().result.reason != flow::StopReason::kDiverged) {
     triples = EvaluatePerturbativeTriples(solver, config);
@@ -794,6 +768,19 @@ void Run(const RunConfig& config) {
         st.stage, st.generator, st.result.steps, st.result.num_gathers,
         st.result.s, st.result.e0, StopName(st.result.reason));
   }
+}
+
+/// Writes the final valence file and the transformed operators, then
+/// results.json; throws NumericalError after writing if the flow diverged.
+void FinishRun(const RunConfig& config, const pipeline::PreparedHamiltonian& ph,
+               Engine& solver, const FlowStart& start, bool magnus,
+               const std::vector<OperatorRequest>& requests,
+               const std::optional<ChargeRadiusSlots>& radius_slots,
+               const std::vector<StageRecord>& stages,
+               const std::optional<TriplesRecord>& triples,
+               std::vector<OperatorRecord>& ops) {
+  const fs::path dir(config.output.directory);
+  const basis::ModelSpace& ms = ph.hno.model_space();
   const bool diverged =
       stages.back().result.reason == flow::StopReason::kDiverged;
 
@@ -834,6 +821,51 @@ void Run(const RunConfig& config) {
     throw NumericalError(
         "the IMSRG flow diverged (see the flow log); results.json was written");
   }
+}
+
+}  // namespace
+
+void Run(const RunConfig& config) {
+  const fs::path dir(config.output.directory);
+  WriteResolvedConfig(config, dir / "resolved_config.toml");
+  RejectPlanned(config);
+
+  const pipeline::PreparedHamiltonian ph = pipeline::PrepareHamiltonian(config);
+  if (config.run.task == Task::kHf) {
+    WriteResults(dir / "results.json", ph, {}, ph.e_reference, 0, 0, {}, "");
+    return;
+  }
+  const basis::ModelSpace& ms = ph.hno.model_space();
+
+  // ---- IMSRG flow: stage 1 with the core generator, stage 2 (valence) with a
+  // new Omega.
+  FlowLog flow_log(config.output.flow_file.empty()
+                       ? dir / "flow.csv"
+                       : fs::path(config.output.flow_file),
+                   config.imsrg3.in_flow);
+  // The ODE methods evolve the requested operators alongside H, so these are
+  // built first (imsrg++.cc:1074); Magnus replays its Omega stack afterwards.
+  const bool magnus = config.imsrg.method == Method::kMagnus;
+  // The charge radius (D35) needs Rso next to Rp2: an Rso that was not
+  // requested is evaluated internally as one more operator after the requested
+  // ones (flowing alongside H for the ODE methods); it gets no file and no
+  // `operators` entry.
+  std::vector<OperatorRequest> requests = config.operators.list;
+  const std::optional<ChargeRadiusSlots> radius_slots =
+      PlanChargeRadius(config, requests);
+  std::vector<op::Operator> prepared;
+  std::vector<OperatorRecord> ops;
+  if (!magnus) prepared = PrepareFlowingOperators(requests, ph, config, ops);
+  commutator::CommutatorOptions copts;
+  const FlowStart start = MakeFlowStart(config, ph, copts);
+  Engine solver = MakeEngine(config, ph, start, prepared, copts);
+  flow_log.set_hamiltonian(
+      [&solver]() -> const op::Operator& { return solver.hamiltonian(); });
+  std::vector<StageRecord> stages;
+  std::optional<TriplesRecord> triples;
+  RunStages(solver, flow_log, config, ms, magnus, stages, triples);
+  FinishRun(config, ph, solver, start, magnus, requests, radius_slots, stages,
+            triples, ops);
 }
 
 }  // namespace imsrg::driver

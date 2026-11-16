@@ -75,6 +75,7 @@ class Checker {
   void Files();
   void HamiltonianBasis();
   void ImsrgRules();
+  void ImsrgStageRules();
   void DeltaOrbitRule();
   void ImsrgSpaceRules();
   void Imsrg3Rules();
@@ -373,7 +374,9 @@ void Checker::HamiltonianBasis() {
   }
 }
 
-void Checker::ImsrgRules() {
+/// V-40 to V-42: the stage count and the core generator against the valence
+/// space.
+void Checker::ImsrgStageRules() {
   const auto& im = cfg_.imsrg;
   const bool has_val = cfg_.valence.has_valence_space();
   if (im.steps == 2 && !has_val) {
@@ -398,6 +401,11 @@ void Checker::ImsrgRules() {
                std::string(ToString(im.generator.core)) +
                "\" is a shell-model generator and needs a valence space");
   }
+}
+
+void Checker::ImsrgRules() {
+  const auto& im = cfg_.imsrg;
+  ImsrgStageRules();
   if (im.denominator.delta != 0 && !im.denominator.delta_orbit) {
     Strict("V-43", "imsrg.denominator.delta_orbit",
            "imsrg.denominator.delta is nonzero but "

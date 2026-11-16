@@ -391,6 +391,47 @@ void DeriveOutputNames(const RawTree& tree, RunConfig& cfg,
   }
 }
 
+/// Derives the Hamiltonian defaults (beta_cm_hw, kinetic energy kind).
+void DeriveHamiltonianDefaults(const RawTree& tree, RunConfig& cfg) {
+  auto& tb = cfg.interaction.two_body;
+  if (!tree.contains("hamiltonian.beta_cm_hw"))
+    cfg.hamiltonian.beta_cm_hw = cfg.basis.hw;
+
+  if (!tree.contains("hamiltonian.kinetic")) {
+    if (tb.format == TwoBodyFormat::kNushellx) {
+      cfg.hamiltonian.kinetic = KineticEnergy::kNone;
+    } else if (cfg.hamiltonian.trap_hw) {
+      cfg.hamiltonian.kinetic = KineticEnergy::kLab;
+    } else {
+      cfg.hamiltonian.kinetic = KineticEnergy::kIntrinsic;
+    }
+  }
+}
+
+/// Derives the IMSRG defaults (IMSRG(3f2) recipe, number of steps, flow
+/// space cuts).
+void DeriveImsrgDefaults(const RawTree& tree, RunConfig& cfg) {
+  // IMSRG(3f2) recipe (owner decision D32): factorized = true implies
+  // hunter-gatherer and omega_norm_max = 0.1 unless given explicitly.
+  if (cfg.imsrg3.factorized) {
+    if (!tree.contains("imsrg.omega.hunter_gatherer"))
+      cfg.imsrg.omega.hunter_gatherer = true;
+    if (!tree.contains("imsrg.step.omega_norm_max"))
+      cfg.imsrg.step.omega_norm_max = 0.1;
+  }
+
+  if (!tree.contains("imsrg.steps"))
+    cfg.imsrg.steps = cfg.valence.has_valence_space() ? 2 : 1;
+
+  if (auto& sp = cfg.imsrg.space) {
+    if (!tree.contains("imsrg.space.emax")) sp->emax = cfg.basis.emax;
+    if (!tree.contains("imsrg.space.e2max")) sp->e2max = 2 * sp->emax;
+    if (!tree.contains("imsrg.space.e3max"))
+      sp->e3max = std::min(cfg.basis.e3max, 3 * sp->emax);
+    if (!tree.contains("imsrg.space.emax_3body")) sp->emax_3body = sp->emax;
+  }
+}
+
 /// Derived values (design/16 section 2). Never throws and never assumes reading
 /// succeeded.
 void Derive(const RawTree& tree, const ResolveOptions& options, RunConfig& cfg,
@@ -429,38 +470,8 @@ void Derive(const RawTree& tree, const ResolveOptions& options, RunConfig& cfg,
   if (options.legacy && !tree.contains("hartree_fock.mixing"))
     cfg.hartree_fock.mixing = HartreeFockMixing::kLinear;
 
-  if (!tree.contains("hamiltonian.beta_cm_hw"))
-    cfg.hamiltonian.beta_cm_hw = cfg.basis.hw;
-
-  if (!tree.contains("hamiltonian.kinetic")) {
-    if (tb.format == TwoBodyFormat::kNushellx) {
-      cfg.hamiltonian.kinetic = KineticEnergy::kNone;
-    } else if (cfg.hamiltonian.trap_hw) {
-      cfg.hamiltonian.kinetic = KineticEnergy::kLab;
-    } else {
-      cfg.hamiltonian.kinetic = KineticEnergy::kIntrinsic;
-    }
-  }
-
-  // IMSRG(3f2) recipe (owner decision D32): factorized = true implies
-  // hunter-gatherer and omega_norm_max = 0.1 unless given explicitly.
-  if (cfg.imsrg3.factorized) {
-    if (!tree.contains("imsrg.omega.hunter_gatherer"))
-      cfg.imsrg.omega.hunter_gatherer = true;
-    if (!tree.contains("imsrg.step.omega_norm_max"))
-      cfg.imsrg.step.omega_norm_max = 0.1;
-  }
-
-  if (!tree.contains("imsrg.steps"))
-    cfg.imsrg.steps = cfg.valence.has_valence_space() ? 2 : 1;
-
-  if (auto& sp = cfg.imsrg.space) {
-    if (!tree.contains("imsrg.space.emax")) sp->emax = cfg.basis.emax;
-    if (!tree.contains("imsrg.space.e2max")) sp->e2max = 2 * sp->emax;
-    if (!tree.contains("imsrg.space.e3max"))
-      sp->e3max = std::min(cfg.basis.e3max, 3 * sp->emax);
-    if (!tree.contains("imsrg.space.emax_3body")) sp->emax_3body = sp->emax;
-  }
+  DeriveHamiltonianDefaults(tree, cfg);
+  DeriveImsrgDefaults(tree, cfg);
 
   DeriveOutputNames(tree, cfg, core);
 
