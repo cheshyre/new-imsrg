@@ -399,7 +399,7 @@ void RunTriples(const Options& o) {
               c.rows, c.rows_before_cuts, c.states);
   std::printf("context_bytes %" PRId64
               " context_GB %.3f scratch_per_team %" PRId64 "\n",
-              ctx.TableBytes(), ctx.TableBytes() / 1.0e9,
+              ctx.TableBytes(), static_cast<double>(ctx.TableBytes()) / 1.0e9,
               ctx.ScratchBytesPerTeam());
   const auto t2 = Clock::now();
   const cm::TriplesWork work = ctx.TileWork();
