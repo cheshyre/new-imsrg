@@ -22,3 +22,17 @@ imsrg_add_test(NAME smoke_mpi_hello
   LABELS mpi
   NO_GTEST_MAIN
   TIMEOUT 120)
+
+# Environment::Abort (M12b D4): rank 1 aborts while rank 0 waits in a barrier. The job must end at
+# once with a non-zero status (WILL_FAIL); a hang would hit the timeout, which also fails the test
+# run (the timeout is short, so a hang is reported rather than waited out).
+imsrg_add_test(NAME smoke_mpi_abort
+  SOURCES mpi_abort_test.cc
+  DEPS comm
+  MPI_RANKS 2
+  LABELS mpi
+  NO_GTEST_MAIN
+  TIMEOUT 60)
+if(TARGET smoke_mpi_abort)
+  set_tests_properties(smoke_mpi_abort PROPERTIES WILL_FAIL TRUE)
+endif()

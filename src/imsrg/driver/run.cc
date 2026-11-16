@@ -26,11 +26,13 @@
 #include "imsrg/basis/orbit.h"
 #include "imsrg/basis/three_body_channels.h"
 #include "imsrg/basis/three_body_space.h"
+#include "imsrg/comm/communicator.h"
 #include "imsrg/commutator/options.h"
 #include "imsrg/driver/config/writer.h"
 #include "imsrg/driver/operators/operator_request.h"
 #include "imsrg/driver/pipeline/charge_radius.h"
 #include "imsrg/driver/pipeline/hamiltonian.h"
+#include "imsrg/driver/pipeline/mpi_sync.h"
 #include "imsrg/flow/magnus.h"
 #include "imsrg/flow/ode.h"
 #include "imsrg/flow/triples.h"
@@ -218,20 +220,30 @@ const char* StopName(flow::StopReason r) {
 class FlowLog {
  public:
   /// `three_body`: add the columns norm_eta_3b and norm_omega_3b (IMSRG(3)).
-  FlowLog(const fs::path& path, bool three_body) : three_body_(three_body) {
-    if (path.has_parent_path()) fs::create_directories(path.parent_path());
-    out_.open(path);
-    if (!out_)
-      throw InputError("cannot write the flow file '" + path.string() + "'");
+  /// `write_file`: false on the ranks that write no files (every rank but rank
+  /// 0): they open nothing but still evaluate every value of a step, so that
+  /// collective evaluations stay matched across the ranks.
+  FlowLog(const fs::path& path, bool three_body, bool write_file)
+      : three_body_(three_body), write_file_(write_file) {
+    if (write_file_) {
+      if (path.has_parent_path()) fs::create_directories(path.parent_path());
+      out_.open(path);
+      if (!out_) {
+        throw InputError("cannot write the flow file '" + path.string() + "'");
+      }
+      WriteHeader();
+    }
+    log::Info(
+        "{:>5} {:>5} {:>12} {:>18} {:>14} {:>14} {:>14} {:>14} {:>4} {:>10}",
+        "stage", "step", "s", "E0", "|eta_1b|", "|eta_2b|", "|Omega_1b|",
+        "|Omega_2b|", "nOm", "wall(s)");
+  }
+  void WriteHeader() {
     out_ << "stage,istep,s,ds,E0,norm_H,norm_eta_1b,norm_eta_2b,"
          << (three_body_ ? "norm_eta_3b," : "")
          << "norm_eta,norm_omega_1b,norm_omega_2b,"
          << (three_body_ ? "norm_omega_3b," : "")
          << "norm_omega,num_omegas,E_MP2,wall_s\n";
-    log::Info(
-        "{:>5} {:>5} {:>12} {:>18} {:>14} {:>14} {:>14} {:>14} {:>4} {:>10}",
-        "stage", "step", "s", "E0", "|eta_1b|", "|eta_2b|", "|Omega_1b|",
-        "|Omega_2b|", "nOm", "wall(s)");
   }
   /// Gives the current Hamiltonian that the `E_MP2` column evaluates.
   void set_hamiltonian(std::function<const op::Operator&()> current) {
@@ -247,6 +259,17 @@ class FlowLog {
       op::Operator h = current_h_();
       e_mp2 = mbpt::Mp2Energy(h);
     }
+    if (write_file_) WriteRow(st, e_mp2);
+    log::Info(
+        "{:>5} {:>5} {:>12.5f} {:>18.9f} {:>14.9f} {:>14.9f} {:>14.9f} "
+        "{:>14.9f} {:>4} "
+        "{:>10.3f}",
+        st.stage, st.istep, st.s, st.e0, st.norm_eta_1b, st.norm_eta_2b,
+        st.norm_omega_1b, st.norm_omega_2b, st.num_omegas, st.wall_seconds);
+  }
+
+ private:
+  void WriteRow(const flow::FlowStatus& st, double e_mp2) {
     out_ << st.stage << ',' << st.istep << ',' << Fmt17(st.s) << ','
          << Fmt17(st.ds) << ',' << Fmt17(st.e0) << ',' << Fmt17(st.norm_h)
          << ',' << Fmt17(st.norm_eta_1b) << ',' << Fmt17(st.norm_eta_2b) << ',';
@@ -257,16 +280,10 @@ class FlowLog {
     out_ << Fmt17(st.norm_omega) << ',' << st.num_omegas << ',' << Fmt17(e_mp2)
          << ',' << Fmt17(st.wall_seconds) << '\n';
     out_.flush();
-    log::Info(
-        "{:>5} {:>5} {:>12.5f} {:>18.9f} {:>14.9f} {:>14.9f} {:>14.9f} "
-        "{:>14.9f} {:>4} "
-        "{:>10.3f}",
-        st.stage, st.istep, st.s, st.e0, st.norm_eta_1b, st.norm_eta_2b,
-        st.norm_omega_1b, st.norm_omega_2b, st.num_omegas, st.wall_seconds);
   }
 
- private:
   bool three_body_ = false;
+  bool write_file_ = true;
   std::ofstream out_;
   std::function<const op::Operator&()> current_h_;
 };
@@ -437,10 +454,14 @@ io::TokyoWriteOptions TokyoOptions(const RunConfig& c,
   return o;
 }
 
+/// Writes `O` as a valence-space file; only rank 0 writes (the device-to-host
+/// sync, a possible collective of later phases, runs on every rank first).
 void WriteValenceFile(const fs::path& path, op::Operator O, const RunConfig& c,
                       const pipeline::PreparedHamiltonian& ph,
-                      io::ValenceWriteMode mode) {
+                      io::ValenceWriteMode mode,
+                      const comm::Communicator& comm) {
   O.SyncToHost();
+  if (!comm.is_root()) return;
   const io::ValenceWriteOptions o = TokyoOptions(c, ph, mode);
   if (c.output.valence_file_format == ValenceFileFormat::kNushellx) {
     fs::path base = path;
@@ -611,10 +632,11 @@ FlowStart MakeFlowStart(const RunConfig& config,
 std::vector<op::Operator> PrepareFlowingOperators(
     const std::vector<OperatorRequest>& requests,
     const pipeline::PreparedHamiltonian& ph, const RunConfig& config,
-    std::vector<OperatorRecord>& ops) {
+    const comm::Communicator& comm, std::vector<OperatorRecord>& ops) {
   std::vector<op::Operator> prepared;
   for (const OperatorRequest& req : requests) {
     prepared.push_back(pipeline::PrepareOperator(req, ph, config));
+    pipeline::BroadcastOperator(prepared.back(), comm);
     OperatorRecord rec;
     rec.name = req.canonical_name;
     rec.reference = prepared.back().zero_body();
@@ -662,13 +684,16 @@ void RunValenceStage(Engine& solver, FlowLog& flow_log, const RunConfig& config,
 }
 
 /// Transforms the requested operators to the end of the flow, writes their
-/// valence files and fills the IMSRG values of `ops`.
+/// valence files (rank 0 only) and fills the IMSRG values of `ops` (on every
+/// rank). For Magnus the HF-basis operators are built on every rank and then
+/// broadcast from rank 0, so that all ranks replay the Omegas on identical
+/// bits.
 void TransformOperators(const std::vector<OperatorRequest>& requests,
                         const pipeline::PreparedHamiltonian& ph,
                         const RunConfig& config, Engine& solver, bool magnus,
                         const std::shared_ptr<const basis::ModelSpace>& ms_flow,
                         bool renormal, const fs::path& dir,
-                        const std::string& stem,
+                        const std::string& stem, const comm::Communicator& comm,
                         std::vector<OperatorRecord>& ops) {
   const bool imsrg3 = config.imsrg3.in_flow;
   for (std::size_t i = 0; i < requests.size(); ++i) {
@@ -676,6 +701,7 @@ void TransformOperators(const std::vector<OperatorRequest>& requests,
     op::Operator hf;
     if (magnus) {
       hf = pipeline::PrepareOperator(req, ph, config);
+      pipeline::BroadcastOperator(hf, comm);
       OperatorRecord rec;
       rec.name = req.canonical_name;
       rec.reference = hf.zero_body();
@@ -691,7 +717,7 @@ void TransformOperators(const std::vector<OperatorRequest>& requests,
     if (i >= config.operators.list.size()) continue;  // internal Rso
     rec.file = (dir / (stem + "_" + rec.name + ".snt")).string();
     WriteValenceFile(rec.file, O, config, ph,
-                     io::ValenceWriteMode::kIsospinAveragedOperator);
+                     io::ValenceWriteMode::kIsospinAveragedOperator, comm);
   }
 }
 
@@ -721,20 +747,22 @@ Engine MakeEngine(const RunConfig& config,
                   const pipeline::PreparedHamiltonian& ph,
                   const FlowStart& start,
                   const std::vector<op::Operator>& prepared,
-                  const commutator::CommutatorOptions& copts) {
+                  const commutator::CommutatorOptions& copts,
+                  const comm::Communicator& comm) {
   const flow::SolverOptions so = MakeSolverOptions(config);
   const flow::BchOptions bch = MakeBchOptions(config);
   const flow::GeneratorOptions core_opts = MakeGeneratorOptions(
       config, config.imsrg.generator.core, ph.hno.model_space());
   const bool magnus = config.imsrg.method == Method::kMagnus;
+  const commutator::WorkspaceOptions wopts{.comm = comm};
   return magnus ? Engine(flow::MagnusSolver(start.h_start, so, core_opts, bch,
-                                            copts))
-                : Engine(flow::OdeSolver(config.imsrg.method == Method::kFlowRk4
-                                             ? flow::OdeMethod::kRk4
-                                             : flow::OdeMethod::kDopri5,
-                                         ph.hno, prepared, so,
-                                         config.imsrg.step.ode_tolerance,
-                                         core_opts));
+                                            copts, wopts))
+                : Engine(flow::OdeSolver(
+                      config.imsrg.method == Method::kFlowRk4
+                          ? flow::OdeMethod::kRk4
+                          : flow::OdeMethod::kDopri5,
+                      ph.hno, prepared, so, config.imsrg.step.ode_tolerance,
+                      core_opts, commutator::CommutatorOptions{}, wopts));
 }
 
 /// Runs stage 1, the perturbative triples and the optional valence stage,
@@ -778,7 +806,13 @@ void FinishRun(const RunConfig& config, const pipeline::PreparedHamiltonian& ph,
                const std::optional<ChargeRadiusSlots>& radius_slots,
                const std::vector<StageRecord>& stages,
                const std::optional<TriplesRecord>& triples,
+               const comm::Communicator& comm,
                std::vector<OperatorRecord>& ops) {
+  // Output stage rule (review note M4): every value that is printed or written
+  // is computed on ALL ranks, before any is_root() branch; only the file
+  // writes are root-only. Never compute (norms, expectation values,
+  // transformations) inside a root-only branch: in phase 2 op::Norm and the
+  // gathers become collectives that every rank must call.
   const fs::path dir(config.output.directory);
   const basis::ModelSpace& ms = ph.hno.model_space();
   const bool diverged =
@@ -804,19 +838,21 @@ void FinishRun(const RunConfig& config, const pipeline::PreparedHamiltonian& ph,
   if (config.valence.has_valence_space()) {
     valence_file = (dir / (stem + ".snt")).string();
     WriteValenceFile(valence_file, h_final, config, ph,
-                     io::ValenceWriteMode::kHamiltonian);
+                     io::ValenceWriteMode::kHamiltonian, comm);
   }
 
   // ---- Operators: HF-basis, normal-ordered operators transformed with the
   // Omega stack.
   TransformOperators(requests, ph, config, solver, magnus, start.ms_flow,
-                     renormal, dir, stem, ops);
+                     renormal, dir, stem, comm, ops);
   std::optional<ChargeRadiusRecord> radius;
   if (radius_slots) radius = MakeChargeRadiusRecord(ops, *radius_slots, ph);
   ops.resize(config.operators.list.size());  // drop the internal Rso
 
-  WriteResults(dir / "results.json", ph, stages, e0, solver.num_omegas(),
-               solver.num_gathers(), ops, valence_file, triples, radius);
+  if (comm.is_root()) {
+    WriteResults(dir / "results.json", ph, stages, e0, solver.num_omegas(),
+                 solver.num_gathers(), ops, valence_file, triples, radius);
+  }
   if (diverged) {
     throw NumericalError(
         "the IMSRG flow diverged (see the flow log); results.json was written");
@@ -825,14 +861,24 @@ void FinishRun(const RunConfig& config, const pipeline::PreparedHamiltonian& ph,
 
 }  // namespace
 
-void Run(const RunConfig& config) {
+void Run(const RunConfig& config, const comm::Communicator& comm) {
+  // Only rank 0 prints (Logger default) and writes files; every rank runs the
+  // whole pipeline on replicated data.
+  log::DefaultLogger().set_rank(comm.rank());
   const fs::path dir(config.output.directory);
-  WriteResolvedConfig(config, dir / "resolved_config.toml");
+  if (comm.is_root()) WriteResolvedConfig(config, dir / "resolved_config.toml");
   RejectPlanned(config);
 
-  const pipeline::PreparedHamiltonian ph = pipeline::PrepareHamiltonian(config);
+  pipeline::PreparedHamiltonian ph = pipeline::PrepareHamiltonian(config);
+  // HF and the normal ordering use parallel reductions: the ranks agree only
+  // to rounding, so all start the flow from the bits of rank 0. Nothing in the
+  // driver derives the model space from NAT occupations yet
+  // (imsrg3.occ_nat3_cut is E-PLANNED); when it does, broadcast it here too.
+  pipeline::BroadcastOperator(ph.hno, comm);
   if (config.run.task == Task::kHf) {
-    WriteResults(dir / "results.json", ph, {}, ph.e_reference, 0, 0, {}, "");
+    if (comm.is_root()) {
+      WriteResults(dir / "results.json", ph, {}, ph.e_reference, 0, 0, {}, "");
+    }
     return;
   }
   const basis::ModelSpace& ms = ph.hno.model_space();
@@ -842,7 +888,7 @@ void Run(const RunConfig& config) {
   FlowLog flow_log(config.output.flow_file.empty()
                        ? dir / "flow.csv"
                        : fs::path(config.output.flow_file),
-                   config.imsrg3.in_flow);
+                   config.imsrg3.in_flow, comm.is_root());
   // The ODE methods evolve the requested operators alongside H, so these are
   // built first (imsrg++.cc:1074); Magnus replays its Omega stack afterwards.
   const bool magnus = config.imsrg.method == Method::kMagnus;
@@ -855,17 +901,19 @@ void Run(const RunConfig& config) {
       PlanChargeRadius(config, requests);
   std::vector<op::Operator> prepared;
   std::vector<OperatorRecord> ops;
-  if (!magnus) prepared = PrepareFlowingOperators(requests, ph, config, ops);
+  if (!magnus) {
+    prepared = PrepareFlowingOperators(requests, ph, config, comm, ops);
+  }
   commutator::CommutatorOptions copts;
   const FlowStart start = MakeFlowStart(config, ph, copts);
-  Engine solver = MakeEngine(config, ph, start, prepared, copts);
+  Engine solver = MakeEngine(config, ph, start, prepared, copts, comm);
   flow_log.set_hamiltonian(
       [&solver]() -> const op::Operator& { return solver.hamiltonian(); });
   std::vector<StageRecord> stages;
   std::optional<TriplesRecord> triples;
   RunStages(solver, flow_log, config, ms, magnus, stages, triples);
   FinishRun(config, ph, solver, start, magnus, requests, radius_slots, stages,
-            triples, ops);
+            triples, comm, ops);
 }
 
 }  // namespace imsrg::driver

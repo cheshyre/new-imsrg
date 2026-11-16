@@ -42,6 +42,13 @@ class Environment {
   static bool MpiEnabled() noexcept;
   /// True if MPI is initialized and not finalized (always false without MPI).
   static bool IsInitialized() noexcept;
+  /// Terminates the whole job at once with `exit_code`: MPI_Abort on
+  /// MPI_COMM_WORLD when MPI is initialized and not finalized, else
+  /// `std::_Exit(exit_code)` (no destructors, no atexit handlers). Only `main`
+  /// may call this (from its exception handlers, so that a failure on one rank
+  /// cannot leave the others blocked in a collective); library code never
+  /// exits. Does not return.
+  [[noreturn]] static void Abort(int exit_code) noexcept;
   /// The provided thread level (MPI_THREAD_* value); 0 without MPI.
   int thread_level() const noexcept { return thread_level_; }
 

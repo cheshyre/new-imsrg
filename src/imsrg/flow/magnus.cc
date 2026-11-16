@@ -112,7 +112,8 @@ void MagnusSolver::set_solver_options(const SolverOptions& solver) {
 MagnusSolver::MagnusSolver(op::Operator H0, const SolverOptions& solver,
                            const GeneratorOptions& generator,
                            const BchOptions& bch,
-                           const commutator::CommutatorOptions& comm)
+                           const commutator::CommutatorOptions& comm,
+                           const commutator::WorkspaceOptions& workspace)
     : solver_(solver),
       generator_(generator),
       bch_(bch),
@@ -140,7 +141,8 @@ MagnusSolver::MagnusSolver(op::Operator H0, const SolverOptions& solver,
         "MagnusSolver: a particle-rank-3 H0 needs IMSRG(3) commutator terms");
   }
   const std::int32_t rank = h0_.spec().particle_rank;
-  ws_ = std::make_unique<commutator::Workspace>(h0_.model_space_ptr());
+  ws_ =
+      std::make_unique<commutator::Workspace>(h0_.model_space_ptr(), workspace);
   h_ = h0_;
   eta_ = op::Operator(h0_.model_space_ptr(),
                       GeneratorSpec(h0_.spec(), generator_.kind));

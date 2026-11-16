@@ -5,6 +5,8 @@
 #                  [DEPS <module>...]           # imsrg modules, e.g. base exec
 #                  [LIBS <target>...]           # other targets, e.g. Kokkos::kokkos MPI::MPI_CXX
 #                  [MPI_RANKS <n>]              # run under mpiexec -n <n> (adds the mpi label)
+#                  [THREADS <t>]                # OpenMP threads per rank (MPI_RANKS only; default
+#                                               # max(1, 8 / ranks)); PROCESSORS = ranks * t
 #                  [NO_GTEST_MAIN]              # the test provides main() (Kokkos/MPI init)
 #                  [TIMEOUT <seconds>]          # default 300
 #                  [ARGS <arg>...])             # extra command-line arguments for the test
@@ -12,7 +14,8 @@
 # Without MPI_RANKS, each GoogleTest case becomes its own CTest test named <name>.<Suite>.<Case>
 # (gtest_discover_tests, discovered when ctest runs, so nothing executes at build time). With
 # MPI_RANKS, the whole executable is one CTest test run under mpiexec; it is skipped (not defined)
-# when IMSRG_ENABLE_MPI is OFF. Select tests with `ctest -L <label>`.
+# when IMSRG_ENABLE_MPI is OFF. An MPI test runs with OMP_NUM_THREADS=<t> and OMP_PROC_BIND=false
+# (the launcher flags in IMSRG_MPIEXEC_PREFLAGS keep Open MPI from binding each rank to one core). Select tests with `ctest -L <label>`.
 
 include_guard(GLOBAL)
 include(GoogleTest)
@@ -20,7 +23,7 @@ include(GoogleTest)
 set(IMSRG_TEST_LABELS unit integration mpi slow reference)
 
 function(imsrg_add_test)
-  cmake_parse_arguments(PARSE_ARGV 0 ARG "NO_GTEST_MAIN" "NAME;MPI_RANKS;TIMEOUT"
+  cmake_parse_arguments(PARSE_ARGV 0 ARG "NO_GTEST_MAIN" "NAME;MPI_RANKS;THREADS;TIMEOUT"
                         "SOURCES;LABELS;DEPS;LIBS;ARGS")
   if(ARG_UNPARSED_ARGUMENTS)
     message(FATAL_ERROR "imsrg_add_test: unexpected arguments '${ARG_UNPARSED_ARGUMENTS}'")
@@ -43,6 +46,20 @@ function(imsrg_add_test)
   if(ARG_MPI_RANKS AND NOT IMSRG_ENABLE_MPI)
     message(STATUS "imsrg: skipping MPI test ${ARG_NAME} (IMSRG_ENABLE_MPI=OFF)")
     return()
+  endif()
+  if(ARG_THREADS AND NOT ARG_MPI_RANKS)
+    message(FATAL_ERROR "imsrg_add_test(${ARG_NAME}): THREADS needs MPI_RANKS")
+  endif()
+  if(ARG_MPI_RANKS)
+    if(ARG_THREADS)
+      set(_threads ${ARG_THREADS})
+    else()
+      math(EXPR _threads "8 / ${ARG_MPI_RANKS}")
+      if(_threads LESS 1)
+        set(_threads 1)
+      endif()
+    endif()
+    math(EXPR _processors "${ARG_MPI_RANKS} * ${_threads}")
   endif()
   if(NOT ARG_TIMEOUT)
     set(ARG_TIMEOUT 300)
@@ -70,7 +87,8 @@ function(imsrg_add_test)
                      ${MPIEXEC_PREFLAGS} ${_extra} $<TARGET_FILE:${ARG_NAME}>
                      ${MPIEXEC_POSTFLAGS} ${ARG_ARGS})
     set_tests_properties(${ARG_NAME} PROPERTIES
-      LABELS "${_labels}" PROCESSORS ${ARG_MPI_RANKS} TIMEOUT ${ARG_TIMEOUT})
+      LABELS "${_labels}" PROCESSORS ${_processors} TIMEOUT ${ARG_TIMEOUT}
+      ENVIRONMENT "OMP_NUM_THREADS=${_threads};OMP_PROC_BIND=false")
   else()
     gtest_discover_tests(${ARG_NAME}
       TEST_PREFIX "${ARG_NAME}."

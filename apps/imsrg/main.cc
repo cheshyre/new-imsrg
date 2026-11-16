@@ -7,12 +7,14 @@
 #include <exception>
 #include <filesystem>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <vector>
 
 #include <CLI/CLI.hpp>
 
 #include "imsrg/base/error.h"
+#include "imsrg/comm/communicator.h"
 #include "imsrg/comm/environment.h"
 #include "imsrg/driver/config/load_config.h"
 #include "imsrg/driver/config/writer.h"
@@ -66,24 +68,39 @@ int ReportLoadFailure(const imsrg::driver::ConfigIssues& issues) {
   return all_input ? 3 : 2;
 }
 
+/// Reports a failure of the pipeline and returns the exit code `code`. On more
+/// than one rank the message carries the rank prefix and the whole job is
+/// aborted at once (`Environment::Abort`; only `main` may do that), so a
+/// failure on one rank cannot leave the others blocked in a collective.
+int Fail(const imsrg::comm::Communicator& world, int code, const char* what) {
+  if (world.size() > 1) {
+    std::cerr << "imsrg[rank " << world.rank() << "]: " << what << "\n";
+    std::cerr.flush();
+    imsrg::comm::Environment::Abort(code);
+  }
+  std::cerr << "imsrg: " << what << "\n";
+  return code;
+}
+
 /// Runs the pipeline for `config` and returns the exit code (0 ok, 1 runtime
-/// failure, 2 configuration error, 3 input file error).
+/// failure, 2 configuration error, 3 input file error). With several MPI ranks
+/// a failure on any rank aborts the job (see `Fail`).
 int RunPipeline(int argc, char** argv, const imsrg::driver::RunConfig& config) {
+  // MPI first, Kokkos second (design/10 section 4). The Environment outlives
+  // the handlers, so that MPI is still initialized when they abort the job.
+  std::unique_ptr<imsrg::comm::Environment> environment;
+  imsrg::comm::Communicator world;
   try {
-    // MPI first, Kokkos second (design/10 section 4); both live only around the
-    // pipeline, which destroys all operators before they finalize.
-    imsrg::comm::Environment environment(argc, argv);
+    environment = std::make_unique<imsrg::comm::Environment>(argc, argv);
+    world = environment->world();
     imsrg::exec::Runtime runtime(argc, argv);
-    imsrg::driver::Run(config);
+    imsrg::driver::Run(config, world);
   } catch (const imsrg::ConfigError& e) {
-    std::cerr << "imsrg: " << e.what() << "\n";
-    return 2;
+    return Fail(world, 2, e.what());
   } catch (const imsrg::InputError& e) {
-    std::cerr << "imsrg: " << e.what() << "\n";
-    return 3;
+    return Fail(world, 3, e.what());
   } catch (const std::exception& e) {
-    std::cerr << "imsrg: " << e.what() << "\n";
-    return 1;
+    return Fail(world, 1, e.what());
   }
   return 0;
 }
