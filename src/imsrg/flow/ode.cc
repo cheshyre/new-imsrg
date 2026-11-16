@@ -139,6 +139,22 @@ void DopriTrialStep(RhsFn&& rhs, const State& x, double t, double dt,
                    {dt * kDc7, &w.dxdt_new}});
 }
 
+/// Shrinks `dt` after a rejected step with scaled error `err` > 1
+/// (odeint default_step_adjuster::decrease_step, error order 4).
+void DecreaseStep(double& dt, double err) {
+  dt *= std::max(0.9 * std::pow(err, -1.0 / 3.0), 1.0 / 5.0);
+}
+
+/// Grows `dt` after an accepted step with scaled error `err` (odeint
+/// default_step_adjuster::increase_step, stepper order 5); unchanged for
+/// err >= 0.5.
+void IncreaseStep(double& dt, double err) {
+  if (err < 0.5) {
+    const double e = std::max(std::pow(5.0, -5.0), err);
+    dt *= 0.9 * std::pow(e, -1.0 / 5.0);
+  }
+}
+
 }  // namespace
 
 double ScaledStateError(const State& x_err, const State& x, const State& dxdt,
@@ -381,7 +397,7 @@ SolveResult OdeSolver::SolveDopri5() {
       const double err = ScaledStateError(w.xerr, x, w.dxdt, dt, eps_, eps_);
       if (err > 1.0) {
         // default_step_adjuster::decrease_step (error_order 4).
-        dt *= std::max(0.9 * std::pow(err, -1.0 / 3.0), 1.0 / 5.0);
+        DecreaseStep(dt, err);
         if (++failed >= 500) {
           throw NumericalError(
               "OdeSolver: max number of iterations exceeded (500): a new step "
@@ -390,10 +406,7 @@ SolveResult OdeSolver::SolveDopri5() {
       } else {
         t += dt;
         // default_step_adjuster::increase_step (stepper_order 5).
-        if (err < 0.5) {
-          const double e = std::max(std::pow(5.0, -5.0), err);
-          dt *= 0.9 * std::pow(e, -1.0 / 5.0);
-        }
+        IncreaseStep(dt, err);
         std::swap(x, w.xnew);
         std::swap(w.dxdt, w.dxdt_new);
         accepted = true;
