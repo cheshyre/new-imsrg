@@ -39,3 +39,22 @@ imsrg_add_test(NAME flow_generator3_kernel
   DEPS flow commutator operator
   LABELS unit
   NO_GTEST_MAIN)
+
+# The three-body generator on distributed storage (M12b D8): serial (unit), 2
+# and 4 ranks.
+foreach(_ranks 2 4)
+  imsrg_add_test(NAME flow_generator3_mpi_${_ranks}ranks
+    SOURCES test_generator3_mpi.cc ${PROJECT_SOURCE_DIR}/tests/support/mpi_test_main.cc
+            "${PROJECT_SOURCE_DIR}/tests/support/three_body_test_support.cc"
+    DEPS flow commutator operator basis comm exec
+    MPI_RANKS ${_ranks}
+    LABELS mpi
+    NO_GTEST_MAIN
+    TIMEOUT 300)
+endforeach()
+imsrg_add_test(NAME flow_generator3_mpi_serial
+  SOURCES test_generator3_mpi.cc ${PROJECT_SOURCE_DIR}/tests/support/mpi_test_main.cc
+          "${PROJECT_SOURCE_DIR}/tests/support/three_body_test_support.cc"
+  DEPS flow commutator operator basis comm exec
+  LABELS unit
+  NO_GTEST_MAIN)

@@ -140,17 +140,20 @@ void FillThreeBodyGenerator(const op::ThreeBody& H3, op::ThreeBody& eta3,
     ch_row_off[static_cast<std::size_t>(c)] = kc.row_offset;
     ch_dim[static_cast<std::size_t>(c)] = kc.dim;
   }
-  const std::span<const std::int64_t> blk = eta3.block_offsets();
-  const std::vector<std::int64_t> ch_blk(blk.begin(), blk.end());
-  // Per row of the set: channel and local row.
+  // Per row of the set: channel, local row and the start of the stored row
+  // (z(k, k)) in the local buffers of H3 and eta3 (equal layouts).
   std::vector<std::int32_t> set_ch;
   std::vector<std::int32_t> set_k;
+  std::vector<std::int64_t> set_off;
   set_ch.reserve(static_cast<std::size_t>(nrows_set));
   set_k.reserve(static_cast<std::size_t>(nrows_set));
+  set_off.reserve(static_cast<std::size_t>(nrows_set));
   for (const basis::RowRange& rg : rows.ranges()) {
     for (std::int32_t k = rg.row_begin.value(); k < rg.row_end.value(); ++k) {
       set_ch.push_back(rg.channel.value());
       set_k.push_back(k);
+      set_off.push_back(rows.LocalRowOffset(Channel3Index{rg.channel.value()},
+                                            basis::KeptRow3Index{k}, true));
     }
   }
   const std::vector<double> f_host(f_diag.begin(), f_diag.end());
@@ -162,9 +165,9 @@ void FillThreeBodyGenerator(const op::ThreeBody& H3, op::ThreeBody& eta3,
   const auto d_row_triple = Upload(row_triple, "flow::row_triple");
   const auto d_ch_row_off = Upload(ch_row_off, "flow::ch_row_off");
   const auto d_ch_dim = Upload(ch_dim, "flow::ch_dim");
-  const auto d_ch_blk = Upload(ch_blk, "flow::ch_blk");
   const auto d_set_ch = Upload(set_ch, "flow::set_ch");
   const auto d_set_k = Upload(set_k, "flow::set_k");
+  const auto d_set_off = Upload(set_off, "flow::set_off");
   const auto d_f = Upload(f_host, "flow::f_diag");
 
   const auto v_a = exec::View(d_tr_a);
@@ -174,9 +177,9 @@ void FillThreeBodyGenerator(const op::ThreeBody& H3, op::ThreeBody& eta3,
   const auto v_rt = exec::View(d_row_triple);
   const auto v_cro = exec::View(d_ch_row_off);
   const auto v_dim = exec::View(d_ch_dim);
-  const auto v_blk = exec::View(d_ch_blk);
   const auto v_sch = exec::View(d_set_ch);
   const auto v_sk = exec::View(d_set_k);
+  const auto v_soff = exec::View(d_set_off);
   const auto v_f = exec::View(d_f);
   const double* h_data = H3.device_data();
   double* z_data = eta3.device_data();
@@ -191,9 +194,9 @@ void FillThreeBodyGenerator(const op::ThreeBody& H3, op::ThreeBody& eta3,
         const std::int64_t k = v_sk(r);
         const std::int64_t n = v_dim(ch);
         const std::int64_t base = v_cro(ch);
-        // Column k of the packed lower triangle: z(m, k), m = k..n-1.
-        const std::int64_t col =
-            v_blk(ch) + op::ThreeBody::PackedIndex(n, k, k);
+        // Column k of the packed lower triangle: z(m, k), m = k..n-1, at
+        // the local offset of the row.
+        const std::int64_t col = v_soff(r);
         const int clk = v_cls(v_rt(base + k));
         z_data[col] = 0.0;  // the diagonal of an anti-Hermitian part
         for (std::int64_t m = k + 1; m < n; ++m) {

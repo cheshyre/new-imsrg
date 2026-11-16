@@ -327,9 +327,9 @@ void FillThreeBodyEta(const op::Operator& Hh, const Denominators& den,
                       const basis::ModelSpace& ms, const basis::Partition& part,
                       const GeneratorOptions& opts, op::Operator& eta) {
   const basis::ThreeBodySpace& ts = *ms.three_body_space();
-  // The row set of this process: all rows. Task D7 passes the model space's
-  // `three_body_rows()` (the rank's share of the distributed storage) here.
-  const basis::RowSet rows = basis::RowSet::Whole(ts);
+  // The rows of this process (all rows if the model space is not
+  // distributed).
+  const basis::RowSet& rows = ms.three_body_rows();
   const std::int32_t norb = ms.basis().num_orbits();
   std::vector<std::int32_t> is_core(static_cast<std::size_t>(norb));
   for (std::int32_t o = 0; o < norb; ++o) {

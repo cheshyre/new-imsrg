@@ -21,15 +21,18 @@ namespace imsrg::flow::detail {
 /// Writes the three-body part eta3 of the generator for the rows of `rows`.
 ///
 /// For every STORED element z(m, k) of eta3 (packed lower triangle, m >= k)
-/// of a row k in `rows`: with T(m), T(k) the orbit triples of the two rows,
-/// if T(m) is all-particle (no core orbit) and T(k) all-core, the element is
-/// f(H3(m, k), d(T(m), T(k))); if T(m) is all-core and T(k) all-particle, it
-/// is -f(H3(k, m), d(T(k), T(m))) (anti-Hermitian triangle); otherwise, and on
-/// the diagonal, it is 0. Here f is `GeneratorFunction(kind, ., ., nq)` and d
-/// the floored `Denominators::three_body(bra triple, ket triple)` with the
-/// bra the all-particle triple; the operation order is that of the host
-/// formulas, so the values are bitwise those of the former host loop on the
-/// OpenMP backend. Elements of rows outside `rows` are not touched.
+/// of a row k in `rows` (addressed through the local row offset
+/// `RowSet::LocalRowOffset(ch, k, true)` in both H3 and eta3, so the same code
+/// serves whole and distributed storage; for `RowSet::Whole` the offset is
+/// block offset + PackedIndex(n, k, k)): with T(m), T(k) the orbit triples of
+/// the two rows, if T(m) is all-particle (no core orbit) and T(k) all-core, the
+/// element is f(H3(m, k), d(T(m), T(k))); if T(m) is all-core and T(k)
+/// all-particle, it is -f(H3(k, m), d(T(k), T(m))) (anti-Hermitian triangle);
+/// otherwise, and on the diagonal, it is 0. Here f is `GeneratorFunction(kind,
+/// ., ., nq)` and d the floored `Denominators::three_body(bra triple, ket
+/// triple)` with the bra the all-particle triple; the operation order is that
+/// of the host formulas, so the values are bitwise those of the former host
+/// loop on the OpenMP backend. Elements of rows outside `rows` are not touched.
 ///
 /// Conventions: `f_diag` is the one-body diagonal per orbit (MeV),
 /// `orbit_is_core[o]` is 1 for a core orbit and 0 otherwise, `cutoff` the
@@ -37,8 +40,10 @@ namespace imsrg::flow::detail {
 /// (`H3`'s device data must be current; `eta3`'s device data are written and
 /// its host mirror is stale on return).
 /// Preconditions: H3 Hermitian, eta3 anti-Hermitian (both packed), both on
-/// the three-body space `ts`; `rows` built on `ts`; `kind` one of the kinds
-/// with a generator function (not Hartree-Fock).
+/// the three-body space `ts` and the same model space (so equal local
+/// layouts); `rows` built on `ts` and equal to that model space's
+/// `three_body_rows()` (the rows stored by H3 and eta3); `kind` one of the
+/// kinds with a generator function (not Hartree-Fock).
 /// @throws InvariantError on a violated precondition.
 /// Complexity: O(stored elements of the row set) work, O(rows + triples)
 /// host table construction.

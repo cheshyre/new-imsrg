@@ -3,7 +3,7 @@
 
 // The device kernel of the three-body generator (task D8) against the former
 // host loop (kept here as the reference): bitwise identical values, for every
-// generator kind with a function, and the row-set restriction.
+// generator kind with a function.
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -16,9 +16,7 @@
 #include "imsrg/base/types.h"
 #include "imsrg/basis/model_space.h"
 #include "imsrg/basis/three_body_channels.h"
-#include "imsrg/basis/three_body_rows.h"
 #include "imsrg/commutator/three_body.h"
-#include "imsrg/flow/detail/generator_three_body.h"
 #include "imsrg/flow/generator.h"
 #include "imsrg/operator/operator.h"
 #include "tests/support/three_body_test_support.h"
@@ -123,88 +121,9 @@ TEST(GeneratorThreeBodyKernel, BitwiseHe4Emax2) { CheckBitwise({"He4", 2, 6}); }
 TEST(GeneratorThreeBodyKernel, BitwiseO16Emax2) { CheckBitwise({"O16", 2, 6}); }
 TEST(GeneratorThreeBodyKernel, BitwiseO16Emax3) { CheckBitwise({"O16", 3, 9}); }
 
-// Row subsets: every even channel whole, the first half of the triples of the
-// odd channels with at least two triples.
-TEST(GeneratorThreeBodyKernel, RowSetWritesOnlyItsRows) {
-  const Case c{"O16", 2, 6};
-  const commutator::ThreeBodyContext ctx(MakeSpace(c));
-  Operator H =
-      testing::RandomThreeBodyOperator(ctx, Hermiticity::kHermitian, 31);
-  H.SyncToDevice();
-  GeneratorOptions opts;
-  opts.kind = GeneratorKind::kAtan;
-  const Operator eta_whole = flow::ComputeGenerator(H, opts);
-  const basis::ModelSpace& ms = H.model_space();
-  const basis::ThreeBodySpace& ts = *ms.three_body_space();
-
-  std::vector<basis::RowRange> ranges;
-  for (std::int32_t ch = 0; ch < ts.num_channels(); ++ch) {
-    const basis::KeptChannel3& kc = ts.channel(Channel3Index{ch});
-    if (kc.dim == 0) continue;
-    std::int32_t tend = kc.triple_end.value();
-    if (ch % 2 != 0) {
-      if (kc.triple_end.value() - kc.triple_begin.value() < 2) continue;
-      tend = kc.triple_begin.value() +
-             (kc.triple_end.value() - kc.triple_begin.value()) / 2;
-    }
-    basis::RowRange rg;
-    rg.channel = Channel3Index{ch};
-    rg.triple_begin = kc.triple_begin;
-    rg.triple_end = basis::Triple3Index{tend};
-    rg.row_begin = ts.triple(rg.triple_begin).row_begin;
-    rg.row_end = ts.triple(basis::Triple3Index{tend - 1}).row_end;
-    ranges.push_back(rg);
-  }
-  ASSERT_GE(ranges.size(), 3u);
-  const basis::RowSet rows = basis::RowSet::FromRanges(ts, ranges);
-
-  Operator eta(H.model_space_ptr(), flow::GeneratorSpec(H.spec(), opts.kind));
-  eta.set_zero();
-  eta.SyncToDevice();
-  const flow::Denominators den(H, opts);
-  std::vector<std::int32_t> is_core(
-      static_cast<std::size_t>(ms.basis().num_orbits()));
-  for (std::size_t o = 0; o < is_core.size(); ++o) {
-    is_core[o] =
-        ms.partition().orbit_class(OrbitIndex{static_cast<std::int32_t>(o)}) ==
-                basis::OrbitClass::kCore
-            ? 1
-            : 0;
-  }
-  flow::detail::FillThreeBodyGenerator(*H.three_body(), *eta.three_body(), ts,
-                                       rows, den.OneBodyDiagonal(), is_core,
-                                       opts.denominator_cutoff, opts.kind, 1);
-  eta.SyncToHost();
-
-  const auto zs = eta.three_body()->host_span();
-  const auto zw = eta_whole.three_body()->host_span();
-  std::vector<char> expect_set(zs.size(), 0);
-  const auto offs = eta.three_body()->block_offsets();
-  for (const basis::RowRange& rg : rows.ranges()) {
-    const std::int64_t n = ts.dim(rg.channel);
-    for (std::int32_t k = rg.row_begin.value(); k < rg.row_end.value(); ++k) {
-      const std::int64_t col =
-          offs[rg.channel.ToSize()] + op::ThreeBody::PackedIndex(n, k, k);
-      for (std::int64_t m = k; m < n; ++m) {
-        expect_set[static_cast<std::size_t>(col + m - k)] = 1;
-      }
-    }
-  }
-  std::size_t nset = 0, nnonzero = 0, bad = 0;
-  for (std::size_t e = 0; e < zs.size(); ++e) {
-    if (expect_set[e] != 0) {
-      ++nset;
-      if (zw[e] != 0.0) ++nnonzero;
-      if (std::memcmp(&zs[e], &zw[e], sizeof(double)) != 0) ++bad;
-    } else if (zs[e] != 0.0) {
-      ++bad;
-    }
-  }
-  EXPECT_EQ(bad, 0u);
-  EXPECT_GT(nset, 0u);
-  EXPECT_LT(nset, zs.size());
-  EXPECT_GT(nnonzero, 0u);
-}
+// The row-subset behaviour (a rank writes only its rows, addressed through the
+// local row offsets) is tested on distributed storage in
+// test_generator3_mpi.cc.
 
 }  // namespace
 }  // namespace imsrg
