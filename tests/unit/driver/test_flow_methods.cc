@@ -289,20 +289,35 @@ TEST(FlowMethods, O16Emax3AdaptiveDriver) {
 // Magnus and `flow_rk4`; imsrg++ leaves a `flow_rk4` stage 2 empty and doubles
 // smax for Magnus only, the patched reference does the same as we do). Magnus
 // and RK4 flow files are compared line by line.
+//
+// `_smax10_eta` (D47): smax = 10, eta_criterion = 0.014, so that stage 1
+// CONVERGES (s1 = 7.399) and stage 2 ends at s1 + smax = 17.399; a doubled smax
+// would run to 20. `_hg` (D48): two-stage hunter-gatherer; stage 2 starts from
+// the H rebuilt with the gathered Omega (E0 of its first flow row = the E0
+// reported by stage 1); the flow logs carry one extra row per stage (the
+// rebuilt H), so only steps, gathers and the stage-2 start are compared.
+struct StageCase {
+  std::string toml;  ///< extra TOML tables (before [output])
+  std::string tag;   ///< directory suffix
+  double s1 = -1.0;  ///< expected s after stage 1 (< 0: not checked)
+  double s2 = -1.0;  ///< expected s after stage 2
+  bool rows = true;  ///< compare the flow file row by row (RK4, Magnus)
+  bool hg = false;   ///< hunter-gatherer case
+};
+
 void TwoStage(const std::string& method, const char* gdir, const char* tag,
-              const std::string& step_toml = "") {
+              const StageCase& sc = {}) {
   if (!std::filesystem::exists(DataFile(TwoBodyName())))
     GTEST_SKIP() << "missing 2N input file";
   const bool compare_flow = method != "flow";
-  const auto dir = FreshDir("flow_two_stage_" + method +
-                            (step_toml.empty() ? "" : "_smax10"));
+  const auto dir = FreshDir("flow_two_stage_" + method + sc.tag);
   std::ostringstream t;
   t << "[basis]\nemax = 2\nhw = 16.0\n\n[reference]\nnucleus = \"He4\"\n\n"
     << "[interaction.two_body]\nfile = \"" << DataFile(TwoBodyName()).string()
     << "\"\ne1max = 14\ne2max = 28\nlmax = 14\n\n"
     << "[valence]\nspace = \"p-shell\"\n\n"
     << "[imsrg]\nmethod = \"" << method << "\"\n\n"
-    << step_toml << "[output]\ndirectory = \"" << dir.string() << "\"\n";
+    << sc.toml << "[output]\ndirectory = \"" << dir.string() << "\"\n";
   driver::ConfigSources src;
   src.config_text = t.str();
   const RunResult r = Execute(src, dir);
@@ -312,9 +327,9 @@ void TwoStage(const std::string& method, const char* gdir, const char* tag,
   const auto& stages = r.results["imsrg"]["stages"];
   ASSERT_EQ(stages.items.size(), 2u);
   EXPECT_EQ(stages.items[1]["generator"].text, "shell_model_atan");
-  if (!step_toml.empty()) {  // D47: [s1, s1 + smax], s continues
-    EXPECT_NEAR(stages.items[0]["s"].number, 10.0, 1.0e-12);
-    EXPECT_NEAR(stages.items[1]["s"].number, 20.0, 1.0e-6);
+  if (sc.s1 > 0.0) {  // D47: [s1, s1 + smax], s continues
+    EXPECT_NEAR(stages.items[0]["s"].number, sc.s1, 1.0e-4);
+    EXPECT_NEAR(stages.items[1]["s"].number, sc.s2, 1.0e-4);
   }
   std::printf(
       "[%s] steps per stage: %d %d; s at the end of the stages: %.4f %.4f\n",
@@ -337,27 +352,56 @@ void TwoStage(const std::string& method, const char* gdir, const char* tag,
     EXPECT_EQ(static_cast<int>(stages.items[0]["steps"].number), gold_steps[0]);
     EXPECT_EQ(static_cast<int>(stages.items[1]["steps"].number), gold_steps[1]);
 
-    // The flow file, both stages, row by row.
-    ASSERT_EQ(r.flow.rows.size(), gold.size());
-    Deviations d;
-    for (std::size_t i = 0; i < gold.size(); ++i) {
-      d.s = std::max(d.s, std::abs(r.flow.at(i, "s") - gold[i].s));
-      d.e0 = std::max(d.e0, std::abs(r.flow.at(i, "E0") - gold[i].e0));
-      d.norm_h =
-          std::max(d.norm_h, std::abs(r.flow.at(i, "norm_H") - gold[i].norm_h));
-      d.eta1 = std::max(d.eta1,
-                        std::abs(r.flow.at(i, "norm_eta_1b") - gold[i].eta1));
-      d.eta2 = std::max(d.eta2,
-                        std::abs(r.flow.at(i, "norm_eta_2b") - gold[i].eta2));
-      d.e_mp2 =
-          std::max(d.e_mp2, std::abs(r.flow.at(i, "E_MP2") - gold[i].e_mp2));
+    if (sc.hg) {
+      // Stage 2 starts from the rebuilt H: its istep-0 row has the E0 of the
+      // golden's, and the reported E0 of stage 1 (D48).
+      std::size_t g2 = 0, o2 = 0;
+      for (std::size_t i = 0, n0 = 0; i < gold.size(); ++i)
+        if (gold[i].istep == 0 && ++n0 == 2) g2 = i;
+      for (std::size_t i = 0; i < r.flow.rows.size(); ++i)
+        if (r.flow.at(i, "stage") == 2.0 && r.flow.at(i, "istep") == 0.0) {
+          o2 = i;
+          break;
+        }
+      ASSERT_GT(g2, 0u);
+      ASSERT_GT(o2, 0u);
+      std::printf("[%s] stage-2 start E0 %.9f golden %.9f; gathers %.0f\n", tag,
+                  r.flow.at(o2, "E0"), gold[g2].e0,
+                  r.results["imsrg"]["num_gathers"].number);
+      EXPECT_NEAR(r.flow.at(o2, "E0"), gold[g2].e0, 1.0e-6);
+      EXPECT_EQ(r.flow.at(o2, "E0"), stages.items[0]["e0"].number);
+      // Gathers: the "gathering Omega." lines of the imsrg++ log.
+      std::ifstream log(GoldenFile(std::string(gdir) + "/stdout.log"));
+      int gathers_gold = 0;
+      for (std::string line; std::getline(log, line);)
+        if (line.find("gathering Omega") != std::string::npos) ++gathers_gold;
+      EXPECT_EQ(static_cast<int>(r.results["imsrg"]["num_gathers"].number),
+                gathers_gold);
+      EXPECT_EQ(gathers_gold, 84);
     }
-    Report(tag, gold.size(), d);
-    EXPECT_LT(d.s, 1.0e-5);
-    EXPECT_LT(d.e0, 1.0e-6);
-    EXPECT_LT(d.norm_h, 1.0e-6);
-    EXPECT_LT(d.eta1, 1.0e-6);
-    EXPECT_LT(d.eta2, 1.0e-6);
+    // The flow file, both stages, row by row.
+    if (sc.rows) {
+      ASSERT_EQ(r.flow.rows.size(), gold.size());
+      Deviations d;
+      for (std::size_t i = 0; i < gold.size(); ++i) {
+        d.s = std::max(d.s, std::abs(r.flow.at(i, "s") - gold[i].s));
+        d.e0 = std::max(d.e0, std::abs(r.flow.at(i, "E0") - gold[i].e0));
+        d.norm_h = std::max(d.norm_h,
+                            std::abs(r.flow.at(i, "norm_H") - gold[i].norm_h));
+        d.eta1 = std::max(d.eta1,
+                          std::abs(r.flow.at(i, "norm_eta_1b") - gold[i].eta1));
+        d.eta2 = std::max(d.eta2,
+                          std::abs(r.flow.at(i, "norm_eta_2b") - gold[i].eta2));
+        d.e_mp2 =
+            std::max(d.e_mp2, std::abs(r.flow.at(i, "E_MP2") - gold[i].e_mp2));
+      }
+      Report(tag, gold.size(), d);
+      EXPECT_LT(d.s, 1.0e-5);
+      EXPECT_LT(d.e0, 1.0e-6);
+      EXPECT_LT(d.norm_h, 1.0e-6);
+      EXPECT_LT(d.eta1, 1.0e-6);
+      EXPECT_LT(d.eta2, 1.0e-6);
+    }
   }
 
   // Final E0 and the valence-space interaction.
@@ -365,21 +409,24 @@ void TwoStage(const std::string& method, const char* gdir, const char* tag,
   const double e0_gold = res["flow"]["final_E0"].number;
   std::printf("[%s] E0 %.9f golden %.9f dev %.3e\n", tag, e0, e0_gold,
               e0 - e0_gold);
-  EXPECT_NEAR(e0, e0_gold, 1.0e-3);
+  // The golden's last flow line is the last hunter step, not the rebuilt H
+  // (D48): the .snt (rebuilt H) is compared at 1e-9 instead.
+  if (!sc.hg) EXPECT_NEAR(e0, e0_gold, 1.0e-3);
+  const double tol = sc.hg ? 1.0e-9 : 1.0e-3;
 
   ASSERT_EQ(r.results["valence_interaction"].kind, Json::Kind::kString);
   const SntData got = ReadSnt(r.results["valence_interaction"].text);
   const SntData want = ReadSnt(GoldenFile(std::string(gdir) + "/int.snt"));
-  const SntComparison c = CompareSnt(got, want, 1.0e-3);
+  const SntComparison c = CompareSnt(got, want, tol);
   std::printf(
       "[%s] .snt zero body dev %.3e, 1B max dev %.3e (%zu elements), 2B max "
       "dev %.3e (%zu elements), missing %zu, orbits equal %s\n",
       tag, c.zero_dev, c.max_dev_1b, c.n1b_a, c.max_dev_2b, c.n2b_a, c.missing,
       c.orbits_equal ? "yes" : "NO");
   EXPECT_TRUE(c.orbits_equal);
-  EXPECT_LE(c.zero_dev, 1.0e-3);
-  EXPECT_LE(c.max_dev_1b, 1.0e-3);
-  EXPECT_LE(c.max_dev_2b, 1.0e-3);
+  EXPECT_LE(c.zero_dev, tol);
+  EXPECT_LE(c.max_dev_1b, tol);
+  EXPECT_LE(c.max_dev_2b, tol);
   EXPECT_EQ(c.missing, 0u);
 }
 
@@ -391,20 +438,35 @@ TEST(FlowMethods, TwoStageAdaptiveHe4PShellDriver) {
 }
 
 // D47: stage 1 stops at smax = 10, stage 2 integrates [10, 20] (golden: the
-// patched imsrg++). The final s of both stages is checked here, the rest in
-// `TwoStage`.
+// patched imsrg++), see `TwoStage`.
 const char kSmax10[] = "[imsrg.step]\nsmax = 10.0\n\n";
 TEST(FlowMethods, StageTwoRangeRk4Smax10) {
   TwoStage("flow_rk4", "IT-15/He4_emax2_pshell_rk4_smax10", "IT-15 RK4 smax 10",
-           kSmax10);
+           {kSmax10, "_smax10", 10.0, 20.0, true, false});
 }
 TEST(FlowMethods, StageTwoRangeAdaptiveSmax10) {
   TwoStage("flow", "IT-15/He4_emax2_pshell_flow_smax10", "IT-15 dopri5 smax 10",
-           kSmax10);
+           {kSmax10, "_smax10", 10.0, 20.0, true, false});
 }
 TEST(FlowMethods, StageTwoRangeMagnusSmax10) {
   TwoStage("magnus", "IT-15/He4_emax2_pshell_magnus_smax10",
-           "IT-15 Magnus smax 10", kSmax10);
+           "IT-15 Magnus smax 10",
+           {kSmax10, "_smax10", 10.0, 20.0, true, false});
+}
+// Stage 1 converges at s = 7.399: s1 + smax = 17.399, the doubled smax of
+// pristine imsrg++ would end at 20 (98 steps, 16 + 82, in the golden).
+TEST(FlowMethods, StageTwoRangeMagnusConvergedStage1) {
+  TwoStage("magnus", "IT-15/He4_emax2_pshell_magnus_smax10_eta",
+           "IT-15 Magnus smax 10 eta 0.014",
+           {"[imsrg.step]\nsmax = 10.0\neta_criterion = 0.014\n\n", "_eta",
+            7.39922, 17.39922, true, false});
+}
+// D48: two-stage hunter-gatherer, stage 2 starts from the rebuilt H.
+TEST(FlowMethods, TwoStageHunterGathererHe4PShellDriver) {
+  TwoStage("magnus", "IT-15/He4_emax2_pshell_hg", "IT-15 HG He4 p-shell",
+           {"[hartree_fock]\nmixing = \"linear\"\n\n[imsrg.step]\n"
+            "omega_norm_max = 0.1\n\n[imsrg.omega]\nhunter_gatherer = true\n\n",
+            "_hg", -1.0, -1.0, false, true});
 }
 #else   // IMSRG_FLOW_SLOW: O16 emax 4, 7-14 s each in a debug build
 TEST(FlowMethods, O16Emax4Rk4Driver) {

@@ -130,7 +130,18 @@ TEST(MagnusSolver, HunterGathererHamiltonianIsRebuiltWithGatheredOmega) {
   std::vector<flow::FlowStatus> lines;
   const flow::SolveResult r =
       solver.Solve([&](const flow::FlowStatus& st) { lines.push_back(st); });
-  ASSERT_GT(lines.size(), 3u);
+  ASSERT_GT(lines.size(), 4u);
+  // The last status line is the rebuilt H at the same s (istep = steps + 1).
+  const flow::FlowStatus rebuilt = lines.back();
+  lines.pop_back();
+  EXPECT_EQ(rebuilt.istep, r.steps + 1);
+  EXPECT_EQ(rebuilt.s, lines.back().s);
+  EXPECT_EQ(rebuilt.ds, 0.0);
+  EXPECT_EQ(rebuilt.e0, r.e0);
+  // eta(s) belongs to the rebuilt H (not the discarded hunter-step H).
+  EXPECT_EQ(rebuilt.norm_eta, r.norm_eta);
+  EXPECT_EQ(r.norm_eta, op::Norm(solver.eta()));
+  EXPECT_NE(r.norm_eta, lines.back().norm_eta);
   // Gather count: the loop gathers (whenever the hunter was > omega_norm_max)
   // plus the final one.
   int loop_gathers = 0;
@@ -167,6 +178,36 @@ TEST(MagnusSolver, HunterGathererHamiltonianIsRebuiltWithGatheredOmega) {
   solver.set_generator(flow::GeneratorOptions{});
   EXPECT_EQ(solver.omegas().size(), 2u);
   EXPECT_EQ(solver.num_gathers(), r.num_gathers);
+}
+
+// D47: eta_criterion is a double. A threshold one ulp above ||eta|| of the
+// initial H stops the flow at once; rounded through float (imsrg++) the
+// threshold would fall below ||eta|| (a float has 24 mantissa bits) and the
+// solver would take steps.
+TEST(MagnusSolver, EtaCriterionIsADouble) {
+  const op::Operator h0 = Emax2Hno();
+  flow::MagnusSolver probe(h0, ShortFlow(0.0), flow::GeneratorOptions{});
+  probe.Solve();  // smax 0: only computes eta
+  const double norm_eta = op::Norm(probe.eta());
+  ASSERT_GT(norm_eta, 0.0);
+  const double above = std::nextafter(norm_eta, 1.0e300);
+  const double below = std::nextafter(norm_eta, 0.0);
+  // Precondition of the test: a round trip through float moves one of the two
+  // thresholds to the other side of ||eta|| (float has 24 mantissa bits).
+  ASSERT_TRUE(static_cast<double>(static_cast<float>(above)) <= norm_eta ||
+              static_cast<double>(static_cast<float>(below)) >= norm_eta);
+  for (const double crit : {above, below}) {
+    flow::SolverOptions o = ShortFlow(1.5);
+    o.eta_criterion = crit;
+    flow::MagnusSolver solver(h0, o, flow::GeneratorOptions{});
+    const flow::SolveResult r = solver.Solve();
+    if (crit > norm_eta) {
+      EXPECT_EQ(r.reason, flow::StopReason::kConverged);
+      EXPECT_EQ(r.steps, 0);
+    } else {
+      EXPECT_GT(r.steps, 0);
+    }
+  }
 }
 
 // Review item 5: with omega_norm_max == domega the imsrg++ solver raises domega

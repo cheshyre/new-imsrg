@@ -240,7 +240,7 @@ first column of this table and compares it with the keys of a real run, so the t
 | `imsrg.stages[].num_gathers` | int | per stage | gathers in this stage. |
 | `imsrg.stages[].s` | number | per stage | final flow parameter. |
 | `imsrg.stages[].e0` | number | per stage | E0 at the end of the stage. |
-| `imsrg.stages[].norm_eta` | number | per stage | norm of the generator at the end. |
+| `imsrg.stages[].norm_eta` | number | per stage | norm of the generator at the end; for a hunter-gatherer stage that of the H rebuilt with the gathered Omega (D48: 1e-3 where the flow stopped at 1e-6, a warning is logged; the flow does not continue). |
 | `imsrg.stages[].stop` | string | per stage | `converged`, `smax` or `diverged`. |
 | `imsrg.perturbative_triples` | object | `imsrg.perturbative_triples = true` | the perturbative-triples correction after stage 1 (imsrg++ `Perturbative triples:` line). *(added in version 2)* |
 | `imsrg.perturbative_triples.de` | number | with `imsrg.perturbative_triples` | the energy correction dE, MeV. |
@@ -268,7 +268,8 @@ norm_eta_2b, norm_eta, norm_omega_1b, norm_omega_2b, norm_omega, num_omegas, E_M
 `E_MP2` is the MBPT(2) correlation energy of the current Hamiltonian H(s), as in imsrg++'s flow
 file (`E(MP2)` column); it costs one MP2 evaluation per step. With `imsrg3.in_flow` the columns
 `norm_eta_3b` (after `norm_eta_2b`) and `norm_omega_3b` (after `norm_omega_2b`) are added; the other
-runs keep the columns above.
+runs keep the columns above. A hunter-gatherer stage ends with one more row (`istep` = steps + 1, `ds` = 0, same
+`s`) for the H rebuilt with the gathered Omega, so the file ends with the reported E0 (D48).
 
 Changelog (newest first):
 

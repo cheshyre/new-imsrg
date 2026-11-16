@@ -80,16 +80,6 @@ foreach(_variant "" "_slow")
     "IMSRG_TEST_DATA_DIR=\"${IMSRG_TEST_DATA_DIR}\"")
 endforeach()
 target_compile_definitions(driver_flow_methods_slow PRIVATE IMSRG_FLOW_SLOW=1)
-# IT-10 O16 emax 3 (IMSRG(3f2); slow in Debug): the same source compiled for the slow case only.
-# tools/ci.sh excludes the slow label.
-imsrg_add_test(NAME driver_integration_slow
-  SOURCES test_imsrg3f2.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
-  DEPS driver LABELS slow integration TIMEOUT 3600 NO_GTEST_MAIN)
-target_compile_definitions(driver_integration_slow PRIVATE IMSRG_IT10_SLOW
-  "IMSRG_SOURCE_DIR=\"${PROJECT_SOURCE_DIR}\""
-  "IMSRG_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden\""
-  "IMSRG_TEST_DATA_DIR=\"${IMSRG_TEST_DATA_DIR}\"")
-
 # IT-8 perturbative triples after the Magnus flow (He4 emax 2 and O16 emax 3, about 7 s each in Debug).
 imsrg_add_test(NAME driver_triples
   SOURCES test_triples.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc

@@ -166,6 +166,11 @@ class MagnusSolver {
   /// imsrg++ leaves H(s) at the last hunter step, which differs from this by
   /// up to tens of keV in E0). `result.e0` and `hamiltonian()` are the
   /// rebuilt ones, so `Transform(H_0)` reproduces H(s) at round-off level.
+  /// eta(s) is recomputed from the rebuilt H (`eta()`, `result.norm_eta`), a
+  /// warning is logged if its norm exceeds `eta_criterion` (it usually does,
+  /// by 1e3: the flow does not continue, `result.reason` stays that of the
+  /// loop), and one more status line (istep = steps + 1, ds = 0, same s)
+  /// reports the rebuilt H, so the flow log ends with the reported E0.
   /// `on_status` (optional) receives the istep-0 line and one line per step.
   SolveResult Solve(const StatusCallback& on_status = {});
 
