@@ -17,6 +17,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <iostream>
 #include <limits>
 #include <memory>
 #include <span>
@@ -430,10 +431,8 @@ void CheckOperand(const ThreeBodyContext& ctx,
     double max_ref = 1.0;
     const double dh = MaxDeviation(got.h, got.h_written, ref_h, &max_ref);
     const double dw = MaxDeviation(got.w, got.w_written, ref_w, &max_ref);
-    std::printf(
-        "[ n7_batch ] %s budget %lld: max|dH| %.3e max|dW| %.3e "
-        "(scale %.3e)\n",
-        tag.c_str(), static_cast<long long>(budget), dh, dw, max_ref);
+    std::cout << "[ n7_batch ] " << tag << " budget " << budget << ": max|dH| "
+              << dh << " max|dW| " << dw << " (scale " << max_ref << ")\n";
     EXPECT_LE(dh, 1.0e-12 * max_ref);
     EXPECT_LE(dw, 1.0e-12 * max_ref);
     if (!have_first) {
