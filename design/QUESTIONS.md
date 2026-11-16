@@ -995,3 +995,10 @@ the orchestrator uses `O4` and up).
   listed once in a "not implemented" section instead of kept as design text; the old old-`pyIMSRG`
   mapping table was dropped (it lives in git history). Say if the table should be kept for the
   term-by-term milestone.
+* **O4** (2026-11-16, orchestrator, binary ME2JP/ME3JP, D57) - The binary variant stores 4-byte
+  floats after the 255-byte header (A. Tichai's reader, imsrg++ `.bin`), so a `.bin` file keeps
+  about 7 digits and does not round-trip our doubles; D54 wants checkpoints and stored Omegas to
+  restart bit for bit (`19` §3: `%.17g`). **Assumed meanwhile:** `.bin` (float32) is for
+  interactions and other inputs; checkpoints and stored Omegas are written as text or gzip.
+  Alternative: an additional double-precision binary variant for checkpoints (for example a
+  `.bin64` suffix or a header token `prec=64`, which jIMSRG would not read). Say which.

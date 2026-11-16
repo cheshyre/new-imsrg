@@ -62,10 +62,41 @@ milestone after tensor operators (D53, D54); `40-roadmap.md` M15+.
   validator; our readers allow it for all three.
 * **Variants and file names:** text `name.me1j`, `name.me2jp`, `name.me3jp`; **gzip** text
   `name.me2jp.gz`, `name.me3jp.gz` (D54; through `io::TextInput` and `GzipWriter`; ME1J stays
-  plain text, it is small); **binary** `name.me2jp.bin`, `name.me3jp.bin`: a header made of a
-  fixed number of characters, then the values in record order. The binary specification is
-  pending from the owner; the implementation separates the record enumeration from the value I/O
-  so that the binary variant only adds the header and the raw value source and sink.
+  plain text, it is small); **binary** `name.me2jp.bin`, `name.me3jp.bin`: a header of exactly
+  255 bytes, then the values in record order as 4-byte floats (§3.1; owner via A. Tichai,
+  2026-11-16, D57). The implementation separates the record enumeration from the value I/O so
+  that the binary variant only adds the header and the raw value source and sink.
+
+### 3.1 Binary variant (D57)
+
+Layout, as A. Tichai's reader (`binary_to_vector`, `#define BINARYHEADERSIZE 255`) reads it:
+
+| Bytes | Content |
+|-------|---------|
+| 0 … 254 | header, 255 bytes, skipped unread by A. Tichai's reader and imsrg++ |
+| 255 … | the values of the text variant in the same record order, IEEE-754 binary32 (`float`), native byte order (little-endian on every supported target), no record markers or padding |
+
+* **Same as imsrg++'s binary ME2J/ME3J** (checked 2026-11-16 in imsrg-devel): `ReadWrite.cc:30`
+  `#define HEADERSIZE 255` (a commented-out `500` above it); `ReadBareTBME_Darmstadt` (`.bin`,
+  `ReadWrite.cc:687-717`) and `Read_Darmstadt_3body` (`.bin`, `ReadWrite.cc:764-797`) take
+  n = (file size − 255) / 4, read and discard the 255 header bytes, read n floats and feed them
+  to the text parser through `VectorStream` (`ReadWrite.hh:156-173`), whose `getline` does
+  nothing: the binary header replaces the text header line, and the floats are exactly the text
+  values.
+* **The header content is not interpreted** by either reader. Our writer fills it with our text
+  header line (§3: tag and `key=value` tokens), padded with spaces to 255 bytes; our reader checks
+  the tag only when the header contains one (files from other writers stay readable).
+* **Checks the old readers lack:** the file size must be 255 + 4n with n at least the expected
+  value count for the caller's emax (and E3max), longer files being allowed by the prefix rule;
+  sizes and offsets are 64-bit (imsrg++'s ME2J path holds the file size in an `int`,
+  `ReadWrite.cc:698`, wrong above 2 GiB; its ME3J path uses `size_t`); every read is checked (a
+  truncated file is an `InputError`, not zeros); large ME3JP files are read in chunks instead of
+  one vector (88 GB of floats at emax 12 / E3max 16).
+* **Precision:** binary32 keeps about 7 digits, so a `.bin` file does not round-trip our doubles.
+  Until the owner decides otherwise (QUESTIONS O4), `.bin` is for interactions and other inputs;
+  checkpoints and stored Omegas use the text or gzip variant (`%.17g`, bit for bit).
+* The same 255-byte rule gives our ME2J reader (and a later ME3J reader) imsrg++'s `.me2j.bin`
+  path for free; that reader path is a small follow-up task.
 
 ## 4. ME1J
 
@@ -167,7 +198,8 @@ for p in basis:
   stored Omega and transforms a list of operators; `[checkpoint]` (interval, directory) writes H(s),
   the Omega stack and the solver state (s, step, stage, ds, gather count) and restarts from them.
 * **J-range safety (D55):** the rules and tests of §8 are part of the acceptance.
-* Open, from the owner: the binary header and value type of `.bin`.
+* Binary `.bin`: specified in §3.1 (D57); open: whether checkpoints need a double-precision
+  binary variant (QUESTIONS O4).
 
 ## 8. J-range safety (owner requirement, D55)
 
