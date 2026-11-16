@@ -129,12 +129,10 @@ struct GroupHost {
   std::vector<std::int32_t> g_orb, g_jpos;
 };
 
-/// Builds the two-body block offsets, the kept-space channel tables and the
-/// triple tables of `im`; returns host copies of the channel and triple
-/// ranges.
-KeptHost InitKeptSpace(ThreeBodyContext::Impl& im,
-                       const basis::ModelSpace& ms3) {
-  const basis::ThreeBodySpace& space = *ms3.three_body_space();
+/// Builds the two-body block offsets of `im` as op::TwoBody stores a scalar
+/// operator.
+void InitTwoBodyOffsets(ThreeBodyContext::Impl& im,
+                        const basis::ModelSpace& ms3) {
   // Two-body block offsets as op::TwoBody stores a scalar operator.
   const auto& tbc = ms3.two_body();
   im.two_body_offset_host.assign(U(tbc.num_channels()) + 1, 0);
@@ -142,7 +140,12 @@ KeptHost InitKeptSpace(ThreeBodyContext::Impl& im,
     const std::int64_t n = tbc.channel(ChannelIndex{ch}).num_kets;
     im.two_body_offset_host[U(ch) + 1] = im.two_body_offset_host[U(ch)] + n * n;
   }
+}
 
+/// Builds the kept-space channel tables of `im` and stores the host copies of
+/// the triple ranges in `kh`.
+void InitKeptChannelTables(ThreeBodyContext::Impl& im,
+                           const basis::ThreeBodySpace& space, KeptHost& kh) {
   // Kept canonical space.
   const auto channels = space.channels();
   const std::size_t nc = channels.size();
@@ -171,7 +174,14 @@ KeptHost InitKeptSpace(ThreeBodyContext::Impl& im,
       Upload(im.packed_offset_host, "commutator::comm223_ch_packed_offset");
   im.ch_dense_offset =
       Upload(im.dense_offset_host, "commutator::comm223_ch_dense_offset");
+  kh.c_tb = std::move(c_tb);
+  kh.c_te = std::move(c_te);
+}
 
+/// Builds the orbit-triple tables of `im` and stores the host copies of the
+/// triples in `kh`.
+void InitTripleTables(ThreeBodyContext::Impl& im,
+                      const basis::ThreeBodySpace& space, KeptHost& kh) {
   const auto triples = space.triples();
   im.num_triples = static_cast<std::int32_t>(triples.size());
   const std::size_t nt = triples.size();
@@ -194,10 +204,23 @@ KeptHost InitKeptSpace(ThreeBodyContext::Impl& im,
   im.tr_row_begin = Upload(t_rb, "commutator::comm223_tr_row_begin");
   im.tr_row_end = Upload(t_re, "commutator::comm223_tr_row_end");
   im.tr_sym = Upload(t_sym, "commutator::comm223_tr_sym");
+  kh.t_a = std::move(t_a);
+  kh.t_b = std::move(t_b);
+  kh.t_c = std::move(t_c);
+  kh.t_rb = std::move(t_rb);
+  kh.t_re = std::move(t_re);
+}
 
-  return KeptHost{std::move(c_tb), std::move(c_te), std::move(t_a),
-                  std::move(t_b),  std::move(t_c),  std::move(t_rb),
-                  std::move(t_re)};
+/// Builds the two-body block offsets, the kept-space channel tables and the
+/// triple tables of `im`; returns host copies of the channel and triple
+/// ranges.
+KeptHost InitKeptSpace(ThreeBodyContext::Impl& im,
+                       const basis::ModelSpace& ms3) {
+  KeptHost kh;
+  InitTwoBodyOffsets(im, ms3);
+  InitKeptChannelTables(im, *ms3.three_body_space(), kh);
+  InitTripleTables(im, *ms3.three_body_space(), kh);
+  return kh;
 }
 
 /// Builds the N7 tables of `im`: 2 Jab and triple per flat kept row, the
@@ -360,13 +383,13 @@ void InitStateBases(ThreeBodyContext::Impl& im, const basis::ModelSpace& ms3) {
   }
 }
 
-/// Builds the tile extents and the work orders of `im`. Estimated work of bra
-/// triple t: m_t times the summed m of its ket triples (m = pair-third
-/// states).
-void InitWorkOrders(ThreeBodyContext::Impl& im, const basis::ModelSpace& ms3,
-                    const KeptHost& kh) {
-  const op::PairThirdView pv = im.pair_third.host_view();
-  const std::size_t nt = kh.t_a.size();
+/// Fills the per-triple cost estimates and the tile extents (`im.ext`) from the
+/// pair-third state counts; `cost_triples` skips triple pairs without work.
+void ComputeWorkCosts(ThreeBodyContext::Impl& im, const basis::ModelSpace& ms3,
+                      const op::PairThirdView& pv, const KeptHost& kh,
+                      std::vector<double>& cost_lower,
+                      std::vector<double>& cost_full,
+                      std::vector<double>& cost_triples) {
   const std::size_t nc = kh.c_tb.size();
   const std::vector<std::int32_t>& c_tb = kh.c_tb;
   const std::vector<std::int32_t>& c_te = kh.c_te;
@@ -375,11 +398,6 @@ void InitWorkOrders(ThreeBodyContext::Impl& im, const basis::ModelSpace& ms3,
   const std::vector<std::int32_t>& t_c = kh.t_c;
   const std::vector<std::int32_t>& t_rb = kh.t_rb;
   const std::vector<std::int32_t>& t_re = kh.t_re;
-  // Tile extents and work orders. Estimated work of bra triple t: m_t times
-  // the summed m of its ket triples (m = pair-third states).
-  std::vector<double> cost_lower(nt, 0.0);
-  std::vector<double> cost_full(nt, 0.0);
-  std::vector<double> cost_triples(nt, 0.0);
   const auto occ = ms3.reference().occupations();
   // Host copies of the occupation tests of the triples kernel, with half the
   // threshold: a triple listed here without work is skipped by the kernel,
@@ -420,6 +438,19 @@ void InitWorkOrders(ThreeBodyContext::Impl& im, const basis::ModelSpace& ms3,
       cost_triples[U(t)] = m * work;
     }
   }
+}
+
+/// Builds the tile extents and the work orders of `im`. Estimated work of bra
+/// triple t: m_t times the summed m of its ket triples (m = pair-third
+/// states).
+void InitWorkOrders(ThreeBodyContext::Impl& im, const basis::ModelSpace& ms3,
+                    const KeptHost& kh) {
+  const op::PairThirdView pv = im.pair_third.host_view();
+  const std::size_t nt = kh.t_a.size();
+  std::vector<double> cost_lower(nt, 0.0);
+  std::vector<double> cost_full(nt, 0.0);
+  std::vector<double> cost_triples(nt, 0.0);
+  ComputeWorkCosts(im, ms3, pv, kh, cost_lower, cost_full, cost_triples);
   im.order_lower =
       Upload(ByCost(cost_lower), "commutator::comm223_order_lower");
   im.order_full = Upload(ByCost(cost_full), "commutator::comm223_order_full");
