@@ -55,3 +55,11 @@ imsrg_add_test(NAME operator_pair_third
   DEPS operator exec
   LABELS unit
   NO_GTEST_MAIN)
+
+# Masking helpers of the row-range tests (tests/support/row_mask.cc).
+imsrg_add_test(NAME operator_three_body_row_mask
+  SOURCES test_three_body_row_mask.cc
+          ${PROJECT_SOURCE_DIR}/tests/support/row_mask.cc ${_imsrg_exec_main}
+  DEPS operator basis
+  LABELS unit
+  NO_GTEST_MAIN)
