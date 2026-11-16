@@ -133,16 +133,28 @@ std::string FormatValue(const KeyInfo& key, const T& value) {
 
 /// `VisitSchema` visitor: collects (table, "key = value") lines in canonical
 /// order.
-struct LineWriter {
-  std::vector<std::pair<std::string, std::string>> lines;
-  /// One-stage run: imsrg.generator.valence is inert (resolve resets it to its
-  /// default) and an explicit value is V-41 with a valence space, so it is left
-  /// out to keep the file loadable.
-  bool one_stage = false;
+class LineWriter {
+ public:
+  using Line = std::pair<std::string, std::string>;
 
+  /// One-stage run (`one_stage`): imsrg.generator.valence is inert (resolve
+  /// resets it to its default) and an explicit value is V-41 with a valence
+  /// space, so it is left out to keep the file loadable.
+  explicit LineWriter(bool one_stage) : one_stage_(one_stage) {}
+
+  LineWriter(const LineWriter&) = default;
+  LineWriter& operator=(const LineWriter&) = default;
+  LineWriter(LineWriter&&) = default;
+  LineWriter& operator=(LineWriter&&) = default;
+
+  /// The collected (table, line) pairs in visiting order.
+  const std::vector<Line>& Lines() const noexcept { return lines_; }
+
+  /// Visitor hook: records one schema field (skipped values: see the
+  /// constructor; disengaged optionals).
   template <class T>
   void Field(const KeyInfo& key, const T& value) {
-    if (one_stage && key.path == "imsrg.generator.valence") return;
+    if (one_stage_ && key.path == "imsrg.generator.valence") return;
     if constexpr (requires { value.has_value(); }) {
       if (value.has_value()) Emit(key, *value);
     } else {
@@ -150,21 +162,26 @@ struct LineWriter {
     }
   }
 
+  /// Visitor hook: visits the body of a present optional table.
   template <class Section, class Body>
   void OptionalTable(std::string_view /*table*/,
                      const std::optional<Section>& section, Body&& body) {
     if (section) body(*section);
   }
 
+ private:
   /// Appends the line of one key (a helper of `Field`).
   template <class T>
   void Emit(const KeyInfo& key, const T& value) {
     const std::string_view path = key.path;
     const std::size_t dot = path.rfind('.');
-    lines.emplace_back(
+    lines_.emplace_back(
         std::string(path.substr(0, dot)),
         std::string(path.substr(dot + 1)) + " = " + FormatValue(key, value));
   }
+
+  std::vector<Line> lines_;
+  bool one_stage_ = false;
 };
 
 }  // namespace
@@ -174,12 +191,11 @@ std::string ToToml(const RunConfig& config, bool include_provenance) {
       "# imsrg resolved configuration (design/16-config-and-cli.md); reproduce "
       "with: imsrg "
       "--config <this file>\n";
-  LineWriter writer;
-  writer.one_stage = config.imsrg.steps == 1;
+  LineWriter writer(config.imsrg.steps == 1);
   VisitSchema(config, writer);
   std::string current;
   bool first = true;
-  for (const auto& [table, line] : writer.lines) {
+  for (const auto& [table, line] : writer.Lines()) {
     if (first || table != current) {
       out += "\n[" + table + "]\n";
       current = table;
