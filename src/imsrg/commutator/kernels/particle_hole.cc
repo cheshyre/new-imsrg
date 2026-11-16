@@ -675,9 +675,26 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
           const CcTerm t2 = MakeCcTerm(a, j, l, k, i);
           double zbar1[kMaxJp];
           double zbar2[kMaxJp];
+          // Distributed: the masked reads leave only the owned cc channels
+          // nonzero, so skip the pair when all vanish and trim the J' loop to
+          // the span of nonzero entries (skipped terms add exactly 0). The
+          // serial path keeps the full range (bitwise identical).
+          int jq0 = jp0;
+          int jq1 = jp1;
           for (int Jp = jp0; Jp <= jp1; ++Jp) {
             zbar1[Jp - jp0] = CcValue(a, t1, Jp);
             zbar2[Jp - jp0] = CcValue(a, t2, Jp);
+          }
+          if (a.owned != nullptr) {
+            while (jq0 <= jq1 && zbar1[jq0 - jp0] == 0.0 &&
+                   zbar2[jq0 - jp0] == 0.0) {
+              ++jq0;
+            }
+            while (jq1 >= jq0 && zbar1[jq1 - jp0] == 0.0 &&
+                   zbar2[jq1 - jp0] == 0.0) {
+              --jq1;
+            }
+            if (jq0 > jq1) continue;
           }
           for (int J = jlo; J <= jhi; ++J) {
             const std::int32_t ib = lit_a[J];
@@ -693,7 +710,7 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
             const double* row2 =
                 a.sj.row(TwoJ{jj}, TwoJ{ji}, TwoJ{2 * J}, TwoJ{jk}, TwoJ{jl});
             double z = 0.0;
-            for (int Jp = jp0; Jp <= jp1; ++Jp) {
+            for (int Jp = jq0; Jp <= jq1; ++Jp) {
               const double s1 = row1[Jp];
               const double s2 = row2[Jp];
               double t = 0.0;
