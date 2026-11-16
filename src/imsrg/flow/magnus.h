@@ -108,13 +108,16 @@ class MagnusSolver {
   /// A rank-3 H0 needs IMSRG(3) terms in `comm` as well (else the commutator
   /// results would not match its rank; InputError): s = 0,
   /// Omega stack = {0}, eta not computed yet. Builds the commutator workspace
-  /// (needs an initialized exec::Runtime).
+  /// (needs an initialized exec::Runtime) with `workspace` (its communicator
+  /// is the set of ranks that share the commutator work; the default is
+  /// serial; construction is not collective).
   /// @throws InputError if `solver.dsmax`, `domega`, `ds_0` or
   ///   `omega_norm_max` is not a positive finite number, `smax` is not finite
   ///   or `eta_criterion` is NaN (ds would be 0 or NaN and the loop endless).
   MagnusSolver(op::Operator H0, const SolverOptions& solver,
                const GeneratorOptions& generator, const BchOptions& bch = {},
-               const commutator::CommutatorOptions& comm = {});
+               const commutator::CommutatorOptions& comm = {},
+               const commutator::WorkspaceOptions& workspace = {});
   ~MagnusSolver();
   MagnusSolver(MagnusSolver&&) noexcept;
   MagnusSolver& operator=(MagnusSolver&&) noexcept;

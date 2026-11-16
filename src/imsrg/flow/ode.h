@@ -66,14 +66,17 @@ class OdeSolver {
   /// conserving; copied and promoted to particle_rank 2). `ode_tolerance` is
   /// the absolute and relative odeint tolerance of `kDopri5`, used as a
   /// double (D47; imsrg++ `SetODETolerance(float)` rounds it). Builds the
-  /// commutator workspace (needs an initialized exec::Runtime).
+  /// commutator workspace with `workspace` (communicator of the ranks that
+  /// share the commutator work, serial by default) (needs an initialized
+  /// exec::Runtime).
   /// @throws InputError for invalid step options (see `ValidateSolverOptions`),
   ///   `solver.hunter_gatherer`, ode_tolerance <= 0, or an operator that is not
   ///   a scalar number-conserving one.
   OdeSolver(OdeMethod method, op::Operator H0,
             std::vector<op::Operator> operators, const SolverOptions& solver,
             double ode_tolerance, const GeneratorOptions& generator,
-            const commutator::CommutatorOptions& comm = {});
+            const commutator::CommutatorOptions& comm = {},
+            const commutator::WorkspaceOptions& workspace = {});
   ~OdeSolver();
   OdeSolver(OdeSolver&&) noexcept;
   OdeSolver& operator=(OdeSolver&&) noexcept;

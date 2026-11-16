@@ -186,7 +186,8 @@ OdeSolver::OdeSolver(OdeMethod method, op::Operator H0,
                      std::vector<op::Operator> operators,
                      const SolverOptions& solver, double ode_tolerance,
                      const GeneratorOptions& generator,
-                     const commutator::CommutatorOptions& comm)
+                     const commutator::CommutatorOptions& comm,
+                     const commutator::WorkspaceOptions& workspace)
     : solver_(solver),
       generator_(generator),
       comm_(comm),
@@ -205,7 +206,8 @@ OdeSolver::OdeSolver(OdeMethod method, op::Operator H0,
       H0.spec().is_scalar() && H0.spec().is_number_conserving() &&
           H0.spec().particle_rank == 2,
       "OdeSolver: H0 must be a scalar, number-conserving two-body operator");
-  ws_ = std::make_unique<commutator::Workspace>(H0.model_space_ptr());
+  ws_ =
+      std::make_unique<commutator::Workspace>(H0.model_space_ptr(), workspace);
   eta_ = op::Operator(H0.model_space_ptr(),
                       GeneratorSpec(H0.spec(), generator_.kind));
   state_.push_back(std::move(H0));
