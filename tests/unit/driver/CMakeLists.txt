@@ -118,3 +118,29 @@ foreach(_ranks 2 4)
       "IMSRG_TEST_DATA_DIR=\"${IMSRG_TEST_DATA_DIR}\"")
   endif()
 endforeach()
+
+# IT-11 (M12b D5): end-to-end MPI invariance. Flows on 2 and 4 ranks reproduce the serial run (results.json
+# and .snt to 1e-12 max(1, |ref|), identical step counts), and all ranks hold identical bits of H(s) after every
+# step. The slow variant (same source, IMSRG_IT11_SLOW) holds N7 and the perturbative triples.
+foreach(_variant "" "_slow")
+  foreach(_ranks 2 4)
+    if(_variant STREQUAL "")
+      set(_labels mpi)
+      set(_timeout 900)
+    else()
+      set(_labels mpi slow)
+      set(_timeout 14400)
+    endif()
+    imsrg_add_test(NAME driver_mpi_it11${_variant}_${_ranks}ranks
+      SOURCES ${_it_support} test_mpi_it11.cc ${PROJECT_SOURCE_DIR}/tests/support/mpi_test_main.cc
+      DEPS driver comm LABELS ${_labels} MPI_RANKS ${_ranks} NO_GTEST_MAIN TIMEOUT ${_timeout})
+    if(TARGET driver_mpi_it11${_variant}_${_ranks}ranks)
+      target_compile_definitions(driver_mpi_it11${_variant}_${_ranks}ranks PRIVATE
+        "IMSRG_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden\""
+        "IMSRG_TEST_DATA_DIR=\"${IMSRG_TEST_DATA_DIR}\"")
+      if(_variant STREQUAL "_slow")
+        target_compile_definitions(driver_mpi_it11${_variant}_${_ranks}ranks PRIVATE IMSRG_IT11_SLOW=1)
+      endif()
+    endif()
+  endforeach()
+endforeach()
