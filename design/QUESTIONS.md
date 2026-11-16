@@ -1049,3 +1049,35 @@ the orchestrator uses `O4` and up).
   `tests/golden/README.md` "pristine" list no longer names it. **Assumed:** the divergent runs of IT-8/emax2 need no separate entry.
 * **IT3-Q12** (2026-11-16, run 3 follow-ups) - The Ctrl-C children restore the default SIGINT handler (a `&` job of a
   non-interactive shell starts them with SIGINT ignored). **Assumed:** this matches a real terminal Ctrl-C, which is what the tests mean to cover.
+
+### M15 reference preparation (run 3, phase 0; tensor operators, D53)
+
+* **M15-Q1** (2026-11-16) - Phase/gauge of the reduced matrix elements. imsrg++'s one-body closed forms (E2, GamowTeller)
+  equal `(-1)^{j_bra-j_ket}` times the Edmonds reduced element (`(-1)^{j_bra-j_ket+λ}` for E-multipoles); the
+  hermiticity relation `(-1)^{j_a-j_b}` is the same in both. The factor telescopes in `[scalar, tensor]` commutators.
+  **Assumed:** the new code may use the Edmonds convention internally only if it converts at the edges (inputs,
+  dumps, 6j/9j recoupling formulas of `TensorCommutators.cc`, whose phases were derived for the imsrg++ gauge);
+  the safest choice is to keep imsrg++'s gauge. Decision needed before the tensor `OperatorDump` v2.
+* **M15-Q2** (2026-11-16) - Tensor `OperatorDump` layout. The raw format stores only `ch_bra <= ch_ket` blocks and
+  lists labelled blocks (`block ...` + `2b p q r s v`). **Assumed:** v2 should store the same minimal set plus the
+  rule `<hi||O||lo> = (-1)^{J_lo-J_hi} <lo||O||hi>` for Hermitian, and say how ΔTz = ±1, ±2 are labelled (imsrg++
+  stores `O + O†` and calls it Hermitian; `delta_Tz` means `|ΔTz|`). Whether the new code stores ΔTz > 0 operators as
+  `O + O†` like imsrg++ or as the one-directional operator is open (it changes the Hermiticity checks).
+* **M15-Q3** (2026-11-16) - Reducedness of J=0 isospin-changing scalars (Fermi, 0νββ, DGT): imsrg++ builds them
+  reduced but makes them not reduced before the HF transformation (`imsrg++.cc:815`) and leaves them so; the
+  `Commutator` dispatch treats them as scalars. The dumps are all reduced (`reduced 1`). **Assumed:** the new
+  code stores J=0 channel-changing operators in the same convention as J>0 (reduced); the scalar-scalar
+  commutator with them (not covered by these goldens) needs a separate reference.
+* **M15-Q4** (2026-11-16) - A one-body Y (E2, M1, GT, Fermi) exercises only `comm111st`, `comm121st`, `comm122st`;
+  the 222/221 terms are zero. The term-by-term goldens for them use seeded random tensors at **emax 1** (He4) because
+  emax-2 files are about 85 KB per 2B-dense dump (limit 1 MB total). **Assumed:** enough for the first tensor
+  milestone; random tensors at emax 2 (He4, O16) and tensor Y with 2B parts from 0νββ-like operators can be added
+  as gitignored `generated/` data when needed. No E1/E3/M1 commutator goldens (only E2, GT) and no commutator with
+  the J=0, ΔTz = 2 operators.
+* **M15-Q5** (2026-11-16) - 0νββ operators and the Magnus golden. imsrg++ provides `M0nu_{GT,F,T}`, `M0nu_C`,
+  `M0nuHeavy_*`, `DGT` (all J=0, ΔTz=2, 2B only; the HO operators depend on the model-space target mass through
+  `R0 A^{1/3}`). Only `Ec = 7.72`, `src = none`, and the default form factors are dumped, in HO and HF bases, with
+  ΔTz = 2 stored as the pp (bra) - nn (ket) block. The Magnus golden is one BCH step with a random anti-Hermitian
+  Omega of norm 0.3, not a flow-produced Omega. **Assumed:** acceptable; a flow-produced Omega
+  (`refharness flow` writes none) needs a harness hook. The imsrg++ `BCH_Transform` stops at the default thresholds,
+  so the golden contains truncation error of that order.

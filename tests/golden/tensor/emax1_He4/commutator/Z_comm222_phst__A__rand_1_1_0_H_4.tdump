@@ -1,0 +1,115 @@
+# imsrg-tensor-dump raw v0 (M15 reference prep, run 3; NOT the final OperatorDump format)
+source imsrg-devel src-sha256:ddcbf1aff166414e746113d5f3de2ddc1e72783fb7c201829cd58e317717f40f+d35-patch:3b0ff5eed6806a72 refharness commutator-tensor comm222_phst
+command commutator-tensor 2bme=VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz X=A Y=rand_1_1_0_H_4 emax=1 file2e1max=14 file2e2max=28 file2lmax=14 hw=16 reference=He4 terms=comm111st,comm121st,comm122st,comm221st,comm222_pp_hhst,comm222_pp_hh_221st,comm222_phst,all valence_space=He4
+operator [A,rand_1_1_0_H_4] term comm222_phst
+basis HF emax 1 hw 16 reference He4
+spec rank_J 1 parity 0 delta_Tz 1 hermiticity H particle_rank 2 reduced 1
+convention reduced matrix elements <bra||O||ket> as stored by imsrg++ (scalars: sqrt(2J_bra+1) times the J-coupled element, TwoBodyME::MakeReduced; sigma and E2 equal (-1)^(j_bra-j_ket) times the Edmonds element, see design/15-operator-dump-format.md)
+convention 2B pairs: p<=q, r<=s, normalized antisymmetrized (TwoBodyME::GetTBME_norm), bra pair in channel ch_bra, ket pair in ch_ket; only ch_bra<=ch_ket blocks are stored (TwoBodyME::Allocate, TwoBodyME.cc:94-113); full matrix of each block listed
+convention channel = (J, parity, Tz) with Tz=(tz2_p+tz2_q)/2 in {-1,0,1}, ch = 6J+2(Tz+1)+parity; delta_Tz = |Tz_bra-Tz_ket|; 2tz=-1 is proton
+columns 1b a b value (OneBody(a,b) = <a||O||b>)
+columns block ch_bra J_bra parity_bra Tz_bra ch_ket J_ket parity_ket Tz_ket count (header of the following `count` 2b lines; only blocks with a nonzero element)
+columns 2b p q r s value (<pq;J_bra||O||rs;J_ket>, channels of the preceding block line)
+norbits 6
+orbit 0 0 0 1 -1 1
+orbit 1 0 0 1 1 1
+orbit 2 0 1 3 -1 0
+orbit 3 0 1 3 1 0
+orbit 4 0 1 1 -1 0
+orbit 5 0 1 1 1 0
+zero_body 0
+one_body 0
+two_body 72 blocks 20
+block 0 0 0 -1 8 1 0 0 6
+2b 0 0 2 3 0.45303063616472489
+2b 0 0 2 5 2.7231607948051137
+2b 0 0 3 4 -2.2481099188263549
+2b 0 0 4 5 1.3300730267682579
+2b 2 2 0 1 3.7661483422608053
+2b 4 4 0 1 3.4953146774389596
+block 1 0 1 -1 9 1 1 0 4
+2b 0 4 0 3 -3.3713853493833894
+2b 0 4 0 5 6.8264548655420265
+2b 0 4 1 2 -4.4571146203970535
+2b 0 4 1 4 -2.9697560674630359
+block 2 0 0 0 6 1 0 -1 1
+2b 0 1 2 4 -2.1254556057909872
+block 2 0 0 0 10 1 0 1 1
+2b 0 1 3 5 1.3278275930282746
+block 3 0 1 0 7 1 1 -1 4
+2b 0 5 0 2 0.72534180279860261
+2b 0 5 0 4 3.6469030561432971
+2b 1 4 0 2 -1.2700255015066464
+2b 1 4 0 4 -0.92717096553376344
+block 3 0 1 0 11 1 1 1 4
+2b 0 5 1 3 3.3467571641818865
+2b 0 5 1 5 3.6406870240152975
+2b 1 4 1 3 -3.8516942580360052
+2b 1 4 1 5 -0.070188145779347094
+block 4 0 0 1 8 1 0 0 6
+2b 1 1 2 3 -0.56834894487175625
+2b 1 1 2 5 1.0315785070114381
+2b 1 1 3 4 -0.20736495067177815
+2b 1 1 4 5 -3.2059780069139641
+2b 3 3 0 1 0.41665137078094094
+2b 5 5 0 1 -0.77395203142197277
+block 5 0 1 1 9 1 1 0 4
+2b 1 5 0 3 4.1286428945203761
+2b 1 5 0 5 2.7445330096123652
+2b 1 5 1 2 1.2917025070080956
+2b 1 5 1 4 -1.5957950312154092
+block 6 1 0 -1 8 1 0 0 1
+2b 2 4 0 1 -2.7625943790083181
+block 7 1 1 -1 9 1 1 0 8
+2b 0 2 0 3 -0.046067687475673358
+2b 0 2 0 5 1.8635565940792498
+2b 0 2 1 2 2.4665787102980095
+2b 0 2 1 4 0.44061029023802101
+2b 0 4 0 3 -4.580716638642131
+2b 0 4 0 5 -0.9410852322476505
+2b 0 4 1 2 -0.39779910782009492
+2b 0 4 1 4 -1.4797769281004518
+block 7 1 1 -1 15 2 1 0 4
+2b 0 2 0 3 -0.95549474929343003
+2b 0 2 1 2 -2.1374799528070794
+2b 0 4 0 3 -5.0033216334372312
+2b 0 4 1 2 1.3607750354905639
+block 8 1 0 0 10 1 0 1 1
+2b 0 1 3 5 2.7822756726314433
+block 8 1 0 0 12 2 0 -1 2
+2b 0 1 2 2 1.118780541419709
+2b 0 1 2 4 0.71062466943175639
+block 8 1 0 0 16 2 0 1 2
+2b 0 1 3 3 -1.2528190374319934
+2b 0 1 3 5 -6.492073343894714
+block 9 1 1 0 11 1 1 1 8
+2b 0 3 1 3 1.6182692689588756
+2b 0 3 1 5 2.3903403557969289
+2b 0 5 1 3 0.87469400913215667
+2b 0 5 1 5 -4.2706915735720958
+2b 1 2 1 3 -0.10197993266958988
+2b 1 2 1 5 6.2261807982400477
+2b 1 4 1 3 -1.0602108611746133
+2b 1 4 1 5 4.2136571152171092
+block 9 1 1 0 13 2 1 -1 4
+2b 0 3 0 2 0.10257431006421863
+2b 0 5 0 2 2.0418551028291829
+2b 1 2 0 2 0.39999246943608191
+2b 1 4 0 2 0.071756145615738398
+block 9 1 1 0 17 2 1 1 4
+2b 0 3 1 3 -0.46886734511177719
+2b 0 5 1 3 2.7654742142459003
+2b 1 2 1 3 -0.35431504120109164
+2b 1 4 1 3 -5.1115368564480042
+block 11 1 1 1 15 2 1 0 4
+2b 1 3 0 3 -1.9371926015389431
+2b 1 3 1 2 2.6414870356023505
+2b 1 5 0 3 -2.1569087266388118
+2b 1 5 1 2 1.1670591800908672
+block 13 2 1 -1 15 2 1 0 2
+2b 0 2 0 3 -1.2241784698676939
+2b 0 2 1 2 -1.6567922373817583
+block 15 2 1 0 17 2 1 1 2
+2b 0 3 1 3 -3.5673715960360415
+2b 1 2 1 3 -5.669579543512075
+end

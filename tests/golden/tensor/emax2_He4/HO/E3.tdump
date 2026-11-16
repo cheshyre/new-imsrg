@@ -1,0 +1,35 @@
+# imsrg-tensor-dump raw v0 (M15 reference prep, run 3; NOT the final OperatorDump format)
+source imsrg-devel src-sha256:ddcbf1aff166414e746113d5f3de2ddc1e72783fb7c201829cd58e317717f40f+d35-patch:3b0ff5eed6806a72 refharness dump-tensor
+command dump-tensor 2bme=VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz basis=HO emax=2 file2e1max=14 file2e2max=28 file2lmax=14 hw=16 ops=E1,E2,E3,M1,Fermi,GamowTeller,M0nu_GT_7.72_none,M0nu_F_7.72_none,DGT reference=He4 valence_space=He4
+operator E3
+basis HO emax 2 hw 16 reference He4
+spec rank_J 3 parity 1 delta_Tz 0 hermiticity H particle_rank 2 reduced 1
+convention reduced matrix elements <bra||O||ket> as stored by imsrg++ (scalars: sqrt(2J_bra+1) times the J-coupled element, TwoBodyME::MakeReduced; sigma and E2 equal (-1)^(j_bra-j_ket) times the Edmonds element, see design/15-operator-dump-format.md)
+convention 2B pairs: p<=q, r<=s, normalized antisymmetrized (TwoBodyME::GetTBME_norm), bra pair in channel ch_bra, ket pair in ch_ket; only ch_bra<=ch_ket blocks are stored (TwoBodyME::Allocate, TwoBodyME.cc:94-113); full matrix of each block listed
+convention channel = (J, parity, Tz) with Tz=(tz2_p+tz2_q)/2 in {-1,0,1}, ch = 6J+2(Tz+1)+parity; delta_Tz = |Tz_bra-Tz_ket|; 2tz=-1 is proton
+columns 1b a b value (OneBody(a,b) = <a||O||b>)
+columns block ch_bra J_bra parity_bra Tz_bra ch_ket J_ket parity_ket Tz_ket count (header of the following `count` 2b lines; only blocks with a nonzero element)
+columns 2b p q r s value (<pq;J_bra||O||rs;J_ket>, channels of the preceding block line)
+norbits 12
+orbit 0 0 0 1 -1 1
+orbit 1 0 0 1 1 1
+orbit 2 0 1 3 -1 0
+orbit 3 0 1 3 1 0
+orbit 4 0 1 1 -1 0
+orbit 5 0 1 1 1 0
+orbit 6 0 2 5 -1 0
+orbit 7 0 2 5 1 0
+orbit 8 0 2 3 -1 0
+orbit 9 0 2 3 1 0
+orbit 10 1 0 1 -1 0
+orbit 11 1 0 1 1 0
+zero_body 0
+one_body 6
+1b 2 6 14.272205907543677
+1b 2 8 17.479810988708863
+1b 4 6 -15.956811299070875
+1b 6 2 -14.272205907543677
+1b 6 4 -15.956811299070875
+1b 8 2 17.479810988708863
+two_body 0 blocks 0
+end

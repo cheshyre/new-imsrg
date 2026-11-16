@@ -1,0 +1,59 @@
+# imsrg-tensor-dump raw v0 (M15 reference prep, run 3; NOT the final OperatorDump format)
+source imsrg-devel src-sha256:ddcbf1aff166414e746113d5f3de2ddc1e72783fb7c201829cd58e317717f40f+d35-patch:3b0ff5eed6806a72 refharness commutator-tensor comm121st
+command commutator-tensor 2bme=VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz X=H Y=E2,GamowTeller emax=2 file2e1max=14 file2e2max=28 file2lmax=14 hw=16 reference=O16 terms=comm111st,comm121st,comm122st,comm221st,comm222_pp_hhst,comm222_pp_hh_221st,comm222_phst,all valence_space=O16
+operator [H,E2] term comm121st
+basis HF emax 2 hw 16 reference O16
+spec rank_J 2 parity 0 delta_Tz 0 hermiticity A particle_rank 2 reduced 1
+convention reduced matrix elements <bra||O||ket> as stored by imsrg++ (scalars: sqrt(2J_bra+1) times the J-coupled element, TwoBodyME::MakeReduced; sigma and E2 equal (-1)^(j_bra-j_ket) times the Edmonds element, see design/15-operator-dump-format.md)
+convention 2B pairs: p<=q, r<=s, normalized antisymmetrized (TwoBodyME::GetTBME_norm), bra pair in channel ch_bra, ket pair in ch_ket; only ch_bra<=ch_ket blocks are stored (TwoBodyME::Allocate, TwoBodyME.cc:94-113); full matrix of each block listed
+convention channel = (J, parity, Tz) with Tz=(tz2_p+tz2_q)/2 in {-1,0,1}, ch = 6J+2(Tz+1)+parity; delta_Tz = |Tz_bra-Tz_ket|; 2tz=-1 is proton
+columns 1b a b value (OneBody(a,b) = <a||O||b>)
+columns block ch_bra J_bra parity_bra Tz_bra ch_ket J_ket parity_ket Tz_ket count (header of the following `count` 2b lines; only blocks with a nonzero element)
+columns 2b p q r s value (<pq;J_bra||O||rs;J_ket>, channels of the preceding block line)
+norbits 12
+orbit 0 0 0 1 -1 1
+orbit 1 0 0 1 1 1
+orbit 2 0 1 3 -1 1
+orbit 3 0 1 3 1 1
+orbit 4 0 1 1 -1 1
+orbit 5 0 1 1 1 1
+orbit 6 0 2 5 -1 0
+orbit 7 0 2 5 1 0
+orbit 8 0 2 3 -1 0
+orbit 9 0 2 3 1 0
+orbit 10 1 0 1 -1 0
+orbit 11 1 0 1 1 0
+zero_body 0
+one_body 30
+1b 0 6 2.5101676277988805
+1b 0 8 6.9843029188024666
+1b 1 7 12.032259120158724
+1b 1 9 12.244431661525269
+1b 2 2 -1.4346367261311624e-16
+1b 2 4 -3.3762055172612651
+1b 3 3 -5.7613868561367637e-17
+1b 3 5 -1.694166278424531
+1b 4 2 -3.3762055172612651
+1b 5 3 -1.694166278424531
+1b 6 0 -2.5101676277988805
+1b 6 6 9.8644857445515817e-18
+1b 6 8 -2.4733221576396582
+1b 6 10 -1.6031863390547374
+1b 7 1 -12.032259120158724
+1b 7 7 -5.2971555256117367e-16
+1b 7 9 -1.2824462140658899
+1b 7 11 -3.5442244741403597
+1b 8 0 6.9843029188024666
+1b 8 6 -2.4733221576396582
+1b 8 8 -1.5972468254501116e-17
+1b 8 10 0.055492958773950038
+1b 9 1 12.244431661525269
+1b 9 7 -1.2824462140658899
+1b 9 9 9.8687505858974998e-17
+1b 9 11 2.147779824752778
+1b 10 6 1.6031863390547374
+1b 10 8 0.055492958773950038
+1b 11 7 3.5442244741403597
+1b 11 9 2.147779824752778
+two_body 0 blocks 0
+end
