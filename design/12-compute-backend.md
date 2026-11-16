@@ -119,7 +119,8 @@ none computes a symbol inside a hot loop, and no table is a lazy cache.
 * **Phase 1 (implemented; replicated data, distributed work; D59)**: every rank holds the full
   1B and 2B operators and runs the whole pipeline.
   * Work split (`commutator/detail/work_items.h`, `AssignWork`): the ladder terms (pp/hh,
-    including 221) by a contiguous cost-balanced cut of the global row sequence; comm122 and the
+    including 221) by a contiguous cut of the global row sequence whose per-rank capacities leave
+    room for the calibrated comm122 and ph loads (`JointLadderItems`); comm122 and the
     particle-hole term by whole channels with LPT; the cheap terms 110/220/111/121 and all N7
     terms on rank 0; 3f2 replicated.
   * Combine (`commutator/commutator.cc`, single exit of `Commutator()`): `ReduceBcastSum` of
