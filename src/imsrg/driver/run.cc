@@ -8,6 +8,7 @@
 #include "imsrg/driver/run.h"
 
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -67,12 +68,6 @@ void RejectPlanned(const RunConfig& c) {
   }
   if (c.imsrg.use_brueckner_bch) Planned("imsrg.use_brueckner_bch");
   if (c.imsrg.goose_tank) Planned("imsrg.goose_tank");
-  if (c.imsrg.perturbative_triples && c.imsrg3.occ_nat3_cut) {
-    // imsrg++.cc:570 switches to natural orbitals for the cut. (The IMSRG(3)
-    // flow supports the cut, see MakeFlowStart; the perturbative triples
-    // follow once flow/triples is rewritten.)
-    Planned("imsrg3.occ_nat3_cut with imsrg.perturbative_triples");
-  }
   if (c.imsrg.space) Planned("[imsrg.space] (IMSRG model-space truncation)");
   if (c.imsrg3.at_end) Planned("imsrg3.at_end");
   if (c.imsrg3.in_flow) {
@@ -339,7 +334,9 @@ struct StageRecord {
 /// The perturbative-triples correction of stage 1 (imsrg++.cc:1100-1108).
 struct TriplesRecord {
   double de = 0.0;
-  double e0_plus_de = 0.0;  ///< E0 of the stage-1 H(s) plus de.
+  double e0_plus_de = 0.0;      ///< E0 of the stage-1 H(s) plus de.
+  std::int64_t kept_kets = 0;   ///< 3B kets kept by the dE3max/OccNat3 cuts.
+  std::int64_t total_kets = 0;  ///< The same before the cuts.
 };
 
 struct OperatorRecord {
@@ -494,7 +491,9 @@ void WriteImsrgBlock(std::ostream& out, const std::vector<StageRecord>& stages,
   out << "]";
   if (triples) {
     out << ", \"perturbative_triples\": {\"de\": " << Fmt17(triples->de)
-        << ", \"e0_plus_de\": " << Fmt17(triples->e0_plus_de) << "}";
+        << ", \"e0_plus_de\": " << Fmt17(triples->e0_plus_de)
+        << ", \"kept_kets\": " << triples->kept_kets
+        << ", \"total_kets\": " << triples->total_kets << "}";
   }
   out << "}";
 }
@@ -574,6 +573,17 @@ flow::BchOptions MakeBchOptions(const RunConfig& config) {
   return bch;
 }
 
+/// Natural occupations n_i (one per orbit) for the OccNat3 cut
+/// (imsrg++.cc:570): those of the MBPT(2) density matrix of `ph.hno`, also in
+/// an HF-basis run; the NAT step's values are reused for `basis.kind = "nat"`.
+/// Shared by the IMSRG(3) flow and the perturbative triples.
+std::vector<double> CutOccupations(const pipeline::PreparedHamiltonian& ph) {
+  if (!ph.nat_occupations.empty()) return ph.nat_occupations;
+  op::Operator hno = ph.hno;  // Mbpt2DensityMatrix syncs its argument
+  const linalg::Matrix<double> rho = mbpt::Mbpt2DensityMatrix(hno);
+  return mbpt::ComputeNaturalOrbitals(rho, ph.hno.model_space()).occupations;
+}
+
 /// The Hamiltonian and model space the flow starts from.
 struct FlowStart {
   op::Operator h_start;
@@ -594,17 +604,8 @@ FlowStart MakeFlowStart(const RunConfig& config,
     cuts.emax_3body = -1;
     if (config.imsrg3.de3max) cuts.de3max = *config.imsrg3.de3max;
     if (config.imsrg3.occ_nat3_cut) {
-      // imsrg++.cc:570: natural occupations of the MBPT(2) density matrix,
-      // also in an HF-basis run; the NAT step's values are reused.
       cuts.occnat3_cut = *config.imsrg3.occ_nat3_cut;
-      if (!ph.nat_occupations.empty()) {
-        cuts.natural_occupations = ph.nat_occupations;
-      } else {
-        op::Operator hno = ph.hno;  // Mbpt2DensityMatrix syncs its argument
-        const linalg::Matrix<double> rho = mbpt::Mbpt2DensityMatrix(hno);
-        cuts.natural_occupations =
-            mbpt::ComputeNaturalOrbitals(rho, ph.hno.model_space()).occupations;
-      }
+      cuts.natural_occupations = CutOccupations(ph);
     }
     const std::shared_ptr<const basis::ModelSpace> ms3 =
         ph.hno.model_space_ptr()->WithThreeBody(cuts);
@@ -641,19 +642,25 @@ std::vector<op::Operator> PrepareFlowingOperators(
 }
 
 /// Evaluates the perturbative triples correction of the stage-1 H(s).
-TriplesRecord EvaluatePerturbativeTriples(Engine& solver,
-                                          const RunConfig& config) {
+TriplesRecord EvaluatePerturbativeTriples(
+    Engine& solver, const pipeline::PreparedHamiltonian& ph,
+    const RunConfig& config) {
   flow::TriplesOptions to;
   if (config.imsrg3.de3max) to.de3max = *config.imsrg3.de3max;
+  if (config.imsrg3.occ_nat3_cut) {
+    to.occnat3_cut = *config.imsrg3.occ_nat3_cut;
+    to.natural_occupations = CutOccupations(ph);
+  }
   const flow::TriplesResult tr =
       flow::PerturbativeTriples(solver.magnus_solver(), to);
   const double e0_stage1 = solver.hamiltonian().zero_body();
   log::Info(
-      "Perturbative triples: dE3max = {}, 3-body states kept: {} out of {}",
-      to.de3max, tr.kept_rows, tr.total_kets);
+      "Perturbative triples: dE3max = {}, OccNat3Cut = {:e}, 3-body states "
+      "kept: {} out of {}",
+      to.de3max, to.occnat3_cut, tr.kept_rows, tr.total_kets);
   log::Info("Perturbative triples:  {:16.8f} -> {:.8f}", tr.de,
             e0_stage1 + tr.de);
-  return TriplesRecord{tr.de, e0_stage1 + tr.de};
+  return TriplesRecord{tr.de, e0_stage1 + tr.de, tr.kept_rows, tr.total_kets};
 }
 
 /// Runs stage 2 (the valence generator with a new Omega) and records it.
@@ -756,6 +763,7 @@ Engine MakeEngine(const RunConfig& config,
 /// Runs stage 1, the perturbative triples and the optional valence stage,
 /// appending the stage records and logging their summary.
 void RunStages(Engine& solver, FlowLog& flow_log, const RunConfig& config,
+               const pipeline::PreparedHamiltonian& ph,
                const basis::ModelSpace& ms, bool magnus,
                std::vector<StageRecord>& stages,
                std::optional<TriplesRecord>& triples) {
@@ -768,7 +776,7 @@ void RunStages(Engine& solver, FlowLog& flow_log, const RunConfig& config,
   // second stage; H(s) and the Omega stack are those of stage 1).
   if (config.imsrg.perturbative_triples && magnus &&
       stages.back().result.reason != flow::StopReason::kDiverged) {
-    triples = EvaluatePerturbativeTriples(solver, config);
+    triples = EvaluatePerturbativeTriples(solver, ph, config);
   }
 
   const bool second_stage =
@@ -879,7 +887,7 @@ void Run(const RunConfig& config) {
       [&solver]() -> const op::Operator& { return solver.hamiltonian(); });
   std::vector<StageRecord> stages;
   std::optional<TriplesRecord> triples;
-  RunStages(solver, flow_log, config, ms, magnus, stages, triples);
+  RunStages(solver, flow_log, config, ph, ms, magnus, stages, triples);
   FinishRun(config, ph, solver, start, magnus, requests, radius_slots, stages,
             triples, ops);
 }
