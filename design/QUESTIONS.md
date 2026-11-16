@@ -971,3 +971,20 @@ settled the decisions for run 3 and later: D44–D54 in `00-requirements-and-dec
 
 Run 3 appends its questions below (ids per brief, e.g. `M10-Q70..Q79`, `M12b-Q1..Q9`, `MS2-Q1..Q9`;
 the orchestrator uses `O4` and up).
+
+* **IT3-Q1** (2026-11-16, run 3, brief A part 1) - The D35 patch of imsrg-devel now carries the D47 and D48
+  hunks in the same file (one version stamp, `...+d35-patch:0c7af4dd0112f621`); goldens whose numbers did not
+  change (IT-1..IT-8, IT-14, IT-15 old jobs, IT-9 emax 3) keep their old `source` string `...cb9d11ba30f579d4`
+  on purpose, to avoid churn. **Assumed meanwhile:** fine (the string is informational; `tests/golden/README.md`
+  says so). Alternative: regenerate every golden once so that all carry the new stamp.
+* **IT3-Q2** (2026-11-16, run 3, D48) - After the final gather `MagnusSolver` replaces H(s) but not eta(s):
+  `SolveResult::norm_eta` and the stage-2 start (`Solve` recomputes eta from H) therefore see the rebuilt H only
+  from stage 2 on, as in the patched imsrg++ (`FlowingOps[0] = H_saved`, Eta untouched); after a divergence H is
+  not rebuilt. **Assumed meanwhile:** fine, trajectories and counts unchanged. Alternative: recompute eta and
+  report its norm after the rebuild.
+* **IT3-Q3** (2026-11-16, run 3, D47) - The adaptive `flow` method of the patched imsrg++ still restarts s at 0 in
+  stage 2 (it integrates a copy of the solver), so for `flow` the reference flow file ends at s = smax while ours
+  ends at s1 + smax; the range LENGTH is the same, only the final quantities are compared
+  (`FlowMethods.StageTwoRangeAdaptiveSmax10`). Also: `tools/ci.sh` started from a background job of a
+  non-interactive shell fails `test_ctrl_c_*` of `tests/python/test_threading.py` (background jobs ignore SIGINT);
+  run it in the foreground. **Assumed meanwhile:** no change.
