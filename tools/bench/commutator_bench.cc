@@ -176,8 +176,9 @@ void ModelMpiRow(int emax) {
   std::printf(
       "  ladder with row blocks (implementation weight), imbalance %%:");
   for (const int r : kRanks)
-    std::printf(" %d:%.1f", r,
-                ImbalancePercent(wi::LadderWorkItems(s, r).cost, r));
+    std::printf(
+        " %d:%.1f", r,
+        100.0 * wi::WorkAssignment::Build(s, 0, r).ladder_map().Imbalance());
   std::printf("\n");
   PrintTermRow("comm122 (whole channels)", wi::Comm122WorkItems(s).cost, kRanks,
                5);

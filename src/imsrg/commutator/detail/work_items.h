@@ -56,10 +56,12 @@ struct WorkSizes {
 /// buffers. Complexity O(kets x orbits per one-body channel).
 WorkSizes ComputeWorkSizes(const basis::ModelSpace& ms);
 
-/// Ladder work items (row blocks) with their costs.
+/// Ladder work items (row blocks) with their costs and owning ranks.
 struct LadderItems {
   std::vector<RowBlock> blocks;  ///< Ascending (channel, row_begin).
   std::vector<double> cost;      ///< Cost of each block.
+  /// Owning rank of each block (ascending; all 0 for one part).
+  std::vector<std::int32_t> owner;
 };
 
 /// Whole-channel work items (comm122 or particle-hole) with their costs.
@@ -68,13 +70,20 @@ struct ChannelItems {
   std::vector<double> cost;            ///< Cost of each item.
 };
 
-/// Ladder items: one per channel with N_c > 0 and k_pp + k_hh > 0, cost 2 rows
-/// N_c (k_pp + k_hh). Only if `num_parts > 1`, a channel whose cost exceeds
-/// total / (4 num_parts) is split into nb row blocks of near-equal rows (block
-/// b is [b N / nb, (b + 1) N / nb)), nb = min(N_c, ceil(cost / (total / (4
-/// num_parts)))), raised until the largest block fits the threshold (or is one
-/// row). With `num_parts == 1` nothing is split. Precondition: `num_parts >=
-/// 1`. Complexity O(channels + items).
+/// Ladder items and their owners: a contiguous cost-balanced cut of the
+/// global row sequence. The sequence is the rows 0..N_c-1 of the eligible
+/// channels (N_c > 0 and k_pp + k_hh > 0) in ascending channel order, R rows
+/// in all; a row of channel c costs u_c = 2 N_c (k_pp + k_hh). With prefix
+/// sums S_0 = 0, S_i = u of rows 0..i-1 (exact in double: integers < 2^53) and
+/// total T = S_R, the cuts are cut_0 = 0, cut_P = R and, for r = 1..P-1,
+/// cut_r = the boundary i in [0, R] whose S_i is nearest to r T / P (ties:
+/// lower i), clamped to be non-decreasing. Rank r owns the global rows
+/// [cut_r, cut_{r+1}), split at channel boundaries into row blocks (rows local
+/// to the channel); ranks may own nothing (P > R). Blocks are in ascending
+/// (channel, row_begin) order, which is ascending owner order, and `cost` is
+/// u_c times the rows. Hence |load_r - T / P| <= the largest row cost. With
+/// `num_parts == 1` there is one block per eligible channel, owner 0.
+/// Precondition: `num_parts >= 1`. Complexity O(R + P log R).
 LadderItems LadderWorkItems(const WorkSizes& sizes, std::int32_t num_parts);
 
 /// comm122 items: one per channel with N_c > 0 and lifted_c > 0, cost N_c
@@ -85,8 +94,11 @@ ChannelItems Comm122WorkItems(const WorkSizes& sizes);
 /// Ncc^2 nk. O(cc channels).
 ChannelItems PhWorkItems(const WorkSizes& sizes);
 
-/// The work of one part (rank) of `num_parts`: three `OwnershipMap::Greedy`
-/// maps (one per term, balanced per term) and the owned items. Value type.
+/// The work of one part (rank) of `num_parts`: three `OwnershipMap`s (one per
+/// term) and the owned items. The ladder map is the contiguous row cut of
+/// `LadderWorkItems` (`OwnershipMap::FromOwners`); the comm122 and
+/// particle-hole maps are `OwnershipMap::Greedy` (LPT) over whole channels.
+/// Value type.
 class WorkAssignment {
  public:
   /// The assignment of a single part (owns nothing: no items).
@@ -99,7 +111,7 @@ class WorkAssignment {
 
   /// Builds the assignment of `part` of `num_parts`. Deterministic: every part
   /// builds the same maps. Precondition: 0 <= part < num_parts (IMSRG_CHECK).
-  /// Complexity O(items log items).
+  /// Complexity O(R + items log items) with R the ladder rows.
   static WorkAssignment Build(const WorkSizes& sizes, std::int32_t part,
                               std::int32_t num_parts);
 

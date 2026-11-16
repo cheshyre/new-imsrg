@@ -108,7 +108,7 @@ TEST(commutator_distributed_ladder, parts_sum_to_serial) {
         detail::AssignWork(ws, 0, 1);
         const Operator serial = Compute(t, X, Y, ws, ms);
         const double scale = std::max(1.0, op::MaxAbs(serial).max());
-        for (int parts : {2, 3}) {
+        for (int parts : {2, 3, 7}) {
           const Operator sum = PartSum(t, X, Y, ws, parts, ms);
           const double dev = op::MaxAbsDifference(sum, serial).max();
           std::printf(

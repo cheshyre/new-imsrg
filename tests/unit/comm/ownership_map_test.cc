@@ -142,6 +142,67 @@ TEST(OwnershipMap, ManySmallItemsAreBalanced) {
   EXPECT_LT(m.Imbalance(), 0.05);
 }
 
+TEST(OwnershipMap, FromOwnersCsrLoadsAndImbalance) {
+  const std::vector<std::int32_t> owner{0, 0, 2, 2, 2, 3};
+  const std::vector<double> cost{1, 2, 3, 4, 5, 6};
+  const auto m = OwnershipMap::FromOwners(owner, cost, 4);
+  EXPECT_EQ(m.num_items(), 6);
+  EXPECT_EQ(m.num_ranks(), 4);
+  EXPECT_EQ(Owners(m), owner);
+  EXPECT_EQ(ItemsOf(m, 0), (std::vector<std::int32_t>{0, 1}));
+  EXPECT_TRUE(ItemsOf(m, 1).empty());  // an empty rank
+  EXPECT_EQ(ItemsOf(m, 2), (std::vector<std::int32_t>{2, 3, 4}));
+  EXPECT_EQ(ItemsOf(m, 3), (std::vector<std::int32_t>{5}));
+  EXPECT_EQ(m.load(0), 3.0);
+  EXPECT_EQ(m.load(1), 0.0);
+  EXPECT_EQ(m.load(2), 12.0);
+  EXPECT_EQ(m.load(3), 6.0);
+  EXPECT_DOUBLE_EQ(m.Imbalance(), 12.0 / (21.0 / 4.0) - 1.0);
+}
+
+TEST(OwnershipMap, FromOwnersUnsortedOwnersGiveAscendingItems) {
+  const std::vector<std::int32_t> owner{1, 0, 1, 0};
+  const std::vector<double> cost{1, 1, 1, 1};
+  const auto m = OwnershipMap::FromOwners(owner, cost, 2);
+  EXPECT_EQ(ItemsOf(m, 0), (std::vector<std::int32_t>{1, 3}));
+  EXPECT_EQ(ItemsOf(m, 1), (std::vector<std::int32_t>{0, 2}));
+  EXPECT_EQ(m.Imbalance(), 0.0);
+}
+
+TEST(OwnershipMap, FromOwnersMatchesGreedyOwners) {
+  const std::vector<double> cost{5, 3, 3, 2, 2, 1};
+  const auto g = OwnershipMap::Greedy(cost, 3);
+  const auto f = OwnershipMap::FromOwners(Owners(g), cost, 3);
+  for (std::int32_t r = 0; r < 3; ++r) {
+    EXPECT_EQ(ItemsOf(f, r), ItemsOf(g, r));
+    EXPECT_DOUBLE_EQ(f.load(r), g.load(r));
+  }
+  EXPECT_DOUBLE_EQ(f.Imbalance(), g.Imbalance());
+}
+
+TEST(OwnershipMap, FromOwnersEmptyAndInvalid) {
+  const auto empty = OwnershipMap::FromOwners({}, {}, 3);
+  EXPECT_EQ(empty.num_items(), 0);
+  EXPECT_EQ(empty.num_ranks(), 3);
+  EXPECT_EQ(empty.Imbalance(), 0.0);
+  const std::vector<std::int32_t> owner{0, 1};
+  const std::vector<double> cost{1.0, 2.0};
+  EXPECT_THROW(OwnershipMap::FromOwners(owner, cost, 0), InputError);
+  EXPECT_THROW(OwnershipMap::FromOwners(owner, cost, -1), InputError);
+  const std::vector<double> short_cost{1.0};
+  EXPECT_THROW(OwnershipMap::FromOwners(owner, short_cost, 2), InputError);
+  EXPECT_THROW(OwnershipMap::FromOwners(owner, cost, 1), InputError);
+  const std::vector<std::int32_t> negative{0, -1};
+  EXPECT_THROW(OwnershipMap::FromOwners(negative, cost, 2), InputError);
+  const std::vector<double> bad_neg{1.0, -2.0};
+  EXPECT_THROW(OwnershipMap::FromOwners(owner, bad_neg, 2), InputError);
+  const std::vector<double> bad_nan{1.0, std::nan("")};
+  EXPECT_THROW(OwnershipMap::FromOwners(owner, bad_nan, 2), InputError);
+  const std::vector<double> bad_inf{1.0,
+                                    std::numeric_limits<double>::infinity()};
+  EXPECT_THROW(OwnershipMap::FromOwners(owner, bad_inf, 2), InputError);
+}
+
 TEST(CommChunks, Ranges) {
   using detail::ChunkRanges;
   EXPECT_TRUE(ChunkRanges(0, 4).empty());

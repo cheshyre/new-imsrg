@@ -22,14 +22,14 @@ namespace {
 
 void ValidateGreedyInput(std::span<const double> cost, std::int32_t num_ranks) {
   if (num_ranks < 1) {
-    throw InputError("OwnershipMap::Greedy: num_ranks must be >= 1");
+    throw InputError("OwnershipMap: num_ranks must be >= 1");
   }
   if (cost.size() > static_cast<std::size_t>(INT32_MAX)) {
-    throw InputError("OwnershipMap::Greedy: more than INT32_MAX items");
+    throw InputError("OwnershipMap: more than INT32_MAX items");
   }
   for (const double c : cost) {
     if (!std::isfinite(c) || c < 0.0) {
-      throw InputError("OwnershipMap::Greedy: cost must be finite and >= 0");
+      throw InputError("OwnershipMap: cost must be finite and >= 0");
     }
   }
 }
@@ -39,7 +39,6 @@ void ValidateGreedyInput(std::span<const double> cost, std::int32_t num_ranks) {
 OwnershipMap OwnershipMap::Greedy(std::span<const double> cost,
                                   std::int32_t num_ranks) {
   ValidateGreedyInput(cost, num_ranks);
-  const auto n = static_cast<std::int32_t>(cost.size());
   std::vector<std::int32_t> order(cost.size());
   std::iota(order.begin(), order.end(), 0);
   std::stable_sort(order.begin(), order.end(),
@@ -63,20 +62,44 @@ OwnershipMap OwnershipMap::Greedy(std::span<const double> cost,
     heap.push({new_load, rank});
   }
 
-  map.item_begin_.assign(static_cast<std::size_t>(num_ranks) + 1, 0);
-  for (const std::int32_t r : map.owner_) {
-    ++map.item_begin_[static_cast<std::size_t>(r) + 1];
+  map.BuildCsr();
+  return map;
+}
+
+void OwnershipMap::BuildCsr() {
+  const auto n = static_cast<std::int32_t>(owner_.size());
+  const std::size_t num_ranks = load_.size();
+  item_begin_.assign(num_ranks + 1, 0);
+  for (const std::int32_t r : owner_) {
+    ++item_begin_[static_cast<std::size_t>(r) + 1];
   }
-  std::partial_sum(map.item_begin_.begin(), map.item_begin_.end(),
-                   map.item_begin_.begin());
-  map.items_.resize(cost.size());
-  std::vector<std::int64_t> fill(map.item_begin_.begin(),
-                                 map.item_begin_.end() - 1);
+  std::partial_sum(item_begin_.begin(), item_begin_.end(), item_begin_.begin());
+  items_.resize(owner_.size());
+  std::vector<std::int64_t> fill(item_begin_.begin(), item_begin_.end() - 1);
   for (std::int32_t item = 0; item < n; ++item) {  // ascending per rank
     const auto r =
-        static_cast<std::size_t>(map.owner_[static_cast<std::size_t>(item)]);
-    map.items_[static_cast<std::size_t>(fill[r]++)] = item;
+        static_cast<std::size_t>(owner_[static_cast<std::size_t>(item)]);
+    items_[static_cast<std::size_t>(fill[r]++)] = item;
   }
+}
+
+OwnershipMap OwnershipMap::FromOwners(std::span<const std::int32_t> owner,
+                                      std::span<const double> cost,
+                                      std::int32_t num_ranks) {
+  ValidateGreedyInput(cost, num_ranks);
+  if (owner.size() != cost.size()) {
+    throw InputError("OwnershipMap::FromOwners: owner and cost sizes differ");
+  }
+  OwnershipMap map;
+  map.owner_.assign(owner.begin(), owner.end());
+  map.load_.assign(static_cast<std::size_t>(num_ranks), 0.0);
+  for (std::size_t i = 0; i < owner.size(); ++i) {
+    if (owner[i] < 0 || owner[i] >= num_ranks) {
+      throw InputError("OwnershipMap::FromOwners: owner out of range");
+    }
+    map.load_[static_cast<std::size_t>(owner[i])] += cost[i];
+  }
+  map.BuildCsr();
   return map;
 }
 

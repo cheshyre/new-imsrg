@@ -5,6 +5,7 @@
 // (M12b phase 1): sizes against the Workspace's own data, ladder row-block
 // items, disjoint and complete assignments, and the Workspace hook-up.
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -86,45 +87,114 @@ TEST(commutator_work_items, ladder_items_single_part_are_whole_channels) {
   EXPECT_EQ(item, items.blocks.size());
 }
 
-TEST(commutator_work_items, ladder_items_split_covers_rows_once) {
-  const auto ms = MakeSpace({"O16_emax4", 4, "O16", false});
-  const WorkSizes s = ComputeWorkSizes(*ms);
-  const LadderItems whole = LadderWorkItems(s, 1);
-  double total = 0.0;
-  for (const double c : whole.cost) total += c;
-  for (const std::int32_t parts : {2, 4, 22}) {
-    SCOPED_TRACE(parts);
-    const LadderItems items = LadderWorkItems(s, parts);
-    const double threshold = total / (4.0 * parts);
-    std::size_t item = 0;
-    int num_split = 0;
-    for (const RowBlock& w : whole.blocks) {
-      std::int32_t next = 0, min_rows = w.row_end, max_rows = 0;
-      double cost_sum = 0.0;
-      std::size_t first = item;
-      while (item < items.blocks.size() &&
-             items.blocks[item].channel == w.channel) {
-        const RowBlock& b = items.blocks[item];
-        EXPECT_EQ(b.row_begin, next);  // contiguous, no overlap, no gap
-        EXPECT_GT(b.row_end, b.row_begin);
-        const std::int32_t rows = b.row_end - b.row_begin;
-        min_rows = std::min(min_rows, rows);
-        max_rows = std::max(max_rows, rows);
-        next = b.row_end;
-        cost_sum += items.cost[item];
-        if (rows > 1) EXPECT_LE(items.cost[item], threshold);
-        ++item;
-      }
-      EXPECT_EQ(next, w.row_end) << "channel " << w.channel;
-      EXPECT_LE(max_rows - min_rows, 1) << "channel " << w.channel;
-      EXPECT_NEAR(cost_sum,
-                  whole.cost[static_cast<std::size_t>(&w - &whole.blocks[0])],
-                  1.0e-9 * cost_sum);
-      if (item - first > 1) ++num_split;
+/// Row cost of channel c in `s`.
+double RowCost(const WorkSizes& s, std::size_t c) {
+  return 2.0 * s.num_kets[c] * (s.k_pp[c] + s.k_hh[c]);
+}
+
+/// Checks the contiguous cost-balanced cut of `LadderWorkItems(s, parts)`.
+void ExpectContiguousCut(const WorkSizes& s, std::int32_t parts) {
+  SCOPED_TRACE(parts);
+  const LadderItems items = LadderWorkItems(s, parts);
+  const std::size_t nb = items.blocks.size();
+  ASSERT_EQ(items.cost.size(), nb);
+  ASSERT_EQ(items.owner.size(), nb);
+  // Global row sequence: eligible channels ascending.
+  std::vector<std::int32_t> row_channel;
+  std::vector<std::int32_t> row_local;
+  double total = 0.0, max_row = 0.0;
+  for (std::size_t c = 0; c < s.num_kets.size(); ++c) {
+    if (s.num_kets[c] == 0 || s.k_pp[c] + s.k_hh[c] == 0) continue;
+    for (std::int32_t j = 0; j < s.num_kets[c]; ++j) {
+      row_channel.push_back(static_cast<std::int32_t>(c));
+      row_local.push_back(j);
+      total += RowCost(s, c);
     }
-    EXPECT_EQ(item, items.blocks.size());
-    std::printf("[          ] P = %d: %zu items, %d channels split\n", parts,
-                items.blocks.size(), num_split);
+    max_row = std::max(max_row, RowCost(s, c));
+  }
+  // The blocks tile the sequence in order (no gap, no overlap) and the owners
+  // ascend, so each rank's blocks are one contiguous run.
+  std::size_t pos = 0;
+  std::vector<double> load(static_cast<std::size_t>(parts), 0.0);
+  for (std::size_t i = 0; i < nb; ++i) {
+    const RowBlock& b = items.blocks[i];
+    ASSERT_GT(b.row_end, b.row_begin);
+    ASSERT_LT(pos, row_channel.size());
+    EXPECT_EQ(row_channel[pos], b.channel);
+    EXPECT_EQ(row_local[pos], b.row_begin);
+    const auto rows = static_cast<std::size_t>(b.row_end - b.row_begin);
+    pos += rows;
+    ASSERT_LE(pos, row_channel.size());
+    EXPECT_EQ(row_channel[pos - 1], b.channel);
+    EXPECT_EQ(row_local[pos - 1], b.row_end - 1);
+    const auto r = static_cast<std::size_t>(items.owner[i]);
+    ASSERT_LT(r, load.size());
+    if (i > 0) EXPECT_LE(items.owner[i - 1], items.owner[i]);
+    EXPECT_EQ(items.cost[i], RowCost(s, static_cast<std::size_t>(b.channel)) *
+                                 static_cast<double>(rows));
+    load[r] += items.cost[i];
+  }
+  EXPECT_EQ(pos, row_channel.size());
+  // Loads within one (largest) row of T / P.
+  for (std::int32_t r = 0; r < parts; ++r)
+    EXPECT_LE(std::abs(load[static_cast<std::size_t>(r)] - total / parts),
+              max_row)
+        << "rank " << r;
+  // Deterministic.
+  const LadderItems again = LadderWorkItems(s, parts);
+  EXPECT_TRUE(again.blocks == items.blocks);
+  EXPECT_EQ(again.owner, items.owner);
+  EXPECT_EQ(again.cost, items.cost);
+  if (parts == 1) {  // the old items: one whole block per eligible channel
+    for (std::size_t i = 0; i < nb; ++i) {
+      EXPECT_EQ(items.owner[i], 0);
+      EXPECT_EQ(items.blocks[i].row_begin, 0);
+      EXPECT_EQ(items.blocks[i].row_end,
+                s.num_kets[static_cast<std::size_t>(items.blocks[i].channel)]);
+    }
+  }
+  // The assignment's map agrees with the owners.
+  const WorkAssignment a = WorkAssignment::Build(s, 0, parts);
+  ASSERT_EQ(a.ladder_map().num_items(), static_cast<std::int32_t>(nb));
+  for (std::size_t i = 0; i < nb; ++i)
+    EXPECT_EQ(a.ladder_map().owner(static_cast<std::int32_t>(i)),
+              items.owner[i]);
+}
+
+TEST(commutator_work_items, ladder_cut_synthetic) {
+  WorkSizes s;
+  s.num_kets = {5, 0, 3, 7, 2, 1};
+  s.k_pp = {4, 9, 0, 1, 0, 6};
+  s.k_hh = {1, 9, 0, 2, 0, 0};  // channels 1, 2 and 4 are ineligible
+  s.lifted.assign(6, 0);
+  for (const std::int32_t parts : {1, 2, 3, 4, 7, 22, 64})
+    ExpectContiguousCut(s, parts);
+  // Hand check, P = 2: row costs 50 (x5), 42 (x7), 12 (x1); T = 556, target
+  // 278: S_5 = 250, S_6 = 292, so the nearest boundary is 6 (one row of the
+  // second channel goes to rank 0).
+  const LadderItems two = LadderWorkItems(s, 2);
+  ASSERT_EQ(two.blocks.size(), 4U);
+  EXPECT_EQ(two.owner, (std::vector<std::int32_t>{0, 0, 1, 1}));
+  EXPECT_TRUE((two.blocks[1] == RowBlock{3, 0, 1}));
+  EXPECT_TRUE((two.blocks[2] == RowBlock{3, 1, 7}));
+  EXPECT_EQ(two.cost[1], 42.0);
+  // No eligible channel: no items for any P.
+  WorkSizes none;
+  none.num_kets = {0, 3};
+  none.k_pp = {0, 0};
+  none.k_hh = {0, 0};
+  EXPECT_TRUE(LadderWorkItems(none, 4).blocks.empty());
+}
+
+TEST(commutator_work_items, ladder_cut_model_spaces) {
+  const SpaceCase cases[] = {{"He4_emax2", 2, "He4", false},
+                             {"O16_emax4", 4, "O16", false},
+                             {"O16_emax6", 6, "O16", false}};
+  for (const SpaceCase& c : cases) {
+    SCOPED_TRACE(c.label);
+    const WorkSizes s = ComputeWorkSizes(*MakeSpace(c));
+    for (const std::int32_t parts : {1, 2, 3, 4, 7, 22, 64, 256})
+      ExpectContiguousCut(s, parts);
   }
 }
 
