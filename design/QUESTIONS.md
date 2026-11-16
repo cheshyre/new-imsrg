@@ -1011,8 +1011,10 @@ the orchestrator uses `O4` and up).
   **Correction to the owner's premise "no change for IT-8 (single Omega)":** IT-8's Magnus flows
   have split Omega stacks, so the fix shifts the triples dE by -3.9e-4 MeV (He4 emax 2) and
   -2.0e-3 MeV (O16 emax 3). Applied per D49 (old-code bug fix, reversible); no compatibility switch
-  (D35); the IT-8 goldens are to be regenerated from the patched reference (D42). Until then the
-  `driver_triples` IT-8 tests fail against the old goldens, by design.
+  (D35). **Done:** the D35 patch gained the same fix in both `CalculatePerturbativeTriples` overloads
+  (stamp `3b0ff5eed6806a72`), and the IT-8 goldens were regenerated through the scripts (D42): dE He4
+  emax 2 -0.05209710 -> -0.05249001, O16 emax 3 -0.53867396 -> -0.54068122 MeV; `driver_triples`
+  compares against them at the old tolerances.
 * **IT3-Q1** (2026-11-16, run 3, brief A part 1) - The D35 patch of imsrg-devel now carries the D47 and D48 hunks
   in the same file (version stamps `0c7af4dd0112f621`, after the review fix `a908abab2eded439`); goldens whose
   numbers did not change keep their old stamps on purpose, to avoid churn: `cb9d11ba30f579d4` (IT-1..IT-7, IT-14,

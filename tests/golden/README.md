@@ -47,7 +47,12 @@ for how the tests use them and §2 for the tolerances.
   `IT-15`, `imsrg3`, `n7`), `0c7af4dd0112f621` (D47/D48 patch: `IT-2/hunter_gatherer`, `IT-10`, `IT-15/*_smax10`,
   and the regenerated `IT-9/He4_emax2`, `IT-9/O16_emax2` with `Operators=Rp2`) and `a908abab2eded439` (the same plus
   the divergence guard of the D48 hunk: `IT-15/*_smax10_eta`, `IT-15/*_hg`; a rerun of the IT-2/IT-10 hunter-gatherer
-  jobs with it changes no number). The IT-9 emax 3 goldens still come from the pristine build.
+  jobs with it changes no number). The D49 patch hunk (`CalculatePerturbativeTriples` combines a split Omega stack in
+  transformation order, `BCH_Product(Omega[n], omega)`) has the stamp `3b0ff5eed6806a72`: `e2e/IT-8/He4_emax2` and
+  `IT-8/emax3` (result.json, flow.dat, harness_triples.json) were regenerated with it (dE He4 emax 2 -0.05209710 ->
+  -0.05249001, O16 emax 3 -0.53867396 -> -0.54068122 MeV; no other number changes, same steps 192 / 154); every golden
+  of the earlier stamps keeps its numbers (the hunk touches only the triples). The IT-9 emax 3 goldens still come from
+  the pristine build.
   Goldens not listed here (V2, V3_NO2B, random_H, commutator, basis, IT-9 emax 3, IT-8/emax2 divergent runs) still
   come from the pristine build.
 * **Default build of the generation scripts (D35).** Every `tools/reference/gen_golden_*.sh` that runs

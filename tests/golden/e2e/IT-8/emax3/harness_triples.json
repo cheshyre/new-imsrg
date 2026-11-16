@@ -1,9 +1,9 @@
 {
   "job": "IT-8/emax3",
-  "reference_version": "imsrg-devel src-sha256:ddcbf1aff166414e746113d5f3de2ddc1e72783fb7c201829cd58e317717f40f+d35-patch:5fdd2b73265417f2",
+  "reference_version": "imsrg-devel src-sha256:ddcbf1aff166414e746113d5f3de2ddc1e72783fb7c201829cd58e317717f40f+d35-patch:3b0ff5eed6806a72",
   "E0": -157.8477647632355,
-  "dE": -0.5386739630851514,
-  "E0_plus_dE": -158.38643872632065,
+  "dE": -0.5406812233263012,
+  "E0_plus_dE": -158.38844598656178,
   "steps": 154,
   "command": "refharness flow emax=3 reference=O16 valence_space=O16 2bme=/Users/cheshyre/Downloads/new-imsrg/VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz file2e1max=14 file2e2max=28 file2lmax=14 hw=16 --perturbative-triples",
   "note": "refharness flow of the D35 patched reference, defaults = imsrg++ method=magnus; values with %.17g precision, compare with result.json (imsrg++ log, 8 decimals)"
