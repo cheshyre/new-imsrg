@@ -1126,3 +1126,26 @@ the orchestrator uses `O4` and up).
   in `driver/run.cc` (not touched, another worker) still reads "out of", which stays correct. Also: the leg/group
   table builders of `ThreeBodyContext::Impl` (three_body.cc) are duplicated in `commutator/triples.cc` because
   three_body.cc was outside this task's files; a later cleanup can factor them into one internal header.
+* **M10-Q70..Q74, Q76..Q79** (2026-11-17, brief C, N7 performance; proposals of the plan
+  `new-imsrg-reference/plans/m10-n7-perf-plan.md` section 8, taken as proposed unless noted):
+  * **Q70** Row = today's stored segment z(m >= k, k); the packed storage, dumps and Python views are unchanged.
+  * **Q71** Line attribution (a batch owns whole matrix rows; transpose parts read through the views) for every
+    term; the zipper `RowPartition::Balanced` balances compute and memory together.
+  * **Q72** 133, 331, 231, 132 rewritten on the pair-third intermediates H and W; the element-wise kernels stay as
+    `detail::Comm<term>ssReference` (tests; dense-Z path of 133). Measured deviations <= 3e-14 in the M3 form.
+  * **Q73** One fused batch loop (`detail::RunN7`) in `Commutator()`; the `terms::` functions stay single-term and
+    rebuild H/W per call.
+  * **Q74** Batch budget `detail::kN7BatchBytes` = 512 MiB; it bounds H + W of one batch (allocation max(H) +
+    max(W) over the batches, at most twice the budget, plus TransposeOut and the 133 slot tables).
+    `CommutatorOptions::imsrg3_batch_bytes` is **not** added yet: passing it to `ThreeBodyTerms()` changes a
+    signature in `commutator.cc` that the M12b lead edits at the same time. **Assumed:** add the option after the
+    M12b merge (one-line plumbing).
+  * **Q76** OccNat3Cut occupations: the MBPT(2) natural occupations (the NAT step's values for `basis.kind = "nat"`,
+    computed in an HF-basis run too, as imsrg++.cc:570), for the IMSRG(3) flow and the perturbative triples.
+  * **Q77** Facade scope (C4) still open: not implemented in run 3 (see the hand-off of
+    `design/benchmarks/imsrg3-n7-performance.md`).
+  * **Q78** `WorkspaceOptions::three_body_context` (kAuto/kSkip) plus an explicit
+    `Workspace::BuildThreeBodyContext()`; the exception type for a missing context stays `InputError`.
+  * **Q79** Additions per output part keep imsrg++'s order (Z3 133 -> 223, Z2 232 -> 132, Z1 331 -> 231). The fused
+    driver equals the per-term sequence bitwise when a commutator fits one batch (all emax <= 2 cases) and differs
+    at 8e-17 in Z1/Z2 at emax 3 (two batches); IT-9 step counts and E0 are unchanged at emax 2 and 3.
