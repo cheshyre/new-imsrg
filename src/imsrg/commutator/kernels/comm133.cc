@@ -10,18 +10,22 @@
 //                     + X_ra Y3[(p q) Jpq a; K']
 //                     - Y3[K; (a t) Jst u] X_as - Y3[K; (s a) Jst u] X_at
 //                     - Y3[K; (s t) Jst a] X_au }.
-// One parallel task per bra row computes the stored elements of its row (the
-// packed lower triangle j <= i, or the dense row), so there are no atomics.
+//
+// Element-wise reference (`detail::Comm133ssReference`, the kernel before the
+// row tiling): one parallel task per bra row computes the stored elements of
+// its row (the packed lower triangle j <= i, or the dense row), every Y3
+// element read through `ThreeBodyElement`, so there are no atomics.
 
 #include <cstdint>
 
 #include "imsrg/base/assert.h"
 #include "imsrg/commutator/detail/n7_common.h"
+#include "imsrg/commutator/detail/n7_terms.h"
 #include "imsrg/commutator/detail/n7_views.h"
 #include "imsrg/commutator/imsrg3.h"
 #include "imsrg/exec/kokkos_backend.h"
 
-namespace imsrg::commutator::terms {
+namespace imsrg::commutator {
 
 namespace {
 
@@ -88,16 +92,18 @@ IMSRG_INLINE_FUNCTION double OneBodyOnThreeBody(
 
 }  // namespace
 
-void Comm133ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
-               const ThreeBodyContext& ctx) {
-  const detail::N7Views v = detail::PrepareN7("Comm133ss", X, Y, Z, ctx);
-  const detail::ThreeBodyOutView out =
-      detail::ThreeBodyOut("Comm133ss", Z, ctx);
+namespace detail {
+
+void Comm133ssReference(const op::Operator& X, const op::Operator& Y,
+                        op::Operator& Z, const ThreeBodyContext& ctx) {
+  const N7Views v = PrepareN7("Comm133ss", X, Y, Z, ctx);
+  const ThreeBodyOutView out = ThreeBodyOut("Comm133ss", Z, ctx);
   if (v.x3.local == nullptr && v.y3.local == nullptr) return;
   const exec::Index nrows = static_cast<exec::Index>(
       ctx.model_space_ptr()->three_body_space()->NumRows());
   exec::ParallelFor(
-      "commutator::comm133ss", nrows, IMSRG_LAMBDA(const exec::Index r) {
+      "commutator::comm133ss_reference", nrows,
+      IMSRG_LAMBDA(const exec::Index r) {
         const int tr = v.row_triple[r];
         const int ch = v.sp.tr_channel[tr];
         const std::int64_t base = v.sp.ch_row_offset[ch];
@@ -121,10 +127,21 @@ void Comm133ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                                               jpq, s, t, u, jst) -
                            OneBodyOnThreeBody(v, v.y1, v.x3, two_j, p, q, rr,
                                               jpq, s, t, u, jst);
-          out.data[detail::ThreeBodyOutIndex(out, base, i, j)] += z;
+          out.data[ThreeBodyOutIndex(out, base, i, j)] += z;
         }
       });
-  exec::Fence("commutator::comm133ss");
+  exec::Fence("commutator::comm133ss_reference");
 }
 
-}  // namespace imsrg::commutator::terms
+}  // namespace detail
+
+namespace terms {
+
+void Comm133ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
+               const ThreeBodyContext& ctx) {
+  detail::Comm133ssReference(X, Y, Z, ctx);
+}
+
+}  // namespace terms
+
+}  // namespace imsrg::commutator
