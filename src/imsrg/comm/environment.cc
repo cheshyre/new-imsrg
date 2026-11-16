@@ -3,6 +3,8 @@
 
 #include "imsrg/comm/environment.h"
 
+#include <cstdlib>
+
 #include "imsrg/base/error.h"
 
 #if IMSRG_COMM_WITH_MPI
@@ -61,6 +63,13 @@ bool Environment::IsInitialized() noexcept { return false; }
 Environment::Environment() { Init(nullptr, nullptr); }
 
 Environment::Environment(int& argc, char**& argv) { Init(&argc, &argv); }
+
+void Environment::Abort(int exit_code) noexcept {
+#if IMSRG_COMM_WITH_MPI
+  if (IsInitialized()) MPI_Abort(MPI_COMM_WORLD, exit_code);
+#endif
+  std::_Exit(exit_code);
+}
 
 Communicator Environment::world() const { return Communicator::World(); }
 
