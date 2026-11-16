@@ -193,8 +193,8 @@ struct ColumnLists {
 /// The `ColumnLists` of `plan` (`pt`: host view of the pair-third space of
 /// the context). Counting sort by third, stable in plan order, so the lists
 /// are deterministic. O(states of the batch + norb).
-ColumnLists ListColumnsByThird(const op::PairThirdView& pt, const LineBatch& plan,
-                               int norb) {
+ColumnLists ListColumnsByThird(const op::PairThirdView& pt,
+                               const LineBatch& plan, int norb) {
   ColumnLists out;
   out.col_begin.assign(static_cast<std::size_t>(norb) + 1, 0);
   for (const LineTile& tile : plan.tiles) {
@@ -212,13 +212,15 @@ ColumnLists ListColumnsByThird(const op::PairThirdView& pt, const LineBatch& pla
   out.p.resize(n);
   out.q.resize(n);
   out.offset.resize(n);
-  std::vector<std::int32_t> next(out.col_begin.begin(), out.col_begin.end() - 1);
+  std::vector<std::int32_t> next(out.col_begin.begin(),
+                                 out.col_begin.end() - 1);
   for (const LineTile& tile : plan.tiles) {
     const std::int32_t base = pt.ch_state_offset[tile.channel];
     const std::int64_t stride = pt.ch_num_states[tile.channel];
     for (std::int32_t t = tile.state_begin; t < tile.state_end; ++t) {
       const std::int32_t f = base + t;
-      const auto e = static_cast<std::size_t>(next[static_cast<std::size_t>(pt.st_r[f])]++);
+      const auto e = static_cast<std::size_t>(
+          next[static_cast<std::size_t>(pt.st_r[f])]++);
       out.ch[e] = tile.channel;
       out.jpq[e] = pt.st_two_jpq[f] / 2;
       out.p[e] = pt.st_p[f];
@@ -278,11 +280,11 @@ IMSRG_INLINE_FUNCTION double Comm231Pair(const Comm231Args& a, int i,
         tb.channel_of(OrbitIndex{p}, OrbitIndex{q}, TwoJ{2 * jpq}).value();
     if (ch2 >= tb.num_channels) continue;
     const std::int64_t n2 = tb.channel_num_kets[ch2];
-    const std::int32_t loc_c =
-        tb.local_index(tb.ket_index(OrbitIndex{p}, OrbitIndex{q}), TwoJ{2 * jpq});
+    const std::int32_t loc_c = tb.local_index(
+        tb.ket_index(OrbitIndex{p}, OrbitIndex{q}), TwoJ{2 * jpq});
     if (loc_c < 0) continue;
     const double n_c = np * nq;
-    const double nbar_c = (1.0 - np) * (1.0- nq);
+    const double nbar_c = (1.0 - np) * (1.0 - nq);
     const double cw_c = p == q ? constants::kInvSqrt2 : 1.0;
     // W column of C: rows R at wcol[t] for the flat sorted row t.
     const std::int64_t wcol = a.col_offset[e] - tab.ch_begin[ch];
