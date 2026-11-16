@@ -1,43 +1,40 @@
-# Prompt for the owner Q&A and design-interview session (after run 2)
+# Prompt for the owner Q&A and design-interview session (after run 3)
 
-> **Status:** refreshed at the end of run 2 (2026-11-15/16) for the interview that follows it (D42).
-> The interviews so far: 2026-11-13 (D25–D29) and 2026-11-15 (D30–D42, report
-> `design/reports/2026-11-15-owner-interview.md`). The next free decision number is D44 (D43 is the
-> layout decision of run 2; check `00` for later rows). Every run-2 question below carries the
-> assumption the run made, so the owner can answer with one word.
->
-> **Used on 2026-11-16** (report `design/reports/2026-11-16-owner-interview.md`, decisions D44–D54;
-> every question below is answered in `QUESTIONS.md`). Run 3 replaces the agenda for the interview
-> after it and keeps the method, with two additions from this session: show the owner a progress
-> bar of the agenda after each round (owner request), and measure a numeric consequence live
-> (a worker in a throwaway worktree) when a decision hinges on it, as for M8-Q10.
+> **Status:** written at the end of run 3 (2026-11-16/17) for the interview that follows it. The
+> interviews so far: 2026-11-13 (D25-D29), 2026-11-15 (D30-D42), 2026-11-16 (D44-D54, report
+> `design/reports/2026-11-16-owner-interview.md`). Run 3 added D55-D60 (check `00` for the next free
+> number). Every run-3 question below carries the assumption the run made, so the owner can
+> answer with one word. Run 3's report: `design/reports/2026-11-16-run3.md`; `develop` = 7bfba4e.
+> Method additions kept from the last interview: show the owner a progress bar of the agenda after
+> each round (owner request), and measure a numeric consequence live (a worker in a throwaway
+> worktree) when a decision hinges on it.
 
 **How to use:** after syncing the main checkout (QUESTIONS O1/O3), start an **interactive** Claude
 Code session (Opus) in `/Users/cheshyre/Downloads/new-imsrg` on `develop`, and paste everything
-below the line. Plan 60–90 minutes. The session only edits documentation; the next unsupervised
-run (`design/NEXT_SESSION_PROMPT.md`) builds on what it records.
+below the line. Plan 60-90 minutes. The session only edits documentation; the next unsupervised
+run (`design/NEXT_SESSION_PROMPT.md`, run 4) builds on what it records.
 
 ---
 
 You will interview the owner of the imsrg rewrite (a modern C++20/Kokkos/MPI replacement of
 imsrg++). Two goals:
 
-1. **Resolve the open questions** recorded during run 2 (2026-11-15/16) in `design/QUESTIONS.md`
-   ("Added during run 2"). Each one says which assumption the run made.
-2. **Interview the owner about the design decisions** needed for the next milestones (N7 at scale,
-   MPI, tensor operators), so run 3 can work without blocking.
+1. **Resolve the open questions** recorded during run 3 (2026-11-16/17) in `design/QUESTIONS.md`
+   ("Added during run 3"). Each one says which assumption the run made.
+2. **Decide the process and design points** needed for run 4 (the order of the work, the usage
+   rules after the cap breach, the MPI imbalance at 256 ranks), so run 4 can work without blocking.
 
-## Preparation (before your first question; ≤ 10 minutes, keep it to yourself)
+## Preparation (before your first question; <= 10 minutes, keep it to yourself)
 
-Read `AGENTS.md`, `design/STATUS.md`, `design/reports/2026-11-15-run2.md` (and the run-1 report if
-needed), `design/00-requirements-and-decisions.md` (D30–D43), `design/QUESTIONS.md` (section "Added
-during run 2" only; everything before it is answered), and skim `design/40-roadmap.md`,
-`design/14-imsrg3-plan.md` and `design/benchmarks/imsrg3-layout.md`. For every question on the
-agenda, note in 2–3 sentences the context (file/section), the options, the assumption the run made,
-and what would change under each answer. Look things up in the code only when needed to explain a
-consequence. IMSRG(3)-N7 merged during run 2 (its questions are M10-Q60..Q67 below); M12a merged too (questions M12-Q1..Q5, listed in group F).
+Read `AGENTS.md`, `design/STATUS.md`, `design/reports/2026-11-16-run3.md`,
+`design/00-requirements-and-decisions.md` (D55-D60), `design/QUESTIONS.md` (section "Added during
+run 3" only; everything before it is answered), and skim `design/40-roadmap.md`,
+`design/benchmarks/imsrg3-n7-performance.md` and `design/benchmarks/mpi-scaling.md`. For every
+question on the agenda, note in 2-3 sentences the context (file/section), the options, the
+assumption the run made, and what would change under each answer. Look things up in the code only
+when needed to explain a consequence.
 
-## How to run the interview (the method that worked on 2026-11-15)
+## How to run the interview (the method that worked on 2026-11-15 and 2026-11-16)
 
 * Use `AskUserQuestion` for decisions with clear options: **batches of up to 4 questions**, at most 4
   options each, your **recommendation first** and marked as such, the **concrete consequence of each
@@ -66,188 +63,136 @@ consequence. IMSRG(3)-N7 merged during run 2 (its questions are M10-Q60..Q67 bel
   merge on your worktree branch, then `tools/ci.sh dev-openmp && git update-ref refs/heads/develop
   <new> <old>` (never chain the update to a grep of the CI log). Git stays local: never push.
 
-## Agenda, part 1: open questions of run 2 (ids from `design/QUESTIONS.md`)
+## Agenda, part 1: open questions of run 3 (ids from `design/QUESTIONS.md`)
 
-Format: **id** — summary; *assumption taken*; what an answer changes.
+Format: **id** - summary; *assumption taken*; what an answer changes.
 
-**A. Owner facts and actions (ask first)**
-* **O3** — run 2 started in an app worktree again (D31 asked for the main checkout), so the main
-  checkout's files are stale. *Accepted as in run 1.* Ask: was the main checkout synced and
-  `build/golden-generated` regenerated (`tools/reference/gen_golden_generated.sh`, M8-Q21)? Is the
-  app setting that opens sessions in the main checkout (no worktree) available? Optional:
-  `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
-* **M10-Q2** — which E3max/dE3max does the owner use at emax 10–12, and how much memory per node?
-  *Assumed: 4 nodes × 256 GB, at most 50 % for the 3B operators of an N7 step.* At E3max 14 layout A
-  needs 38–40 GB per packed operator, at E3max 16 without a dE3max cut 157–177 GB, with dE3max 8
-  4.4 GB. The layout choice holds in every case; only the node count and the MPI phase-2 design change.
+**A. Owner actions and facts (ask first)**
+* **Main checkout:** was it re-synced (`git -C /Users/cheshyre/Downloads/new-imsrg reset --hard` when it
+  has no local edits) and `tools/reference/gen_golden_generated.sh` run there? (QUESTIONS O1/O3.)
+* **Optional end-to-end check of D57:** does imsrg++ read a `.me2j.bin` written by our rule (255-byte
+  header, float32)? A. Tichai's reader was the source of the rule.
 * **Full N2LO 3N file** (D33): available yet? It would give full-flow goldens for IT-4/IT-5/IT-9.
-* **MS-Q4** — `AUTHORS` names the owner as holder of "Copyright 2026 The imsrg authors"; SPDX says
-  `GPL-3.0-or-later`. *Assumed as written.* Confirm holder list and "or later".
 
-**B. Physics and numerics (high impact; focused questions)**
-* **M8-Q10** — hunter-gatherer `H(s)` semantics: imsrg++ `GatherOmega` rebuilds the saved H from H0
-  through the gathered Omega but leaves `H(s)` untouched, so `H(s)` and `Transform(H0)` differ by up
-  to 2e-3 after a solve (O16 emax 2 test); stage 2's first eta uses the pre-gather `H(s)`. *Copied
-  from imsrg++* (the IT-10 and hunter-gatherer goldens depend on it). Alternative: re-evaluate
-  `H(s)` from the gatherer or gather before the next stage (a cleaner definition, new goldens, a
-  deviation entry). Given D35 (fix quirks, no switches) this is the question most likely to be overridden.
-* **M8-Q40** — flow `s` continuation: imsrg++'s adaptive `flow` integrates a copy of the solver, so s
-  restarts at 0 in stage 2. *Implemented: s continues for `flow` and `flow_rk4`* (same results when
-  stage 1 converged). Also (2) the new divergence guard (norm or E0 > 1e12/1e9 ends the flow), (4)
-  hunter-gatherer with a flow method is a ConfigError, (7) no `shell-model-atan` cutoff switch in the
-  Magnus path (a no-op at the default cutoff). Confirm all.
-* **M8-Q20** — no charge-radius computation exists yet; D35 wants Rso added "wherever the code
-  computes a charge radius". *Assumed: the output stage task implements charge radius = Rp2 + Rso/Z
-  + nucleon-size terms (`PROTON_RCH2`, `NEUTRON_RCH2`, `DARWIN_FOLDY`, `16` §6).* Schedule it in run 3?
-* **M10-Q20** — 3f2 2b intermediates are E-PLANNED (about 25 two-body operators of memory;
-  imsrg++'s own default has both on, the owner's recipe D32 has 2b off). *Not scheduled.* Needed?
-* **M10-Q21 / Q22 / Q23** — 3f2 details. Q21: `factorized` with `in_flow`/`at_end` is an error
-  (V-57) instead of double counting. Q22: the correction needs an anti-Hermitian eta (imsrg++'s sign
-  is "a guess" for the Hermitian case). Q23: the correction applies to every BCH call, including
-  transformations of Rp2 etc. and the hunter-gatherer rebuild, as in imsrg++ (the IT-10 goldens
-  contain it); should observables be transformed without it? *All assumed fine.*
-* **M10-Q40** — Omega combination order in the perturbative triples for a split Omega stack:
-  imsrg++ uses e^{Omega_0} e^{Omega_n}, the H transformation applies the oldest piece first.
-  *Reproduced imsrg++* (identical for a single Omega, as in IT-8). A fix would be an old-code bug
-  entry in `30` §6; under D35 the owner probably prefers the fix: ask, with the consequence (no
-  change for the tests, which have a single Omega).
-* **M10-Q43** — imsrg++ `comm223ss` returns early when ||X2||·||Y2|| < 1e-6; `Comm223` always
-  computes. *Not reproduced* (differs only for a tiny nonzero product). Confirm.
-* **M10-Q46** — perturbative triples use E3max = 3 emax as imsrg++; at emax 10–12 without a dE3max
-  cut the triples' tables alone need tens of GB. *As imsrg++; triples at emax ≥ 8 would need R built
-  per tile.* Are triples at emax ≥ 8 wanted (decides a follow-up task)?
-* **M8-Q41** — `ode_tolerance` is rounded to float as in imsrg++ (1e-6 → 9.99999997e-7), contrary to
-  the "fix: double" decision of Q14 for other parameters. *Assumed: kept for step-count identity.*
-  One line to change.
-* **M8-Q32** — `hartree_fock.mixing = "diis"` (the TOML default) changes E_HF at 1e-8 MeV and may
-  change flow step counts versus imsrg++; step-count tests set `mixing = "linear"`. *Assumed.*
-* **M8-Q12** — flow fixes: ds starts at min(ds_0, dsmax) without `magnus_adaptive`; NaN/inf is
-  `Diverged` and leaves H as it is (imsrg++ multiplies by 1/0); `denominator_cutoff <= 0` is an
-  error; `omega.storage = scratch|discard` E-PLANNED. *Implemented.* Confirm.
-* **M7-Q10 / M7-Q11** — general fast paths follow the hermiticity flag, not the data (about 2× ladder
-  and 4× particle-hole flops when flagged NonHermitian); the reference's general support rests on
-  bilinearity, the m-scheme brute force stays on the M10 list. *Accepted.*
+**B. Flow and IMSRG(3) (IT3; high impact, focused questions)**
+* **IT3-Q2** - after the final hunter-gatherer gather the rebuilt H(s) has ||eta|| 2000-5000 times
+  `eta_criterion` (E0 8-43 keV from the last hunter line). *Assumed: the flow does not continue; a
+  warning is logged, eta and `norm_eta` describe the rebuilt H, one extra flow row.* Alternative:
+  continue until the rebuilt H converges (changes step counts and goldens).
+* **IT3-Q7 / Q8 / Q9** - the three-body denominator floor (D21 form, same cutoff as 1B/2B) and the
+  split Omega stack order `BchProduct(Omega_n, omega)` in the perturbative triples. *Assumed: one
+  cutoff for 1B/2B/3B; Magnus applies Omega_0 first; BCH keeps imsrg++'s truncation.* The premise
+  "IT-8 has a single Omega" was wrong: IT-8 triples dE moved by -3.9e-4 (He4 emax 2) and -2.0e-3 MeV
+  (O16 emax 3), beyond the 1e-4 tolerance; goldens regenerated from the patched reference. Is a
+  split-flow end-to-end triples test (split vs single Omega) wanted? Separate 3B cutoff wanted?
+* **IT3-Q3** - the patched imsrg++ adaptive `flow` restarts s at 0 in stage 2 (ours continues).
+  *Assumed: no change; only final quantities are compared.*
+* **IT3-Q1** - goldens whose numbers did not change keep older reference-build stamps
+  (`cb9d11ba30f579d4`, `5fdd2b73265417f2`). *Assumed: fine (listed as equivalent in
+  `tests/golden/README.md`).* Alternative: regenerate every golden once.
+* **IT3-Q4** - strict Python residency in CI. *Assumed: nothing else; a GPU build still needs a real GPU
+  run.* **IT3-Q5** - physics-symbol list (159 names; `iJ`, `nA`, `Hh`, `Lam` counted as physics
+  notation). *Assumed: kept;* alternative: reject the prefixed forms (about 20 names shrink, renames).
+  **IT3-Q6** - `design/18` rewritten to the bound API, old pyIMSRG mapping table dropped.
+  *Assumed: dropped;* keep it for the term-by-term milestone?
+* **IT3-Q10, Q11, Q12** - confirmations: `ode_tolerance` double-ness not testable separately (covered
+  by construction); IT-8/emax2 stamp note; Ctrl-C test children restore the default SIGINT. *Assumed: fine.*
 
-**C. Code style**
-* **MS-Q1** — physics capitals kept in about 900 variable/parameter/member names (`X`, `Y`, `Z`, `H`,
-  `J`, `Jp`, `Tz`, `hw_MeV`, `twoJ`), documented exception 6 in `17` §3; lower-casing would merge
-  `j` and `J` in the same scope. *Kept.* Strict snake_case is a clang-tidy run away.
-* **MS-Q2** — accessors (const methods returning a property or part of the object, possibly by index
-  or key, e.g. `num_orbits()`, `orbit(i)`, `spec()`) and `set_*` mutators stay snake_case, everything
-  else PascalCase (199-name allowlist in `.clang-tidy`). *Assumed.* Alternative: PascalCase for all
-  methods (collides with type names such as `Orbit`, `Channel`, `Reference`).
-* **MS-Q3** — header guards outside `src/` use cpplint's fallback without the `IMSRG_` prefix
-  (`TESTS_UNIT_HF_HF_TEST_SUPPORT_H_`). *Fine.*
-* **MS-Q5** — structural items left unconverted: long inline functions in headers, 36 structs with
-  member functions, functions over ~40 lines, unsigned types. *Guidelines for new code; a cleanup
-  task if wanted.*
+**C. Formats (O4)**
+* **O4** - the binary ME2JP/ME3JP variant (D57) stores float32 after a 255-byte header, so it cannot
+  carry bit-exact checkpoints or stored Omegas (D54 wants restart bit for bit). *Assumed: `.bin` is
+  for interactions and other inputs; checkpoints and Omegas are text or gzip.* Alternative: an extra
+  double-precision binary variant (`.bin64` or `prec=64` in the header; jIMSRG would not read it).
 
-**C2. Charge radius and flow (run 2, late)**
-* **M8-Q50** — Rso flows alongside H (or is replayed) when only Rp2 is requested, so the adaptive
-  `flow` error norm includes it and the step sequence differs from imsrg++'s (end results agree:
-  E0 4e-8 MeV, radius 5e-8 fm); the driver-level adaptive tests compare final quantities. Also stage 2
-  of the adaptive `flow` integrates [s1, s1 + smax] (imsrg++ restarts s at 0, M8-Q40). *Assumed.*
-  Alternative: exclude passive operators from the error norm.
-* **M8-Q51** — the charge radius is produced only for plain `Rp2` (not `Rp2Z_*`/`Rp2AZ_*`, not for
-  `run.task = "hf"`); `Rch` is null when Rch2 < 0; N/Z from `basis.mass_number`. *Assumed.*
-* **M8-Q52** — pristine imsrg++ prints a radius only for non-Magnus methods, so the Magnus radius has
-  no imsrg++ number to compare with (validated through `flow_RK4`/`flow` runs and IT-6's `.snt`).
-  *Assumed sufficient.*
+**D. Style (MS2)**
+* **MS2-Q1** - 12 structs with member functions became classes; the device views and kernel data
+  bundles (`MatrixView`, `TwoBodyView`, `PandyaData`, `LadderData`, ...) stay structs (about 150
+  sites). *Assumed: stay structs;* alternative: convert them now that the N7/M12b restructuring is
+  merged.
+* **MS2-Q2** - scoped enums use `std::int8_t` (14 of them), NO2B monopole orbit indices
+  `std::int16_t`; unsigned only for bit patterns and modular arithmetic. *Assumed: yes;* a one-line
+  revert per enum if unsigned underlying types should be allowed.
+* **MS2-Q3 / Q4** - the perturbative-triples energy differs 1-2 ulp run to run (reduction order);
+  parameterized test names embed heap pointers; the reference harness emax-4 HF/HNO output is not
+  bitwise reproducible. *Assumed: harmless;* a deterministic triples reduction could be added
+  with the tiled triples.
 
-**D. Configuration and outputs**
-* **M8-Q30** — a default `output.directory` (no key in the file) and `--set` values resolve against
-  the working directory, not the config directory. *Assumed.*
-* **M8-Q31** — `results.json` `schema_version` 1 covers the run-2 table; bump only after a release.
-  The perturbative-triples merge moved it to schema 2: confirm the policy.
-* **M8-Q33** — NAT basis covers `natural_orbitals` defaults; `use_occupations` and `order = "energy"`
-  stay E-PLANNED (M9-Q3, D36). *Assumed.*
-* **M8-Q11** — gather counting in `SolveResult` and the `results.json` keys. *Assumed.*
+**E. Tensor operators (M15), needed before M15 starts**
+* **M15-Q1** (decide this one) - phase/gauge of reduced matrix elements: imsrg++ stores
+  `(-1)^{j_bra-j_ket}` times the Edmonds element (`(-1)^{j_bra-j_ket+lambda}` for E-multipoles).
+  *Assumed: keep imsrg++'s gauge internally* (the 6j/9j phases of `TensorCommutators.cc` were
+  derived for it); Edmonds only with conversion at the edges. Needed before the tensor
+  `OperatorDump` v2.
+* **M15-Q2** - dump v2 stores only `ch_bra <= ch_ket` blocks plus the Hermiticity rule; whether
+  Delta Tz > 0 operators are stored as `O + O^dagger` (imsrg++) or one-directional. *Assumed: as
+  imsrg++.* **M15-Q3** - J=0 isospin-changing scalars (Fermi, 0nubb, DGT) stored reduced like J>0.
+  *Assumed: yes;* the scalar-scalar commutator with them needs its own reference.
+* **M15-Q4** - one-body Y exercises only comm111st/121st/122st; the 222/221 tensor terms are
+  goldened only with seeded random tensors at emax 1 (size limit). *Assumed: enough for the first
+  milestone.* **M15-Q5** - the 0nubb operators and the Magnus golden (one BCH step with a random Omega
+  of norm 0.3). *Assumed: acceptable;* a flow-produced Omega needs a harness hook.
 
-**E. Python**
-* **M11-Q11** — stale-view policy: `Auto` raises `StaleHostError` only where memory is not host
-  accessible (GPU builds); `Strict` (`imsrg.strict_residency()` or `IMSRG_RESIDENCY=strict`) raises
-  everywhere; `Implicit` never. *Assumed Auto default* (23 old tests read library views directly).
-  Should the default be `Strict`?
-* **M11-Q12** — `Runtime.finalize(force=True)` and the exit hook free device data of live operators
-  and solvers but refuse while numpy views are alive. *Assumed.*
-* **M11-Q13** — no stop request from a C++ solver status callback (an exception aborts at a step
-  boundary); Python generator callbacks are not bound. *Assumed enough; a `flow` API addition if not.*
-* **M11-Q15** — Ctrl-C: solvers raise `KeyboardInterrupt` at a step boundary, but `pipeline.run` has no
-  cancel hook, so SIGINT stops the process. *Fine for scripts*; a cancel flag in `driver::Run` for a
-  clean interrupt?
-* **M11-Q16** — exception classes completed per `18` (`ConvergenceError` on divergence and with
-  `hf.solve(raise_on_failure=True)`, default False; `SymmetryError` reserved for tensor operators;
-  `InputFileNotFoundError` is also a `FileNotFoundError`). *Assumed.* (Q11 and Q14 are the pending
-  owner decisions of the hardening merge.)
-* **M11-Q14** — the bound API follows the C++ modules (`imsrg.io.read_me2j`, `hf.solve`,
-  `flow.MagnusSolver`, `pipeline.run`) rather than the dataclass tree proposed in `18`; `opslib`
-  bound too. *Assumed.* Update `18` or rework?
+**F. MPI (M12b)**
+* **M12b-Q1** - the communicator lives in `WorkspaceOptions::comm` (phase 1) and the model space's
+  `ThreeBodyDistribution` (edge `basis -> comm`). *Assumed: yes* (alternative `operator -> comm`).
+* **M12b-Q2** - combine by reduce + broadcast (identical bits), not `Allreduce`. *Assumed: yes.*
+* **M12b-Q3 / Q18** - the ladder is a contiguous cost-balanced row cut; comm122 and the
+  particle-hole terms go by whole channels (ph inverse transform only partly distributed).
+  *Assumed: acceptable now; row panels are the first task of run 4* (imbalance 310-880 % at 256 ranks).
+* **M12b-Q4, Q5** - cheap terms, the 3f2 correction and N7 on rank 0 until the distributed N7
+  driver (D10). *Assumed: yes.* **M12b-Q6** - every rank reads the interaction files. *Assumed: yes;*
+  root read + broadcast if I/O contention shows on a cluster.
+* **M12b-Q7, Q16** - output only on rank 0 (warnings of other ranks are lost); `results.json`
+  records no rank/thread count. *Assumed: fine for now.*
+* **M12b-Q8** - distributed 3B parts are packed only. *Assumed: yes.* **M12b-Q9** - lockstep
+  `Alltoallv` rounds instead of one-sided `MPI_Get`. *Assumed: rounds* (deterministic, portable to
+  InfiniBand and Slingshot). **M12b-Q10** - partition weights from the cost model with measured
+  w_122 = 59, w_ph = 2.9 (measured under load). *Assumed: recalibrate on an idle machine.*
+* **M12b-Q11, Q17** - one rank per node with OpenMP threads; on one node more ranks are slower (emax 8:
+  30.5 / 43.5 / 61.8 ms for 1 / 2 / 4 ranks at 16 threads in total). *Assumed: MPI across nodes
+  only, no warning;* one rank per GPU in M14. **M12b-Q12** - device-aware MPI only in M14.
+  **M12b-Q13** - Python bindings stay serial. **M12b-Q14** - config key `[parallel]
+  three_body_distribution` ("rows" default with several ranks, "replicated" for tests), in phase 2.
+* **M12b-Q15** - IT-11 tolerance max|d| <= 1e-12 max(1, max|ref|), identical step counts.
+  **M12b-Q19** - `CheckReplicatedSetup` requires equal thread counts on all ranks, so heterogeneous
+  nodes fail. *Assumed: keep* (bitwise identity needs the same reduction order).
 
-**F. IMSRG(3) engineering (batch; flag any to revisit)**
-* **M10-Q1** — layout counts at emax 10–12 come from `--count-only` (enumeration only), covered by the
-  emax rule as bookkeeping. **M10-Q3** — layout A with packed blocks (halves memory; unpacking cost
-  4 % of a [2,2]→3 at emax 3). **M10-Q41/Q42** — `Comm223` per-tile gathers cost 1.7× the prototype
-  at emax 3; locality at emax 12 is unmeasured (6j table 451 MB, strided reads); a timing-only run at
-  emax 4–6 would settle it: *allowed?* **M10-Q44** — the kernel calls Kokkos directly until
-  `exec::TeamFor` gets schedule/scratch/reducer options. **M10-Q45** — extra accessors
-  (`ScratchBytesPerTeam()`, `impl()`) kept; the E map is built but unused by these kernels.
-* **M10-Q60** — the 3B generator copies imsrg++ (Delta3 one-body diagonal only, no floor, no
-  `denominator_delta`; vanishing Delta3 gives inf/NaN with white). *As imsrg++* (D21 floor not
-  extended to 3B). Floor it? Under D35 (fix quirks) likely yes.
-* **M10-Q61** — with IMSRG(3) the residual 3B part of H and of transformed operators is dropped
-  before output (as imsrg++); a rank-2 operator transformed with the IMSRG(3) commutator gets the
-  terms that need Omega_3. *As imsrg++; no operator golden exists (IT-9 has none).* Wanted?
-* **M10-Q62** — `imsrg3.occ_nat3_cut`, `variant = "full"`/`"mp4"`, `at_end`, `only_2b_omega` stay
-  E-PLANNED (the driver does not pass NAT occupations to the 3B space). *Needed for production?*
-* **M10-Q63 / Q64 / Q65 / Q66** — `comm232ss` batching never splits a channel (one block set ~33 GB at
-  emax 12 / E3max 14); its sorted tables moved into the context (Q64 resolved by the follow-up);
-  direct Kokkos policies in kernel TUs; a `Workspace` on a 3B space always builds the 3B context.
-  *Assumed fine at emax <= 3; the N7-performance task of run 3 addresses them.*
-* **M10-Q67** — a Python GIL timing test was relaxed for dev-serial (bound scales with the solve
-  time). *Assumed.*
-* **N7 results to mention** (no question): IT-9 passes with identical steps, |dE0| <= 3.8e-10 MeV, and
-  the imsrg++ comm232 non-Hermitian bug is fixed; ours is 2x (emax 2) to 2.5x (emax 3) faster.
-* **M12-Q1** — `get_pn` orbit scan and CGs tabulated (183 → 65 ns); six hash lookups remain. *Left as is.*
-* **M12-Q2** — `TwoBodyNorm` relies on contiguous `BlockSparseMatrix` blocks (checked); two small
-  device buffers per call. *Assumed this stays the layout.*
-* **M12-Q3** — the Python GIL-release test was wall-time fragile as the solver got faster; now a
-  builtin `list.append` callback counted from the main thread. *Resolved; no decision.*
-* **M12-Q4** — ladder-direct channels read X, Y in place when all weights are exactly 1.0; scratch
-  3.75× → 2.0× of a 2B operator. *No open decision.*
-* **M12-Q5** — `GroupedGemm` runs problems concurrently only with Accelerate; OpenBLAS/MKL keep the
-  sequential loop (oversubscription, MKL rounding). *To be decided with the cluster builds (M12b/M14).*
+**G. N7 performance (M10-Q70..Q79; the rest of the Q70-Q79 are taken as proposed, confirm in one go)**
+* **M10-Q74** (open) - batch budget `kN7BatchBytes` = 512 MiB bounds H + W of one batch;
+  `CommutatorOptions::imsrg3_batch_bytes` not added yet (it changes the `ThreeBodyTerms()`
+  signature, which collided with M12b). *Assumed: add after the M12b merge (one-line plumbing).*
+* **M10-Q75** (open) - `TriplesResult::kept_rows` / `total_kets` now count the kets of the triples
+  the context holds (hhh/ppp of channels with an hhh triple), before and after the dE3max/OccNat3
+  cuts; the driver log text still reads "out of". *Assumed: fine;* the duplicated table builders
+  can be factored later.
+* **M10-Q70..Q73, Q76..Q79** (answered in `QUESTIONS.md`; confirm): a row is one stored segment
+  z(m >= k, k), storage unchanged (Q70); line attribution, the zipper `RowPartition::Balanced`
+  (Q71); 133/331/231/132 on the intermediates H and W, element-wise `Comm<term>ssReference` kept for
+  tests (Q72); one fused `RunN7` loop, `terms::` functions rebuild H/W per call (Q73);
+  `imsrg3.occ_nat3_cut` uses the MBPT(2) natural occupations (Q76); the `exec::TeamFor`/`TeamReduce`
+  facade (Q77); `WorkspaceOptions::three_body_context` kAuto/kSkip (Q78); the fused driver differs
+  from the per-term sequence by 8e-17 at emax 3 (Q79).
 
-**G. Low-impact confirmations (summarize one line each and ask the owner to flag any to revisit)**
-M8-Q22 (merge resolution), M8-Q21 (resolved: gen scripts default to the patched harness), M11-Q10
-(resolved at the merge), MS-Q3, M10-Q45, plus any later ids in `QUESTIONS.md` not listed above.
+## Agenda, part 2: decisions for the owner
 
-## Agenda, part 2: further design decisions (interview)
-
-1. **Priorities for run 3**: the proposal is N7 performance first, then finishing M12a, M12b MPI, tensor operators, M13 only if
-   all done (D39/D40). Is the order right now that 3f2, the triples and N7 are done? Are the 3f2 2b
-   intermediates (M10-Q20) and the `full`/`mp4` variants (M10-Q62) wanted, and which emax and E3max
-   matter for N7 production?
-2. **Tensor operators (D39, first extension)**: which operators and ranks first (E1/E2 transitions,
-   M1, Gamow-Teller, 0νββ, dagger, DM), transformation only or also flow (M8-Q40: tensors cannot
-   flow today), `ch_bra ≤ ch_ket` storage (D25), validation against imsrg++ (goldens needed from
-   the patched build).
-3. **N7 at scale and MPI (M12b)**: target E3max/dE3max, nodes and memory (M10-Q2), the schedulers
-   and interconnect of the clusters, when the Hagen–Nam block-distribution evaluation should run
-   and what scaling is "good enough"; when GPU work (M14, after M12) should start and on which
-   machine first (H100/GH200, A100, MI250X/MI300A).
-4. **Performance goals (M12a)**: imsrg++ parity is passed (now 2.4–4.5x faster at emax 6–8, 1.1x at emax 4 on 18 threads); how much effort beyond parity; is the occasional emax-8 benchmark against imsrg++
-   (one run, never in CI) enough?
-5. **Outputs and workflows**: charge radius and other observables in the output stage (M8-Q20),
-   me2jp/me3jp specifications (the owner supplies them), checkpoint/restart and Omega scratch
-   storage (after M13), 3N inputs (me3j, Navratil/Miyagi operator files) and their order.
-6. **Testing policy**: the `slow` label and its run before numerics merges worked; golden
-   regeneration with a patched reference worked; tolerances for IMSRG(3) as D19/D34; how long may
-   `ci.sh` get (75–90 s now, limit 5 min).
-7. **Process**: feedback on run 2's orchestration (worktree start instead of the main checkout,
-   out-of-repository preparation during exclusive tasks, usage pacing with the 5-hour windows,
-   Opus reviews on numerics merges), the incidents (the whole-disk `find` and the macOS privacy
-   prompt, golden rule 10; "Python quit unexpectedly" dialogs, lldb for crashes), the length and
-   format of the report, review cadence, licensing and naming.
+1. **Order of run 4.** Proposal: (1) M12b phase 2 completion (row panels for comm122/ph, D9, D10 and
+   lifting the D7 guard, D11, D12, weight recalibration); (2) N7 follow-ups (tiled `BuildH`, C15,
+   partition timings, `imsrg3_batch_bytes`); (3) M15 tensor operators after M15-Q1..Q5 (goldens
+   exist); (4) M16 formats; (5) fillers (Python hooks D51, `.me2j.bin` reader if not merged, run-2
+   section 7 cleanup). Is the order right? Should M15 go before M12b phase 2?
+2. **Pause and cap rules after the breach.** In run 3 an N7 lead ignored the 21:35 pause message and
+   the window reached 97 % at 22:00 against the 90 % cap (D58); the lead was stopped at 22:01.
+   Should the rules be stricter (pause message earlier, a mandatory TaskStop backstop for leads,
+   a lower cap for the last hour before a deadline)? Which cap should apply in run 4?
+3. **Weekly usage budget per run.** Run 3 used about 17 points of the weekly limit (44 % -> 61 %).
+   What weekly ceiling should run 4 stay under, and should the run stop when it is reached?
+4. **The D45 imbalance at 256 ranks.** The cost model says the compute imbalance is 0-0.1 % at 22
+   ranks, 3 % at 64 ranks only at emax 12 (58 % at emax 10, 146 % at emax 8) and 310-880 % at 256
+   ranks, because comm122/ph go by whole channels. Is "row panels for comm122/ph first" the right
+   priority, and are 22/64/256 ranks the right targets (which emax and E3max matter at 256 ranks)?
+5. **Process feedback on run 3:** fresh leads at each reset with hand-off notes, early merges of
+   shared interfaces, planner and plan review outside the repository, orchestrator-run slow suites.
+   Anything to change? (Details: run-3 report section 6.)
 
 ## Recording the answers
 
