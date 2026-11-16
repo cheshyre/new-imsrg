@@ -130,6 +130,21 @@ void AbsolutizeConfig(RunConfig& c, const fs::path& base) {
   }
 }
 
+/// Fills the provenance block of a resolved config.
+void FillProvenance(RunConfig& cfg, const ConfigSources& src,
+                    const ConfigIssues& issues,
+                    std::vector<std::string> applied_rules) {
+  cfg.provenance.version = IMSRG_VERSION_STRING;
+  cfg.provenance.git_hash = IMSRG_GIT_HASH;
+  cfg.provenance.date = UtcNow();
+  cfg.provenance.command_line = src.command_line;
+  cfg.provenance.legacy_args = src.legacy_args;
+  for (const auto& i : issues) {
+    if (i.severity == Severity::kWarning) cfg.provenance.warnings.push_back(i);
+  }
+  cfg.provenance.applied_rules = std::move(applied_rules);
+}
+
 }  // namespace
 
 Expected<RunConfig, ConfigIssues> LoadConfig(const ConfigSources& src,
@@ -188,15 +203,7 @@ Expected<RunConfig, ConfigIssues> LoadConfig(const ConfigSources& src,
 
   RunConfig cfg = std::move(resolved.config);
   AbsolutizeConfig(cfg, WorkingDirectory());
-  cfg.provenance.version = IMSRG_VERSION_STRING;
-  cfg.provenance.git_hash = IMSRG_GIT_HASH;
-  cfg.provenance.date = UtcNow();
-  cfg.provenance.command_line = src.command_line;
-  cfg.provenance.legacy_args = src.legacy_args;
-  for (const auto& i : issues) {
-    if (i.severity == Severity::kWarning) cfg.provenance.warnings.push_back(i);
-  }
-  cfg.provenance.applied_rules = std::move(applied_rules);
+  FillProvenance(cfg, src, issues, std::move(applied_rules));
   return cfg;
 }
 

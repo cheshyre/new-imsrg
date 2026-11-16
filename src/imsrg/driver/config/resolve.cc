@@ -96,37 +96,9 @@ class Reader {
       TypeError(path, v, "a boolean");
       return false;
     } else if constexpr (std::is_same_v<F, int>) {
-      if (const auto* i = v.get_if<std::int64_t>()) {
-        if (*i < std::numeric_limits<int>::min() ||
-            *i > std::numeric_limits<int>::max()) {
-          issues_.push_back(MakeError(
-              "V-02", path,
-              path + " = " + std::to_string(*i) + " does not fit into an int",
-              v.where));
-          return false;
-        }
-        f = static_cast<int>(*i);
-        return true;
-      }
-      TypeError(path, v, "an integer");
-      return false;
+      return ReadInt(path, v, f);
     } else if constexpr (std::is_same_v<F, double>) {
-      if (const double* d = v.get_if<double>()) {
-        if (!std::isfinite(
-                *d)) {  // TOML allows inf and nan; no parameter means them
-          issues_.push_back(MakeError(
-              "V-02", path, path + " must be a finite number", v.where));
-          return false;
-        }
-        f = *d;
-        return true;
-      }
-      if (const auto* i = v.get_if<std::int64_t>()) {
-        f = static_cast<double>(*i);
-        return true;
-      }
-      TypeError(path, v, "a number");
-      return false;
+      return ReadDouble(path, v, f);
     } else if constexpr (std::is_same_v<F, std::string>) {
       if (const auto* s = v.get_if<std::string>()) {
         f = *s;
@@ -142,72 +114,182 @@ class Reader {
       }
       return false;
     } else if constexpr (detail::ConfigEnum<F>) {
-      const auto* s = v.get_if<std::string>();
-      if (s == nullptr) {
-        TypeError(path, v, "a string");
-        return false;
-      }
-      if (auto e = EnumFromString<F>(*s)) {
-        f = *e;
-        return true;
-      }
-      const auto names = EnumNames<F>();
-      std::string allowed;
-      for (const auto n : names) {
-        if (!allowed.empty()) allowed += ", ";
-        allowed += n;
-      }
-      issues_.push_back(MakeError(
-          "V-01", path,
-          "unknown " + std::string(EnumTraits<F>::type_name) + " '" + *s +
-              "'; allowed: " + allowed,
-          v.where, DidYouMean(*s, std::span<const std::string_view>(names))));
-      return false;
+      return ReadEnum(path, v, f);
     } else if constexpr (std::is_same_v<F, std::vector<std::string>>) {
-      if (const auto* s = v.get_if<std::string>();
-          s != nullptr && string_or_array) {
-        f = {*s};
-        return true;
-      }
-      const auto* a = v.get_if<RawArray>();
-      if (a == nullptr) {
-        TypeError(path, v,
-                  string_or_array ? "a string or an array of strings"
-                                  : "an array of strings");
-        return false;
-      }
-      std::vector<std::string> out;
-      bool ok = true;
-      for (std::size_t i = 0; i < a->size(); ++i) {
-        const auto* s = (*a)[i].get_if<std::string>();
-        if (s == nullptr) {
-          TypeError(path + "[" + std::to_string(i) + "]", (*a)[i], "a string");
-          ok = false;
-        } else {
-          out.push_back(*s);
-        }
-      }
-      if (ok) f = std::move(out);
-      return ok;
+      return ReadStringList(path, v, f, string_or_array);
     } else if constexpr (std::is_same_v<F, std::vector<OperatorRequest>>) {
-      const auto* a = v.get_if<RawArray>();
-      if (a == nullptr) {
-        TypeError(path, v, "an array");
-        return false;
-      }
-      auto parsed = ParseOperatorList(std::span<const RawValue>(*a),
-                                      ModelSpaceInfo{cfg_.basis.emax}, path);
-      if (parsed.has_value()) {
-        f = std::move(parsed.value());
-        return true;
-      }
-      for (auto& issue : parsed.error()) issues_.push_back(std::move(issue));
-      return false;
+      return ReadOperatorList(path, v, f);
     } else if constexpr (std::is_same_v<F, std::vector<OperatorFromFile>>) {
       return ReadFromFile(path, v, f);
     } else {
       static_assert(!sizeof(F), "unsupported schema field type");
     }
+  }
+
+  /// Reads an int field; V-02 if the TOML integer does not fit.
+  bool ReadInt(const std::string& path, const RawValue& v, int& f) {
+    if (const auto* i = v.get_if<std::int64_t>()) {
+      if (*i < std::numeric_limits<int>::min() ||
+          *i > std::numeric_limits<int>::max()) {
+        issues_.push_back(MakeError(
+            "V-02", path,
+            path + " = " + std::to_string(*i) + " does not fit into an int",
+            v.where));
+        return false;
+      }
+      f = static_cast<int>(*i);
+      return true;
+    }
+    TypeError(path, v, "an integer");
+    return false;
+  }
+
+  /// Reads a double field (a TOML integer is accepted); V-02 if not finite.
+  bool ReadDouble(const std::string& path, const RawValue& v, double& f) {
+    if (const double* d = v.get_if<double>()) {
+      if (!std::isfinite(
+              *d)) {  // TOML allows inf and nan; no parameter means them
+        issues_.push_back(MakeError(
+            "V-02", path, path + " must be a finite number", v.where));
+        return false;
+      }
+      f = *d;
+      return true;
+    }
+    if (const auto* i = v.get_if<std::int64_t>()) {
+      f = static_cast<double>(*i);
+      return true;
+    }
+    TypeError(path, v, "a number");
+    return false;
+  }
+
+  /// Reads an enum field from its string name; V-01 lists the allowed names.
+  template <class F>
+  bool ReadEnum(const std::string& path, const RawValue& v, F& f) {
+    const auto* s = v.get_if<std::string>();
+    if (s == nullptr) {
+      TypeError(path, v, "a string");
+      return false;
+    }
+    if (auto e = EnumFromString<F>(*s)) {
+      f = *e;
+      return true;
+    }
+    const auto names = EnumNames<F>();
+    std::string allowed;
+    for (const auto n : names) {
+      if (!allowed.empty()) allowed += ", ";
+      allowed += n;
+    }
+    issues_.push_back(MakeError(
+        "V-01", path,
+        "unknown " + std::string(EnumTraits<F>::type_name) + " '" + *s +
+            "'; allowed: " + allowed,
+        v.where, DidYouMean(*s, std::span<const std::string_view>(names))));
+    return false;
+  }
+
+  /// Reads a list of strings (a single string if `string_or_array`).
+  bool ReadStringList(const std::string& path, const RawValue& v,
+                      std::vector<std::string>& f, bool string_or_array) {
+    if (const auto* s = v.get_if<std::string>();
+        s != nullptr && string_or_array) {
+      f = {*s};
+      return true;
+    }
+    const auto* a = v.get_if<RawArray>();
+    if (a == nullptr) {
+      TypeError(path, v,
+                string_or_array ? "a string or an array of strings"
+                                : "an array of strings");
+      return false;
+    }
+    std::vector<std::string> out;
+    bool ok = true;
+    for (std::size_t i = 0; i < a->size(); ++i) {
+      const auto* s = (*a)[i].get_if<std::string>();
+      if (s == nullptr) {
+        TypeError(path + "[" + std::to_string(i) + "]", (*a)[i], "a string");
+        ok = false;
+      } else {
+        out.push_back(*s);
+      }
+    }
+    if (ok) f = std::move(out);
+    return ok;
+  }
+
+  /// Reads the `operators.list` entries through `ParseOperatorList`.
+  bool ReadOperatorList(const std::string& path, const RawValue& v,
+                        std::vector<OperatorRequest>& f) {
+    const auto* a = v.get_if<RawArray>();
+    if (a == nullptr) {
+      TypeError(path, v, "an array");
+      return false;
+    }
+    auto parsed = ParseOperatorList(std::span<const RawValue>(*a),
+                                    ModelSpaceInfo{cfg_.basis.emax}, path);
+    if (parsed.has_value()) {
+      f = std::move(parsed.value());
+      return true;
+    }
+    for (auto& issue : parsed.error()) issues_.push_back(std::move(issue));
+    return false;
+  }
+
+  /// Reads one `operators.from_file` entry at `base` into `e`; returns false
+  /// if any key is wrong or required keys are missing.
+  bool ReadFromFileEntry(const std::string& base, const RawValue& entry,
+                         const RawTable& tbl, OperatorFromFile& e) {
+    static const auto* const kKeys = new std::vector<std::string>{
+        "name",          "rank",    "dtz",     "parity",
+        "particle_rank", "file_2b", "file_3b", "format"};
+    bool ok = true;
+    bool have_name = false;
+    bool have_file = false;
+    for (const auto& [key, val] : tbl) {
+      const std::string ep = base + "." + key;
+      bool r = true;
+      if (key == "name") {
+        r = Read(ep, val, e.name);
+        have_name = true;
+      } else if (key == "rank") {
+        r = Read(ep, val, e.rank);
+      } else if (key == "dtz") {
+        r = Read(ep, val, e.dtz);
+      } else if (key == "parity") {
+        r = Read(ep, val, e.parity);
+      } else if (key == "particle_rank") {
+        r = Read(ep, val, e.particle_rank);
+      } else if (key == "file_2b") {
+        r = Read(ep, val, e.file_2b);
+        have_file = true;
+      } else if (key == "file_3b") {
+        r = Read(ep, val, e.file_3b);
+      } else if (key == "format") {
+        r = Read(ep, val, e.format);
+      } else {
+        issues_.push_back(MakeError("E-KEY-UNKNOWN", ep,
+                                    "unknown key '" + key + "' in " + base,
+                                    val.where, DidYouMean(key, *kKeys)));
+        r = false;
+      }
+      ok = ok && r;
+    }
+    if (!have_name) {
+      issues_.push_back(MakeError("V-03", base + ".name",
+                                  "required key '" + base + ".name' is missing",
+                                  entry.where));
+      ok = false;
+    }
+    if (!have_file) {
+      issues_.push_back(MakeError(
+          "V-03", base + ".file_2b",
+          "required key '" + base + ".file_2b' is missing", entry.where));
+      ok = false;
+    }
+    return ok;
   }
 
   bool ReadFromFile(const std::string& path, const RawValue& v,
@@ -217,9 +299,6 @@ class Reader {
       TypeError(path, v, "an array of tables");
       return false;
     }
-    static const auto* const kKeys = new std::vector<std::string>{
-        "name",          "rank",    "dtz",     "parity",
-        "particle_rank", "file_2b", "file_3b", "format"};
     std::vector<OperatorFromFile> result;
     bool ok = true;
     for (std::size_t i = 0; i < a->size(); ++i) {
@@ -231,49 +310,7 @@ class Reader {
         continue;
       }
       OperatorFromFile e;
-      bool have_name = false;
-      bool have_file = false;
-      for (const auto& [key, val] : *tbl) {
-        const std::string ep = base + "." + key;
-        bool r = true;
-        if (key == "name") {
-          r = Read(ep, val, e.name);
-          have_name = true;
-        } else if (key == "rank") {
-          r = Read(ep, val, e.rank);
-        } else if (key == "dtz") {
-          r = Read(ep, val, e.dtz);
-        } else if (key == "parity") {
-          r = Read(ep, val, e.parity);
-        } else if (key == "particle_rank") {
-          r = Read(ep, val, e.particle_rank);
-        } else if (key == "file_2b") {
-          r = Read(ep, val, e.file_2b);
-          have_file = true;
-        } else if (key == "file_3b") {
-          r = Read(ep, val, e.file_3b);
-        } else if (key == "format") {
-          r = Read(ep, val, e.format);
-        } else {
-          issues_.push_back(MakeError("E-KEY-UNKNOWN", ep,
-                                      "unknown key '" + key + "' in " + base,
-                                      val.where, DidYouMean(key, *kKeys)));
-          r = false;
-        }
-        ok = ok && r;
-      }
-      if (!have_name) {
-        issues_.push_back(MakeError(
-            "V-03", base + ".name",
-            "required key '" + base + ".name' is missing", (*a)[i].where));
-        ok = false;
-      }
-      if (!have_file) {
-        issues_.push_back(MakeError(
-            "V-03", base + ".file_2b",
-            "required key '" + base + ".file_2b' is missing", (*a)[i].where));
-        ok = false;
-      }
+      ok = ReadFromFileEntry(base, (*a)[i], *tbl, e) && ok;
       result.push_back(std::move(e));
     }
     if (ok) out = std::move(result);
@@ -301,6 +338,57 @@ std::string Sanitize(const std::string& s) {
     if (!ok) c = '_';
   }
   return out;
+}
+
+/// Derives the mass number from the reference nucleus or the valence core
+/// (V-23 if neither fixes it).
+void DeriveMassNumber(const RawTree& tree, RunConfig& cfg, ConfigIssues& issues,
+                      const std::optional<basis::Nucleus>& reference,
+                      bool reference_bad,
+                      const std::optional<basis::Nucleus>& core) {
+  if (!tree.contains("basis.mass_number")) {
+    const std::optional<basis::Nucleus>& src = reference ? reference : core;
+    if (src && src->A == std::floor(src->A) && src->A >= 1.0) {
+      cfg.basis.mass_number = static_cast<int>(src->A);
+    } else if (!reference_bad) {
+      issues.push_back(MakeError(
+          "V-23", "basis.mass_number",
+          "cannot determine the mass number; set basis.mass_number or "
+          "reference.nucleus",
+          SourceRef{SourceRef::Kind::kDerived, "basis.mass_number", 0, 0}));
+    }
+  }
+}
+
+/// Derives the output stem and the flow file from the run's identity.
+void DeriveOutputNames(const RawTree& tree, RunConfig& cfg,
+                       const std::optional<basis::Nucleus>& core) {
+  if (!tree.contains("output.stem")) {
+    const std::string method = cfg.run.task == Task::kImsrg
+                                   ? std::string(ToString(cfg.imsrg.method))
+                                   : std::string(ToString(cfg.run.task));
+    std::string ref = "none";
+    if (cfg.reference.nucleus) {
+      ref = *cfg.reference.nucleus;
+    } else if (core) {
+      ref = core->name();
+    }
+    std::string val = ref;
+    if (cfg.valence.space) {
+      val = *cfg.valence.space;
+    } else if (cfg.valence.custom) {
+      val = *cfg.valence.custom;
+    }
+    cfg.output.stem =
+        Sanitize(method + "_" + ref + "_" + val + "_hw" +
+                 FormatG(cfg.basis.hw) + "_e" + std::to_string(cfg.basis.emax) +
+                 "_A" + std::to_string(cfg.basis.mass_number));
+  }
+  if (!tree.contains("output.flow_file")) {
+    cfg.output.flow_file = (std::filesystem::path(cfg.output.directory) /
+                            (cfg.output.stem + ".flow"))
+                               .generic_string();
+  }
 }
 
 /// Derived values (design/16 section 2). Never throws and never assumes reading
@@ -334,19 +422,7 @@ void Derive(const RawTree& tree, const ResolveOptions& options, RunConfig& cfg,
     }
   }
 
-  // Mass number.
-  if (!tree.contains("basis.mass_number")) {
-    const std::optional<basis::Nucleus>& src = reference ? reference : core;
-    if (src && src->A == std::floor(src->A) && src->A >= 1.0) {
-      cfg.basis.mass_number = static_cast<int>(src->A);
-    } else if (!reference_bad) {
-      issues.push_back(MakeError(
-          "V-23", "basis.mass_number",
-          "cannot determine the mass number; set basis.mass_number or "
-          "reference.nucleus",
-          SourceRef{SourceRef::Kind::kDerived, "basis.mass_number", 0, 0}));
-    }
-  }
+  DeriveMassNumber(tree, cfg, issues, reference, reference_bad, core);
 
   // D37: DIIS for TOML configs, imsrg++'s linear mixing for legacy command
   // lines (so that old command lines reproduce imsrg++ iteration counts).
@@ -386,33 +462,7 @@ void Derive(const RawTree& tree, const ResolveOptions& options, RunConfig& cfg,
     if (!tree.contains("imsrg.space.emax_3body")) sp->emax_3body = sp->emax;
   }
 
-  // Output stem and flow file.
-  if (!tree.contains("output.stem")) {
-    const std::string method = cfg.run.task == Task::kImsrg
-                                   ? std::string(ToString(cfg.imsrg.method))
-                                   : std::string(ToString(cfg.run.task));
-    std::string ref = "none";
-    if (cfg.reference.nucleus) {
-      ref = *cfg.reference.nucleus;
-    } else if (core) {
-      ref = core->name();
-    }
-    std::string val = ref;
-    if (cfg.valence.space) {
-      val = *cfg.valence.space;
-    } else if (cfg.valence.custom) {
-      val = *cfg.valence.custom;
-    }
-    cfg.output.stem =
-        Sanitize(method + "_" + ref + "_" + val + "_hw" +
-                 FormatG(cfg.basis.hw) + "_e" + std::to_string(cfg.basis.emax) +
-                 "_A" + std::to_string(cfg.basis.mass_number));
-  }
-  if (!tree.contains("output.flow_file")) {
-    cfg.output.flow_file = (std::filesystem::path(cfg.output.directory) /
-                            (cfg.output.stem + ".flow"))
-                               .generic_string();
-  }
+  DeriveOutputNames(tree, cfg, core);
 
   // The stage-2 generator is inert for one stage: report the default.
   if (cfg.imsrg.steps == 1)

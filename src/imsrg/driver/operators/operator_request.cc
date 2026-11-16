@@ -585,14 +585,12 @@ class ListParser {
     return false;
   }
 
-  void ParseString(const std::string& spec, const SourceRef& where) {
-    if (spec.empty()) {
-      AddError("E-OP-PARAMS", "empty operator spec", where);
-      return;
-    }
-    const auto tokens = SplitUnderscore(spec);
+  /// The catalog row with the longest name that is a prefix of `tokens`
+  /// (QdotQ* matches QdotQ); sets `name_tokens` to its token count.
+  static const OperatorCatalogEntry* MatchRow(
+      const std::vector<std::string_view>& tokens, std::size_t& name_tokens) {
     const OperatorCatalogEntry* row = nullptr;
-    std::size_t name_tokens = 0;
+    name_tokens = 0;
     for (const auto& e : CatalogRows()) {
       const auto nt = SplitUnderscore(e.name);
       if (nt.size() <= name_tokens || nt.size() > tokens.size()) continue;
@@ -607,6 +605,17 @@ class ListParser {
       }
       name_tokens = 1;
     }
+    return row;
+  }
+
+  void ParseString(const std::string& spec, const SourceRef& where) {
+    if (spec.empty()) {
+      AddError("E-OP-PARAMS", "empty operator spec", where);
+      return;
+    }
+    const auto tokens = SplitUnderscore(spec);
+    std::size_t name_tokens = 0;
+    const OperatorCatalogEntry* row = MatchRow(tokens, name_tokens);
     if (row == nullptr) {
       const std::string name(tokens[0]);
       AddError("E-OP-UNKNOWN", "operator '" + name + "' is not known", where,
@@ -673,6 +682,20 @@ class ListParser {
     }
     if (RejectPhase(*row, *name, where)) return;
 
+    bool ok = CheckTableKeys(*row, *name, table, where);
+    std::vector<OpParam> params;
+    ok = ConvertTableParams(*row, *name, table, where, params) && ok;
+    if (!ok) return;
+    FinishRow(*row, std::move(params), where);
+  }
+
+  /// Reports unknown and repeated keys of an inline operator table; returns
+  /// true if there are none.
+  bool CheckTableKeys(const OperatorCatalogEntry& row_ref,
+                      const std::string& name_ref, const RawTable& table,
+                      const SourceRef& where) {
+    const OperatorCatalogEntry* row = &row_ref;
+    const std::string* name = &name_ref;
     bool ok = true;
     std::set<std::string_view> keys;
     for (const auto& [k, v] : table) {
@@ -694,7 +717,18 @@ class ListParser {
         ok = false;
       }
     }
-    std::vector<OpParam> params;
+    return ok;
+  }
+
+  /// Converts the parameters of an inline operator table in schema order;
+  /// returns true if all are valid.
+  bool ConvertTableParams(const OperatorCatalogEntry& row_ref,
+                          const std::string& name_ref, const RawTable& table,
+                          const SourceRef& where,
+                          std::vector<OpParam>& params) {
+    const OperatorCatalogEntry* row = &row_ref;
+    const std::string* name = &name_ref;
+    bool ok = true;
     bool gap = false;
     for (std::size_t i = 0; i < row->params.size(); ++i) {
       const auto& spec = row->params[i];
@@ -729,8 +763,7 @@ class ListParser {
         params.push_back(std::move(value));
       }
     }
-    if (!ok) return;
-    FinishRow(*row, std::move(params), where);
+    return ok;
   }
 
   int emax_;

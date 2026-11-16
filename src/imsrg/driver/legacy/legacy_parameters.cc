@@ -721,6 +721,37 @@ class Translator {
 
   // ------------------------------------------------------------------ method
   // (design/16 3.5)
+  /// method = NSmagnus, brueckner or brueckner1step: Magnus with a forced
+  /// omega_norm_max (and Brueckner BCH / one step).
+  void ForceNsMagnusMethod(const std::string& v, const SourceRef& ref) {
+    PutS("imsrg.method", "magnus", ref);
+    std::string text = "method=" + v + " -> imsrg.method=magnus";
+    const double onm = v == "NSmagnus" ? 50000.0 : 500.0;
+    forced_omega_ = onm;
+    text += ", imsrg.step.omega_norm_max=" +
+            std::string(v == "NSmagnus" ? "50000" : "500");
+    PutD("imsrg.step.omega_norm_max", onm, ref);
+    if (const Entry* o = get("omega_norm_max")) {
+      const auto given_v = ParseDouble(*o, "omega_norm_max");
+      if (given_v && std::abs(*given_v - onm) > 1.0e-12)
+        Warn("W-Q15", "imsrg.step.omega_norm_max",
+             "method=" + v + " overrides omega_norm_max=" + o->value,
+             ArgRef(*o));
+    }
+    if (v != "NSmagnus") {
+      forced_brueckner_ = true;
+      PutB("imsrg.use_brueckner_bch", true, ref);
+      text += ", imsrg.use_brueckner_bch=true";
+    }
+    if (v == "brueckner1step") {
+      forced_steps_ = 1;
+      PutI("imsrg.steps", 1, ref);
+      core_from_valence_ = true;
+      text += ", imsrg.steps=1, imsrg.generator.core=<valence_generator>";
+    }
+    Rule(text);
+  }
+
   void DoMethod() {
     const Entry* m = get("method");
     if (m == nullptr) return;
@@ -733,32 +764,7 @@ class Translator {
       PutS("run.task", task, ref);
       Rule("method=" + v + " -> run.task=" + task);
     } else if (v == "NSmagnus" || v == "brueckner" || v == "brueckner1step") {
-      PutS("imsrg.method", "magnus", ref);
-      std::string text = "method=" + v + " -> imsrg.method=magnus";
-      const double onm = v == "NSmagnus" ? 50000.0 : 500.0;
-      forced_omega_ = onm;
-      text += ", imsrg.step.omega_norm_max=" +
-              std::string(v == "NSmagnus" ? "50000" : "500");
-      PutD("imsrg.step.omega_norm_max", onm, ref);
-      if (const Entry* o = get("omega_norm_max")) {
-        const auto given_v = ParseDouble(*o, "omega_norm_max");
-        if (given_v && std::abs(*given_v - onm) > 1.0e-12)
-          Warn("W-Q15", "imsrg.step.omega_norm_max",
-               "method=" + v + " overrides omega_norm_max=" + o->value,
-               ArgRef(*o));
-      }
-      if (v != "NSmagnus") {
-        forced_brueckner_ = true;
-        PutB("imsrg.use_brueckner_bch", true, ref);
-        text += ", imsrg.use_brueckner_bch=true";
-      }
-      if (v == "brueckner1step") {
-        forced_steps_ = 1;
-        PutI("imsrg.steps", 1, ref);
-        core_from_valence_ = true;
-        text += ", imsrg.steps=1, imsrg.generator.core=<valence_generator>";
-      }
-      Rule(text);
+      ForceNsMagnusMethod(v, ref);
     } else if (v == "brueckner2") {
       AddError(
           "E-PLANNED", "imsrg.method",
@@ -826,7 +832,14 @@ class Translator {
   // bools, enums
   void DoBasisAndMisc() {
     if (basis_) PutS("basis.kind", *basis_, ref_of("basis"));
+    DoDirectBools();
+    DoImsrg3Variant();
+    DoEnumKeys();
+    DoUnsupportedSystem();
+  }
 
+  /// Bools mapped 1:1, and use_brueckner_bch.
+  void DoDirectBools() {
     // Bools mapped 1:1.
     for (const DirectBool& d : kDirectBools) {
       const Entry* e = get(d.key);
@@ -843,7 +856,10 @@ class Translator {
       if (b && !forced_brueckner_)
         PutB("imsrg.use_brueckner_bch", *b, ArgRef(*e));
     }
+  }
 
+  /// imsrg3_n7 / imsrg3_mp4 -> imsrg3.variant.
+  void DoImsrg3Variant() {
     // imsrg3 variant.
     const Entry* n7 = get("imsrg3_n7");
     const Entry* mp4 = get("imsrg3_mp4");
@@ -857,7 +873,11 @@ class Translator {
       PutS("imsrg3.variant", "n7", ArgRef(*n7));
     else if (mp4v && *mp4v)
       PutS("imsrg3.variant", "mp4", ArgRef(*mp4));
+  }
 
+  /// Enum-valued and string keys: NAT order, valence file format, denominator
+  /// partitioning and delta orbit, occupations file.
+  void DoEnumKeys() {
     // order_NAT_by_energy overrides NAT_order.
     if (const Entry* e = get("NAT_order")) {
       const auto o = MapEnum(*e, "natural_orbitals.order", kNatOrder);
@@ -886,7 +906,10 @@ class Translator {
       PutS("imsrg.denominator.delta_orbit", e->value, ArgRef(*e));
     if (const Entry* e = get("occ_file"); e && e->value != "none")
       PutS("reference.occupations_file", e->value, ArgRef(*e));
+  }
 
+  /// Rejects atomic systems; warns about the ignored LECs key.
+  void DoUnsupportedSystem() {
     if (const Entry* e = get("physical_system")) {
       if (e->value == "atomic")
         AddError("E-LEGACY-NS", "physical_system",
@@ -1008,7 +1031,13 @@ class Translator {
     if (!given_valid_double("hw")) PutD("basis.hw", 20.0, DefaultRef("hw"));
     if (!given_valid_int("file2e1max"))
       PutI("interaction.two_body.e1max", 12, DefaultRef("file2e1max"));
+    DoDirectNumbers();
+    DoCutNumbers();
+    DoStepsAndTrap();
+  }
 
+  /// Integer and double keys mapped 1:1.
+  void DoDirectNumbers() {
     for (const DirectNumber& d : kDirectInts) {
       const Entry* e = get(d.key);
       if (e == nullptr) continue;
@@ -1027,6 +1056,10 @@ class Translator {
       if (!v || AbsentBySentinel(d.absent, *v)) continue;
       PutD(d.path, *v, ArgRef(*e));
     }
+  }
+
+  /// omega_norm_max, lmax and file2lmax.
+  void DoCutNumbers() {
     if (const Entry* e = get("omega_norm_max"); e && !forced_omega_) {
       if (const auto v = ParseDouble(*e, "omega_norm_max"))
         PutD("imsrg.step.omega_norm_max", *v, ArgRef(*e));
@@ -1048,6 +1081,10 @@ class Translator {
         }
       }
     }
+  }
+
+  /// nsteps and hw_trap.
+  void DoStepsAndTrap() {
     if (const Entry* e = get("nsteps"); e && !forced_steps_) {
       if (const auto v = ParseInt(*e, "nsteps")) {
         if (*v == 1 || *v == 2)
@@ -1237,51 +1274,9 @@ class Translator {
   // cross-key rules
   void Drop(std::string_view path) { out_.tree.erase(path); }
 
-  void DoCrossRules() {
-    const bool has_valence =
-        in_tree("valence.space") || in_tree("valence.custom");
-    const std::string method = tree_str("imsrg.method").value_or("magnus");
-    const auto steps = tree_int("imsrg.steps");
-
-    // Q1.
-    if (steps && *steps == 1 && has_valence && given("valence_generator")) {
-      Drop("imsrg.generator.valence");
-      if (!core_from_valence_)
-        Warn("W-NSTEPS1", "valence_generator",
-             "nsteps=1 uses core_generator only; valence_generator is ignored "
-             "(design/16 Q1)",
-             ref_of("valence_generator"));
-    }
-    // Q9.
-    if (steps && *steps == 2 && !has_valence) {
-      Drop("imsrg.steps");
-      Warn("W-Q9", "nsteps",
-           "nsteps=2 without a valence space: the second stage is skipped",
-           ref_of("nsteps"));
-    }
-    // Q3.
-    if (const auto dv = tree_double("imsrg.denominator.delta");
-        dv && *dv != 0.0 && !in_tree("imsrg.denominator.delta_orbit")) {
-      Drop("imsrg.denominator.delta");
-      Warn("W-Q3", "denominator_delta",
-           "denominator_delta is ignored without denominator_delta_orbit",
-           ref_of("denominator_delta"));
-    }
-    // Q10.
-    if (tree_true("imsrg.perturbative_triples") && method != "magnus") {
-      Drop("imsrg.perturbative_triples");
-      Warn("W-Q10", "perturbative_triples",
-           "perturbative_triples runs only with method=magnus; ignored",
-           ref_of("perturbative_triples"));
-    }
-    // V-52.
-    if (tree_true("imsrg3.at_end") && method != "magnus") {
-      Drop("imsrg3.at_end");
-      Warn("V-52", "imsrg3_at_end",
-           "imsrg3_at_end requires a magnus method; ignored",
-           ref_of("imsrg3_at_end"));
-    }
-    // L2.
+  /// L2: IMSRG(3)-only keys are dropped (with a warning) when IMSRG(3) is not
+  /// active.
+  void DropInertImsrg3Keys() {
     const bool imsrg3_active =
         tree_true("imsrg3.in_flow") || tree_true("imsrg3.at_end");
     if (!imsrg3_active) {
@@ -1326,18 +1321,10 @@ class Translator {
         }
       }
     }
-    // Q2.
-    if (given("ds_0") && method == "magnus") {
-      const auto fast = [](const std::optional<Gen>& g) {
-        return g && (g->canon.find("imaginary") != std::string::npos ||
-                     g->canon.find("wegner") != std::string::npos);
-      };
-      if (!fast(core_gen_) && !fast(val_gen_))
-        Warn("W-Q2", "ds_0",
-             "ds_0 has no effect with method=magnus (design/16 Q2)",
-             ref_of("ds_0"));
-    }
-    // V-21.
+  }
+
+  /// V-21: natural-orbital keys are dropped (with a warning) unless basis=NAT.
+  void DropInertNaturalOrbitalKeys() {
     if (tree_str("basis.kind").value_or("hf") != "nat") {
       for (std::string_view key : {std::string_view("use_NAT_occupations"),
                                    std::string_view("NAT_order"),
@@ -1350,6 +1337,65 @@ class Translator {
       Drop("natural_orbitals.use_occupations");
       Drop("natural_orbitals.order");
     }
+  }
+
+  void DoCrossRules() {
+    const bool has_valence =
+        in_tree("valence.space") || in_tree("valence.custom");
+    const std::string method = tree_str("imsrg.method").value_or("magnus");
+    const auto steps = tree_int("imsrg.steps");
+
+    // Q1.
+    if (steps && *steps == 1 && has_valence && given("valence_generator")) {
+      Drop("imsrg.generator.valence");
+      if (!core_from_valence_)
+        Warn("W-NSTEPS1", "valence_generator",
+             "nsteps=1 uses core_generator only; valence_generator is ignored "
+             "(design/16 Q1)",
+             ref_of("valence_generator"));
+    }
+    // Q9.
+    if (steps && *steps == 2 && !has_valence) {
+      Drop("imsrg.steps");
+      Warn("W-Q9", "nsteps",
+           "nsteps=2 without a valence space: the second stage is skipped",
+           ref_of("nsteps"));
+    }
+    // Q3.
+    if (const auto dv = tree_double("imsrg.denominator.delta");
+        dv && *dv != 0.0 && !in_tree("imsrg.denominator.delta_orbit")) {
+      Drop("imsrg.denominator.delta");
+      Warn("W-Q3", "denominator_delta",
+           "denominator_delta is ignored without denominator_delta_orbit",
+           ref_of("denominator_delta"));
+    }
+    // Q10.
+    if (tree_true("imsrg.perturbative_triples") && method != "magnus") {
+      Drop("imsrg.perturbative_triples");
+      Warn("W-Q10", "perturbative_triples",
+           "perturbative_triples runs only with method=magnus; ignored",
+           ref_of("perturbative_triples"));
+    }
+    // V-52.
+    if (tree_true("imsrg3.at_end") && method != "magnus") {
+      Drop("imsrg3.at_end");
+      Warn("V-52", "imsrg3_at_end",
+           "imsrg3_at_end requires a magnus method; ignored",
+           ref_of("imsrg3_at_end"));
+    }
+    DropInertImsrg3Keys();
+    // Q2.
+    if (given("ds_0") && method == "magnus") {
+      const auto fast = [](const std::optional<Gen>& g) {
+        return g && (g->canon.find("imaginary") != std::string::npos ||
+                     g->canon.find("wegner") != std::string::npos);
+      };
+      if (!fast(core_gen_) && !fast(val_gen_))
+        Warn("W-Q2", "ds_0",
+             "ds_0 has no effect with method=magnus (design/16 Q2)",
+             ref_of("ds_0"));
+    }
+    DropInertNaturalOrbitalKeys();
   }
 };
 

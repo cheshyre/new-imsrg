@@ -168,6 +168,34 @@ std::string_view Trim(std::string_view s) {
   return s;
 }
 
+/// Parses the value text of a `--set` assignment as a TOML value; text that is
+/// not valid TOML is kept verbatim as a string.
+RawValue ParseSetValue(std::string_view text, std::string_view assignment,
+                       const SourceRef& where) {
+  std::optional<RawValue> value;
+  try {
+    const toml::table parsed = toml::parse("v = " + std::string(text));
+    if (parsed.size() == 1) {
+      if (const toml::node* node = parsed.get("v")) {
+        ConvertError error;
+        const Origin origin{SourceRef::Kind::kSetOption,
+                            std::string(assignment)};
+        value = Convert(*node, origin, true, error);
+        if (value) value->where = where;
+      }
+    }
+  } catch (const toml::parse_error&) {
+    value.reset();
+  }
+  if (!value) {
+    RawValue verbatim;
+    verbatim.data = std::string(text);
+    verbatim.where = where;
+    value = std::move(verbatim);
+  }
+  return std::move(*value);
+}
+
 }  // namespace
 
 ConfigIssues ReadTomlFile(const std::filesystem::path& file, RawTree& tree) {
@@ -216,28 +244,7 @@ ConfigIssues ApplySetOverride(std::string_view assignment, RawTree& tree) {
     return issues;
   }
   const std::string_view text = Trim(assignment.substr(eq + 1));
-  std::optional<RawValue> value;
-  try {
-    const toml::table parsed = toml::parse("v = " + std::string(text));
-    if (parsed.size() == 1) {
-      if (const toml::node* node = parsed.get("v")) {
-        ConvertError error;
-        const Origin origin{SourceRef::Kind::kSetOption,
-                            std::string(assignment)};
-        value = Convert(*node, origin, true, error);
-        if (value) value->where = where;
-      }
-    }
-  } catch (const toml::parse_error&) {
-    value.reset();
-  }
-  if (!value) {
-    RawValue verbatim;
-    verbatim.data = std::string(text);
-    verbatim.where = where;
-    value = std::move(verbatim);
-  }
-  tree.set(path, std::move(*value));
+  tree.set(path, ParseSetValue(text, assignment, where));
   return issues;
 }
 
