@@ -2,6 +2,15 @@
 // Copyright 2026 The imsrg authors
 
 // The N7 term comm330ss, [X3, Y3] -> Z0 (imsrg3.h). Kernel TU.
+//
+// Z0 += sum over channels, (m, k) of (2J+1) (sym_m/6) (sym_k/6)
+//       (n_m nbar_k - nbar_m n_k) X(m, k) Y(k, m)
+// over the kept canonical rows m != k of a channel (sym: multiplicity of the
+// triple, n and nbar the occupation products). `detail::Comm330ssReference`
+// is the kernel before the row tiling (one task per row m); the batch form
+// (`detail::Comm330Batch`) sums the same terms per line k of the batch with
+// one Kokkos sum reduction (`ThreeBodyLocal` reads the elements on line k
+// whichever triangle they are stored in), needs no H or W.
 
 #include <cstddef>
 #include <cstdint>

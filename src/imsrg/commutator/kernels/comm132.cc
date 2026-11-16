@@ -9,9 +9,24 @@
 //   1)
 //       [ X_ab Y3^{J3}((ij)J b; (kl)J a) - Y_ab X3^{J3}((ij)J b; (kl)J a) ],
 // added to the stored normalized element divided by sqrt((1 + d_ij)(1 +
-// d_kl)). One parallel task per stored element of Z's two-body part (both
-// triangles of every block), so there are no atomics.
-
+// d_kl)).
+//
+// Element-wise reference (`detail::Comm132ssReference`, the kernel before the
+// row tiling): one parallel task per stored element of Z's two-body part (both
+// triangles of every block), three-body elements through `ThreeBodyElement`.
+//
+// Batch form (`detail::Comm132Batch`, needs W = E B E^T of the batch). The
+// sum over J3 is the sum over the three-body channels, and the element
+// Y3^{J3}((ij) J b; (kl) J a) is W_Y[((ij) J b), ((kl) J a)] of the channel
+// with 2 J3 (rows: pair-third states, `FindSortedRow`; columns: the batch's
+// states). So z(ij, kl) gets (2 J3 + 1)/(2J + 1) (n_a - n_b) [X_ab W_Y - Y_ab
+// W_X] from every column ((kl) J, a) of the batch and every b of the one-body
+// channel of a; pairs (ij) of any occupation class occur (review fix B1).
+// The batch's columns are grouped by key (k, l, J) in a host work list; one
+// work item per (key, bra ket (ij)) owns the element z(ij, kl), sums the
+// key's columns in plan order, and adds it, so there are no atomics and the
+// result is bitwise reproducible at a fixed batching. W is read as stored
+// (no transposed blocks are needed: the bra index is the row of W).
 #include <algorithm>
 #include <cstdint>
 #include <optional>
