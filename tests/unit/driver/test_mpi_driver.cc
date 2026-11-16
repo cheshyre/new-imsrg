@@ -145,27 +145,36 @@ void CompareWithSerial(const std::string& extra, bool expect_rp2) {
   if (world.AllreduceMax(failed) != 0) return;  // all ranks agree: leave
   world.Barrier();
 
+  // Rank 0 compares; exceptions are caught and agreed on, so that every rank
+  // reaches the closing barrier.
+  std::int64_t root_failed = 0;
   if (world.is_root()) {
-    EXPECT_TRUE(fs::exists(fs::path(cfg.output.directory) / "results.json"));
-    EXPECT_TRUE(fs::exists(FlowPath(cfg)));
-    EXPECT_TRUE(
-        fs::exists(fs::path(cfg.output.directory) / "resolved_config.toml"));
-    for (int r = 1; r < world.size(); ++r) {
-      const fs::path d = base / "mpi" / ("rank" + std::to_string(r));
-      EXPECT_EQ(CountFiles(d), 0u) << "files written by rank " << r;
+    try {
+      EXPECT_TRUE(fs::exists(fs::path(cfg.output.directory) / "results.json"));
+      EXPECT_TRUE(fs::exists(FlowPath(cfg)));
+      EXPECT_TRUE(
+          fs::exists(fs::path(cfg.output.directory) / "resolved_config.toml"));
+      for (int r = 1; r < world.size(); ++r) {
+        const fs::path d = base / "mpi" / ("rank" + std::to_string(r));
+        EXPECT_EQ(CountFiles(d), 0u) << "files written by rank " << r;
+      }
+      const driver::RunConfig scfg = Load(base / "serial", extra);
+      driver::Run(scfg, Communicator::Serial());
+      const Summary m = Summarize(cfg);
+      const Summary s = Summarize(scfg);
+      ExpectClose("E0", m.e0, s.e0);
+      ExpectClose("E_HF", m.e_hf, s.e_hf);
+      if (expect_rp2) ExpectClose("Rp2", m.rp2, s.rp2);
+      EXPECT_EQ(m.steps, s.steps) << "steps per stage";
+      EXPECT_EQ(m.flow_lines, s.flow_lines) << "flow CSV lines";
+      std::printf("[mpi-driver] ranks %d, stages %zu, flow lines %zu\n",
+                  world.size(), m.steps.size(), m.flow_lines);
+    } catch (const std::exception& e) {
+      ADD_FAILURE() << "rank 0 comparison failed: " << e.what();
+      root_failed = 1;
     }
-    const driver::RunConfig scfg = Load(base / "serial", extra);
-    driver::Run(scfg, Communicator::Serial());
-    const Summary m = Summarize(cfg);
-    const Summary s = Summarize(scfg);
-    ExpectClose("E0", m.e0, s.e0);
-    ExpectClose("E_HF", m.e_hf, s.e_hf);
-    if (expect_rp2) ExpectClose("Rp2", m.rp2, s.rp2);
-    EXPECT_EQ(m.steps, s.steps) << "steps per stage";
-    EXPECT_EQ(m.flow_lines, s.flow_lines) << "flow CSV lines";
-    std::printf("[mpi-driver] ranks %d, stages %zu, flow lines %zu\n",
-                world.size(), m.steps.size(), m.flow_lines);
   }
+  world.AllreduceMax(root_failed);  // all ranks leave together
   world.Barrier();
 }
 
