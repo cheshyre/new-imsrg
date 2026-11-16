@@ -263,6 +263,8 @@ void AssignWork(Workspace& ws, std::int32_t part, std::int32_t num_parts) {
   impl.work = std::move(a);
   impl.work_device = std::move(d);
   AttachLadderWork(impl);
+  AttachPandyaWork(impl.pandya, impl.work.ph_channels(),
+                   impl.work.distributed());
 }
 
 }  // namespace imsrg::commutator::detail
