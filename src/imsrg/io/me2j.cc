@@ -181,6 +181,43 @@ void CheckNoExtraValues(TextInput& in, const std::filesystem::path& path,
   }
 }
 
+/// Reads every record of the file prefix into `tb` and returns the number of
+/// values consumed; `expected` is only used for the truncation message.
+std::int64_t ReadRecords(TextInput& in, const std::filesystem::path& path,
+                         const Resolved& r, const std::vector<FileOrbit>& orbs,
+                         const std::vector<PnOrbit>& pn, op::TwoBody& tb,
+                         std::int64_t expected) {
+  std::int64_t read = 0;
+
+  const auto next = [&]() {
+    float v = 0.0F;
+    if (!in.NextFloat(v)) {
+      throw InputError("'" + path.string() + "': data ended after " +
+                       std::to_string(read) + " values; " +
+                       std::to_string(expected) +
+                       " are needed for the given file truncation (check "
+                       "file2e1max, file2e2max "
+                       "and file2lmax)");
+    }
+    ++read;
+    return static_cast<double>(v);
+  };
+
+  ForEachRecord(orbs, r.e2max,
+                [&](std::size_t i1, std::size_t i2, std::size_t i3,
+                    std::size_t i4, std::int32_t J) {
+                  // File order: T=0 pn, nn, T=1 pn, pp (widened from float).
+                  RecordValues rv{};
+                  rv.v00 = next();
+                  rv.vnn = next();
+                  rv.v10 = next();
+                  rv.vpp = next();
+                  StoreRecord(tb, pn[i1], pn[i2], pn[i3], pn[i4], i1, i2, i3,
+                              i4, J, rv);
+                });
+  return read;
+}
+
 }  // namespace
 
 std::int64_t Me2jValueCount(const Me2jTruncation& file,
@@ -212,34 +249,7 @@ op::Operator ReadMe2j(const std::filesystem::path& path,
   in.SkipLine();  // header line
 
   const std::int64_t expected = CountValues(r, emax_read);
-  std::int64_t read = 0;
-
-  const auto next = [&]() {
-    float v = 0.0F;
-    if (!in.NextFloat(v)) {
-      throw InputError("'" + path.string() + "': data ended after " +
-                       std::to_string(read) + " values; " +
-                       std::to_string(expected) +
-                       " are needed for the given file truncation (check "
-                       "file2e1max, file2e2max "
-                       "and file2lmax)");
-    }
-    ++read;
-    return static_cast<double>(v);
-  };
-
-  ForEachRecord(orbs, r.e2max,
-                [&](std::size_t i1, std::size_t i2, std::size_t i3,
-                    std::size_t i4, std::int32_t J) {
-                  // File order: T=0 pn, nn, T=1 pn, pp (widened from float).
-                  RecordValues rv{};
-                  rv.v00 = next();
-                  rv.vnn = next();
-                  rv.v10 = next();
-                  rv.vpp = next();
-                  StoreRecord(tb, pn[i1], pn[i2], pn[i3], pn[i4], i1, i2, i3,
-                              i4, J, rv);
-                });
+  const std::int64_t read = ReadRecords(in, path, r, orbs, pn, tb, expected);
 
   if (options.read_whole_file) {
     CheckNoExtraValues(in, path, read, expected);
