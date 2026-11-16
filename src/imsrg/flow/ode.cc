@@ -102,7 +102,7 @@ OdeSolver::OdeSolver(OdeMethod method, op::Operator H0,
   if (!(ode_tolerance > 0.0) || !std::isfinite(ode_tolerance)) {
     throw InputError("OdeSolver: ode_tolerance must be positive and finite");
   }
-  eps_ = static_cast<double>(static_cast<float>(ode_tolerance));  // imsrg++
+  eps_ = ode_tolerance;  // double (D47; imsrg++ rounds it through float)
   IMSRG_CHECK(!H0.empty(), "OdeSolver: empty Hamiltonian");
   IMSRG_CHECK(
       H0.spec().is_scalar() && H0.spec().is_number_conserving() &&
@@ -184,9 +184,8 @@ void OdeSolver::Rhs(const State& x, State& dxdt, double t) {
                norm_eta, x[0].zero_body(), t);
     diverged_ = true;
   }
-  // imsrg++ SetEtaCriterion takes a float (quirk P7).
-  const double eta_criterion =
-      static_cast<double>(static_cast<float>(solver_.eta_criterion));
+  // D47: a double (imsrg++ rounds it through float, quirk P7).
+  const double eta_criterion = solver_.eta_criterion;
   if (norm_eta < eta_criterion || diverged_) {
     for (std::size_t i = 0; i < x.size(); ++i) {
       dxdt[i] = x[i];
@@ -209,8 +208,7 @@ SolveResult OdeSolver::Solve(const StatusCallback& on_status) {
   result.s = s_;
   result.e0 = state_.front().zero_body();
   result.norm_eta = op::Norm(eta_);
-  const double eta_criterion =
-      static_cast<double>(static_cast<float>(solver_.eta_criterion));
+  const double eta_criterion = solver_.eta_criterion;
   if (diverged_ || !std::isfinite(result.norm_eta) ||
       !std::isfinite(result.e0)) {
     result.reason = StopReason::kDiverged;
@@ -228,8 +226,7 @@ SolveResult OdeSolver::SolveRk4() {
   const double user_cutoff = generator_.denominator_cutoff;
   if (shell_atan) generator_.denominator_cutoff = 1.0;
   ComputeGenerator(state_[0], eta_, generator_);
-  const double eta_criterion =
-      static_cast<double>(static_cast<float>(solver_.eta_criterion));
+  const double eta_criterion = solver_.eta_criterion;
   if (on_status_) on_status_(MakeStatus(0, 0.0, s_, state_[0], false));
 
   const std::size_t n = state_.size();

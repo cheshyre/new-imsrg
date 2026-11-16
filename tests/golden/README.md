@@ -35,8 +35,26 @@ for how the tests use them and §2 for the tolerances.
   `source` lines then carry the `+d35-patch` version string). Why: with dumps from the pristine build the
   test `OpslibGolden.Emax4TrelAndRp2` fails (Rp2 differs by 0.063), and the emax-4 tests skip when the
   directory is absent (a fresh checkout has none).
-  Goldens not listed here (V2, V3_NO2B, random_H, commutator, basis, IT-9/10 other jobs) still come from
+  **Run 3 (D47, D48, 2026-11-16):** the same patch also changes the flow semantics (hunter-gatherer
+  H(s) = H_saved after the final gather, stage 2 over [s1, s1 + smax] for every method, `eta_criterion` and
+  `ode_tolerance` in double; new version stamp `...+d35-patch:0c7af4dd0112f621`). Goldens regenerated for it:
+  `e2e/IT-2/hunter_gatherer/*` and `e2e/IT-10/*` (E0 changes, `e2e/README.md`), new `e2e/IT-15/*_smax10`; every
+  other golden keeps its old `source` string because its numbers are unchanged (checked, `design/30` section 6,
+  D47-2).
+  **Version stamps in the files (all four are equivalent for the numbers they hold, checked by regenerating):**
+  `cb9d11ba30f579d4` (D35 only: `hamiltonian`, `hf`, `operator`, `factorized`, `e2e/IT-1..IT-7`, `IT-8/emax2`,
+  `IT-14`), `5fdd2b73265417f2` (D35 plus the imsrg++ pieces added later: `e2e/IT-8/He4_emax2`, `IT-8/emax3`, old
+  `IT-15`, `imsrg3`, `n7`), `0c7af4dd0112f621` (D47/D48 patch: `IT-2/hunter_gatherer`, `IT-10`, `IT-15/*_smax10`,
+  and the regenerated `IT-9/He4_emax2`, `IT-9/O16_emax2` with `Operators=Rp2`) and `a908abab2eded439` (the same plus
+  the divergence guard of the D48 hunk: `IT-15/*_smax10_eta`, `IT-15/*_hg`; a rerun of the IT-2/IT-10 hunter-gatherer
+  jobs with it changes no number). The D49 patch hunk (`CalculatePerturbativeTriples` combines a split Omega stack in
+  transformation order, `BCH_Product(Omega[n], omega)`) has the stamp `3b0ff5eed6806a72`: `e2e/IT-8/He4_emax2` and
+  `IT-8/emax3` (result.json, flow.dat, harness_triples.json) were regenerated with it (dE He4 emax 2 -0.05209710 ->
+  -0.05249001, O16 emax 3 -0.53867396 -> -0.54068122 MeV; no other number changes, same steps 192 / 154); every golden
+  of the earlier stamps keeps its numbers (the hunk touches only the triples). The IT-9 emax 3 goldens still come from
   the pristine build.
+  Goldens not listed here (V2, V3_NO2B, random_H, commutator, basis, IT-9 emax 3, IT-8/emax2 divergent runs) still
+  come from the pristine build.
 * **Default build of the generation scripts (D35).** Every `tools/reference/gen_golden_*.sh` that runs
   `refharness` or `imsrg++` now defaults to the patched build (`harness-build-d35/refharness`,
   `build-d35/imsrg++`, run directory `runs-d35/e2e`) and to its version file `REFERENCE_SRC_SHA256_D35`,

@@ -147,10 +147,15 @@ before the final gather. The harness was cross-checked against `imsrg++ hunter_g
 
 | case | E_HF | E0 | steps / s_final | gathers (incl. final) |
 |---|---|---|---|---|
-| omax_0.25 (O16 emax 4) | -147.8935764285 | -164.9671965257 | 292 / 142.45672 | 8 |
-| omax_0.10 (O16 emax 4) | -147.8935764285 | -165.0014416512 | 298 / 145.45693 | 21 |
-| He4_emax2_omax_0.10 | -22.9897017465 | -25.1967654146 | 196 / 97.39937 | 7 |
+| omax_0.25 (O16 emax 4) | -147.8935764285 | -165.0103968065 | 292 / 142.45672 | 8 |
+| omax_0.10 (O16 emax 4) | -147.8935764285 | -165.0235062778 | 298 / 145.45693 | 21 |
+| He4_emax2_omax_0.10 | -22.9897017465 | -25.2048902236 | 196 / 97.39937 | 7 |
 
+  **D48 (2026-11-16):** E0 is that of H(s) rebuilt with the final gathered Omega (the D35 patch of
+  imsrg++ and `refharness flow` set H(s) = H_saved after the final gather; imsrg++ left the last hunter
+  step). Old -> new E0 (MeV): omax_0.25 -164.9671965257 -> -165.0103968065 (-43.2 keV), omax_0.10
+  -165.0014416512 -> -165.0235062778 (-22.1 keV), He4 -25.1967654146 -> -25.2048902236 (-8.1 keV);
+  steps, gathers and the (in-loop) trajectories are unchanged.
   Hunter-gatherer is not a re-ordering of the split-Omega calculation: the gatherer reaches a norm of
   about 1.7 and its BCH product and transform are truncated, so E0 differs from the split run by
   -0.32 MeV (0.25) and -0.35 MeV (0.1). The rewrite must implement `GatherOmega` exactly.
@@ -159,9 +164,13 @@ before the final gather. The harness was cross-checked against `imsrg++ hunter_g
 
 | case | E_HF | E0 | steps / s_final | gathers (incl. final) | wall (s) |
 |---|---|---|---|---|---|
-| IT-10/O16_emax2 | -134.03044657 | -145.683281903 | 192 / 92.62615 (|eta| < 1e-6) | 24 | 0.65 |
-| IT-10/He4_emax2 | -22.98970175 | -25.183340567 | 198 / 98.40187 (|eta| < 1e-6) | 8 | 0.47 |
-| IT-10/O16_emax3 | -147.43333256 | -157.675593064 | 150 / 72.41060 (|eta| < 1e-6) | 13 | 0.96 |
+| IT-10/O16_emax2 | -134.03044657 | -145.696636666 | 192 / 92.62615 (|eta| < 1e-6) | 24 | 0.65 |
+| IT-10/He4_emax2 | -22.98970175 | -25.180558244 | 198 / 98.40187 (|eta| < 1e-6) | 8 | 0.47 |
+| IT-10/O16_emax3 | -147.43333256 | -157.673762697 | 150 / 72.41060 (|eta| < 1e-6) | 13 | 0.96 |
+
+D48: same rebuild as above; old -> new E0 (MeV): O16 emax 2 -145.683281903 -> -145.696636666 (-13.4 keV),
+He4 emax 2 -25.183340567 -> -25.180558244 (+2.8 keV), O16 emax 3 -157.675593064 -> -157.673762697
+(+1.8 keV); steps and gathers unchanged.
 
 O16 emax 2 converges (192 steps, s = 92.6); with the former imsrg++ defaults it ran into smax = 200.
 He4 emax 2 is kept as an extra case.
@@ -175,3 +184,20 @@ with the sd-shell diverges in IMSRG(2), see IT-8). Stage 1 uses the atan generat
 file (`flow.dat`) holds both stages (`istep` restarts at 0). `flow`: E0 = -25.167373; only `result.json`
 and `int.snt` are kept (the flow file has 1078 lines of right-hand-side evaluations and is not
 compared: imsrg++ restarts s at 0 in stage 2, M8-Q40). `int.snt` is the valence-space interaction.
+
+**IT-15 `_smax10` (D47, 2026-11-16):** the same He4 emax 2 p-shell case with `smax=10`, so that stage 1 stops at
+smax and stage 2 integrates [s1, s1 + smax] = [10, 20] for every method (the D35 patch has `smax += s` in
+`imsrg++.cc`; the pristine code leaves the `flow_RK4` stage 2 empty and doubles smax only for Magnus; the
+adaptive `flow` method restarts at s = 0 and integrates a copy of the solver, so its flow file ends at s = 10 and
+only `result.json` and `int.snt` are kept). `flow_RK4`: 20 + 20 steps, E0 = -25.171401444; Magnus: 22 + 82 steps,
+E0 = -25.169486339 (flow file kept, `s` continues to 20); `flow`: E0 = -25.167136457. Regenerate with
+`bash tools/reference/gen_golden_e2e.sh IT-15/He4_emax2_pshell_rk4_smax10 IT-15/He4_emax2_pshell_flow_smax10
+IT-15/He4_emax2_pshell_magnus_smax10`. The existing IT-15 and IT-14 goldens were regenerated with the new patch
+and are unchanged (stage 2 converges before either range ends).
+
+**IT-9 `Operators=Rp2` (D49, M10-Q61, 2026-11-16):** `IT-9/He4_emax2` and `IT-9/O16_emax2` are run with
+`Operators=Rp2` added (patched `imsrg++`): Rp2 is transformed with the same Omega stack and the IMSRG(3)
+commutators (imsrg++ transforms rank-2 operators with the IMSRG(3) terms and drops the residual three-body
+part before the output). New files `intRp2.snt` (core-only valence file: zero-body part He4 2.27494683, O16
+5.18255589 fm^2) and the `operators` entry of `result.json` (HF value 2.137921 / 5.400941); E0, step counts and
+the flow file are those of the earlier runs (unchanged, checked).

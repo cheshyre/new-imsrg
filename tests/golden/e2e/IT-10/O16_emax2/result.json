@@ -1,12 +1,12 @@
 {
-  "source": "imsrg-devel src-sha256:ddcbf1aff166414e746113d5f3de2ddc1e72783fb7c201829cd58e317717f40f+d35-patch:cb9d11ba30f579d4 refharness flow",
+  "source": "imsrg-devel src-sha256:ddcbf1aff166414e746113d5f3de2ddc1e72783fb7c201829cd58e317717f40f+d35-patch:0c7af4dd0112f621 refharness flow",
   "emax": 2,
   "reference": "O16",
   "generator": "atan",
   "variant": "IMSRG3f2",
   "smax": 200,
   "EHF": -134.03044657048093,
-  "E0": -145.68328190285183,
+  "E0": -145.69663666563525,
   "steps": 192,
   "s_final": 92.626145633275399,
   "norm_eta_final": 9.6131370875068208e-07,
@@ -19,5 +19,5 @@
   "factorized_1b_intermediates": true,
   "factorized_2b_intermediates": false,
   "omp_threads": 8,
-  "wall_time_s": 0.65151405334472656
+  "wall_time_s": 0.6892859935760498
 }

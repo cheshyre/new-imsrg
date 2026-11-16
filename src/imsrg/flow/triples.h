@@ -12,6 +12,7 @@
 /// denominators and the 3B space are numerics-defining (design/00 D12).
 #include <cstdint>
 #include <limits>
+#include <vector>
 
 #include "imsrg/flow/magnus.h"
 
@@ -33,10 +34,22 @@ struct TriplesResult {
   std::int64_t total_kets = 0;  ///< 3B kets before the dE3max/OccNat3 cuts.
 };
 
+/// The single Omega of a split stack in transformation order: omega =
+/// Omega_0; omega = BchProduct(Omega_n, omega) for n = 1, 2, ..., i.e. e^omega
+/// = e^Omega_n ... e^Omega_0, the unitary that generated H(s) from H_0
+/// (H = e^Omega_n ... e^Omega_0 H_0 e^-Omega_0 ... e^-Omega_n). A single
+/// Omega is returned unchanged. Preconditions: non-empty stack (else
+/// InvariantError), operators scalar, number conserving, on `workspace`'s model
+/// space. Complexity: (size - 1) BCH products.
+op::Operator CombineOmegaStack(const std::vector<op::Operator>& omegas,
+                               const BchOptions& options,
+                               commutator::Workspace& workspace);
+
 /// dE of the triples for the state of `solver` after `Solve` (imsrg++
 /// `CalculatePerturbativeTriples`):
-///   omega = Omega_0; omega = BchProduct(omega, Omega_n) for n = 1, 2, ...
-///     (imsrg++'s operand order, design/QUESTIONS.md M10-Q40);
+///   omega = `CombineOmegaStack` (transformation order, e^omega = e^Omega_n
+///     ... e^Omega_0; imsrg++ has the reverse operand order, an old-code bug
+///     fixed here, D49, design/QUESTIONS.md M10-Q40);
 ///   Htilde = Transform(H_0) with `BchOptions::skip_first_commutator`;
 ///   epsilon_a = diagonal one-body matrix element a a of H(s);
 ///   dE = `commutator::PerturbativeTriplesEnergy(omega, Htilde, epsilon)` on

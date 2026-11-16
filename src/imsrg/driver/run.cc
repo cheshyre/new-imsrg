@@ -642,19 +642,14 @@ void Run(const RunConfig& config) {
       config.imsrg.steps > 1 && config.valence.has_valence_space();
   if (second_stage &&
       stages.back().result.reason != flow::StopReason::kDiverged) {
-    // imsrg++.cc:1122-1143: smax doubled for the second Magnus stage only (not
-    // for the flow methods), new Omega.
+    // New Omega. D47: stage 2 integrates [s_1, s_1 + smax] for every method
+    // (s continues across the stages); imsrg++ doubled smax for Magnus only
+    // (imsrg++.cc:1122-1143), which left a flow_rk4 stage 2 empty after a
+    // stage 1 that reached smax.
     const Generator val_gen = config.imsrg.generator.valence;
     // Derived from the solver's options so that the domega bump persists.
     flow::SolverOptions so2 = solver.solver_options();
-    so2.smax = (magnus ? 2.0 : 1.0) * step.smax;
-    if (config.imsrg.method == Method::kFlow) {
-      // The flow parameter continues across the stages (M8-Q40), but imsrg++'s
-      // adaptive method restarts at s = 0 and so integrates [0, smax] again
-      // even when stage 1 ran to smax. The flow equation is autonomous, so
-      // the equivalent range here is [s_1, s_1 + smax] (M8-Q50).
-      so2.smax = stages.back().result.s + step.smax;
-    }
+    so2.smax = stages.back().result.s + step.smax;
     SmallStepsForStiffGenerators(val_gen, so2);
     log::Info("Setting generator to {}", ToString(val_gen));
     solver.set_generator(MakeGeneratorOptions(config, val_gen, ms));

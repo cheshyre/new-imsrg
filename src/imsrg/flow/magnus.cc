@@ -182,9 +182,8 @@ SolveResult MagnusSolver::Solve(const StatusCallback& on_status) {
         "omega_norm_max = {}",
         solver_.domega, solver_.omega_norm_max);
   }
-  // imsrg++ SetEtaCriterion takes a float (quirk P7).
-  const double eta_criterion =
-      static_cast<double>(static_cast<float>(solver_.eta_criterion));
+  // D47: a double (imsrg++ rounds it through float, quirk P7).
+  const double eta_criterion = solver_.eta_criterion;
   double e_last = h0_.zero_body();
   // Used only if magnus_adaptive is off: imsrg++'s member ds is set to ds_0
   // and capped by SetDsmax (IMSRGSolver.cc:201-205).
@@ -237,6 +236,31 @@ SolveResult MagnusSolver::Solve(const StatusCallback& on_status) {
   if (solver_.hunter_gatherer) {
     GatherOmega();
     result.num_gathers = loop_gathers + 1;
+    // D48 (owner, M8-Q10): H(s) becomes the H rebuilt with the gathered Omega
+    // (h_saved_ = e^Omega H_0 e^-Omega, already computed by the gather), so E0
+    // and every transformed operator come from one Omega and a second stage
+    // starts from it. imsrg++ leaves H(s) at the last hunter step, which
+    // differs from this by up to tens of keV in E0 (design/30 section 6). Not
+    // after a divergence (the rebuilt H could be non-finite as well).
+    if (result.reason != StopReason::kDiverged) {
+      h_ = h_saved_;
+      // eta(s) and the reported norms belong to the rebuilt H as well. The
+      // flow does NOT continue (steps and gathers stay as decided in D48);
+      // ||eta|| of the rebuilt H is usually far above eta_criterion (1e-3
+      // against 1e-6 in the IT-2 hunter-gatherer cases), so warn.
+      ComputeGenerator(h_, eta_, generator_);
+      const double norm_eta_rebuilt = op::Norm(eta_);
+      if (!(norm_eta_rebuilt < eta_criterion)) {
+        log::Warn(
+            "hunter-gatherer: ||eta|| = {} of the H rebuilt with the gathered "
+            "Omega exceeds eta_criterion = {} (the flow stopped on the "
+            "||eta|| of the last hunter step)",
+            norm_eta_rebuilt, eta_criterion);
+      }
+      // Last flow-log row: the rebuilt H at the same s (istep = steps + 1,
+      // ds = 0), so the log ends with the reported E0.
+      if (on_status) on_status(Status(result.steps + 1, 0.0));
+    }
   }
   result.s = s_;
   result.e0 = h_.zero_body();

@@ -19,6 +19,7 @@
 #include "imsrg/basis/model_space.h"
 #include "imsrg/commutator/commutator.h"
 #include "imsrg/flow/bch.h"
+#include "imsrg/flow/triples.h"
 #include "imsrg/operator/arithmetic.h"
 #include "imsrg/operator/compare.h"
 #include "imsrg/operator/norms.h"
@@ -414,6 +415,63 @@ TEST(flow_bch, hermiticity) {
   std::printf("[bch hermiticity] transform %.2e, product %.2e\n", hz, hp);
   EXPECT_LT(hp, 1.0e-12);
   EXPECT_EQ(P.zero_body(), 0.0);
+}
+
+}  // namespace
+}  // namespace imsrg
+
+namespace imsrg {
+namespace {
+
+// D49 / M10-Q40: the combined omega of a split Omega stack must generate the
+// same H as the pieces applied in order (oldest first): e^omega = e^Om_n ...
+// e^Om_0. imsrg++ combines as BchProduct(omega, Om_n) (reverse order), which
+// differs at the commutator level [Om_0, Om_n].
+TEST(flow_bch, SplitStackCombinationFollowsTransformationOrder) {
+  // One-body operators: the transform is exactly the matrix conjugation, so
+  // the reference U H0 U^T with U = e^Om_2 e^Om_1 e^Om_0 is exact. emax 4:
+  // the blocks are up to 3x3, so rotations of one block do not commute.
+  const auto ms = MakeSpace(4, "O16");
+  Workspace ws(ms);
+  const Operator H0 = RandOp(ms, Hermiticity::kHermitian, 71, 1, 5.0);
+  std::vector<Operator> stack;
+  for (std::uint64_t k = 0; k < 3; ++k) {
+    stack.push_back(RandOp(ms, Hermiticity::kAntiHermitian, 72 + k, 1, 0.15));
+  }
+  Operator h0 = H0;
+  Dense u = Identity(OneBodyDense(h0).n);
+  for (Operator& om : stack) u = Mul(Expm(OneBodyDense(om)), u);
+  const Dense ref = Mul(Mul(u, OneBodyDense(h0)), Transpose(u));
+
+  BchOptions bo;
+  bo.transform_threshold = 1.0e-12;
+  const Operator omega_new = flow::CombineOmegaStack(stack, bo, ws);
+  Operator omega_old = stack[0];
+  for (std::size_t n = 1; n < stack.size(); ++n) {
+    omega_old =
+        flow::BchProduct(omega_old, stack[n], bo, CommutatorOptions{}, ws);
+  }
+  Operator h_new = flow::BchTransform(flow::WithParticleRank(H0, 2),
+                                      flow::WithParticleRank(omega_new, 2), bo,
+                                      CommutatorOptions{}, ws);
+  Operator h_old = flow::BchTransform(flow::WithParticleRank(H0, 2),
+                                      flow::WithParticleRank(omega_old, 2), bo,
+                                      CommutatorOptions{}, ws);
+  const double dev_new = MaxAbsDiff(OneBodyDense(h_new), ref);
+  const double dev_old = MaxAbsDiff(OneBodyDense(h_old), ref);
+  const double shift = MaxAbsDiff(ref, OneBodyDense(h0));
+  std::printf(
+      "[bch split stack] max|H(combined omega) - U H0 U^T|: transformation "
+      "order %.3e, imsrg++ order %.3e (max|U H0 U^T - H0| %.3e)\n",
+      dev_new, dev_old, shift);
+  // The residual of the right order is the BCH product truncation (the -1/24
+  // term and the 1e-4 series threshold, O(Omega^3 [Omega, Omega])); the
+  // reverse order is wrong at the [Om_0, Om_n] level.
+  EXPECT_LT(dev_new, 1.0e-3 * shift);
+  EXPECT_GT(dev_old, 10.0 * dev_new);
+  // A single Omega is returned unchanged.
+  const Operator one = flow::CombineOmegaStack({stack[0]}, bo, ws);
+  EXPECT_EQ(MaxDev(one, stack[0]), 0.0);
 }
 
 }  // namespace

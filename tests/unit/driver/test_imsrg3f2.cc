@@ -6,9 +6,9 @@
 // factorized = true` only: the recipe supplies hunter-gatherer Magnus and
 // omega_norm_max = 0.1 (D32). Step and gather counts must be identical, E0 is
 // accepted within 1e-3 MeV (D19) and the whole trajectory row by row within
-// 1e-8; deviations are printed. The O16 emax 3 case is compiled into the slow
-// target (`IMSRG_IT10_SLOW`), the others into the integration target. Skips
-// without the 2N input file.
+// 1e-8; deviations are printed. The flow log ends with the row of the rebuilt
+// H (D48), which is not part of the golden trajectory. Skips without the 2N
+// input file.
 
 #include <algorithm>
 #include <chrono>  // NOLINT(build/c++11)
@@ -42,6 +42,17 @@ std::vector<Row> Rows(const FlowTable& t) {
                     t.at(i, "norm_omega")});
   }
   return rows;
+}
+
+/// The flow log of a hunter-gatherer stage ends with one row for the H rebuilt
+/// with the gathered Omega (same s as the row before, D48); removes it and
+/// returns it, so the rest can be compared with the in-loop golden trajectory.
+Row PopRebuiltRow(std::vector<Row>& rows) {
+  EXPECT_GE(rows.size(), 2u);
+  const Row rebuilt = rows.back();
+  rows.pop_back();
+  EXPECT_EQ(rebuilt.s, rows.back().s);
+  return rebuilt;
 }
 
 /// Compares a flow with the golden trajectory row by row (bound `tol` on s,
@@ -161,26 +172,26 @@ void RunCase(const std::string& nucleus, int emax, const std::string& golden,
             gathers_ref);
   EXPECT_EQ(static_cast<int>(gold["n_gathers"].number), gathers_ref);
   EXPECT_LE(std::abs(de0), 1.0e-3);  // D19
+  std::vector<Row> rows = Rows(r.flow);
+  const Row rebuilt = PopRebuiltRow(rows);
+  EXPECT_EQ(rebuilt.e0, e0);
   CompareTrajectory(
-      golden.c_str(), Rows(r.flow),
+      golden.c_str(), rows,
       Rows(ReadFlow(GoldenFile("IT-10/" + golden + "/trajectory.csv"))),
       1.0e-8);
 }
 
-#ifdef IMSRG_IT10_SLOW
-
-TEST(Imsrg3f2, O16Emax3) {
-  RunCase("O16", 3, "O16_emax3", -157.67559306432887, 150, 13);
+TEST(Imsrg3f2, O16Emax2) {
+  RunCase("O16", 2, "O16_emax2", -145.69663666563525, 192, 24);
 }
 
-#else
-
-TEST(Imsrg3f2, O16Emax2) {
-  RunCase("O16", 2, "O16_emax2", -145.68328190285183, 192, 24);
+// 1.4 s: in the regular suite (formerly under `slow`).
+TEST(Imsrg3f2, O16Emax3) {
+  RunCase("O16", 3, "O16_emax3", -157.6737626968918, 150, 13);
 }
 
 TEST(Imsrg3f2, He4Emax2) {
-  RunCase("He4", 2, "He4_emax2", -25.18334056692935, 198, 8);
+  RunCase("He4", 2, "He4_emax2", -25.180558243538115, 198, 8);
 }
 
 // With the one-body intermediates off the factorized correction vanishes, so
@@ -190,7 +201,7 @@ TEST(Imsrg3f2, SwitchesOffReproducePlainHunterGatherer) {
   if (!HaveInput()) GTEST_SKIP() << "missing 2N input file";
   const std::string rel = "IT-2/hunter_gatherer/He4_emax2_omax_0.10/";
   const Json gold = ParseJson(Slurp(GoldenFile(rel + "result.json")));
-  EXPECT_DOUBLE_EQ(gold["E0"].number, -25.196765414643416);
+  EXPECT_DOUBLE_EQ(gold["E0"].number, -25.204890223641264);
 
   const auto dir = FreshDir("imsrg3f2_off");
   const Timed off = TimedExecute(
@@ -208,7 +219,9 @@ TEST(Imsrg3f2, SwitchesOffReproducePlainHunterGatherer) {
   EXPECT_EQ(off.steps, 196);
   EXPECT_EQ(static_cast<int>(stage["num_gathers"].number), 7);
   EXPECT_NEAR(e0, gold["E0"].number, 1.0e-9);
-  CompareTrajectory("switches off", Rows(off.result.flow),
+  std::vector<Row> off_rows = Rows(off.result.flow);
+  PopRebuiltRow(off_rows);
+  CompareTrajectory("switches off", off_rows,
                     Rows(ReadFlow(GoldenFile(rel + "trajectory.csv"))), 1.0e-9);
 
   // The plain hunter-gatherer run (no factorized key) and a fresh 3f2 run for
@@ -242,8 +255,6 @@ TEST(Imsrg3f2, TwoBodyIntermediatesArePlanned) {
   EXPECT_NE(r.note.find("factorized_2b_intermediates"), std::string::npos)
       << r.note;
 }
-
-#endif  // IMSRG_IT10_SLOW
 
 }  // namespace
 }  // namespace imsrg::it

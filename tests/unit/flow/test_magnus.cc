@@ -117,11 +117,12 @@ TEST(MagnusSolver, ReplayOfOmegaStackReproducesH) {
       << d.zero_body << " " << d.one_body << " " << d.two_body;
 }
 
-// Hunter-gatherer (imsrg++ GatherOmega semantics, D32): the stack is
-// {gatherer, hunter}, the final gather leaves H(s) untouched, so H(s) differs
-// from the replay of the gathered Omega on H_0 at the truncation level of the
-// BCH product/transform (unlike the split stack, see the test above).
-TEST(MagnusSolver, HunterGathererDocumentsImsrgSemantics) {
+// Hunter-gatherer (imsrg++ GatherOmega semantics, D32, and D48): the stack is
+// {gatherer, hunter}; after the final gather H(s) is the H rebuilt with the
+// gathered Omega, so H(s) == Transform(H_0) with the final Omega (imsrg++ left
+// H(s) at the last hunter step; design/30 section 6). A gather inside the loop
+// leaves H(s) alone (the status lines are those of the loop).
+TEST(MagnusSolver, HunterGathererHamiltonianIsRebuiltWithGatheredOmega) {
   op::Operator h0 = Emax2Hno();
   flow::SolverOptions o = ShortFlow(1.5);
   o.hunter_gatherer = true;
@@ -129,7 +130,18 @@ TEST(MagnusSolver, HunterGathererDocumentsImsrgSemantics) {
   std::vector<flow::FlowStatus> lines;
   const flow::SolveResult r =
       solver.Solve([&](const flow::FlowStatus& st) { lines.push_back(st); });
-  ASSERT_GT(lines.size(), 3u);
+  ASSERT_GT(lines.size(), 4u);
+  // The last status line is the rebuilt H at the same s (istep = steps + 1).
+  const flow::FlowStatus rebuilt = lines.back();
+  lines.pop_back();
+  EXPECT_EQ(rebuilt.istep, r.steps + 1);
+  EXPECT_EQ(rebuilt.s, lines.back().s);
+  EXPECT_EQ(rebuilt.ds, 0.0);
+  EXPECT_EQ(rebuilt.e0, r.e0);
+  // eta(s) belongs to the rebuilt H (not the discarded hunter-step H).
+  EXPECT_EQ(rebuilt.norm_eta, r.norm_eta);
+  EXPECT_EQ(r.norm_eta, op::Norm(solver.eta()));
+  EXPECT_NE(r.norm_eta, lines.back().norm_eta);
   // Gather count: the loop gathers (whenever the hunter was > omega_norm_max)
   // plus the final one.
   int loop_gathers = 0;
@@ -147,21 +159,55 @@ TEST(MagnusSolver, HunterGathererDocumentsImsrgSemantics) {
   for (const auto& st : lines) EXPECT_LE(st.num_omegas, 2u);
   EXPECT_EQ(op::Norm(solver.omegas().back()), 0.0);
   EXPECT_GT(op::Norm(solver.omegas().front()), 0.25);
-  // H(s) is untouched by the final gather.
-  EXPECT_EQ(solver.hamiltonian().zero_body(), lines.back().e0);
-  EXPECT_EQ(r.e0, lines.back().e0);
-  // Replay of the gathered Omega: close to, but not equal to, H(s).
+  // D48: H(s) is the replay of the gathered Omega on H_0 (the loop's last line
+  // still shows the hunter-step H; the rebuilt one differs from it).
   const op::Operator replayed = solver.Transform(h0);
   const op::PartMaxima d = op::MaxAbsDifference(replayed, solver.hamiltonian());
+  const double scale = std::max(1.0, op::Norm(solver.hamiltonian()));
   std::printf(
-      "[magnus HG] %d gathers; replay vs H(s): E0 %.3e, 1b %.3e, 2b %.3e\n",
-      r.num_gathers, d.zero_body, d.one_body, d.two_body);
-  EXPECT_LT(d.max(), 1.0e-2);
+      "[magnus HG] %d gathers; replay vs H(s): E0 %.3e, 1b %.3e, 2b %.3e; "
+      "E0 %.9f (last loop line %.9f, shift %.3e)\n",
+      r.num_gathers, d.zero_body, d.one_body, d.two_body, r.e0, lines.back().e0,
+      r.e0 - lines.back().e0);
+  EXPECT_LT(d.max(), 1.0e-10 * scale);
+  EXPECT_EQ(r.e0, solver.hamiltonian().zero_body());
+  EXPECT_NE(r.e0, lines.back().e0);  // the rebuild moves E0 (BCH truncation)
+  EXPECT_LT(std::abs(r.e0 - lines.back().e0), 1.0e-1);
   // A second stage gathers nothing in set_generator (the hunter is zero) and
   // keeps the stack at two entries.
   solver.set_generator(flow::GeneratorOptions{});
   EXPECT_EQ(solver.omegas().size(), 2u);
   EXPECT_EQ(solver.num_gathers(), r.num_gathers);
+}
+
+// D47: eta_criterion is a double. A threshold one ulp above ||eta|| of the
+// initial H stops the flow at once; rounded through float (imsrg++) the
+// threshold would fall below ||eta|| (a float has 24 mantissa bits) and the
+// solver would take steps.
+TEST(MagnusSolver, EtaCriterionIsADouble) {
+  const op::Operator h0 = Emax2Hno();
+  flow::MagnusSolver probe(h0, ShortFlow(0.0), flow::GeneratorOptions{});
+  probe.Solve();  // smax 0: only computes eta
+  const double norm_eta = op::Norm(probe.eta());
+  ASSERT_GT(norm_eta, 0.0);
+  const double above = std::nextafter(norm_eta, 1.0e300);
+  const double below = std::nextafter(norm_eta, 0.0);
+  // Precondition of the test: a round trip through float moves one of the two
+  // thresholds to the other side of ||eta|| (float has 24 mantissa bits).
+  ASSERT_TRUE(static_cast<double>(static_cast<float>(above)) <= norm_eta ||
+              static_cast<double>(static_cast<float>(below)) >= norm_eta);
+  for (const double crit : {above, below}) {
+    flow::SolverOptions o = ShortFlow(1.5);
+    o.eta_criterion = crit;
+    flow::MagnusSolver solver(h0, o, flow::GeneratorOptions{});
+    const flow::SolveResult r = solver.Solve();
+    if (crit > norm_eta) {
+      EXPECT_EQ(r.reason, flow::StopReason::kConverged);
+      EXPECT_EQ(r.steps, 0);
+    } else {
+      EXPECT_GT(r.steps, 0);
+    }
+  }
 }
 
 // Review item 5: with omega_norm_max == domega the imsrg++ solver raises domega

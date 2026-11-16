@@ -7,8 +7,12 @@
 // emax-2 cases are in the integration target; the emax-3 cases (30 and 21
 // minutes in imsrg++) are compiled for the slow label only. The flow must take
 // the golden number of steps and end at the golden E0 within 1e-3 MeV (D19);
-// the deviations and the wall time are printed. Skips without the 2N input
-// file.
+// the deviations and the wall time are printed. The emax-2 cases also
+// transform Rp2 with the IMSRG(3) commutators (imsrg++ `Operators=Rp2`, D49,
+// M10-Q61: the residual three-body part is dropped before the output, a rank-2
+// operator is transformed with the IMSRG(3) terms) and compare its zero-body
+// part with the golden `intRp2.snt` of the patched imsrg++ (1e-6 fm^2 as
+// IT-6). Skips without the 2N input file.
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -21,14 +25,17 @@
 #include "imsrg/driver/config/load_config.h"
 #include "tests/unit/driver/integration/mini_json.h"
 #include "tests/unit/driver/integration/run_support.h"
+#include "tests/unit/driver/integration/snt_compare.h"
 
 namespace imsrg::it {
 namespace {
 
 namespace driver = imsrg::driver;
 
-/// One IT-9 case: `nucleus` at `emax`, atan, Magnus, linear HF mixing, N7.
-void RunCase(const std::string& nucleus, int emax, const std::string& golden) {
+/// One IT-9 case: `nucleus` at `emax`, atan, Magnus, linear HF mixing, N7;
+/// with `rp2` the point-proton radius operator is transformed as well.
+void RunCase(const std::string& nucleus, int emax, const std::string& golden,
+             bool rp2 = false) {
   if (!std::filesystem::exists(DataFile(TwoBodyName())))
     GTEST_SKIP() << "missing 2N input file";
   const auto dir = FreshDir("imsrg3n7_" + golden);
@@ -40,6 +47,7 @@ void RunCase(const std::string& nucleus, int emax, const std::string& golden) {
     << "[hartree_fock]\nmixing = \"linear\"\n\n"
     << "[imsrg]\nmethod = \"magnus\"\n\n[imsrg.step]\nsmax = 200\n\n"
     << "[imsrg3]\nin_flow = true\nvariant = \"n7\"\n\n"
+    << (rp2 ? "[operators]\nlist = [\"Rp2\"]\n\n" : "")
     << "[output]\ndirectory = \"" << dir.string() << "\"\n";
   driver::ConfigSources src;
   src.config_text = t.str();
@@ -79,6 +87,28 @@ void RunCase(const std::string& nucleus, int emax, const std::string& golden) {
   EXPECT_NEAR(om2, om2_ref, 1.0e-5);
   EXPECT_NEAR(om3, om3_ref, 1.0e-5);
   EXPECT_GT(om3, 0.0);
+
+  if (rp2) {
+    const auto snt = GoldenFile("IT-9/" + golden + "/intRp2.snt");
+    ASSERT_TRUE(std::filesystem::exists(snt)) << snt;
+    const SntData want = ReadSnt(snt);
+    ASSERT_TRUE(r.results["operators"].has("Rp2"));
+    const double rp2_hf = r.results["operators"]["Rp2"]["reference"].number;
+    const double rp2_hf_ref = gold["operators"].items.at(0)["HF_value"].number;
+    const double rp2_imsrg = r.results["operators"]["Rp2"]["imsrg"].number;
+    std::printf(
+        "[IT-9 %s] Rp2 HF %.8f (golden %.6f), IMSRG %.8f golden %.8f dev "
+        "%.3e fm^2\n",
+        golden.c_str(), rp2_hf, rp2_hf_ref, rp2_imsrg, want.zero_body,
+        rp2_imsrg - want.zero_body);
+    EXPECT_NEAR(rp2_hf, rp2_hf_ref, 1.0e-5);
+    EXPECT_NEAR(rp2_imsrg, want.zero_body, 1.0e-6);
+    // The core-only valence file of the operator has no one- or two-body part.
+    const SntData got = ReadSnt(r.results["operators"]["Rp2"]["file"].text);
+    EXPECT_NEAR(got.zero_body, want.zero_body, 1.0e-6);
+    EXPECT_EQ(got.one_body.size(), want.one_body.size());
+    EXPECT_EQ(got.two_body.size(), want.two_body.size());
+  }
 }
 
 #ifdef IMSRG_IT9_SLOW
@@ -89,9 +119,9 @@ TEST(Imsrg3N7, O16Emax3) { RunCase("O16", 3, "O16_emax3"); }
 
 #else
 
-TEST(Imsrg3N7, He4Emax2) { RunCase("He4", 2, "He4_emax2"); }
+TEST(Imsrg3N7, He4Emax2) { RunCase("He4", 2, "He4_emax2", true); }
 
-TEST(Imsrg3N7, O16Emax2) { RunCase("O16", 2, "O16_emax2"); }
+TEST(Imsrg3N7, O16Emax2) { RunCase("O16", 2, "O16_emax2", true); }
 
 #endif
 

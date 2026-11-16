@@ -1,9 +1,9 @@
 {
   "job": "IT-8/emax3",
-  "reference_version": "imsrg-devel src-sha256:ddcbf1aff166414e746113d5f3de2ddc1e72783fb7c201829cd58e317717f40f+d35-patch:5fdd2b73265417f2",
+  "reference_version": "imsrg-devel src-sha256:ddcbf1aff166414e746113d5f3de2ddc1e72783fb7c201829cd58e317717f40f+d35-patch:3b0ff5eed6806a72",
   "command": "/Users/cheshyre/Downloads/new-imsrg-reference/build-d35/imsrg++ 2bme=/Users/cheshyre/Downloads/new-imsrg/VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz file2e1max=14 file2e2max=28 file2lmax=14 hw=16 emax=3 reference=O16 valence_space=O16 method=magnus perturbative_triples=true flowfile=/Users/cheshyre/Downloads/new-imsrg-reference/runs-d35/e2e/IT-8/emax3/flow.dat intfile=/Users/cheshyre/Downloads/new-imsrg-reference/runs-d35/e2e/IT-8/emax3/int",
   "omp_threads": 8,
-  "wall_time_s": 0.616,
+  "wall_time_s": 0.768,
   "exit_code": 0,
   "timed_out": false,
   "completed": true,
@@ -286,10 +286,10 @@
   "core_energy": -157.847765,
   "core_energy_str": "-157.847765",
   "perturbative_triples": {
-    "dE": -0.53867396,
-    "dE_str": "-0.53867396",
-    "E0_plus_dE": -158.38643873,
-    "E0_plus_dE_str": "-158.38643873"
+    "dE": -0.54068122,
+    "dE_str": "-0.54068122",
+    "E0_plus_dE": -158.38844599,
+    "E0_plus_dE_str": "-158.38844599"
   },
   "flow": {
     "n_lines": 155,

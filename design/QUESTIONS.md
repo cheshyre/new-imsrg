@@ -995,6 +995,46 @@ the orchestrator uses `O4` and up).
   listed once in a "not implemented" section instead of kept as design text; the old old-`pyIMSRG`
   mapping table was dropped (it lives in git history). Say if the table should be kept for the
   term-by-term milestone.
+* **IT3-Q7** (2026-11-16, run 3 brief A part 3, D49 / M10-Q60) - Delta3 floor. `Denominators::three_body`
+  now uses `FloorDenominator` (sign-keeping, an exact zero gives +cutoff, as the 1B/2B code) with
+  `denominator_cutoff`; no `denominator_delta`. **Assumed:** the cutoff is the same value for 1B, 2B
+  and 3B; a separate 3B cutoff can be added if wanted. IT-9 unchanged.
+* **IT3-Q8** (2026-11-16, run 3 brief A part 3, D49 / M10-Q40) - Split-stack order. Added the public
+  helper `flow::CombineOmegaStack` (triples.h) so the order is unit-testable; it uses
+  `BchProduct(Omega_n, omega)`. **Assumed:** Magnus `Transform` applies Omega_0 first (checked in
+  magnus.cc), so this is the transformation order. The `BchProduct` itself keeps the imsrg++ truncation
+  (no -1/24 term), so the combined omega is correct to the BCH truncation only.
+* **IT3-Q9** (2026-11-16, run 3 brief A part 3) - No IT golden has a split Omega stack in the
+  perturbative triples (IT-8 is a single Omega), so the fix is validated by the BCH-level consistency
+  test only, not by an end-to-end imsrg++ comparison (imsrg++ gives the old, inconsistent order).
+  Say if a split-flow end-to-end triples test (split vs single Omega energy) is wanted.
+  **Correction to the owner's premise "no change for IT-8 (single Omega)":** IT-8's Magnus flows
+  have split Omega stacks, so the fix shifts the triples dE by -3.9e-4 MeV (He4 emax 2) and
+  -2.0e-3 MeV (O16 emax 3). Applied per D49 (old-code bug fix, reversible); no compatibility switch
+  (D35). **Done:** the D35 patch gained the same fix in both `CalculatePerturbativeTriples` overloads
+  (stamp `3b0ff5eed6806a72`), and the IT-8 goldens were regenerated through the scripts (D42): dE He4
+  emax 2 -0.05209710 -> -0.05249001, O16 emax 3 -0.53867396 -> -0.54068122 MeV; `driver_triples`
+  compares against them at the old tolerances.
+* **IT3-Q1** (2026-11-16, run 3, brief A part 1) - The D35 patch of imsrg-devel now carries the D47 and D48 hunks
+  in the same file (version stamps `0c7af4dd0112f621`, after the review fix `a908abab2eded439`); goldens whose
+  numbers did not change keep their old stamps on purpose, to avoid churn: `cb9d11ba30f579d4` (IT-1..IT-7, IT-14,
+  hamiltonian, hf, ...) and `5fdd2b73265417f2` (IT-8/He4_emax2, IT-8/emax3, old IT-15, imsrg3, n7). All are listed in
+  `tests/golden/README.md` as equivalent. **Assumed meanwhile:** fine. Alternative: regenerate every golden once so
+  that all carry the newest stamp.
+* **IT3-Q2** (2026-11-16, run 3, D48; extended after the review) - After the final gather `MagnusSolver` replaces H(s)
+  and now also recomputes eta(s) from it (the patched imsrg++ leaves Eta untouched, which no output shows). The
+  flow does NOT continue: measured ||eta(rebuilt H)|| = 1.8e-3 (He4 emax 2, omax 0.1), 4.8e-3 (O16 emax 4, omax
+  0.25), 2.5e-3 (O16 emax 4, omax 0.1), i.e. 2000-5000 times eta_criterion = 1e-6, where the loop had stopped on
+  the hunter-step H (9.6e-7); E0 of the rebuilt H is 8-43 keV away from the last hunter-step line. A warning is
+  logged, `norm_eta` of the stage and `eta()` describe the rebuilt H, and the flow log gets one extra row for it
+  (istep = steps + 1, same s). **Owner to decide** whether the flow should instead continue until the rebuilt H
+  converges (changes step counts and the goldens).
+* **IT3-Q3** (2026-11-16, run 3, D47) - The adaptive `flow` method of the patched imsrg++ still restarts s at 0 in
+  stage 2 (it integrates a copy of the solver), so for `flow` the reference flow file ends at s = smax while ours
+  ends at s1 + smax; the range LENGTH is the same, only the final quantities are compared
+  (`FlowMethods.StageTwoRangeAdaptiveSmax10`). Also: `tools/ci.sh` started from a background job of a
+  non-interactive shell fails `test_ctrl_c_*` of `tests/python/test_threading.py` (background jobs ignore SIGINT);
+  run it in the foreground. **Assumed meanwhile:** no change.
 * **O4** (2026-11-16, orchestrator, binary ME2JP/ME3JP, D57) - The binary variant stores 4-byte
   floats after the 255-byte header (A. Tichai's reader, imsrg++ `.bin`), so a `.bin` file keeps
   about 7 digits and does not round-trip our doubles; D54 wants checkpoints and stored Omegas to

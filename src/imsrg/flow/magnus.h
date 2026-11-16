@@ -30,9 +30,9 @@ struct SolverOptions {
   double dsmax = 0.5;   ///< Upper bound of ds.
   double ds_0 = 0.5;    ///< Initial ds; unused by Magnus (imsrg++ quirk P3).
   double domega = 0.1;  ///< Bound of ||eta ds|| (and of ||eta ds|| ||Omega||).
-  double omega_norm_max = 0.25;  ///< Split Omega when ||Omega|| exceeds this.
-  double eta_criterion =
-      1.0e-6;  ///< Converged when ||eta|| < this (compared as a float, P7).
+  double omega_norm_max = 0.25;   ///< Split Omega when ||Omega|| exceeds this.
+  double eta_criterion = 1.0e-6;  ///< Converged when ||eta|| < this (a double,
+                                  ///< D47; imsrg++: float).
   bool magnus_adaptive =
       true;  ///< Recompute ds every step (imsrg++ `magnus_adaptive`).
   /// Hunter-gatherer Omega (imsrg++ `hunter_gatherer`, D32): keep two Omegas,
@@ -126,8 +126,8 @@ class MagnusSolver {
   /// a second stage starts a new Omega (hunter-gatherer: the Omega is gathered
   /// instead; after a `Solve` the hunter is zero and nothing happens).
   void set_generator(const GeneratorOptions& generator);
-  /// Changes smax for the next `solve` (imsrg++ doubles it for the second
-  /// Magnus stage; the driver does that).
+  /// Changes smax for the next `solve` (the driver sets s1 + smax for stage 2,
+  /// D47; imsrg++ doubled it for the second Magnus stage only).
   void set_smax(double smax) noexcept { solver_.smax = smax; }
   /// Replaces the step options for the next `solve` (imsrg++.cc:1130-1140
   /// sets Ds, Dsmax and Smax before the second stage). The bump of `domega`
@@ -157,11 +157,20 @@ class MagnusSolver {
   /// {gatherer, hunter}. GatherOmega with a one-entry stack appends a zero
   /// hunter (the old Omega becomes the gatherer); otherwise
   /// gatherer = BchProduct(hunter, gatherer) if ||hunter|| > 1e-12; then the
-  /// hunter is zeroed and H_saved = H_0 transformed by the gatherer. H(s)
-  /// itself is NOT touched, so it differs from `Transform(H_0)` at the
-  /// truncation level of the BCH product and transform. `Solve` gathers once
-  /// more after the loop (also after divergence), and counts that in
-  /// `SolveResult::num_gathers`.
+  /// hunter is zeroed and H_saved = H_0 transformed by the gatherer. A gather
+  /// inside the loop leaves H(s) alone (the flow goes on from it). `Solve`
+  /// gathers once more after the loop (also after divergence), counts that in
+  /// `SolveResult::num_gathers` and, unless the flow diverged, sets
+  /// H(s) = H_saved = e^Omega H_0 e^-Omega with the gathered Omega (D48: one
+  /// Omega for E0 and every transformed operator, and stage 2 starts from it;
+  /// imsrg++ leaves H(s) at the last hunter step, which differs from this by
+  /// up to tens of keV in E0). `result.e0` and `hamiltonian()` are the
+  /// rebuilt ones, so `Transform(H_0)` reproduces H(s) at round-off level.
+  /// eta(s) is recomputed from the rebuilt H (`eta()`, `result.norm_eta`), a
+  /// warning is logged if its norm exceeds `eta_criterion` (it usually does,
+  /// by 1e3: the flow does not continue, `result.reason` stays that of the
+  /// loop), and one more status line (istep = steps + 1, ds = 0, same s)
+  /// reports the rebuilt H, so the flow log ends with the reported E0.
   /// `on_status` (optional) receives the istep-0 line and one line per step.
   SolveResult Solve(const StatusCallback& on_status = {});
 
