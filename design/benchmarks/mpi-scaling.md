@@ -84,3 +84,23 @@ emax 12: 156 two-body channels (151 non-empty), max N 2483, Z2 1.18 GB
 
 ## Hand-off
 
+
+## Particle-hole inverse transform: pair skip and J' trim (2026-11-17)
+
+In the distributed path the inverse transform of the ph term now skips a ket pair when all
+masked zbar values are zero and trims the J' loop to the span of nonzero values (the serial
+path is unchanged; `commutator_bench --checksum --emax 6` hashes are identical before and
+after). Release build, emax 8, best of 3 invocations, `tools/bench/mpi_scaling.sh`
+(`EMAXES=8 RUNS=3`), times in ms:
+
+| P x T | ph before | ph after | full before | full after | load before runs (before / after) |
+|---|---|---|---|---|---|
+| 1 x 16 | 15.80 | 14.81 | 34.64 | 30.02 | 5.97 / 4.51 |
+| 2 x 8 | 24.09 | 21.85 | 44.72 | 43.47 | 5.97 / 4.51-5.51 |
+| 4 x 4 | 32.72 | 30.10 | 63.18 | 60.29 | 5.31 / 5.51 |
+
+The 1 x 16 change is run-to-run noise (same code path). The gain is about 2 ms (7-9 %) of the
+ph term at 2 and 4 ranks; the term still grows with the rank count, so the rest of the
+inverse transform (pair loop, 6j row lookups, the masked gather itself) and the cost of the
+whole-channel split remain (M12b-Q18). Loads were below 6 for all runs, but other jobs were
+running on the machine.
