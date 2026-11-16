@@ -244,7 +244,13 @@ def test_deleting_the_model_space_frees_the_cached_workspace():
 
 # ---------------------------------------------------------------------- Ctrl-C
 
-_SIGINT_SOLVE = """
+# Cause of earlier failures: when tools/ci.sh runs as a `&` job of a non-interactive
+# shell, POSIX makes asynchronous commands inherit SIGINT as SIG_IGN; Python then
+# installs no KeyboardInterrupt handler and the children ignore the signal. Every
+# child therefore restores the default handler first.
+_RESTORE_SIGINT = "import signal; signal.signal(signal.SIGINT, signal.default_int_handler)\n"
+
+_SIGINT_SOLVE = _RESTORE_SIGINT + """
 import imsrg, sys
 from imsrg import flow
 ms = imsrg.ModelSpace(2, "O16", "O16", hw=16.0)
@@ -295,7 +301,7 @@ def test_ctrl_c_interrupts_a_solve(golden):
     assert p.returncode == 0
 
 
-_SIGINT_RUN = """
+_SIGINT_RUN = _RESTORE_SIGINT + """
 import imsrg, sys
 cfg = imsrg.load_config(file=sys.argv[1])
 print("ready", flush=True)
