@@ -114,6 +114,19 @@ bool IsGeneral(const op::Operator& X, const op::Operator& Y);
 /// (asserted in debug builds).
 int CommutatorHermiticitySign(const op::Operator& X, const op::Operator& Y);
 
+/// Combines the per-part results of a commutator over the ranks of
+/// `ws.comm()` (D14 phase 1): Z0, Z1 and Z2 hold each part's partial sum and
+/// become the sum over all parts by `Communicator::ReduceBcastSum` (reduce to
+/// rank 0, then broadcast, so every rank holds rank 0's bits, M12b-Q2); Z3,
+/// computed on rank 0 alone in phase 1, is broadcast from rank 0. Nothing
+/// happens on a one-rank communicator (fake parts of a serial workspace stay
+/// partial). Collective over `ws.comm()`: every rank calls it once per
+/// commutator, in the same order. Precondition (InvariantError): on more than
+/// one rank the work assignment is (comm.rank(), comm.size()). Host buffers
+/// (the operator is synced to the host and back). Complexity: O(size of Z)
+/// communication per rank, independent of the number of ranks.
+void CombinePartials(op::Operator& Z, const Workspace& ws);
+
 }  // namespace detail
 
 }  // namespace imsrg::commutator
