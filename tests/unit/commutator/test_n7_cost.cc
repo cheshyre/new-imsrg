@@ -136,7 +136,7 @@ TEST(N7CostTest, TermFormulasAtEmax2) {
 
 TEST(N7CostTest, LineWeights) {
   const auto ms = Space(3, 9, "O16");
-  const basis::LineWeights w = N7LineWeights(*ms);
+  const basis::LineWeights w = N7LineWeights(*ms, 0.0);
   const basis::ThreeBodySpace& space = *ms->three_body_space();
   ASSERT_EQ(w.compute.size(), U(space.num_triples()));
   ASSERT_EQ(w.memory.size(), U(space.num_triples()));
@@ -150,6 +150,25 @@ TEST(N7CostTest, LineWeights) {
   EXPECT_DOUBLE_EQ(mem, 2261446.0);
   const N7CostModel model(*ms);
   EXPECT_NEAR(compute, model.TotalMultiplyAdds(), 1.0e-9 * compute);
+}
+
+TEST(N7CostTest, LineWeightsRowOverhead) {
+  const auto ms = Space(3, 9, "O16");
+  const basis::LineWeights w0 = N7LineWeights(*ms, 0.0);
+  const basis::LineWeights w1 = N7LineWeights(*ms, 1000.0);
+  const basis::LineWeights wd = N7LineWeights(*ms);
+  const N7CostModel model(*ms);
+  ASSERT_EQ(w1.compute.size(), w0.compute.size());
+  for (std::size_t t = 0; t < w0.compute.size(); ++t) {
+    // The per-row term: overhead x rows of the triple; memory is unchanged.
+    EXPECT_NEAR(w1.compute[t] - w0.compute[t], 1000.0 * model.triples()[t].rows,
+                1.0e-9 * w1.compute[t]);
+    EXPECT_DOUBLE_EQ(w1.memory[t], w0.memory[t]);
+    EXPECT_NEAR(wd.compute[t] - w0.compute[t],
+                kRowOverheadMadd * model.triples()[t].rows,
+                1.0e-9 * wd.compute[t] + 1.0e-12);
+  }
+  EXPECT_THROW(N7LineWeights(*ms, -1.0), imsrg::InvariantError);
 }
 
 TEST(N7CostTest, BatchScratch) {

@@ -282,13 +282,15 @@ N7BatchScratch N7CostModel::BatchScratch(std::int64_t lines_per_batch) const {
   return best;
 }
 
-basis::LineWeights N7LineWeights(const basis::ModelSpace& ms3) {
+basis::LineWeights N7LineWeights(const basis::ModelSpace& ms3,
+                                 double row_overhead_madd) {
+  IMSRG_CHECK(row_overhead_madd >= 0.0, "N7LineWeights: negative overhead");
   const N7CostModel model(ms3);
   basis::LineWeights w;
   w.compute.reserve(model.triples().size());
   w.memory.reserve(model.triples().size());
   for (const N7TripleCost& c : model.triples()) {
-    w.compute.push_back(c.Total());
+    w.compute.push_back(c.Total() + row_overhead_madd * c.rows);
     w.memory.push_back(static_cast<double>(c.mem));
   }
   return w;
