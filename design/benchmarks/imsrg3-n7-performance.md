@@ -23,6 +23,8 @@ follow D52 (timing only, emax 4-6, one operator below ~8 GB, never in CI); count
 | C5 | `WorkspaceOptions::three_body_context` (kAuto/kSkip), `Workspace::BuildThreeBodyContext()` | a5ac995 |
 | C13 | `imsrg3.occ_nat3_cut` for the IMSRG(3) flow (MBPT(2) natural occupations) | 008d5ad |
 | C12 | `commutator::TriplesContext`: only channels with an hhh triple, only hhh/ppp triples; no E map | c3a2940 (merge e1aff9e) |
+| C4 | `exec::TeamOptions`, `TeamFor`/`TeamReduce`; comm223 launches ported (checksums identical) | adda75c (merge 71b1334) |
+| C14c | `n7_bench --partition P` (Balanced) and `--partition-contiguous`: per-part times, sum/whole, max/mean | 4702200 (merge d8803df) |
 
 Every rewritten kernel keeps its element-wise predecessor as `detail::Comm<term>ssReference`.
 
@@ -107,7 +109,12 @@ peak): a follow-up.
 
 ## 6. Simulated partitions
 
-Pending: `n7_bench --partition P` (plan section 3.13) is not implemented yet.
+`n7_bench --partition P` runs `detail::RunN7` part by part on replicated operands. Smoke runs
+(He4/O16 emax 2-3, P up to 64, one repetition on the busy machine): the summed result equals the
+whole within 9e-16 (M3 form), P = 1 is bitwise equal to the whole run. The timing ratios of
+those runs (sum/whole 0.7-6.3, max/mean 1.05-1.9) are noise at these sizes; the planned
+measurement (emax 5, P = 4, 16, 64, quiet machine; targets sum/whole <= 1.10 and max/mean <= 1.10
+at P = 16) is **pending**.
 
 ## 7. Review and hand-off
 
@@ -123,9 +130,8 @@ asserting fewer kept rows. `imsrg3.occ_nat3_cut` also works with the perturbativ
 
 Open items, in priority order:
 1. `CommutatorOptions::imsrg3_batch_bytes` after the M12b merge (M10-Q74).
-2. C4 (exec `TeamFor`/`TeamReduce`, M10-Q44/Q65/Q77) and C15 (223 locality, M10-Q41/Q42; needs
-   quiet-machine timings at emax 4-6).
-3. `n7_bench --partition P` and the simulated-partition table (section 6).
+2. C15 (223 locality, M10-Q41/Q42; needs quiet-machine timings at emax 4-6).
+3. The simulated-partition timings of section 6 (quiet machine, emax 5).
 4. The H build looks like the least efficient piece: estimated from the single-term times at
    emax 4 (331 = H + contraction, 231 = H + W + contraction), H runs at about 4e9 multiply-adds/s
    and W at about 1.7e10. `BuildH` reads B through `ThreeBodyLocal` once per E-row entry; a tiled

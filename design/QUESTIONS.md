@@ -1161,8 +1161,9 @@ the orchestrator uses `O4` and up).
     M12b merge (one-line plumbing).
   * **Q76** OccNat3Cut occupations: the MBPT(2) natural occupations (the NAT step's values for `basis.kind = "nat"`,
     computed in an HF-basis run too, as imsrg++.cc:570), for the IMSRG(3) flow and the perturbative triples.
-  * **Q77** Facade scope (C4) still open: not implemented in run 3 (see the hand-off of
-    `design/benchmarks/imsrg3-n7-performance.md`).
+  * **Q77** Facade (C4) as proposed: `exec::TeamOptions` (schedule, team/vector size, scratch level with
+    kAuto = level 0 if the bytes fit, else level 1), `TeamFor`, `TeamReduce`; the comm223/triples launches use
+    them; nested `TeamThreadRange`/`ThreadVectorRange`/`single` stay Kokkos inside kernel TUs.
   * **Q78** `WorkspaceOptions::three_body_context` (kAuto/kSkip) plus an explicit
     `Workspace::BuildThreeBodyContext()`; the exception type for a missing context stays `InputError`.
   * **Q79** Additions per output part keep imsrg++'s order (Z3 133 -> 223, Z2 232 -> 132, Z1 331 -> 231). The fused
