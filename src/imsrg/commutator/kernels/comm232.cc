@@ -74,6 +74,7 @@
 #include "imsrg/basis/three_body_space.h"
 #include "imsrg/basis/two_body_channels.h"
 #include "imsrg/commutator/detail/device_views.h"
+#include "imsrg/commutator/detail/n7_batch.h"
 #include "imsrg/commutator/detail/n7_common.h"
 #include "imsrg/commutator/detail/n7_views.h"
 #include "imsrg/commutator/detail/three_body_impl.h"
@@ -103,18 +104,6 @@ IMSRG_INLINE_FUNCTION int Phase(int n) noexcept { return (n & 1) ? -1 : 1; }
 /// |a - b| for ints.
 IMSRG_INLINE_FUNCTION int AbsDiff(int a, int b) noexcept {
   return a > b ? a - b : b - a;
-}
-
-/// Occupation class of a pair with occupations np, nq: 0 if only n_p n_q is
-/// nonzero (hh-only), 1 if n_p n_q and nbar_p nbar_q are both nonzero
-/// (mixed, fractional occupations), 2 if only nbar_p nbar_q is nonzero
-/// (pp-only), 3 if both vanish (inactive, e.g. a particle-hole pair).
-/// Host and device use this one function, so the classes agree exactly.
-IMSRG_INLINE_FUNCTION int PairClass(double np, double nq) noexcept {
-  const bool hh = np != 0.0 && nq != 0.0;
-  const bool pp = np != 1.0 && nq != 1.0;
-  if (hh) return pp ? 1 : 0;
-  return pp ? 2 : 3;
 }
 
 /// The 2 J3 range [lo, hi] of F: triangle(J', j_q, J3) and triangle(J, j_c,
@@ -233,25 +222,6 @@ struct BatchBlocks {
 };
 static_assert(std::is_trivially_copyable_v<BatchBlocks>);
 
-/// The position of `key` in the ascending `keys[lo, hi)`, or -1. Binary
-/// search, O(log(hi - lo)).
-IMSRG_INLINE_FUNCTION int FindKey(const std::int32_t* keys, int lo, int hi,
-                                  int key) noexcept {
-  int a = lo;
-  int b = hi - 1;
-  while (a <= b) {
-    const int mid = a + (b - a) / 2;
-    const int k = keys[mid];
-    if (k == key) return mid;
-    if (k < key) {
-      a = mid + 1;
-    } else {
-      b = mid - 1;
-    }
-  }
-  return -1;
-}
-
 /// Larger of two ints.
 IMSRG_INLINE_FUNCTION int Max(int a, int b) noexcept { return a > b ? a : b; }
 /// Smaller of two ints.
@@ -274,7 +244,8 @@ IMSRG_INLINE_FUNCTION double HalfSumPairThird(
   const int jq = v.ob.j2[q];
   const int two_J = 2 * J;
   const int rs_key = r * pb.norb + s;
-  const int rs_class = PairClass(v.ob.occupation[r], v.ob.occupation[s]);
+  const int rs_class =
+      detail::PairClass(v.ob.occupation[r], v.ob.occupation[s]);
   double total = 0.0;
   for (int c = bb.c_lo; c <= bb.c_hi; ++c) {
     const int jc = v.ob.j2[c];
@@ -326,8 +297,8 @@ IMSRG_INLINE_FUNCTION double HalfSumPairThird(
         if (r0 >= r1) continue;
         const int cb =
             detail::kComm232Classes * ((ch3 * pb.norb + c) * pb.nj + J);
-        const int col = FindKey(pb.key, pb.blk[cb + rs_class],
-                                pb.blk[cb + rs_class + 1], rs_key);
+        const int col = detail::FindKey(pb.key, pb.blk[cb + rs_class],
+                                        pb.blk[cb + rs_class + 1], rs_key);
         if (col < bb.t0 || col >= bb.t1) continue;  // also col == -1
         const double six = v.sj(TwoJ{jq}, TwoJ{jp}, TwoJ{two_J}, TwoJ{jc},
                                 TwoJ{two_j3}, TwoJ{2 * Jp});
