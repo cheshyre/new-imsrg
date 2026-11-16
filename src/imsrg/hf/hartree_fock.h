@@ -44,10 +44,10 @@ struct HFOptions {
   /// Linear mixing: weight of the OLD density (imsrg++ 0.2 for the density
   /// mixing).
   double density_mixing = 0.2;
-  /// Keep the occupations of the reference fixed (no `FillLowestOrbits`). With
-  /// false (default, as the imsrg++ driver, which calls
-  /// `UnFreezeOccupations()`; the goldens were produced so) the lowest orbits
-  /// are re-filled periodically from iteration 11 on.
+  /// Whether the occupations of the reference stay fixed (no
+  /// `FillLowestOrbits`). With false (default, as the imsrg++ driver, which
+  /// calls `UnFreezeOccupations()`; the goldens were produced so) the lowest
+  /// orbits are re-filled periodically from iteration 11 on.
   bool freeze_occupations = false;
   /// DIIS: first iteration whose Fock matrix enters the subspace.
   std::int32_t diis_start = 2;

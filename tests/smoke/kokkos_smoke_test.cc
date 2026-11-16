@@ -80,7 +80,7 @@ TEST(KokkosSmoke, ParallelReduceSumsIndices) {
   EXPECT_EQ(imsrg_smoke::SumIndices(n), n * (n - 1) / 2);
 }
 
-// Fill a View in the default memory space, reduce it there, and check a host
+// Fills a View in the default memory space, reduces it there, and checks a host
 // mirror.
 TEST(KokkosSmoke, ParallelForThenReduceOverView) {
   constexpr std::int64_t n = 4096;

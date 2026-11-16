@@ -116,8 +116,8 @@ struct GeneratorOptions {
   int qtransfer_n = 1;
   /// Only the one-body part of eta (imsrg++ `only_1b_eta`).
   bool only_1b_eta = false;
-  /// Keep eta to its one- and two-body parts even for a rank-3 H (imsrg++
-  /// `only_2b_eta`).
+  /// Whether eta is limited to its one- and two-body parts even for a rank-3 H
+  /// (imsrg++ `only_2b_eta`).
   bool only_2b_eta = false;
 };
 
