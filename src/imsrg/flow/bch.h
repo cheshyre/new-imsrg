@@ -86,7 +86,8 @@ struct BchReport {
 /// Omega scalar, number conserving, on `ws`'s model space. Complexity: (number
 /// of nested commutators) x one commutator, plus one factorized double
 /// commutator per nested term from the second on with `factorized` (about half
-/// a commutator each).
+/// a commutator each). Collective over the Workspace communicator: every rank
+/// calls it with identical inputs.
 op::Operator BchTransform(const op::Operator& X, const op::Operator& Omega,
                           const BchOptions& opts,
                           const commutator::CommutatorOptions& copts,
@@ -114,7 +115,8 @@ op::Operator BchTransform(const op::Operator& X, const op::Operator& Omega,
 /// model space; Z gets the larger particle_rank of X and Y, and rank 3 if
 /// `copts` select IMSRG(3) terms and `ws` has a three-body context. Complexity:
 /// up to 9 commutators, plus up to 8 factorized double commutators with
-/// `factorized`.
+/// `factorized`. Collective over the Workspace communicator: every rank calls
+/// it with identical inputs.
 op::Operator BchProduct(const op::Operator& X, const op::Operator& Y,
                         const BchOptions& opts,
                         const commutator::CommutatorOptions& copts,

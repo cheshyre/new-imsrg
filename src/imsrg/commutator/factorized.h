@@ -113,6 +113,8 @@ class FactorizedEta {
 /// channels N^2 (|Kpp| + |Khh|) flops), a comm221ss-like contraction per
 /// pair, a comm121ss-like one-body pass and a comm122ss-like two-body pass;
 /// measured at about half of an IMSRG(2) commutator (O16 emax 4).
+/// Replicated, not distributed: with a non-serial Workspace communicator every
+/// rank must call it with identical inputs (and computes the full result).
 void FactorizedDoubleCommutator(const op::Operator& eta,
                                 const op::Operator& gamma, op::Operator& Z,
                                 const FactorizedOptions& opts, Workspace& ws);
