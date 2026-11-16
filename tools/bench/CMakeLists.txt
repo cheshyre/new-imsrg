@@ -13,7 +13,7 @@ endif()
 
 add_executable(commutator_bench commutator_bench.cc)
 target_compile_definitions(commutator_bench PRIVATE IMSRG_BENCH_GIT_HASH="${_bench_git_hash}")
-target_link_libraries(commutator_bench PRIVATE imsrg::commutator imsrg::operator imsrg::exec
+target_link_libraries(commutator_bench PRIVATE imsrg::commutator imsrg::comm imsrg::operator imsrg::exec
                                                imsrg::basis imsrg::warnings)
 
 # IMSRG(3) three-body storage layout benchmark (design/14 section 2,
@@ -26,7 +26,7 @@ add_executable(imsrg_n7_inputs
   n7_inputs.cc
   "${PROJECT_SOURCE_DIR}/tests/support/three_body_test_support.cc")
 target_include_directories(imsrg_n7_inputs PRIVATE "${PROJECT_SOURCE_DIR}")
-target_link_libraries(imsrg_n7_inputs PRIVATE imsrg::commutator imsrg::operator imsrg::exec
+target_link_libraries(imsrg_n7_inputs PRIVATE imsrg::commutator imsrg::comm imsrg::operator imsrg::exec
                                               imsrg::basis imsrg::warnings)
 
 # IMSRG(3)-N7 timing/checksum benchmark (milestone M10).
@@ -35,5 +35,5 @@ add_executable(n7_bench
   "${PROJECT_SOURCE_DIR}/tests/support/three_body_test_support.cc")
 target_include_directories(n7_bench PRIVATE "${PROJECT_SOURCE_DIR}")
 target_compile_definitions(n7_bench PRIVATE IMSRG_BENCH_GIT_HASH="${_bench_git_hash}")
-target_link_libraries(n7_bench PRIVATE imsrg::commutator imsrg::operator imsrg::exec
+target_link_libraries(n7_bench PRIVATE imsrg::commutator imsrg::comm imsrg::operator imsrg::exec
                                        imsrg::basis imsrg::warnings)

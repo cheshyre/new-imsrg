@@ -21,6 +21,27 @@
 // count-only cost model of the MPI work distribution (M12b): for emax 8, 10 and
 // 12 it builds the model space only (no operators, no Workspace) and prints the
 // work items' load imbalance on several rank counts.
+//
+// MPI usage (M12b phase 1: replicated 1B/2B operators, channel blocks of the
+// expensive terms split across ranks, combined by reduce + broadcast):
+//
+//   mpiexec -n P [launcher flags] commutator_bench --emax N --reps R ...
+//
+// With Open MPI use `--bind-to none` (and `--oversubscribe` if P exceeds the
+// core count) and OMP_NUM_THREADS=T, OMP_PROC_BIND=false, so each rank runs T
+// threads. Every rank builds identical X and Y (same seed; the hashes are
+// compared across ranks and the run fails on a mismatch) and a Workspace on
+// the world communicator. Each timed function is bracketed by a barrier and
+// its time is the maximum over the ranks (the cost of the slowest rank), per
+// repetition; the "mean ms" and "min ms" columns are over repetitions of that
+// maximum. The term functions time each rank's own share without the combine;
+// the full `Commutator()` includes it; "combine (reduce+bcast)" times
+// `ReduceBcastSum` alone over a buffer of the size of Z's zero-, one- and
+// two-body parts. With more than one rank a last column "rmin mean ms" gives
+// the mean over repetitions of the minimum over ranks (so max/min shows the
+// imbalance). Only rank 0 prints. `--checksum` requires bitwise equal hashes
+// on all ranks. With one rank the output is that of the serial benchmark plus
+// the "ranks"/"threads" header fields.
 
 #include <chrono>
 #include <cinttypes>
@@ -31,11 +52,14 @@
 #include <cstring>
 #include <functional>
 #include <limits>
+#include <span>
 #include <string>
 #include <vector>
 
 #include "imsrg/base/types.h"
 #include "imsrg/basis/model_space.h"
+#include "imsrg/comm/communicator.h"
+#include "imsrg/comm/environment.h"
 #include "imsrg/comm/ownership_map.h"
 #include "imsrg/commutator/commutator.h"
 #include "imsrg/commutator/detail/work_items.h"
@@ -62,28 +86,45 @@ struct Row {
   std::string name;
   double mean_ms = 0.0;
   double min_ms = 0.0;
+  double rank_min_mean_ms = 0.0;  // mean over reps of the min over ranks
 };
 
-/// One warm-up call, then `reps` fenced timed calls of `fn`; returns mean and
-/// min in ms.
-Row TimeIt(const std::string& name, int reps, const std::function<void()>& fn) {
+/// Collective over `world`. One warm-up call, then `reps` timed calls of `fn`,
+/// each bracketed by a barrier and fences; the time of a repetition is the
+/// maximum over the ranks. Returns the mean and min over repetitions of that
+/// maximum, and the mean over repetitions of the minimum over ranks, in ms
+/// (identical on all ranks; all equal the serial values on one rank).
+Row TimeIt(const imsrg::comm::Communicator& world, const std::string& name,
+           int reps, const std::function<void()>& fn) {
+  world.Barrier();
   fn();
   imsrg::exec::Fence("bench warm-up");
   Row r;
   r.name = name;
-  r.min_ms = std::numeric_limits<double>::max();
-  double total = 0.0;
+  std::vector<double> t_max(static_cast<std::size_t>(reps));
   for (int i = 0; i < reps; ++i) {
     imsrg::exec::Fence("bench pre");
+    world.Barrier();
     const auto t0 = Clock::now();
     fn();
     imsrg::exec::Fence("bench post");
-    const double ms =
+    t_max[static_cast<std::size_t>(i)] =
         std::chrono::duration<double, std::milli>(Clock::now() - t0).count();
+  }
+  std::vector<double> t_min = t_max;
+  world.AllreduceMax(std::span<double>(t_max));
+  world.AllreduceMin(std::span<double>(t_min));
+  r.min_ms = std::numeric_limits<double>::max();
+  double total = 0.0;
+  double total_min = 0.0;
+  for (int i = 0; i < reps; ++i) {
+    const double ms = t_max[static_cast<std::size_t>(i)];
     total += ms;
+    total_min += t_min[static_cast<std::size_t>(i)];
     if (ms < r.min_ms) r.min_ms = ms;
   }
   r.mean_ms = total / reps;
+  r.rank_min_mean_ms = total_min / reps;
   return r;
 }
 
@@ -115,6 +156,16 @@ std::uint64_t Checksum(const op::Operator& z) {
   h = Fnv1a(z.one_body().buffer().ToVector(), h);
   h = Fnv1a(z.two_body().matrix().buffer().ToVector(), h);
   return h;
+}
+
+/// Collective. True iff `value` is the same on every rank.
+bool AgreeOnAllRanks(const imsrg::comm::Communicator& world,
+                     std::uint64_t value) {
+  const std::vector<std::int64_t> all =
+      world.Allgather(static_cast<std::int64_t>(value));
+  for (const std::int64_t v : all)
+    if (v != all.front()) return false;
+  return true;
 }
 
 /// Sum of `cost`.
@@ -199,7 +250,11 @@ int main(int argc, char** argv) {
   bool checksum = false;
   bool only_full = false;
   bool model_mpi = false;
+  // MPI first, Kokkos second, destroyed in the reverse order (design/10 s. 4).
+  imsrg::comm::Environment environment(argc, argv);
   imsrg::exec::Runtime runtime(argc, argv);
+  const imsrg::comm::Communicator world = environment.world();
+  const bool root = world.is_root();
   for (int i = 1; i < argc; ++i) {
     const std::string a = argv[i];
     const bool has_val = i + 1 < argc;
@@ -227,7 +282,7 @@ int main(int argc, char** argv) {
   }
   if (reps < 1) return 2;
   if (model_mpi) {
-    ModelMpi();
+    if (root) ModelMpi();
     return 0;
   }
 
@@ -235,10 +290,10 @@ int main(int argc, char** argv) {
       imsrg::basis::BasisTruncation{emax}, 16.0, reference, reference);
 
   const auto tw0 = Clock::now();
-  cm::Workspace ws(ms);
+  cm::Workspace ws(ms, cm::WorkspaceOptions{world});
   imsrg::exec::Fence("workspace");
-  const double ws_ms =
-      std::chrono::duration<double, std::milli>(Clock::now() - tw0).count();
+  const double ws_ms = world.AllreduceMax(
+      std::chrono::duration<double, std::milli>(Clock::now() - tw0).count());
 
   op::RandomOperatorOptions ro;
   ro.seed = seed;
@@ -249,16 +304,26 @@ int main(int argc, char** argv) {
       ms, op::OperatorSpec::Scalar(2, imsrg::Hermiticity::kHermitian), ro);
   op::Operator Z(ms, cm::CommutatorSpec(X.spec(), Y.spec()));
 
+  // X and Y must be identical on all ranks (same seed).
+  if (!AgreeOnAllRanks(world, Checksum(X)) ||
+      !AgreeOnAllRanks(world, Checksum(Y))) {
+    if (root) std::fprintf(stderr, "error: X or Y differ between ranks\n");
+    return 1;
+  }
+
   const char* omp = std::getenv("OMP_NUM_THREADS");
-  std::printf("# commutator_bench (this code)\n");
-  std::printf("emax %d  reference %s  orbits %d  2B elements %" PRId64
-              "  OMP_NUM_THREADS %s  "
-              "git %s\n",
-              emax, reference.c_str(), static_cast<int>(ms->num_orbits()),
-              static_cast<std::int64_t>(X.two_body().matrix().total_size()),
-              omp ? omp : "(unset)", IMSRG_BENCH_GIT_HASH);
-  std::printf("reps %d\nworkspace construction: %.3f ms\n", reps, ws_ms);
-  {
+  if (root) {
+    std::printf("# commutator_bench (this code)\n");
+    std::printf("emax %d  reference %s  orbits %d  2B elements %" PRId64
+                "  ranks %d  threads %d  OMP_NUM_THREADS %s  "
+                "git %s\n",
+                emax, reference.c_str(), static_cast<int>(ms->num_orbits()),
+                static_cast<std::int64_t>(X.two_body().matrix().total_size()),
+                world.size(), imsrg::exec::Runtime::Concurrency(),
+                omp ? omp : "(unset)", IMSRG_BENCH_GIT_HASH);
+    std::printf("reps %d\nworkspace construction: %.3f ms\n", reps, ws_ms);
+  }
+  if (root) {
     // Scratch footprint relative to one two-body operator (design/benchmarks).
     const auto& impl = ws.impl();
     const double op_mb =
@@ -312,25 +377,53 @@ int main(int argc, char** argv) {
   if (!only_full) {
     for (const Named& n : named) {
       Z.set_zero();
-      rows.push_back(TimeIt(n.name, reps, [&] { n.fn(X, Y, Z, ws); }));
+      rows.push_back(TimeIt(world, n.name, reps, [&] { n.fn(X, Y, Z, ws); }));
     }
   }
   const cm::CommutatorOptions opts;
-  rows.push_back(TimeIt("commutator (full)", reps,
+  rows.push_back(TimeIt(world, "commutator (full)", reps,
                         [&] { cm::Commutator(X, Y, Z, opts, ws); }));
+  const bool multi = world.size() > 1;
+  if (multi) {
+    // The combine alone: the buffer has the size of Z's three parts.
+    std::vector<double> buf(
+        1 + Z.one_body().buffer().ToVector().size() +
+            static_cast<std::size_t>(Z.two_body().matrix().total_size()),
+        1.0);
+    rows.push_back(TimeIt(world, "combine (reduce+bcast)", reps, [&] {
+      world.ReduceBcastSum(std::span<double>(buf));
+    }));
+  }
 
-  std::printf("%-22s %12s %12s\n", "term", "mean ms", "min ms");
-  for (const Row& r : rows)
-    std::printf("%-22s %12.4f %12.4f\n", r.name.c_str(), r.mean_ms, r.min_ms);
+  if (root) {
+    std::printf("%-22s %12s %12s", "term", "mean ms", "min ms");
+    if (multi) std::printf(" %14s", "rmin mean ms");
+    std::printf("\n");
+    for (const Row& r : rows) {
+      std::printf("%-22s %12.4f %12.4f", r.name.c_str(), r.mean_ms, r.min_ms);
+      if (multi) std::printf(" %14.4f", r.rank_min_mean_ms);
+      std::printf("\n");
+    }
+  }
   if (checksum) {
     cm::Commutator(X, Y, Z, opts, ws);
-    std::printf("checksum [A,H] %016" PRIx64 "\n", Checksum(Z));
+    const std::uint64_t h_ah = Checksum(Z);
+    if (!AgreeOnAllRanks(world, h_ah)) {
+      if (root) std::fprintf(stderr, "error: [A,H] differs between ranks\n");
+      return 1;
+    }
+    if (root) std::printf("checksum [A,H] %016" PRIx64 "\n", h_ah);
     ro.seed = seed + 2;
     const op::Operator N = op::RandomOperator(
         ms, op::OperatorSpec::Scalar(2, imsrg::Hermiticity::kNonHermitian), ro);
     op::Operator ZN;
     cm::Commutator(N, Y, ZN, opts, ws);
-    std::printf("checksum [N,H] %016" PRIx64 "\n", Checksum(ZN));
+    const std::uint64_t h_nh = Checksum(ZN);
+    if (!AgreeOnAllRanks(world, h_nh)) {
+      if (root) std::fprintf(stderr, "error: [N,H] differs between ranks\n");
+      return 1;
+    }
+    if (root) std::printf("checksum [N,H] %016" PRIx64 "\n", h_nh);
   }
   return 0;
 }
