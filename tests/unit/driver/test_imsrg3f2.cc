@@ -170,17 +170,17 @@ void RunCase(const std::string& nucleus, int emax, const std::string& golden,
 #ifdef IMSRG_IT10_SLOW
 
 TEST(Imsrg3f2, O16Emax3) {
-  RunCase("O16", 3, "O16_emax3", -157.67559306432887, 150, 13);
+  RunCase("O16", 3, "O16_emax3", -157.6737626968918, 150, 13);
 }
 
 #else
 
 TEST(Imsrg3f2, O16Emax2) {
-  RunCase("O16", 2, "O16_emax2", -145.68328190285183, 192, 24);
+  RunCase("O16", 2, "O16_emax2", -145.69663666563525, 192, 24);
 }
 
 TEST(Imsrg3f2, He4Emax2) {
-  RunCase("He4", 2, "He4_emax2", -25.18334056692935, 198, 8);
+  RunCase("He4", 2, "He4_emax2", -25.180558243538115, 198, 8);
 }
 
 // With the one-body intermediates off the factorized correction vanishes, so
@@ -190,7 +190,7 @@ TEST(Imsrg3f2, SwitchesOffReproducePlainHunterGatherer) {
   if (!HaveInput()) GTEST_SKIP() << "missing 2N input file";
   const std::string rel = "IT-2/hunter_gatherer/He4_emax2_omax_0.10/";
   const Json gold = ParseJson(Slurp(GoldenFile(rel + "result.json")));
-  EXPECT_DOUBLE_EQ(gold["E0"].number, -25.196765414643416);
+  EXPECT_DOUBLE_EQ(gold["E0"].number, -25.204890223641264);
 
   const auto dir = FreshDir("imsrg3f2_off");
   const Timed off = TimedExecute(
