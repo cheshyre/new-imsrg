@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <limits>
+#include <optional>
 
 #include "imsrg/angmom/detail/double_double.h"
 
@@ -243,19 +244,12 @@ DD BuckInnerSum(int f1, int f2, int F, int la, int lb, int lc, int ld,
   return mosh3;
 }
 
-}  // namespace
-
-namespace detail {
-
-double DdCg0(int a, int b, int c) { return ToDouble(DdCg0Impl(a, b, c)); }
-
-double DdNinej(int a, int b, int c, int d, int e, int f, int g, int h, int i) {
-  return ToDouble(DdNinejImpl(a, b, c, d, e, f, g, h, i));
-}
-
-}  // namespace detail
-
-double Moshinsky(HoNL cm, HoNL rel, HoNL a, HoNL b, int lam) noexcept {
+/// Returns the value of Moshinsky(cm, rel, a, b, lam) when it is fixed by the
+/// selection rules (0 for negative quantum numbers, energy or parity/coupling
+/// violations; NaN beyond the dd tables), and std::nullopt when the Buck et
+/// al. sum has to be evaluated.
+std::optional<double> MoshinskySelectionRules(HoNL cm, HoNL rel, HoNL a, HoNL b,
+                                              int lam) {
   const int N = cm.n, L = cm.l, n = rel.n, l = rel.l;
   const int n1 = a.n, l1 = a.l, n2 = b.n, l2 = b.l;
   if (N < 0 || L < 0 || n < 0 || l < 0 || n1 < 0 || l1 < 0 || n2 < 0 ||
@@ -279,6 +273,31 @@ double Moshinsky(HoNL cm, HoNL rel, HoNL a, HoNL b, int lam) noexcept {
       lam < std::abs(L - l) || lam > L + l) {
     return 0.0;
   }
+  return std::nullopt;
+}
+
+}  // namespace
+
+namespace detail {
+
+double DdCg0(int a, int b, int c) { return ToDouble(DdCg0Impl(a, b, c)); }
+
+double DdNinej(int a, int b, int c, int d, int e, int f, int g, int h, int i) {
+  return ToDouble(DdNinejImpl(a, b, c, d, e, f, g, h, i));
+}
+
+}  // namespace detail
+
+double Moshinsky(HoNL cm, HoNL rel, HoNL a, HoNL b, int lam) noexcept {
+  if (const std::optional<double> fixed =
+          MoshinskySelectionRules(cm, rel, a, b, lam)) {
+    return *fixed;
+  }
+  const int N = cm.n, L = cm.l, l = rel.l;
+  const int n1 = a.n, l1 = a.l, n2 = b.n, l2 = b.l;
+  const int f1 = 2 * n1 + l1;
+  const int f2 = 2 * n2 + l2;
+  const int F = 2 * N + L;
 
   // Buck et al. evaluated entirely in double-double. With cos B = sin B =
   // 2^(-1/2) every term of the innermost sum carries the same factor
