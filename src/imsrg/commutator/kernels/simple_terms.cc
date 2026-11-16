@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-only
 // Copyright 2026 The imsrg authors
 
 // The one-, two-body-reduced and mixed IMSRG(2) terms: comm110ss, comm220ss,

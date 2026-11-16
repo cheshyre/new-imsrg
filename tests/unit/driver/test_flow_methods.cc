@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-only
 // Copyright 2026 The imsrg authors
 
 // The ODE flow methods `flow_rk4` (fixed-step RK4) and `flow` (odeint dopri5)

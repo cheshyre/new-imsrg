@@ -37,7 +37,7 @@ imsrg++ copies linked against the old library), `tests/golden/` and `extern/` ex
 | 80 columns (now 100) | 5,547 lines > 80 in 281 files | clang-format reflows 281 files, ~11,100 changed lines; cpplint `whitespace/line_length` 5,513 |
 | File extensions `.h` / `.cc` | `.hpp` / `.cpp` (and `.cc` in `python/src`) | 113 + 186 renames, 782 `#include` lines, CMake lists, layering check |
 | `#define` header guards | `#pragma once` in all 113 headers (cpplint 2.0 accepts it, the guide does not) | 113 headers |
-| License boilerplate | none (cpplint `legal/copyright` 304) | `// SPDX-License-Identifier: GPL-3.0-or-later` + `// Copyright 2026 The imsrg authors` in 304 files, plus an `AUTHORS` file |
+| License boilerplate | none (cpplint `legal/copyright` 304) | `// SPDX-License-Identifier: GPL-3.0-only` + `// Copyright 2026 The imsrg authors` in 304 files, plus an `AUTHORS` file |
 | Floating-point literals | 325 like `1e-10`, 12 like `1.` | `1.0e-10`, `1.0` (values identical) |
 | Include order: related, C system, C++ std, other libraries, project | C system headers grouped with third-party | ~14 lines |
 

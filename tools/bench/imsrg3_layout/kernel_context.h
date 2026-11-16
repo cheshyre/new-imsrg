@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-only
 // Copyright 2026 The imsrg authors
 
 #ifndef TOOLS_BENCH_IMSRG3_LAYOUT_KERNEL_CONTEXT_H_

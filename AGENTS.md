@@ -87,7 +87,7 @@ then `.venv/bin/pytest tests/python`.
 * C++20, no compiler extensions. Formatting: `.clang-format` (Google base, **80 columns**,
   include order: related header, C system, C++ standard, other libraries, project headers).
 * Files `snake_case.h` / `snake_case.cc`, each starting with
-  `// SPDX-License-Identifier: GPL-3.0-or-later` and `// Copyright 2026 The imsrg authors`;
+  `// SPDX-License-Identifier: GPL-3.0-only` and `// Copyright 2026 The imsrg authors`;
   headers use `#define` guards `IMSRG_<PATH>_H_` (path below `src/`; outside `src/` the path
   from the repository root, e.g. `TESTS_UNIT_HF_HF_TEST_SUPPORT_H_`). Include project headers as
   `"imsrg/<module>/x.h"`, test- and binding-local headers by their path from the repository root

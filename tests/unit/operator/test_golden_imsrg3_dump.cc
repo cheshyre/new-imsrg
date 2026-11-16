@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-only
 // Copyright 2026 The imsrg authors
 
 // The committed imsrg++ comm223ss result Z = [X, Y]_3 (tests/golden/imsrg3,
