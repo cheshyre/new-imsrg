@@ -6,6 +6,7 @@
 // the partial results equals the serial term; stale product buffers left by
 // other terms do not change a part's result; the parts really split the work.
 #include <algorithm>
+#include <cinttypes>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -213,11 +214,12 @@ TEST(commutator_distributed_ladder, work_actually_splits) {
     const auto& map = ws.impl().work.ladder_map();
     double all = 0.0;
     for (int q = 0; q < 2; ++q) all += map.load(q);
-    std::printf(
-        "[split] part %d: ladder cost share %.3f, %lld gemms, %.3e C cells "
-        "(serial %lld gemms, %.3e cells)\n",
-        p, map.load(p) / all, static_cast<long long>(got.count), got.cells,
-        static_cast<long long>(serial.count), serial.cells);
+    std::printf("[split] part %d: ladder cost share %.3f, %" PRId64
+                " gemms, %.3e C cells "
+                "(serial %" PRId64 " gemms, %.3e cells)\n",
+                p, map.load(p) / all, static_cast<std::int64_t>(got.count),
+                got.cells, static_cast<std::int64_t>(serial.count),
+                serial.cells);
     EXPECT_EQ(got.count, want.count);
     EXPECT_EQ(got.cells, want.cells);
     EXPECT_LT(got.cells, serial.cells);

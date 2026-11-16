@@ -392,8 +392,9 @@ void AttachPandyaWork(PandyaData& pd, const std::vector<std::int32_t>& owned,
   std::int32_t first = 0;
   for (std::int32_t c = 0; c < pd.num_cc; ++c) {
     const std::int32_t n = pd.ncc_host[static_cast<std::size_t>(c)];
-    if (flag[static_cast<std::size_t>(c)])
+    if (flag[static_cast<std::size_t>(c)]) {
       for (std::int32_t i = 0; i < n; ++i) kets.push_back(first + i);
+    }
     first += n;
   }
   pd.num_owned_kets = static_cast<std::int64_t>(kets.size());

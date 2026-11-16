@@ -6,6 +6,7 @@
 // scratch of non-owned channels is never read, and each part runs only its own
 // GEMMs. The parts are faked in one process with `detail::AssignWork`.
 #include <algorithm>
+#include <cinttypes>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -145,11 +146,11 @@ TEST(commutator_distributed_ph, work_actually_splits) {
     const auto& pd = ws.impl().pandya;
     std::printf(
         "[dist-ph] part %d/2: ph cost share %.4f, owned channels %zu, GEMMs "
-        "%zu of %zu (right %zu, general %zu of %zu), owned kets %lld\n",
+        "%zu of %zu (right %zu, general %zu of %zu), owned kets %" PRId64 "\n",
         p, load[p] / (load[0] + load[1]), ws.impl().work.ph_channels().size(),
         pd.gemms_owned.size(), total, pd.gemms_right_owned.size(),
         pd.general.gemms_owned.size(), total_general,
-        static_cast<long long>(pd.num_owned_kets));
+        static_cast<std::int64_t>(pd.num_owned_kets));
     EXPECT_GT(pd.gemms_owned.size(), 0u);
     EXPECT_LT(pd.gemms_owned.size(), total);
     EXPECT_EQ(pd.gemms_right_owned.size(), pd.gemms_owned.size());
