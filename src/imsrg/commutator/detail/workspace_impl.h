@@ -20,6 +20,7 @@
 #include "imsrg/commutator/detail/ladder.h"
 #include "imsrg/commutator/detail/lifted.h"
 #include "imsrg/commutator/detail/pandya.h"
+#include "imsrg/commutator/detail/work_items.h"
 #include "imsrg/commutator/workspace.h"
 #include "imsrg/exec/device_buffer.h"
 #include "imsrg/operator/operator.h"
@@ -73,6 +74,10 @@ struct Workspace::Impl {
   detail::LadderData ladder;  ///< Data of the pp/hh ladder terms (T3b).
   detail::PandyaData pandya;  ///< Data of the particle-hole term (T4).
   detail::LiftedData lifted;  ///< Lifted one-body lists of comm122ss.
+  /// This rank's share of the ladder, comm122 and particle-hole work and its
+  /// device lists (`detail::AssignWork`; everything owned on one rank).
+  detail::WorkAssignment work;
+  detail::WorkDeviceData work_device;  ///< Device copies of the owned lists.
   detail::FactorizedScratch
       factorized;  ///< One-body scratch of the factorized double commutator.
 
