@@ -60,6 +60,32 @@ bool SameLjtz(const basis::Orbit& a, const basis::Orbit& b) {
   return a.l == b.l && a.j2.twice == b.j2.twice && a.tz2.twice == b.tz2.twice;
 }
 
+// Fills the Epstein-Nesbet monopole table (row-major norb x norb, symmetric)
+// from the unnormalized two-body matrix elements <ab|V|ab> of H.
+void FillMonopole(const op::Operator& Hh, const basis::SingleParticleBasis& sp,
+                  std::int32_t norb, std::vector<double>& monopole) {
+  const auto n = static_cast<std::size_t>(norb);
+  monopole.assign(n * n, 0.0);
+  for (std::int32_t a = 0; a < norb; ++a) {
+    for (std::int32_t b = a; b < norb; ++b) {
+      const OrbitIndex oa{a}, ob{b};
+      const int ja = sp.orbit(oa).j2.twice, jb = sp.orbit(ob).j2.twice;
+      double sum = 0.0;
+      for (int tj = std::abs(ja - jb); tj <= ja + jb; tj += 2) {
+        if (a == b && (tj / 2) % 2 == 1) continue;
+        sum +=
+            (tj + 1) * Hh.two_body().get_unnormalized(oa, ob, oa, ob, TwoJ{tj});
+      }
+      const double v =
+          sum / (static_cast<double>(ja + 1) * static_cast<double>(jb + 1));
+      monopole[static_cast<std::size_t>(a) + static_cast<std::size_t>(b) * n] =
+          v;
+      monopole[static_cast<std::size_t>(b) + static_cast<std::size_t>(a) * n] =
+          v;
+    }
+  }
+}
+
 }  // namespace
 
 double GeneratorFunction(GeneratorKind kind, double h_od, double denominator,
@@ -114,25 +140,7 @@ Denominators::Denominators(const op::Operator& H, const GeneratorOptions& opts)
         sp.find(o).value_or(OrbitIndex{a});
   }
   if (opts_.partitioning == Partitioning::kEpsteinNesbet) {
-    monopole_.assign(n * n, 0.0);
-    for (std::int32_t a = 0; a < norb_; ++a) {
-      for (std::int32_t b = a; b < norb_; ++b) {
-        const OrbitIndex oa{a}, ob{b};
-        const int ja = sp.orbit(oa).j2.twice, jb = sp.orbit(ob).j2.twice;
-        double sum = 0.0;
-        for (int tj = std::abs(ja - jb); tj <= ja + jb; tj += 2) {
-          if (a == b && (tj / 2) % 2 == 1) continue;
-          sum += (tj + 1) *
-                 Hh.two_body().get_unnormalized(oa, ob, oa, ob, TwoJ{tj});
-        }
-        const double v =
-            sum / (static_cast<double>(ja + 1) * static_cast<double>(jb + 1));
-        monopole_[static_cast<std::size_t>(a) +
-                  static_cast<std::size_t>(b) * n] = v;
-        monopole_[static_cast<std::size_t>(b) +
-                  static_cast<std::size_t>(a) * n] = v;
-      }
-    }
+    FillMonopole(Hh, sp, norb_, monopole_);
   }
 }
 
@@ -200,8 +208,11 @@ op::OperatorSpec GeneratorSpec(const op::OperatorSpec& h, GeneratorKind kind) {
       Hermiticity::kAntiHermitian);
 }
 
-void ComputeGenerator(const op::Operator& H, op::Operator& eta,
-                      const GeneratorOptions& opts) {
+namespace {
+
+// Checks that H is a scalar, number-conserving rank-2 or rank-3 operator for
+// which generator `opts.kind` is implemented; returns whether H is rank 3.
+bool CheckGeneratorInputs(const op::Operator& H, const GeneratorOptions& opts) {
   IMSRG_CHECK(!H.empty(), "compute_generator: empty H");
   IMSRG_CHECK(H.spec().is_scalar() && H.spec().is_number_conserving(),
               "compute_generator: H must be scalar and number conserving");
@@ -224,40 +235,32 @@ void ComputeGenerator(const op::Operator& H, op::Operator& eta,
         "shell-model and hartree-fock generators with a rank-3 H are not "
         "implemented");
   }
-  const op::OperatorSpec spec = GeneratorSpec(H.spec(), opts.kind);
-  if (eta.empty() || !(eta.spec() == spec) || !op::SameModelSpace(eta, H)) {
-    eta = op::Operator(H.model_space_ptr(), spec);
-  }
-  eta.set_zero();
-  eta.SyncToHost();
+  return rank3;
+}
 
-  H.SyncToHost();  // host reads below (no copy of H, flow review item)
-  const op::Operator& Hh = H;
-  const Denominators den(H, opts);
-  const basis::ModelSpace& ms = H.model_space();
-  const basis::SingleParticleBasis& sp = ms.basis();
-  const basis::Partition& part = ms.partition();
-  const int nq = opts.qtransfer_n;
-
-  if (opts.kind == GeneratorKind::kHartreeFock) {
-    const std::int32_t norb = sp.num_orbits();
-    for (std::int32_t i = 0; i < norb; ++i) {
-      for (std::int32_t j = 0; j < i; ++j) {
-        const OrbitIndex oi{i}, oj{j};
-        if (!SameLjtz(sp.orbit(oi), sp.orbit(oj))) continue;
-        const double v = Hh.one_body().get(oi, oj) / den.one_body(oi, oj);
-        eta.one_body().set_element(oi, oj, v);
-        eta.one_body().set_element(oj, oi, -v);
-      }
+// Fills the Hartree-Fock generator: eta_ij = f_ij / (f_ii - f_jj) between
+// orbits of equal (l, j, tz).
+void FillHartreeFockEta(const op::Operator& Hh, const Denominators& den,
+                        const basis::SingleParticleBasis& sp,
+                        op::Operator& eta) {
+  const std::int32_t norb = sp.num_orbits();
+  for (std::int32_t i = 0; i < norb; ++i) {
+    for (std::int32_t j = 0; j < i; ++j) {
+      const OrbitIndex oi{i}, oj{j};
+      if (!SameLjtz(sp.orbit(oi), sp.orbit(oj))) continue;
+      const double v = Hh.one_body().get(oi, oj) / den.one_body(oi, oj);
+      eta.one_body().set_element(oi, oj, v);
+      eta.one_body().set_element(oj, oi, -v);
     }
-    eta.SyncToDevice();
-    return;
   }
+}
 
-  const bool shell = IsShellModel(opts.kind);
-  const GeneratorKind kind = opts.kind;
-
-  // One-body part.
+// Fills the one-body part of eta for the single-reference or shell-model
+// partitions.
+void FillOneBodyEta(const op::Operator& Hh, const Denominators& den,
+                    const basis::SingleParticleBasis& sp,
+                    const basis::Partition& part, GeneratorKind kind,
+                    bool shell, int nq, op::Operator& eta) {
   auto one_body_pair = [&](OrbitIndex a, OrbitIndex i) {
     if (a == i || !SameLjtz(sp.orbit(a), sp.orbit(i))) return;
     const double d = den.one_body(i, a);
@@ -277,74 +280,114 @@ void ComputeGenerator(const op::Operator& H, op::Operator& eta,
     for_ai(part.valence(), part.valence());
     for_ai(part.valence(), part.qspace());
   }
+}
 
-  // Two-body part.
-  if (!opts.only_1b_eta) {
-    const basis::TwoBodyKetSubsets& sub = ms.two_body_subsets();
-    const std::int32_t nch = ms.two_body().num_channels();
-    using basis::KetClass;
-    for (std::int32_t c = 0; c < nch; ++c) {
-      const ChannelIndex ch{c};
-      auto block = [&](KetClass kc_ket,
-                       std::initializer_list<KetClass> bra_classes) {
-        for (LocalKetIndex k : sub.kets(ch, kc_ket)) {
-          for (KetClass bc : bra_classes) {
-            for (LocalKetIndex b : sub.kets(ch, bc)) {
-              const double v =
-                  GeneratorFunction(kind, Hh.two_body().get(ch, ch, b, k),
-                                    den.two_body(ch, b, k), nq);
-              eta.two_body().set(ch, ch, b, k, v);
-              eta.two_body().set(ch, ch, k, b, -v);
-            }
+// Fills the two-body part of eta channel by channel from the ket subsets.
+void FillTwoBodyEta(const op::Operator& Hh, const Denominators& den,
+                    const basis::ModelSpace& ms, GeneratorKind kind, bool shell,
+                    int nq, op::Operator& eta) {
+  const basis::TwoBodyKetSubsets& sub = ms.two_body_subsets();
+  const std::int32_t nch = ms.two_body().num_channels();
+  using basis::KetClass;
+  for (std::int32_t c = 0; c < nch; ++c) {
+    const ChannelIndex ch{c};
+    auto block = [&](KetClass kc_ket,
+                     std::initializer_list<KetClass> bra_classes) {
+      for (LocalKetIndex k : sub.kets(ch, kc_ket)) {
+        for (KetClass bc : bra_classes) {
+          for (LocalKetIndex b : sub.kets(ch, bc)) {
+            const double v =
+                GeneratorFunction(kind, Hh.two_body().get(ch, ch, b, k),
+                                  den.two_body(ch, b, k), nq);
+            eta.two_body().set(ch, ch, b, k, v);
+            eta.two_body().set(ch, ch, k, b, -v);
           }
         }
-      };
-      if (!shell) {
-        block(KetClass::kCc, {KetClass::kQq, KetClass::kVv, KetClass::kQv});
-      } else {
-        block(KetClass::kCc, {KetClass::kVv, KetClass::kQv, KetClass::kQq});
-        block(KetClass::kVc, {KetClass::kVv, KetClass::kQv, KetClass::kQq});
-        block(KetClass::kVv, {KetClass::kQv, KetClass::kQq});
+      }
+    };
+    if (!shell) {
+      block(KetClass::kCc, {KetClass::kQq, KetClass::kVv, KetClass::kQv});
+    } else {
+      block(KetClass::kCc, {KetClass::kVv, KetClass::kQv, KetClass::kQq});
+      block(KetClass::kVc, {KetClass::kVv, KetClass::kQv, KetClass::kQq});
+      block(KetClass::kVv, {KetClass::kQv, KetClass::kQq});
+    }
+  }
+}
+
+// Fills the three-body part of eta (imsrg++
+// ConstructGenerator_SingleRef_3body).
+void FillThreeBodyEta(const op::Operator& Hh, const Denominators& den,
+                      const basis::ModelSpace& ms, const basis::Partition& part,
+                      GeneratorKind kind, int nq, op::Operator& eta) {
+  const basis::ThreeBodySpace& ts = *ms.three_body_space();
+  const op::ThreeBody& H3 = *Hh.three_body();
+  op::ThreeBody& eta3 = *eta.three_body();
+  using basis::OrbitClass;
+  const auto all_class = [&](const basis::OrbitTriple& t, bool core) {
+    const bool a = part.orbit_class(t.a) == OrbitClass::kCore;
+    const bool b = part.orbit_class(t.b) == OrbitClass::kCore;
+    const bool c = part.orbit_class(t.c) == OrbitClass::kCore;
+    return core ? (a && b && c) : (!a && !b && !c);
+  };
+  for (std::int32_t c = 0; c < ts.num_channels(); ++c) {
+    const Channel3Index ch{c};
+    const basis::KeptChannel3& kc = ts.channel(ch);
+    for (std::int32_t tb = kc.triple_begin.value(); tb < kc.triple_end.value();
+         ++tb) {
+      const basis::OrbitTriple& bt = ts.triple(basis::Triple3Index{tb});
+      if (!all_class(bt, false)) continue;
+      for (std::int32_t tk = kc.triple_begin.value();
+           tk < kc.triple_end.value(); ++tk) {
+        const basis::OrbitTriple& kt = ts.triple(basis::Triple3Index{tk});
+        if (!all_class(kt, true)) continue;
+        const double d = den.three_body(bt.a, bt.b, bt.c, kt.a, kt.b, kt.c);
+        for (std::int32_t i = bt.row_begin.value(); i < bt.row_end.value();
+             ++i) {
+          for (std::int32_t j = kt.row_begin.value(); j < kt.row_end.value();
+               ++j) {
+            const basis::KeptRow3Index ri{i}, rj{j};
+            eta3.set(ch, ri, rj,
+                     GeneratorFunction(kind, H3.get(ch, ri, rj), d, nq));
+          }
+        }
       }
     }
   }
+}
 
-  // Three-body part (imsrg++ ConstructGenerator_SingleRef_3body).
+}  // namespace
+
+void ComputeGenerator(const op::Operator& H, op::Operator& eta,
+                      const GeneratorOptions& opts) {
+  const bool rank3 = CheckGeneratorInputs(H, opts);
+  const op::OperatorSpec spec = GeneratorSpec(H.spec(), opts.kind);
+  if (eta.empty() || !(eta.spec() == spec) || !op::SameModelSpace(eta, H)) {
+    eta = op::Operator(H.model_space_ptr(), spec);
+  }
+  eta.set_zero();
+  eta.SyncToHost();
+
+  H.SyncToHost();  // host reads below (no copy of H, flow review item)
+  const op::Operator& Hh = H;
+  const Denominators den(H, opts);
+  const basis::ModelSpace& ms = H.model_space();
+  const basis::SingleParticleBasis& sp = ms.basis();
+  const basis::Partition& part = ms.partition();
+  const int nq = opts.qtransfer_n;
+
+  if (opts.kind == GeneratorKind::kHartreeFock) {
+    FillHartreeFockEta(Hh, den, sp, eta);
+    eta.SyncToDevice();
+    return;
+  }
+
+  const bool shell = IsShellModel(opts.kind);
+  const GeneratorKind kind = opts.kind;
+  FillOneBodyEta(Hh, den, sp, part, kind, shell, nq, eta);
+  if (!opts.only_1b_eta) FillTwoBodyEta(Hh, den, ms, kind, shell, nq, eta);
   if (rank3 && !opts.only_1b_eta && !opts.only_2b_eta) {
-    const basis::ThreeBodySpace& ts = *ms.three_body_space();
-    const op::ThreeBody& H3 = *Hh.three_body();
-    op::ThreeBody& eta3 = *eta.three_body();
-    using basis::OrbitClass;
-    const auto all_class = [&](const basis::OrbitTriple& t, bool core) {
-      const bool a = part.orbit_class(t.a) == OrbitClass::kCore;
-      const bool b = part.orbit_class(t.b) == OrbitClass::kCore;
-      const bool c = part.orbit_class(t.c) == OrbitClass::kCore;
-      return core ? (a && b && c) : (!a && !b && !c);
-    };
-    for (std::int32_t c = 0; c < ts.num_channels(); ++c) {
-      const Channel3Index ch{c};
-      const basis::KeptChannel3& kc = ts.channel(ch);
-      for (std::int32_t tb = kc.triple_begin.value();
-           tb < kc.triple_end.value(); ++tb) {
-        const basis::OrbitTriple& bt = ts.triple(basis::Triple3Index{tb});
-        if (!all_class(bt, false)) continue;
-        for (std::int32_t tk = kc.triple_begin.value();
-             tk < kc.triple_end.value(); ++tk) {
-          const basis::OrbitTriple& kt = ts.triple(basis::Triple3Index{tk});
-          if (!all_class(kt, true)) continue;
-          const double d = den.three_body(bt.a, bt.b, bt.c, kt.a, kt.b, kt.c);
-          for (std::int32_t i = bt.row_begin.value(); i < bt.row_end.value();
-               ++i) {
-            for (std::int32_t j = kt.row_begin.value(); j < kt.row_end.value();
-                 ++j) {
-              const basis::KeptRow3Index ri{i}, rj{j};
-              eta3.set(ch, ri, rj,
-                       GeneratorFunction(kind, H3.get(ch, ri, rj), d, nq));
-            }
-          }
-        }
-      }
-    }
+    FillThreeBodyEta(Hh, den, ms, part, kind, nq, eta);
   }
   eta.SyncToDevice();
 }

@@ -35,6 +35,37 @@ op::Operator ZeroOmega(const std::shared_ptr<const basis::ModelSpace>& ms,
       ms, op::OperatorSpec::Scalar(particle_rank, Hermiticity::kAntiHermitian));
 }
 
+// Recomputes eta(s) for the H rebuilt with the gathered Omega and warns when
+// the flow stopped on the eta criterion of the last hunter step but the
+// rebuilt ||eta|| exceeds it. The flow does NOT continue (steps and gathers
+// stay as decided in D48); ||eta|| of the rebuilt H is usually far above
+// eta_criterion (1e-3 against 1e-6 in the IT-2 hunter-gatherer cases).
+void RebuiltEtaCheck(const op::Operator& h, op::Operator& eta,
+                     const GeneratorOptions& generator, double eta_criterion,
+                     StopReason reason) {
+  // eta(s) and the reported norms belong to the rebuilt H as well.
+  ComputeGenerator(h, eta, generator);
+  const double norm_eta_rebuilt = op::Norm(eta);
+  if (reason == StopReason::kConverged && !(norm_eta_rebuilt < eta_criterion)) {
+    log::Warn(
+        "hunter-gatherer: ||eta|| = {} of the H rebuilt with the gathered "
+        "Omega exceeds eta_criterion = {} (the flow stopped on the "
+        "||eta|| of the last hunter step)",
+        norm_eta_rebuilt, eta_criterion);
+  }
+}
+
+// The last step may have produced a NaN that the loop condition never saw:
+// flags the result as diverged when ||eta|| or E0 is not finite.
+void MarkNonFiniteDiverged(SolveResult& result, double s) {
+  if (result.reason != StopReason::kDiverged &&
+      (!std::isfinite(result.norm_eta) || !std::isfinite(result.e0))) {
+    log::Error("the IMSRG flow diverged: non-finite ||eta|| or E0 at s = {}",
+               s);
+    result.reason = StopReason::kDiverged;
+  }
+}
+
 }  // namespace
 
 void ValidateSolverOptions(const SolverOptions& o) {
@@ -244,21 +275,7 @@ SolveResult MagnusSolver::Solve(const StatusCallback& on_status) {
     // after a divergence (the rebuilt H could be non-finite as well).
     if (result.reason != StopReason::kDiverged) {
       h_ = h_saved_;
-      // eta(s) and the reported norms belong to the rebuilt H as well. The
-      // flow does NOT continue (steps and gathers stay as decided in D48);
-      // ||eta|| of the rebuilt H is usually far above eta_criterion (1e-3
-      // against 1e-6 in the IT-2 hunter-gatherer cases), so warn when the loop
-      // stopped on the eta criterion (not at smax).
-      ComputeGenerator(h_, eta_, generator_);
-      const double norm_eta_rebuilt = op::Norm(eta_);
-      if (result.reason == StopReason::kConverged &&
-          !(norm_eta_rebuilt < eta_criterion)) {
-        log::Warn(
-            "hunter-gatherer: ||eta|| = {} of the H rebuilt with the gathered "
-            "Omega exceeds eta_criterion = {} (the flow stopped on the "
-            "||eta|| of the last hunter step)",
-            norm_eta_rebuilt, eta_criterion);
-      }
+      RebuiltEtaCheck(h_, eta_, generator_, eta_criterion, result.reason);
       // Last flow-log row: the rebuilt H at the same s (istep = steps + 1,
       // ds = 0), so the log ends with the reported E0.
       if (on_status) on_status(Status(result.steps + 1, 0.0));
@@ -267,13 +284,7 @@ SolveResult MagnusSolver::Solve(const StatusCallback& on_status) {
   result.s = s_;
   result.e0 = h_.zero_body();
   result.norm_eta = op::Norm(eta_);
-  // The last step may have produced a NaN that the loop condition never saw.
-  if (result.reason != StopReason::kDiverged &&
-      (!std::isfinite(result.norm_eta) || !std::isfinite(result.e0))) {
-    log::Error("the IMSRG flow diverged: non-finite ||eta|| or E0 at s = {}",
-               s_);
-    result.reason = StopReason::kDiverged;
-  }
+  MarkNonFiniteDiverged(result, s_);
   return result;
 }
 
