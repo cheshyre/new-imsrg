@@ -2,46 +2,62 @@
 
 ## Current state (keep this section up to date)
 
-* **Phase:** **owner interview after run 2 done** (2026-11-16, D44–D54, report
-  `design/reports/2026-11-16-owner-interview.md`); every run-2 question is answered. Next: **run 3**
-  (`design/NEXT_SESSION_PROMPT.md`, order D53). Run 2 ended 2026-11-16 ~07:30 JST (started
-  2026-11-15 13:50; report `design/reports/2026-11-15-run2.md`). Run 1 ended 2026-11-12 ~08:45 JST (report
-  `design/reports/2026-11-12-overnight.md`); the owner interviews of 2026-11-13 (D25–D29) and
-  2026-11-15 (D30–D42, `design/reports/2026-11-15-owner-interview.md`) answered every run-1 question.
+* **Phase:** **run 3 done** (2026-11-16 12:40 to 2026-11-17 ~04:10 JST; report
+  `design/reports/2026-11-16-run3.md`). `develop` = **7bfba4e** (the owner re-syncs the main
+  checkout, see below). Next: the **owner interview after run 3** (`design/INTERVIEW_PROMPT.md`,
+  every open run-3 question with its assumption), then **run 4** (`design/NEXT_SESSION_PROMPT.md`).
+  Earlier: run 2 ended 2026-11-16 ~07:30 (report `design/reports/2026-11-15-run2.md`), run 1
+  2026-11-12 ~08:45; interviews 2026-11-13 (D25-D29), 2026-11-15 (D30-D42) and 2026-11-16
+  (D44-D54, `design/reports/2026-11-16-owner-interview.md`).
 * **Integration branch:** `develop` (local). Runs and interviews start in app worktrees and advance
   `develop` with `tools/ci.sh dev-openmp [&& ctest -L slow] && git update-ref refs/heads/develop
-  <new> <old>` (standard since D44; QUESTIONS O1, O3). **The main checkout's files do not follow;
-  the owner re-syncs it after each run** (it was synced after run 2; the 2026-11-16 interview moved
-  `develop` twice since).
+  <new> <old>` (D44; QUESTIONS O1, O3). **The main checkout's files do not follow; the owner
+  re-syncs it after each run** (`git -C /Users/cheshyre/Downloads/new-imsrg reset --hard` when it has
+  no local edits, then `tools/reference/gen_golden_generated.sh`).
 * **Code style:** Google C++ Style Guide since the MS merge (D38, `17-code-style.md`): `.h`/`.cc`,
   PascalCase functions, `kName` constants and enumerators, 80 columns, blocking cpplint step in
   `tools/ci.sh`, clang-tidy naming check `tools/lint.sh`; exceptions and allowlists in `17` §3.
-* **Merged:** run 1: M0–M9 and M11 phase 1. Run 2: MS (Google style); hunter-gatherer Magnus; D35
-  (Tcm, Rp2, `Rso`, patched reference build); flow-review fixes; D37 config/driver tasks;
-  reference-tooling clean-up; ODE flow methods `flow_rk4`/`flow` (dopri5); IMSRG(3f2) (D32); M10 layout
-  decision D43 (layout A); general (non-Hermitian) IMSRG(2) commutator and full-precision 1/√2 (D36);
-  M11 phase 2 Python bindings and their hardening; M10 step 2 (3B storage, `Comm223`, perturbative
-  triples); charge radius with Rso and a two-stage ODE test; M10 step 3 IMSRG(3)-N7 with the comm232
-  batching follow-up; robust Ctrl-C tests; M12a single-node performance. Interview 2026-11-16:
-  license GPL-3.0-only (D46, `license headers` CI step) and the decision/plan documents.
-* **End to end:** `imsrg` reproduces imsrg-devel (the D35-patched build) for IT-1 … IT-10 (IT-4/IT-5
-  at smax 10; IT-8 He4 emax 2 / O16 emax 3; IT-9 emax 2 and 3; IT-10 3f2), IT-12, IT-14 (ODE methods),
-  IT-15 (two-stage ODE) and the hunter-gatherer cases: same step counts, |ΔE0| ≤ 3.8e-10 MeV for
-  IMSRG(2)/(3)-N7/3f2, triples ≤ 1.3e-15 rel., `.snt` ≤ 2e-14 (details in the run-2 report §3). CI
-  on `develop` (9bef685): 1069 unit, 61 integration, 3 MPI, 149 Python (1 skipped), 6 slow tests; `ci.sh` ~130 s; the slow suite (incl. IT-9 emax 3) passes (~46–50 min on a loaded machine).
-* **Performance** (`design/benchmarks/`): IMSRG(2) commutator 3.6–4× faster than imsrg++ at emax 6–8,
-  O16 emax-8 flow 3.1–3.7× (59.8 s vs 187.8 s at 6 threads); peak memory of that flow 1.1 GB vs
-  2.3–2.6 GB; production `Comm223` 15.2 ms vs imsrg++ 482 ms (O16 emax 3, 18 threads); IT-9 2–3×
-  faster than imsrg++; 3f2 step 1.10× a plain hunter-gatherer step.
-* **Not started / next (D53):** the interview tasks (D47–D49, D51, D50 clang-tidy pattern), the MS2
-  structural style pass (alone), N7 performance with row tiling, triples at emax ≥ 8 and
-  `occ_nat3_cut` in parallel with M12b phase 1, M12b phase 2 (row-wise 3B distribution, D45), M15
-  tensor operators, M16 ME1J/ME2JP/ME3JP with stored Omega and checkpoint/restart (D54,
-  `19-mexj-formats.md`), M13, M14 (GPU after M12b). 3f2 2b intermediates stay E-PLANNED. No unmerged branch holds unique work; `tmp/m12a-bench-base`
-  (scratch) and run 1's empty `feature/m10-layout-benchmark` (checked out in a stale worktree) can go.
-* **Interruptions:** run 1: 5-hour usage limit 01:30–02:30 and 04:15–07:30 JST. Run 2: limit reached
-  ~16:35, ~21:15 and ~01:30 JST (resets 18:00, 23:00, 04:00); agents resumed with `SendMessage`;
-  weekly usage ~8 % → ~32 %. The usage budget, not wall time, binds.
+* **Merged:** run 1: M0-M9, M11 phase 1. Run 2: MS (Google style), D35 patched reference, ODE flow
+  methods, IMSRG(3f2), layout decision D43, M10 steps 2-3 (3B storage, `Comm223`, perturbative
+  triples, IMSRG(3)-N7), M11 phase 2, M12a, license D46. **Run 3:** brief A (D47 stage-2 range and
+  double `eta_criterion`, D48 hunter-gatherer H(s) rebuild, D49 three-body denominator floor and
+  triples Omega-stack order, D50/D51 lint and strict Python residency, IT-9 Rp2 golden); D57
+  binary ME2JP/ME3JP layout (docs); M15 reference preparation (tensor goldens only, no library
+  code); **MS2** structural style pass; **M10 step 4, N7 performance (brief C, D60): complete
+  except C15 and the follow-ups below**; **M12b phase 1 (D1-D5, D59) and the D7/D8 part of phase 2**.
+* **Milestone status:** M0-M9, M10 (layout A, 3f2, triples, N7 incl. performance), M11, M12a
+  complete. **M12b partial:** IMSRG(2) commutator distributed (ownership map, contiguous
+  cost-balanced ladder cut with comm122/ph loads, `CombinePartials`, collective driver with rank-0
+  output, IT-11), distributed `op::ThreeBody` storage (D7) and generator 3B kernel (D8); distributed
+  3B parts are refused by `Commutator()` until D10. Left: comm122/ph row panels, D9 halo exchange,
+  D10 distributed N7 driver (then lift the guard), D11, D12, weight recalibration. **Not started:**
+  M15 tensor operators (goldens exist), M16 formats, M13, M14.
+* **End to end:** `imsrg` reproduces imsrg-devel (the D35-patched build) for IT-1 ... IT-10, IT-12,
+  IT-14, IT-15 and the hunter-gatherer cases (same step counts; the D48/D49 changes moved IT-2 HG,
+  IT-10 and IT-8 by design and their goldens were regenerated, run-3 report section 3), plus IT-11
+  (MPI 2 and 4 ranks vs serial: identical steps, max relative deviation 1.2e-16).
+  **CI:** the last complete CI log of run 3 (93e2d9f, the combined N7 + M12b merge): 1231 unit, 69
+  integration, 18 MPI, 150 Python (1 skipped); the slow suite 7/7 passed in 1027 s (IT-9 emax 3: He4
+  490 s, O16 311 s). 7bfba4e only added C4 and `n7_bench --partition`; `ci.sh dev-openmp` on its content PASS: 1235 unit, 69
+  integration, 18 MPI, 150 Python (1 skipped). TODO(orchestrator): confirm the slow suite on 7bfba4e.
+* **Performance** (`design/benchmarks/`): IMSRG(2) commutator 3.6-4x faster than imsrg++ at emax 6-8
+  (run 2). **N7 (run 3, O16, full N7 commutator, release, best of 5):** 255 -> 105 ms at emax 3
+  (2.4x), 6289 -> 1147 ms at emax 4 (5.5x), 46.6 -> 6.2 s at emax 5 (7.5x), ~1.7e10 multiply-adds/s;
+  the slow suite dropped from ~50 min to 17 min. Cost at emax 12 / E3max 16: 3.37e13 multiply-adds
+  per commutator (2.29e13 in comm232), 177 GB per packed operator. **MPI (one node, 16 threads in
+  total):** more ranks are slower (emax 8: 30.5 / 43.5 / 61.8 ms for 1 / 2 / 4 ranks); the cost
+  model's compute imbalance is 0-0.1 % at 22 ranks, 3 % at 64 ranks only at emax 12 (58 % at emax
+  10, 146 % at emax 8), 310-880 % at 256 ranks (whole comm122/ph channels; row panels next).
+* **Not started / next (run 4, details in `NEXT_SESSION_PROMPT.md`):** M12b phase 2 rest (row panels
+  for comm122/ph, D9, D10 and lifting the D7 guard, D11, D12, weights recalibrated on an idle
+  machine); N7 follow-ups (tiled `BuildH`, C15 Comm223 locality, partition timings at emax 5,
+  `CommutatorOptions::imsrg3_batch_bytes`, factoring the duplicated triples table builders); M15
+  tensor operators after M15-Q1..Q5; M16 formats; fillers (Python hooks D51, `.me2j.bin` reader,
+  run-2 section 7 cleanup); M13, M14 (GPU after M12b). 3f2 2b intermediates stay E-PLANNED.
+* **Interruptions:** run 3 (windows reset at 14:10, 19:10, 00:10, 05:10 JST): 83 % at 18:29; the
+  19:10 window reached **97 % at 22:00 against the 90 % cap of D58** (an N7 lead ignored the 21:35
+  pause message and was stopped at 22:01); 00:10 window 27/62/72/86 % at 04:02; weekly usage 44 % ->
+  61 %. Runs 1 and 2: see the earlier reports. The usage budget, not wall time, binds.
 * **Toolchain:** Homebrew cmake 4.4.5, ninja 1.13.2, ccache 4.14.3, Open MPI 5.0.11, libomp 23.1.5,
   clang-format 23.1.5, gsl, boost, openblas; Apple clang 21; Python 3.15.2; Kokkos 5.3.0 per backend
   in `~/.cache/imsrg-deps` (`tools/bootstrap_deps.sh`); shared venv `~/.cache/imsrg-deps/venv`. The
@@ -52,9 +68,10 @@
 * **Inputs:** me2j test file = 168,066,656 values (e1max 14, e2max 28, lmax 14); NO2B test file =
   32,685,840 floats (6, 12, 18; single precision) holding only the cE contact term (M1-Q1); it stays
   the 3N test input until the owner provides a full N2LO file (D33).
-* **Blocking questions:** none. All questions of run 2 were answered on 2026-11-16 (D44–D54; M12-Q5
-  deferred to the cluster builds); run 3 appends under "Added during run 3" in `QUESTIONS.md`.
-  Owner-side open items: the binary ME2JP/ME3JP header, the full N2LO 3N file (D33).
+* **Blocking questions:** none. Open questions of run 3 (IT3-Q1..Q12, O4, MS2-Q1..Q4, M15-Q1..Q5,
+  M12b-Q1..Q19, M10-Q70..Q79) are in `QUESTIONS.md` under "Added during run 3", with their
+  assumptions, for the interview. Owner-side open items: the full N2LO 3N file (D33), a check that
+  imsrg++ reads our `.bin` rule (D57).
 
 ## Log (append one entry per merged branch)
 
@@ -112,7 +129,7 @@
 | 2026-11-16 16:45 | feature/m15-reference-prep (b434918) → develop | **M15 reference preparation, phase 0** (out-of-library prep during MS2): refharness `rh_tensor.cpp` with `dump-tensor` (HO/HF basis; E1, E2, E3, M1, Fermi, GT and the 0νββ operators M0nu_GT/F/T/C and DGT; He4, O16, open-shell Ne20), `commutator-tensor` (X = H or a random anti-Hermitian scalar, Y = E2, GT or seeded random tensors; per term comm111st, comm121st, … and `all`) and `bch-tensor` (BCH transformation of a tensor with a random Omega); `gen_golden_tensor.sh` (~20 s) with `tensor_golden_check.py` and `tensor_convention_check.py`; goldens `tests/golden/tensor/` (91 files, 960 KB, largest 110 KB) in a labelled raw text format documented in `15` ("Tensor reference dumps"): imsrg++ stores reduced matrix elements as (−1)^{j_bra−j_ket} × Edmonds, O+O† with \|ΔTz\|, only ch_bra ≤ ch_ket blocks | ci.sh dev-openmp PASS (worker) and on the merge; the script's 66 internal checks pass (max dev 1.4e-16); no library code touched | M15-Q1..Q5 (Q1 phase/gauge convention, Q4: the 222/221 tensor terms only at emax 1 for size); not yet reviewed — the M15 lead reviews before use |
 | 2026-11-16 18:35 | feature/style-structural (b310387) → develop | **MS2 structural style pass (D50)**, 35 commits: 12 structs with member functions became classes (Python wrappers, driver helpers, the angmom views, still trivially copyable, the bench `TriplesBody`); 14 scoped enums `std::uint8_t`→`std::int8_t`, NO2B monopole orbit indices `std::int16_t`; ~85 functions split (host functions outside kernels and tests: over 60 lines 62→8, over 100 lines 25→1, the `VisitSchema` table); `SyevdLower` and 13 test helpers moved out of headers (header functions over 10 lines 35→22, all templates or device lookups); imperative comments made descriptive; `Jbig`→`J_big` (physics-symbol list now 158) | ci.sh dev-openmp PASS after every item (lead), dev-serial at the end; integration logs, driver result files, `ctest -N`, the Python API and the commutator checksum identical to the baseline; lint.sh clean; release timing within noise (emax-6 commutator −0.4 %, IT-9 −0.5 %); ci.sh dev-openmp + `-L slow` PASS on the merge | MS2-Q1..Q4 (device views and kernel data bundles kept as structs, to convert during the N7 tiling; triples dE not bitwise reproducible run to run, 1–2 ulp); no separate reviewer (usage pacing; the only kernel change is one accessor line, IT-8/IT-9 outputs bitwise identical) |
 | 2026-11-16 19:25 | feature/m12b-mpi (3119356, interface commit P0) → develop | **M12b/N7 shared interface, early**: `commutator::WorkspaceOptions{comm::Communicator comm}` with `Workspace(ms, opts = {})`; `Commutator()` has a single exit (review note m2), its IMSRG(3) block moved verbatim into the helper `ThreeBodyTerms()` in `commutator.cc`. Merged early so the N7 lead's C5 (adds `three_body_context` to these options) and C11 (edits only `ThreeBodyTerms()`) build on it, while the end of `Commutator()` stays M12b's combine | ci.sh dev-openmp PASS (lead) and on the merge; behaviour-neutral code movement, IT-9 emax 2 in ci (no slow run: the IMSRG(3) code path is unchanged) | — |
-| 2026-11-16 20:30 | feature/m10-n7-perf (31fb9ae, C1 + C2 + C14) → develop | **N7 performance, row-range interface, early** (brief C; merged first so that M12b phase 2 builds on it): C1 `basis/three_body_rows.{h,cc}` (`RowRange`, `RowSet`, balanced and whole-channel `RowPartition`s, row-mask test helpers); C2 every three-body operand read (`ThreeBodyLocal`) and output write (comm133ss, comm223 tiles) goes through a per-flat-row offset table (`row_off`) instead of `ch_packed_offset` + `PackedIndex`, with a halo buffer slot that serial code never reads; C14 `n7_bench` (timing, checksums, `--count-only`) and the exact count and cost model of the tiled N7 terms (`N7CostModel`, public `N7LineWeights`). Contains 3119356. Also on the merge: `comm` added to the clang-tidy method allowlist (lint finding from 3119356) | n7_bench checksums bitwise identical (every read and write hits the same element); new `test_n7_views` (tables vs `op::ThreeBody` block offsets and `RowSet::LocalRowOffset`, He4/O16, dE3max cut, packed and dense; halo contract); ci.sh dev-openmp PASS (lead); ci.sh + lint.sh + slow PASS on the merge | The N7 lead's final Opus review covers C1/C2/C14 too |
+| 2026-11-16 20:05 | feature/m10-n7-perf (31fb9ae, C1 + C2 + C14) → develop | **N7 performance, row-range interface, early** (brief C; merged first so that M12b phase 2 builds on it): C1 `basis/three_body_rows.{h,cc}` (`RowRange`, `RowSet`, balanced and whole-channel `RowPartition`s, row-mask test helpers); C2 every three-body operand read (`ThreeBodyLocal`) and output write (comm133ss, comm223 tiles) goes through a per-flat-row offset table (`row_off`) instead of `ch_packed_offset` + `PackedIndex`, with a halo buffer slot that serial code never reads; C14 `n7_bench` (timing, checksums, `--count-only`) and the exact count and cost model of the tiled N7 terms (`N7CostModel`, public `N7LineWeights`). Contains 3119356. Also on the merge: `comm` plus the C1 accessors `ranges`, `num_parts`, `part` added to the clang-tidy method allowlist (lint findings from 3119356 and C1) | n7_bench checksums bitwise identical (every read and write hits the same element); new `test_n7_views` (tables vs `op::ThreeBody` block offsets and `RowSet::LocalRowOffset`, He4/O16, dE3max cut, packed and dense; halo contract); ci.sh dev-openmp PASS (lead); ci.sh + lint.sh + slow PASS on the merge | The N7 lead's final Opus review covers C1/C2/C14 too |
 | 2026-11-17 01:45 | feature/m12b-mpi-2 (a2ce18e; with feature/m12b-mpi 5928cd4) → develop | **M12b phase 1, MPI distribution of the IMSRG(2) commutator (D14, D59)**: `OwnershipMap`, `ReduceBcastSum` and message chunking; work items with costs and `AssignWork`; the ladder terms (pp/hh, 221) split by a contiguous cost-balanced cut of the global row sequence (D2c), comm122 and the particle-hole terms by ownership (row panels, inverse-transform pair skip); `CombinePartials` with the cheap and N7 terms on rank 0; collective `driver::Run` with rank-0-only output (review note M4), collective entry points documented; `commutator_bench` MPI mode and `mpi_scaling.sh`; IT-11; docs `00` D59, `12` §6, `30` §2, `design/benchmarks/mpi-scaling.md` | IT-11 on 2 and 4 ranks: identical step counts, max relative deviation 1.2e-16 (Magnus, hunter-gatherer, 3f2, rk4, N7 at emax 2/3, triples; per-step H(s) hashes identical across ranks); MPI commutator tests max\|dZ\| 1.8e-14; the IT-11 slow cases cut to the whole machine and fewer N7 flows; Opus review: no blocker, no major, minors fixed; ci.sh dev-openmp + lint (lead), dev-serial on 5928cd4+develop; ci.sh + lint + slow PASS on the merge | M12b-Q1..Q19; phase 2 (D7–D12) next |
 | 2026-11-17 03:30 | feature/m12b-mpi-2 (4783620) → develop | **M12b phase 2, first part (D7, D8)**: `ThreeBodyDistribution` (new `basis → comm` edge, `10` §2 and the layering check updated); `op::ThreeBody` stores its rows per model-space distribution (`GatherToRoot` checks counts against INT_MAX on every rank); the replicated pipeline refuses distributed three-body parts; the three-body generator runs as a device kernel over a row set, also on distributed storage; the ladder row cut absorbs the comm122 and particle-hole loads (joint cut); hand-off for D9–D12 in `design/benchmarks/mpi-scaling.md` | Opus review of D7/D8, findings fixed (distributed three-body test gaps, partition validation, core orbits above the q-space); ci.sh dev-openmp + dev-serial + lint (lead); ci.sh + lint + slow PASS on the merge (together with the N7 merge below) | D9 (halo exchange), D10 (distributed N7 driver), D11, D12 remain |
 | 2026-11-17 03:30 | feature/m10-n7-perf-2 (c63cdc4; continues feature/m10-n7-perf 750854d) → develop | **N7 performance (brief C), main part**: C3 Comm223 on row work items; C5 lazy `ThreeBodyContext` (`WorkspaceOptions::three_body_context`, built on demand for IMSRG(2)-only use); C6 batch planner with the shared pair-third intermediates H and W (B1: W covers particle–hole bra pairs); C7 Comm232 on batches; C8–C10 comm331/231, comm132/330 and comm133 (TransposeOut, with a cache) on the batch interface; C11 fused N7 driver inside `ThreeBodyTerms()`; C12 perturbative triples on row tiles for emax ≥ 8 (R per tile, no E map, ppp/hhh only); C13 `imsrg3.occ_nat3_cut` with the NAT occupations in the three-body space, also for the triples (C13b); partition-invariance tests with masked operands (review note M1); report `design/benchmarks/imsrg3-n7-performance.md` | Full N7 commutator 2.4× / 5.5× / 7.5× faster at emax 3 / 4 / 5 (release, best of 5, start load < 6); Opus review of e739622..e1aff9e: no blocker, two test-gap majors fixed; ci.sh dev-openmp + dev-serial + lint (lead); ci.sh + lint + slow PASS on the merge (with the M12b merge above). Merge conflicts with M12b (includes, `Workspace` constructor: work assignment plus lazy context, triples docstring, CMake lists, questions) resolved keeping both sides | M10-Q70..Q79; C4 (exec facade) and C15 (Comm223 locality) in progress |
