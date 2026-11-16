@@ -971,3 +971,27 @@ settled the decisions for run 3 and later: D44–D54 in `00-requirements-and-dec
 
 Run 3 appends its questions below (ids per brief, e.g. `M10-Q70..Q79`, `M12b-Q1..Q9`, `MS2-Q1..Q9`;
 the orchestrator uses `O4` and up).
+
+* **IT3-Q4** (2026-11-16, run 3 brief A part 2, D51) - Strict residency in CI. `tools/ci.sh` now runs
+  `tests/python` with `IMSRG_RESIDENCY=strict`. Only four tests needed changes (the 23 of M11-Q11 had
+  been fixed in phase 2): `test_non_hermitian_operands` and `test_numpy_view_round_trip` gained
+  `sync_to_host()`; the two policy tests (`test_default_policy_matches_the_build`,
+  `test_implicit_policy_syncs_by_itself`) set the policy they test inside a `residency_policy_scope`
+  (Auto stays tested), and a new test checks the `IMSRG_RESIDENCY` values in subprocesses.
+  **Assumed:** nothing else; `examples/python/he4_pipeline.py` already syncs and its test passes under
+  strict. A GPU build still needs a real GPU run to confirm portability.
+* **IT3-Q5** (2026-11-16, run 3 brief A part 2, D50) - Physics-symbol list. `.clang-tidy` ignore
+  patterns for variables, parameters, members and local constants are generated from
+  `tools/physics_symbols.txt` (159 symbols) by `tools/gen_physics_symbols.py`; names pass if their
+  `_`-parts are lower-case words or listed symbols. **Assumed:** the one-letter-prefixed forms (`iJ`,
+  `nA`, `tJ`, `dZ`) and labelled matrices (`Hh`, `Fk`, `Ct`, `EB`, `Lam`, `PL`, `Tde`) count as physics
+  notation; 18 non-physics locals were renamed (separate commit); 12 accessors missing from the
+  method allowlist were added so that `tools/lint.sh` is clean (it was not on `develop`). Say if the
+  prefixed forms should be rejected (the list would shrink by about 20 names and those locals be renamed).
+* **IT3-Q6** (2026-11-16, run 3 brief A part 2, D51) - `design/18` rewritten to the bound API (modules
+  `imsrg`, `basis` types in `imsrg`, `operators`, `io`, `hf`, `mbpt`, `commutators`, `flow`,
+  `pipeline`). **Assumed:** the old proposal's unbound parts (dataclass `SolverOptions(method=...)`,
+  `ModelSpace.from_reference`, term-by-term `terms.*`, `angmom`, stubs, callbacks of generators) are
+  listed once in a "not implemented" section instead of kept as design text; the old old-`pyIMSRG`
+  mapping table was dropped (it lives in git history). Say if the table should be kept for the
+  term-by-term milestone.

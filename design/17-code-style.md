@@ -103,11 +103,21 @@ unindented namespaces and access specifiers (clang-format Google base); project 
    keep the capitals of the physics symbols they name (`X`, `Y`, `Z` for commutator operands, `H`,
    `A`/`Z` for nucleon numbers, `J`, `Jp`, `Tz`, `hw_MeV`, `twoJ`), as in imsrg++ and the
    literature; lower-casing them would merge distinct quantities (`j` and `J`) and break the
-   element-by-element comparison with imsrg++. The naming check accepts any name with a capital
-   for these kinds; everything else follows the guide. **To tighten (owner, 2026-11-16, D50):** the
-   ignore pattern also lets camelCase names through, so it becomes a curated list of physics
-   symbols (as whole names or name parts: `X`, `Y`, `Z`, `H`, `A`, `N`, `J`, `Jp`, `Tz`, `hw_MeV`,
-   `twoJ`, ...), built from the names in the code today; no renames.
+   element-by-element comparison with imsrg++. **Rule (D50, run 3):** the naming check accepts a
+   variable, parameter or data-member name only if its `_`-separated parts are lower-case words
+   (`[a-z0-9]+`) or symbols from the curated list `tools/physics_symbols.txt`, with at least one
+   symbol; private and protected members end in `_` as usual, a parameter may end in `_`, and
+   local constants may also be `kName`. So `twoJ`, `ket_J_offsets`, `delta_Tz`, `hw_MeV`,
+   `A_core_`, `Z_fast` pass; camelCase such as `numOrbits` or `bigA` does not (a descriptive
+   suffix is a separate part: `A_big`). The list (159 symbols, collected with clang-tidy from the
+   names the code used on 2026-11-16) holds single letters (`A`..`Z`), numbered or labelled
+   forms (`J12`, `T45`, `Hh`, `Zg`), angular-momentum and isospin quantities (`Jab`, `Jpmax`,
+   `Tz`, `twoJ`, `twoTz`), index/count/double forms (`iJ`, `nA`, `tJ`, `dZ`), nucleon numbers and
+   reference labels (`Aref`, `Zcore`), `Om`/`Omega` and `MeV`. A new symbol is added to the file,
+   `tools/gen_physics_symbols.py --write` regenerates the `IgnoredRegexp` lines of `.clang-tidy`
+   (Variable, LocalVariable, Parameter, PublicMember, PrivateMember, ProtectedMember,
+   LocalConstant), and `tools/lint.sh` fails if the two are out of sync. Physics names were not
+   renamed; the 18 non-physics names found (all locals) were: see §6.
 7. **Accessors** *(run 2, MS-Q2)*: the guide lets accessors and mutators be named like variables.
    Here an accessor is a const method that returns a property or a part of the object without
    side effects, possibly selected by an index or key (`num_orbits()`, `orbit(i)`, `channel(c)`,
@@ -248,3 +258,21 @@ functions over about 40 lines are split, long inline functions in headers move t
 inline), imperative function comments become descriptive; one commit per item, bitwise-identical
 results, `tools/ci.sh` after each. Header guards outside `src/` stay as they are (MS-Q3). The
 license line is `GPL-3.0-only` since the interview (D46).
+
+### Physics-symbol list (run 3, D50, MS-Q1)
+
+The ignore pattern that accepted any name containing a capital was replaced by the curated list of
+exception 6 (§3). Removing the exemption flagged 215 distinct variable, parameter and member
+names (not counting `kName` constants); 197 are physics notation (159 distinct whole parts after
+splitting at `_`, in `tools/physics_symbols.txt`); 18 were not and were renamed in one commit (locals only, no behavior change): `bigA`/`bigB`/`bigC`
+-> `A_big`/`B_big`/`C_big`, `chiY` -> `chi_Y`, `etaME` -> `eta_me`, `hEta`/`hZ` -> `h_eta`/`h_Z`
+(the names `factorized.h` documents), `mOm` -> `neg_Om`, `MEs` -> `me_sum`, `Acopy` -> `A_copy`,
+`Zfast`/`Zok`/`Zbad`/`Zswap`/`Zwrong`/`Zwrong2` -> `Z_fast`/..., `Cbad` -> `C_bad`, and the lambda
+local `busy_` -> `busy`. Borderline, kept as symbols: the one-letter-prefixed forms `iJ`, `nA`,
+`tJ`, `dZ`, ... (index, number, twice, change of a symbol) and the labelled matrices `Hh`, `Fk`,
+`Ct`, `EB`, `Lam`, `PL`, `Tde`, which are physics notation of the formulas they implement. No
+other camelCase names exist in variables, parameters or members (public API methods and types are
+checked by the other naming kinds). For the structural pass (MS2): `Jbig` could be `J_big`.
+The method allowlist of `.clang-tidy` gained 12 accessors that run-3 code added without a clang-tidy
+run (`flowing_operator`, `num_omegas`, `num_gathers`, `num_operators`, `is_magnus`,
+`magnus_solver`, `three_body_context`, `chi1`, `chia`, `row`, `mutex`, `ws`).
