@@ -245,6 +245,8 @@ first column of this table and compares it with the keys of a real run, so the t
 | `imsrg.perturbative_triples` | object | `imsrg.perturbative_triples = true` | the perturbative-triples correction after stage 1 (imsrg++ `Perturbative triples:` line). *(added in version 2)* |
 | `imsrg.perturbative_triples.de` | number | with `imsrg.perturbative_triples` | the energy correction dE, MeV. |
 | `imsrg.perturbative_triples.e0_plus_de` | number | with `imsrg.perturbative_triples` | E0 of H(s) after stage 1 plus dE (not the E0 after stage 2). |
+| `imsrg.perturbative_triples.kept_kets` | integer | with `imsrg.perturbative_triples` | 3B kets the triples use that pass the dE3max / OccNat3 cuts (hhh and ppp triples of the channels with an hhh triple). |
+| `imsrg.perturbative_triples.total_kets` | integer | with `imsrg.perturbative_triples` | The same kets before the cuts. |
 | `operators` | object | always | transformed operators by canonical name (empty if none requested). |
 | `operators.<name>` | object | per operator | one entry per requested operator. |
 | `operators.<name>.reference` | number | per operator | zero-body part before the flow (HF basis, normal ordered). |

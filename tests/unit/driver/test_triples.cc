@@ -100,7 +100,7 @@ Json RunHe4Triples(const std::string& tag, const std::string& imsrg3) {
 
 // imsrg3.occ_nat3_cut with the perturbative triples (C13): the MBPT(2)
 // natural occupations feed the cut. A tiny cut keeps every ket and must
-// reproduce the uncut run bitwise (the cut is a pure filter); 1e-9 drops
+// reproduce the uncut run (the cut is a pure filter); 1e-9 drops
 // kets (1e-5 dropped all of them) and changes dE.
 TEST(Triples, OccNat3Cut_He4_Emax2) {
   if (!std::filesystem::exists(DataFile(TwoBodyName())))
@@ -123,7 +123,9 @@ TEST(Triples, OccNat3Cut_He4_Emax2) {
       static_cast<long long>(cut["total_kets"].number));
   EXPECT_EQ(k0, tot);
   EXPECT_EQ(k1, k0);
-  EXPECT_EQ(de1, de0);  // bitwise
+  // Same kets in the same order; the sums differ only by thread-scheduling
+  // rounding (measured 1.4e-17).
+  EXPECT_NEAR(de1, de0, 1.0e-14);
   EXPECT_LT(k2, k0);
   EXPECT_GT(k2, 0);
   EXPECT_NE(de2, de0);
