@@ -6,6 +6,7 @@
 //
 //   commutator_bench --emax N --reps R [--reference O16] [--seed S]
 //                    [--checksum] [--only-full]
+//   commutator_bench --model-mpi
 //
 // Times every `commutator::terms::` function and the full `Commutator()` on
 // random scalar two-body operators (X anti-Hermitian, Y Hermitian), after one
@@ -16,7 +17,10 @@
 // the same table. `--checksum` prints an FNV-1a hash of the bytes of [X, Y]
 // (zero-, one- and two-body parts) for X and Y anti-Hermitian/Hermitian and
 // for X general, so optimizations can be checked for bitwise identical
-// results; `--only-full` times only the full commutator.
+// results; `--only-full` times only the full commutator. `--model-mpi` is a
+// count-only cost model of the MPI work distribution (M12b): for emax 8, 10 and
+// 12 it builds the model space only (no operators, no Workspace) and prints the
+// work items' load imbalance on several rank counts.
 
 #include <chrono>
 #include <cinttypes>
@@ -32,7 +36,9 @@
 
 #include "imsrg/base/types.h"
 #include "imsrg/basis/model_space.h"
+#include "imsrg/comm/ownership_map.h"
 #include "imsrg/commutator/commutator.h"
+#include "imsrg/commutator/detail/work_items.h"
 #include "imsrg/commutator/detail/workspace_impl.h"
 #include "imsrg/commutator/options.h"
 #include "imsrg/commutator/workspace.h"
@@ -111,6 +117,78 @@ std::uint64_t Checksum(const op::Operator& z) {
   return h;
 }
 
+/// Sum of `cost`.
+double Sum(const std::vector<double>& cost) {
+  double t = 0.0;
+  for (const double c : cost) t += c;
+  return t;
+}
+
+/// Largest entry of `cost` as a fraction of its sum.
+double LargestShare(const std::vector<double>& cost) {
+  double mx = 0.0;
+  for (const double c : cost) mx = c > mx ? c : mx;
+  const double t = Sum(cost);
+  return t > 0.0 ? mx / t : 0.0;
+}
+
+/// LPT imbalance (max / mean - 1) of `cost` on `ranks` ranks, in percent.
+double ImbalancePercent(const std::vector<double>& cost, int ranks) {
+  return 100.0 * imsrg::comm::OwnershipMap::Greedy(cost, ranks).Imbalance();
+}
+
+/// Prints "name  sum  largest share  imbalance on each rank count".
+void PrintTermRow(const char* name, const std::vector<double>& cost,
+                  const int* ranks, int num_ranks) {
+  std::printf("  %-26s sum %.3e  largest %5.1f %%  imbalance %%:", name,
+              Sum(cost), 100.0 * LargestShare(cost));
+  for (int i = 0; i < num_ranks; ++i)
+    std::printf(" %d:%.1f", ranks[i], ImbalancePercent(cost, ranks[i]));
+  std::printf("\n");
+}
+
+/// The count-only cost model of one emax: channel statistics, ladder with the
+/// plan's weight 2 N^3 and the implementation's 2 N^2 (k_pp + k_hh), the
+/// ladder with row blocks, comm122 and the particle-hole term.
+void ModelMpiRow(int emax) {
+  namespace wi = imsrg::commutator::detail;
+  constexpr int kRanks[] = {2, 4, 22, 64, 256};
+  const auto ms = imsrg::basis::ModelSpace::FromNames(
+      imsrg::basis::BasisTruncation{emax}, 16.0, "O16", "O16");
+  const wi::WorkSizes s = wi::ComputeWorkSizes(*ms);
+  std::int32_t max_n = 0;
+  std::size_t nonempty = 0;
+  double z2 = 0.0;
+  std::vector<double> plan_cost;
+  for (const std::int32_t n : s.num_kets) {
+    max_n = n > max_n ? n : max_n;
+    nonempty += n > 0 ? 1 : 0;
+    z2 += static_cast<double>(n) * n;
+    plan_cost.push_back(2.0 * n * n * n);
+  }
+  std::printf(
+      "emax %d: %zu two-body channels (%zu non-empty), max N %d, Z2 "
+      "%.2f GB\n",
+      emax, s.num_kets.size(), nonempty, static_cast<int>(max_n), z2 * 8.0e-9);
+  PrintTermRow("ladder, plan 2 N^3", plan_cost, kRanks, 5);
+  PrintTermRow("ladder, 2 N^2 (kpp+khh)", wi::LadderWorkItems(s, 1).cost,
+               kRanks, 5);
+  std::printf(
+      "  ladder with row blocks (implementation weight), imbalance %%:");
+  for (const int r : kRanks)
+    std::printf(" %d:%.1f", r,
+                ImbalancePercent(wi::LadderWorkItems(s, r).cost, r));
+  std::printf("\n");
+  PrintTermRow("comm122 (whole channels)", wi::Comm122WorkItems(s).cost, kRanks,
+               5);
+  PrintTermRow("ph 4 Ncc^2 nk (whole)", wi::PhWorkItems(s).cost, kRanks, 5);
+}
+
+/// Runs `ModelMpiRow` for emax 8, 10 and 12.
+void ModelMpi() {
+  for (const int emax : {8, 10, 12}) ModelMpiRow(emax);
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -120,6 +198,7 @@ int main(int argc, char** argv) {
   std::string reference = "O16";
   bool checksum = false;
   bool only_full = false;
+  bool model_mpi = false;
   imsrg::exec::Runtime runtime(argc, argv);
   for (int i = 1; i < argc; ++i) {
     const std::string a = argv[i];
@@ -136,14 +215,21 @@ int main(int argc, char** argv) {
       checksum = true;
     } else if (a == "--only-full") {
       only_full = true;
+    } else if (a == "--model-mpi") {
+      model_mpi = true;
     } else {
-      std::fprintf(stderr,
-                   "usage: commutator_bench --emax N --reps R [--reference "
-                   "O16] [--seed S] [--checksum] [--only-full]\n");
+      std::fprintf(
+          stderr,
+          "usage: commutator_bench --emax N --reps R [--reference "
+          "O16] [--seed S] [--checksum] [--only-full] | --model-mpi\n");
       return 2;
     }
   }
   if (reps < 1) return 2;
+  if (model_mpi) {
+    ModelMpi();
+    return 0;
+  }
 
   const auto ms = imsrg::basis::ModelSpace::FromNames(
       imsrg::basis::BasisTruncation{emax}, 16.0, reference, reference);
