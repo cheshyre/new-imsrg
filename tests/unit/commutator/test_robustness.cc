@@ -14,10 +14,12 @@
 #include <gtest/gtest.h>
 
 #include "imsrg/base/error.h"
+#include "imsrg/basis/three_body_channels.h"
 #include "imsrg/commutator/commutator.h"
 #include "imsrg/commutator/detail/workspace_impl.h"
 #include "imsrg/commutator_ref/commutator_ref.h"
 #include "imsrg/operator/arithmetic.h"
+#include "imsrg/operator/norms.h"
 #include "tests/support/commutator_test_support.h"
 #include "tests/unit/commutator/commutator_test_cases.h"
 
@@ -27,7 +29,9 @@ namespace {
 using commutator::CommutatorOptions;
 using commutator::Term;
 using commutator::TermMask;
+using commutator::ThreeBodyContextMode;
 using commutator::Workspace;
+using commutator::WorkspaceOptions;
 using op::Operator;
 using op::OperatorSpec;
 
@@ -264,6 +268,58 @@ TEST(commutator_robustness, ladder_direct_channels) {
              static_cast<std::int64_t>(pp.count_host[ch]);
     return t;
   }());
+}
+
+// WorkspaceOptions::three_body_context: kSkip builds no IMSRG(3) tables, an
+// IMSRG(3) commutator then throws until BuildThreeBodyContext() has run, and
+// the built workspace gives the bitwise result of a kAuto workspace. The
+// default is kAuto.
+TEST(commutator_robustness, three_body_context_skip_then_build) {
+  const auto ms2 = imsrg::testing::MakeModelSpace(2, "He4");
+  const auto ms3 = ms2->WithThreeBody(basis::ThreeBodyCuts{.e3max = 3});
+  CommutatorOptions n7;
+  n7.terms = TermMask::Imsrg3N7();
+  const Operator x =
+      imsrg::testing::RandomOperator(ms3, Hermiticity::kAntiHermitian, 801, 2);
+  const Operator y =
+      imsrg::testing::RandomOperator(ms3, Hermiticity::kHermitian, 802, 2);
+
+  EXPECT_EQ(WorkspaceOptions{}.three_body_context, ThreeBodyContextMode::kAuto);
+  Workspace auto_ws(ms3);
+  ASSERT_NE(auto_ws.three_body_context(), nullptr);
+  Operator z_auto;
+  Commutator(x, y, z_auto, n7, auto_ws);
+  ASSERT_GT(op::ThreeBodyNorm(z_auto), 0.0);
+
+  Workspace skip(
+      ms3, WorkspaceOptions{.three_body_context = ThreeBodyContextMode::kSkip});
+  EXPECT_EQ(skip.three_body_context(), nullptr);
+  Operator z_skip;
+  EXPECT_THROW(Commutator(x, y, z_skip, n7, skip), InputError);
+
+  skip.BuildThreeBodyContext();
+  const auto* ctx = skip.three_body_context();
+  ASSERT_NE(ctx, nullptr);
+  Operator z_built;
+  Commutator(x, y, z_built, n7, skip);
+  EXPECT_EQ(imsrg::testing::RelativeDeviation(z_built, z_auto), 0.0);
+
+  // A second build keeps the context built by the first.
+  skip.BuildThreeBodyContext();
+  EXPECT_EQ(skip.three_body_context(), ctx);
+}
+
+// BuildThreeBodyContext() needs a three-body space; a kAuto workspace on an
+// IMSRG(2) model space has no context and the build throws.
+TEST(commutator_robustness, three_body_context_needs_three_body_space) {
+  const auto ms2 = imsrg::testing::MakeModelSpace(2, "He4");
+  Workspace plain(ms2);
+  EXPECT_EQ(plain.three_body_context(), nullptr);
+  EXPECT_THROW(plain.BuildThreeBodyContext(), InputError);
+  Workspace skip(
+      ms2, WorkspaceOptions{.three_body_context = ThreeBodyContextMode::kSkip});
+  EXPECT_EQ(skip.three_body_context(), nullptr);
+  EXPECT_THROW(skip.BuildThreeBodyContext(), InputError);
 }
 
 }  // namespace

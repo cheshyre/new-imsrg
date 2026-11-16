@@ -86,7 +86,9 @@ void CheckTermSet(const op::Operator& X, const op::Operator& Y,
     if (ws.three_body_context() == nullptr)
       throw InputError(
           "commutator: the IMSRG(3) terms need a workspace on a model space "
-          "with a three-body space (ModelSpace::WithThreeBody)");
+          "with a three-body space (ModelSpace::WithThreeBody), or a workspace "
+          "built with WorkspaceOptions::three_body_context = kSkip: call "
+          "Workspace::BuildThreeBodyContext() first");
   } else if (X.three_body().has_value() || Y.three_body().has_value()) {
     // Refuse three-body operands instead of silently dropping them.
     throw NotImplementedError(

@@ -19,6 +19,19 @@ namespace imsrg::commutator {
 
 class ThreeBodyContext;
 
+/// Whether the constructor of a `Workspace` builds the IMSRG(3) tables
+/// (`ThreeBodyContext`).
+enum class ThreeBodyContextMode {
+  /// Build the context iff the model space has a three-body space
+  /// (`ModelSpace::WithThreeBody`). The default; IMSRG(2) users on a model
+  /// space with a three-body space pay for tables they do not use.
+  kAuto,
+  /// Never build it in the constructor. The context is then built on demand
+  /// by `Workspace::BuildThreeBodyContext()`; until then the IMSRG(3) terms
+  /// are refused with `InputError`.
+  kSkip,
+};
+
 /// Construction options of a `Workspace`.
 struct WorkspaceOptions {
   /// The ranks that share the commutator work (design/12 section 6, D14 phase
@@ -27,6 +40,12 @@ struct WorkspaceOptions {
   /// rank's share, which `Commutator()` combines (a collective over `comm`).
   /// The default, the serial communicator, distributes nothing.
   comm::Communicator comm;
+
+  /// Whether the constructor builds the three-body context (see
+  /// `ThreeBodyContextMode`). The default, `kAuto`, is the behaviour without
+  /// this field. With `kSkip`, call `Workspace::BuildThreeBodyContext()`
+  /// before any IMSRG(3) term.
+  ThreeBodyContextMode three_body_context = ThreeBodyContextMode::kAuto;
 };
 
 /// Everything the IMSRG(2) kernels need besides X, Y and Z, built once per
@@ -88,12 +107,27 @@ class Workspace {
   /// The communicator of `WorkspaceOptions::comm` (serial by default).
   const comm::Communicator& comm() const noexcept { return comm_; }
 
-  /// The tables of the IMSRG(3) terms (`ThreeBodyContext`, three_body.h),
-  /// built by the constructor iff the model space has a three-body space
-  /// (`ModelSpace::WithThreeBody`); null otherwise.
+  /// The tables of the IMSRG(3) terms (`ThreeBodyContext`, three_body.h).
+  /// Built by the constructor iff `WorkspaceOptions::three_body_context` is
+  /// `kAuto` and the model space has a three-body space, or later by
+  /// `BuildThreeBodyContext()`; null otherwise.
   const ThreeBodyContext* three_body_context() const noexcept {
     return three_body_.get();
   }
+
+  /// Builds the IMSRG(3) tables (`three_body_context()`) on this workspace's
+  /// model space. Use it after a `kSkip` construction, once an IMSRG(3)
+  /// commutator is needed; a no-op if the context is already built.
+  /// Preconditions: the model space has a three-body space; the workspace is
+  /// not in use by another thread. Cost: the construction of
+  /// `ThreeBodyContext` (its six-j and index tables, of the order of the
+  /// construction of a kAuto workspace on this model space); it allocates and
+  /// runs no commutator. Explicit by design (design/00 D10): no lazy cache is
+  /// built inside `Commutator()`.
+  /// Not thread-safe: the call changes the workspace, so it must not run
+  /// concurrently with any other member function on the same object.
+  /// @throws InputError if the model space has no three-body space.
+  void BuildThreeBodyContext();
 
   /// Internal data of the kernels (defined in `detail/workspace_impl.h`, not a
   /// public API).
