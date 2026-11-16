@@ -157,11 +157,19 @@ communication vs 210 s compute per step at 22 ranks, 1.3 s vs 18 s at 256; not y
 one node more ranks at fixed ranks x threads are slower (section "Result").
 
 **Next steps, in order.**
-1. ph and comm122 row panels (M12b-Q3, Q18; the 256-rank limit): each rank computes the W rows
-   of its panel and the transposed panel that the combine `W -/+ W^T` needs (about 2x the
-   panel's GEMM, no communication), then the inverse mask per (J', row) (review note m6); the
-   same cut with capacities then balances all three terms. Recalibrate w_ph and w_122 on an
-   idle machine (they were measured at load 12-50).
+1. ph and comm122 row panels (M12b-Q3, Q18; the 256-rank limit). Design sketch for the ph term
+   (`kernels/particle_hole.cc`): per cc channel c, W = XK YK and W' = XK YK' (n x n each, GEMMs
+   n x nk x n), then the combine w[a,b] = W[a,b] - hXhY W[b,a] and w[a,n+b] = hY phi_b (W'[a,n+b] +
+   W'[b,n+a]); the inverse reads w by (row = bra cc ket, column). A rank that owns rows [r0, r1)
+   of c computes the row panels W[r0:r1, :], W'[r0:r1, :] and the column panels W[:, r0:r1],
+   W'[:, r0:r1] (4 GEMMs of p x nk x n: twice the flops of the whole channel for split channels
+   only, no communication), so it can form w for its rows; XK and YK of a split channel are filled
+   completely (O(n nk), small). The inverse mask `owned[c]` becomes a per-channel row range
+   [lo_c, hi_c) tested on the bra index in `CcValue`. Items: the global sequence of cc rows (row
+   cost 4 n nk unsplit, 8 n nk split), cut with the same capacities as the ladder
+   (`LadderWorkItems(sizes, capacity)`), at most two partial channels per rank, the rest whole.
+   comm122 rows split like the ladder (rows of Z2 from the lifted data). Recalibrate w_ph and
+   w_122 on an idle machine (they were measured at load 12-50).
 2. Review note M2 before D9/D10: simulate the lockstep round schedule (round time = slowest
    rank, summed over rounds) in D12 / `n7_bench --model-mpi`; cut batches by cost, not bytes;
    calibrate line weights on measured per-batch times (C14's model); exchange `TransposeOut` once
