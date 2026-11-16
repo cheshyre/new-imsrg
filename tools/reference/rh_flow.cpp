@@ -165,7 +165,7 @@ int cmd_flow(const Args& a) {
     norm_omega_gathered = solver.Omega[solver.Omega.size() - 2].Norm();
     // D48 (same line as the D35 patch of IMSRGSolver::Solve): H(s) := H_saved = e^Omega H_0 e^-Omega with
     // the gathered Omega, so E0 and every transformed operator come from one Omega.
-    solver.FlowingOps[0] = solver.H_saved;
+    if (!diverged) solver.FlowingOps[0] = solver.H_saved;  // not after a divergence, as the patch
   }
 
   const bool triples = a.flag("perturbative-triples");

@@ -14,7 +14,7 @@
 #   3. (D48) IMSRGSolver::Solve: after the final GatherOmega of the hunter-gatherer, H(s) :=
 #      H_saved = exp(Omega_gathered) H_0 exp(-Omega_gathered), so E0 and every transformed operator
 #      come from one Omega and a second stage starts from it (imsrg++ left H(s) at the last hunter
-#      step, inconsistent with the gathered Omega by up to tens of keV). refharness (rh_flow.cpp)
+#      step, inconsistent with the gathered Omega by up to tens of keV); not after a divergence. refharness (rh_flow.cpp)
 #      repeats this line after its own final GatherOmega.
 #   4. (D47) imsrg++.cc: stage 2 integrates [s1, s1 + smax] for every method (`smax += s`), instead
 #      of doubling smax for Magnus only (which left flow_RK4 stage 2 empty after a stage 1 that
@@ -52,13 +52,15 @@
   Operator Rn2_corrected_Op(ModelSpace& modelspace, int A, int Z)
 --- a/src/IMSRGSolver.cc
 +++ b/src/IMSRGSolver.cc
-@@ -236,6 +236,9 @@
+@@ -236,6 +236,11 @@
    if (hunter_gatherer)
    {
      GatherOmega();
 +    // D48: H(s) becomes the rebuilt H_saved = exp(Omega) H_0 exp(-Omega) with the gathered Omega
-+    // (imsrg++ leaves H(s) as the last hunter step produced it).
-+    FlowingOps[0] = H_saved;
++    // (imsrg++ leaves H(s) as the last hunter step produced it). Not after a divergence (the
++    // guard of Solve_magnus_euler), which keeps its marker.
++    if (not (Eta.Norm() > 1e12 or std::abs(Elast) > 1e9))
++      FlowingOps[0] = H_saved;
    }
  }
  
