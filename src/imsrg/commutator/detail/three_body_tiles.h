@@ -59,10 +59,6 @@ struct Space3View {
   const std::int64_t* ch_row_offset = nullptr;    ///< Flat row of local row 0.
   const std::int32_t* ch_triple_begin = nullptr;  ///< First triple.
   const std::int32_t* ch_triple_end = nullptr;    ///< One past the last.
-  /// Offsets of the packed lower-triangle blocks (num_channels + 1).
-  const std::int64_t* ch_packed_offset = nullptr;
-  /// Offsets of the dense column-major blocks (num_channels + 1).
-  const std::int64_t* ch_dense_offset = nullptr;
   const std::int32_t* tr_a = nullptr;  ///< Orbits a <= b <= c per triple.
   const std::int32_t* tr_b = nullptr;
   const std::int32_t* tr_c = nullptr;
@@ -183,6 +179,10 @@ struct TileViews {
   const double* x2 = nullptr;  ///< Two-body data of X (op::TwoBody layout).
   const double* y2 = nullptr;  ///< Two-body data of Y.
   double* z = nullptr;         ///< Output blocks (packed or dense modes).
+  /// Per flat kept row f: element (i, j) of channel ch (flat row f of its
+  /// local row j) is `z[z_row_off[f + j] + i]` (f = `sp.ch_row_offset[ch]`;
+  /// the packed table for kLowerPacked, the dense one for kFullDense).
+  const std::int64_t* z_row_off = nullptr;
   const double* epsilon = nullptr;  ///< One energy per orbit (triples mode).
   /// Strides of the dense 6j table: {j1 j2 J12; j3 J J23} is at c1 i1 + c2 i2
   /// + c3 J12 + c4 i3 + c5 iJ + J23 with i = (2j - 1) / 2, iJ = (2J - 1) / 2.

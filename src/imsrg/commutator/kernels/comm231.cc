@@ -88,7 +88,7 @@ IMSRG_INLINE_FUNCTION double Comm231Channel(const detail::N7Views& v, int ch2,
 void Comm231ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                const ThreeBodyContext& ctx) {
   const detail::N7Views v = detail::PrepareN7("Comm231ss", X, Y, Z, ctx);
-  if (v.x3.data == nullptr && v.y3.data == nullptr) return;
+  if (v.x3.local == nullptr && v.y3.local == nullptr) return;
   const exec::Index norb = v.norb;
   const exec::Index nch = v.x2.tb.num_channels;
   if (norb == 0 || nch == 0) return;
