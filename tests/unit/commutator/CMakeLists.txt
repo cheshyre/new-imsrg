@@ -40,3 +40,13 @@ foreach(_t n7 n7_133_132 n7_231_331 n7_232 n7_full)
   target_compile_definitions(commutator_${_t} PRIVATE
     IMSRG_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/tests/golden")
 endforeach()
+
+# The distributed commutator on real MPI ranks (M12b phase 1, D3): one source,
+# two rank counts; the shared MPI main provides the Kokkos runtime.
+foreach(_ranks 2 4)
+  imsrg_add_test(NAME commutator_mpi_${_ranks}ranks
+    SOURCES test_mpi_commutator.cc ${PROJECT_SOURCE_DIR}/tests/support/mpi_test_main.cc
+            ${_imsrg_comm_support} ${_imsrg_n7_support}
+    DEPS commutator commutator_ref operator flow comm
+    LABELS mpi MPI_RANKS ${_ranks} NO_GTEST_MAIN TIMEOUT 600)
+endforeach()
