@@ -195,9 +195,9 @@ TEST(commutator_ref_factorized, rejects_unsupported_operands) {
                imsrg::NotImplementedError);
   EXPECT_THROW(cr::FactorizedDoubleCommutator(anti_eta, nonherm, Z),
                imsrg::NotImplementedError);
-  Operator Zbad(
+  Operator Z_bad(
       ms, imsrg::op::OperatorSpec::Scalar(2, Hermiticity::kAntiHermitian));
-  EXPECT_THROW(cr::FactorizedDoubleCommutator(anti_eta, gamma, Zbad),
+  EXPECT_THROW(cr::FactorizedDoubleCommutator(anti_eta, gamma, Z_bad),
                imsrg::InvariantError);
 }
 

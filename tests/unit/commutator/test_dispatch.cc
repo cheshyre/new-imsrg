@@ -166,9 +166,9 @@ TEST(commutator_dispatch, full_commutator_matches_reference_and_properties) {
       const Operator Z = commutator::Commutator(X, Y, CommutatorOptions{}, ws);
       const Operator Zref = commutator_ref::Commutator(X, Y);
       const double dref = imsrg::testing::RelativeDeviation(Z, Zref);
-      Operator Zswap = commutator::Commutator(Y, X, CommutatorOptions{}, ws);
-      Zswap *= -1.0;
-      const double danti = imsrg::testing::RelativeDeviation(Zswap, Z);
+      Operator Z_swap = commutator::Commutator(Y, X, CommutatorOptions{}, ws);
+      Z_swap *= -1.0;
+      const double danti = imsrg::testing::RelativeDeviation(Z_swap, Z);
       const double dherm = HermiticityViolation(Z);
       EXPECT_LE(dref, commutator_test::kTol) << sc.label << " " << hp.label;
       EXPECT_LE(danti, 1.0e-12) << sc.label << " " << hp.label;

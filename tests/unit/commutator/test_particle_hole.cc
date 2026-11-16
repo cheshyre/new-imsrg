@@ -87,12 +87,12 @@ TEST(commutator_particle_hole, Timing) {
               1.0e3 * std::chrono::duration<double>(t1 - t0).count() / 20.0);
   // The term accumulates into Z, so compare a single fresh call with the
   // reference.
-  Operator Zfast(ms, commutator::CommutatorSpec(A.spec(), H.spec()));
+  Operator Z_fast(ms, commutator::CommutatorSpec(A.spec(), H.spec()));
   Operator Zref(ms, commutator::CommutatorSpec(A.spec(), H.spec()));
   const Operator zero(ms, commutator::CommutatorSpec(A.spec(), H.spec()));
-  commutator::terms::Comm222Phss(A, H, Zfast, ws);
+  commutator::terms::Comm222Phss(A, H, Z_fast, ws);
   commutator_ref::Comm222Phss(A, H, Zref);
-  const double dev = RelativeDeviation(Zfast, Zref);
+  const double dev = RelativeDeviation(Z_fast, Zref);
   const double mag = RelativeDeviation(Zref, zero);
   std::printf("[timing] emax 4 fast-vs-ref: %.3e (reference magnitude %.3e)\n",
               dev, mag);

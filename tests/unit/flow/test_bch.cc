@@ -206,12 +206,12 @@ TEST(flow_bch, invertibility) {
       ms, OperatorSpec::Scalar(2, Hermiticity::kHermitian), ro);
   op::Scale(H, 5.0 / op::Norm(H));
   const Operator Om = RandOp(ms, Hermiticity::kAntiHermitian, 22, 2, 0.1);
-  const Operator mOm = -Om;
+  const Operator neg_Om = -Om;
   BchReport r1, r2;
   const Operator Z =
       flow::BchTransform(H, Om, BchOptions{}, CommutatorOptions{}, ws, &r1);
   const Operator Hb =
-      flow::BchTransform(Z, mOm, BchOptions{}, CommutatorOptions{}, ws, &r2);
+      flow::BchTransform(Z, neg_Om, BchOptions{}, CommutatorOptions{}, ws, &r2);
   // The truncated commutator is bilinear, so exp(ad_Om) exp(-ad_Om) = 1 exactly
   // in the limit; what remains is the series truncation: each pass stops once
   // ||nested_i|| < eps0 (i+1)!, with eps0 = ||X|| e^{-2||Om||} thr / (2||Om||),

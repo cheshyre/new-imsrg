@@ -14,8 +14,8 @@
 //  (2) like the rest of commutator_ref, EVERY stored element of Z is computed
 //      directly (all (p, q) of each one-body channel, both triangles of each
 //      two-body block) instead of computing q <= p / ibra <= iket and
-//      mirroring with hZ; the formulas are hZ-consistent, so the results agree
-//      with imsrg++ to round-off. The same holds for the one-body
+//      mirroring with h_Z; the formulas are h_Z-consistent, so the results
+//      agree with imsrg++ to round-off. The same holds for the one-body
 //      intermediates, which are computed for all (d, e);
 //  (3) the ket loops of the 232 term run over the one-body channel of the
 //      orbit (imsrg++ uses Eta's channels; identical for scalars);
@@ -163,8 +163,8 @@ void Factorized231Chi1b(const Operator& eta, const Operator& gamma,
   int h_gamma = 0;
   CheckOperands(eta, gamma, Z, h_gamma);
   if (!eta.two_body().allocated() || !gamma.two_body().allocated()) return;
-  const int hEta = -1;
-  const int hZ = h_gamma;
+  const int h_eta = -1;
+  const int h_Z = h_gamma;
   const int n = Z.model_space().num_orbits();
   const Occupations occ(Z);
   const auto& chans = Z.model_space().two_body();
@@ -259,11 +259,11 @@ void Factorized231Chi1b(const Operator& eta, const Operator& gamma,
                 ((1.0 - occ[a]) * (1.0 - occ[e]) * occ[b] * occ[cc] -
                  (1.0 - occ[b]) * (1.0 - occ[cc]) * occ[a] * occ[e]);
             if (occfactor == 0.0) continue;
-            const double MEs = (2 * J0 + 1) * occfactor *
-                               Tbme(eta, J0, b, cc, a, e) *
-                               Tbme(gamma, J0, a, d, b, cc);
-            eta_de += MEs;
-            if (b != cc) eta_de += MEs;
+            const double me_sum = (2 * J0 + 1) * occfactor *
+                                  Tbme(eta, J0, b, cc, a, e) *
+                                  Tbme(gamma, J0, a, d, b, cc);
+            eta_de += me_sum;
+            if (b != cc) eta_de += me_sum;
           }
         }
       }
@@ -290,9 +290,9 @@ void Factorized231Chi1b(const Operator& eta, const Operator& gamma,
           const int K1min = std::abs(J2Of(Z, e) - jp) / 2;
           const int K1max = (J2Of(Z, e) + jp) / 2;
           for (int J1 = K1min; J1 <= K1max; ++J1) {
-            const double etaME = (2 * J1 + 1) * Tbme(eta, J1, e, p, d, q);
-            zij_a += chi_b(d, e) * etaME;
-            zij_b -= hEta * hZ * chi_b(e, d) * etaME;
+            const double eta_me = (2 * J1 + 1) * Tbme(eta, J1, e, p, d, q);
+            zij_a += chi_b(d, e) * eta_me;
+            zij_b -= h_eta * h_Z * chi_b(e, d) * eta_me;
           }
         }
       }
@@ -313,8 +313,8 @@ void Factorized232Chi1b(const Operator& eta, const Operator& gamma,
       !Z.two_body().allocated()) {
     return;
   }
-  const int hEta = -1;
-  const int hZ = h_gamma;
+  const int h_eta = -1;
+  const int h_Z = h_gamma;
   const int n = Z.model_space().num_orbits();
   const Occupations occ(Z);
 
@@ -330,7 +330,7 @@ void Factorized232Chi1b(const Operator& eta, const Operator& gamma,
     for (const int q : Channel(Z, p)) {
       const int jq = J2Of(Z, q);
       double chi = 0.0;
-      double chiY = 0.0;
+      double chi_Y = 0.0;
       for (int a = 0; a < n; ++a) {
         const int ja = J2Of(Z, a);
         const double nbar_a = 1.0 - occ[a];
@@ -351,7 +351,8 @@ void Factorized232Chi1b(const Operator& eta, const Operator& gamma,
               const double xapij = Tbme(eta, J2, a, p, i, j);
               const double yapij = Tbme(gamma, J2, a, p, i, j);
               chi += 0.5 * occfactor * (2 * J2 + 1) / (jq + 1) * xapij * xijaq;
-              chiY += 0.5 * occfactor * (2 * J2 + 1) / (jq + 1) * yapij * xijaq;
+              chi_Y +=
+                  0.5 * occfactor * (2 * J2 + 1) / (jq + 1) * yapij * xijaq;
             }
           }
           for (int b = 0; b < n; ++b) {
@@ -367,13 +368,14 @@ void Factorized232Chi1b(const Operator& eta, const Operator& gamma,
               const double xipab = Tbme(eta, J2, i, p, a, b);
               const double yipab = Tbme(gamma, J2, i, p, a, b);
               chi += 0.5 * occfactor * (2 * J2 + 1) / (jq + 1) * xipab * xabiq;
-              chiY += 0.5 * occfactor * (2 * J2 + 1) / (jq + 1) * yipab * xabiq;
+              chi_Y +=
+                  0.5 * occfactor * (2 * J2 + 1) / (jq + 1) * yipab * xabiq;
             }
           }
         }
       }
       chi_I(p, q) = chi;
-      chi_II(p, q) = chiY;
+      chi_II(p, q) = chi_Y;
     }
   }
 
@@ -382,11 +384,11 @@ void Factorized232Chi1b(const Operator& eta, const Operator& gamma,
     double z = 0.0;
     for (const int b : Channel(Z, p)) {
       z += chi_I(p, b) * Tbme(gamma, J, b, q, r, s);
-      z -= hEta * hZ * chi_II(b, p) * Tbme(eta, J, b, q, r, s);
+      z -= h_eta * h_Z * chi_II(b, p) * Tbme(eta, J, b, q, r, s);
     }
     for (const int b : Channel(Z, q)) {
       z += chi_I(q, b) * Tbme(gamma, J, p, b, r, s);
-      z -= hEta * hZ * chi_II(b, q) * Tbme(eta, J, p, b, r, s);
+      z -= h_eta * h_Z * chi_II(b, q) * Tbme(eta, J, p, b, r, s);
     }
     for (const int b : Channel(Z, r)) {
       z += Tbme(gamma, J, p, q, b, s) * chi_I(b, r);
