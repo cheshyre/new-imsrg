@@ -25,6 +25,10 @@ struct TriplesOptions {
   double de3max = std::numeric_limits<double>::infinity();
   /// Smallest prod n_i (1 - n_i) of a kept ket; negative = no cut.
   double occnat3_cut = -1.0;
+  /// Combine a split Omega stack in imsrg++'s operand order,
+  /// BchProduct(omega, Omega_n) (an old-code bug, D49 / M10-Q40): only to
+  /// reproduce imsrg++ goldens. Default false = transformation order.
+  bool legacy_omega_order = false;
 };
 
 /// Result of `PerturbativeTriples`.
@@ -40,10 +44,12 @@ struct TriplesResult {
 /// (H = e^Omega_n ... e^Omega_0 H_0 e^-Omega_0 ... e^-Omega_n). A single
 /// Omega is returned unchanged. Preconditions: non-empty stack (else
 /// InvariantError), operators scalar, number conserving, on `workspace`'s model
-/// space. Complexity: (size - 1) BCH products.
+/// space. With `legacy_order`, imsrg++'s BchProduct(omega, Omega_n) instead.
+/// Complexity: (size - 1) BCH products.
 op::Operator CombineOmegaStack(const std::vector<op::Operator>& omegas,
                                const BchOptions& options,
-                               commutator::Workspace& workspace);
+                               commutator::Workspace& workspace,
+                               bool legacy_order = false);
 
 /// dE of the triples for the state of `solver` after `Solve` (imsrg++
 /// `CalculatePerturbativeTriples`):

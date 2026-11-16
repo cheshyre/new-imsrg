@@ -627,6 +627,7 @@ void Run(const RunConfig& config) {
       stages.back().result.reason != flow::StopReason::kDiverged) {
     flow::TriplesOptions to;
     if (config.imsrg3.de3max) to.de3max = *config.imsrg3.de3max;
+    to.legacy_omega_order = config.imsrg3.legacy_omega_order;
     const flow::TriplesResult tr =
         flow::PerturbativeTriples(solver.magnus_solver(), to);
     const double e0_stage1 = solver.hamiltonian().zero_body();

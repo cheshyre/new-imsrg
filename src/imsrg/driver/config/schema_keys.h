@@ -301,6 +301,10 @@ void VisitSchema(Config& c, Visitor&& v) {
   v.Field(KeyInfo{"imsrg3.occ_nat3_cut",
                   "natural-orbital occupation cut on 3-body states", "none"},
           c.imsrg3.occ_nat3_cut);
+  v.Field(KeyInfo{"imsrg3.legacy_omega_order",
+                  "perturbative triples: imsrg++ (buggy) Omega-stack order",
+                  "false"},
+          c.imsrg3.legacy_omega_order);
   // [operators]
   v.Field(
       KeyInfo{"operators.list", "operators transformed with the flow", "[]"},

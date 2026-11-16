@@ -17,12 +17,16 @@ namespace imsrg::flow {
 
 op::Operator CombineOmegaStack(const std::vector<op::Operator>& omegas,
                                const BchOptions& options,
-                               commutator::Workspace& workspace) {
+                               commutator::Workspace& workspace,
+                               bool legacy_order) {
   IMSRG_CHECK(!omegas.empty(), "CombineOmegaStack: empty Omega stack");
   op::Operator omega = omegas.front();
   for (std::size_t n = 1; n < omegas.size(); ++n) {
-    omega = BchProduct(omegas[n], omega, options,
-                       commutator::CommutatorOptions{}, workspace);
+    omega = legacy_order
+                ? BchProduct(omega, omegas[n], options,
+                             commutator::CommutatorOptions{}, workspace)
+                : BchProduct(omegas[n], omega, options,
+                             commutator::CommutatorOptions{}, workspace);
   }
   return omega;
 }
@@ -31,8 +35,9 @@ TriplesResult PerturbativeTriples(MagnusSolver& solver,
                                   const TriplesOptions& options) {
   const std::vector<op::Operator>& omegas = solver.omegas();
   // Transformation order (D49, M10-Q40): not imsrg++'s BchProduct(omega, n).
-  const op::Operator omega = CombineOmegaStack(
-      omegas, solver.bch_options(), solver.workspace());
+  const op::Operator omega =
+      CombineOmegaStack(omegas, solver.bch_options(), solver.workspace(),
+                        options.legacy_omega_order);
 
   BchOptions skip = solver.bch_options();
   skip.skip_first_commutator = true;

@@ -1008,3 +1008,10 @@ the orchestrator uses `O4` and up).
   perturbative triples (IT-8 is a single Omega), so the fix is validated by the BCH-level consistency
   test only, not by an end-to-end imsrg++ comparison (imsrg++ gives the old, inconsistent order).
   Say if a split-flow end-to-end triples test (split vs single Omega energy) is wanted.
+  **Important, contradicts the brief:** IT-8 is NOT unchanged. Its Magnus flows have a split Omega
+  stack (omega_norm_max), and the imsrg++ golden carries the old order: with the fix dE shifts by
+  -3.9e-4 MeV (He4 emax 2) and -2.0e-3 MeV (O16 emax 3), beyond the D19 1e-4 tolerance. **Done
+  (reversible):** new `imsrg3.legacy_omega_order` (default false, new config key, `TriplesOptions::
+  legacy_omega_order`); `driver_triples` reproduces the golden with it at the old tolerances and
+  also runs the default order, logging the shift. Say if the golden should be regenerated from a
+  patched reference instead (then drop the key), or if the key should not exist.

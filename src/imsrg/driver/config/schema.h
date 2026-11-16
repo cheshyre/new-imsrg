@@ -484,6 +484,10 @@ struct Imsrg3Config {
   double threebody_threshold = 0.0;
   std::optional<double> de3max;  ///< none = no energy cut (old default 99)
   std::optional<double> occ_nat3_cut;  ///< none = no cut (old default -1)
+  /// Perturbative triples: combine a split Omega stack in the imsrg++ operand
+  /// order (old-code bug, D49 / M10-Q40) instead of the transformation order.
+  /// Only to reproduce imsrg++ goldens; new key, no legacy name.
+  bool legacy_omega_order = false;
   /// True if any IMSRG(3) evaluation is requested (in the flow or at the end).
   bool active() const noexcept { return in_flow || at_end; }
   friend bool operator==(const Imsrg3Config&, const Imsrg3Config&) = default;
