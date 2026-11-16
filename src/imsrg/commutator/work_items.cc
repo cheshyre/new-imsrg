@@ -7,7 +7,6 @@
 #include "imsrg/commutator/detail/work_items.h"
 
 #include <algorithm>
-#include <cmath>
 #include <cstddef>
 #include <span>
 #include <utility>
@@ -78,22 +77,6 @@ std::int32_t CountPandyaK(const basis::TwoBodyChannels& tb,
     if (np != nq) nk += 2;
   }
   return nk;
-}
-
-/// Number of row blocks of a channel with `rows` rows, per-row cost `unit`
-/// and total cost `cost`, for the block threshold `threshold`.
-std::int32_t NumBlocks(std::int32_t rows, double unit, double cost,
-                       double threshold) {
-  if (!(cost > threshold)) return 1;
-  auto nb = static_cast<std::int64_t>(std::ceil(cost / threshold));
-  nb = std::min<std::int64_t>(nb, rows);
-  // Raise nb until the largest block, ceil(rows / nb) rows, fits (or is one
-  // row): rows_max = floor(threshold / unit) rows fit.
-  const auto rows_max = std::max<std::int64_t>(
-      1, static_cast<std::int64_t>(std::floor(threshold / unit)));
-  const std::int64_t nb_fit =
-      std::min<std::int64_t>((rows + rows_max - 1) / rows_max, rows);
-  return static_cast<std::int32_t>(std::max(nb, nb_fit));
 }
 
 /// Maps the item indices owned by `part` to `items[...]`.
@@ -174,24 +157,49 @@ LadderItems LadderWorkItems(const WorkSizes& sizes, std::int32_t num_parts) {
   auto eligible = [&](std::size_t c) {
     return sizes.num_kets[c] > 0 && sizes.k_pp[c] + sizes.k_hh[c] > 0;
   };
-  double total = 0.0;
-  for (std::size_t c = 0; c < nch; ++c)
-    if (eligible(c)) total += unit_of(c) * sizes.num_kets[c];
-  const double threshold = total / (4.0 * num_parts);
+  // Prefix sums S_i of the row costs over the global row sequence (exact:
+  // integers below 2^53), and the first global row g_c of each channel.
+  std::vector<double> prefix(1, 0.0);
+  std::vector<std::int64_t> first_row(nch, 0);
+  for (std::size_t c = 0; c < nch; ++c) {
+    first_row[c] = static_cast<std::int64_t>(prefix.size()) - 1;
+    if (!eligible(c)) continue;
+    const double unit = unit_of(c);
+    for (std::int32_t j = 0; j < sizes.num_kets[c]; ++j)
+      prefix.push_back(prefix.back() + unit);
+  }
+  const auto num_rows = static_cast<std::int64_t>(prefix.size()) - 1;
+  const double total = prefix.back();
+  // cut[r] = the boundary whose S_i is nearest to r T / P (ties: lower i).
+  std::vector<std::int64_t> cut(static_cast<std::size_t>(num_parts) + 1, 0);
+  cut.back() = num_rows;
+  for (std::int32_t r = 1; r < num_parts; ++r) {
+    const double target = total * r / num_parts;
+    auto it = std::lower_bound(prefix.begin(), prefix.end(), target);
+    auto i = static_cast<std::int64_t>(it - prefix.begin());  // S_i >= target
+    if (i > 0 && target - prefix[static_cast<std::size_t>(i - 1)] <=
+                     prefix[static_cast<std::size_t>(i)] - target)
+      --i;
+    cut[static_cast<std::size_t>(r)] =
+        std::max(i, cut[static_cast<std::size_t>(r - 1)]);
+  }
   LadderItems items;
+  std::int32_t rank = 0;
   for (std::size_t c = 0; c < nch; ++c) {
     if (!eligible(c)) continue;
-    const std::int32_t n = sizes.num_kets[c];
     const double unit = unit_of(c);
-    const std::int32_t nb =
-        num_parts > 1 ? NumBlocks(n, unit, unit * n, threshold) : 1;
-    for (std::int32_t b = 0; b < nb; ++b) {
-      const auto lo =
-          static_cast<std::int32_t>(static_cast<std::int64_t>(b) * n / nb);
-      const auto hi =
-          static_cast<std::int32_t>(static_cast<std::int64_t>(b + 1) * n / nb);
-      items.blocks.push_back({static_cast<std::int32_t>(c), lo, hi});
-      items.cost.push_back(unit * (hi - lo));
+    const std::int64_t g0 = first_row[c];
+    const std::int64_t g1 = g0 + sizes.num_kets[c];
+    for (std::int64_t pos = g0; pos < g1;) {
+      while (cut[static_cast<std::size_t>(rank) + 1] <= pos) ++rank;
+      const std::int64_t hi =
+          std::min(g1, cut[static_cast<std::size_t>(rank) + 1]);
+      items.blocks.push_back({static_cast<std::int32_t>(c),
+                              static_cast<std::int32_t>(pos - g0),
+                              static_cast<std::int32_t>(hi - g0)});
+      items.cost.push_back(unit * static_cast<double>(hi - pos));
+      items.owner.push_back(rank);
+      pos = hi;
     }
   }
   return items;
@@ -231,7 +239,8 @@ WorkAssignment WorkAssignment::Build(const WorkSizes& sizes, std::int32_t part,
   const LadderItems lad = LadderWorkItems(sizes, num_parts);
   const ChannelItems c122 = Comm122WorkItems(sizes);
   const ChannelItems ph = PhWorkItems(sizes);
-  a.ladder_map_ = comm::OwnershipMap::Greedy(lad.cost, num_parts);
+  a.ladder_map_ =
+      comm::OwnershipMap::FromOwners(lad.owner, lad.cost, num_parts);
   a.comm122_map_ = comm::OwnershipMap::Greedy(c122.cost, num_parts);
   a.ph_map_ = comm::OwnershipMap::Greedy(ph.cost, num_parts);
   a.ladder_blocks_ = Owned(a.ladder_map_, part, lad.blocks);
