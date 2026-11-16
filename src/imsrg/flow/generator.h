@@ -61,6 +61,7 @@
 ///   sets Delta = +cutoff, losing the sign of small negative denominators.
 #include <memory>
 #include <optional>
+#include <span>
 #include <vector>
 
 #include "imsrg/base/types.h"
@@ -161,6 +162,8 @@ class Denominators {
   /// +-cutoff with the sign kept (an exact zero gives +cutoff).
   double three_body(OrbitIndex a, OrbitIndex b, OrbitIndex c, OrbitIndex i,
                     OrbitIndex j, OrbitIndex k) const;
+  /// The one-body diagonal f_aa per orbit (MeV), indexed by orbit.
+  std::span<const double> OneBodyDiagonal() const noexcept { return f_diag_; }
   /// The unnormalized J-averaged monopole V-bar_abab (imsrg++
   /// `GetTBMEmonopole(a,b,a,b)`).
   double monopole(OrbitIndex a, OrbitIndex b) const;
