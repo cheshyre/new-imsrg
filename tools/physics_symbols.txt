@@ -113,7 +113,6 @@ KE
 # Angular-momentum and isospin quantum numbers and their ranges
 Jab
 Jbc
-Jbig
 Jin
 Jmax
 Jmin
