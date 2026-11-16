@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-only
 // Copyright 2026 The imsrg authors
 
 #ifndef IMSRG_EXEC_DETAIL_DEVICE_BUFFER_IMPL_H_

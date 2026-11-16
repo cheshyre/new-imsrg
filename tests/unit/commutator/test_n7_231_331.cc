@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-only
 // Copyright 2026 The imsrg authors
 
 // IMSRG(3)-N7 terms comm231ss and comm331ss (imsrg3.h) against the m-scheme

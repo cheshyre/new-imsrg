@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-only
 // Copyright 2026 The imsrg authors
 
 // MP2 / MP3 energies against the imsrg-devel goldens (hf.json EMP2, EMP3_*).

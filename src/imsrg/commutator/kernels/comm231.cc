@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-only
 // Copyright 2026 The imsrg authors
 
 // The N7 term comm231ss, [X2, Y3] + [X3, Y2] -> Z1 (imsrg3.h). Kernel TU.
