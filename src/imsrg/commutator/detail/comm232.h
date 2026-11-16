@@ -9,8 +9,10 @@
 /// imsrg3.h; implementation and conventions in kernels/comm232.cc): the
 /// sorted pair-third tables (built once per `ThreeBodyContext`) and the entry
 /// points used by `terms::Comm232ss` and the tests (design/12 section 4.2:
-/// every kernel phase passes the same tests). Internal to the commutator
-/// module and its tests; no Kokkos.
+/// every kernel phase passes the same tests). The batch kernel
+/// `Comm232Batch` and the row loop `Comm232Rows` are declared with the other
+/// N7 batch kernels in detail/n7_terms.h. Internal to the commutator module
+/// and its tests; no Kokkos.
 
 #include <cstdint>
 #include <type_traits>
@@ -120,20 +122,15 @@ Comm232Tables BuildComm232Tables(const op::PairThirdSpace& pair_third,
 void Comm232ssReference(const op::Operator& X, const op::Operator& Y,
                         op::Operator& Z, const ThreeBodyContext& ctx);
 
-/// comm232ss through the pair-third blocks of the three-body operands (the
-/// path of `terms::Comm232ss`, which passes `kComm232MaxBlockBytes`): the
-/// active rows of W = E B3 E^T, built per call for batches of consecutive
-/// columns (flat sorted states, so a batch may hold several channels or part
-/// of one) whose blocks (one set per operand, two for a non-Hermitian
-/// three-body part) fit `max_block_bytes` together; a batch holds at least
-/// one column, so the budget bounds the scratch unless a single column
-/// (A_ch doubles per set) exceeds it. The element pass runs once per batch,
-/// over the Z2 blocks whose J can reach the batch's 2 J3 range, with the c,
-/// J' and J3 loops clamped to it (same result for any budget up to rounding).
-/// Same contract as `terms::Comm232ss`. Complexity: the block build O(sum
-/// over channels A S nnz(E row)^2) plus, per batch, O(elements in the J range
-/// * norb * (J', J3 in range) * (rows + log S)) (S pair-third states of a
-/// channel, A of them with an active pair).
+/// comm232ss through the pair-third blocks W = E B3 E^T of the three-body
+/// operands: `detail::Comm232Rows` (detail/n7_terms.h) on the whole space
+/// with the batch budget `max_block_bytes` (the H and W blocks of all
+/// operand blocks of one batch; `terms::Comm232ss` passes `kN7BatchBytes`).
+/// A batch holds at least one triple, so the budget bounds the scratch
+/// unless a single triple exceeds it; any budget gives the same result up to
+/// rounding. Same contract as `terms::Comm232ss`. Complexity: per batch the
+/// H/W build (`BuildH`, `BuildW`) plus `Comm232Batch`, i.e. over all batches
+/// O(sum over Z2 elements of the (column, J') pairs that reach them * rows).
 void Comm232ssPairThird(const op::Operator& X, const op::Operator& Y,
                         op::Operator& Z, const ThreeBodyContext& ctx,
                         std::int64_t max_block_bytes);
