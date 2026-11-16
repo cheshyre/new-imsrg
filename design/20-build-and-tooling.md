@@ -146,7 +146,9 @@ As implemented in M0:
   built, `check_layering.py` with its self-test, `clang-format --dry-run --Werror` and cpplint
   (since run 2, D38; it prints every finding and fails on any) on git-tracked C++ files under
   `src/ apps/ tests/ python/ tools/bench/` (never `extern/`, `tools/reference/`,
-  `tests/golden/`). Tests labeled `slow` never run in CI. Each step is timed; the last line is exactly `CI PASS <preset>` or
+  `tests/golden/`), and since 2026-11-16 the `license headers` step (D46: every tracked `.h`/`.cc`
+  of ours carries `SPDX-License-Identifier: GPL-3.0-only` in its first 5 lines). Tests labeled
+  `slow` never run in CI. Each step is timed; the last line is exactly `CI PASS <preset>` or
   `CI FAIL <preset>: <step>` (nonzero exit). `IMSRG_BUILD_DIR` overrides the build tree (default
   `build/<preset>`) so two runs in one checkout do not collide; `IMSRG_CI_JOBS` sets the build
   jobs. Tests get `OMP_NUM_THREADS=4`, `OMP_PROC_BIND=false` unless set, and ctest runs
@@ -299,4 +301,6 @@ OpenMP inside; GPU/MPI builds from source.
 Implemented in M11 phase 1: `IMSRG_BUILD_PYTHON` adds `python/`, which builds `_core` with
 `nanobind_add_module(NB_STATIC)` into `<build>/python/imsrg/` (with the pure-Python files copied
 next to it), so `PYTHONPATH=<build>/python` works. `tools/ci.sh` runs `pytest tests/python` after
-the integration step when the extension exists, and prints a skip message otherwise.
+the integration step when the extension exists, and prints a skip message otherwise. Planned
+(owner, 2026-11-16, D51): the Python step runs with `IMSRG_RESIDENCY=strict`, so the tests and
+examples stay GPU-portable (they call `sync_to_host()` explicitly).

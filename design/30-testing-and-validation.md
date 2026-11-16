@@ -118,7 +118,7 @@ file3e1max=6 file3e2max=12 file3e3max=18`. **Never emax > 6. IMSRG(3) only at em
 | IT-6 | Operator transformation Rp2 (IT-2 setup) | ⟨Rp2⟩ after IMSRG |
 | IT-7 | Valence space with an open-shell reference: `reference=Ne20`, sd-shell, emax 4 (fractional occupations in normal ordering) | `.snt` elements |
 | IT-8 | Perturbative triples, O16, emax 2 and 3, 2N | E0, triples energy |
-| IT-9 | IMSRG(3)-N7 Magnus, He4 and O16, emax 2 (3 under `slow`) | E0 |
+| IT-9 | IMSRG(3)-N7 Magnus, He4 and O16, emax 2 (3 under `slow`) | E0; planned (D49, M10-Q61): ⟨Rp2⟩ from a patched-reference operator golden |
 | IT-10 | IMSRG(3f2) Magnus (owner's recipe, D32: hunter-gatherer, `omega_norm_max` 0.1, 1b intermediates on, 2b off), O16, emax 2 and 3 (golden data from `refharness flow --factorized`, regenerated with the recipe; imsrg++ has no executable switch) | E0 |
 | IT-11 | IT-2 with `mpirun -n 2` and `-n 4` | identical to IT-2 within 1e-10 relative |
 | IT-12 | IT-2 driven through legacy `key=value` arguments vs TOML config | identical results |
@@ -139,8 +139,15 @@ comparison also runs **occasionally at emax 8** (IMSRG(2) only, never in CI, res
 `design/benchmarks/`). Once M12b scales across nodes, single-node speed may fall back to imsrg++
 level. GPU work starts after M12.
 
+**Owner, 2026-11-16 (D52).** Two more benchmark-only exceptions, never in CI and without full
+flows: timing of single IMSRG(3) kernels (Comm223, comm232 tiles) at emax 4–6 with an E3max that
+keeps one operator under about 8 GB (checked first with `--count-only`), and single IMSRG(2)
+commutators at emax 10–12. Process and tolerances stay as in D19/D34/D42 (D53).
+
 **CI budget (D42).** `tools/ci.sh dev-openmp` stays under 5 minutes (139 s on 2026-11-15: unit
-34 s, integration 24 s). Longer tests carry the `slow` label and run before merges that touch
+34 s, integration 24 s; 105 s warm and 192 s from a fresh worktree on 2026-11-16, including the
+`license headers` step of D46). Planned (D51): the Python suite runs under
+`IMSRG_RESIDENCY=strict`. Longer tests carry the `slow` label and run before merges that touch
 numerics.
 
 ## 6. Deviation log (old-code bugs we fixed)
@@ -171,3 +178,12 @@ covers the fixed behaviour.
 | M10-N7-3 | `IMSRG3Commutators.cc:521-552` (`comm231ss`: `d_ed` from `ec`, occnat of c/d from the bra, keep iff product `> cut`), `:289-292` (`comm331ss`: cuts on (a, b, j) only), `comm233_pp_hhss` (cut copy-paste) | dE3max/OccNat3Cut applied inconsistently inside kernels (design/14 section 1) | Kets failing a cut do not exist (D34): every N7 term sums over the same kept space | comm232ss brute force with E3max and dE3max cuts; comm223 kept-space tests; the defaults (no cut) reproduce imsrg++ element by element (`tests/golden/n7`) |
 
 The owner confirmed the fixes M8-1..M8-3 and deviation #1 (double-double Moshinsky) on 2026-11-15 (D36).
+
+**Decided on 2026-11-16, not implemented yet (run 3 adds a row for each when it lands, with the
+validation and the old vs new numbers):** D48 hunter-gatherer H(s) = the H rebuilt with the final
+gathered Omega (`IMSRGSolver.cc` GatherOmega leaves H(s) untouched; measured ΔE0 up to 43 keV;
+the D35 patch of imsrg-devel gets the same change, IT-10 and hunter-gatherer goldens regenerated);
+D47 stage 2 integrates [s1, s1 + smax] for every method (imsrg++: doubled Magnus smax, `flow_RK4`
+to the same smax) and `eta_criterion`/`ode_tolerance` in double (imsrg++ float); D49 the
+three-body denominator floor (`Generator.cc:231-239` has none) and the triples' split-stack order
+(`IMSRGSolver.cc:1186` combines e^{Omega_0} e^{Omega_n}).

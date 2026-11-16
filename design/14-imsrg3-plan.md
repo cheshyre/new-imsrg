@@ -41,6 +41,12 @@ relative, perturbative triples 1e-4 MeV, N7/3f2 E0 1e-3 MeV).
 
 **Production target (owner, D34):** IMSRG(3)-N7 at emax 10–12 on several nodes. Tests stay at
 emax 2 and 3; the layout, its memory per operator and MPI phase 2 must be judged against that target.
+**Refined (owner, 2026-11-16, D45):** E3max 16 without a dE3max cut as the starting point (about
+177 GB per packed layout-A operator at emax 12, about 1.06 TB for the six operators of an N7 step),
+nodes with 256 GB or less (sometimes 100 GB), at most 50 % of a node for 3B operators, many nodes:
+single channels are split across ranks (row-wise, cost-balanced distribution as the baseline), and
+the N7 kernels are tiled over row ranges of distributed blocks. Production also needs
+`occ_nat3_cut` (D49). Timing-only kernel runs at emax 4–6 are allowed (D52).
 
 ### 1.1 The N7 term set (imsrg++ `imsrg3_n7`) and its imsrg++ bugs (inventory, run 2)
 
@@ -84,6 +90,8 @@ imsrg++ IMSRG(3) bugs and quirks (section 1 list, re-checked, plus new findings)
   loop" unless the 6j cache was filled before (they rely on an earlier `comm223ss` or the first
   pass); `refharness comm3` calls `PreCalculateSixJ()` first.
 * NEW: the three-body denominator has no floor and no `denominator_delta` (M10-Q60); copied.
+  **To change (owner, D49):** the sign-keeping floor of D21 is extended to the 3B denominator
+  (no `denominator_delta`); no golden changes, a deviation entry in `30` §6.
 * `comm233_pp_hhss` cut copy-paste and the failing `comm233_phss_tz`: N8 terms, not implemented.
 * The factorized kernels assume an anti-Hermitian eta and apply no 3B truncation: the 3f2 track
   (D32), unchanged.
@@ -99,6 +107,16 @@ pair-third tiles like 223/232; (3) the pair-third tables of comm232ss are rebuil
 belong in the context (M10-Q64); (4) the kernels call Kokkos range/team policies directly (as
 comm223), a candidate for the exec facade (M10-Q65); (5) MPI distribution of the 3B blocks
 (D14 phase 2, M12b).
+**Status after the 2026-11-16 interview:** items (1) and (3) were done by the comm232 follow-up
+47aa8b2 (column tiles split channels, J3 clamped per batch, tables in `ThreeBodyContext`). Run 3
+(D53) continues with: tiling all N7 kernels over **row ranges** of channel blocks, so that a
+row-distributed block (D45) needs no kernel change; (2); `exec::TeamFor`/`TeamReduce` options
+(M10-Q44/Q65); a lazy `ThreeBodyContext` for IMSRG(2)-only use (M10-Q66); per-tile 6j slices and
+a ket cache for `Comm223`, judged with timing-only runs at emax 4–6 (M10-Q41/Q42, D52);
+perturbative triples at emax ≥ 8 (R per tile, no E map, only ppp/hhh blocks, M10-Q46) and the
+split-stack order fix `BchProduct(Omega_n, omega)` (M10-Q40); `occ_nat3_cut` with NAT occupations
+passed into the 3B space (M10-Q62); an IT-9 Rp2 operator golden from the patched reference
+(M10-Q61). Then (5) in M12b phase 2.
 
 ## 2. Step 1: 3B layout benchmark (decide by measurement) *(user)*
 

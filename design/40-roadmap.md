@@ -28,13 +28,25 @@ to one `imsrg-implementer`/`imsrg-mechanic`, without a lead agent.
 | M12b | MPI distribution (D14 phase 1; phase 2 for 3B blocks, evaluating the Hagen–Nam scheme, D40) | M12a | M10 | opus / sonnet |
 | M13 | Plain Makefile, docs site, polishing | M8 | any | haiku / haiku |
 | M14 | GPU builds and tuning (CUDA/HIP; after M12, D40) | M12b | — | opus / sonnet |
-| M15+ | Extensions: tensor operators first, then me3j, Navratil/Miyagi files, dagger, 0νββ, DM (order open); checkpoint/restart and Omega scratch storage; me2jp/me3jp output formats (D39) | M10 | — | opus / sonnet |
+| MS2 | Structural Google-style pass (D50: structs with invariants → classes, unsigned → signed, long functions split, long inline header functions out of line); first in run 3, alone, time-boxed | MS | none (alone) | opus / sonnet, haiku |
+| M15 | Tensor operators (D53): E2 and other electric multipoles, M1, Gamow–Teller/Fermi (ΔTz = ±1), 0νββ (ΔTz = ±2); scalar–tensor commutators, transformation with the Magnus Omega only; validation against the patched imsrg++ build and an m-scheme brute force for tensors | M10, M12b | — | opus / sonnet |
+| M16 | ME1J/ME2JP/ME3JP readers and writers (text, gzip, later binary; `19-mexj-formats.md`), stored Omega with a `transform` task, checkpoint/restart (D54) | M15 | — | opus / sonnet |
+| M17+ | Further extensions: me3j, Navratil/Miyagi files, dagger, DM (order open, D39) | M15 | — | opus / sonnet |
 
 Run 1 (2026-11-11/12) finished M0–M9 and M11 phase 1. **Run-2 order (owner, 2026-11-15, D38/D39):**
 (1) MS, alone, before any other branch; (2) the M8 follow-ups and the tasks of the 2026-11-15
 interview (below); (3) M10, with the IMSRG(3f2) track in parallel with the layout benchmark, then
 perturbative triples → N7; (4) M11 phase 2 and M12a alongside when capacity allows. M12b follows
 M12a; GPU work (M14) starts only after M12. Keep going down the list for as long as the session runs.
+
+Run 2 (2026-11-15/16) finished MS, the M8 follow-ups, M10 (3f2, layout A, triples, N7), M11
+phase 2 and M12a. **Run-3 order (owner, 2026-11-16, D53):** (1) the small interview tasks (D47–D49,
+D51 and their goldens); (2) MS2, alone and time-boxed, with the N7 and MPI work prepared outside the
+repository meanwhile; (3) N7 performance with distribution-ready row tiling, triples at emax ≥ 8
+and `occ_nat3_cut`, in parallel with M12b phase 1; (4) M12b phase 2 (row-wise 3B distribution,
+D45); (5) M15 tensor operators; (6) M16 ME1J/ME2JP/ME3JP with stored Omega and checkpoint/restart.
+M12a follow-ups (emax 10–12 commutator benchmarks allowed, D52) and the Python hooks (D51) are
+filler; M13 last; M14 after M12b (CUDA and HIP compile checks, NVIDIA tuning first).
 
 ## MS — Google C++ style conversion (first task of run 2)
 * Follow `17-code-style.md` §5: tooling, `.h`/`.cc` renames, `#define` guards, license boilerplate,
@@ -149,7 +161,7 @@ M12a; GPU work (M14) starts only after M12. Keep going down the list for as long
   phase 1), then the 3B-block distribution for IMSRG(3) (phase 2), evaluating the row-wise,
   cost-balanced block distribution of Hagen and Nam (Prog. Theor. Phys. Suppl. 196, 102 (2012),
   arXiv:1203.3765) against distribution by channel. Single-node speed may fall back to imsrg++ level
-  once scaled. **Accept**: IT-11 passes; scaling measurements recorded.
+  once scaled. **Accept**: IT-11 passes; scaling measurements recorded. **Target (owner, 2026-11-16, D45):** N7 at emax 10–12 with E3max 16 (no dE3max) on 22–256 nodes of 100–256 GB (3B operators ≤ 50 % of a node); single channels are split across ranks (row-wise, cost-balanced distribution as the baseline, whole channels only as the comparison); accepted by cost model at ≤ 10 % compute and memory imbalance and communication below compute at ~25 GB/s per node (InfiniBand and Slingshot clusters with Slurm).
 * GPU work (M14) starts after M12.
 
 ## M13 — Makefile and docs

@@ -432,7 +432,9 @@ further design decisions (D30–D42 in `00-requirements-and-decisions.md`; repor
   meanwhile:** as written; please confirm the holder list and "or later".
   **Answer (owner, 2026-11-16):** GPL-3.0-only, not "or later"; the holder list stays as written
   (AUTHORS). Every SPDX line becomes `// SPDX-License-Identifier: GPL-3.0-only` (D46, amends
-  D17/D38); still compatible with imsrg++ (GPL-2.0-or-later).
+  D17/D38); still compatible with imsrg++ (GPL-2.0-or-later). Implemented during the interview at
+  the owner's request: `feature/license-gpl3-only` merged into `develop` (6bcca88; `tools/ci.sh
+  dev-openmp` PASS, new step `license headers`).
 * **MS-Q5** (2026-11-15, MS Google style) - Structural items not converted (design/17 section 6):
   inline functions over ~10 lines in headers (device-code lookups, templates, header-only test
   helpers), the 36 structs with member functions, functions over ~40 lines, unsigned types.
@@ -442,7 +444,9 @@ further design decisions (D30–D42 in `00-requirements-and-decisions.md`; repor
   ahead of tensor operators. Structs with member functions that hold invariants become classes,
   unsigned types become signed except sizes and bit patterns, functions over about 40 lines are
   split, long inline functions in headers move to `.cc` files (device-code lookups and templates
-  excepted); results bitwise identical (D50).
+  excepted); results bitwise identical (D50). Placement (owner, same interview): first in run 3,
+  right after the small interview tasks, alone and time-boxed, with the N7 and MPI work prepared
+  outside the repository meanwhile (D53).
 * **O3** (2026-11-15, orchestrator) — **Run 2 started in an app worktree again, not in the main
   checkout (D31 not met).** The desktop app opened the session in
   `.claude/worktrees/imsrg-rewrite-run-2-36094d` (branch `claude/imsrg-rewrite-run-2-36094d`, at
@@ -923,3 +927,39 @@ old/new numbers (D42) (D47).
   **Answer (owner, 2026-11-16):** deferred to the cluster builds (M12b/M14): concurrent
   `GroupedGemm` with OpenBLAS/MKL needs single-threaded calls per item and a determinism check;
   until then they keep the sequential loop.
+
+## Owner interview 2026-11-16
+
+Every entry above now has an answer (the low-impact ones confirmed in batches). The interview also
+settled the decisions for run 3 and later: D44–D54 in `00-requirements-and-decisions.md`, report
+`design/reports/2026-11-16-owner-interview.md`. Answers given outside the question ids:
+
+* **Run-3 order and design topics** (multiple choice; D50, D52, D53): the structural style pass
+  first in run 3, alone and time-boxed; then N7 performance with distribution-ready row tiling,
+  triples at emax ≥ 8 and `occ_nat3_cut`, in parallel with M12b phase 1; M12b phase 2; tensor
+  operators (E2 and other electric multipoles, M1, Gamow–Teller/Fermi, 0νββ; Magnus transformation
+  only); M12a follow-ups and the Python hooks as filler; M13 last. 3B distribution accepted by cost
+  model at ≤ 10 % imbalance with communication below compute at ~25 GB/s per node; clusters with
+  InfiniBand + Slurm and Slingshot + Slurm (Cray). GPU: CUDA and HIP builds, tuning on NVIDIA first.
+  IMSRG(2) single-commutator benchmarks at emax 10–12 allowed. Process and report format kept. The
+  full N2LO 3N file is not available yet (D33 unchanged).
+* **Extension after tensor operators:** me2jp/me3jp (not checkpoint/restart as proposed). Verbatim:
+  "I provide sample code in a second." and "Wait until I have provided the me2jp and me3jp files and
+  you have worked through the spec. THen write it up."
+* **ME2JP/ME3JP specification** (the owner sent `jIMSRG-develop/jimsrg/files/formats.zip`; worked out
+  in `19-mexj-formats.md`, D54). Verbatim: "The ME2JP and ME3JP formats are implemented in this
+  directory. Check that the ME2JP is a straight forward extension of ME2J from NLJJ to NLJJT. ME3JP is
+  analogous but for full three-body angular momentum coupling." Normalization: unnormalized, as
+  ME2J/ME3J (confirmed). Scope: "Readers and writers. Keep in mind as a todo that there is also a
+  binary version of these files where the header is stored as a fixed set of characters. I am
+  figuring out the exact specification here. For now, prepare for a binary implementation
+  (me2jp.bin, me3jp.bin)." File variants: "See previous response." Contents: "The evolved H by
+  default, other operators optionally. me2jp and me3jp will be most useful for checkpointing the code
+  and storing the Magnus operators for efficient evaluation of a large amount of extra operators."
+  On the restated summary: "Correct except that gzip should be implemented for me2jp and me3jp as
+  well. This goes after tensor ops."
+
+## Added during run 3
+
+Run 3 appends its questions below (ids per brief, e.g. `M10-Q70..Q79`, `M12b-Q1..Q9`, `MS2-Q1..Q9`;
+the orchestrator uses `O4` and up).

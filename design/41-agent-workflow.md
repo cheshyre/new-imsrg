@@ -29,10 +29,12 @@ orchestrator → lead → worker structure works as described.
 * Never `git push`. Never use bare `git stash`: the stash is shared across worktrees. Use WIP
   commits instead. Git stays local, without pushes or PRs, until the owner decides otherwise
   (2026-11-15, D42).
-* **Where runs start (owner, 2026-11-15, D31):** unsupervised runs start in the main checkout on
-  `develop` and merge there directly. The staging procedure of QUESTIONS O1 (merge on the worktree
-  branch, CI, then `tools/ci.sh dev-openmp && git update-ref refs/heads/develop <new> <old>`) is
-  only the fallback when the app forces a worktree.
+* **Where runs start (owner, 2026-11-16, D44, amending D31):** runs start in an app worktree. The
+  orchestrator merges on its worktree branch (or a detached HEAD at `develop`) and advances
+  `develop` with `tools/ci.sh dev-openmp && git update-ref refs/heads/develop <new> <old>`, with
+  `&& ctest --preset dev-openmp -L slow` before the update for numerics merges, all chained to the
+  exit codes in one command (never to a grep of the log). The owner re-syncs the main checkout
+  after each run; agents never commit in the main checkout.
 * **Pacing (D31):** at most 3 leads, Sonnet-heavy delegation; when the 5-hour usage limit stops
   agents, resume each with `SendMessage` after the reset; the owner launches runs right after a
   usage reset. An owner interview follows every run (D42).

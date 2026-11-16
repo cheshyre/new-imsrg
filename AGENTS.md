@@ -25,8 +25,10 @@ we do not port it line by line.
 2. **Tests gate everything.** No merge without unit tests. Numerics must match imsrg-devel (or the
    brute-force reference) within the tolerances of `design/30-testing-and-validation.md` §2. Never
    loosen a tolerance silently.
-3. **Problem sizes:** emax ≤ 6 in every test and run; IMSRG(3) only at emax 2 and 3. Exception
-   (owner, D40): occasional emax-8 IMSRG(2) performance benchmarks against imsrg++, never in CI.
+3. **Problem sizes:** emax ≤ 6 in every test and run; IMSRG(3) only at emax 2 and 3. Exceptions,
+   benchmarks only and never in CI: occasional emax-8 IMSRG(2) benchmarks against imsrg++ (D40);
+   timing of single IMSRG(3) kernels at emax 4–6 with one operator under ~8 GB (D52); single
+   IMSRG(2) commutators at emax 10–12 (D52). No full flows beyond emax 6 (IMSRG(3): beyond 3).
 4. **Never block on a question.** Append it to `design/QUESTIONS.md`, choose the most reversible
    option, note the assumption, and continue.
 5. **Respect the module DAG** (`design/10-architecture.md` §2). `tools/check_layering.py`
