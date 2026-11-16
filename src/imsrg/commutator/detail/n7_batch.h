@@ -198,8 +198,8 @@ IMSRG_INLINE_FUNCTION int FindSortedRow(const Comm232TablesView& tab,
 /// work item per H element, s fastest (contiguous writes). Cost: per line
 /// k and sorted row s the nnz of the E row of s multiply-adds, i.e. the sum
 /// over the triples T of the channel of k_T m_T per line over all S rows.
-/// Asynchronous on device backends (the caller fences). The sum order is
-/// that of the E row, so the result does not depend on the batching.
+/// Blocking (fenced). The sum order is that of the E row, so the result does
+/// not depend on the batching.
 void BuildH(const Space3View& sp, const op::PairThirdView& pt,
             const Comm232TablesView& tab, const ThreeBodyPartView& b,
             int transposed, const LineBatchView& batch, double* h);
@@ -207,8 +207,8 @@ void BuildH(const Space3View& sp, const op::PairThirdView& pt,
 /// Builds W = (E B E^T) of every tile of `batch` from the H built by `BuildH`
 /// into `w` (`batch.w_doubles` doubles; every element is written). One flat
 /// work item per W element, s fastest (contiguous reads down a column of
-/// H). Cost: per tile column t, S nnz(E row of t) multiply-adds. Same
-/// asynchrony and batching invariance as `BuildH`.
+/// H). Cost: per tile column t, S nnz(E row of t) multiply-adds. Blocking;
+/// batching invariant as `BuildH`.
 void BuildW(const op::PairThirdView& pt, const LineBatchView& batch,
             const double* h, double* w);
 

@@ -1,17 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright 2026 The imsrg authors
 
-// Batch planner and device upload of the line tiles of the row-tiled
-// IMSRG(3)-N7 terms (detail/n7_batch.h). Host code.
+// Batch planner, device upload of the line tiles and the batch loop of the
+// row-tiled IMSRG(3)-N7 terms (detail/n7_batch.h, detail/n7_terms.h). Host
+// code.
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <utility>
 #include <vector>
 
 #include "imsrg/base/assert.h"
 #include "imsrg/commutator/detail/n7_batch.h"
+#include "imsrg/commutator/detail/n7_terms.h"
 #include "imsrg/commutator/detail/three_body_impl.h"
+#include "imsrg/exec/device_buffer.h"
 
 namespace imsrg::commutator::detail {
 
@@ -193,6 +198,96 @@ LineBatchView LineBatchDevice::view() const noexcept {
   v.h_doubles = h_doubles_;
   v.w_doubles = w_doubles_;
   return v;
+}
+
+namespace {
+
+/// The H and W buffers of one three-body operand (plain and, for a dense
+/// part, transposed), allocated for the largest batch.
+struct OperandBlocks {
+  exec::DeviceBuffer<double> h;
+  exec::DeviceBuffer<double> ht;
+  exec::DeviceBuffer<double> w;
+  exec::DeviceBuffer<double> wt;
+};
+
+/// Allocates the blocks of a part `b` for the sizes `h_max`, `w_max` (none
+/// for a missing part or an intermediate that is not needed).
+OperandBlocks AllocateBlocks(const ThreeBodyPartView& b, N7Needs needs,
+                             std::int64_t h_max, std::int64_t w_max) {
+  OperandBlocks o;
+  if (b.local == nullptr || !(needs.h || needs.w)) return o;
+  const bool dense = b.packed == 0;
+  const auto hn = static_cast<std::size_t>(h_max);
+  const auto wn = static_cast<std::size_t>(w_max);
+  o.h = exec::DeviceBuffer<double>(hn, "commutator::n7_h");
+  if (dense) o.ht = exec::DeviceBuffer<double>(hn, "commutator::n7_ht");
+  if (needs.w) {
+    o.w = exec::DeviceBuffer<double>(wn, "commutator::n7_w");
+    if (dense) o.wt = exec::DeviceBuffer<double>(wn, "commutator::n7_wt");
+  }
+  return o;
+}
+
+/// Builds the intermediates of part `b` for `batch` into `o` and returns the
+/// pointers {h, ht, w, wt} and the sign of the transposed blocks through the
+/// out parameters (null for what is not built).
+void BuildBlocks(const N7Views& v, const op::PairThirdView& pt,
+                 const Comm232TablesView& tab, const ThreeBodyPartView& b,
+                 N7Needs needs, const LineBatchView& batch, OperandBlocks& o,
+                 const double*& h, const double*& ht, const double*& w,
+                 const double*& wt, double& sign_t) {
+  h = ht = w = wt = nullptr;
+  sign_t = 1.0;
+  if (b.local == nullptr || !(needs.h || needs.w)) return;
+  const bool dense = b.packed == 0;
+  BuildH(v.sp, pt, tab, b, 0, batch, o.h.device_data());
+  if (dense) BuildH(v.sp, pt, tab, b, 1, batch, o.ht.device_data());
+  h = o.h.device_data();
+  ht = dense ? o.ht.device_data() : h;
+  sign_t = dense ? 1.0 : static_cast<double>(b.sign);
+  if (!needs.w) return;
+  BuildW(pt, batch, o.h.device_data(), o.w.device_data());
+  if (dense) BuildW(pt, batch, o.ht.device_data(), o.wt.device_data());
+  w = o.w.device_data();
+  wt = dense ? o.wt.device_data() : w;
+}
+
+}  // namespace
+
+void ForEachN7Batch(const N7Views& v, const ThreeBodyContext& ctx,
+                    const basis::RowSet& rows, std::int64_t budget_bytes,
+                    N7Needs needs,
+                    const std::function<void(const N7BatchInputs&)>& body) {
+  const ThreeBodyContext::Impl& im = ctx.impl();
+  if (needs.w) needs.h = true;
+  const auto blocks_of = [](const ThreeBodyPartView& b) {
+    return b.local == nullptr ? 0 : (b.packed == 0 ? 2 : 1);
+  };
+  const std::int32_t blocks = std::max(1, blocks_of(v.x3) + blocks_of(v.y3));
+  const std::vector<LineBatch> batches =
+      PlanBatches(im, rows, budget_bytes, blocks);
+  std::int64_t h_max = 0;
+  std::int64_t w_max = 0;
+  for (const LineBatch& b : batches) {
+    h_max = std::max(h_max, b.h_doubles);
+    w_max = std::max(w_max, b.w_doubles);
+  }
+  OperandBlocks xb = AllocateBlocks(v.x3, needs, h_max, w_max);
+  OperandBlocks yb = AllocateBlocks(v.y3, needs, h_max, w_max);
+  N7BatchInputs in;
+  in.v = v;
+  in.pt = im.pair_third.device_view();
+  in.tab = im.comm232.View();
+  for (const LineBatch& b : batches) {
+    const LineBatchDevice dev(b, v.sp.num_channels);
+    in.batch = dev.view();
+    BuildBlocks(v, in.pt, in.tab, v.x3, needs, in.batch, xb, in.hx, in.hxt,
+                in.wx, in.wxt, in.sxt);
+    BuildBlocks(v, in.pt, in.tab, v.y3, needs, in.batch, yb, in.hy, in.hyt,
+                in.wy, in.wyt, in.syt);
+    body(in);
+  }
 }
 
 }  // namespace imsrg::commutator::detail

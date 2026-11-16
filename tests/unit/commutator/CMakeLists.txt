@@ -38,6 +38,17 @@ imsrg_add_test(NAME commutator_comm223_rows
 target_compile_definitions(commutator_comm223_rows PRIVATE
   IMSRG_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/tests/golden")
 
+# The batch loop of the row-tiled N7 terms and the partition/masking test
+# support (tests/support/n7_partition_support.h), on the [2,2]->3 rows.
+imsrg_add_test(NAME commutator_n7_batch_loop
+  SOURCES test_n7_batch_loop.cc ${_imsrg_exec_main}
+          "${PROJECT_SOURCE_DIR}/tests/support/three_body_test_support.cc"
+          "${PROJECT_SOURCE_DIR}/tests/support/row_mask.cc"
+          "${PROJECT_SOURCE_DIR}/tests/support/n7_partition_support.cc"
+  DEPS commutator operator
+  LABELS unit
+  NO_GTEST_MAIN)
+
 # The IMSRG(3)-N7 terms (design/14 section 4 item 2) against the m-scheme brute
 # force (commutator_ref::mscheme, emax 1) and the imsrg-devel goldens of
 # tests/golden/n7 (emax 2). One target per group of terms.

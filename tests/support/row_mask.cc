@@ -48,6 +48,7 @@ void ForEachStored(const op::ThreeBody& b, Channel3Index ch, F f) {
 
 void MaskOutsideLines(op::ThreeBody& b, const basis::RowSet& lines) {
   const double nan = std::numeric_limits<double>::quiet_NaN();
+  b.SyncToHost();  // the host mirror may be stale (device backends)
   const std::span<double> data = b.host_span();
   for (std::int32_t c = 0; c < b.num_channels(); ++c) {
     const Channel3Index ch{c};

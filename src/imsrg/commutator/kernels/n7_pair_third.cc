@@ -99,6 +99,7 @@ void BuildH(const Space3View& sp, const op::PairThirdView& pt,
         const int k = tile.row_begin + static_cast<int>(x / ss);
         h[i] = HElement(sp, pt, tab, b, transposed, tile.channel, s, k);
       });
+  exec::Fence("commutator::n7_build_h");
 }
 
 void BuildW(const op::PairThirdView& pt, const LineBatchView& batch,
@@ -114,6 +115,7 @@ void BuildW(const op::PairThirdView& pt, const LineBatchView& batch,
         const int t = tile.state_begin + static_cast<int>(x / ss);
         w[i] = WElement(pt, tile, h, s, ss, t);
       });
+  exec::Fence("commutator::n7_build_w");
 }
 
 }  // namespace imsrg::commutator::detail
