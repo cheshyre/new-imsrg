@@ -2,12 +2,12 @@
 // Copyright 2026 The imsrg authors
 
 #include <cstdint>
-#include <exception>
 #include <limits>
 #include <vector>
 
 #include <gtest/gtest.h>
 
+#include "imsrg/base/error.h"
 #include "tests/unit/exec/kernels_impl.h"
 
 namespace {
@@ -97,10 +97,12 @@ TEST(ExecKernels, ResolveScratchLevelBoundaries) {
   EXPECT_EQ(t::ResolveLevel(0, max0), 0);
   EXPECT_EQ(t::ResolveLevel(0, max0 + 1), 1);
   EXPECT_EQ(t::ResolveLevel(0, max1), 1);
-  EXPECT_THROW(t::ResolveLevel(0, max1 + 1), std::exception);
+  EXPECT_THROW(t::ResolveLevel(0, max1 + 1), ::imsrg::InvariantError);
   EXPECT_EQ(t::ResolveLevel(1, 16), 0);
-  EXPECT_THROW(t::ResolveLevel(1, max0 + 1), std::exception);
+  EXPECT_THROW(t::ResolveLevel(1, max0 + 1), ::imsrg::InvariantError);
   EXPECT_EQ(t::ResolveLevel(2, 16), 1);
+  EXPECT_EQ(t::ResolveLevel(2, max1), 1);
+  EXPECT_THROW(t::ResolveLevel(2, max1 + 1), ::imsrg::InvariantError);
 }
 
 TEST(ExecKernels, TeamForWithLevel0AndLevel1Scratch) {

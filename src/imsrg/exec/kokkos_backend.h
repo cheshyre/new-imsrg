@@ -161,10 +161,10 @@ Policy MakeTeamPolicy(int league_size, const TeamOptions& opts) {
       opts.team_size > 0
           ? (opts.vector_length > 0
                  ? Policy(league_size, opts.team_size, opts.vector_length)
-                 : Policy(league_size, opts.team_size))
+                 : Policy(league_size, opts.team_size, Kokkos::AUTO))
           : (opts.vector_length > 0
                  ? Policy(league_size, Kokkos::AUTO, opts.vector_length)
-                 : Policy(league_size, Kokkos::AUTO));
+                 : Policy(league_size, Kokkos::AUTO, Kokkos::AUTO));
   if (opts.scratch_bytes > 0) {
     policy.set_scratch_size(level, Kokkos::PerTeam(opts.scratch_bytes));
   }
@@ -217,13 +217,17 @@ void TeamReduce(const char* name, int league_size, const TeamOptions& opts,
   }
 }
 
-/// Convenience overload: static schedule, team size `team_size` (<= 0: AUTO),
-/// `scratch_bytes_per_team` bytes of scratch (level chosen automatically).
+/// Convenience overload (the launch before `TeamOptions`): static schedule,
+/// team size `team_size` (<= 0: AUTO), vector length 1, and
+/// `scratch_bytes_per_team` bytes of LEVEL-0 scratch, which its callers read
+/// as `member.team_scratch(0)` (IMSRG_CHECK that it fits level 0).
 template <class F>
 void TeamFor(const char* name, int league_size, int team_size,
              std::size_t scratch_bytes_per_team, const F& f) {
   TeamOptions opts;
   opts.team_size = team_size;
+  opts.vector_length = 1;
+  opts.level = ScratchLevel::kLevel0;
   opts.scratch_bytes = scratch_bytes_per_team;
   TeamFor(name, league_size, opts, f);
 }

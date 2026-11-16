@@ -9,6 +9,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <type_traits>
 
 #include "imsrg/base/assert.h"
@@ -511,12 +512,22 @@ exec::TeamOptions MakeOptions(std::int64_t bytes) {
   return opts;
 }
 
-/// Scratch level for `bytes` per team (0 if it fits, else 1; IMSRG_CHECK that
-/// level 1 holds it). Also checks that the 6j row offsets (`row_six`, below
-/// c2) fit the int32 scratch table.
-int ScratchLevelFor(const TileViews& v, std::int64_t bytes) {
+/// The launch options of a tile kernel with `bytes` of team scratch, with the
+/// level fixed (0 if it fits, else 1), so that the kernel
+/// (`TileFunctor::level`) and the launch use the same level. IMSRG_CHECK that
+/// level 1 holds `bytes` and that the 6j row offsets (`row_six`, below c2) fit
+/// the int32 scratch table.
+exec::TeamOptions TileOptions(const TileViews& v, std::int64_t bytes) {
   IMSRG_CHECK(v.c2 <= INT32_MAX, "comm223: the 6j table is too large");
-  return exec::ResolveScratchLevel(MakeOptions(bytes));
+  IMSRG_CHECK(
+      bytes >= 0 && static_cast<std::size_t>(bytes) <= exec::TeamScratchMax(1),
+      "comm223: the team scratch of " + std::to_string(bytes) +
+          " bytes exceeds the level-1 maximum");
+  exec::TeamOptions opts = MakeOptions(bytes);
+  opts.level = exec::ResolveScratchLevel(opts) == 0
+                   ? exec::ScratchLevel::kLevel0
+                   : exec::ScratchLevel::kLevel1;
+  return opts;
 }
 
 }  // namespace
@@ -534,30 +545,27 @@ void RunComm223Tiles(const TileViews& v, TileMode mode,
   IMSRG_CHECK(mode != TileMode::kTriples,
               "RunComm223Tiles: use RunTriplesTiles for the triples");
   if (num_items <= 0) return;
-  const std::int64_t bytes = TeamScratchBytes(v.ext);
-  const int level = ScratchLevelFor(v, bytes);
+  const exec::TeamOptions opts = TileOptions(v, TeamScratchBytes(v.ext));
   TileFunctor f;
   f.v = v;
   f.items = items;
   f.mode = mode;
-  f.level = level;
-  exec::TeamFor("commutator::comm223_tiles", num_items, MakeOptions(bytes), f);
+  f.level = exec::ResolveScratchLevel(opts);
+  exec::TeamFor("commutator::comm223_tiles", num_items, opts, f);
   exec::Fence("commutator::comm223_tiles");
 }
 
 double RunTriplesTiles(const TileViews& v, const std::int32_t* order,
                        std::int32_t league) {
   if (league <= 0) return 0.0;
-  const std::int64_t bytes = TeamScratchBytes(v.ext);
-  const int level = ScratchLevelFor(v, bytes);
+  const exec::TeamOptions opts = TileOptions(v, TeamScratchBytes(v.ext));
   TileFunctor f;
   f.v = v;
   f.order = order;
   f.mode = TileMode::kTriples;
-  f.level = level;
+  f.level = exec::ResolveScratchLevel(opts);
   double energy = 0.0;
-  exec::TeamReduce("commutator::triples_tiles", league, MakeOptions(bytes), f,
-                   energy);
+  exec::TeamReduce("commutator::triples_tiles", league, opts, f, energy);
   return energy;
 }
 
