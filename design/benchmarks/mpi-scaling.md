@@ -281,3 +281,36 @@ particle-hole and comm122 kernels change (the ph row panels of M12b next step 1 
 64 and 256 rank failures at emax 8-10 are unaffected by the weights: a single whole comm122 or ph
 channel exceeds the rank's share, which only the phase-2 row splitting fixes. The mpi_scaling.sh
 rank-scaling table (1 x 16, 2 x 8, 4 x 4) was not repeated; no code was changed.
+
+### Rank-scaling table repeated on the quiet machine (05:29 JST, git a88f835)
+
+The 1 x 16, 2 x 8, 4 x 4 table above was repeated at 05:29-05:35 JST on the idle machine (Apple M5 Pro,
+18 cores, nothing else running; `release-openmp` with `-DIMSRG_BUILD_BENCH=ON`, bench = develop
+a88f835, no code changes). Best of 5 invocations of 5 repetitions each (the invocation with the
+smallest full commutator; its term rows are shown). `sysctl -n vm.loadavg` is read by the script
+before each invocation; all values were 3.15-5.52, never above 6, so no run was repeated. As in the
+original table, "load before runs" is the value before each invocation (the loadavg moves every 5 s
+and an invocation takes seconds).
+
+```
+cmake --preset release-openmp -DIMSRG_BUILD_BENCH=ON
+cmake --build build/release-openmp --target commutator_bench imsrg -j 6
+RUNS=5 REPS=5 EMAXES="6 8" CONFIGS="1x16 2x8 4x4" tools/bench/mpi_scaling.sh build/release-openmp
+# per invocation: OMP_NUM_THREADS=T OMP_PROC_BIND=false mpiexec -n P --oversubscribe --bind-to none \
+#   build/release-openmp/tools/bench/commutator_bench --emax E --reps 5 --reference O16
+```
+
+| emax | P x T | full commutator ms | slowest terms (ms) | combine ms | speedup | load before runs |
+|---|---|---|---|---|---|---|
+| 6 | 1 x 16 | 3.5867 | comm222_phss 1.8113, comm222_pp_hh_221ss 0.8248, comm221ss 0.7637 | - | 1.00 | 3.15 3.15 3.15 3.15 3.15  |
+| 6 | 2 x 8 | 4.7908 | comm222_phss 2.5985, comm222_pp_hh_221ss 0.9024, comm221ss 0.8320 | 0.5324 | 0.75 | 3.15 3.15 3.15 3.15 3.15  |
+| 6 | 4 x 4 | 6.9570 | comm222_phss 3.6768, comm222_pp_hh_221ss 0.8971, comm221ss 0.7893 | 1.6854 | 0.52 | 3.15 3.15 3.15 4.34 4.34  |
+| 8 | 1 x 16 | 30.1174 | comm222_phss 14.7896, comm222_pp_hh_221ss 10.5491, comm221ss 10.0830 | - | 1.00 | 4.34 4.34 4.34 4.34 4.34  |
+| 8 | 2 x 8 | 42.5511 | comm222_phss 21.4795, comm222_pp_hh_221ss 11.4535, comm221ss 11.1283 | 3.6748 | 0.71 | 4.34 5.52 5.52 5.52 5.52  |
+| 8 | 4 x 4 | 59.5929 | comm222_phss 30.0756, comm222_pp_hhss 12.7084, comm222_pp_hh_221ss 12.6242 | 12.1004 | 0.51 | 5.52 4.19 4.19 4.19 4.19  |
+
+Same picture as the first table (speedup 0.75 / 0.52 at emax 6 and 0.71 / 0.51 at emax 8 against
+0.76 / 0.49 and 0.70 / 0.49 before): on one node at fixed ranks x threads more ranks are slower, the
+combine (0.53 / 1.69 ms at emax 6, 3.67 / 12.1 ms at emax 8) and the replicated ph term are the
+overhead. The numbers agree with the earlier ones within about 5 %; the 4-rank rows are a little
+faster (the ph term 30.1 against 31.0 ms at emax 8).
