@@ -2,6 +2,9 @@
 # Test names are global, hence the driver_ prefix. One executable per component so that parallel
 # work on different components does not rebuild each other's tests.
 set(_driver_test_data "${CMAKE_CURRENT_SOURCE_DIR}/data")
+# Out-of-line helpers of the integration-test headers (integration/*.h); every test that includes
+# them compiles these sources itself, because they read the IMSRG_*_DIR definitions of the target.
+set(_it_support integration/mini_json.cc integration/run_support.cc integration/snt_compare.cc)
 
 # Schema table, enum spellings (design/16 6.3 item 7, enum part).
 imsrg_add_test(NAME driver_schema SOURCES test_schema.cc DEPS driver LABELS unit)
@@ -54,7 +57,7 @@ target_compile_definitions(driver_pipeline_hamiltonian PRIVATE
 # End-to-end integration tests IT-2, IT-3, IT-4, IT-6, IT-7, IT-10 (emax 2), IT-12 (design/30 section 4): run the
 # pipeline in process and compare with tests/golden/e2e; skip without the input files.
 imsrg_add_test(NAME driver_integration
-  SOURCES test_integration.cc test_hunter_gatherer.cc test_stage_two_options.cc test_results_schema.cc
+  SOURCES ${_it_support} test_integration.cc test_hunter_gatherer.cc test_stage_two_options.cc test_results_schema.cc
   test_imsrg3f2.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
   DEPS driver LABELS integration NO_GTEST_MAIN)
 target_compile_definitions(driver_integration PRIVATE
@@ -71,7 +74,7 @@ foreach(_variant "" "_slow")
     set(_flow_labels integration slow)
   endif()
   imsrg_add_test(NAME driver_flow_methods${_variant}
-    SOURCES test_flow_methods.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
+    SOURCES ${_it_support} test_flow_methods.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
     DEPS driver mbpt
     LABELS ${_flow_labels}
     NO_GTEST_MAIN)
@@ -82,7 +85,7 @@ endforeach()
 target_compile_definitions(driver_flow_methods_slow PRIVATE IMSRG_FLOW_SLOW=1)
 # IT-8 perturbative triples after the Magnus flow (He4 emax 2 and O16 emax 3, about 7 s each in Debug).
 imsrg_add_test(NAME driver_triples
-  SOURCES test_triples.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
+  SOURCES ${_it_support} test_triples.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
   DEPS driver LABELS integration NO_GTEST_MAIN)
 target_compile_definitions(driver_triples PRIVATE
   "IMSRG_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden\""
@@ -91,13 +94,13 @@ target_compile_definitions(driver_triples PRIVATE
 # IT-9 IMSRG(3)-N7 Magnus flow (He4 and O16 emax 2) against tests/golden/e2e/IT-9; the emax-3 cases
 # (about 30 and 21 minutes in imsrg++) are the same source compiled for the slow label.
 imsrg_add_test(NAME driver_imsrg3_n7
-  SOURCES test_imsrg3_n7.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
+  SOURCES ${_it_support} test_imsrg3_n7.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
   DEPS driver LABELS integration NO_GTEST_MAIN)
 target_compile_definitions(driver_imsrg3_n7 PRIVATE
   "IMSRG_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden\""
   "IMSRG_TEST_DATA_DIR=\"${IMSRG_TEST_DATA_DIR}\"")
 imsrg_add_test(NAME driver_imsrg3_n7_slow
-  SOURCES test_imsrg3_n7.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
+  SOURCES ${_it_support} test_imsrg3_n7.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
   DEPS driver LABELS slow integration TIMEOUT 7200 NO_GTEST_MAIN)
 target_compile_definitions(driver_imsrg3_n7_slow PRIVATE IMSRG_IT9_SLOW
   "IMSRG_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden\""
