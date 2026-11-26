@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <memory>
 #include <numeric>
 #include <utility>
@@ -13,9 +14,11 @@
 #include "imsrg/base/assert.h"
 #include "imsrg/base/error.h"
 #include "imsrg/basis/orbit.h"
+#include "imsrg/exec/host_parallel.h"
 #include "imsrg/hf/diis.h"
 #include "imsrg/hf/monopole.h"
 #include "imsrg/linalg/blas.h"
+#include "imsrg/linalg/matrix_view.h"
 #include "imsrg/operator/basis_transform.h"
 
 namespace imsrg::hf {
@@ -360,44 +363,72 @@ void AddThreeBodyContribution(op::Operator& X, const op::No2bThreeBody& v3,
       static_cast<std::size_t>(norb));
   for (const auto& ch : channels)
     for (std::int32_t i : ch) channel_of[static_cast<std::size_t>(i)] = &ch;
-  const auto& tbc = ms->two_body();
-  for (std::int32_t ch = 0; ch < tbc.num_channels(); ++ch) {
-    const ChannelIndex chi{ch};
-    const auto kets = tbc.channel_kets(chi);
-    const std::int32_t J = tbc.channel(chi).J();
-    auto blk = X.two_body().host_block(chi);
-    const auto npq = static_cast<std::int64_t>(kets.size());
-    for (std::int64_t i = 0; i < npq; ++i) {
-      const auto& bra = tbc.ket(kets[static_cast<std::size_t>(i)]);
-      const auto& orbit_p = basis.orbit(bra.p);
-      const auto& oq = basis.orbit(bra.q);
-      const std::int32_t e2bra = orbit_p.e() + oq.e();
-      for (std::int64_t j = i; j < npq; ++j) {
-        const auto& ket = tbc.ket(kets[static_cast<std::size_t>(j)]);
-        const auto& orr = basis.orbit(ket.p);
-        const auto& os = basis.orbit(ket.q);
-        const std::int32_t e2ket = orr.e() + os.e();
-        double v = 0.0;
-        for (std::int32_t a = 0; a < norb; ++a) {
-          const auto& oa = basis.orbit(OrbitIndex{a});
-          if (oa.e() + e2bra > options.e3max) continue;
-          for (std::int32_t b : *channel_of[static_cast<std::size_t>(a)]) {
-            const auto& ob = basis.orbit(OrbitIndex{b});
-            if (ob.e() + e2ket > options.e3max) continue;
-            const double rab = r.rho(a, b);
-            if (std::abs(rab) < 1.0e-8) continue;
-            // imsrg++ passes the integer J as the J2 argument.
-            v += rab * v3.get_pn(orbit_p, oq, oa, orr, os, ob, J);
-          }
-        }
-        v /= static_cast<double>(2 * J + 1);
-        if (bra.p == bra.q) v /= std::sqrt(2.0);
-        if (ket.p == ket.q) v /= std::sqrt(2.0);
-        blk(i, j) += v;
-        if (j != i) blk(j, i) += v;
-      }
+  // The density pairs (a, b) with |rho_ab| >= 1e-8, in the order of the
+  // original loops (a ascending, b in channel order), so every element sums
+  // the same terms in the same order as before.
+  struct RhoPair {
+    std::int32_t a, b;
+    double rho;
+  };
+  std::vector<RhoPair> rho_pairs;
+  for (std::int32_t a = 0; a < norb; ++a) {
+    for (std::int32_t b : *channel_of[static_cast<std::size_t>(a)]) {
+      const double rab = r.rho(a, b);
+      if (std::abs(rab) < 1.0e-8) continue;
+      rho_pairs.push_back({a, b, rab});
     }
   }
+  const auto& tbc = ms->two_body();
+  // Views first (the host mirror must not be created concurrently), then one
+  // host task per (channel, bra row): row i writes (i, j >= i) and (j, i), so
+  // rows never write the same element. Production size (27Al, emax 14,
+  // e3max 24): ~1e9 elements, each a sum over rho_pairs of get_pn.
+  std::vector<linalg::MatrixView<double>> blocks;
+  std::vector<std::int64_t> first_row(
+      static_cast<std::size_t>(tbc.num_channels()) + 1, 0);
+  for (std::int32_t ch = 0; ch < tbc.num_channels(); ++ch) {
+    blocks.push_back(X.two_body().host_block(ChannelIndex{ch}));
+    first_row[static_cast<std::size_t>(ch) + 1] =
+        first_row[static_cast<std::size_t>(ch)] +
+        static_cast<std::int64_t>(tbc.channel_kets(ChannelIndex{ch}).size());
+  }
+  exec::HostParallelForDynamic(
+      "imsrg::hf::AddThreeBodyContribution", first_row.back(),
+      [&](std::int64_t row) {
+        const auto it =
+            std::upper_bound(first_row.begin(), first_row.end(), row) - 1;
+        const auto ch = static_cast<std::int32_t>(it - first_row.begin());
+        const std::int64_t i = row - *it;
+        const ChannelIndex chi{ch};
+        const auto kets = tbc.channel_kets(chi);
+        const std::int32_t J = tbc.channel(chi).J();
+        linalg::MatrixView<double> blk = blocks[static_cast<std::size_t>(ch)];
+        const auto npq = static_cast<std::int64_t>(kets.size());
+        const auto& bra = tbc.ket(kets[static_cast<std::size_t>(i)]);
+        const auto& orbit_p = basis.orbit(bra.p);
+        const auto& oq = basis.orbit(bra.q);
+        const std::int32_t e2bra = orbit_p.e() + oq.e();
+        for (std::int64_t j = i; j < npq; ++j) {
+          const auto& ket = tbc.ket(kets[static_cast<std::size_t>(j)]);
+          const auto& orr = basis.orbit(ket.p);
+          const auto& os = basis.orbit(ket.q);
+          const std::int32_t e2ket = orr.e() + os.e();
+          double v = 0.0;
+          for (const RhoPair& rp : rho_pairs) {
+            const auto& oa = basis.orbit(OrbitIndex{rp.a});
+            if (oa.e() + e2bra > options.e3max) continue;
+            const auto& ob = basis.orbit(OrbitIndex{rp.b});
+            if (ob.e() + e2ket > options.e3max) continue;
+            // imsrg++ passes the integer J as the J2 argument.
+            v += rp.rho * v3.get_pn(orbit_p, oq, oa, orr, os, ob, J);
+          }
+          v /= static_cast<double>(2 * J + 1);
+          if (bra.p == bra.q) v /= std::sqrt(2.0);
+          if (ket.p == ket.q) v /= std::sqrt(2.0);
+          blk(i, j) += v;
+          if (j != i) blk(j, i) += v;
+        }
+      });
 }
 
 }  // namespace
