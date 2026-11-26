@@ -48,7 +48,10 @@ std::optional<OperatorRequest> ParseItem(const std::string& name,
                                          std::string& error) {
   auto r = ParseOperatorSpec(name, ModelSpaceInfo{.emax = config.basis.emax});
   if (!r) {
-    error = r.error().ToString();
+    error.clear();
+    for (const ConfigIssue& issue : r.error()) {
+      error += (error.empty() ? "" : "; ") + issue.ToString();
+    }
     return std::nullopt;
   }
   if (r.value().size() != 1) {
@@ -149,9 +152,7 @@ pipeline::OperatorFrame MakeFrameFromManifest(const RunConfig& config,
 commutator::CommutatorOptions TransformCommutatorOptions(
     const RunConfig& config) {
   commutator::CommutatorOptions copts;
-  if (CompatOptionsFor(config.run.compat).tensor_ninej_threshold_1e8) {
-    copts.tensor_ninej_threshold = 1.0e-8;
-  }
+  pipeline::ApplyCompatCommutatorOptions(config, copts);
   return copts;
 }
 

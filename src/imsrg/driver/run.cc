@@ -610,11 +610,7 @@ FlowStart MakeFlowStart(const RunConfig& config,
     copts.terms = commutator::TermMask::Imsrg3N7();
     copts.threebody_threshold = config.imsrg3.threebody_threshold;
   }
-  if (CompatOptionsFor(config.run.compat).tensor_ninej_threshold_1e8) {
-    copts.tensor_ninej_threshold = 1.0e-8;
-  }
-  copts.tensor_fork_ph_missing_rank_phase =
-      CompatOptionsFor(config.run.compat).tensor_fork_ph_missing_rank_phase;
+  pipeline::ApplyCompatCommutatorOptions(config, copts);
   return start;
 }
 

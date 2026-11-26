@@ -33,6 +33,13 @@ namespace {
 
 }  // namespace
 
+void ApplyCompatCommutatorOptions(const RunConfig& config,
+                                  commutator::CommutatorOptions& copts) {
+  const CompatOptions c = CompatOptionsFor(config.run.compat);
+  if (c.tensor_ninej_threshold_1e8) copts.tensor_ninej_threshold = 1.0e-8;
+  copts.tensor_fork_ph_missing_rank_phase = c.tensor_fork_ph_missing_rank_phase;
+}
+
 std::vector<double> CoreOccupations(const basis::ModelSpace& ms) {
   std::vector<double> occ(static_cast<std::size_t>(ms.num_orbits()), 0.0);
   for (const OrbitIndex a : ms.partition().core()) occ[a.ToSize()] = 1.0;

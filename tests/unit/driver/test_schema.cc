@@ -117,7 +117,7 @@ TEST(DriverSchema, TablesAndChildren) {
                                                   "imsrg3",
                                                   "operators",
                                                   "output",
-                                                  "checkpoint"};
+                                                  "checkpoint", "transform"};
   EXPECT_EQ(std::vector<std::string_view>(tables.begin(), tables.end()),
             expected);
 
