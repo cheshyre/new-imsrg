@@ -1325,7 +1325,6 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
 
 ## Added during the Al27 night (2026-11-26)
 
-<<<<<<< HEAD
 * **AL-C1** (lead C, C5 `[imsrg.space]`) - The two-body channels have no e2max cut, so
   `imsrg.space.e2max < 2*imsrg.space.emax` is E-PLANNED (the 27Al runs use e2max = 2 emax = 20).
   `e3max_imsrg`/`emax_3body_imsrg` are accepted and unused for IMSRG(2). **Assumed:** enough for the
@@ -1353,7 +1352,6 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
   bit exact except for entries with exactly one identical-orbit pair (x*sqrt2 then /sqrt2, within
   2 ulp); native files are the exact format. (c) A `.bin` header without a tag is accepted. The
   `asan` preset was not run (Mac-only preset). **Assumed:** fine; fix the formula in the doc.
-=======
 ### Lead A (M15 tensor operators, capability C3)
 
 * **AL-A-Q1** (2026-11-26) - Seeded random operators depend on the C++ standard library. The Frontier
@@ -1398,4 +1396,3 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
   keeps imsrg++'s formula (it drives the BCH thresholds the archive was produced with); whether the
   fork runs hit the NaN case is to be checked when the J=5 operators are reproduced (C8). A
   physically sensible norm ((2j_p+1) per element, or (2j_p+1)(2j_q+1)/(2L+1)) can be a named option.
->>>>>>> origin/feature/m15-tensor-operators
