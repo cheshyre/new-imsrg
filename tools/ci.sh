@@ -16,12 +16,21 @@
 #                      tools/lib/imsrg_env.sh); without them Kokkos is built in-tree (slow)
 #   IMSRG_CI_JOBS      parallel build jobs (default: number of CPUs)
 #   OMP_NUM_THREADS    threads per test process (default 4); OMP_PROC_BIND (default false)
+#
+# OLCF Frontier (presets frontier-*; tools/lib/frontier_env.sh): the script loads the pinned
+# modules (frontier-hip: plus rocm) and runs configure, build and the tests on a compute node of a
+# running allocation through `srun --overlap` (IMSRG_SLURM_JOBID, SLURM_JOB_ID, or the newest
+# running job named `imsrg`); MPI tests start their ranks with a nested `srun -n`. The lint steps
+# stay on the login node. frontier-hip stops after the build (no GPU tests yet).
+#   IMSRG_COMPUTE_CPUS cores of the compute step (default 56; build jobs and test slots follow)
 set -uo pipefail
 
 preset=${1:-dev-openmp}
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=lib/imsrg_env.sh
 . "$script_dir/lib/imsrg_env.sh"
+# shellcheck source=lib/frontier_env.sh
+. "$script_dir/lib/frontier_env.sh"
 
 summary=""
 ci_start=$SECONDS
@@ -80,7 +89,21 @@ case $build_dir in
 esac
 cd "$repo_root" || finish "setup (cannot cd to $repo_root)"
 
-ncpu=$(imsrg_ncpu)
+# On Frontier the heavy steps run on a compute node (`on_compute`); elsewhere `on_compute` is empty.
+on_compute=""
+build_only=0
+case $preset in
+  frontier-*)
+    if ! imsrg_on_frontier; then finish "setup (preset $preset needs OLCF Frontier)"; fi
+    toolchain=cpu
+    case $preset in frontier-hip*) toolchain=hip; build_only=1 ;; esac
+    imsrg_frontier_modules "$toolchain" || finish "setup (module load)"
+    jobid=$(imsrg_frontier_jobid) || finish "setup (no compute allocation)"
+    on_compute=imsrg_compute
+    ncpu=$IMSRG_COMPUTE_CPUS
+    echo "[ci] Frontier: toolchain $toolchain, compute steps in job $jobid ($ncpu cores)" ;;
+  *) ncpu=$(imsrg_ncpu) ;;
+esac
 jobs=${IMSRG_CI_JOBS:-$ncpu}
 export OMP_NUM_THREADS=${OMP_NUM_THREADS:-4}
 export OMP_PROC_BIND=${OMP_PROC_BIND:-false}
@@ -117,11 +140,11 @@ step_submodules() {
 }
 
 step_configure() {
-  cmake --preset "$preset" -B "$build_dir" -DIMSRG_WERROR=ON
+  $on_compute cmake --preset "$preset" -B "$build_dir" -DIMSRG_WERROR=ON
 }
 
 step_build() {
-  cmake --build "$build_dir" --parallel "$jobs"
+  $on_compute cmake --build "$build_dir" --parallel "$jobs"
 }
 
 cache_value() {  # <variable>: value from the build tree's CMakeCache.txt
@@ -129,20 +152,20 @@ cache_value() {  # <variable>: value from the build tree's CMakeCache.txt
 }
 
 step_unit() {
-  ctest --test-dir "$build_dir" -L '^unit$' -LE '^slow$' --output-on-failure --no-tests=error \
+  $on_compute ctest --test-dir "$build_dir" -L '^unit$' -LE '^slow$' --output-on-failure --no-tests=error \
     -j "$test_jobs"
 }
 
 step_integration() {
-  ctest --test-dir "$build_dir" -L '^integration$' -LE '^(slow|mpi)$' --output-on-failure \
+  $on_compute ctest --test-dir "$build_dir" -L '^integration$' -LE '^(slow|mpi)$' --output-on-failure \
     --no-tests=ignore -j "$test_jobs" || return 1
   if ls tests/integration/test_*.py >/dev/null 2>&1; then
-    IMSRG_BUILD_DIR="$build_dir" "$python" -m pytest -q tests/integration -m "not slow"
+    IMSRG_BUILD_DIR="$build_dir" $on_compute "$python" -m pytest -q tests/integration -m "not slow"
   fi
 }
 
 step_mpi() {
-  ctest --test-dir "$build_dir" -L '^mpi$' -LE '^slow$' --output-on-failure --no-tests=error \
+  $on_compute ctest --test-dir "$build_dir" -L '^mpi$' -LE '^slow$' --output-on-failure --no-tests=error \
     -j "$test_jobs"
 }
 
@@ -152,7 +175,7 @@ step_python() {
   # without sync_to_host() fails here although it would pass on the CPU, so the scripts stay
   # portable to GPU builds. The user default (Auto) is exercised by tests that set it explicitly.
   IMSRG_RESIDENCY=strict IMSRG_REQUIRE_PYTHON_EXT=1 IMSRG_TEST_DATA_DIR="$(cache_value IMSRG_TEST_DATA_DIR)" \
-    PYTHONPATH="$build_dir/python" "$python" -m pytest -q tests/python
+    PYTHONPATH="$build_dir/python" $on_compute "$python" -m pytest -q tests/python
 }
 
 step_layering() {
@@ -171,15 +194,18 @@ cxx_sources() {
 }
 
 step_format() {
-  if ! command -v clang-format >/dev/null 2>&1; then
-    echo "clang-format not found (brew install clang-format)"; return 1
+  # The pinned clang-format of the venv (tools/requirements-dev.txt), else the one on the PATH.
+  local clang_format=$IMSRG_VENV/bin/clang-format
+  if [ ! -x "$clang_format" ]; then
+    clang_format=$(command -v clang-format) || {
+      echo "clang-format not found (pip install -r tools/requirements-dev.txt)"; return 1; }
   fi
-  echo "$(clang-format --version)"
+  echo "$("$clang_format" --version)"
   local files
   files=$(cxx_sources)
   if [ -z "$files" ]; then echo "no C++ sources"; return 0; fi
   echo "checking $(echo "$files" | wc -l | tr -d ' ') files"
-  echo "$files" | tr '\n' '\0' | xargs -0 clang-format --dry-run --Werror
+  echo "$files" | tr '\n' '\0' | xargs -0 "$clang_format" --dry-run --Werror
 }
 
 # cpplint with the repository's CPPLINT.cfg (design/17 section 4); fails on any finding.
@@ -230,6 +256,9 @@ if ! ls "$IMSRG_DEPS_PREFIX"/kokkos-*/lib*/cmake/Kokkos/KokkosConfig.cmake >/dev
 fi
 run_step configure step_configure
 run_step build step_build
+if [ "$build_only" -eq 1 ]; then
+  skip_step "tests" "preset $preset is a compile check"
+else
 run_step "unit tests" step_unit
 
 data_dir=$(cache_value IMSRG_TEST_DATA_DIR)
@@ -254,6 +283,7 @@ case $(cache_value IMSRG_BUILD_PYTHON) in
     fi ;;
   *) skip_step "python tests" "IMSRG_BUILD_PYTHON is off" ;;
 esac
+fi  # build_only
 
 run_step layering step_layering
 run_step clang-format step_format

@@ -43,19 +43,30 @@
       "name": "dev-openmp",
       "displayName": "Dev (OpenMP, Debug -O1 -g)",
       "description": "Daily development: Kokkos OpenMP backend, Debug with assertions, -O1 -g",
-      "inherits": ["base", "backend-openmp", "debug-flags"]
+      "inherits": [
+        "base",
+        "backend-openmp",
+        "debug-flags"
+      ]
     },
     {
       "name": "dev-serial",
       "displayName": "Dev (Serial, Debug -O1 -g)",
       "description": "Debugging: Kokkos Serial backend, Debug with assertions, -O1 -g",
-      "inherits": ["base", "backend-serial", "debug-flags"]
+      "inherits": [
+        "base",
+        "backend-serial",
+        "debug-flags"
+      ]
     },
     {
       "name": "release-openmp",
       "displayName": "Release (OpenMP, -O3 native)",
       "description": "Performance runs: Kokkos OpenMP, -O3, -mcpu=native/-march=native",
-      "inherits": ["base", "backend-openmp"],
+      "inherits": [
+        "base",
+        "backend-openmp"
+      ],
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "IMSRG_NATIVE_ARCH": "ON"
@@ -65,7 +76,11 @@
       "name": "asan",
       "displayName": "AddressSanitizer + UBSan (Serial)",
       "description": "AddressSanitizer + UBSan on the Serial backend",
-      "inherits": ["base", "backend-serial", "debug-flags"],
+      "inherits": [
+        "base",
+        "backend-serial",
+        "debug-flags"
+      ],
       "cacheVariables": {
         "IMSRG_SANITIZE": "address;undefined"
       }
@@ -74,7 +89,9 @@
       "name": "cuda",
       "displayName": "Cluster (Kokkos CUDA, Release)",
       "description": "Cluster build, Kokkos CUDA (not testable on the dev machine). Needs Kokkos installed with CUDA in $IMSRG_DEPS_PREFIX/kokkos-cuda or -DKokkos_ROOT=...",
-      "inherits": ["base"],
+      "inherits": [
+        "base"
+      ],
       "cacheVariables": {
         "IMSRG_KOKKOS_BACKEND": "cuda",
         "CMAKE_BUILD_TYPE": "Release",
@@ -85,11 +102,69 @@
       "name": "hip",
       "displayName": "Cluster (Kokkos HIP, Release)",
       "description": "Cluster build, Kokkos HIP (not testable on the dev machine). Needs Kokkos installed with HIP in $IMSRG_DEPS_PREFIX/kokkos-hip or -DKokkos_ROOT=...",
-      "inherits": ["base"],
+      "inherits": [
+        "base"
+      ],
       "cacheVariables": {
         "IMSRG_KOKKOS_BACKEND": "hip",
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_CXX_COMPILER": "hipcc"
+      }
+    },
+    {
+      "name": "frontier-cpu",
+      "displayName": "Frontier CPU (OpenMP, Debug -O1 -g)",
+      "description": "OLCF Frontier, CI preset: PrgEnv-gnu through the Cray CC wrapper (cray-mpich, cray-libsci BLAS/LAPACK), Kokkos OpenMP from $IMSRG_DEPS_PREFIX/kokkos-openmp, MPI tests via srun. Load the modules first (tools/lib/frontier_env.sh; tools/ci.sh does it).",
+      "inherits": [
+        "base",
+        "debug-flags"
+      ],
+      "cacheVariables": {
+        "IMSRG_KOKKOS_BACKEND": "openmp",
+        "CMAKE_CXX_COMPILER": "CC",
+        "IMSRG_TEST_DATA_DIR": "$env{IMSRG_WORK}/inputs",
+        "IMSRG_GENERATED_GOLDEN_DIR": "$env{IMSRG_WORK}/golden-generated",
+        "MPIEXEC_EXECUTABLE": "/usr/bin/srun",
+        "MPIEXEC_NUMPROC_FLAG": "-n",
+        "IMSRG_MPIEXEC_PREFLAGS": "--overlap --cpu-bind=none -c 4"
+      }
+    },
+    {
+      "name": "frontier-cpu-release",
+      "displayName": "Frontier CPU (OpenMP, Release, ZEN3)",
+      "description": "OLCF Frontier performance runs on the CPU: as frontier-cpu, Release, -march=native (ZEN3).",
+      "inherits": [
+        "base"
+      ],
+      "cacheVariables": {
+        "IMSRG_KOKKOS_BACKEND": "openmp",
+        "CMAKE_CXX_COMPILER": "CC",
+        "CMAKE_BUILD_TYPE": "Release",
+        "IMSRG_NATIVE_ARCH": "ON",
+        "IMSRG_TEST_DATA_DIR": "$env{IMSRG_WORK}/inputs",
+        "IMSRG_GENERATED_GOLDEN_DIR": "$env{IMSRG_WORK}/golden-generated",
+        "MPIEXEC_EXECUTABLE": "/usr/bin/srun",
+        "MPIEXEC_NUMPROC_FLAG": "-n",
+        "IMSRG_MPIEXEC_PREFLAGS": "--overlap --cpu-bind=none -c 4"
+      }
+    },
+    {
+      "name": "frontier-hip",
+      "displayName": "Frontier GPU (Kokkos HIP gfx90a, Release)",
+      "description": "OLCF Frontier MI250X: hipcc (rocm module), Kokkos HIP from $IMSRG_DEPS_PREFIX/kokkos-hip (gfx90a, ZEN3 host), cray-mpich through MPI_HOME, cray-libsci for host BLAS/LAPACK. Compile check for now; the Python module is off.",
+      "inherits": [
+        "base"
+      ],
+      "cacheVariables": {
+        "IMSRG_KOKKOS_BACKEND": "hip",
+        "CMAKE_CXX_COMPILER": "hipcc",
+        "CMAKE_BUILD_TYPE": "Release",
+        "IMSRG_BUILD_PYTHON": "OFF",
+        "IMSRG_TEST_DATA_DIR": "$env{IMSRG_WORK}/inputs",
+        "IMSRG_GENERATED_GOLDEN_DIR": "$env{IMSRG_WORK}/golden-generated",
+        "MPIEXEC_EXECUTABLE": "/usr/bin/srun",
+        "MPIEXEC_NUMPROC_FLAG": "-n",
+        "IMSRG_MPIEXEC_PREFLAGS": "--overlap --cpu-bind=none -c 4"
       }
     }
   ],
@@ -109,6 +184,18 @@
     {
       "name": "asan",
       "configurePreset": "asan"
+    },
+    {
+      "name": "frontier-cpu",
+      "configurePreset": "frontier-cpu"
+    },
+    {
+      "name": "frontier-cpu-release",
+      "configurePreset": "frontier-cpu-release"
+    },
+    {
+      "name": "frontier-hip",
+      "configurePreset": "frontier-hip"
     }
   ],
   "testPresets": [
@@ -148,6 +235,16 @@
       "environment": {
         "UBSAN_OPTIONS": "print_stacktrace=1:halt_on_error=1"
       }
+    },
+    {
+      "name": "frontier-cpu",
+      "configurePreset": "frontier-cpu",
+      "inherits": "test-base"
+    },
+    {
+      "name": "frontier-cpu-release",
+      "configurePreset": "frontier-cpu-release",
+      "inherits": "test-base"
     }
   ]
 }

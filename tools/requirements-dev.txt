@@ -1,9 +1,13 @@
 # Python packages for the shared development venv ($IMSRG_VENV, made by tools/bootstrap_deps.sh).
 # numpy: array checks in tests; pytest: integration and binding tests; sympy: exact Wigner symbols
 # for the angmom reference tables; scikit-build-core: builds the nanobind extension (pip install -e);
-# cpplint: the style lint of tools/ci.sh (design/17 section 4).
+# cpplint, clang-format: the style checks of tools/ci.sh, clang-tidy: tools/lint.sh (design/17
+# section 4). The three are pinned so every machine formats and lints identically (the Mac used
+# Homebrew clang-format 23.1.5 and clang-tidy 23.1.5; 23.1.5 has no clang-tidy wheel).
 numpy>=2.0
 pytest>=8.0
 sympy>=1.13
 scikit-build-core>=0.10
-cpplint>=2.0
+cpplint==2.0.2
+clang-format==23.1.5
+clang-tidy==23.1.4
