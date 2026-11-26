@@ -181,5 +181,9 @@ void RunCase(const std::string& golden_dir, const std::string& tag) {
 
 TEST(Al27ForkGolden, NatEmax2) { RunCase("nat_emax2", "al27_fork_emax2"); }
 
+TEST(Al27ForkGolden, NatEmax4Imsrg3) {
+  RunCase("nat_emax4_imsrg3", "al27_fork_emax4");
+}
+
 }  // namespace
 }  // namespace imsrg::it
