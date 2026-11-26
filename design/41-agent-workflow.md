@@ -87,7 +87,7 @@ orchestrator → lead → worker structure works as described.
   stash, and every local branch is contained in a hub branch; `--merged` also requires every
   branch to be merged into the hub's `develop`. The integrator runs
   `tools/agent_retire.sh --all --merged` after merges; clones it keeps are reported with the
-  reason.
+  reason; `--merged` additionally keeps a clone whose branch is not on the hub under its own name, still sits at the creation commit (`imsrg.baseCommit`, recorded by `agent_clone.sh`; clones without it are kept), or is younger than 60 minutes (`--force-young` overrides the age rule).
 * **Fallback (scheme (b), not needed so far).** Without the WorktreeCreate hook, the integrator or
   a lead runs `tools/agent_clone.sh <task> [<base>]` itself, names the clone in the brief, and
   every command starts with `cd <clone> &&`; `agent_guard.py` binds a code-writing agent to the
