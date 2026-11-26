@@ -20,6 +20,7 @@ imsrg_add_module(NAME operator
     no2b.cc
     basis_transform.cc
     random_operator.cc
+    tensor_dump.cc
     pair_third.cc
     kernels/part_kernels.cc
   DEPS basis linalg angmom exec base)

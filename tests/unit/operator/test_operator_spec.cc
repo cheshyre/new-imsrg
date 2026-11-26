@@ -2,6 +2,8 @@
 // Copyright 2026 The imsrg authors
 
 // Tests of OperatorSpec helpers: hermiticity codes and validate().
+#include <cstdint>
+
 #include <gtest/gtest.h>
 
 #include "imsrg/base/error.h"
@@ -58,15 +60,34 @@ TEST(OperatorSpec, OutOfRangeFieldsAreInputErrors) {
   EXPECT_THROW(Validate(s), InputError);
 }
 
-TEST(OperatorSpec, UnimplementedFeaturesThrowNotImplemented) {
+TEST(OperatorSpec, TensorSpecsAreAcceptedAndReduced) {
   OperatorSpec s = OperatorSpec::Scalar(2);
+  EXPECT_FALSE(s.is_reduced());
+  for (const auto h : {Hermiticity::kHermitian, Hermiticity::kAntiHermitian}) {
+    for (std::int32_t J = 0; J <= 5; ++J) {
+      for (const auto p : {Parity::kEven, Parity::kOdd}) {
+        for (std::int32_t dtz = 0; dtz <= 2; ++dtz) {
+          s = OperatorSpec::Scalar(2, h);
+          s.rank_J = J;
+          s.parity = p;
+          s.delta_Tz = dtz;
+          EXPECT_NO_THROW(Validate(s));
+          EXPECT_EQ(s.is_reduced(), !s.is_scalar());
+        }
+      }
+    }
+  }
+  s = OperatorSpec::Scalar(2);
+  s.delta_Tz = 3;
+  EXPECT_THROW(Validate(s), InputError);
+}
+
+TEST(OperatorSpec, UnimplementedFeaturesThrowNotImplemented) {
+  OperatorSpec s = OperatorSpec::Scalar(3);
   s.rank_J = 1;
   EXPECT_THROW(Validate(s), NotImplementedError);
-  s = OperatorSpec::Scalar(2);
+  s = OperatorSpec::Scalar(2, Hermiticity::kNonHermitian);
   s.parity = Parity::kOdd;
-  EXPECT_THROW(Validate(s), NotImplementedError);
-  s = OperatorSpec::Scalar(2);
-  s.delta_Tz = 1;
   EXPECT_THROW(Validate(s), NotImplementedError);
   s = OperatorSpec::Scalar(2);
   s.delta_particle_number = 1;
