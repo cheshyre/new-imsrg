@@ -1431,10 +1431,17 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
   emulated (compat `tensor_fork_ph_missing_rank_phase`, odd L only); this reduced the deviation 189 -> 25
   rows at s = 0.1 and 3.6e-4 -> 5.6e-5 at the end, but not to zero. comm121st (fork form checked
   numerically), comm122st, comm222_pp_hh_221st and the normal ordering were compared and are equivalent.
-  Remaining cause unknown (another odd-L difference in comm222_phst, or in the emulation of the stored
-  matrices). **Assumed meanwhile:** keep the emulation; the odd-rank files are NOT within the 5e-7 rule
-  (the integration test compares them with the strict rule and therefore fails for them; no tolerance
-  was loosened).
+  **Resolved (alf1, 2026-11-26):** the remaining cause was the fork's doubled Zbar columns: it stores
+  each cross-coupled ket pair twice (k <= j, and flipped k >= j with the Ybar part missing (-1)^L), and
+  the inverse transform reads the flipped half also for a DIAGONAL pair (`k>j?0:nkets` with k == j,
+  Commutator.cc:12399/12404/12472/12477), so for odd L the Xbar*Ybar part of those elements flips sign.
+  The emulation negated only k > j columns; comm222_phst now also keeps Xbar*YA in fork mode and reads
+  such elements as Zbar - 2 Xbar*YA. Per-term fork goldens (`tests/golden/tensor/fork-79e9330`,
+  `tools/reference/gen_golden_tensor_fork.sh`, forkharness commutator-tensor) agree to 1e-13 for ranks
+  1, 3 (both parities) and 2; driver_al27_fork_golden passes with the strict tolerance (odd-rank max dev
+  1.6e-4/5.7e-4 -> <= 1e-10, the printed precision). A fork bug, emulated only under the compat option
+  (design/30 section 6, row AL-F1); the default path stays imsrg-devel's (which our default matches for
+  ranks 1 and 2, commutator_tensor_golden).
 * **AL-F2** (lead F, C10 file names) - The transform farm writes the fork's names `<stem><name>.snt` /
   `<stem><name>_2b.snt` (with `output.stem = "int"` exactly the archive's), the in-process driver keeps
   `<stem>_<name>.snt` / `<stem>_<name>_2b.snt`. **Assumed:** keep both (no change for existing runs);
