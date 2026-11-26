@@ -92,6 +92,17 @@ manifests, basis C and occupations, in `$IMSRG_WORK/runs/al27/v1/N2LOsat/`.
 | EMP2 (emax 14) | -104.47937337 | -104.47937337 |
 | EMP2 / EMP3 (emax 10) | -104.362419 / -9.735131 | -104.362419 / -9.735131 |
 | Stage 1 end: steps, s, E0, eta 2b, Omega 2b | 30, 11.30557, -157.357310359, 8.27e-4, 2.2179 | 30, 11.30557, -157.357310359, 8.27073e-4, 2.217947 |
+| Stage 2 end: steps, s, E0, eta 2b, Omega 2b | 253, 47.14639, -217.066364762, 9.77e-4, 7.8900 | 253, 47.14639, -217.066364762, 9.76786e-4, 7.889981 |
+| Zero body of H in `.snt` | -116.291 | -116.291242 |
+| TCM zero body, HF / IMSRG | 10.617215428337673 / 7.083534497103805 | 10.617215428337671 / 7.083534497103864 |
+| H `.snt`, max abs deviation (6 1b + 158 2b) | | **5.0e-7** (1b 4.5e-7) |
+| TCM `.snt` | | 1b 4.7e-8; 150 written 2b elements 5e-9; 8 below the devel writer threshold missing (AL-D3) |
+
+Job boundary: killed at stage 2 step ~245 (job end), restarted from checkpoint 6 (step 220,
+15-minute interval) in a later job; steps 221-245 reproduced bit for bit. Timings: stage 1
+12.3 s/step, stage 2 23.7 s/step (27 s/step near the end), restart run 33.7 min in total
+(~17 min preparation, 33 steps, operators and writers). Omegas in both formats in
+`$IMSRG_WORK/runs/al27/v1/DN2LOGO/`.
 
 ## 4. Timings (N2LOsat, one node, 56 threads, release build)
 
