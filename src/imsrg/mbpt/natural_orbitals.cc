@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "imsrg/base/assert.h"
 #include "imsrg/base/error.h"
 #include "imsrg/linalg/blas.h"
 #include "imsrg/operator/basis_transform.h"
@@ -205,7 +206,8 @@ linalg::Matrix<double> Mbpt2DensityMatrix(op::Operator& H) {
 }
 
 NaturalOrbitals ComputeNaturalOrbitals(const linalg::Matrix<double>& rho_hf,
-                                       const basis::ModelSpace& ms) {
+                                       const basis::ModelSpace& ms,
+                                       NatSorting sorting) {
   const auto& basis = ms.basis();
   const std::int64_t N = ms.num_orbits();
   NaturalOrbitals out{linalg::Matrix<double>(N, N),
@@ -223,18 +225,32 @@ NaturalOrbitals ComputeNaturalOrbitals(const linalg::Matrix<double>& rho_hf,
         blk(r, c) = rho_hf(idx[static_cast<std::size_t>(r)].value(),
                            idx[static_cast<std::size_t>(c)].value());
     const auto eig = linalg::Eigh(blk.const_view());
+    // src[c] = eigenpair placed in slot c: descending signed occupation
+    // (Eigh is ascending), then optionally re-sorted by |occupation|.
+    std::vector<std::int64_t> src(static_cast<std::size_t>(n));
+    for (std::int64_t c = 0; c < n; ++c)
+      src[static_cast<std::size_t>(c)] = n - 1 - c;
+    if (sorting == NatSorting::kAbsDescending) {
+      std::stable_sort(src.begin(), src.end(),
+                       [&eig](std::int64_t x, std::int64_t y) {
+                         return std::abs(eig.eigenvalues[static_cast<
+                                    std::size_t>(x)]) >
+                                std::abs(eig.eigenvalues[static_cast<
+                                    std::size_t>(y)]);
+                       });
+    }
     const int j2 = basis.orbit(oa).j2.twice;
     for (std::int64_t c = 0; c < n; ++c) {
-      const std::int64_t src = n - 1 - c;  // descending occupations
-      const double sign =
-          (eig.eigenvectors(c, src) < 0.0) ? -1.0 : 1.0;  // C(i,i) >= 0
       const auto cc = static_cast<std::size_t>(c);
+      const std::int64_t s = src[cc];
+      const double sign =
+          (eig.eigenvectors(c, s) < 0.0) ? -1.0 : 1.0;  // C(i,i) >= 0
       for (std::int64_t r = 0; r < n; ++r)
         out.c_hf2nat(idx[static_cast<std::size_t>(r)].value(),
-                     idx[cc].value()) = sign * eig.eigenvectors(r, src);
+                     idx[cc].value()) = sign * eig.eigenvectors(r, s);
       out.occupations[static_cast<size_t>(idx[cc].value())] =
-          eig.eigenvalues[static_cast<size_t>(src)];
-      trace += (j2 + 1) * eig.eigenvalues[static_cast<size_t>(src)];
+          eig.eigenvalues[static_cast<size_t>(s)];
+      trace += (j2 + 1) * eig.eigenvalues[static_cast<size_t>(s)];
     }
   }
   if (std::abs(trace - ms.reference().A()) > 1.0e-6)
@@ -242,6 +258,61 @@ NaturalOrbitals ComputeNaturalOrbitals(const linalg::Matrix<double>& rho_hf,
         "natural_orbitals: density-matrix trace " + std::to_string(trace) +
         " differs from A = " + std::to_string(ms.reference().A()));
   return out;
+}
+
+void UseHfForHoleStates(NaturalOrbitals& nat, const basis::ModelSpace& ms) {
+  // Fork imsrg++ 79e9330 HFMBPT::UseHFForHoleStates (HFMBPT.cc:892-1136); the
+  // loops below keep its order of operations.
+  const auto& basis = ms.basis();
+  const auto& ref = ms.reference();
+  const std::int64_t N = ms.num_orbits();
+  auto& C = nat.c_hf2nat;
+  IMSRG_CHECK(C.rows() == N && C.cols() == N,
+              "UseHfForHoleStates: C_hf2nat must be norb x norb");
+  // 1. Hole columns := unit vectors, hole rows := 0 in all other columns.
+  for (std::int64_t i = 0; i < N; ++i) {
+    if (!(ref.occupation(OrbitIndex(static_cast<std::int32_t>(i))) > 1.0e-8))
+      continue;
+    for (std::int64_t j = 0; j < N; ++j) {
+      if (j == i) {
+        C(j, i) = 1.0;
+      } else {
+        C(j, i) = 0.0;
+        C(i, j) = 0.0;
+      }
+    }
+  }
+  // 2. Gram-Schmidt within each channel, in increasing orbit index.
+  for (std::int64_t i = 0; i < N; ++i) {
+    const auto ch = basis.SameLjtz(OrbitIndex(static_cast<std::int32_t>(i)));
+    for (const OrbitIndex oj : ch) {
+      const std::int64_t j = oj.value();
+      if (j >= i) continue;
+      double ij = 0.0;
+      double jj = 0.0;
+      for (const OrbitIndex ok : ch) {
+        const std::int64_t k = ok.value();
+        ij += C(k, i) * C(k, j);
+        jj += C(k, j) * C(k, j);
+      }
+      for (const OrbitIndex ok : ch) {
+        const std::int64_t k = ok.value();
+        C(k, i) -= ij / jj * C(k, j);
+      }
+    }
+  }
+  // 3. Normalize every column, then C(i,i) >= 0.
+  for (std::int64_t i = 0; i < N; ++i) {
+    const auto ch = basis.SameLjtz(OrbitIndex(static_cast<std::int32_t>(i)));
+    double ii = 0.0;
+    for (const OrbitIndex ok : ch) ii += C(ok.value(), i) * C(ok.value(), i);
+    for (const OrbitIndex ok : ch) C(ok.value(), i) *= 1 / std::sqrt(ii);
+  }
+  for (std::int64_t i = 0; i < N; ++i) {
+    if (C(i, i) < 0.0) {
+      for (std::int64_t k = 0; k < N; ++k) C(k, i) = -C(k, i);
+    }
+  }
 }
 
 linalg::Matrix<double> Matmul(const linalg::Matrix<double>& a,
