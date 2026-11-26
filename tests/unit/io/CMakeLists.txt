@@ -59,3 +59,10 @@ imsrg_add_test(NAME io_valence_writers
   LABELS integration reference
   NO_GTEST_MAIN)
 target_compile_definitions(io_valence_writers PRIVATE IMSRG_GOLDEN_DIR="${_imsrg_golden_dir}")
+
+# WriteTensorTokyo: archived fork files (read in place, skipped if absent) and synthetic tensors.
+imsrg_add_test(NAME io_tensor_writers
+  SOURCES test_tensor_writers.cc ${_imsrg_exec_main}
+  DEPS io
+  LABELS unit
+  NO_GTEST_MAIN)

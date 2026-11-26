@@ -6,6 +6,7 @@ imsrg_add_module(NAME io
     input_stream.cc
     me2j.cc
     no2b.cc
+    tensor_writers.cc
     valence_writers.cc
   DEPS operator basis base
   PRIVATE_LIBS ZLIB::ZLIB)
