@@ -224,6 +224,9 @@ if(_imsrg_device_blas STREQUAL "HOST" AND IMSRG_KOKKOS_BACKEND MATCHES "^(cuda|h
   message(FATAL_ERROR "IMSRG_DEVICE_BLAS=HOST cannot run GEMMs on ${IMSRG_KOKKOS_BACKEND} device "
                       "memory; use ROCBLAS or KOKKOSKERNELS")
 endif()
+if(_imsrg_device_blas STREQUAL "ROCBLAS" AND NOT IMSRG_KOKKOS_BACKEND STREQUAL "hip")
+  message(FATAL_ERROR "IMSRG_DEVICE_BLAS=ROCBLAS needs IMSRG_KOKKOS_BACKEND=hip")
+endif()
 add_library(imsrg_device_blas INTERFACE)
 add_library(imsrg::device_blas ALIAS imsrg_device_blas)
 if(_imsrg_device_blas STREQUAL "HOST")

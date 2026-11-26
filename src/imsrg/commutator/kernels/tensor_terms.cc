@@ -678,8 +678,8 @@ void Comm122st(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   k.zd = Z.two_body().matrix().buffer().device_data();
   const basis::TwoBodyTableView tb = ctx.tables.two_body();
   // One item per row of the stacked stored blocks, its columns iket (up to
-  // ibra in diagonal blocks): inside the item on the host, over a team's
-  // threads on the device (M14). Bitwise equal across the shapes.
+  // ibra in diagonal blocks), inside the item (host). The device takes the
+  // GEMM form (Comm122stGemm); NestedFor's device branch is unused here.
   if constexpr (exec::kDeviceKernels) {
     Comm122stGemm(X, Y, Z, a, k, tb, rows, ctx.ms->two_body(), hZ);
     return;
