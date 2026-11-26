@@ -1257,3 +1257,15 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
   lock per call, and threaded BLAS stays available for large gemms. The alternative, linking the
   serial `libsci_gnu` (reentrant, would also allow concurrent `GroupedGemm` items, M12-Q5), loses
   BLAS threading for the large ladder gemms; decide with the Frontier benchmarks.
+* **FP-Q7** (2026-11-26, frontier-serial) - with the debug Serial Kokkos (`Kokkos_ENABLE_DEBUG`,
+  bounds checks) GCC 14 at `-O1` reports `-Wmaybe-uninitialized` in `Kokkos_View.hpp:1143` (View
+  copy, `from`/`to`), inlined into our units, so the `-isystem` treatment of the installed Kokkos
+  does not hide it (21 diagnostics; none with the OpenMP Kokkos or Apple clang). **Assumed
+  meanwhile:** the `frontier-serial` preset adds `-Wno-error=maybe-uninitialized` (warning still
+  printed, not fatal); no other preset changes. Alternative: report upstream / build kokkos-serial
+  without `Kokkos_ENABLE_DEBUG`.
+  Also (frontier-serial, 2026-11-26): `driver_imsrg3_n7.Imsrg3N7.He4Emax2OccNat3Cut` exceeds its
+  300 s timeout with the single-threaded debug Serial Kokkos (it takes ~113 s under frontier-cpu);
+  every other unit and integration test of the preset passes up to that point. **Assumed
+  meanwhile:** `frontier-serial` is not the merge gate (frontier-cpu is); raise the test's timeout
+  or label it `slow` for serial builds? Owner to decide.

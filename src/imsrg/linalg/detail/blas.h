@@ -23,18 +23,23 @@
 #if defined(IMSRG_BLAS_ACCELERATE) && IMSRG_BLAS_ACCELERATE
 #include <Accelerate/Accelerate.h>
 #else
+// Fortran BLAS/LAPACK symbols have fixed ABI names (naming check off).
 extern "C" {
+// NOLINTNEXTLINE(readability-identifier-naming)
 void dgemm_(const char* transa, const char* transb, const int* m, const int* n,
             const int* k, const double* alpha, const double* a, const int* lda,
             const double* b, const int* ldb, const double* beta, double* c,
             const int* ldc);
+// NOLINTNEXTLINE(readability-identifier-naming)
 void sgemm_(const char* transa, const char* transb, const int* m, const int* n,
             const int* k, const float* alpha, const float* a, const int* lda,
             const float* b, const int* ldb, const float* beta, float* c,
             const int* ldc);
+// NOLINTNEXTLINE(readability-identifier-naming)
 void dsyevd_(const char* jobz, const char* uplo, const int* n, double* a,
              const int* lda, double* w, double* work, const int* lwork,
              int* iwork, const int* liwork, int* info);
+// NOLINTNEXTLINE(readability-identifier-naming)
 void dgesv_(const int* n, const int* nrhs, double* a, const int* lda, int* ipiv,
             double* b, const int* ldb, int* info);
 }

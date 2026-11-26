@@ -32,11 +32,17 @@ extra_args=()
 if imsrg_on_frontier; then
   default_build=frontier-cpu
   if [ -n "${MPICH_DIR:-}" ]; then extra_args+=("--extra-arg=-isystem$MPICH_DIR/include"); fi
-  # The pip clang-tidy has no omp.h of its own; Kokkos' OpenMP headers need GCC's.
-  gcc_inc=$(dirname "$(gcc -print-file-name=include/omp.h 2>/dev/null)")
-  if [ -f "$gcc_inc/omp.h" ]; then extra_args+=("--extra-arg=-isystem$gcc_inc"); fi
 fi
 build_dir=${IMSRG_BUILD_DIR:-$repo_root/build/$default_build}
+if imsrg_on_frontier; then
+  # The pip clang-tidy has no omp.h of its own; Kokkos' OpenMP headers need GCC's. Only that
+  # header is exposed (GCC's include directory also holds GCC-only intrinsics headers).
+  gcc_omp=$(gcc -print-file-name=include/omp.h 2>/dev/null)
+  if [ -f "$gcc_omp" ]; then
+    mkdir -p "$build_dir/lint-include" && ln -sf "$gcc_omp" "$build_dir/lint-include/omp.h"
+    extra_args+=("--extra-arg=-isystem$build_dir/lint-include")
+  fi
+fi
 db=$build_dir/compile_commands.json
 if [ ! -f "$db" ]; then
   echo "lint: $db not found (configure a build first: cmake --preset dev-openmp)"; exit 2

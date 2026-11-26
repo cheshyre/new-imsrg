@@ -133,7 +133,7 @@
     {
       "name": "frontier-serial",
       "displayName": "Frontier CPU (Serial, Debug -O1 -g)",
-      "description": "OLCF Frontier debugging build: as frontier-cpu with the Serial Kokkos backend ($IMSRG_DEPS_PREFIX/kokkos-serial: debug checks and bounds checking); run it for kernel changes.",
+      "description": "OLCF Frontier debugging build: as frontier-cpu with the Serial Kokkos backend ($IMSRG_DEPS_PREFIX/kokkos-serial: debug checks and bounds checking); run it for kernel changes. GCC 14 reports -Wmaybe-uninitialized inside the debug Kokkos View copy (Kokkos_View.hpp, reached by inlining, so -isystem does not hide it); the warning stays visible but is not an error here (FP-Q7).",
       "inherits": [
         "base",
         "debug-flags"
@@ -146,7 +146,8 @@
         "MPIEXEC_EXECUTABLE": "/usr/bin/srun",
         "MPIEXEC_NUMPROC_FLAG": "-n",
         "IMSRG_MPIEXEC_PREFLAGS": "--overlap --cpu-bind=none -c 4",
-        "MPI_CXX_LIB_NAMES": "mpi_gnu"
+        "MPI_CXX_LIB_NAMES": "mpi_gnu",
+        "CMAKE_CXX_FLAGS": "-Wno-error=maybe-uninitialized"
       }
     },
     {
