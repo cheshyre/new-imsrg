@@ -110,6 +110,35 @@ IMSRG_INLINE_FUNCTION int Imin(int a, int b) { return a < b ? a : b; }
 IMSRG_INLINE_FUNCTION int Imax(int a, int b) { return a > b ? a : b; }
 IMSRG_INLINE_FUNCTION int Iabs(int a) { return a < 0 ? -a : a; }
 
+/// Adds the contribution of orbit c (pass 0: a hole, pass 1: a particle) to
+/// Z1(i, j) of comm221st (the J1, J2 sums), in the order of the host loop.
+IMSRG_FORCEINLINE_FUNCTION void Add221Orbit(const OneBodyArgs& a,
+                                            const TensorTwoBodyView& vpp,
+                                            const TensorTwoBodyView& vhh, int i,
+                                            int j, int pass, int c,
+                                            double& cij) {
+  const int ji = a.j2[i];
+  const int jj = a.j2[j];
+  const int jc = a.j2[c];
+  const double oc = a.occ[c];
+  for (int J1 = Iabs(jc - ji) / 2; J1 <= (jc + ji) / 2; ++J1) {
+    const int J2min = Imax(Iabs(jc - jj) / 2, Iabs(a.L - J1));
+    const int J2max = Imin((jc + jj) / 2, J1 + a.L);
+    for (int J2 = J2min; J2 <= J2max; ++J2) {
+      const double hat = Kokkos::sqrt((2.0 * J1 + 1) * (2.0 * J2 + 1));
+      const double sj =
+          a.sixjL(TwoJ{2 * J1}, TwoJ{2 * J2}, TwoJ{jj}, TwoJ{ji}, TwoJ{jc});
+      const int ph = Phase((jj + jc) / 2 + J1 + a.L);
+      const double mh = vhh.get_unnormalized(c, i, c, j, 2 * J1, 2 * J2);
+      const double m =
+          pass == 0 ? oc * vpp.get_unnormalized(c, i, c, j, 2 * J1, 2 * J2) +
+                          (1.0 - oc) * mh
+                    : mh;
+      cij += hat * sj * ph * m;
+    }
+  }
+}
+
 }  // namespace
 
 void Comm111st(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
@@ -609,47 +638,62 @@ void Comm222PpHh221st(const op::Operator& X, const op::Operator& Y,
   const auto yoff = detail::BlockOffsetTable(Y.two_body(), nch);
   const OneBodyArgs a = MakeOneBodyArgs(X, Y, Z, ctx, rd, xoff, yoff, hZ);
   const exec::Index norb = ctx.tables.orbits().num_orbits;
-  exec::ParallelForDynamic(
-      "commutator::comm221st", norb, IMSRG_LAMBDA(const exec::Index ii) {
-        const int i = static_cast<int>(ii);
-        const int ji = a.j2[i];
-        for (int ej = a.tc1.offsets[i]; ej < a.tc1.offsets[i + 1]; ++ej) {
+  if constexpr (exec::kDeviceKernels) {
+    // Device shape (M14): one team per (i, j) entry of the tensor one-body
+    // list, its threads reducing over the orbits c (a thread per orbit i
+    // gave the GPU ~1e2 items). The reduction order differs from the host
+    // loop (not bitwise equal to the host shape).
+    const auto entries = static_cast<int>(rd.tensor_ch1.items.size());
+    const int nh = a.num_holes;
+    const int nc = a.num_holes + a.num_particles;
+    exec::TeamOptions opts;
+    opts.team_size = 64;
+    opts.vector_length = 1;
+    exec::TeamFor(
+        "commutator::comm221st_team", entries, opts,
+        IMSRG_LAMBDA(const exec::TeamMember& member) {
+          const int ej = member.league_rank();
+          const int i =
+              detail::FindBlock(a.tc1.offsets, static_cast<int>(norb), ej);
           const int j = a.tc1.items[ej];
-          if (j < i) continue;
-          const int jj = a.j2[j];
+          if (j < i) return;
           double cij = 0.0;
-          for (int pass = 0; pass < 2; ++pass) {
-            const int n = pass == 0 ? a.num_holes : a.num_particles;
-            const std::int32_t* list = pass == 0 ? a.holes : a.particles;
-            for (int ic = 0; ic < n; ++ic) {
-              const int c = list[ic];
-              const int jc = a.j2[c];
-              const double oc = a.occ[c];
-              for (int J1 = Iabs(jc - ji) / 2; J1 <= (jc + ji) / 2; ++J1) {
-                const int J2min = Imax(Iabs(jc - jj) / 2, Iabs(a.L - J1));
-                const int J2max = Imin((jc + jj) / 2, J1 + a.L);
-                for (int J2 = J2min; J2 <= J2max; ++J2) {
-                  const double hat =
-                      Kokkos::sqrt((2.0 * J1 + 1) * (2.0 * J2 + 1));
-                  const double sj = a.sixjL(TwoJ{2 * J1}, TwoJ{2 * J2},
-                                            TwoJ{jj}, TwoJ{ji}, TwoJ{jc});
-                  const int ph = Phase((jj + jc) / 2 + J1 + a.L);
-                  const double mh =
-                      vhh.get_unnormalized(c, i, c, j, 2 * J1, 2 * J2);
-                  const double m = pass == 0
-                                       ? oc * vpp.get_unnormalized(
-                                                  c, i, c, j, 2 * J1, 2 * J2) +
-                                             (1.0 - oc) * mh
-                                       : mh;
-                  cij += hat * sj * ph * m;
-                }
-              }
+          Kokkos::parallel_reduce(
+              Kokkos::TeamThreadRange(member, nc),
+              [&](const int t, double& part) {
+                const int pass = t < nh ? 0 : 1;
+                const int c = pass == 0 ? a.holes[t] : a.particles[t - nh];
+                Add221Orbit(a, vpp, vhh, i, j, pass, c, part);
+              },
+              cij);
+          Kokkos::single(Kokkos::PerTeam(member), [&]() {
+            const int ji = a.j2[i];
+            const int jj = a.j2[j];
+            a.z1(i, j) += cij;
+            if (i != j) a.z1(j, i) += a.hZ * Phase((ji - jj) / 2) * cij;
+          });
+        });
+  } else {
+    exec::ParallelForDynamic(
+        "commutator::comm221st", norb, IMSRG_LAMBDA(const exec::Index ii) {
+          const int i = static_cast<int>(ii);
+          const int ji = a.j2[i];
+          for (int ej = a.tc1.offsets[i]; ej < a.tc1.offsets[i + 1]; ++ej) {
+            const int j = a.tc1.items[ej];
+            if (j < i) continue;
+            const int jj = a.j2[j];
+            double cij = 0.0;
+            for (int pass = 0; pass < 2; ++pass) {
+              const int n = pass == 0 ? a.num_holes : a.num_particles;
+              const std::int32_t* list = pass == 0 ? a.holes : a.particles;
+              for (int ic = 0; ic < n; ++ic)
+                Add221Orbit(a, vpp, vhh, i, j, pass, list[ic], cij);
             }
+            a.z1(i, j) += cij;
+            if (i != j) a.z1(j, i) += a.hZ * Phase((ji - jj) / 2) * cij;
           }
-          a.z1(i, j) += cij;
-          if (i != j) a.z1(j, i) += a.hZ * Phase((ji - jj) / 2) * cij;
-        }
-      });
+        });
+  }
   exec::Fence("commutator::comm221st");
 }
 

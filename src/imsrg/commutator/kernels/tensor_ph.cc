@@ -146,6 +146,73 @@ struct InverseArgs {
 };
 static_assert(std::is_trivially_copyable_v<InverseArgs>);
 
+/// One element (row rr of the stacked stored blocks, column iket) of the
+/// inverse transform of comm222_phst, plus its mirror in a diagonal block.
+/// Every element is written by exactly one (rr, iket), so elements run
+/// concurrently without atomics. O((J3 range) x (J4 range)) 9j-weighted
+/// Zbar gathers.
+IMSRG_FORCEINLINE_FUNCTION void PhstInverseElement(const InverseArgs& v,
+                                                   exec::Index rr, int iket) {
+  const int k = detail::FindBlock(v.row_offset, v.num_blocks, rr);
+  const int ibra = static_cast<int>(rr) - v.row_offset[k];
+  const int cb = v.ch_bra[k];
+  const int ck = v.ch_ket[k];
+  const int J1 = v.tb.channel_two_j[cb] / 2;
+  const int J2 = v.tb.channel_two_j[ck] / 2;
+  const int nb = v.nbra[k];
+  const KetIndex gb = v.tb.global_ket(ChannelIndex{cb}, LocalKetIndex{ibra});
+  const int i = v.tb.ket_p[gb.value()];
+  const int j = v.tb.ket_q[gb.value()];
+  const int ji = v.j2[i];
+  const int jj = v.j2[j];
+  double* blk = v.zd + v.offset[k];
+  const KetIndex gk = v.tb.global_ket(ChannelIndex{ck}, LocalKetIndex{iket});
+  const int kk = v.tb.ket_p[gk.value()];
+  const int ll = v.tb.ket_q[gk.value()];
+  const int jk = v.j2[kk];
+  const int jl = v.j2[ll];
+  double commij = 0.0;
+  for (int J3 = Iabs(ji - jl) / 2; J3 <= (ji + jl) / 2; ++J3) {
+    const int J4min = Imax(Iabs(jk - jj) / 2, Iabs(J3 - v.L));
+    const int J4max = Imin((jk + jj) / 2, J3 + v.L);
+    for (int J4 = J4min; J4 <= J4max; ++J4) {
+      const double nj =
+          v.ninej(TwoJ{ji}, TwoJ{jl}, TwoJ{2 * J3}, TwoJ{jj}, TwoJ{jk},
+                  TwoJ{2 * J4}, TwoJ{2 * J1}, TwoJ{2 * J2});
+      if (nj == 0.0) continue;
+      const double hat = Kokkos::sqrt((2.0 * J1 + 1) * (2.0 * J2 + 1) *
+                                      (2.0 * J3 + 1) * (2.0 * J4 + 1));
+      commij += hat * Phase((jj + jl) / 2 + J2 + J4) * nj *
+                v.Zbar(i, ll, kk, j, J3, J4);
+    }
+  }
+  double commji = commij;
+  if (i != j) {
+    commji = 0.0;
+    for (int J3 = Iabs(jj - jl) / 2; J3 <= (jj + jl) / 2; ++J3) {
+      const int J4min = Imax(Iabs(jk - ji) / 2, Iabs(J3 - v.L));
+      const int J4max = Imin((jk + ji) / 2, J3 + v.L);
+      for (int J4 = J4min; J4 <= J4max; ++J4) {
+        const double nj =
+            v.ninej(TwoJ{jj}, TwoJ{jl}, TwoJ{2 * J3}, TwoJ{ji}, TwoJ{jk},
+                    TwoJ{2 * J4}, TwoJ{2 * J1}, TwoJ{2 * J2});
+        if (nj == 0.0) continue;
+        const double hat = Kokkos::sqrt((2.0 * J1 + 1) * (2.0 * J2 + 1) *
+                                        (2.0 * J3 + 1) * (2.0 * J4 + 1));
+        commji += hat * Phase((ji + jl) / 2 + J2 + J4) * nj *
+                  v.Zbar(j, ll, kk, i, J3, J4);
+      }
+    }
+  }
+  const bool dij = (i == j);
+  const bool dkl = (kk == ll);
+  const double norm = (dij == dkl) ? (dij ? 2.0 : 1.0) : constants::kSqrt2;
+  const double val = (commij - Phase((ji + jj) / 2 - J1) * commji) / norm;
+  blk[ibra + static_cast<std::int64_t>(iket) * nb] += val;
+  if (cb == ck && iket > ibra)
+    blk[iket + static_cast<std::int64_t>(ibra) * nb] += v.hZ * val;
+}
+
 }  // namespace
 
 void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
@@ -430,75 +497,22 @@ void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   v.row_offset = d_zro.device_data();
   v.num_blocks = static_cast<std::int32_t>(zcb.size());
   v.zd = Z.two_body().matrix().buffer().device_data();
-  exec::ParallelForDynamic(
+  // One item per row of the stacked stored blocks, its columns iket >= the
+  // first stored one (iket >= ibra in diagonal blocks): looped inside the
+  // item on the host, over a team's threads on the device (M14).
+  exec::NestedFor(
       "commutator::comm222_phst::inverse", zro.back(),
       IMSRG_LAMBDA(const exec::Index rr) {
         const int k = detail::FindBlock(v.row_offset, v.num_blocks, rr);
         const int ibra = static_cast<int>(rr) - v.row_offset[k];
-        const int cb = v.ch_bra[k];
-        const int ck = v.ch_ket[k];
-        const int J1 = v.tb.channel_two_j[cb] / 2;
-        const int J2 = v.tb.channel_two_j[ck] / 2;
-        const int nb = v.nbra[k];
-        const int nk = v.nket[k];
-        const KetIndex gb =
-            v.tb.global_ket(ChannelIndex{cb}, LocalKetIndex{ibra});
-        const int i = v.tb.ket_p[gb.value()];
-        const int j = v.tb.ket_q[gb.value()];
-        const int ji = v.j2[i];
-        const int jj = v.j2[j];
-        double* blk = v.zd + v.offset[k];
-        for (int iket = (cb == ck ? ibra : 0); iket < nk; ++iket) {
-          const KetIndex gk =
-              v.tb.global_ket(ChannelIndex{ck}, LocalKetIndex{iket});
-          const int kk = v.tb.ket_p[gk.value()];
-          const int ll = v.tb.ket_q[gk.value()];
-          const int jk = v.j2[kk];
-          const int jl = v.j2[ll];
-          double commij = 0.0;
-          for (int J3 = Iabs(ji - jl) / 2; J3 <= (ji + jl) / 2; ++J3) {
-            const int J4min = Imax(Iabs(jk - jj) / 2, Iabs(J3 - v.L));
-            const int J4max = Imin((jk + jj) / 2, J3 + v.L);
-            for (int J4 = J4min; J4 <= J4max; ++J4) {
-              const double nj =
-                  v.ninej(TwoJ{ji}, TwoJ{jl}, TwoJ{2 * J3}, TwoJ{jj}, TwoJ{jk},
-                          TwoJ{2 * J4}, TwoJ{2 * J1}, TwoJ{2 * J2});
-              if (nj == 0.0) continue;
-              const double hat = Kokkos::sqrt((2.0 * J1 + 1) * (2.0 * J2 + 1) *
-                                              (2.0 * J3 + 1) * (2.0 * J4 + 1));
-              commij += hat * Phase((jj + jl) / 2 + J2 + J4) * nj *
-                        v.Zbar(i, ll, kk, j, J3, J4);
-            }
-          }
-          double commji = commij;
-          if (i != j) {
-            commji = 0.0;
-            for (int J3 = Iabs(jj - jl) / 2; J3 <= (jj + jl) / 2; ++J3) {
-              const int J4min = Imax(Iabs(jk - ji) / 2, Iabs(J3 - v.L));
-              const int J4max = Imin((jk + ji) / 2, J3 + v.L);
-              for (int J4 = J4min; J4 <= J4max; ++J4) {
-                const double nj =
-                    v.ninej(TwoJ{jj}, TwoJ{jl}, TwoJ{2 * J3}, TwoJ{ji},
-                            TwoJ{jk}, TwoJ{2 * J4}, TwoJ{2 * J1}, TwoJ{2 * J2});
-                if (nj == 0.0) continue;
-                const double hat =
-                    Kokkos::sqrt((2.0 * J1 + 1) * (2.0 * J2 + 1) *
-                                 (2.0 * J3 + 1) * (2.0 * J4 + 1));
-                commji += hat * Phase((ji + jl) / 2 + J2 + J4) * nj *
-                          v.Zbar(j, ll, kk, i, J3, J4);
-              }
-            }
-          }
-          const bool dij = (i == j);
-          const bool dkl = (kk == ll);
-          const double norm =
-              (dij == dkl) ? (dij ? 2.0 : 1.0) : constants::kSqrt2;
-          const double val =
-              (commij - Phase((ji + jj) / 2 - J1) * commji) / norm;
-          blk[ibra + static_cast<std::int64_t>(iket) * nb] += val;
-          if (cb == ck && iket > ibra)
-            blk[iket + static_cast<std::int64_t>(ibra) * nb] += v.hZ * val;
-        }
+        const int first = v.ch_bra[k] == v.ch_ket[k] ? ibra : 0;
+        return static_cast<exec::Index>(v.nket[k] - first);
+      },
+      IMSRG_LAMBDA(const exec::Index rr, const exec::Index t) {
+        const int k = detail::FindBlock(v.row_offset, v.num_blocks, rr);
+        const int ibra = static_cast<int>(rr) - v.row_offset[k];
+        const int first = v.ch_bra[k] == v.ch_ket[k] ? ibra : 0;
+        PhstInverseElement(v, rr, first + static_cast<int>(t));
       });
   exec::Fence("commutator::comm222_phst");
 }

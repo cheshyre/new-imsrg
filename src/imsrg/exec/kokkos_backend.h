@@ -240,6 +240,41 @@ void TeamFor(const char* name, int league_size, int team_size,
   TeamFor(name, league_size, opts, f);
 }
 
+/// Ragged nested loop: `body(i, k)` for every item i in [0, n) and k in
+/// [0, count(i)). The pairs must be independent (each writes its own
+/// elements). Host backends: `ParallelForDynamic` over i with the k loop
+/// inside (the host-tuned shape, same order). Device backends
+/// (`kDeviceKernels`): one team per item with its threads over k, for items
+/// whose k iterations are expensive (cheap ones are better flattened).
+/// `count` and `body` are `IMSRG_LAMBDA`s with value captures; per-item
+/// quantities are recomputed by `body` per pair. Asynchronous on async
+/// backends.
+template <class Count, class Body>
+void NestedFor(const char* name, Index n, const Count& count,
+               const Body& body) {
+  IMSRG_CHECK(n >= 0, name);
+  if constexpr (kDeviceKernels) {
+    IMSRG_CHECK(n <= Index{2147483647}, name);
+    TeamOptions opts;
+    opts.schedule = Schedule::kDynamic;
+    opts.team_size = 64;
+    opts.vector_length = 1;
+    TeamFor(
+        name, static_cast<int>(n), opts,
+        KOKKOS_LAMBDA(const TeamMember& member) {
+          const Index i = member.league_rank();
+          Kokkos::parallel_for(Kokkos::TeamThreadRange(member, count(i)),
+                               [&](const Index k) { body(i, k); });
+        });
+  } else {
+    ParallelForDynamic(
+        name, n, KOKKOS_LAMBDA(const Index i) {
+          const Index m = count(i);
+          for (Index k = 0; k < m; ++k) body(i, k);
+        });
+  }
+}
+
 /// Waits for all work on the default execution space.
 inline void Fence(const char* name) { DefaultExecSpace().fence(name); }
 
