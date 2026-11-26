@@ -1360,3 +1360,12 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
   operator a name denotes. **Assumed:** the rewrite stores what imsrg++ stores (owner answer to M15-Q1
   holds unchanged); the NREFT builders (lead B) must reproduce the fork's closed forms, and an Edmonds
   converter at the edges is then the identity on storage. Worth a line in design/15.
+* **AL-A-Q6** (2026-11-26, reviewer finding) - imsrg++'s tensor one-body norm uses the integer
+  degeneracy `(2j_p+1) * ((min(2j_q, 2j_p + L) - max(-2j_q, 2j_p - L)) / 2 + 1)`, which mixes 2j with
+  the undoubled rank and can be NEGATIVE (2j_p = 21, 2j_q = 11, L = 5 gives -22; first possible at
+  emax 10 with rank 5, i.e. in the 27Al Sigma'/Sigma''/Delta J=5 operators). A negative weighted sum
+  makes the norm NaN, and imsrg++'s BCH then never meets `||nested|| < epsilon` and runs to 40 nested
+  commutators, while the rewrite's BCH stops at the first non-finite norm. **Assumed:** the rewrite
+  keeps imsrg++'s formula (it drives the BCH thresholds the archive was produced with); whether the
+  fork runs hit the NaN case is to be checked when the J=5 operators are reproduced (C8). A
+  physically sensible norm ((2j_p+1) per element, or (2j_p+1)(2j_q+1)/(2L+1)) can be a named option.

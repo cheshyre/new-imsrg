@@ -475,7 +475,8 @@ void Comm222PpHh221st(const op::Operator& X, const op::Operator& Y,
   const TensorTwoBodyView vpp = detail::MakeTensorView(mpp, tb, zoff);
   const TensorTwoBodyView vhh = detail::MakeTensorView(mhh, tb, zoff);
   const auto xoff = detail::BlockOffsetTable(X.two_body(), nch);
-  const OneBodyArgs a = MakeOneBodyArgs(X, Y, Z, ctx, rd, xoff, zoff, hZ);
+  const auto yoff = detail::BlockOffsetTable(Y.two_body(), nch);
+  const OneBodyArgs a = MakeOneBodyArgs(X, Y, Z, ctx, rd, xoff, yoff, hZ);
   const exec::Index norb = ctx.tables.orbits().num_orbits;
   exec::ParallelForDynamic(
       "commutator::comm221st", norb, IMSRG_LAMBDA(const exec::Index ii) {

@@ -5,15 +5,19 @@
 // DeviceBuffer storage.
 #include "imsrg/angmom/tensor_tables.h"
 
+#include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <span>
+#include <thread>
 #include <vector>
 
 #include "imsrg/angmom/wigner.h"
 #include "imsrg/base/assert.h"
+#include "imsrg/exec/runtime.h"
 
 namespace imsrg::angmom {
 
@@ -81,25 +85,44 @@ NineJTable::NineJTable(int emax, int lambda, double skip_threshold)
                                        "imsrg::NineJTable");
   std::span<double> out = values_.host_span();
   const TwoJ L{2 * lambda};
-  std::size_t i = 0;
-  for (int A = 1; A <= 2 * emax + 1; A += 2)
-    for (int B = 1; B <= 2 * emax + 1; B += 2)
-      for (int D = 1; D <= 2 * emax + 1; D += 2)
-        for (int E = 1; E <= 2 * emax + 1; E += 2)
-          for (int C = std::abs(A - B); C <= A + B; C += 2)
-            for (int F = std::abs(D - E); F <= D + E; F += 2)
-              for (int G = std::abs(A - D); G <= A + D; G += 2)
-                for (int H = std::abs(B - E); H <= B + E; H += 2, ++i) {
-                  double v = 0.0;
-                  if (Triangle(TwoJ{C}, TwoJ{F}, L) &&
-                      Triangle(TwoJ{G}, TwoJ{H}, L)) {
-                    v = Wigner9j(TwoJ{A}, TwoJ{B}, TwoJ{C}, TwoJ{D}, TwoJ{E},
-                                 TwoJ{F}, TwoJ{G}, TwoJ{H}, L);
-                    if (std::abs(v) < skip_threshold) v = 0.0;
-                  }
-                  out[i] = v;
-                }
-  IMSRG_CHECK(static_cast<std::int64_t>(i) == total);
+  // One box per (A, B, D, E), independent: host threads take boxes from a
+  // shared counter (Wigner9j is host-only; the build takes minutes serially
+  // at emax 10).
+  const auto fill_box = [&](std::size_t box) {
+    std::size_t r = box;
+    const int E = 2 * static_cast<int>(r % nj) + 1;
+    r /= nj;
+    const int D = 2 * static_cast<int>(r % nj) + 1;
+    r /= nj;
+    const int B = 2 * static_cast<int>(r % nj) + 1;
+    r /= nj;
+    const int A = 2 * static_cast<int>(r) + 1;
+    std::size_t i = static_cast<std::size_t>(offsets[box]);
+    for (int C = std::abs(A - B); C <= A + B; C += 2)
+      for (int F = std::abs(D - E); F <= D + E; F += 2)
+        for (int G = std::abs(A - D); G <= A + D; G += 2)
+          for (int H = std::abs(B - E); H <= B + E; H += 2, ++i) {
+            double v = 0.0;
+            if (Triangle(TwoJ{C}, TwoJ{F}, L) &&
+                Triangle(TwoJ{G}, TwoJ{H}, L)) {
+              v = Wigner9j(TwoJ{A}, TwoJ{B}, TwoJ{C}, TwoJ{D}, TwoJ{E}, TwoJ{F},
+                           TwoJ{G}, TwoJ{H}, L);
+              if (std::abs(v) < skip_threshold) v = 0.0;
+            }
+            out[i] = v;
+          }
+  };
+  const std::size_t nbox = offsets.size();
+  std::atomic<std::size_t> next{0};
+  const unsigned nthreads = std::max(
+      1u, std::min(static_cast<unsigned>(exec::Runtime::Concurrency()), 64u));
+  std::vector<std::thread> pool;
+  for (unsigned t = 1; t < nthreads; ++t)
+    pool.emplace_back([&] {
+      for (std::size_t b = next++; b < nbox; b = next++) fill_box(b);
+    });
+  for (std::size_t b = next++; b < nbox; b = next++) fill_box(b);
+  for (auto& th : pool) th.join();
   values_.SyncToDevice();
 }
 

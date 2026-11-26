@@ -12,6 +12,7 @@
 /// results agree element by element (tested against imsrg-devel goldens at
 /// 1e-10).
 #include <cstdint>
+#include <memory>
 #include <span>
 
 #include "imsrg/operator/no2b.h"
@@ -85,6 +86,20 @@ Operator NormalOrderTensor(const Operator& op,
 /// Inverse of `NormalOrderTensor(op, options)`.
 Operator UndoNormalOrderTensor(const Operator& op,
                                const TensorNormalOrderOptions& options = {});
+
+/// Re-normal-ordering to another reference (imsrg++.cc:1500-1519, the
+/// valence-space step after the flow: `UndoNormalOrdering()` w.r.t. the
+/// ensemble reference, `SetModelSpace(ms2)`, `DoNormalOrdering()` w.r.t. the
+/// core): undoes the normal ordering w.r.t. the reference of `op`'s model
+/// space, normal orders w.r.t. the reference of `target` and returns the
+/// result on `target`, which must have the same single-particle basis.
+/// Scalars use `NormalOrder` (the zero-body part changes too), tensors
+/// `NormalOrderTensor` with `options` in both steps (the fork applied its bug
+/// in both). Zero- to two-body parts only.
+/// @throws InvariantError if the bases differ or `target` is null.
+Operator ReNormalOrder(const Operator& op,
+                       std::shared_ptr<const basis::ModelSpace> target,
+                       const TensorNormalOrderOptions& options = {});
 
 /// imsrg++ `DoNormalOrdering3` (Operator.cc:582-674) for an operator whose 0B +
 /// 1B + 2B parts are `op` and whose three-body part is the NO2B input `v3`: the

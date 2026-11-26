@@ -127,11 +127,20 @@ struct InverseArgs {
                                     int J4) const {
     const int c3 = CrossCoupledChannel(l, tz2, i, ll, J3);
     const int c4 = CrossCoupledChannel(l, tz2, k, j, J4);
-    const int P = pair_of[c3 * ncc + c4];
-    if (P < 0) return 0.0;
     const int r = cc.local_index(i, ll, J3);
     const int c = cc.local_index(k, j, J4);
-    return zbar[zbar_off[P] + r + static_cast<std::int64_t>(c) * cc_size[c3]];
+    if (c3 <= c4) {
+      const int P = pair_of[c3 * ncc + c4];
+      if (P < 0) return 0.0;
+      return zbar[zbar_off[P] + r + static_cast<std::int64_t>(c) * cc_size[c3]];
+    }
+    // Only c3 <= c4 is stored: Zbar^{c3 c4}_{x,y} = hZ (-1)^(J3-J4)
+    // Zbar^{c4 c3}_{y,x} (hermiticity of the tensor Pandya transform,
+    // imsrg++ AddInverseTensorPandyaTransformation).
+    const int P = pair_of[c4 * ncc + c3];
+    if (P < 0) return 0.0;
+    return hZ * Phase(J3 - J4) *
+           zbar[zbar_off[P] + c + static_cast<std::int64_t>(r) * cc_size[c4]];
   }
 };
 static_assert(std::is_trivially_copyable_v<InverseArgs>);
@@ -196,7 +205,9 @@ void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   for (std::int32_t c3 = 0; c3 < ncc; ++c3) {
     const std::int32_t n3 = size[static_cast<std::size_t>(c3)];
     if (n3 == 0) continue;
-    for (std::int32_t c4 = 0; c4 < ncc; ++c4) {
+    // c4 >= c3 only: the other half follows from the hermiticity relation
+    // used in `InverseArgs::Zbar`.
+    for (std::int32_t c4 = c3; c4 < ncc; ++c4) {
       const std::int32_t n4 = size[static_cast<std::size_t>(c4)];
       if (n4 == 0) continue;
       const int J3 = cc.J[static_cast<std::size_t>(c3)];

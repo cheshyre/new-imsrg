@@ -207,6 +207,12 @@ void Commutator(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
     }
     TensorOptions to;
     to.ninej_threshold = opts.tensor_ninej_threshold;
+    to.comm111 = opts.terms.test(Term::kComm111ss);
+    to.comm121 = opts.terms.test(Term::kComm121ss);
+    to.comm122 = opts.terms.test(Term::kComm122ss);
+    to.comm221 = opts.terms.test(Term::kComm221ss);
+    to.comm222_pp_hh = opts.terms.test(Term::kComm222PpHhss);
+    to.comm222_ph = opts.terms.test(Term::kComm222Phss);
     if (X.spec().is_scalar()) {
       TensorCommutator(X, Y, Z, to, ws.tensor());
     } else if (Y.spec().is_scalar()) {

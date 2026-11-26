@@ -17,6 +17,7 @@
 #include <gtest/gtest.h>
 
 #include "imsrg/basis/model_space.h"
+#include "imsrg/operator/basis_transform.h"
 #include "imsrg/operator/compare.h"
 #include "imsrg/operator/normal_ordering.h"
 #include "imsrg/operator/operator.h"
@@ -175,6 +176,26 @@ TEST(TensorNormalOrder, ForkOptionChangesOnlyTheDiagonal) {
   Operator back = UndoNormalOrderTensor(bad, fork);
   back.SyncToHost();
   EXPECT_LE(MaxAbsDifference(back, y).max(), 1.0e-14);
+}
+
+TEST(TensorNormalOrder, ReNormalOrderToAnotherReference) {
+  const auto ensemble = Space(true);
+  const auto core = Space(false);
+  for (const auto& s : Specs()) {
+    SCOPED_TRACE("rank " + std::to_string(s.rank_J));
+    const Operator y = RandomTensor(ensemble, s, 77);
+    Operator moved = ReNormalOrder(y, core);
+    moved.SyncToHost();
+    EXPECT_EQ(moved.model_space_ptr(), core);
+    Operator expected =
+        NormalOrderTensor(WithModelSpace(UndoNormalOrderTensor(y), core));
+    expected.SyncToHost();
+    EXPECT_LE(MaxAbsDifference(moved, expected).max(), 1.0e-15);
+    Operator back = ReNormalOrder(moved, ensemble);
+    back.SyncToHost();
+    EXPECT_LE(MaxAbsDifference(back, y).max(),
+              1.0e-14 * std::max(1.0, MaxAbs(y).max()));
+  }
 }
 
 }  // namespace

@@ -6,13 +6,16 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <memory>
 #include <span>
+#include <utility>
 #include <vector>
 
 #include "imsrg/angmom/tensor_tables.h"
 #include "imsrg/base/assert.h"
 #include "imsrg/base/error.h"
 #include "imsrg/basis/orbit.h"
+#include "imsrg/operator/basis_transform.h"
 #include "imsrg/operator/normal_ordering.h"
 #include "imsrg/operator/two_body.h"
 
@@ -112,6 +115,24 @@ Operator UndoNormalOrderTensor(const Operator& op,
   IMSRG_CHECK(!op.empty(), "undo_normal_order_tensor: empty operator");
   return NormalOrderTensor(op, op.model_space().reference().occupations(),
                            NormalOrderDirection::kToVacuum, options);
+}
+
+Operator ReNormalOrder(const Operator& op,
+                       std::shared_ptr<const basis::ModelSpace> target,
+                       const TensorNormalOrderOptions& options) {
+  IMSRG_CHECK(!op.empty() && target != nullptr,
+              "renormal_order: empty operator or null target");
+  const auto from = op.model_space().reference().occupations();
+  const auto to = target->reference().occupations();
+  Operator vac = op.spec().is_scalar()
+                     ? NormalOrder(op, from, NormalOrderDirection::kToVacuum)
+                     : NormalOrderTensor(
+                           op, from, NormalOrderDirection::kToVacuum, options);
+  Operator moved = WithModelSpace(vac, std::move(target));
+  return moved.spec().is_scalar()
+             ? NormalOrder(moved, to, NormalOrderDirection::kToReference)
+             : NormalOrderTensor(moved, to, NormalOrderDirection::kToReference,
+                                 options);
 }
 
 }  // namespace imsrg::op
