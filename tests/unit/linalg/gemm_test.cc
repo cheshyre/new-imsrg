@@ -3,10 +3,12 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <limits>
 #include <random>
 #include <span>
+#include <thread>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -83,7 +85,43 @@ void RunCase(std::mt19937_64& rng, std::int64_t m, std::int64_t n,
     }
 }
 
+/// Repeated 96x96x96 gemms on one host thread; returns the largest deviation
+/// from the naive product (no gtest assertions off the main thread).
+double RepeatedGemms(std::uint64_t seed, int reps) {
+  std::mt19937_64 rng(seed);
+  const std::int64_t n = 96;
+  const Matrix<double> A = RandomMatrix<double>(rng, n, n);
+  const Matrix<double> B = RandomMatrix<double>(rng, n, n);
+  Matrix<double> C(n, n);
+  const Matrix<double> ref =
+      Naive<double>(1.0, A.const_view(), Op::kNoTrans, B.const_view(),
+                    Op::kNoTrans, 0.0, C.const_view());
+  double dev = 0.0;
+  for (int r = 0; r < reps; ++r) {
+    Gemm(1.0, A.const_view(), Op::kNoTrans, B.const_view(), Op::kNoTrans, 0.0,
+         C.view());
+    for (std::int64_t j = 0; j < n; ++j)
+      for (std::int64_t i = 0; i < n; ++i)
+        dev = std::max(dev, std::abs(C(i, j) - ref(i, j)));
+  }
+  return dev;
+}
+
 }  // namespace
+
+// Two host threads calling Gemm at once (two Python threads solving): the
+// OpenMP cray-libsci crashed here before calls were serialized (FP-Q6).
+TEST(LinalgGemm, ConcurrentCallsFromTwoHostThreads) {
+  double dev1 = -1.0, dev2 = -1.0;
+  std::thread t1([&] { dev1 = RepeatedGemms(31, 300); });
+  std::thread t2([&] { dev2 = RepeatedGemms(32, 300); });
+  t1.join();
+  t2.join();
+  EXPECT_GE(dev1, 0.0);
+  EXPECT_GE(dev2, 0.0);
+  EXPECT_LT(dev1, 1.0e-12 * 96);
+  EXPECT_LT(dev2, 1.0e-12 * 96);
+}
 
 TEST(LinalgGemm, AllOpCombinationsAndShapes) {
   std::mt19937_64 rng(12345);

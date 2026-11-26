@@ -1228,3 +1228,18 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
   differs file by file from `$IMSRG_REFERENCE_ROOT/golden-generated-d35`; which one is newer is
   not recorded). **Assumed meanwhile:** the presets point at `$IMSRG_WORK/golden-generated`.
   Which of the two sets is current, and should the other be removed?
+* **FP-Q6** (2026-11-26, BLAS reentrancy) - `test_two_threads_on_distinct_solvers_and_operators`
+  segfaulted on Frontier in `dgemm_kernel_loop_mnk_a1b1_mt_naples` (`libsci_gnu_mp.so.6`, the
+  OpenMP cray-libsci that `CC -fopenmp` links). gdb: one Python thread in libsci `dgemm` with its
+  OpenMP team, the other in a Kokkos `parallel_for` (Comm121ss); `OMP_NUM_THREADS=1` passes. A
+  20-line C++ program without Kokkos or imsrg code (two `std::thread`s calling `dgemm_` on their
+  own matrices, n = 100 or 400) crashes with `libsci_gnu_mp` at 4 and at 1 OpenMP thread; it runs
+  clean when the calls are under a mutex, when one thread runs plain `omp parallel for` loops
+  instead, and with the serial `libsci_gnu`. `CRAYBLAS_ALLOC_TYPE=2` and
+  `CRAYBLAS_FORCE_HEAP_ALLOC=1` do not help; `man intro_libsci` says nothing about reentrancy.
+  So Kokkos OpenMP entered from two host threads is fine; the threaded libsci is not reentrant.
+  **Assumed meanwhile:** `linalg` holds a process-wide mutex around every BLAS/LAPACK call
+  (`IMSRG_BLAS_SERIALIZE`, default ON except Accelerate); single-threaded hosts pay one uncontended
+  lock per call, and threaded BLAS stays available for large gemms. The alternative, linking the
+  serial `libsci_gnu` (reentrant, would also allow concurrent `GroupedGemm` items, M12-Q5), loses
+  BLAS threading for the large ladder gemms; decide with the Frontier benchmarks.

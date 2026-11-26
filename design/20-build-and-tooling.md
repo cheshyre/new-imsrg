@@ -357,5 +357,8 @@ builds `openmp serial hip` by default on Frontier; run it on a compute node
 * `.gitmodules` asks for shallow submodules; local clones ignore `--depth` with a warning. The
   nested `extern/nanobind/ext/robin_map` must be initialized in the integrator's clone
   (`git submodule update --init --recursive`) before agent clones can borrow it.
+* The OpenMP cray-libsci that `CC -fopenmp` links (`libsci_gnu_mp`) is not reentrant across host
+  threads: two threads in `dgemm` at once segfault (`dgemm_kernel_loop_mnk_a1b1_mt_naples`), with
+  or without Kokkos. `linalg` serializes its BLAS/LAPACK calls (`IMSRG_BLAS_SERIALIZE`, FP-Q6).
 * The integrator's clone has its own git identity (`git config user.name/user.email`, local);
   `tools/agent_clone.sh` copies it into each agent clone.
