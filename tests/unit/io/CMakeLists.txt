@@ -26,6 +26,12 @@ target_compile_definitions(io_me2j_golden PRIVATE
   IMSRG_TEST_DATA_DIR="${IMSRG_TEST_DATA_DIR}"
   IMSRG_GENERATED_GOLDEN_DIR="${IMSRG_GENERATED_GOLDEN_DIR}")
 
+imsrg_add_test(NAME io_mexj
+  SOURCES test_mexj.cc ${_imsrg_exec_main}
+  DEPS io
+  LABELS unit
+  NO_GTEST_MAIN)
+
 imsrg_add_test(NAME io_no2b
   SOURCES test_no2b.cc ${_imsrg_exec_main}
   DEPS io
