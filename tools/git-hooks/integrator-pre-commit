@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# pre-commit and pre-merge-commit hook of the integrator's clone ($IMSRG_WORK/main), installed by
+# tools/install_git_hooks.sh. Commits there are made only by the integrator (the main session or
+# the owner), who sets IMSRG_INTEGRATOR=1; agents commit in their own clones.
+if [ "${IMSRG_INTEGRATOR:-0}" != 1 ]; then
+  echo "pre-commit: this is the integrator's clone; commit with IMSRG_INTEGRATOR=1 only if you" \
+       "are the integrator (agents work in \$IMSRG_WORK/agents/<name>)" >&2
+  exit 1
+fi
+exit 0

@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Hub `update` hook (installed into $IMSRG_HUB/hooks/update by tools/install_git_hooks.sh).
+# Arguments: <ref> <old> <new>. Rejects
+#   * any update or deletion of refs/heads/main;
+#   * updates of refs/heads/develop unless the pusher sets IMSRG_INTEGRATOR=1 (the integrator's
+#     clone; agents push only feature branches), and every deletion of develop;
+#   * tags (none are used yet).
+# Non-fast-forward updates are refused by receive.denyNonFastForwards=true.
+ref=$1 old=$2 new=$3
+zero=0000000000000000000000000000000000000000
+case $ref in
+  refs/heads/main)
+    echo "hub: refs/heads/main is never updated (AGENTS.md golden rule 1)" >&2; exit 1 ;;
+  refs/heads/develop)
+    if [ "$new" = "$zero" ]; then echo "hub: develop cannot be deleted" >&2; exit 1; fi
+    if [ "${IMSRG_INTEGRATOR:-0}" != 1 ]; then
+      echo "hub: only the integrator updates develop (push your feature branch instead)" >&2
+      exit 1
+    fi ;;
+  refs/tags/*)
+    echo "hub: tags are not pushed to the hub" >&2; exit 1 ;;
+esac
+exit 0
