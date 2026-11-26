@@ -173,7 +173,7 @@ io::ValenceWriteOptions MakeValenceWriteOptions(const RunConfig& c,
   o.a_ref = static_cast<std::int32_t>(frame.ms_bare->reference().target_mass());
   o.z_ref = static_cast<std::int32_t>(frame.ms_bare->reference().target_Z());
   o.a_target = static_cast<double>(frame.mass_number);
-  if (CompatOptionsFor(c.run.compat).tokyo_fork_format) {
+  if (CompatOptionsFor(c.run.compat).tokyo_writer_fork_79e9330) {
     // The fork writes the core's A and Z and, as a label artifact of
     // SetReference(core), the core mass as "A_for_kinetic_energy".
     const basis::Partition& p = frame.ms_imsrg->partition();
@@ -198,7 +198,7 @@ void WriteTensorSnt(const std::filesystem::path& path, op::Operator O,
   const io::ValenceWriteOptions v =
       MakeValenceWriteOptions(config, frame, io::ValenceWriteMode::kHamiltonian);
   io::TensorTokyoOptions t;
-  t.format = CompatOptionsFor(config.run.compat).tokyo_fork_format
+  t.format = CompatOptionsFor(config.run.compat).tokyo_writer_fork_79e9330
                  ? io::TokyoFormat::kFork79e9330
                  : io::TokyoFormat::kDevel;
   t.file_2n = v.file_2n;
