@@ -53,7 +53,9 @@ void CheckCase(const char* reference, int e3max, const char* file) {
   EXPECT_LE(dev.one_body, tol);
   EXPECT_LE(dev.two_body, tol);
   EXPECT_LE(dev.three_body, tol);
-  if (e3max >= 6) EXPECT_GT(ref.three_body, 0.0);
+  if (e3max >= 6) {
+    EXPECT_GT(ref.three_body, 0.0);
+  }
 }
 
 TEST(Generator3, He4E3max3) { CheckCase("He4", 3, "eta_white.dump"); }

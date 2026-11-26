@@ -304,13 +304,14 @@ TEST(AngmomDoubleDouble, Arithmetic) {
   // 30! exactly against an integer product (30! < 2^108, use dd product of
   // exact small factors and compare with a __int128 product).
   DD f = Dd(1.0);
-  unsigned __int128 fi = 1;
+  __extension__ typedef unsigned __int128 U128;
+  U128 fi = 1;
   for (int i = 1; i <= 30; ++i) {
     f = f * Dd(i);
     fi *= static_cast<unsigned>(i);
   }
   const double hi = static_cast<double>(fi);
-  const unsigned __int128 hi_i = static_cast<unsigned __int128>(hi);
+  const U128 hi_i = static_cast<U128>(hi);
   const double lo = hi_i <= fi ? static_cast<double>(fi - hi_i)
                                : -static_cast<double>(hi_i - fi);
   EXPECT_EQ(f.hi, hi);

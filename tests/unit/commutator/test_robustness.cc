@@ -292,7 +292,8 @@ TEST(commutator_robustness, three_body_context_skip_then_build) {
   ASSERT_GT(op::ThreeBodyNorm(z_auto), 0.0);
 
   Workspace skip(
-      ms3, WorkspaceOptions{.three_body_context = ThreeBodyContextMode::kSkip});
+      ms3, WorkspaceOptions{.comm = {},
+                            .three_body_context = ThreeBodyContextMode::kSkip});
   EXPECT_EQ(skip.three_body_context(), nullptr);
   Operator z_skip;
   EXPECT_THROW(Commutator(x, y, z_skip, n7, skip), InputError);
@@ -317,7 +318,8 @@ TEST(commutator_robustness, three_body_context_needs_three_body_space) {
   EXPECT_EQ(plain.three_body_context(), nullptr);
   EXPECT_THROW(plain.BuildThreeBodyContext(), InputError);
   Workspace skip(
-      ms2, WorkspaceOptions{.three_body_context = ThreeBodyContextMode::kSkip});
+      ms2, WorkspaceOptions{.comm = {},
+                            .three_body_context = ThreeBodyContextMode::kSkip});
   EXPECT_EQ(skip.three_body_context(), nullptr);
   EXPECT_THROW(skip.BuildThreeBodyContext(), InputError);
 }

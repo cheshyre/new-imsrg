@@ -68,7 +68,9 @@ TEST(OwnershipMap, RandomCostsPartitionExactly) {
       count += items.size();
       double l = 0.0;
       for (std::size_t k = 0; k < items.size(); ++k) {
-        if (k > 0) ASSERT_LT(items[k - 1], items[k]);
+        if (k > 0) {
+          ASSERT_LT(items[k - 1], items[k]);
+        }
         ++seen[static_cast<std::size_t>(items[k])];
         ASSERT_EQ(m.owner(items[k]), r);
         l += cost[static_cast<std::size_t>(items[k])];
