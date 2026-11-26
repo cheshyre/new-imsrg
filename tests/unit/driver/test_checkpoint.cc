@@ -122,8 +122,8 @@ TEST(Checkpoint, Me2jpRestartWithinFloat32) {
               e0c, e0a, e0c - e0a, Stages(c).at(1)["steps"].number,
               Stages(a).at(1)["steps"].number);
   // float32 two-body parts (~6e-8 relative per element): owner O4 accepts a
-  // restart within float32 precision (E0 ~1e-6 MeV); allow 1e-6 relative.
-  EXPECT_NEAR(e0c, e0a, 1.0e-6 * std::abs(e0a));
+  // restart within float32 precision, E0 to ~1e-6 MeV (observed 7e-9 MeV).
+  EXPECT_NEAR(e0c, e0a, 1.0e-6);
   EXPECT_NEAR(Stages(c).at(1)["steps"].number, Stages(a).at(1)["steps"].number,
               3.0);
 }
