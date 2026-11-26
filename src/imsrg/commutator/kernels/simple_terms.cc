@@ -8,6 +8,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <vector>
 
 #include "imsrg/base/assert.h"
 #include "imsrg/base/constants.h"
@@ -346,31 +347,59 @@ void Comm122ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
       static_cast<exec::Index>(owned ? impl.work_device.comm122_columns.size()
                                      : impl.entry_channel.size());
   if (exec::kDeviceKernels && !owned) {
-    // Device shape (M14): one thread per element (r, c) instead of one per
-    // column, so neighbouring threads touch neighbouring rows of one column
-    // (coalesced) and the GPU sees ~1e6-1e8 items. Same arithmetic per
-    // element as the column loops below.
+    // Device shape (M14): the bra part as GEMMs. B = Lx Y - Ly X per channel,
+    // with the lifted one-body operators Lx(r, m) = sum over the lifted
+    // entries t of row r with lm[t] = m of lcoef[t] x1(from[t], to[t]) (Ly
+    // with y1) stored densely in two-body layout: one thread per row builds
+    // its row, then two grouped device GEMMs (the lifted lists are sparse,
+    // ~10-20 entries per row, but dense GEMMs on the matrix cores beat the
+    // gathers). The summation order differs from the host loops (not
+    // bitwise equal to the host shape).
+    exec::DeviceBuffer<double> lx(static_cast<std::size_t>(total),
+                                  "imsrg::comm122ss::lx");
+    exec::DeviceBuffer<double> ly(static_cast<std::size_t>(total),
+                                  "imsrg::comm122ss::ly");
+    double* lxd = lx.device_data();
+    double* lyd = ly.device_data();
     exec::ParallelFor(
-        "commutator::comm122ss::bra_flat", total,
+        "commutator::comm122ss::lift", columns,
         IMSRG_LAMBDA(const exec::Index e) {
-          const int ch = detail::FindBlock(block_offset, nch, e);
+          const int ch = entry_channel[e];
           const std::int64_t off = block_offset[ch];
           const std::int64_t n = num_kets[ch];
-          const std::int64_t local = e - off;
-          const std::int64_t c = local / n;
-          const auto r = static_cast<int>(local - c * n);
-          const int rb = row_base[ch];
-          double b = 0.0;
+          const std::int64_t r = e - channel_ket_offset[ch];
+          const std::int64_t rb = row_base[ch];
           for (int t = entry_offset[rb + r]; t < entry_offset[rb + r + 1];
                ++t) {
-            const std::int64_t idx = off + lm[t] + c * n;
-            double v = 0.0;
-            if (yd != nullptr) v += x1(lfrom[t], lto[t]) * yd[idx];
-            if (xd != nullptr) v -= y1(lfrom[t], lto[t]) * xd[idx];
-            b += lcoef[t] * v;
+            const std::int64_t idx = off + r + lm[t] * n;
+            lxd[idx] += lcoef[t] * x1(lfrom[t], lto[t]);
+            lyd[idx] += lcoef[t] * y1(lfrom[t], lto[t]);
           }
-          bsc[e] = b;
         });
+    std::vector<linalg::GemmProblem> first;
+    std::vector<linalg::GemmProblem> second;
+    for (const auto& info : Z.two_body().matrix().blocks()) {
+      const std::int64_t n = info.rows;
+      if (n == 0 || info.row_block != info.col_block) continue;
+      const std::int64_t off = info.offset;
+      const linalg::MatrixView<double> bv{bsc + off, n, n, n};
+      if (yd != nullptr) {
+        first.push_back(linalg::GemmProblem{
+            1.0, linalg::MatrixView<const double>{lxd + off, n, n, n},
+            linalg::Op::kNoTrans,
+            linalg::MatrixView<const double>{yd + off, n, n, n},
+            linalg::Op::kNoTrans, 0.0, bv});
+      }
+      if (xd != nullptr) {
+        second.push_back(linalg::GemmProblem{
+            -1.0, linalg::MatrixView<const double>{lyd + off, n, n, n},
+            linalg::Op::kNoTrans,
+            linalg::MatrixView<const double>{xd + off, n, n, n},
+            linalg::Op::kNoTrans, yd != nullptr ? 1.0 : 0.0, bv});
+      }
+    }
+    linalg::DeviceGroupedGemm(first);
+    linalg::DeviceGroupedGemm(second);
     exec::ParallelFor(
         "commutator::comm122ss_flat", total, IMSRG_LAMBDA(const exec::Index e) {
           const int ch = detail::FindBlock(block_offset, nch, e);
