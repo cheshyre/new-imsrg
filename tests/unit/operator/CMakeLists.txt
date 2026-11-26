@@ -31,7 +31,7 @@ imsrg_add_test(NAME operator_golden_norms
   NO_GTEST_MAIN)
 target_compile_definitions(operator_golden_norms PRIVATE IMSRG_GOLDEN_DIR="${_imsrg_golden_dir}")
 
-foreach(_t normal_order no2b no2b_get_pn basis_transform random_operator)
+foreach(_t normal_order no2b no2b_get_pn basis_transform random_operator tensor_storage tensor_transform)
   imsrg_add_test(NAME operator_${_t}
     SOURCES test_${_t}.cc ${_imsrg_exec_main}
     DEPS operator

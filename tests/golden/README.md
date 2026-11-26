@@ -233,7 +233,13 @@ Raw labelled format `# imsrg-tensor-dump raw v0` (`*.tdump`), described with ims
 | `emax2_Ne20/HF` | open shell (0d5/2 occupation 1/3): `E2 M1 Fermi GamowTeller` |
 | `emax2_{He4,O16}/commutator` | `CommutatorScalarTensor` terms for X = HF-basis H (O16 also reuses `hf/emax2_O16_2N/HNO.dump`) or seeded random anti-Hermitian A (He4: `emax2_He4/inputs/H_HF.dump`, A = `commutator/emax2_O16/random_A.dump`), Y = E2, GamowTeller: `comm111st comm121st all` (identically zero terms are not written, see `result.json`) |
 | `emax1_He4/commutator` | all seven terms and `all` for X in {H, A} and seeded random tensors Y (`rand_J_dTz_parity_H|A_seed`; every 2B term nonzero), the four hermiticity pairs |
+| `emax1_He4/inputs` | X inputs `H_HF.dump`, `random_A.dump` (OperatorDump v1) and the Y inputs `E2.tdump`, `rand_*.tdump` of the emax-1 commutator and BCH goldens (added 2026-11-26); `emax2_He4/inputs` holds `H_HF.dump` and `random_A.dump` |
 | `emax{1,2}_He4/bch` | `BCH::BCH_Transform(Y, Omega)`, Omega = s random_A, \|Omega\| = 0.3 (Y = E2 at emax 2; E2 and two random tensors at emax 1) |
+
+**Regenerated on Frontier (2026-11-26):** the seeded random operators (`random_A`, `rand_*`) come from the C++ standard
+library's distributions, so the Frontier (libstdc++) harness gives other values than the Mac (libc++) one; every golden
+that depends on them changed, the deterministic ones agree with the Mac files to <= 1.5e-14. The tensor goldens are
+self-contained (their random inputs are stored); `commutator/emax2_O16/random_A.dump` (Mac) is no longer their X input.
 
 New refharness subcommands: `dump-tensor`, `commutator-tensor`, `bch-tensor` (`tools/reference/rh_tensor.cpp`). Rebuild the patched harness with
 `FRESH=1 tools/reference/build_imsrg_devel.sh patched-harness` when its CMake cache points at another checkout.

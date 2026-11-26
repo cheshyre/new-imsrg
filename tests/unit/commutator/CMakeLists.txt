@@ -172,3 +172,12 @@ imsrg_add_test(NAME commutator_n7_batch
   DEPS commutator operator
   LABELS unit
   NO_GTEST_MAIN)
+
+# Scalar-tensor commutator terms (M15) against the imsrg-devel tensor goldens.
+imsrg_add_test(NAME commutator_tensor_golden
+  SOURCES test_tensor_golden.cc ${_imsrg_exec_main}
+  DEPS commutator operator
+  LABELS unit
+  NO_GTEST_MAIN)
+target_compile_definitions(commutator_tensor_golden PRIVATE
+  IMSRG_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/tests/golden")
