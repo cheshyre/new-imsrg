@@ -4,7 +4,7 @@
 # `tools/reference/build_fork.sh` (both variants). D42: these goldens are regenerated ONLY through
 # this script; a regeneration commit states the reason and the old vs new numbers.
 #
-# Usage: tools/reference/gen_golden_nreft.sh [bare] [flow]          (default: both)
+# Usage: tools/reference/gen_golden_nreft.sh [bare] [flow] [large]  (default: bare flow)
 #   bare   forkharness (plain 79e9330 build) dumps of the bare one-body tables, HO basis, hw 16:
 #            tests/golden/nreft/bare_emax2.txt             shorthands + raw building blocks
 #            tests/golden/nreft/bare_emax4_shorthands.txt  shorthands only
@@ -27,6 +27,10 @@
 #          differ: the tilde-Phi' .snt and stdout.log.
 #          The run directories (with the Omega scratch files) stay in
 #          $REF_BUILD/runs-fork/<variant>/<run>.
+#   large  the shorthands at the production emax 14 (HF/NAT basis size of the archived runs),
+#          13 MB, NOT committed: $GEN_OUT/nreft/bare_emax14_shorthands.txt with GEN_OUT =
+#          IMSRG_GENERATED_GOLDEN_DIR, else $IMSRG_WORK/golden-generated (the frontier presets'
+#          IMSRG_GENERATED_GOLDEN_DIR); test opslib_nreft skips it when absent.
 # Environment: OMP_NUM_THREADS (default 8). Frontier: run on the compute node
 # (`imsrg_compute tools/reference/gen_golden_nreft.sh`).
 set -euo pipefail
@@ -108,11 +112,21 @@ gen_flow() {
   du -sh "${OUT}/flow"
 }
 
+gen_large() {
+  local fh="${REF_BUILD}/fork-79e9330/build-harness/forkharness"
+  local v; v="fork-79e9330:$(version_of FORK_79E9330_SRC_SHA256)"
+  local gen="${IMSRG_GENERATED_GOLDEN_DIR:-${IMSRG_WORK:?}/golden-generated}"
+  mkdir -p "${gen}/nreft"
+  "${fh}" nreft-bare 14 16 shorthands "$v" > "${gen}/nreft/bare_emax14_shorthands.txt" 2> /dev/null
+  ls -l "${gen}/nreft/bare_emax14_shorthands.txt"
+}
+
 sel=("$@"); [[ ${#sel[@]} -eq 0 ]] && sel=(bare flow)
 for s in "${sel[@]}"; do
   case "$s" in
     bare) gen_bare ;;
     flow) gen_flow ;;
-    *) echo "usage: $0 [bare] [flow]" >&2; exit 2 ;;
+    large) gen_large ;;
+    *) echo "usage: $0 [bare] [flow] [large]" >&2; exit 2 ;;
   esac
 done

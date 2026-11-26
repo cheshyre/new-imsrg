@@ -159,7 +159,7 @@ std::string QOf(const std::string& name) {
 /// noise of the cancelling sums, in the fork as here; the fork's own noise is
 /// of this size (its FM0p_15 <0||O||10> and <10||O||0> differ by 6e-14
 /// relative).
-void CompareGolden(const fs::path& file) {
+void CompareGolden(const fs::path& file, double floor = 1.0e-14) {
   if (!fs::exists(file)) GTEST_SKIP() << "golden not found: " << file;
   const Golden g = ReadGolden(file);
   basis::BasisTruncation trunc;
@@ -218,7 +218,7 @@ void CompareGolden(const fs::path& file) {
           total.max_floor = d / sq;
           total.max_floor_at = at;
         }
-        if (!(d <= 1.0e-12 * std::abs(ref) || d <= 1.0e-14 * sq)) {
+        if (!(d <= 1.0e-12 * std::abs(ref) || d <= floor * sq)) {
           if (++total.failures <= 20) {
             ADD_FAILURE() << at << ": ours " << ours << " fork " << ref
                           << " (max|table| " << scale << ", S_q " << sq << ")";
@@ -244,6 +244,86 @@ TEST(NreftGolden, Emax2AllTablesMatchFork) {
 
 TEST(NreftGolden, Emax4ShorthandsMatchFork) {
   CompareGolden(fs::path(IMSRG_GOLDEN_DIR) / "nreft/bare_emax4_shorthands.txt");
+}
+
+/// The production basis size (emax 14, the HF/NAT basis of the archived
+/// runs), from the generated goldens (gen_golden_nreft.sh large; skipped if
+/// absent). Here the fork itself is not exact: its double-precision radial
+/// sums lose up to 8 digits for high radial n (e.g. FPhipp2p_15 <234||232>:
+/// fork -0.0173100007660, exact -0.0173099860818 from the mpmath reference,
+/// 8.5e-7 relative; design/30 section 6). The port is exact to rounding
+/// (EMax14SampleMatchesMpmath below), so this comparison only bounds the
+/// fork's error: |d| <= 1e-12 |ref| or |d| <= 1e-8 S_q (observed 1.5e-9 S_q).
+/// It still catches any wrong channel, sign or prefactor.
+TEST(NreftGolden, Emax14ShorthandsMatchForkWithinItsRoundingError) {
+  CompareGolden(
+      fs::path(IMSRG_GENERATED_GOLDEN_DIR) / "nreft/bare_emax14_shorthands.txt",
+      1.0e-8);
+}
+
+/// Elements of every shorthand family at emax 14 (shells >= 10) against the
+/// brute-force mpmath evaluation of the same formulas at 50 digits
+/// (tools/reference/nreft_mpref.py): 1e-12 relative, or 1e-14 of the largest
+/// sampled element at that q.
+TEST(NreftGolden, Emax14SampleMatchesMpmath) {
+  const fs::path file = fs::path(IMSRG_GOLDEN_DIR) / "nreft/mpref_emax14.txt";
+  if (!fs::exists(file)) GTEST_SKIP() << "golden not found: " << file;
+  basis::BasisTruncation trunc;
+  trunc.emax = 14;
+  const auto basis =
+      basis::SingleParticleBasis::HarmonicOscillator(trunc, 16.0);
+  struct Ref {
+    std::string name;
+    int a, b;
+    double v;
+  };
+  std::vector<Ref> refs;
+  std::map<std::string, double> s_q;
+  std::ifstream in(file);
+  std::string line;
+  while (std::getline(in, line)) {
+    std::istringstream ls(line);
+    std::string w;
+    ls >> w;
+    if (w == "orbit") {
+      int i, n, l, j2, tz2;
+      ls >> i >> n >> l >> j2 >> tz2;
+      const basis::Orbit& o = basis.orbits()[static_cast<std::size_t>(i)];
+      ASSERT_EQ(o.n, n);
+      ASSERT_EQ(o.l, l);
+      ASSERT_EQ(o.j2.twice, j2);
+      ASSERT_EQ(o.tz2.twice, tz2);
+    } else if (w == "ref") {
+      Ref r;
+      ls >> r.name >> r.a >> r.b >> r.v;
+      double& m = s_q[QOf(r.name)];
+      m = std::max(m, std::abs(r.v));
+      refs.push_back(r);
+    }
+  }
+  ASSERT_GT(refs.size(), 500u);
+  double max_rel = 0.0;
+  int failures = 0;
+  for (const Ref& r : refs) {
+    const auto s = ParseShorthand(r.name);
+    ASSERT_TRUE(s.has_value()) << r.name;
+    const double y = OscillatorY(s->q_MeV, 16.0);
+    const double ours =
+        s->prefactor *
+        FamilyElement(s->family, s->L,
+                      basis.orbits()[static_cast<std::size_t>(r.a)],
+                      basis.orbits()[static_cast<std::size_t>(r.b)], y);
+    const double d = std::abs(ours - r.v);
+    if (r.v != 0.0) max_rel = std::max(max_rel, d / std::abs(r.v));
+    if (!(d <= 1.0e-12 * std::abs(r.v) || d <= 1.0e-14 * s_q.at(QOf(r.name)))) {
+      ++failures;
+      ADD_FAILURE() << r.name << " <" << r.a << "||" << r.b << ">: ours "
+                    << ours << " mpmath " << r.v;
+    }
+  }
+  std::cout << "[mpref_emax14.txt] " << refs.size()
+            << " elements, max relative deviation " << max_rel << "\n";
+  EXPECT_EQ(failures, 0);
 }
 
 // ----- q -> 0 limits (provenance README section 5, reference/06 2.3) -----

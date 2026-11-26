@@ -33,4 +33,5 @@ imsrg_add_test(NAME opslib_nreft
   LABELS unit
   NO_GTEST_MAIN)
 target_compile_definitions(opslib_nreft PRIVATE
-  IMSRG_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/tests/golden")
+  IMSRG_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/tests/golden"
+  IMSRG_GENERATED_GOLDEN_DIR="${IMSRG_GENERATED_GOLDEN_DIR}")
