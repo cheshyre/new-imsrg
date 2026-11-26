@@ -252,6 +252,18 @@ TEST(PipelineHamiltonian, RsoIsAnOperatorAndVanishesForClosedShells) {
   EXPECT_EQ(rso.model_space_ptr(), ph.hno.model_space_ptr());
 }
 
+// FM0p_0 and FM0n_0 are the proton and neutron number operators (sqrt(4 pi)
+// M_0(0)), so their reference expectation value in O16 is 8 each.
+TEST(PipelineHamiltonian, NreftChargeAtZeroMomentumIsTheNumberOperator) {
+  if (!Have(kVnn)) GTEST_SKIP() << "missing " << kVnn;
+  const RunConfig cfg = Load(Toml(kO16, false));
+  const PreparedHamiltonian ph = PrepareHamiltonian(cfg);
+  const op::Operator fp = PrepareOperator(Request("FM0p_0"), ph, cfg);
+  const op::Operator fn = PrepareOperator(Request("FM0n_0"), ph, cfg);
+  EXPECT_NEAR(fp.zero_body(), 8.0, 1.0e-8);
+  EXPECT_NEAR(fn.zero_body(), 8.0, 1.0e-8);
+}
+
 TEST(PipelineHamiltonian, PlannedOptionsThrow) {
   const std::string base = Toml(kO16, false);
   const RunConfig nat = Load(Toml(kO16, false, "kind = \"nat\"") +

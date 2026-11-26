@@ -249,3 +249,17 @@ reference builds (`build-d35`, `harness-build-d35`, `harness-build`, ...) live i
 `$IMSRG_WORK/reference-build` (`tools/reference/ref_env.sh`), the pristine source and the SHA files in
 `$IMSRG_REFERENCE_ROOT` (`/ccs/proj/nph123/mheinz/imsrg/reference`), the inputs in `$IMSRG_WORK/inputs`.
 The stamp is the same (`ddcbf1af...+d35-patch:3b0ff5eed6806a72`); see design/20 section 5.
+
+## `nreft/` -- the owner's imsrg++ fork at 79e9330 (27Al NREFT task, added 2026-11-26)
+
+Generated ONLY by `tools/reference/gen_golden_nreft.sh` from the fork builds of
+`tools/reference/build_fork.sh` (design/50-al27-responses.md C1). Stamps: `FORK_79E9330_SRC_SHA256` =
+`d02cbb5d...+cxx14:175987a0848827f7` (79e9330 + the C++14 one-liner 25c88ede), phipfix variant
+`...+phipfix:b6a30e650cf30c16` (Phip not anti-Hermitian, Phitp Hermitian). Total < 1 MB.
+
+| File / directory | Content |
+|---|---|
+| `bare_emax2.txt` | `forkharness nreft-bare 2 16 all`: one-body tables (HO basis, hw 16) of FM/FPhipp L=0,2,4, FSigmap/FSigmapp/FDelta L=1,3,5 (p, n) and the raw blocks M, Phipp, Phip, Phitp, Sigma, Sigmap, Sigmapp, Delta, Deltap (J=0..5), Ms(J,L), Mg(J,L) (p), q = 0, 15, 150, 600, 1050 MeV. q = 0 entries with L = 0 derivative integrals are NaN in the fork (y^(-1/2)); tests skip non-finite values |
+| `bare_emax4_shorthands.txt` | the shorthands only, emax 4 |
+| `flow/fork-79e9330/{nat_emax2,nat_emax4_imsrg3}` | the fork's `imsrg++`: Al27 / sd-shell, NAT with `use_HF_reference_in_NAT`, NSmagnus, test interaction (2N + 3N of AGENTS.md), emax 2 and emax 4 with emax_imsrg 3; `.snt` of H, TCM and NREFT operators at q = 150 MeV (79e9330 writers), stdout (HF/NAT/flow numbers, `<op>_HF`/`<op>_IMSRG`), occupations, `cmd.txt` |
+| `flow/fork-79e9330-phipfix/...` | the same runs with the phipfix build: `intDMNREFT_Phitpp_150_2_2b.snt` (raw tilde-Phi'_2, protons) and stdout |
