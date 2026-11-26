@@ -29,6 +29,7 @@
 #include "imsrg/basis/three_body_space.h"
 #include "imsrg/comm/communicator.h"
 #include "imsrg/commutator/options.h"
+#include "imsrg/driver/config/compat.h"
 #include "imsrg/driver/config/writer.h"
 #include "imsrg/driver/operators/operator_request.h"
 #include "imsrg/driver/pipeline/charge_radius.h"
@@ -479,6 +480,15 @@ io::TokyoWriteOptions TokyoOptions(const RunConfig& c,
   o.a_ref = static_cast<std::int32_t>(ph.ms_bare->reference().target_mass());
   o.z_ref = static_cast<std::int32_t>(ph.ms_bare->reference().target_Z());
   o.a_target = static_cast<double>(ph.mass_number);
+  if (CompatOptionsFor(c.run.compat).tokyo_writer_fork_79e9330) {
+    // The fork writes after SetReference(core): Aref, Zref and the mass
+    // number of the kinetic-energy term are those of the core.
+    const basis::Partition& part = ph.ms_bare->partition();
+    o.tokyo_format = io::TokyoNumberFormat::kFork79e9330;
+    o.a_ref = static_cast<std::int32_t>(std::lround(part.A_core()));
+    o.z_ref = static_cast<std::int32_t>(std::lround(part.Z_core()));
+    o.a_target = static_cast<double>(std::lround(part.A_core()));
+  }
   o.version =
       c.provenance.version.empty() ? "imsrg" : "imsrg " + c.provenance.version;
   return o;

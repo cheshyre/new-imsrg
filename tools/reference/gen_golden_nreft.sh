@@ -21,7 +21,9 @@
 #          tilde-Phi' DMNREFT_Phitpp_150_2, Hermitian there). Outputs per run in
 #          tests/golden/nreft/flow/<variant>/<run>/: the .snt files, stdout.log up to the
 #          profiler tables (HF/NAT/flow numbers, <op>_HF and <op>_IMSRG zero bodies with 24
-#          digits), occupation files, cmd.txt. For the phipfix variant only the files that
+#          digits), occupation files, intC.mat (C_HO2NAT, armadillo binary "ARMA_MAT_BIN_FN008",
+#          column major: with the bare tables it gives the NAT-basis one-body parts C^T O C),
+#          cmd.txt. For the phipfix variant only the files that
 #          differ: the tilde-Phi' .snt and stdout.log.
 #          The run directories (with the Omega scratch files) stay in
 #          $REF_BUILD/runs-fork/<variant>/<run>.
@@ -84,7 +86,7 @@ run_flow() {   # run_flow <variant dir> <run>
   echo "== ${variant}/${run}"
   ( cd "${rd}" && "${cmd[@]}" > stdout.log 2> stderr.log ) || echo "   EXIT $?"
   local f
-  local -a keep=("${rd}"/*.snt "${rd}"/*occ*.dat "${rd}/cmd.txt")
+  local -a keep=("${rd}"/*.snt "${rd}"/*occ*.dat "${rd}/intC.mat" "${rd}/cmd.txt")
   [[ "${variant}" == *phipfix ]] && keep=("${rd}"/intDMNREFT*.snt "${rd}/cmd.txt")
   for f in "${keep[@]}"; do
     [[ -f "$f" ]] && cp "$f" "${gd}/"

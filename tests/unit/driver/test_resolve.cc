@@ -10,6 +10,7 @@
 
 #include <gtest/gtest.h>
 
+#include "imsrg/driver/config/compat.h"
 #include "imsrg/driver/config/resolve.h"
 
 namespace imsrg::driver {
@@ -108,6 +109,12 @@ TEST(Resolve, fork_compat_profile_sets_domega_default) {
   EXPECT_EQ(ResolveTree(fork).config.run.compat, Compat::kImsrgFork79e9330);
   const auto given = With(fork, {{"imsrg.step.domega", D(0.05)}});
   EXPECT_EQ(ResolveTree(given).config.imsrg.step.domega, 0.05);
+}
+
+TEST(Resolve, compat_profile_tokyo_writer_option) {
+  EXPECT_FALSE(CompatOptionsFor(Compat::kNone).tokyo_writer_fork_79e9330);
+  EXPECT_TRUE(
+      CompatOptionsFor(Compat::kImsrgFork79e9330).tokyo_writer_fork_79e9330);
 }
 
 TEST(Resolve, hf_mixing_explicit_value_wins_in_both_modes) {

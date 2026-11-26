@@ -17,9 +17,11 @@
 ///     |occupation| inside each channel (HFMBPT.cc:131-182).
 ///   * `fork_step_defaults` (lead C): the fork's Parameters.hh default
 ///     domega = 0.2 (imsrg-devel: 0.1) when imsrg.step.domega is not given.
+///   * `tokyo_writer_fork_79e9330` (lead B): the scalar tokyo writer format of
+///     the fork (7 significant digits, core reference in the header).
 /// Planned for the same profile (leads A and B): tensor normal-ordering term
 /// for a == b, J_bra != J_ket omitted; 9j skip threshold 1e-8 in the tensor
-/// commutators; the 79e9330 tokyo writer format.
+/// commutators.
 
 #include "imsrg/driver/config/schema.h"
 
@@ -32,6 +34,12 @@ struct CompatOptions {
   bool nat_sort_by_abs_occupation = false;
   /// Default imsrg.step.domega = 0.2 (fork Parameters.hh:117) instead of 0.1.
   bool fork_step_defaults = false;
+  /// Scalar tokyo (.snt) writer in the fork 79e9330 format: 7 significant
+  /// digits (scientific, precision 6, width 18), one-body |v| < 1e-7 dropped
+  /// (absolute), two-body without threshold, zero body with 6 significant
+  /// digits, header Aref/Zref/A_for_kinetic_energy of the core reference (the
+  /// fork writes after SetReference(core): 16 8 16 for an sd-shell run).
+  bool tokyo_writer_fork_79e9330 = false;
   friend bool operator==(const CompatOptions&, const CompatOptions&) = default;
 };
 
@@ -44,6 +52,7 @@ constexpr CompatOptions CompatOptionsFor(Compat c) noexcept {
     case Compat::kImsrgFork79e9330:
       o.nat_sort_by_abs_occupation = true;
       o.fork_step_defaults = true;
+      o.tokyo_writer_fork_79e9330 = true;
       break;
   }
   return o;
