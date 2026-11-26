@@ -69,6 +69,7 @@ Operator MakeOp(int rank, std::uint64_t seed) {
       }
     }
   }
+  o.SyncToDevice();
   return o;
 }
 
@@ -148,9 +149,11 @@ TEST(OperatorNorms, OneBodyIgnoresDifferentLjtzEntries) {
   }
   ASSERT_GE(q.value(), 0);
   o.one_body().set(p, q, 5.0);
+  o.SyncToDevice();
   EXPECT_EQ(OneBodyNorm(o), 0.0);
   const double w = b.orbit(p).j2.twice + 1;
   o.one_body().set(p, p, 2.0);
+  o.SyncToDevice();
   EXPECT_DOUBLE_EQ(OneBodyNorm(o), std::sqrt(4.0 * w));
   // an off-diagonal pair with equal (l, j, tz) but different n counts
   for (int i = 1; i < b.num_orbits(); ++i) {
@@ -158,6 +161,7 @@ TEST(OperatorNorms, OneBodyIgnoresDifferentLjtzEntries) {
     const auto& c = b.orbit(OrbitIndex{i});
     if (a.l == c.l && a.j2 == c.j2 && a.tz2 == c.tz2) {
       o.one_body().set(p, OrbitIndex{i}, 1.0);
+      o.SyncToDevice();
       EXPECT_DOUBLE_EQ(OneBodyNorm(o), std::sqrt(4.0 * w + 2.0 * w));
       break;
     }
@@ -168,6 +172,7 @@ TEST(OperatorNorms, ZeroBodyDoesNotEnterNorm) {
   Operator o = MakeOp(2, 2);
   const double before = Norm(o);
   o.zero_body() += 1.0e3;
+  o.SyncToDevice();
   EXPECT_EQ(Norm(o), before);
 }
 

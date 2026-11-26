@@ -105,6 +105,7 @@ void FillLocal(ThreeBody& t) {
 
 /// Copies the stored elements of the whole part `full` that `d` holds into `d`.
 void CopyLocalFrom(const ThreeBody& full, ThreeBody& d) {
+  full.SyncToHost();  // `full` may have been changed by device ops
   for (std::int32_t c = 0; c < d.num_channels(); ++c) {
     const Channel3Index ch{c};
     const std::int32_t n = d.dim(ch);
@@ -126,6 +127,7 @@ bool BitsEqual(double a, double b) {
 
 /// Compares the local rows of `d` with the whole part `full` bitwise.
 void ExpectLocalRowsEqual(const ThreeBody& full, const ThreeBody& d) {
+  full.SyncToHost();
   d.SyncToHost();
   std::int64_t checked = 0;
   for (std::int32_t c = 0; c < d.num_channels(); ++c) {
