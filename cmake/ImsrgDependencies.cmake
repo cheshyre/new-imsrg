@@ -190,6 +190,19 @@ if(IMSRG_BLAS_SERIALIZE)
 else()
   target_compile_definitions(imsrg_blas_lapack INTERFACE IMSRG_BLAS_SERIALIZE=0)
 endif()
+# Concurrent GroupedGemm items (one single-threaded BLAS call per host thread, M12a): only for a
+# reentrant, single-threaded-per-call BLAS: Accelerate (default ON), or e.g. the serial cray-libsci
+# (BLAS_LIBRARIES=.../libsci_gnu.so with IMSRG_BLAS_SERIALIZE=OFF; M14 CPU baseline, FP-Q6).
+option(IMSRG_BLAS_CONCURRENT "Run GroupedGemm items concurrently on the host threads"
+       ${_imsrg_blas_accel})
+if(IMSRG_BLAS_CONCURRENT AND IMSRG_BLAS_SERIALIZE)
+  message(FATAL_ERROR "IMSRG_BLAS_CONCURRENT needs IMSRG_BLAS_SERIALIZE=OFF (a reentrant BLAS)")
+endif()
+if(IMSRG_BLAS_CONCURRENT)
+  target_compile_definitions(imsrg_blas_lapack INTERFACE IMSRG_BLAS_CONCURRENT=1)
+else()
+  target_compile_definitions(imsrg_blas_lapack INTERFACE IMSRG_BLAS_CONCURRENT=0)
+endif()
 message(STATUS "BLAS/LAPACK backend: ${_imsrg_blas_name} (${BLAS_LIBRARIES}), "
                "calls serialized across host threads: ${IMSRG_BLAS_SERIALIZE}")
 # Device BLAS (module linalg, DeviceGemm/DeviceGroupedGemm, design/12 section 3, M14): GEMMs on

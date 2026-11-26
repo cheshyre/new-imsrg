@@ -27,7 +27,9 @@
 namespace imsrg::linalg {
 namespace {
 
-int Lead(std::int64_t ld) {
+#if !(defined(IMSRG_DEVICE_BLAS_HOST) && IMSRG_DEVICE_BLAS_HOST)
+
+[[maybe_unused]] int Lead(std::int64_t ld) {
   return static_cast<int>(std::max<std::int64_t>(ld, 1));
 }
 
@@ -44,6 +46,8 @@ Dims GemmDims(const GemmProblem& p) {
               static_cast<int>(tb ? p.B.rows : p.B.cols),
               static_cast<int>(ta ? p.A.rows : p.A.cols)};
 }
+
+#endif  // !IMSRG_DEVICE_BLAS_HOST
 
 #if defined(IMSRG_DEVICE_BLAS_ROCBLAS) && IMSRG_DEVICE_BLAS_ROCBLAS
 
