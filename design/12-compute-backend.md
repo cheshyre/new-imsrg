@@ -28,6 +28,8 @@ Kernels use a restricted vocabulary, so a future port has to replace only the fa
 | `exec::TeamFor(name, league, TeamOptions, f)` | `TeamPolicy` (+ scratch) | Team launch; `f(member)` runs on every team thread. `TeamOptions{schedule (kStatic/kDynamic, chunk 1), team_size, vector_length (<= 0: AUTO), level (kAuto/kLevel0/kLevel1), scratch_bytes}`. Asynchronous. The old `TeamFor(name, league, team, scratch_bytes, f)` overload forwards to it (static schedule). Used by `comm223` (dynamic). |
 | `exec::TeamReduce(name, league, TeamOptions, f, double& sum)` | `parallel_reduce` over a `TeamPolicy` | `f(member, double& partial)`; blocking. With `kDynamic` the reduction order, hence the floating-point sum, may vary run to run. |
 | `exec::TeamMember`, `TeamScratchMax(level)`, `ResolveScratchLevel(opts)` | `member_type`, `scratch_size_max` | One member type for both schedules (static_assert). `kAuto` uses level 0 if `scratch_bytes` fits `TeamScratchMax(0)`, else level 1; `IMSRG_CHECK` that it fits level 1. Nested `TeamThreadRange`/`ThreadVectorRange`/`single` stay Kokkos. |
+| `exec::kDeviceKernels` | `DefaultExecSpace` is not the host space | M14: selects a device shape for kernels whose host shape is one thread per row looping over a long ragged range (comm122, ph combine and inverse, ladder antisymmetrization, tensor comm221st). Both shapes do the same per-element arithmetic (bitwise equal) unless a reduction order changes (tensor comm221st, documented there). Device shapes of the distributed (owned-column) paths are not done yet. |
+| `exec::NestedFor(name, n, count, body)` | host: `ParallelForDynamic` over i with the k loop inside; device: one team (64 threads) per i, `TeamThreadRange` over k | M14; for items whose k iterations are expensive (tensor phst inverse, comm122st). Cheap per-element work is better flattened (one thread per element, see comm122ss). |
 | `exec::Fence` | Kokkos equivalent | |
 
 The **mandatory backends** are Serial and OpenMP, both tested on the dev machine. CUDA and HIP
@@ -44,6 +46,17 @@ must compile and run on clusters later. Threads is optional.
   threads, one BLAS call per item, largest first (M12a); otherwise a sequential loop, M12-Q5; later
   versions may use streams, MAGMA vbatched or cuBLAS grouped GEMM), `eigh` (host LAPACK `dsyevd`,
   used for HF and small problems), `solve`/`lstsq` for DIIS.
+* **Device BLAS (M14, `linalg/device_blas.h`):** `DeviceGemm` / `DeviceGroupedGemm` on operands in
+  exec device memory, backend chosen at configure time by `IMSRG_DEVICE_BLAS`: `HOST` (CPU builds:
+  fence, then `GroupedGemm`), `ROCBLAS` (hip default: `rocblas_dgemm` on the Kokkos HIP stream;
+  grouped calls fork onto four side streams, largest problem first to the least loaded stream, and
+  join with events, so the calls are ordered like a kernel and asynchronous), `KOKKOSKERNELS`
+  (`KokkosBlas::gemm` on LayoutLeft subviews; written, not yet built, AL-E-Q1). The IMSRG(2)
+  terms (ladder, ph, 111, tensor ladder and ph Zbar) call these; the problems of one grouped call
+  must have disjoint C, so `C = A B; C -= D E` is two grouped calls. Public headers stay free of
+  HIP and Kokkos (the implementation is in `linalg/kernels/`).
+* `IMSRG_BLAS_CONCURRENT` (default: Accelerate only) runs GroupedGemm items concurrently with any
+  reentrant BLAS that stays single-threaded per call, e.g. the serial cray-libsci (AL-E-Q3).
 * Backends are chosen at configure time. A test runs every op against a naive reference loop.
 * Threading: BLAS calls made inside parallel regions run single-threaded
   (`VECLIB_MAXIMUM_THREADS=1`, `OPENBLAS_NUM_THREADS=1`, or MKL sequential); large standalone GEMMs

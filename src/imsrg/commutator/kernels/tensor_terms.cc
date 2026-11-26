@@ -20,6 +20,7 @@
 #include "imsrg/commutator/tensor.h"
 #include "imsrg/exec/kokkos_backend.h"
 #include "imsrg/linalg/blas.h"
+#include "imsrg/linalg/device_blas.h"
 
 namespace imsrg::commutator::tensor_terms {
 
@@ -44,9 +45,6 @@ int CheckInputs(const op::Operator& X, const op::Operator& Y,
     throw NotImplementedError(
         "tensor commutator: rank_J > 2 emax + 1 exceeds the 6j tables");
   }
-  IMSRG_CHECK(Z.one_body().buffer().host_is_device(),
-              "tensor commutator: host BLAS on device memory (GPU backends "
-              "need a device gemm)");
   exec::Fence("commutator::tensor");
   return op::HermiticitySign(zs.hermiticity);
 }
@@ -101,9 +99,45 @@ OneBodyArgs MakeOneBodyArgs(const op::Operator& X, const op::Operator& Y,
   return a;
 }
 
+template <class T>
+exec::DeviceBuffer<T> ToDevice(const std::vector<T>& v, const char* label) {
+  exec::DeviceBuffer<T> b(v.size(), label);
+  if (!v.empty()) b.CopyFromHost(v);
+  return b;
+}
+
 IMSRG_INLINE_FUNCTION int Imin(int a, int b) { return a < b ? a : b; }
 IMSRG_INLINE_FUNCTION int Imax(int a, int b) { return a > b ? a : b; }
 IMSRG_INLINE_FUNCTION int Iabs(int a) { return a < 0 ? -a : a; }
+
+/// Adds the contribution of orbit c (pass 0: a hole, pass 1: a particle) to
+/// Z1(i, j) of comm221st (the J1, J2 sums), in the order of the host loop.
+IMSRG_FORCEINLINE_FUNCTION void Add221Orbit(const OneBodyArgs& a,
+                                            const TensorTwoBodyView& vpp,
+                                            const TensorTwoBodyView& vhh, int i,
+                                            int j, int pass, int c,
+                                            double& cij) {
+  const int ji = a.j2[i];
+  const int jj = a.j2[j];
+  const int jc = a.j2[c];
+  const double oc = a.occ[c];
+  for (int J1 = Iabs(jc - ji) / 2; J1 <= (jc + ji) / 2; ++J1) {
+    const int J2min = Imax(Iabs(jc - jj) / 2, Iabs(a.L - J1));
+    const int J2max = Imin((jc + jj) / 2, J1 + a.L);
+    for (int J2 = J2min; J2 <= J2max; ++J2) {
+      const double hat = Kokkos::sqrt((2.0 * J1 + 1) * (2.0 * J2 + 1));
+      const double sj =
+          a.sixjL(TwoJ{2 * J1}, TwoJ{2 * J2}, TwoJ{jj}, TwoJ{ji}, TwoJ{jc});
+      const int ph = Phase((jj + jc) / 2 + J1 + a.L);
+      const double mh = vhh.get_unnormalized(c, i, c, j, 2 * J1, 2 * J2);
+      const double m =
+          pass == 0 ? oc * vpp.get_unnormalized(c, i, c, j, 2 * J1, 2 * J2) +
+                          (1.0 - oc) * mh
+                    : mh;
+      cij += hat * sj * ph * m;
+    }
+  }
+}
 
 }  // namespace
 
@@ -113,10 +147,10 @@ void Comm111st(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   const auto x1 = std::as_const(X).one_body().device_view();
   const auto y1 = std::as_const(Y).one_body().device_view();
   const auto z1 = Z.one_body().device_view();
-  linalg::Gemm(1.0, x1, linalg::Op::kNoTrans, y1, linalg::Op::kNoTrans, 1.0,
-               z1);
-  linalg::Gemm(-1.0, y1, linalg::Op::kNoTrans, x1, linalg::Op::kNoTrans, 1.0,
-               z1);
+  linalg::DeviceGemm(1.0, x1, linalg::Op::kNoTrans, y1, linalg::Op::kNoTrans,
+                     1.0, z1);
+  linalg::DeviceGemm(-1.0, y1, linalg::Op::kNoTrans, x1, linalg::Op::kNoTrans,
+                     1.0, z1);
 }
 
 void Comm121st(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
@@ -274,6 +308,347 @@ struct Comm122Args {
 };
 static_assert(std::is_trivially_copyable_v<Comm122Args>);
 
+/// One element (row rr of the stacked stored blocks of Z, column iket) of
+/// comm122st, plus its mirror in a diagonal block. Every element is written
+/// by exactly one (rr, iket). Cost: the lifted and part-2 lists of the row
+/// and the column.
+IMSRG_FORCEINLINE_FUNCTION void Comm122stElement(
+    const OneBodyArgs& a, const Comm122Args& k,
+    const basis::TwoBodyTableView& tb, exec::Index rr, int iket) {
+  const int blk = detail::FindBlock(k.br.row_offset, k.br.num_blocks, rr);
+  const int ibra = static_cast<int>(rr) - k.br.row_offset[blk];
+  const int cb = k.br.ch_bra[blk];
+  const int ck = k.br.ch_ket[blk];
+  const int J1 = tb.channel_two_j[cb] / 2;
+  const int J2 = tb.channel_two_j[ck] / 2;
+  const int nb = k.br.nbra[blk];
+  const int nk = k.br.nket[blk];
+  const double hat = Kokkos::sqrt((2.0 * J1 + 1) * (2.0 * J2 + 1));
+  const KetIndex gb = tb.global_ket(ChannelIndex{cb}, LocalKetIndex{ibra});
+  const int i = tb.ket_p[gb.value()];
+  const int j = tb.ket_q[gb.value()];
+  const int ji = a.j2[i];
+  const int jj = a.j2[j];
+  // Stored blocks of Y (part 1) and of the scalar X (part 2), if any.
+  const std::int64_t yo =
+      (a.y2.data == nullptr) ? -1 : a.y2.block_offset[cb * k.num_channels + ck];
+  const double* yb = (yo >= 0) ? a.y2.data + yo : nullptr;
+  const std::int64_t xbo =
+      (a.x2.data == nullptr) ? -1 : a.x2.block_offset[cb * k.num_channels + cb];
+  const std::int64_t xko =
+      (a.x2.data == nullptr) ? -1 : a.x2.block_offset[ck * k.num_channels + ck];
+  const double* xbb = (xbo >= 0) ? a.x2.data + xbo : nullptr;  // (cb, cb)
+  const double* xkk = (xko >= 0) ? a.x2.data + xko : nullptr;  // (ck, ck)
+  const bool dij = (i == j);
+  const int row_b = k.ket_offset[cb] + ibra;
+  const int a1b = k.lifted.offsets[2 * row_b];
+  const int a1e = k.lifted.offsets[2 * row_b + 1];
+  const int a2e = k.lifted.offsets[2 * row_b + 2];
+  const int b1b = k.bra1.offsets[k.br.row_offset[blk] + ibra];
+  const int b1e = k.bra1.offsets[k.br.row_offset[blk] + ibra + 1];
+  const int b2b = k.bra2.offsets[k.br.row_offset[blk] + ibra];
+  const int b2e = k.bra2.offsets[k.br.row_offset[blk] + ibra + 1];
+  const KetIndex gk = tb.global_ket(ChannelIndex{ck}, LocalKetIndex{iket});
+  const int kk = tb.ket_p[gk.value()];
+  const int l = tb.ket_q[gk.value()];
+  const int jk = a.j2[kk];
+  const int jl = a.j2[l];
+  const bool dkl = (kk == l);
+  const int row_k = k.ket_offset[ck] + iket;
+  const std::int64_t col = k.col_offset[blk] + iket;
+  // Part 1: scalar one-body X1 with the tensor two-body Y2.
+  double c1 = 0.0, c2 = 0.0, c3 = 0.0, c4 = 0.0;
+  if (yb != nullptr) {
+    const double* ycol = yb + static_cast<std::int64_t>(iket) * nb;
+    for (int e = a1b; e < a1e; ++e)
+      c1 += a.x1(k.lifted.from[e], k.lifted.to[e]) * k.lifted.coef[e] *
+            ycol[k.lifted.m[e]];
+    if (dij) {
+      c2 = c1;
+    } else {
+      for (int e = a1e; e < a2e; ++e)
+        c2 += a.x1(k.lifted.from[e], k.lifted.to[e]) * k.lifted.coef[e] *
+              ycol[k.lifted.m[e]];
+    }
+    const int ka = k.lifted.offsets[2 * row_k];
+    const int kb = k.lifted.offsets[2 * row_k + 1];
+    const int ke = k.lifted.offsets[2 * row_k + 2];
+    for (int e = ka; e < kb; ++e)
+      c3 += a.x1(k.lifted.to[e], k.lifted.from[e]) * k.lifted.coef[e] *
+            yb[ibra + static_cast<std::int64_t>(k.lifted.m[e]) * nb];
+    if (dkl) {
+      c4 = c3;
+    } else {
+      for (int e = kb; e < ke; ++e)
+        c4 += a.x1(k.lifted.to[e], k.lifted.from[e]) * k.lifted.coef[e] *
+              yb[ibra + static_cast<std::int64_t>(k.lifted.m[e]) * nb];
+    }
+    // The unnormalized elements carry sqrt2 for k == l (bra lists) or
+    // i == j (ket lists).
+    const double sbra = dkl ? constants::kSqrt2 : 1.0;
+    const double sket = dij ? constants::kSqrt2 : 1.0;
+    c1 *= sbra;
+    c2 *= sbra;
+    c3 *= sket;
+    c4 *= sket;
+  }
+  double cijkl = c1 + c2 - c3 - c4;
+  // Part 2: tensor one-body Y1 with the scalar two-body X2.
+  c1 = c2 = c3 = c4 = 0.0;
+  const int ph1 = Phase((ji + jj) / 2 + J2 + a.L);
+  const int ph23 = Phase(J1 - J2 + a.L);
+  const int ph4 = Phase((jk + jl) / 2 - J1 + a.L);
+  if (xkk != nullptr) {
+    const double* xcol = xkk + static_cast<std::int64_t>(iket) * nk;
+    for (int e = b1b; e < b1e; ++e)
+      c1 += a.y1(k.bra1.from[e], k.bra1.to[e]) * k.bra1.coef[e] *
+            xcol[k.bra1.m[e]];
+    for (int e = b2b; e < b2e; ++e)
+      c2 += a.y1(k.bra2.from[e], k.bra2.to[e]) * k.bra2.coef[e] *
+            xcol[k.bra2.m[e]];
+    if (dkl) {
+      c1 *= constants::kSqrt2;
+      c2 *= constants::kSqrt2;
+    }
+  }
+  if (xbb != nullptr) {
+    const int c3b = k.ket3.offsets[col];
+    const int c3e = k.ket3.offsets[col + 1];
+    for (int e = c3b; e < c3e; ++e)
+      c3 += a.y1(k.ket3.from[e], k.ket3.to[e]) * k.ket3.coef[e] *
+            xbb[ibra + static_cast<std::int64_t>(k.ket3.m[e]) * nb];
+    if (dkl) {
+      c4 = -c3;
+    } else {
+      const int c4b = k.ket4.offsets[col];
+      const int c4e = k.ket4.offsets[col + 1];
+      for (int e = c4b; e < c4e; ++e)
+        c4 += a.y1(k.ket4.from[e], k.ket4.to[e]) * k.ket4.coef[e] *
+              xbb[ibra + static_cast<std::int64_t>(k.ket4.m[e]) * nb];
+    }
+    if (dij) {
+      c3 *= constants::kSqrt2;
+      c4 *= constants::kSqrt2;
+    }
+  }
+  cijkl += hat * (ph1 * c1 + ph23 * c2 + ph23 * c3 + ph4 * c4);
+  const double norm = (dij == dkl) ? (dij ? 2.0 : 1.0) : constants::kSqrt2;
+  const double v = cijkl / norm;
+  double* zb = k.zd + k.br.offset[blk];
+  zb[ibra + static_cast<std::int64_t>(iket) * nb] += v;
+  if (cb == ck && iket < ibra)
+    zb[iket + static_cast<std::int64_t>(ibra) * nb] += a.hZ * v;
+}
+
+/// comm122st on the device as GEMMs (M14). With the lifted scalar one-body
+/// operators per channel, L_c(r, m) = sum_t coef_t x1(from_t, to_t) and R_c
+/// the same with x1 transposed (lists 1 and 2 of row r; list 1 twice for
+/// r = (i, i)), and the part-2 lists folded into B (bra lists, rows scaled by
+/// hat ph1 resp. hat ph23) and K (ket lists, columns scaled by hat ph23 resp.
+/// hat ph4; K4 = -K3 for k = l), every stored block (b, k) of Z gets
+///   G1 = L_b Y_bk + B_bk X_kk,   G2 = X_bb K_bk - Y_bk R_k^T,
+///   Z(r, c) += (s_c G1 + s_r G2) / norm(r, c)
+/// with s = sqrt2 for an equal-orbit ket (the unnormalized elements), which is
+/// the element-wise formula of Comm122stElement regrouped (summation order
+/// differs). Four grouped device GEMM calls; scratch: four Z-sized buffers.
+void Comm122stGemm(const op::Operator& X, const op::Operator& Y,
+                   op::Operator& Z, const OneBodyArgs& a, const Comm122Args& k,
+                   const basis::TwoBodyTableView& tb, const BlockRows& rows,
+                   const basis::TwoBodyChannels& tbh, int hZ) {
+  const auto nchan = static_cast<std::size_t>(tbh.num_channels());
+  std::vector<std::int64_t> kofs(nchan + 1, 0);
+  std::vector<std::int64_t> lofs(nchan + 1, 0);
+  for (std::size_t c = 0; c < nchan; ++c) {
+    const auto n = static_cast<std::int64_t>(
+        tbh.channel_kets(ChannelIndex{static_cast<std::int32_t>(c)}).size());
+    kofs[c + 1] = kofs[c] + n;
+    lofs[c + 1] = lofs[c] + n * n;
+  }
+  const auto d_kofs = ToDevice(kofs, "imsrg::comm122st::kofs");
+  const auto d_lofs = ToDevice(lofs, "imsrg::comm122st::lofs");
+  const std::int64_t lsize = lofs.back();
+  exec::DeviceBuffer<double> lr(static_cast<std::size_t>(2 * lsize),
+                                "imsrg::comm122st::lr");
+  const std::size_t zsize = Z.two_body().matrix().buffer().size();
+  exec::DeviceBuffer<double> bk(2 * zsize, "imsrg::comm122st::bk");
+  exec::DeviceBuffer<double> g(2 * zsize, "imsrg::comm122st::g");
+  const auto zs = static_cast<std::int64_t>(zsize);
+  const int nc = static_cast<int>(nchan);
+  double* lrd = lr.device_data();
+  double* bkd = bk.device_data();
+  double* gd = g.device_data();
+  const std::int64_t* ko = d_kofs.device_data();
+  const std::int64_t* lo = d_lofs.device_data();
+  // 1. L and R, one thread per row of every channel.
+  exec::ParallelFor(
+      "commutator::comm122st::lift", kofs.back(),
+      IMSRG_LAMBDA(const exec::Index row) {
+        const int c = detail::FindBlock(ko, nc, row);
+        const std::int64_t n = ko[c + 1] - ko[c];
+        const std::int64_t r = row - ko[c];
+        const KetIndex gk =
+            tb.global_ket(ChannelIndex{c}, LocalKetIndex{static_cast<int>(r)});
+        const bool dij = tb.ket_p[gk.value()] == tb.ket_q[gk.value()];
+        const int e1 = k.lifted.offsets[2 * row];
+        const int e2 = k.lifted.offsets[2 * row + 1];
+        const int e3 = dij ? e2 : k.lifted.offsets[2 * row + 2];
+        const double w1 = dij ? 2.0 : 1.0;
+        double* lc = lrd + lo[c];
+        double* rc = lrd + lsize + lo[c];
+        for (int e = e1; e < e3; ++e) {
+          const double w = e < e2 ? w1 : 1.0;
+          const std::int64_t idx = r + k.lifted.m[e] * n;
+          lc[idx] +=
+              w * k.lifted.coef[e] * a.x1(k.lifted.from[e], k.lifted.to[e]);
+          rc[idx] +=
+              w * k.lifted.coef[e] * a.x1(k.lifted.to[e], k.lifted.from[e]);
+        }
+      });
+  // 2. B (rows of the stored blocks) and K (columns), Z's block layout.
+  exec::ParallelFor(
+      "commutator::comm122st::bra_lists", rows.num_rows,
+      IMSRG_LAMBDA(const exec::Index rr) {
+        const int blk = detail::FindBlock(k.br.row_offset, k.br.num_blocks, rr);
+        const int ibra = static_cast<int>(rr) - k.br.row_offset[blk];
+        const int cb = k.br.ch_bra[blk];
+        const int ck = k.br.ch_ket[blk];
+        const int J1 = tb.channel_two_j[cb] / 2;
+        const int J2 = tb.channel_two_j[ck] / 2;
+        const int nb = k.br.nbra[blk];
+        const double hat = Kokkos::sqrt((2.0 * J1 + 1) * (2.0 * J2 + 1));
+        const KetIndex gb =
+            tb.global_ket(ChannelIndex{cb}, LocalKetIndex{ibra});
+        const int ji = a.j2[tb.ket_p[gb.value()]];
+        const int jj = a.j2[tb.ket_q[gb.value()]];
+        const double f1 = hat * Phase((ji + jj) / 2 + J2 + a.L);
+        const double f2 = hat * Phase(J1 - J2 + a.L);
+        double* bb = bkd + k.br.offset[blk] + ibra;
+        for (int e = k.bra1.offsets[rr]; e < k.bra1.offsets[rr + 1]; ++e)
+          bb[static_cast<std::int64_t>(k.bra1.m[e]) * nb] +=
+              f1 * a.y1(k.bra1.from[e], k.bra1.to[e]) * k.bra1.coef[e];
+        for (int e = k.bra2.offsets[rr]; e < k.bra2.offsets[rr + 1]; ++e)
+          bb[static_cast<std::int64_t>(k.bra2.m[e]) * nb] +=
+              f2 * a.y1(k.bra2.from[e], k.bra2.to[e]) * k.bra2.coef[e];
+      });
+  const std::int32_t* col_offset = k.col_offset;
+  std::int64_t ncols = 0;  // = col_offset[num_blocks]
+  for (const auto& info : Z.two_body().matrix().blocks()) ncols += info.cols;
+  exec::ParallelFor(
+      "commutator::comm122st::ket_lists", ncols,
+      IMSRG_LAMBDA(const exec::Index col) {
+        const int blk = detail::FindBlock(col_offset, k.br.num_blocks, col);
+        const int iket = static_cast<int>(col) - col_offset[blk];
+        const int cb = k.br.ch_bra[blk];
+        const int ck = k.br.ch_ket[blk];
+        const int J1 = tb.channel_two_j[cb] / 2;
+        const int J2 = tb.channel_two_j[ck] / 2;
+        const int nb = k.br.nbra[blk];
+        const double hat = Kokkos::sqrt((2.0 * J1 + 1) * (2.0 * J2 + 1));
+        const KetIndex gk =
+            tb.global_ket(ChannelIndex{ck}, LocalKetIndex{iket});
+        const int kk = tb.ket_p[gk.value()];
+        const int l = tb.ket_q[gk.value()];
+        const bool dkl = kk == l;
+        const double ph23 = Phase(J1 - J2 + a.L);
+        const double ph4 = Phase((a.j2[kk] + a.j2[l]) / 2 - J1 + a.L);
+        const double f3 = hat * (dkl ? ph23 - ph4 : ph23);
+        const double f4 = hat * ph4;
+        double* kc =
+            bkd + zs + k.br.offset[blk] + static_cast<std::int64_t>(iket) * nb;
+        for (int e = k.ket3.offsets[col]; e < k.ket3.offsets[col + 1]; ++e)
+          kc[k.ket3.m[e]] +=
+              f3 * a.y1(k.ket3.from[e], k.ket3.to[e]) * k.ket3.coef[e];
+        if (!dkl) {
+          for (int e = k.ket4.offsets[col]; e < k.ket4.offsets[col + 1]; ++e)
+            kc[k.ket4.m[e]] +=
+                f4 * a.y1(k.ket4.from[e], k.ket4.to[e]) * k.ket4.coef[e];
+        }
+      });
+  // 3. The GEMMs (beta = 1 onto the zeroed G; one C per call and buffer).
+  const auto& ymat = Y.two_body().matrix();
+  const double* yd =
+      Y.two_body().allocated() ? ymat.buffer().device_data() : nullptr;
+  std::vector<std::int64_t> x_block(nchan, -1);
+  const double* xd = nullptr;
+  if (X.two_body().allocated()) {
+    xd = X.two_body().matrix().buffer().device_data();
+    for (const auto& info : X.two_body().matrix().blocks()) {
+      if (info.row_block != info.col_block || info.rows == 0) continue;
+      x_block[static_cast<std::size_t>(info.row_block.value())] = info.offset;
+    }
+  }
+  using linalg::GemmProblem;
+
+  using linalg::Op;
+  std::vector<GemmProblem> call_a;
+  std::vector<GemmProblem> call_b;
+  for (const auto& info : Z.two_body().matrix().blocks()) {
+    const std::int64_t nb = info.rows;
+    const std::int64_t nk = info.cols;
+    if (nb == 0 || nk == 0) continue;
+    const auto cb = static_cast<std::size_t>(info.row_block.value());
+    const auto ck = static_cast<std::size_t>(info.col_block.value());
+    const MatrixView<double> g1{gd + info.offset, nb, nk, nb};
+    const MatrixView<double> g2{gd + zs + info.offset, nb, nk, nb};
+    if (yd != nullptr) {
+      const auto yk = ymat.find_block(info.row_block, info.col_block);
+      if (yk.has_value()) {
+        const MatrixView<const double> yb{yd + ymat.block_info(*yk).offset, nb,
+                                          nk, nb};
+        call_a.push_back(GemmProblem{
+            1.0, MatrixView<const double>{lrd + lofs[cb], nb, nb, nb},
+            Op::kNoTrans, yb, Op::kNoTrans, 1.0, g1});
+        call_b.push_back(GemmProblem{
+            -1.0, yb, Op::kNoTrans,
+            MatrixView<const double>{lrd + lsize + lofs[ck], nk, nk, nk},
+            Op::kTrans, 1.0, g2});
+      }
+    }
+    if (xd != nullptr && x_block[ck] >= 0) {
+      call_b.push_back(GemmProblem{
+          1.0, MatrixView<const double>{bkd + info.offset, nb, nk, nb},
+          Op::kNoTrans, MatrixView<const double>{xd + x_block[ck], nk, nk, nk},
+          Op::kNoTrans, 1.0, g1});
+    }
+    if (xd != nullptr && x_block[cb] >= 0) {
+      call_a.push_back(GemmProblem{
+          1.0, MatrixView<const double>{xd + x_block[cb], nb, nb, nb},
+          Op::kNoTrans,
+          MatrixView<const double>{bkd + zs + info.offset, nb, nk, nb},
+          Op::kNoTrans, 1.0, g2});
+    }
+  }
+  linalg::DeviceGroupedGemm(call_a);
+  linalg::DeviceGroupedGemm(call_b);
+  // 4. Z += (s_c G1 + s_r G2) / norm; diagonal blocks: c <= r and the mirror.
+  double* zd = Z.two_body().matrix().buffer().device_data();
+  exec::ParallelFor(
+      "commutator::comm122st::combine", zs, IMSRG_LAMBDA(const exec::Index e) {
+        const int blk = detail::FindBlock(k.br.offset, k.br.num_blocks, e);
+        const std::int64_t nb = k.br.nbra[blk];
+        const std::int64_t local = e - k.br.offset[blk];
+        const std::int64_t c = local / nb;
+        const std::int64_t r = local - c * nb;
+        const int cb = k.br.ch_bra[blk];
+        const int ck = k.br.ch_ket[blk];
+        if (cb == ck && c > r) return;  // written as the mirror of (c, r)
+        const KetIndex gb =
+            tb.global_ket(ChannelIndex{cb}, LocalKetIndex{static_cast<int>(r)});
+        const KetIndex gk =
+            tb.global_ket(ChannelIndex{ck}, LocalKetIndex{static_cast<int>(c)});
+        const bool dij = tb.ket_p[gb.value()] == tb.ket_q[gb.value()];
+        const bool dkl = tb.ket_p[gk.value()] == tb.ket_q[gk.value()];
+        const double sc = dkl ? constants::kSqrt2 : 1.0;
+        const double sr = dij ? constants::kSqrt2 : 1.0;
+        const double norm =
+            (dij == dkl) ? (dij ? 2.0 : 1.0) : constants::kSqrt2;
+        const double v = (sc * gd[e] + sr * gd[zs + e]) / norm;
+        zd[e] += v;
+        if (cb == ck && c < r) zd[k.br.offset[blk] + c + r * nb] += hZ * v;
+      });
+  exec::Fence("commutator::comm122st_gemm");
+}
+
 }  // namespace
 
 void Comm122st(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
@@ -302,145 +677,23 @@ void Comm122st(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   k.num_channels = nch;
   k.zd = Z.two_body().matrix().buffer().device_data();
   const basis::TwoBodyTableView tb = ctx.tables.two_body();
-  exec::ParallelForDynamic(
+  // One item per row of the stacked stored blocks, its columns iket (up to
+  // ibra in diagonal blocks), inside the item (host). The device takes the
+  // GEMM form (Comm122stGemm); NestedFor's device branch is unused here.
+  if constexpr (exec::kDeviceKernels) {
+    Comm122stGemm(X, Y, Z, a, k, tb, rows, ctx.ms->two_body(), hZ);
+    return;
+  }
+  exec::NestedFor(
       "commutator::comm122st", rows.num_rows,
       IMSRG_LAMBDA(const exec::Index rr) {
         const int blk = detail::FindBlock(k.br.row_offset, k.br.num_blocks, rr);
         const int ibra = static_cast<int>(rr) - k.br.row_offset[blk];
-        const int cb = k.br.ch_bra[blk];
-        const int ck = k.br.ch_ket[blk];
-        const int J1 = tb.channel_two_j[cb] / 2;
-        const int J2 = tb.channel_two_j[ck] / 2;
-        const int nb = k.br.nbra[blk];
-        const int nk = k.br.nket[blk];
-        const double hat = Kokkos::sqrt((2.0 * J1 + 1) * (2.0 * J2 + 1));
-        const KetIndex gb =
-            tb.global_ket(ChannelIndex{cb}, LocalKetIndex{ibra});
-        const int i = tb.ket_p[gb.value()];
-        const int j = tb.ket_q[gb.value()];
-        const int ji = a.j2[i];
-        const int jj = a.j2[j];
-        // Stored blocks of Y (part 1) and of the scalar X (part 2), if any.
-        const std::int64_t yo =
-            (a.y2.data == nullptr)
-                ? -1
-                : a.y2.block_offset[cb * k.num_channels + ck];
-        const double* yb = (yo >= 0) ? a.y2.data + yo : nullptr;
-        const std::int64_t xbo =
-            (a.x2.data == nullptr)
-                ? -1
-                : a.x2.block_offset[cb * k.num_channels + cb];
-        const std::int64_t xko =
-            (a.x2.data == nullptr)
-                ? -1
-                : a.x2.block_offset[ck * k.num_channels + ck];
-        const double* xbb = (xbo >= 0) ? a.x2.data + xbo : nullptr;  // (cb, cb)
-        const double* xkk = (xko >= 0) ? a.x2.data + xko : nullptr;  // (ck, ck)
-        const bool dij = (i == j);
-        const int row_b = k.ket_offset[cb] + ibra;
-        const int a1b = k.lifted.offsets[2 * row_b];
-        const int a1e = k.lifted.offsets[2 * row_b + 1];
-        const int a2e = k.lifted.offsets[2 * row_b + 2];
-        const int b1b = k.bra1.offsets[k.br.row_offset[blk] + ibra];
-        const int b1e = k.bra1.offsets[k.br.row_offset[blk] + ibra + 1];
-        const int b2b = k.bra2.offsets[k.br.row_offset[blk] + ibra];
-        const int b2e = k.bra2.offsets[k.br.row_offset[blk] + ibra + 1];
-        const int iket_end = (cb == ck) ? ibra + 1 : nk;
-        for (int iket = 0; iket < iket_end; ++iket) {
-          const KetIndex gk =
-              tb.global_ket(ChannelIndex{ck}, LocalKetIndex{iket});
-          const int kk = tb.ket_p[gk.value()];
-          const int l = tb.ket_q[gk.value()];
-          const int jk = a.j2[kk];
-          const int jl = a.j2[l];
-          const bool dkl = (kk == l);
-          const int row_k = k.ket_offset[ck] + iket;
-          const std::int64_t col = k.col_offset[blk] + iket;
-          // Part 1: scalar one-body X1 with the tensor two-body Y2.
-          double c1 = 0.0, c2 = 0.0, c3 = 0.0, c4 = 0.0;
-          if (yb != nullptr) {
-            const double* ycol = yb + static_cast<std::int64_t>(iket) * nb;
-            for (int e = a1b; e < a1e; ++e)
-              c1 += a.x1(k.lifted.from[e], k.lifted.to[e]) * k.lifted.coef[e] *
-                    ycol[k.lifted.m[e]];
-            if (dij) {
-              c2 = c1;
-            } else {
-              for (int e = a1e; e < a2e; ++e)
-                c2 += a.x1(k.lifted.from[e], k.lifted.to[e]) *
-                      k.lifted.coef[e] * ycol[k.lifted.m[e]];
-            }
-            const int ka = k.lifted.offsets[2 * row_k];
-            const int kb = k.lifted.offsets[2 * row_k + 1];
-            const int ke = k.lifted.offsets[2 * row_k + 2];
-            for (int e = ka; e < kb; ++e)
-              c3 += a.x1(k.lifted.to[e], k.lifted.from[e]) * k.lifted.coef[e] *
-                    yb[ibra + static_cast<std::int64_t>(k.lifted.m[e]) * nb];
-            if (dkl) {
-              c4 = c3;
-            } else {
-              for (int e = kb; e < ke; ++e)
-                c4 += a.x1(k.lifted.to[e], k.lifted.from[e]) *
-                      k.lifted.coef[e] *
-                      yb[ibra + static_cast<std::int64_t>(k.lifted.m[e]) * nb];
-            }
-            // The unnormalized elements carry sqrt2 for k == l (bra lists) or
-            // i == j (ket lists).
-            const double sbra = dkl ? constants::kSqrt2 : 1.0;
-            const double sket = dij ? constants::kSqrt2 : 1.0;
-            c1 *= sbra;
-            c2 *= sbra;
-            c3 *= sket;
-            c4 *= sket;
-          }
-          double cijkl = c1 + c2 - c3 - c4;
-          // Part 2: tensor one-body Y1 with the scalar two-body X2.
-          c1 = c2 = c3 = c4 = 0.0;
-          const int ph1 = Phase((ji + jj) / 2 + J2 + a.L);
-          const int ph23 = Phase(J1 - J2 + a.L);
-          const int ph4 = Phase((jk + jl) / 2 - J1 + a.L);
-          if (xkk != nullptr) {
-            const double* xcol = xkk + static_cast<std::int64_t>(iket) * nk;
-            for (int e = b1b; e < b1e; ++e)
-              c1 += a.y1(k.bra1.from[e], k.bra1.to[e]) * k.bra1.coef[e] *
-                    xcol[k.bra1.m[e]];
-            for (int e = b2b; e < b2e; ++e)
-              c2 += a.y1(k.bra2.from[e], k.bra2.to[e]) * k.bra2.coef[e] *
-                    xcol[k.bra2.m[e]];
-            if (dkl) {
-              c1 *= constants::kSqrt2;
-              c2 *= constants::kSqrt2;
-            }
-          }
-          if (xbb != nullptr) {
-            const int c3b = k.ket3.offsets[col];
-            const int c3e = k.ket3.offsets[col + 1];
-            for (int e = c3b; e < c3e; ++e)
-              c3 += a.y1(k.ket3.from[e], k.ket3.to[e]) * k.ket3.coef[e] *
-                    xbb[ibra + static_cast<std::int64_t>(k.ket3.m[e]) * nb];
-            if (dkl) {
-              c4 = -c3;
-            } else {
-              const int c4b = k.ket4.offsets[col];
-              const int c4e = k.ket4.offsets[col + 1];
-              for (int e = c4b; e < c4e; ++e)
-                c4 += a.y1(k.ket4.from[e], k.ket4.to[e]) * k.ket4.coef[e] *
-                      xbb[ibra + static_cast<std::int64_t>(k.ket4.m[e]) * nb];
-            }
-            if (dij) {
-              c3 *= constants::kSqrt2;
-              c4 *= constants::kSqrt2;
-            }
-          }
-          cijkl += hat * (ph1 * c1 + ph23 * c2 + ph23 * c3 + ph4 * c4);
-          const double norm =
-              (dij == dkl) ? (dij ? 2.0 : 1.0) : constants::kSqrt2;
-          const double v = cijkl / norm;
-          double* zb = k.zd + k.br.offset[blk];
-          zb[ibra + static_cast<std::int64_t>(iket) * nb] += v;
-          if (cb == ck && iket < ibra)
-            zb[iket + static_cast<std::int64_t>(ibra) * nb] += a.hZ * v;
-        }
+        return static_cast<exec::Index>(
+            k.br.ch_bra[blk] == k.br.ch_ket[blk] ? ibra + 1 : k.br.nket[blk]);
+      },
+      IMSRG_LAMBDA(const exec::Index rr, const exec::Index iket) {
+        Comm122stElement(a, k, tb, rr, static_cast<int>(iket));
       });
   exec::Fence("commutator::comm122st");
 }
@@ -472,57 +725,128 @@ void Comm222PpHh221st(const op::Operator& X, const op::Operator& Y,
       whh[static_cast<std::size_t>(c)].push_back((ha && hb) ? na * nb : 0.0);
     }
   }
-  // Mpp and Mhh with Z's block layout (host-accessible memory, host BLAS).
+  // Mpp and Mhh with Z's block layout, on the device (M14):
+  //   M_c(b, k) = X_b diag(w_b) Y_bk - Y_bk diag(w_k) X_k
+  // for w = Pbar (pp) and P (hh). The weights go into scaled copies of the
+  // scalar X (XD = X diag(w), DX = diag(w) X: four copies of the small scalar
+  // two-body part) instead of a weighted copy of every tensor block of Y.
+  // Two grouped GEMM calls (the beta = 0 products, then the subtractions into
+  // the same C), then Z += Mpp - Mhh element-wise.
   op::TwoBody mpp(Z.two_body());
   op::TwoBody mhh(Z.two_body());
   mpp.set_zero();
   mhh.set_zero();
-  mpp.SyncToHost();
-  mhh.SyncToHost();
-  X.SyncToHost();
-  Y.SyncToHost();
-  Z.SyncToHost();
-  const op::TwoBody& x2 = X.two_body();
-  const op::TwoBody& y2 = Y.two_body();
+  const auto nchan = static_cast<std::size_t>(tbh.num_channels());
+  std::vector<std::int64_t> ket_off(nchan + 1, 0);
+  for (std::size_t c = 0; c < nchan; ++c)
+    ket_off[c + 1] = ket_off[c] + static_cast<std::int64_t>(wpp[c].size());
+  const std::int64_t nk_all = ket_off.back();
+  std::vector<double> w_host(2 * static_cast<std::size_t>(nk_all));
+  for (std::size_t c = 0; c < nchan; ++c) {
+    for (std::size_t k = 0; k < wpp[c].size(); ++k) {
+      w_host[static_cast<std::size_t>(ket_off[c]) + k] = wpp[c][k];
+      w_host[static_cast<std::size_t>(nk_all + ket_off[c]) + k] = whh[c][k];
+    }
+  }
+  // X's diagonal blocks: offset (-1: absent) and dimension per channel, and
+  // the compact offsets of the scaled copies.
+  std::vector<std::int64_t> x_block(nchan, -1);
+  std::vector<std::int64_t> x_dim(nchan, 0);
+  for (const auto& info : X.two_body().matrix().blocks()) {
+    if (info.row_block != info.col_block || info.rows == 0) continue;
+    const auto c = static_cast<std::size_t>(info.row_block.value());
+    x_block[c] = info.offset;
+    x_dim[c] = info.rows;
+  }
+  std::vector<std::int64_t> x_off(nchan + 1, 0);
+  for (std::size_t c = 0; c < nchan; ++c)
+    x_off[c + 1] = x_off[c] + x_dim[c] * x_dim[c];
+  const std::int64_t xsize = x_off.back();
+  const auto d_w = ToDevice(w_host, "imsrg::tensor_ladder::w");
+  const auto d_xblock = ToDevice(x_block, "imsrg::tensor_ladder::x_block");
+  const auto d_xdim = ToDevice(x_dim, "imsrg::tensor_ladder::x_dim");
+  const auto d_xoff = ToDevice(x_off, "imsrg::tensor_ladder::x_off");
+  const auto d_kofs = ToDevice(ket_off, "imsrg::tensor_ladder::ket_off");
+  // xs = [XD_pp | DX_pp | XD_hh | DX_hh], each compact by channel.
+  exec::DeviceBuffer<double> xs(static_cast<std::size_t>(4 * xsize),
+                                "imsrg::tensor_ladder::xs");
+  if (xsize > 0) {
+    const double* xd = X.two_body().matrix().buffer().device_data();
+    const double* w = d_w.device_data();
+    const std::int64_t* xb = d_xblock.device_data();
+    const std::int64_t* xn = d_xdim.device_data();
+    const std::int64_t* xo = d_xoff.device_data();
+    const std::int64_t* ko = d_kofs.device_data();
+    const int nc = static_cast<int>(nchan);
+    double* out = xs.device_data();
+    exec::ParallelFor(
+        "commutator::comm222_pp_hh_221st::scale_x", xsize,
+        IMSRG_LAMBDA(const exec::Index e) {
+          const int c = detail::FindBlock(xo, nc, e);
+          const std::int64_t dim = xn[c];
+          const std::int64_t local = e - xo[c];
+          const std::int64_t col = local / dim;
+          const std::int64_t row = local - col * dim;
+          const double x = xd[xb[c] + local];
+          const double* wpp_c = w + ko[c];
+          const double* whh_c = w + nk_all + ko[c];
+          out[e] = x * wpp_c[col];
+          out[xsize + e] = wpp_c[row] * x;
+          out[2 * xsize + e] = x * whh_c[col];
+          out[3 * xsize + e] = whh_c[row] * x;
+        });
+  }
+  std::vector<linalg::GemmProblem> first;
+  std::vector<linalg::GemmProblem> second;
+  const auto& ymat = Y.two_body().matrix();
+  const double* yd = ymat.buffer().device_data();
+  const double* xsd = xs.device_data();
   for (const auto& info : Z.two_body().matrix().blocks()) {
     if (info.rows == 0 || info.cols == 0) continue;
-    const ChannelIndex cb{info.row_block.value()};
-    const ChannelIndex ck{info.col_block.value()};
-    const auto yblk = y2.host_block(cb, ck);
-    const auto xb = x2.host_block(cb);
-    const auto xk = x2.host_block(ck);
-    linalg::Matrix<double> ys(info.rows, info.cols);
-    for (const int which : {0, 1}) {
-      const auto& w = (which == 0) ? wpp : whh;
-      const auto out =
-          (which == 0) ? mpp.host_block(cb, ck) : mhh.host_block(cb, ck);
-      const auto& wb = w[cb.ToSize()];
-      const auto& wk = w[ck.ToSize()];
-      for (std::int64_t c = 0; c < info.cols; ++c)
-        for (std::int64_t r = 0; r < info.rows; ++r)
-          ys(r, c) = wb[static_cast<std::size_t>(r)] * yblk(r, c);
-      linalg::Gemm(1.0, xb, linalg::Op::kNoTrans, ys.const_view(),
-                   linalg::Op::kNoTrans, 0.0, out);
-      for (std::int64_t c = 0; c < info.cols; ++c)
-        for (std::int64_t r = 0; r < info.rows; ++r)
-          ys(r, c) = yblk(r, c) * wk[static_cast<std::size_t>(c)];
-      linalg::Gemm(-1.0, ys.const_view(), linalg::Op::kNoTrans, xk,
-                   linalg::Op::kNoTrans, 1.0, out);
+    const auto cb = static_cast<std::size_t>(info.row_block.value());
+    const auto ck = static_cast<std::size_t>(info.col_block.value());
+    const auto yk = ymat.find_block(info.row_block, info.col_block);
+    if (!yk.has_value()) continue;  // Y block absent: M = 0
+    const linalg::MatrixView<const double> yblk{
+        yd + ymat.block_info(*yk).offset, info.rows, info.cols, info.rows};
+    for (int which = 0; which < 2; ++which) {
+      double* out = (which == 0 ? mpp : mhh).matrix().buffer().device_data() +
+                    info.offset;
+      const linalg::MatrixView<double> cv{out, info.rows, info.cols, info.rows};
+      // An absent X block is zero: its product term vanishes.
+      if (x_block[cb] >= 0) {
+        const linalg::MatrixView<const double> xdb{
+            xsd + 2 * which * xsize + x_off[cb], info.rows, info.rows,
+            info.rows};
+        first.push_back(linalg::GemmProblem{1.0, xdb, linalg::Op::kNoTrans,
+                                            yblk, linalg::Op::kNoTrans, 0.0,
+                                            cv});
+      }
+      if (x_block[ck] >= 0) {
+        const linalg::MatrixView<const double> dxk{
+            xsd + (2 * which + 1) * xsize + x_off[ck], info.cols, info.cols,
+            info.cols};
+        second.push_back(linalg::GemmProblem{-1.0, yblk, linalg::Op::kNoTrans,
+                                             dxk, linalg::Op::kNoTrans, 1.0,
+                                             cv});
+      }
     }
-    if (two_body) {
-      const auto z = Z.two_body().host_block(cb, ck);
-      const auto p = std::as_const(mpp).host_block(cb, ck);
-      const auto h = std::as_const(mhh).host_block(cb, ck);
-      for (std::int64_t c = 0; c < info.cols; ++c)
-        for (std::int64_t r = 0; r < info.rows; ++r)
-          z(r, c) += p(r, c) - h(r, c);
-    }
+  }
+  linalg::DeviceGroupedGemm(first);
+  linalg::DeviceGroupedGemm(second);
+  if (two_body) {
+    double* zd = Z.two_body().matrix().buffer().device_data();
+    const double* pd = mpp.matrix().buffer().device_data();
+    const double* hd = mhh.matrix().buffer().device_data();
+    exec::ParallelFor(
+        "commutator::comm222_pp_hh_221st::z2",
+        static_cast<exec::Index>(Z.two_body().matrix().buffer().size()),
+        IMSRG_LAMBDA(const exec::Index e) { zd[e] += pd[e] - hd[e]; });
   }
   mpp.set_hermiticity(Z.hermiticity());
   mhh.set_hermiticity(Z.hermiticity());
-  mpp.SyncToDevice();
-  mhh.SyncToDevice();
-  Z.SyncToDevice();
+  // The temporaries above (xs, offset tables) must outlive the queued work.
+  exec::Fence("commutator::comm222_pp_hh_221st::gemm");
   if (!one_body) return;
   const std::int32_t nch = ctx.tables.two_body().num_channels;
   const auto zoff = detail::BlockOffsetTable(Z.two_body(), nch);
@@ -533,47 +857,62 @@ void Comm222PpHh221st(const op::Operator& X, const op::Operator& Y,
   const auto yoff = detail::BlockOffsetTable(Y.two_body(), nch);
   const OneBodyArgs a = MakeOneBodyArgs(X, Y, Z, ctx, rd, xoff, yoff, hZ);
   const exec::Index norb = ctx.tables.orbits().num_orbits;
-  exec::ParallelForDynamic(
-      "commutator::comm221st", norb, IMSRG_LAMBDA(const exec::Index ii) {
-        const int i = static_cast<int>(ii);
-        const int ji = a.j2[i];
-        for (int ej = a.tc1.offsets[i]; ej < a.tc1.offsets[i + 1]; ++ej) {
+  if constexpr (exec::kDeviceKernels) {
+    // Device shape (M14): one team per (i, j) entry of the tensor one-body
+    // list, its threads reducing over the orbits c (a thread per orbit i
+    // gave the GPU ~1e2 items). The reduction order differs from the host
+    // loop (not bitwise equal to the host shape).
+    const auto entries = static_cast<int>(rd.tensor_ch1.items.size());
+    const int nh = a.num_holes;
+    const int nc = a.num_holes + a.num_particles;
+    exec::TeamOptions opts;
+    opts.team_size = 64;
+    opts.vector_length = 1;
+    exec::TeamFor(
+        "commutator::comm221st_team", entries, opts,
+        IMSRG_LAMBDA(const exec::TeamMember& member) {
+          const int ej = member.league_rank();
+          const int i =
+              detail::FindBlock(a.tc1.offsets, static_cast<int>(norb), ej);
           const int j = a.tc1.items[ej];
-          if (j < i) continue;
-          const int jj = a.j2[j];
+          if (j < i) return;
           double cij = 0.0;
-          for (int pass = 0; pass < 2; ++pass) {
-            const int n = pass == 0 ? a.num_holes : a.num_particles;
-            const std::int32_t* list = pass == 0 ? a.holes : a.particles;
-            for (int ic = 0; ic < n; ++ic) {
-              const int c = list[ic];
-              const int jc = a.j2[c];
-              const double oc = a.occ[c];
-              for (int J1 = Iabs(jc - ji) / 2; J1 <= (jc + ji) / 2; ++J1) {
-                const int J2min = Imax(Iabs(jc - jj) / 2, Iabs(a.L - J1));
-                const int J2max = Imin((jc + jj) / 2, J1 + a.L);
-                for (int J2 = J2min; J2 <= J2max; ++J2) {
-                  const double hat =
-                      Kokkos::sqrt((2.0 * J1 + 1) * (2.0 * J2 + 1));
-                  const double sj = a.sixjL(TwoJ{2 * J1}, TwoJ{2 * J2},
-                                            TwoJ{jj}, TwoJ{ji}, TwoJ{jc});
-                  const int ph = Phase((jj + jc) / 2 + J1 + a.L);
-                  const double mh =
-                      vhh.get_unnormalized(c, i, c, j, 2 * J1, 2 * J2);
-                  const double m = pass == 0
-                                       ? oc * vpp.get_unnormalized(
-                                                  c, i, c, j, 2 * J1, 2 * J2) +
-                                             (1.0 - oc) * mh
-                                       : mh;
-                  cij += hat * sj * ph * m;
-                }
-              }
+          Kokkos::parallel_reduce(
+              Kokkos::TeamThreadRange(member, nc),
+              [&](const int t, double& part) {
+                const int pass = t < nh ? 0 : 1;
+                const int c = pass == 0 ? a.holes[t] : a.particles[t - nh];
+                Add221Orbit(a, vpp, vhh, i, j, pass, c, part);
+              },
+              cij);
+          Kokkos::single(Kokkos::PerTeam(member), [&]() {
+            const int ji = a.j2[i];
+            const int jj = a.j2[j];
+            a.z1(i, j) += cij;
+            if (i != j) a.z1(j, i) += a.hZ * Phase((ji - jj) / 2) * cij;
+          });
+        });
+  } else {
+    exec::ParallelForDynamic(
+        "commutator::comm221st", norb, IMSRG_LAMBDA(const exec::Index ii) {
+          const int i = static_cast<int>(ii);
+          const int ji = a.j2[i];
+          for (int ej = a.tc1.offsets[i]; ej < a.tc1.offsets[i + 1]; ++ej) {
+            const int j = a.tc1.items[ej];
+            if (j < i) continue;
+            const int jj = a.j2[j];
+            double cij = 0.0;
+            for (int pass = 0; pass < 2; ++pass) {
+              const int n = pass == 0 ? a.num_holes : a.num_particles;
+              const std::int32_t* list = pass == 0 ? a.holes : a.particles;
+              for (int ic = 0; ic < n; ++ic)
+                Add221Orbit(a, vpp, vhh, i, j, pass, list[ic], cij);
             }
+            a.z1(i, j) += cij;
+            if (i != j) a.z1(j, i) += a.hZ * Phase((ji - jj) / 2) * cij;
           }
-          a.z1(i, j) += cij;
-          if (i != j) a.z1(j, i) += a.hZ * Phase((ji - jj) / 2) * cij;
-        }
-      });
+        });
+  }
   exec::Fence("commutator::comm221st");
 }
 

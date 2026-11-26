@@ -190,8 +190,64 @@ if(IMSRG_BLAS_SERIALIZE)
 else()
   target_compile_definitions(imsrg_blas_lapack INTERFACE IMSRG_BLAS_SERIALIZE=0)
 endif()
+# Concurrent GroupedGemm items (one single-threaded BLAS call per host thread, M12a): only for a
+# reentrant, single-threaded-per-call BLAS: Accelerate (default ON), or e.g. the serial cray-libsci
+# (BLAS_LIBRARIES=.../libsci_gnu.so with IMSRG_BLAS_SERIALIZE=OFF; M14 CPU baseline, FP-Q6).
+option(IMSRG_BLAS_CONCURRENT "Run GroupedGemm items concurrently on the host threads"
+       ${_imsrg_blas_accel})
+if(IMSRG_BLAS_CONCURRENT AND IMSRG_BLAS_SERIALIZE)
+  message(FATAL_ERROR "IMSRG_BLAS_CONCURRENT needs IMSRG_BLAS_SERIALIZE=OFF (a reentrant BLAS)")
+endif()
+if(IMSRG_BLAS_CONCURRENT)
+  target_compile_definitions(imsrg_blas_lapack INTERFACE IMSRG_BLAS_CONCURRENT=1)
+else()
+  target_compile_definitions(imsrg_blas_lapack INTERFACE IMSRG_BLAS_CONCURRENT=0)
+endif()
 message(STATUS "BLAS/LAPACK backend: ${_imsrg_blas_name} (${BLAS_LIBRARIES}), "
                "calls serialized across host threads: ${IMSRG_BLAS_SERIALIZE}")
+# Device BLAS (module linalg, DeviceGemm/DeviceGroupedGemm, design/12 section 3, M14): GEMMs on
+# operands in exec device memory. HOST = the host BLAS above (CPU backends, where device memory is
+# host memory); ROCBLAS = rocBLAS on the Kokkos HIP stream; KOKKOSKERNELS = KokkosBlas::gemm
+# (portable; Kokkos Kernels from $IMSRG_DEPS_PREFIX/kokkoskernels-<backend>, tools/bootstrap_deps.sh).
+# AUTO picks ROCBLAS for hip and HOST for serial/openmp. Result: INTERFACE target imsrg::device_blas.
+set(IMSRG_DEVICE_BLAS "AUTO" CACHE STRING "Device BLAS backend (AUTO HOST ROCBLAS KOKKOSKERNELS)")
+set_property(CACHE IMSRG_DEVICE_BLAS PROPERTY STRINGS AUTO HOST ROCBLAS KOKKOSKERNELS)
+set(_imsrg_device_blas "${IMSRG_DEVICE_BLAS}")
+if(_imsrg_device_blas STREQUAL "AUTO")
+  if(IMSRG_KOKKOS_BACKEND STREQUAL "hip")
+    set(_imsrg_device_blas ROCBLAS)
+  else()
+    set(_imsrg_device_blas HOST)
+  endif()
+endif()
+if(_imsrg_device_blas STREQUAL "HOST" AND IMSRG_KOKKOS_BACKEND MATCHES "^(cuda|hip)$")
+  message(FATAL_ERROR "IMSRG_DEVICE_BLAS=HOST cannot run GEMMs on ${IMSRG_KOKKOS_BACKEND} device "
+                      "memory; use ROCBLAS or KOKKOSKERNELS")
+endif()
+if(_imsrg_device_blas STREQUAL "ROCBLAS" AND NOT IMSRG_KOKKOS_BACKEND STREQUAL "hip")
+  message(FATAL_ERROR "IMSRG_DEVICE_BLAS=ROCBLAS needs IMSRG_KOKKOS_BACKEND=hip")
+endif()
+add_library(imsrg_device_blas INTERFACE)
+add_library(imsrg::device_blas ALIAS imsrg_device_blas)
+if(_imsrg_device_blas STREQUAL "HOST")
+  target_compile_definitions(imsrg_device_blas INTERFACE IMSRG_DEVICE_BLAS_HOST=1)
+elseif(_imsrg_device_blas STREQUAL "ROCBLAS")
+  find_package(rocblas REQUIRED CONFIG)
+  target_link_libraries(imsrg_device_blas INTERFACE roc::rocblas)
+  target_compile_definitions(imsrg_device_blas INTERFACE IMSRG_DEVICE_BLAS_ROCBLAS=1)
+elseif(_imsrg_device_blas STREQUAL "KOKKOSKERNELS")
+  if(NOT KokkosKernels_ROOT AND NOT DEFINED ENV{KokkosKernels_ROOT})
+    set(KokkosKernels_ROOT "${IMSRG_DEPS_PREFIX}/kokkoskernels-${IMSRG_KOKKOS_BACKEND}")
+  endif()
+  find_package(KokkosKernels REQUIRED CONFIG)
+  target_link_libraries(imsrg_device_blas INTERFACE Kokkos::kokkoskernels)
+  target_compile_definitions(imsrg_device_blas INTERFACE IMSRG_DEVICE_BLAS_KOKKOSKERNELS=1)
+else()
+  message(FATAL_ERROR "IMSRG_DEVICE_BLAS='${IMSRG_DEVICE_BLAS}' (expected AUTO HOST ROCBLAS "
+                      "KOKKOSKERNELS)")
+endif()
+set(IMSRG_DEVICE_BLAS_RESOLVED "${_imsrg_device_blas}" CACHE INTERNAL "")
+message(STATUS "Device BLAS backend: ${_imsrg_device_blas}")
 # M5 (io): gzip streams over zlib (D4: no Boost.Iostreams).
 find_package(ZLIB REQUIRED)
 message(STATUS "zlib: ${ZLIB_LIBRARIES} (${ZLIB_VERSION_STRING})")

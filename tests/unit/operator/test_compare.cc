@@ -40,6 +40,7 @@ TEST(OperatorCompare, MaxAbsPicksLargestMagnitudePerPart) {
   Put2b(o, 5.0);
   o.two_body().set(ChannelIndex{0}, ChannelIndex{0}, LocalKetIndex{0},
                    LocalKetIndex{0}, -7.0);
+  o.SyncToDevice();
   const PartMaxima m = MaxAbs(o);
   EXPECT_EQ(m.zero_body, 2.0);
   EXPECT_EQ(m.one_body, 3.0);
@@ -57,6 +58,8 @@ TEST(OperatorCompare, DifferenceIsPartwise) {
   b.one_body().set(OrbitIndex{0}, OrbitIndex{1}, -1.0);
   Put2b(a, 4.0);
   Put2b(b, 4.25);
+  a.SyncToDevice();
+  b.SyncToDevice();
   const PartMaxima d = MaxAbsDifference(a, b);
   EXPECT_DOUBLE_EQ(d.zero_body, 0.5);
   EXPECT_DOUBLE_EQ(d.one_body, 3.0);
@@ -78,6 +81,7 @@ TEST(OperatorCompare, UnallocatedPartCountsAsZero) {
   Operator a(ms, OperatorSpec::Scalar(2));
   const Operator b(ms, OperatorSpec::Scalar(1));
   Put2b(a, -6.0);
+  a.SyncToDevice();
   EXPECT_DOUBLE_EQ(MaxAbsDifference(a, b).two_body, 6.0);
   EXPECT_DOUBLE_EQ(MaxAbsDifference(b, a).two_body, 6.0);
   EXPECT_EQ(MaxAbs(b).two_body, 0.0);

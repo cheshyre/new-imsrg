@@ -7,6 +7,7 @@
 #   kokkos-openmp/  Kokkos from extern/kokkos with the OpenMP (+ Serial) backend, Release
 #   kokkos-serial/  Kokkos with the Serial backend, RelWithDebInfo, debug checks + bounds checking
 #   kokkos-hip/     Kokkos HIP (gfx90a) + Serial host (ZEN3), Release; default only on Frontier
+#   kokkoskernels-hip/  Kokkos Kernels (BLAS, native kernels) for it, only if the tarball is in src/
 #   venv/           Python venv ($IMSRG_VENV) with tools/requirements-dev.txt
 # On OLCF Frontier (tools/lib/frontier_env.sh) the default backends are "openmp serial hip", the
 # pinned modules are loaded (CC wrapper for openmp/serial, hipcc for hip), and the builds should
@@ -201,6 +202,70 @@ build_kokkos() {
 
 for backend in $backends; do
   ( build_kokkos "$backend" )  # a subshell: the hip module environment must not leak
+done
+
+# ---- Kokkos Kernels (M14, optional) ------------------------------------------------------------
+# The portable device BLAS backend (IMSRG_DEVICE_BLAS=KOKKOSKERNELS) needs Kokkos Kernels built
+# against kokkos-<backend>. It is not a submodule: put the release tarball
+# kokkos-kernels-$kk_version.tar.gz (GitHub archive of the tag) into $IMSRG_DEPS_PREFIX/src/ on a
+# login node (compute nodes have no internet); without it the step is skipped. Native kernels
+# only (no rocBLAS/cuBLAS TPLs), so it measures the portable path; ETI for double, LayoutLeft.
+kk_version=5.3.0
+build_kokkos_kernels() {
+  local backend=$1
+  local tarball="$IMSRG_DEPS_PREFIX/src/kokkos-kernels-$kk_version.tar.gz"
+  local src_dir="$IMSRG_DEPS_PREFIX/src/kokkos-kernels-$kk_version"
+  local install_dir="$IMSRG_DEPS_PREFIX/kokkoskernels-$backend"
+  local build_dir="$IMSRG_DEPS_PREFIX/build/kokkoskernels-$backend"
+  local stage_dir="$IMSRG_DEPS_PREFIX/build/kokkoskernels-$backend-stage"
+  local cxx cxx_path stamp t0
+  if [ ! -f "$tarball" ]; then
+    log "kokkoskernels-$backend skipped: $tarball not found (optional, IMSRG_DEVICE_BLAS=KOKKOSKERNELS)"
+    return 0
+  fi
+  if [ "$backend" = hip ] && imsrg_on_frontier; then
+    imsrg_frontier_modules hip
+  fi
+  cxx=$(backend_cxx "$backend")
+  cxx_path=$(command -v "$cxx") || { log "compiler '$cxx' not found" >&2; return 1; }
+  stamp=$(printf 'kokkos_kernels=%s\nkokkos=%s\nbackend=%s\ncxx=%s\n' "$kk_version" \
+    "$(cat "$IMSRG_DEPS_PREFIX/kokkos-$backend/.imsrg-stamp" 2>/dev/null | head -n 1)" \
+    "$backend" "$cxx_path")
+  if [ "$force" -eq 0 ] && [ -f "$install_dir/.imsrg-stamp" ] \
+     && [ "$(cat "$install_dir/.imsrg-stamp")" = "$stamp" ]; then
+    log "kokkoskernels-$backend is up to date ($kk_version)"
+    return 0
+  fi
+  if [ ! -d "$src_dir" ]; then
+    tar -xzf "$tarball" -C "$IMSRG_DEPS_PREFIX/src"
+  fi
+  log "building kokkoskernels-$backend ($kk_version)"
+  t0=$(date +%s)
+  # shellcheck disable=SC2086
+  cmake -S "$src_dir" -B "$build_dir" $generator_args \
+    -DCMAKE_INSTALL_PREFIX="$install_dir" -DCMAKE_CXX_COMPILER="$cxx_path" $launcher_args \
+    -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_EXTENSIONS=OFF \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -DKokkos_ROOT="$IMSRG_DEPS_PREFIX/kokkos-$backend" \
+    -DKokkosKernels_ENABLE_TPL_BLAS=OFF -DKokkosKernels_ENABLE_TPL_ROCBLAS=OFF \
+    -DKokkosKernels_ENABLE_TPL_CUBLAS=OFF -DKokkosKernels_ENABLE_TPL_LAPACK=OFF \
+    -DKokkosKernels_ENABLE_TESTS=OFF -DKokkosKernels_ENABLE_EXAMPLES=OFF \
+    -DKokkosKernels_ENABLE_COMPONENTS=BLAS \
+    -DKokkosKernels_INST_DOUBLE=ON -DKokkosKernels_INST_LAYOUTLEFT=ON
+  cmake --build "$build_dir" --parallel "$jobs"
+  rm -rf "$stage_dir"
+  DESTDIR="$stage_dir" cmake --install "$build_dir" >/dev/null
+  printf '%s\n' "$stamp" > "$stage_dir$install_dir/.imsrg-stamp"
+  rm -rf "$install_dir.old"
+  if [ -e "$install_dir" ]; then mv "$install_dir" "$install_dir.old"; fi
+  mv "$stage_dir$install_dir" "$install_dir"
+  rm -rf "$install_dir.old" "$stage_dir"
+  log "installed kokkoskernels-$backend into $install_dir in $(( $(date +%s) - t0 ))s"
+}
+for backend in $backends; do
+  case $backend in
+    hip) ( build_kokkos_kernels "$backend" ) ;;
+  esac
 done
 
 # ---- Python venv -----------------------------------------------------------------------------

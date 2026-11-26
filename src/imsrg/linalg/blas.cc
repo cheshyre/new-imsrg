@@ -15,6 +15,7 @@
 #include "imsrg/base/error.h"
 #include "imsrg/exec/host_parallel.h"
 #include "imsrg/linalg/detail/blas.h"
+#include "imsrg/linalg/detail/gemm_check.h"
 
 namespace imsrg::linalg {
 namespace detail {
@@ -128,13 +129,14 @@ void GemmImpl(T alpha, MatrixView<const T> A, Op opA, MatrixView<const T> B,
 /// more than it saves).
 constexpr double kConcurrentGemmMinFlops = 1.0e6;
 
-/// Whether `GroupedGemm` may run its problems concurrently: only with
-/// Accelerate, which keeps a call made inside a parallel region from
-/// oversubscribing the cores and whose results were measured to be
-/// independent of the schedule. OpenBLAS (pthreads) or MKL would need
-/// single-threaded calls per item first (M12-Q5). Never when the calls are
-/// serialized anyway (`IMSRG_BLAS_SERIALIZE`).
-#if defined(IMSRG_BLAS_ACCELERATE) && IMSRG_BLAS_ACCELERATE && \
+/// Whether `GroupedGemm` may run its problems concurrently
+/// (`IMSRG_BLAS_CONCURRENT`): only with a reentrant BLAS whose calls stay
+/// single-threaded inside a parallel region, i.e. Accelerate (default) or the
+/// serial cray-libsci `libsci_gnu` (M14). The threaded `libsci_gnu_mp` is not
+/// reentrant (FP-Q6); OpenBLAS (pthreads) or MKL would need single-threaded
+/// calls per item first (M12-Q5). Never when the calls are serialized anyway
+/// (`IMSRG_BLAS_SERIALIZE`).
+#if defined(IMSRG_BLAS_CONCURRENT) && IMSRG_BLAS_CONCURRENT && \
     !(defined(IMSRG_BLAS_SERIALIZE) && IMSRG_BLAS_SERIALIZE)
 constexpr bool kConcurrentGroupedGemm = true;
 #else
@@ -142,6 +144,14 @@ constexpr bool kConcurrentGroupedGemm = false;
 #endif
 
 }  // namespace
+
+namespace detail {
+
+double CheckGemmProblem(const GemmProblem& p) {
+  return CheckGemm<double>(p.A, p.opA, p.B, p.opB, p.C);
+}
+
+}  // namespace detail
 
 void Gemm(double alpha, MatrixView<const double> A, Op opA,
           MatrixView<const double> B, Op opB, double beta,

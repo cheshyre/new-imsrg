@@ -301,6 +301,7 @@ TEST(MagnusSolver, NanInHamiltonianIsDivergenceNotSmax) {
   {
     op::Operator h0 = Emax2Hno();
     h0.zero_body() = std::numeric_limits<double>::quiet_NaN();
+    h0.SyncToDevice();
     flow::MagnusSolver solver(std::move(h0), ShortFlow(2.0),
                               flow::GeneratorOptions{});
     const flow::SolveResult r = solver.Solve();
@@ -312,6 +313,7 @@ TEST(MagnusSolver, NanInHamiltonianIsDivergenceNotSmax) {
     op::Operator h0 = Emax2Hno();
     h0.one_body().set(OrbitIndex{0}, OrbitIndex{0},
                       std::numeric_limits<double>::quiet_NaN());
+    h0.SyncToDevice();
     flow::MagnusSolver solver(std::move(h0), ShortFlow(2.0),
                               flow::GeneratorOptions{});
     const flow::SolveResult r = solver.Solve();

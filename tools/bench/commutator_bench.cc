@@ -5,7 +5,7 @@
 // 5).
 //
 //   commutator_bench --emax N --reps R [--reference O16] [--seed S]
-//                    [--checksum] [--only-full]
+//                    [--checksum] [--only-full] [--dump FILE]
 //   commutator_bench --model-mpi
 //
 // Times every `commutator::terms::` function and the full `Commutator()` on
@@ -17,10 +17,11 @@
 // the same table. `--checksum` prints an FNV-1a hash of the bytes of [X, Y]
 // (zero-, one- and two-body parts) for X and Y anti-Hermitian/Hermitian and
 // for X general, so optimizations can be checked for bitwise identical
-// results; `--only-full` times only the full commutator. `--model-mpi` is a
-// count-only cost model of the MPI work distribution (M12b): for emax 8, 10 and
-// 12 it builds the model space only (no operators, no Workspace) and prints the
-// work items' load imbalance on several rank counts.
+// results; `--only-full` times only the full commutator; `--dump FILE` writes
+// [X, Y] as raw doubles (DumpOperator) to compare device and host results.
+// `--model-mpi` is a count-only cost model of the MPI work distribution (M12b):
+// for emax 8, 10 and 12 it builds the model space only (no operators, no
+// Workspace) and prints the work items' load imbalance on several rank counts.
 //
 // MPI usage (M12b phase 1: replicated 1B/2B operators, channel blocks of the
 // expensive terms split across ranks, combined by reduce + broadcast):
@@ -158,6 +159,26 @@ std::uint64_t Checksum(const op::Operator& z) {
   return h;
 }
 
+/// Writes the zero-, one- and two-body parts of `z` as raw native doubles
+/// (zero body, then the 1B and the 2B buffers) to `path`, for comparing
+/// device and host results (M14, tools/bench/compare_dumps.py).
+bool DumpOperator(const op::Operator& z, const std::string& path) {
+  std::FILE* f = std::fopen(path.c_str(), "wb");
+  if (f == nullptr) return false;
+  const double z0 = z.zero_body();
+  const std::vector<double> z1 = z.one_body().buffer().ToVector();
+  const std::vector<double> z2 = z.two_body().matrix().buffer().ToVector();
+  const std::uint64_t n1 = z1.size();
+  const std::uint64_t n2 = z2.size();
+  bool ok = std::fwrite(&n1, sizeof n1, 1, f) == 1 &&
+            std::fwrite(&n2, sizeof n2, 1, f) == 1 &&
+            std::fwrite(&z0, sizeof z0, 1, f) == 1 &&
+            std::fwrite(z1.data(), sizeof(double), z1.size(), f) == z1.size() &&
+            std::fwrite(z2.data(), sizeof(double), z2.size(), f) == z2.size();
+  ok = (std::fclose(f) == 0) && ok;
+  return ok;
+}
+
 /// Collective. True iff `value` is the same on every rank.
 bool AgreeOnAllRanks(const imsrg::comm::Communicator& world,
                      std::uint64_t value) {
@@ -282,6 +303,7 @@ int main(int argc, char** argv) {
   bool checksum = false;
   bool only_full = false;
   bool model_mpi = false;
+  std::string dump;
   // MPI first, Kokkos second, destroyed in the reverse order (design/10 s. 4).
   imsrg::comm::Environment environment(argc, argv);
   imsrg::exec::Runtime runtime(argc, argv);
@@ -302,13 +324,15 @@ int main(int argc, char** argv) {
       checksum = true;
     } else if (a == "--only-full") {
       only_full = true;
+    } else if (a == "--dump" && has_val) {
+      dump = argv[++i];
     } else if (a == "--model-mpi") {
       model_mpi = true;
     } else {
-      std::fprintf(
-          stderr,
-          "usage: commutator_bench --emax N --reps R [--reference "
-          "O16] [--seed S] [--checksum] [--only-full] | --model-mpi\n");
+      std::fprintf(stderr,
+                   "usage: commutator_bench --emax N --reps R [--reference "
+                   "O16] [--seed S] [--checksum] [--only-full] [--dump FILE] | "
+                   "--model-mpi\n");
       return 2;
     }
   }
@@ -456,6 +480,13 @@ int main(int argc, char** argv) {
       return 1;
     }
     if (root) std::printf("checksum [N,H] %016" PRIx64 "\n", h_nh);
+  }
+  if (!dump.empty()) {
+    cm::Commutator(X, Y, Z, opts, ws);
+    if (root && !DumpOperator(Z, dump)) {
+      std::fprintf(stderr, "error: cannot write %s\n", dump.c_str());
+      return 1;
+    }
   }
   return 0;
 }

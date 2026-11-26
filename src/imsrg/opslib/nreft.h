@@ -109,7 +109,8 @@ struct OneBodyTable {
 
   /// <a||O||b>. Precondition: valid indices.
   double value(OrbitIndex a, OrbitIndex b) const {
-    return values[static_cast<std::size_t>(a.value()) * num_orbits +
+    return values[static_cast<std::size_t>(a.value()) *
+                      static_cast<std::size_t>(num_orbits) +
                   static_cast<std::size_t>(b.value())];
   }
 };

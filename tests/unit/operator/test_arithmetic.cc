@@ -43,7 +43,7 @@ class Lcg {
 /// Fills all parts with pseudo-random values obeying the hermiticity of the
 /// operator (including entries between orbits of different (l, j, tz): they are
 /// legal storage).
-void Fill(Operator& o, std::uint64_t seed) {
+void FillHost(Operator& o, std::uint64_t seed) {
   Lcg rng(seed);
   const int h = HermiticitySign(o.hermiticity());
   o.zero_body() = rng.Next();
@@ -71,6 +71,12 @@ void Fill(Operator& o, std::uint64_t seed) {
       }
     }
   }
+}
+
+/// Fills on the host and pushes the values to the device (SyncToDevice).
+void Fill(Operator& o, std::uint64_t seed) {
+  FillHost(o, seed);
+  o.SyncToDevice();
 }
 
 Operator MakeOp(const std::shared_ptr<const basis::ModelSpace>& ms, int rank,
@@ -168,6 +174,7 @@ TEST(OperatorArithmetic, AxpyEqualsElementwiseSum) {
   const Operator y0 = MakeOp(ms, 2, 2);
   Operator y = y0;
   Axpy(-0.75, x, y);
+  y.SyncToHost();
   EXPECT_DOUBLE_EQ(y.zero_body(), y0.zero_body() - 0.75 * x.zero_body());
   const auto d = MaxAbsDifference(y, y0);
   EXPECT_GT(d.one_body, 0.1);
@@ -270,6 +277,8 @@ TEST(OperatorArithmetic, RankPromotion) {
   EXPECT_EQ(dv.two_body, 0.0);
   // t - v: copy v, negate, add t
   const Operator d = t - v;
+  d.SyncToHost();
+  s.SyncToHost();
   EXPECT_EQ(d.spec().particle_rank, 2);
   EXPECT_LE(MaxAbsDifference(d, -1.0 * (v - t)).max(), 1.0e-15);
   EXPECT_DOUBLE_EQ(d.one_body().get(OrbitIndex{2}, OrbitIndex{4}),

@@ -19,6 +19,7 @@
 #include "imsrg/commutator/tensor.h"
 #include "imsrg/exec/kokkos_backend.h"
 #include "imsrg/linalg/blas.h"
+#include "imsrg/linalg/device_blas.h"
 
 namespace imsrg::commutator::tensor_terms {
 
@@ -207,6 +208,207 @@ struct InverseArgs {
 };
 static_assert(std::is_trivially_copyable_v<InverseArgs>);
 
+/// One element (row rr of the stacked stored blocks, column iket) of the
+/// inverse transform of comm222_phst, plus its mirror in a diagonal block.
+/// Every element is written by exactly one (rr, iket), so elements run
+/// concurrently without atomics. O((J3 range) x (J4 range)) 9j-weighted
+/// Zbar gathers.
+IMSRG_FORCEINLINE_FUNCTION void PhstInverseElement(const InverseArgs& v,
+                                                   exec::Index rr, int iket) {
+  const int k = detail::FindBlock(v.row_offset, v.num_blocks, rr);
+  const int ibra = static_cast<int>(rr) - v.row_offset[k];
+  const int cb = v.ch_bra[k];
+  const int ck = v.ch_ket[k];
+  const int J1 = v.tb.channel_two_j[cb] / 2;
+  const int J2 = v.tb.channel_two_j[ck] / 2;
+  const int nb = v.nbra[k];
+  const KetIndex gb = v.tb.global_ket(ChannelIndex{cb}, LocalKetIndex{ibra});
+  const int i = v.tb.ket_p[gb.value()];
+  const int j = v.tb.ket_q[gb.value()];
+  const int ji = v.j2[i];
+  const int jj = v.j2[j];
+  double* blk = v.zd + v.offset[k];
+  const KetIndex gk = v.tb.global_ket(ChannelIndex{ck}, LocalKetIndex{iket});
+  const int kk = v.tb.ket_p[gk.value()];
+  const int ll = v.tb.ket_q[gk.value()];
+  const int jk = v.j2[kk];
+  const int jl = v.j2[ll];
+  double commij = 0.0;
+  for (int J3 = Iabs(ji - jl) / 2; J3 <= (ji + jl) / 2; ++J3) {
+    const int J4min = Imax(Iabs(jk - jj) / 2, Iabs(J3 - v.L));
+    const int J4max = Imin((jk + jj) / 2, J3 + v.L);
+    for (int J4 = J4min; J4 <= J4max; ++J4) {
+      const double nj =
+          v.ninej(TwoJ{ji}, TwoJ{jl}, TwoJ{2 * J3}, TwoJ{jj}, TwoJ{jk},
+                  TwoJ{2 * J4}, TwoJ{2 * J1}, TwoJ{2 * J2});
+      if (nj == 0.0) continue;
+      const double hat = Kokkos::sqrt((2.0 * J1 + 1) * (2.0 * J2 + 1) *
+                                      (2.0 * J3 + 1) * (2.0 * J4 + 1));
+      commij += hat * Phase((jj + jl) / 2 + J2 + J4) * nj *
+                v.Zbar(i, ll, kk, j, J3, J4);
+    }
+  }
+  double commji = commij;
+  if (i != j) {
+    commji = 0.0;
+    for (int J3 = Iabs(jj - jl) / 2; J3 <= (jj + jl) / 2; ++J3) {
+      const int J4min = Imax(Iabs(jk - ji) / 2, Iabs(J3 - v.L));
+      const int J4max = Imin((jk + ji) / 2, J3 + v.L);
+      for (int J4 = J4min; J4 <= J4max; ++J4) {
+        const double nj =
+            v.ninej(TwoJ{jj}, TwoJ{jl}, TwoJ{2 * J3}, TwoJ{ji}, TwoJ{jk},
+                    TwoJ{2 * J4}, TwoJ{2 * J1}, TwoJ{2 * J2});
+        if (nj == 0.0) continue;
+        const double hat = Kokkos::sqrt((2.0 * J1 + 1) * (2.0 * J2 + 1) *
+                                        (2.0 * J3 + 1) * (2.0 * J4 + 1));
+        commji += hat * Phase((ji + jl) / 2 + J2 + J4) * nj *
+                  v.Zbar(j, ll, kk, i, J3, J4);
+      }
+    }
+  }
+  const bool dij = (i == j);
+  const bool dkl = (kk == ll);
+  const double norm = (dij == dkl) ? (dij ? 2.0 : 1.0) : constants::kSqrt2;
+  const double val = (commij - Phase((ji + jj) / 2 - J1) * commji) / norm;
+  blk[ibra + static_cast<std::int64_t>(iket) * nb] += val;
+  if (cb == ck && iket > ibra)
+    blk[iket + static_cast<std::int64_t>(ibra) * nb] += v.hZ * val;
+}
+
+/// Device arguments of the quadruple form of the inverse transform.
+struct QuadArgs {
+  InverseArgs v;
+  const std::int32_t* class_kets = nullptr;  ///< Kets grouped by class.
+  const std::int32_t* class_off = nullptr;   ///< 7 offsets.
+  const std::int32_t* pair_a = nullptr;      ///< Class of ket a per pair.
+  const std::int32_t* pair_b = nullptr;      ///< Class of ket b per pair.
+  const std::int64_t* pair_items = nullptr;  ///< Cumulative items.
+  std::int32_t num_pairs = 0;
+  const std::int64_t* zblock = nullptr;  ///< nch^2 Z block offsets, -1 absent.
+  std::int32_t nch = 0;
+  std::int32_t nj = 0;  ///< Scratch J extent (2 emax + 2).
+};
+static_assert(std::is_trivially_copyable_v<QuadArgs>);
+
+/// The inverse transform of comm222_phst for one ket pair (a = (i, j),
+/// b = (k, l)) and all (J1, J2) (M14): the team gathers
+/// Zbar^{J3 J4}_{(il),(kj)} and Zbar^{J3 J4}_{(jl),(ki)} once into team
+/// scratch, then its threads compute the elements of every stored block
+/// (J1, J2) that contains the pair, in exactly the order of
+/// PhstInverseElement (bitwise equal); the element-wise form gathers the
+/// same Zbar values once per (J1, J2).
+IMSRG_FORCEINLINE_FUNCTION void PhstQuad(const exec::TeamMember& member,
+                                         const QuadArgs& q, double* scratch) {
+  const InverseArgs& v = q.v;
+  const exec::Index item = member.league_rank();
+  const int pr = detail::FindBlock(q.pair_items, q.num_pairs, item);
+  const std::int64_t local = item - q.pair_items[pr];
+  const int ca = q.pair_a[pr];
+  const int cbl = q.pair_b[pr];
+  const std::int64_t nbk = q.class_off[cbl + 1] - q.class_off[cbl];
+  const int ka = q.class_kets[q.class_off[ca] + local / nbk];
+  const int kb = q.class_kets[q.class_off[cbl] + local % nbk];
+  const int i = v.tb.ket_p[ka];
+  const int j = v.tb.ket_q[ka];
+  const int kk = v.tb.ket_p[kb];
+  const int ll = v.tb.ket_q[kb];
+  const int ji = v.j2[i], jj = v.j2[j], jk = v.j2[kk], jl = v.j2[ll];
+  const int nj = q.nj;
+  double* z1 = scratch;            // [J3 - J3a][J4 - J4a], term (i, j)
+  double* z2 = scratch + nj * nj;  // term (j, i)
+  // 1. Gather.
+  const int J3a1 = Iabs(ji - jl) / 2, n31 = (ji + jl) / 2 - J3a1 + 1;
+  const int J4a1 = Iabs(jk - jj) / 2, n41 = (jk + jj) / 2 - J4a1 + 1;
+  const int J3a2 = Iabs(jj - jl) / 2, n32 = (jj + jl) / 2 - J3a2 + 1;
+  const int J4a2 = Iabs(jk - ji) / 2, n42 = (jk + ji) / 2 - J4a2 + 1;
+  const bool two = i != j;
+  const int g1 = n31 * n41;
+  const int g2 = two ? n32 * n42 : 0;
+  Kokkos::parallel_for(Kokkos::TeamThreadRange(member, g1 + g2),
+                       [&](const int t) {
+                         if (t < g1) {
+                           const int J3 = J3a1 + t / n41;
+                           const int J4 = J4a1 + t % n41;
+                           z1[(J3 - J3a1) * nj + (J4 - J4a1)] =
+                               J4 >= Iabs(J3 - v.L) && J4 <= J3 + v.L
+                                   ? v.Zbar(i, ll, kk, j, J3, J4)
+                                   : 0.0;
+                         } else {
+                           const int u = t - g1;
+                           const int J3 = J3a2 + u / n42;
+                           const int J4 = J4a2 + u % n42;
+                           z2[(J3 - J3a2) * nj + (J4 - J4a2)] =
+                               J4 >= Iabs(J3 - v.L) && J4 <= J3 + v.L
+                                   ? v.Zbar(j, ll, kk, i, J3, J4)
+                                   : 0.0;
+                         }
+                       });
+  member.team_barrier();
+  // 2. The elements of every (J1, J2).
+  const int J1a = Iabs(ji - jj) / 2, n1 = (ji + jj) / 2 - J1a + 1;
+  const int J2a = Iabs(jk - jl) / 2, n2 = (jk + jl) / 2 - J2a + 1;
+  Kokkos::parallel_for(Kokkos::TeamThreadRange(member, n1 * n2), [&](const int
+                                                                         t) {
+    const int J1 = J1a + t / n2;
+    const int J2 = J2a + t % n2;
+    const std::int32_t ibra = v.tb.local_index(KetIndex{ka}, TwoJ{2 * J1});
+    if (ibra < 0) return;
+    const std::int32_t iket = v.tb.local_index(KetIndex{kb}, TwoJ{2 * J2});
+    if (iket < 0) return;
+    const int cb =
+        v.tb.channel_of(OrbitIndex{i}, OrbitIndex{j}, TwoJ{2 * J1}).value();
+    const int ck =
+        v.tb.channel_of(OrbitIndex{kk}, OrbitIndex{ll}, TwoJ{2 * J2}).value();
+    const std::int64_t off =
+        q.zblock[static_cast<std::int64_t>(cb) * q.nch + ck];
+    if (off < 0) return;
+    if (cb == ck && iket < ibra) return;  // lower triangle: the mirror
+    const int nb = v.tb.channel_num_kets[cb];
+    // The 9j boxes of both sums, looked up once per (J1, J2).
+    const angmom::NineJView::Slice s1 = v.ninej.MakeSlice(
+        TwoJ{ji}, TwoJ{jl}, TwoJ{jj}, TwoJ{jk}, TwoJ{2 * J1}, TwoJ{2 * J2});
+    const angmom::NineJView::Slice s2 = v.ninej.MakeSlice(
+        TwoJ{jj}, TwoJ{jl}, TwoJ{ji}, TwoJ{jk}, TwoJ{2 * J1}, TwoJ{2 * J2});
+    double commij = 0.0;
+    for (int J3 = Iabs(ji - jl) / 2; J3 <= (ji + jl) / 2; ++J3) {
+      const int J4min = Imax(Iabs(jk - jj) / 2, Iabs(J3 - v.L));
+      const int J4max = Imin((jk + jj) / 2, J3 + v.L);
+      for (int J4 = J4min; J4 <= J4max; ++J4) {
+        const double nj9 = s1(J3, J4);
+        if (nj9 == 0.0) continue;
+        const double hat = Kokkos::sqrt((2.0 * J1 + 1) * (2.0 * J2 + 1) *
+                                        (2.0 * J3 + 1) * (2.0 * J4 + 1));
+        commij += hat * Phase((jj + jl) / 2 + J2 + J4) * nj9 *
+                  z1[(J3 - J3a1) * nj + (J4 - J4a1)];
+      }
+    }
+    double commji = commij;
+    if (two) {
+      commji = 0.0;
+      for (int J3 = Iabs(jj - jl) / 2; J3 <= (jj + jl) / 2; ++J3) {
+        const int J4min = Imax(Iabs(jk - ji) / 2, Iabs(J3 - v.L));
+        const int J4max = Imin((jk + ji) / 2, J3 + v.L);
+        for (int J4 = J4min; J4 <= J4max; ++J4) {
+          const double nj9 = s2(J3, J4);
+          if (nj9 == 0.0) continue;
+          const double hat = Kokkos::sqrt((2.0 * J1 + 1) * (2.0 * J2 + 1) *
+                                          (2.0 * J3 + 1) * (2.0 * J4 + 1));
+          commji += hat * Phase((ji + jl) / 2 + J2 + J4) * nj9 *
+                    z2[(J3 - J3a2) * nj + (J4 - J4a2)];
+        }
+      }
+    }
+    const bool dij = (i == j);
+    const bool dkl = (kk == ll);
+    const double norm = (dij == dkl) ? (dij ? 2.0 : 1.0) : constants::kSqrt2;
+    const double val = (commij - Phase((ji + jj) / 2 - J1) * commji) / norm;
+    double* blk = v.zd + off;
+    blk[ibra + static_cast<std::int64_t>(iket) * nb] += val;
+    if (cb == ck && iket > ibra)
+      blk[iket + static_cast<std::int64_t>(ibra) * nb] += v.hZ * val;
+  });
+}
+
 }  // namespace
 
 void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
@@ -220,8 +422,6 @@ void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   if (!X.two_body().allocated() || !Y.two_body().allocated() ||
       !Z.two_body().allocated())
     return;
-  IMSRG_CHECK(Z.one_body().buffer().host_is_device(),
-              "comm222_phst: host BLAS on device memory");
   exec::Fence("commutator::comm222_phst");
   auto& ctx = ws.context();
   const auto& cc = ctx.cross_coupled();
@@ -430,12 +630,15 @@ void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
         });
   }
   exec::Fence("commutator::comm222_phst::pandya");
-  // 3. Zbar^{c3 c4} = Xbar3[:, ph3] YA - hX YB Xbar4[:, ph4]^T (host BLAS).
+  // 3. Zbar^{c3 c4} = Xbar3[:, ph3] YA - hX YB Xbar4[:, ph4]^T (device BLAS:
+  //    the first products in one grouped call, then the subtractions).
   {
     const double* xcd = xc.device_data();
     const double* yad = ya.device_data();
     const double* ybd = yb.device_data();
     double* zbd = zb.device_data();
+    std::vector<linalg::GemmProblem> first;
+    std::vector<linalg::GemmProblem> second;
     for (std::int32_t P = 0; P < npairs; ++P) {
       const std::int32_t c3 = p3[static_cast<std::size_t>(P)];
       const std::int32_t c4 = p4[static_cast<std::size_t>(P)];
@@ -453,18 +656,21 @@ void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
           ybd + yb_off[static_cast<std::size_t>(P)], n3, m4, n3};
       linalg::MatrixView<const double> X4{
           xcd + xc_off[static_cast<std::size_t>(c4)], n4, m4, n4};
-      linalg::Gemm(1.0, X3, linalg::Op::kNoTrans, YA, linalg::Op::kNoTrans, 0.0,
-                   Zm);
+      first.push_back(linalg::GemmProblem{1.0, X3, linalg::Op::kNoTrans, YA,
+                                          linalg::Op::kNoTrans, 0.0, Zm});
       if (fork_odd) {
+        // The Xbar YA part alone (a separate C, same grouped call).
         linalg::MatrixView<double> Zx{
             zxy.device_data() + zb_off[static_cast<std::size_t>(P)], n3, n4,
             n3};
-        linalg::Gemm(1.0, X3, linalg::Op::kNoTrans, YA, linalg::Op::kNoTrans,
-                     0.0, Zx);
+        first.push_back(linalg::GemmProblem{1.0, X3, linalg::Op::kNoTrans, YA,
+                                            linalg::Op::kNoTrans, 0.0, Zx});
       }
-      linalg::Gemm(-1.0 * hX, YB, linalg::Op::kNoTrans, X4, linalg::Op::kTrans,
-                   1.0, Zm);
+      second.push_back(linalg::GemmProblem{-1.0 * hX, YB, linalg::Op::kNoTrans,
+                                           X4, linalg::Op::kTrans, 1.0, Zm});
     }
+    linalg::DeviceGroupedGemm(first);
+    linalg::DeviceGroupedGemm(second);
   }
   // 4. Inverse transform into the stored blocks of Z.
   std::vector<std::int32_t> zcb, zck, znb, znk, zro{0};
@@ -509,75 +715,105 @@ void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   v.row_offset = d_zro.device_data();
   v.num_blocks = static_cast<std::int32_t>(zcb.size());
   v.zd = Z.two_body().matrix().buffer().device_data();
-  exec::ParallelForDynamic(
+  // One item per row of the stacked stored blocks, its columns iket >= the
+  // first stored one (iket >= ibra in diagonal blocks): looped inside the
+  // item on the host, over a team's threads on the device (M14).
+  // Quadruple form (M14): one team per ket pair (a, b) of compatible classes;
+  // the Zbar values of the pair are gathered once for all (J1, J2) blocks
+  // (the element form below gathers them once per block). Bitwise equal to
+  // the element form. Host: always (team size 1; emax 8 rank 5 on 56 cores
+  // 2348 -> 882 ms, emax 10 rank 5 18.9 -> 4.9 s, rank 2 5.3 -> 2.4 s).
+  // Device: only for L >= 3, since for small L few (J1, J2) share a pair and
+  // the element form fills the GPU better; emax 10 (ms, element / quad):
+  // L = 1 275 / 583, 2 675 / 775, 3 1173 / 944, 4 1642 / 1094, 5 2150 / 1206.
+  constexpr int kQuadMinRankDevice = 3;
+  if (!exec::kDeviceKernels || L >= kQuadMinRankDevice) {
+    const basis::TwoBodyChannels& tbh = ctx.ms->two_body();
+    const basis::SingleParticleBasis& sp = ctx.ms->basis();
+    std::vector<std::vector<std::int32_t>> by_class(6);
+    for (std::int32_t kidx = 0; kidx < tbh.num_kets(); ++kidx) {
+      const auto& ket = tbh.ket(KetIndex{kidx});
+      const auto& op = sp.orbit(ket.p);
+      const auto& oq = sp.orbit(ket.q);
+      const int cls = op.tz2.twice + oq.tz2.twice + 2 + (op.l + oq.l) % 2;
+      by_class[static_cast<std::size_t>(cls)].push_back(kidx);
+    }
+    std::vector<std::int32_t> class_kets;
+    std::vector<std::int32_t> class_off{0};
+    for (const auto& c : by_class) {
+      class_kets.insert(class_kets.end(), c.begin(), c.end());
+      class_off.push_back(static_cast<std::int32_t>(class_kets.size()));
+    }
+    // Class pairs that own a stored block of Z (channel = 6 J + class).
+    bool used[6][6] = {};
+    for (const auto& info : Z.two_body().matrix().blocks()) {
+      if (info.rows == 0 || info.cols == 0) continue;
+      used[info.row_block.value() % 6][info.col_block.value() % 6] = true;
+    }
+    std::vector<std::int32_t> pa, pb;
+    std::vector<std::int64_t> pitems{0};
+    for (int x = 0; x < 6; ++x)
+      for (int y = 0; y < 6; ++y) {
+        const auto na = static_cast<std::int64_t>(
+            by_class[static_cast<std::size_t>(x)].size());
+        const auto nbk = static_cast<std::int64_t>(
+            by_class[static_cast<std::size_t>(y)].size());
+        if (!used[x][y] || na == 0 || nbk == 0) continue;
+        pa.push_back(x);
+        pb.push_back(y);
+        pitems.push_back(pitems.back() + na * nbk);
+      }
+    const auto zblock = detail::BlockOffsetTable(Z.two_body(), nch);
+    const auto d_ck = ToDevice(class_kets, "imsrg::phst::class_kets");
+    const auto d_co = ToDevice(class_off, "imsrg::phst::class_off");
+    const auto d_pa = ToDevice(pa, "imsrg::phst::pair_a");
+    const auto d_pb = ToDevice(pb, "imsrg::phst::pair_b");
+    const auto d_pi = ToDevice(pitems, "imsrg::phst::pair_items");
+    QuadArgs q;
+    q.v = v;
+    q.class_kets = d_ck.device_data();
+    q.class_off = d_co.device_data();
+    q.pair_a = d_pa.device_data();
+    q.pair_b = d_pb.device_data();
+    q.pair_items = d_pi.device_data();
+    q.num_pairs = static_cast<std::int32_t>(pa.size());
+    q.zblock = zblock.device_data();
+    q.nch = nch;
+    q.nj = 2 * ws.model_space().basis().emax() + 2;
+    IMSRG_CHECK(pitems.back() <= std::int64_t{2147483647},
+                "comm222_phst: too many ket pairs for one launch");
+    exec::TeamOptions opts;
+    opts.team_size = exec::kDeviceKernels ? 64 : 1;
+    opts.schedule = exec::kDeviceKernels ? exec::Schedule::kStatic
+                                         : exec::Schedule::kDynamic;
+    opts.vector_length = 1;
+    opts.scratch_bytes = 2 * static_cast<std::size_t>(q.nj) *
+                         static_cast<std::size_t>(q.nj) * sizeof(double);
+    const int level = exec::ResolveScratchLevel(opts);
+    exec::TeamFor(
+        "commutator::comm222_phst::inverse_quad",
+        static_cast<int>(pitems.back()), opts,
+        IMSRG_LAMBDA(const exec::TeamMember& member) {
+          auto* scratch = static_cast<double*>(
+              member.team_scratch(level).get_shmem(opts.scratch_bytes));
+          PhstQuad(member, q, scratch);
+        });
+    exec::Fence("commutator::comm222_phst");
+    return;
+  }
+  exec::NestedFor(
       "commutator::comm222_phst::inverse", zro.back(),
       IMSRG_LAMBDA(const exec::Index rr) {
         const int k = detail::FindBlock(v.row_offset, v.num_blocks, rr);
         const int ibra = static_cast<int>(rr) - v.row_offset[k];
-        const int cb = v.ch_bra[k];
-        const int ck = v.ch_ket[k];
-        const int J1 = v.tb.channel_two_j[cb] / 2;
-        const int J2 = v.tb.channel_two_j[ck] / 2;
-        const int nb = v.nbra[k];
-        const int nk = v.nket[k];
-        const KetIndex gb =
-            v.tb.global_ket(ChannelIndex{cb}, LocalKetIndex{ibra});
-        const int i = v.tb.ket_p[gb.value()];
-        const int j = v.tb.ket_q[gb.value()];
-        const int ji = v.j2[i];
-        const int jj = v.j2[j];
-        double* blk = v.zd + v.offset[k];
-        for (int iket = (cb == ck ? ibra : 0); iket < nk; ++iket) {
-          const KetIndex gk =
-              v.tb.global_ket(ChannelIndex{ck}, LocalKetIndex{iket});
-          const int kk = v.tb.ket_p[gk.value()];
-          const int ll = v.tb.ket_q[gk.value()];
-          const int jk = v.j2[kk];
-          const int jl = v.j2[ll];
-          double commij = 0.0;
-          for (int J3 = Iabs(ji - jl) / 2; J3 <= (ji + jl) / 2; ++J3) {
-            const int J4min = Imax(Iabs(jk - jj) / 2, Iabs(J3 - v.L));
-            const int J4max = Imin((jk + jj) / 2, J3 + v.L);
-            for (int J4 = J4min; J4 <= J4max; ++J4) {
-              const double nj =
-                  v.ninej(TwoJ{ji}, TwoJ{jl}, TwoJ{2 * J3}, TwoJ{jj}, TwoJ{jk},
-                          TwoJ{2 * J4}, TwoJ{2 * J1}, TwoJ{2 * J2});
-              if (nj == 0.0) continue;
-              const double hat = Kokkos::sqrt((2.0 * J1 + 1) * (2.0 * J2 + 1) *
-                                              (2.0 * J3 + 1) * (2.0 * J4 + 1));
-              commij += hat * Phase((jj + jl) / 2 + J2 + J4) * nj *
-                        v.Zbar(i, ll, kk, j, J3, J4);
-            }
-          }
-          double commji = commij;
-          if (i != j) {
-            commji = 0.0;
-            for (int J3 = Iabs(jj - jl) / 2; J3 <= (jj + jl) / 2; ++J3) {
-              const int J4min = Imax(Iabs(jk - ji) / 2, Iabs(J3 - v.L));
-              const int J4max = Imin((jk + ji) / 2, J3 + v.L);
-              for (int J4 = J4min; J4 <= J4max; ++J4) {
-                const double nj =
-                    v.ninej(TwoJ{jj}, TwoJ{jl}, TwoJ{2 * J3}, TwoJ{ji},
-                            TwoJ{jk}, TwoJ{2 * J4}, TwoJ{2 * J1}, TwoJ{2 * J2});
-                if (nj == 0.0) continue;
-                const double hat =
-                    Kokkos::sqrt((2.0 * J1 + 1) * (2.0 * J2 + 1) *
-                                 (2.0 * J3 + 1) * (2.0 * J4 + 1));
-                commji += hat * Phase((ji + jl) / 2 + J2 + J4) * nj *
-                          v.Zbar(j, ll, kk, i, J3, J4);
-              }
-            }
-          }
-          const bool dij = (i == j);
-          const bool dkl = (kk == ll);
-          const double norm =
-              (dij == dkl) ? (dij ? 2.0 : 1.0) : constants::kSqrt2;
-          const double val =
-              (commij - Phase((ji + jj) / 2 - J1) * commji) / norm;
-          blk[ibra + static_cast<std::int64_t>(iket) * nb] += val;
-          if (cb == ck && iket > ibra)
-            blk[iket + static_cast<std::int64_t>(ibra) * nb] += v.hZ * val;
-        }
+        const int first = v.ch_bra[k] == v.ch_ket[k] ? ibra : 0;
+        return static_cast<exec::Index>(v.nket[k] - first);
+      },
+      IMSRG_LAMBDA(const exec::Index rr, const exec::Index t) {
+        const int k = detail::FindBlock(v.row_offset, v.num_blocks, rr);
+        const int ibra = static_cast<int>(rr) - v.row_offset[k];
+        const int first = v.ch_bra[k] == v.ch_ket[k] ? ibra : 0;
+        PhstInverseElement(v, rr, first + static_cast<int>(t));
       });
   exec::Fence("commutator::comm222_phst");
 }

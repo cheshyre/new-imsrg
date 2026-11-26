@@ -356,7 +356,8 @@ runs on the login node.
 
 **Presets.** `frontier-cpu` (CI; Debug `-O1 -g`, Kokkos OpenMP, `CMAKE_CXX_COMPILER=CC`), `frontier-serial` (the same with the debug Serial Kokkos, the Mac `dev-serial` equivalent),
 `frontier-cpu-release` (Release, `IMSRG_NATIVE_ARCH`, i.e. `-march=native` = znver3), `frontier-hip`
-(Release, hipcc, `IMSRG_BUILD_PYTHON=OFF`; compile check). All set
+(Release, hipcc, `IMSRG_BUILD_PYTHON=OFF`, `-ffp-contract=off` so host and device arithmetic
+agree bitwise where the code is the same; device BLAS rocBLAS, `IMSRG_DEVICE_BLAS`, M14). All set
 `IMSRG_TEST_DATA_DIR=$IMSRG_WORK/inputs`, `IMSRG_GENERATED_GOLDEN_DIR=$IMSRG_WORK/golden-generated`
 (shared by every clone, so agent clones need no copy), and the MPI test launcher
 `MPIEXEC_EXECUTABLE=/usr/bin/srun`, `MPIEXEC_NUMPROC_FLAG=-n`,
@@ -366,8 +367,14 @@ MPI test as a nested `srun -n <ranks>` step.
 **`tools/ci.sh frontier-*`** loads the modules, finds the allocation, and runs configure, build,
 unit, integration, MPI and Python tests through `imsrg_compute` (56 build jobs, 14 test slots of 4
 threads); layering, clang-format, cpplint and the license check run on the login node.
-`frontier-hip` stops after the build. **`tools/bootstrap_deps.sh`** loads the modules itself and
-builds `openmp serial hip` by default on Frontier; run it on a compute node
+`frontier-hip` stops after the build; **`tools/ci.sh frontier-hip-run`** (M14) builds the same tree
+(`build/frontier-hip`) and runs the unit and integration tests on one GCD through
+`imsrg_compute_gpu` (`srun --gpus=1 -c 7`, 6 test processes sharing the GCD; MPI tests skipped).
+The job must hold GPUs (a full node, e.g. the job `imsrg-a`). Benchmarks on one GCD:
+`srun --jobid=<job> --overlap -N1 -n1 -c7 --gpus=1 <bench>`; one rank per GCD:
+`-n 8 --gpus-per-task=1 --gpu-bind=closest` (design/benchmarks/gpu-m14.md). **`tools/bootstrap_deps.sh`** loads the modules itself and
+builds `openmp serial hip` by default on Frontier (plus `kokkoskernels-hip` if the Kokkos Kernels
+tarball is in `$IMSRG_DEPS_PREFIX/src/`, M14, AL-E-Q1); run it on a compute node
 (`srun --jobid=<job> --overlap -n1 -c 56 tools/bootstrap_deps.sh`), which skips the venv, then
 `tools/bootstrap_deps.sh --backends ""` on the login node for the venv.
 
