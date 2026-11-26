@@ -114,6 +114,26 @@ TEST(TensorCommutatorGolden, Emax1RandomTensors) {
   }
 }
 
+// The fork's 9j skip threshold (1e-8, design/50 section 5) as an option: the
+// result moves by far less than the 1e-4 reproduction target.
+TEST(TensorCommutatorGolden, ForkNineJThresholdIsAnOption) {
+  const std::string in = "tensor/emax1_He4/inputs/";
+  const auto ms = op::ModelSpaceForDump(
+      op::ReadOperatorDumpHeader(Golden(in + "H_HF.dump")));
+  const op::Operator X = op::ReadOperatorDump(Golden(in + "H_HF.dump"), ms);
+  const op::Operator Y =
+      op::ReadTensorDump(Golden(in + "rand_2_0_0_H_3.tdump"), ms);
+  TensorWorkspace ws(ms);
+  TensorOptions devel;
+  TensorOptions fork;
+  fork.ninej_threshold = 1.0e-8;
+  const op::Operator a = TensorCommutator(X, Y, devel, ws);
+  const op::Operator b = TensorCommutator(X, Y, fork, ws);
+  const double d = op::MaxAbsDifference(a, b).max();
+  std::printf("9j threshold 1e-8 vs 1e-10: max|dZ| %.3e\n", d);
+  EXPECT_LE(d, 1.0e-7 * std::max(1.0, op::MaxAbs(a).max()));
+}
+
 TEST(TensorCommutatorGolden, Emax2OneBodyOperators) {
   const std::vector<std::string> terms = {"comm111st", "comm121st", "all"};
   for (const char* y : {"E2", "GamowTeller"}) {
