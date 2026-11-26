@@ -28,7 +28,7 @@ Per term at emax 10 (ms): GPU / CPU (serial libsci, 56): comm221 12.8 / 137, com
 pp_hh 9.7 / 150, ph 34.2 / 127, pp_hh_221 14.9 / 156. GPU history at emax 10: 105 ms with the
 host-shaped kernels (only the GEMMs moved to rocBLAS) -> 103 (team-per-column variants, no gain)
 -> 78 ms (flat element kernels) -> 64 ms (comm122 bra part as dense GEMMs of the lifted one-body
-operators). Remaining hot spot: the ph inverse transform (25 ms, team per ket). A hoisted
+operators) -> 58 ms (comm221ss / comm121ss one team per (i, j)). Remaining hot spot: the ph inverse transform (25 ms, team per ket). A hoisted
 variant of the tensor phst inverse (9j box and cc indices per element, private arrays) was
 slower (2133 -> 2367 ms at emax 10 rank 5, register spills) and was dropped. At emax 8 the host-shaped kernels took 102 ms (ph inverse alone
 73 ms: one thread per ket starves the GPU).
