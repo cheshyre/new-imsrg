@@ -293,7 +293,7 @@ OneBodyTable BuildTable(const basis::SingleParticleBasis& basis, Family family,
 
 double SqrtFourPi() { return std::sqrt(4 * std::numbers::pi); }
 
-// PENDING owner confirmation (2026-11-26 20:00 EST): sqrt(4 pi) as for FPhipp.
+// sqrt(4 pi) as for FPhipp; owner-confirmed, design/50 section 4.
 double PhitpShorthandPrefactor() { return SqrtFourPi(); }
 
 std::optional<Shorthand> ParseShorthand(std::string_view name) {

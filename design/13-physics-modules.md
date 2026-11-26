@@ -289,7 +289,7 @@ imsrg-devel build (`30` §3).
 (`detail/nreft_radial.h`), the blocks M, Ms(J,L), Mg(J,L), Phi', Phi'', tilde-Phi' = Phi' + Ms(J,J)/2,
 Sigma, Sigma', Sigma'', Delta, Delta' (`Family`), isospin selections p/n/+/-, the fork's channel sets
 and J = 0 non-reduced storage, as dense reduced one-body tables (`OneBodyTable`), and the shorthands
-`F<family><L><p|n>_<q>` (`ParseShorthand`; sqrt(4 pi) on FM, FPhipp and, pending the owner,
+`F<family><L><p|n>_<q>` (`ParseShorthand`; sqrt(4 pi) on FM, FPhipp and (owner, design/50 §4)
 FPhitp, `PhitpShorthandPrefactor()`; all Hermitian). Scalar (L = 0) shorthands build operators
 (`BuildScalarShorthand`, driver catalog P1 rows FM0p/n, FPhipp0p/n); L > 0 waits for the M15 tensor
 storage (planned catalog rows). Tested against the fork dumps (`tests/golden/nreft`, test

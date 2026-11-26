@@ -1329,6 +1329,7 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
   `Phitp(L, q)`, Hermitian, like FPhipp (reference/06 section 2.4; orchestrator's notes
   `$IMSRG_WORK/inputs/al27/analysis/phitp-normalization-notes.md`). The constant lives only in
   `opslib::nreft::PhitpShorthandPrefactor()`. **Assumed meanwhile:** sqrt(4 pi); owner to confirm.
+  **Answer (owner, 2026-11-26, via the orchestrator):** "The prefactor is good for now." (design/50 section 4).
 * **AL-B2** (lead B, NREFT table tolerance) - the fork's one-body tables are reproduced element by
   element to 1e-12 relative, except near-zero elements: tables that vanish analytically (Delta'_J at
   emax 2) or elements that are 1e-12 of the table at q = 1050 MeV carry only the rounding noise of
@@ -1337,6 +1338,10 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
   the largest element of all fork tables at that q (the Wigner-symbol rule of design/30 section 2;
   observed max |d|/S_q = 7.8e-15). Alternative: per-element error estimates from the magnitude of the
   summed terms.
+  Update (later the same night): at emax 14 the fork itself is not exact (design/30 section 6,
+  row AL-B-1: up to 8.5e-7 relative, 1.5e-9 S_q). The port now sums in double-double and is
+  checked against a 50-digit mpmath reference (1e-12 rule, max 5.5e-13); the emax-14 fork
+  comparison only bounds the fork's error (1e-8 S_q).
 * **AL-B3** (lead B, fork NaNs at q = 0) - in the fork, `jdmho`/`jdpho` with multipole L = 0 contain
   y^(-1/2) and give inf/NaN at q = 0; this reaches Phi'_1, Phi''_1, tilde-Phi'_1, Delta'_1 and
   Mg(J, 0) at q = 0 (none of the archived shorthands; FPhitp2/4 are finite). The port reproduces the

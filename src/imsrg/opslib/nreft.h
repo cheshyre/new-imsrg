@@ -126,7 +126,7 @@ double SqrtFourPi();
 
 /// Prefactor of the `FPhitp<L>` shorthands: sqrt(4 pi), like FPhipp (the
 /// normal-parity, even-J family; reference/06 section 2.4).
-/// PENDING the owner's confirmation (interview 2026-11-26, 20:00 EST).
+/// Confirmed by the owner (2026-11-26, "good for now"); design/50 section 4.
 double PhitpShorthandPrefactor();
 
 /// A parsed operator-name shorthand `F<family><L><p|n>_<q>`.
