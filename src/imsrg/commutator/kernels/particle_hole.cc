@@ -706,20 +706,27 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   // Item (c, beta) owns the pairs {(alpha, beta), (beta, alpha)} and
   // {(alpha, Ncc + beta), (beta, Ncc + alpha)} for alpha <= beta, so every
   // element is read and written by exactly one item (no separate ZB buffer).
-  exec::ParallelForDynamic(
-      "commutator::comm222_phss::combine", cc_kets,
-      IMSRG_LAMBDA(const exec::Index i) {
-        const exec::Index e = OwnedKet(a, i);
-        const int c = detail::FindBlock(ket_off, num_cc, e);
-        if (a.pv.nk[c] == 0) return;  // W stays zero
-        const std::int64_t n = a.pv.ncc[c];
-        const std::int64_t beta = e - ket_off[c];
-        double* w = a.pv.w + a.pv.w_off[c];
-        const int* kp = a.pv.ket_p + ket_off[c];
-        const int* kq = a.pv.ket_q + ket_off[c];
-        const int* j2 = a.zv.tb.orbit_j2;
-        const double phi_b = ParitySign((j2[kp[beta]] + j2[kq[beta]]) / 2);
-        for (std::int64_t alpha = 0; alpha <= beta; ++alpha) {
+  if (exec::kDeviceKernels && !pd.distributed) {
+    // Device shape (M14): one thread per element (alpha, beta) of the left
+    // halves of all W blocks; the items alpha <= beta do the work of the loop
+    // below (coalesced in alpha, the transposed reads go through the cache).
+    const std::int64_t* w_off = a.pv.w_off;
+    exec::ParallelFor(
+        "commutator::comm222_phss::combine_flat", pd.w_off_host.back(),
+        IMSRG_LAMBDA(const exec::Index e) {
+          const int c = detail::FindBlock(w_off, num_cc, e);
+          if (a.pv.nk[c] == 0) return;  // W stays zero
+          const std::int64_t n = a.pv.ncc[c];
+          const std::int64_t local = e - w_off[c];
+          if (local >= n * n) return;  // right half: done by the left item
+          const std::int64_t beta = local / n;
+          const std::int64_t alpha = local - beta * n;
+          if (alpha > beta) return;
+          double* w = a.pv.w + w_off[c];
+          const int* kp = a.pv.ket_p + ket_off[c];
+          const int* kq = a.pv.ket_q + ket_off[c];
+          const int* j2 = a.zv.tb.orbit_j2;
+          const double phi_b = ParitySign((j2[kp[beta]] + j2[kq[beta]]) / 2);
           const std::int64_t ab = alpha + beta * n;
           const std::int64_t ba = beta + alpha * n;
           const double x = w[ab];
@@ -733,8 +740,39 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
           const double v = w[br];
           w[ar] = a.hy * phi_b * (u + v);
           if (alpha != beta) w[br] = a.hy * phi_a * (v + u);
-        }
-      });
+        });
+  } else {
+    exec::ParallelForDynamic(
+        "commutator::comm222_phss::combine", cc_kets,
+        IMSRG_LAMBDA(const exec::Index i) {
+          const exec::Index e = OwnedKet(a, i);
+          const int c = detail::FindBlock(ket_off, num_cc, e);
+          if (a.pv.nk[c] == 0) return;  // W stays zero
+          const std::int64_t n = a.pv.ncc[c];
+          const std::int64_t beta = e - ket_off[c];
+          double* w = a.pv.w + a.pv.w_off[c];
+          const int* kp = a.pv.ket_p + ket_off[c];
+          const int* kq = a.pv.ket_q + ket_off[c];
+          const int* j2 = a.zv.tb.orbit_j2;
+          const double phi_b = ParitySign((j2[kp[beta]] + j2[kq[beta]]) / 2);
+          for (std::int64_t alpha = 0; alpha <= beta; ++alpha) {
+            const std::int64_t ab = alpha + beta * n;
+            const std::int64_t ba = beta + alpha * n;
+            const double x = w[ab];
+            const double y = w[ba];
+            w[ab] = x - a.hxhy * y;
+            if (alpha != beta) w[ba] = y - a.hxhy * x;
+            const double phi_a =
+                ParitySign((j2[kp[alpha]] + j2[kq[alpha]]) / 2);
+            const std::int64_t ar = alpha + (n + beta) * n;
+            const std::int64_t br = beta + (n + alpha) * n;
+            const double u = w[ar];
+            const double v = w[br];
+            w[ar] = a.hy * phi_b * (u + v);
+            if (alpha != beta) w[br] = a.hy * phi_a * (v + u);
+          }
+        });
+  }
   exec::Fence("commutator::comm222_phss::combine");
 
   // Inverse transform over pairs of kets: item = ket a = (i, j) of a class

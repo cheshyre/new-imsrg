@@ -345,7 +345,7 @@ void Comm122ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   const auto columns =
       static_cast<exec::Index>(owned ? impl.work_device.comm122_columns.size()
                                      : impl.entry_channel.size());
-  if (exec::kDeviceKernels && owned_columns == nullptr) {
+  if (exec::kDeviceKernels && !owned) {
     // Device shape (M14): one thread per element (r, c) instead of one per
     // column, so neighbouring threads touch neighbouring rows of one column
     // (coalesced) and the GPU sees ~1e6-1e8 items. Same arithmetic per

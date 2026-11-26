@@ -365,6 +365,43 @@ void ComputeIntermediates(const op::Operator& X, const op::Operator& Y,
   // One item per column j of every block; it owns the pairs (i, j) and (j, i)
   // for i <= j, so every element is read and written by exactly one item. The
   // optional Z2 update uses the final values of both elements.
+  if (exec::kDeviceKernels && !owned) {
+    // Device shape (M14): one thread per element (i, j); the items i <= j do
+    // the work of the column loop below (same arithmetic).
+    const int nch = xv.tb.num_channels;
+    exec::ParallelFor(
+        "commutator::ladder_antisymmetrize_flat",
+        static_cast<exec::Index>(impl.two_body_size),
+        IMSRG_LAMBDA(const exec::Index e) {
+          const int ch = detail::FindBlock(s.block_offset, nch, e);
+          const std::int64_t base = s.block_offset[ch];
+          const std::int64_t n = s.num_kets[ch];
+          const std::int64_t local = e - base;
+          const std::int64_t j = local / n;
+          const std::int64_t i = local - j * n;
+          if (i > j) return;
+          const std::int64_t ij = base + i + j * n;
+          const std::int64_t ji = base + j + i * n;
+          const double a_pp = s.mpp[ij];
+          const double b_pp = s.mpp[ji];
+          const double a_hh = s.mhh[ij];
+          const double b_hh = s.mhh[ji];
+          const double c_pp = a_pp + s.h_z * b_pp;
+          const double c_hh = a_hh + s.h_z * b_hh;
+          s.mpp[ij] = c_pp;
+          s.mhh[ij] = c_hh;
+          if (s.z2 != nullptr) s.z2[ij] += c_pp - c_hh;
+          if (i != j) {
+            const double d_pp = b_pp + s.h_z * a_pp;
+            const double d_hh = b_hh + s.h_z * a_hh;
+            s.mpp[ji] = d_pp;
+            s.mhh[ji] = d_hh;
+            if (s.z2 != nullptr) s.z2[ji] += d_pp - d_hh;
+          }
+        });
+    exec::Fence("commutator::ladder_antisymmetrize");
+    return;
+  }
   exec::ParallelForDynamic(
       "commutator::ladder_antisymmetrize",
       static_cast<exec::Index>(owned ? impl.work_device.ladder_columns.size()
