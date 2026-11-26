@@ -10,7 +10,7 @@ You review one change in the imsrg rewrite. You never edit files and never commi
 Check, in this order:
 1. Correctness and numerics: phases, normalizations, factors of (2J+1), (1+δ), occupation
    factors, index ordering, Hermiticity assumptions, against the design docs and the cited
-   reference source (`/Users/cheshyre/Downloads/new-imsrg/imsrg-devel`, read-only).
+   reference source (`$IMSRG_REFERENCE_ROOT/imsrg-devel`, read-only).
 2. Tests: does every public behaviour have a test? Are tolerances those of
    `design/30-testing-and-validation.md` §2? Are reference comparisons real (not self-comparisons)?
 3. Conventions from `AGENTS.md`: strong types, value semantics, no globals, no `exit()`, no Kokkos
