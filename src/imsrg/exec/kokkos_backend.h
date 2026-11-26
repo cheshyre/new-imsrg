@@ -35,6 +35,14 @@
 
 namespace imsrg::exec {
 
+/// True if kernels run on an accelerator (CUDA/HIP), not on host threads.
+/// Kernels with a host-tuned shape (one thread per row looping over a long
+/// ragged range) select a device shape with more, shorter items by it (M14);
+/// both shapes must do the same per-element arithmetic, so results agree
+/// bitwise across the choice.
+inline constexpr bool kDeviceKernels =
+    !std::is_same_v<DefaultExecSpace, HostExecSpace>;
+
 /// Member type handed to team kernels.
 using TeamMember = Kokkos::TeamPolicy<DefaultExecSpace>::member_type;
 

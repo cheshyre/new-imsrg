@@ -345,6 +345,55 @@ void Comm122ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   const auto columns =
       static_cast<exec::Index>(owned ? impl.work_device.comm122_columns.size()
                                      : impl.entry_channel.size());
+  if (exec::kDeviceKernels && owned_columns == nullptr) {
+    // Device shape (M14): one thread per element (r, c) instead of one per
+    // column, so neighbouring threads touch neighbouring rows of one column
+    // (coalesced) and the GPU sees ~1e6-1e8 items. Same arithmetic per
+    // element as the column loops below.
+    exec::ParallelFor(
+        "commutator::comm122ss::bra_flat", total,
+        IMSRG_LAMBDA(const exec::Index e) {
+          const int ch = detail::FindBlock(block_offset, nch, e);
+          const std::int64_t off = block_offset[ch];
+          const std::int64_t n = num_kets[ch];
+          const std::int64_t local = e - off;
+          const std::int64_t c = local / n;
+          const auto r = static_cast<int>(local - c * n);
+          const int rb = row_base[ch];
+          double b = 0.0;
+          for (int t = entry_offset[rb + r]; t < entry_offset[rb + r + 1];
+               ++t) {
+            const std::int64_t idx = off + lm[t] + c * n;
+            double v = 0.0;
+            if (yd != nullptr) v += x1(lfrom[t], lto[t]) * yd[idx];
+            if (xd != nullptr) v -= y1(lfrom[t], lto[t]) * xd[idx];
+            b += lcoef[t] * v;
+          }
+          bsc[e] = b;
+        });
+    exec::ParallelFor(
+        "commutator::comm122ss_flat", total, IMSRG_LAMBDA(const exec::Index e) {
+          const int ch = detail::FindBlock(block_offset, nch, e);
+          const std::int64_t off = block_offset[ch];
+          const std::int64_t n = num_kets[ch];
+          const std::int64_t local = e - off;
+          const std::int64_t c = local / n;
+          const std::int64_t r = local - c * n;
+          if (r > c) return;  // the item (c, r) writes this element
+          double* zb = z2 + off;
+          double* bb = bsc + off;
+          const double b_rc = bb[r + c * n];
+          const double b_cr = bb[c + r * n];
+          const double z = b_rc + hz * b_cr;
+          zb[r + c * n] += z;
+          if (r < c) zb[c + r * n] += hz * z;
+        });
+    // Pass 2 of the column shape zeroes the scratch as it goes; here no
+    // element may be zeroed before its mirror item has read it.
+    ws.impl().ladder.pp.product.fill(0.0);
+    exec::Fence("commutator::comm122ss");
+    return;
+  }
   exec::ParallelForDynamic(
       "commutator::comm122ss::bra", columns,
       IMSRG_LAMBDA(const exec::Index col) {
