@@ -43,6 +43,12 @@ struct TensorOptions {
   /// 9j symbols with |9j| below this are treated as zero in the particle-hole
   /// term (imsrg-devel TensorCommutators.cc: 1e-10; fork 79e9330: 1e-8).
   double ninej_threshold = 1.0e-10;
+  /// Reproduce the 79e9330 fork's particle-hole term for ODD rank L: when it
+  /// reads Zbar^{J3 J4}_{(il),(kj)} through the stored (min, max) pair it
+  /// omits the factor (-1)^L that imsrg-devel includes (Commutator.cc:
+  /// 12396-12405 vs TensorCommutators.cc phase(Lambda + J3 + J4 + ...)); the
+  /// affected elements get the opposite sign. No effect for even L.
+  bool fork_ph_missing_rank_phase = false;
   /// Evaluate comm111st.
   bool comm111 = true;
   /// Evaluate comm121st.
@@ -169,7 +175,8 @@ void Comm222PpHh221st(const op::Operator& X, const op::Operator& Y,
 ///       Zbar_{(jl),(ki)} ] / sqrt((1 + d_ij)(1 + d_kl)).
 /// 9j symbols below `ninej_threshold` are skipped.
 void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
-                 TensorWorkspace& ws, double ninej_threshold);
+                 TensorWorkspace& ws, double ninej_threshold,
+                 bool fork_ph_missing_rank_phase = false);
 
 }  // namespace tensor_terms
 

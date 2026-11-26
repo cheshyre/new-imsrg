@@ -190,8 +190,11 @@ TEST(OperatorRequest, NreftShorthands) {
   ASSERT_EQ(r.value().size(), 1u);
   EXPECT_EQ(r.value()[0].kind, OperatorKind::kNreft);
   EXPECT_EQ(r.value()[0].params, (std::vector<OpParam>{15.5}));
-  EXPECT_EQ(ErrorsOf("FSigmap1p_150")[0].code, "E-PLANNED");
-  EXPECT_EQ(ErrorsOf("FPhitp2n_0")[0].code, "E-PLANNED");
+  // Rank L > 0 shorthands are tensor operators (M15): valid, with the rank in
+  // the shape.
+  for (const char* name : {"FSigmap1p_150", "FPhitp2n_0", "FM2p_150"}) {
+    EXPECT_TRUE(ErrorsOf(name).empty()) << name;
+  }
   EXPECT_EQ(ErrorsOf("FM1p_10")[0].code, "E-OP-UNKNOWN");
   EXPECT_EQ(ErrorsOf("FM0p")[0].code, "E-OP-PARAMS");
   EXPECT_EQ(ErrorsOf("FM0p_-1")[0].code, "E-OP-PARAMS");

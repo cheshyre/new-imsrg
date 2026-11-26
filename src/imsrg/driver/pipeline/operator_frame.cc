@@ -4,6 +4,7 @@
 #include "imsrg/driver/pipeline/operator_frame.h"
 
 #include <cmath>
+#include <cstdlib>
 #include <cstddef>
 #include <cstdint>
 #include <optional>

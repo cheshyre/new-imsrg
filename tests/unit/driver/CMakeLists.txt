@@ -158,3 +158,12 @@ foreach(_variant "" "_slow")
     endif()
   endforeach()
 endforeach()
+
+# The 27Al NREFT pipeline (scalar and tensor operators, fork compat profile) against the goldens of
+# the fork imsrg++ 79e9330 (tests/golden/nreft/flow/fork-79e9330): every number of the written .snt.
+imsrg_add_test(NAME driver_al27_fork_golden
+  SOURCES ${_it_support} test_al27_fork_golden.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
+  DEPS driver LABELS integration NO_GTEST_MAIN)
+target_compile_definitions(driver_al27_fork_golden PRIVATE
+  "IMSRG_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden\""
+  "IMSRG_TEST_DATA_DIR=\"${IMSRG_TEST_DATA_DIR}\"")

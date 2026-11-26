@@ -112,6 +112,11 @@ struct InverseArgs {
   std::int32_t ncc = 0;
   int L = 0;
   int hZ = 1;
+  /// Reproduce the 79e9330 fork (odd rank L only), see
+  /// `TensorOptions::fork_ph_missing_rank_phase`: `Zbar` reads the matrices
+  /// the way the fork does (the stored matrices then already carry the fork's
+  /// sign error of the flipped ket orientation).
+  bool fork_odd_rank_phase = false;
   // Z blocks
   const std::int32_t* ch_bra = nullptr;
   const std::int32_t* ch_ket = nullptr;
@@ -127,6 +132,7 @@ struct InverseArgs {
                                     int J4) const {
     const int c3 = CrossCoupledChannel(l, tz2, i, ll, J3);
     const int c4 = CrossCoupledChannel(l, tz2, k, j, J4);
+    if (fork_odd_rank_phase) return ZbarFork(i, ll, k, j, J3, J4, c3, c4);
     const int r = cc.local_index(i, ll, J3);
     const int c = cc.local_index(k, j, J4);
     if (c3 <= c4) {
@@ -142,13 +148,43 @@ struct InverseArgs {
     return hZ * Phase(J3 - J4) *
            zbar[zbar_off[P] + c + static_cast<std::int64_t>(r) * cc_size[c4]];
   }
+
+  /// Stored element (row pair (a, b) at Ja, column pair (c, d) at Jb) of the
+  /// matrix of the channel pair (ca, cb), ca <= cb; 0 if not computed.
+  IMSRG_INLINE_FUNCTION double Stored(int ca, int cb, int a, int b, int Ja,
+                                      int c, int d, int Jb) const {
+    const int P = pair_of[ca * ncc + cb];
+    if (P < 0) return 0.0;
+    return zbar[zbar_off[P] + cc.local_index(a, b, Ja) +
+                static_cast<std::int64_t>(cc.local_index(c, d, Jb)) *
+                    cc_size[ca]];
+  }
+
+  /// The fork's reading of Zbar^{J3 J4}_{(il),(kj)} (Commutator.cc:12396-
+  /// 12405): the stored rows are the pairs (a, b) with a <= b; the others
+  /// are reached through the swap of both pairs, with the phases
+  /// (-1)^(J3 - J4 + j_i + j_j + j_k + j_l) (c3 <= c4, i > l) and
+  /// (-1)^(j_i + j_j + j_k + j_l) (c3 > c4, k > j), which lack the factor
+  /// (-1)^L of imsrg-devel. The matrices must have been built with the sign
+  /// error of the fork (YA columns of pairs (k, j) with k > j negated).
+  IMSRG_INLINE_FUNCTION double ZbarFork(int i, int ll, int k, int j, int J3,
+                                        int J4, int c3, int c4) const {
+    const int S = (j2[i] + j2[j] + j2[k] + j2[ll]) / 2;
+    if (c3 <= c4) {
+      if (i <= ll) return Stored(c3, c4, i, ll, J3, k, j, J4);
+      return hZ * Phase(J3 - J4 + S) * Stored(c3, c4, ll, i, J3, j, k, J4);
+    }
+    if (k <= j) return hZ * Phase(J3 - J4) * Stored(c4, c3, k, j, J4, i, ll, J3);
+    return Phase(S) * Stored(c4, c3, j, k, J4, ll, i, J3);
+  }
 };
 static_assert(std::is_trivially_copyable_v<InverseArgs>);
 
 }  // namespace
 
 void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
-                 TensorWorkspace& ws, double ninej_threshold) {
+                 TensorWorkspace& ws, double ninej_threshold,
+                 bool fork_ph_missing_rank_phase) {
   IMSRG_CHECK(ws.Compatible(X) && ws.Compatible(Y) && ws.Compatible(Z),
               "comm222_phst: operators not on the workspace's space");
   const op::OperatorSpec zs = TensorCommutatorSpec(X.spec(), Y.spec());
@@ -320,6 +356,10 @@ void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
     double* yad = ya.device_data();
     double* ybd = yb.device_data();
     const std::int32_t np = npairs;
+    // The fork's flipped orientation (k > j) of the ket pair of Ybar lacks
+    // (-1)^L (Commutator.cc:12696 vs TensorCommutators.cc phase(Jbra + Jket +
+    // Lambda)); only odd L is affected.
+    const bool fork_flip = fork_ph_missing_rank_phase && (L % 2 != 0);
     exec::ParallelFor(
         "commutator::comm222_phst::ybar", e_off.back(),
         IMSRG_LAMBDA(const exec::Index e) {
@@ -339,6 +379,7 @@ void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
             const int s = b3 + a.ph_local[a.ph_offset[c3] + q];
             const int t = b4 + col;
             yad[yao[P] + loc] =
+                (fork_flip && a.cc.pair_a[t] > a.cc.pair_b[t] ? -1.0 : 1.0) *
                 a.ph_w[a.ph_offset[c3] + q] *
                 YbarElement(a, a.cc.pair_a[s], a.cc.pair_b[s], a.cc.pair_a[t],
                             a.cc.pair_b[t], c3 / 4, c4 / 4);
@@ -418,6 +459,7 @@ void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   v.ncc = ncc;
   v.L = L;
   v.hZ = hZ;
+  v.fork_odd_rank_phase = fork_ph_missing_rank_phase && (L % 2 != 0);
   v.ch_bra = d_zcb.device_data();
   v.ch_ket = d_zck.device_data();
   v.nbra = d_znb.device_data();

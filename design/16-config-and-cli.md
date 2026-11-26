@@ -700,7 +700,7 @@ has no `include_spin_orbit` parameter (done, run 2); `Rso` is implemented in `Pr
 | **PL, charge changing / parity odd** | `Fermi`, `AxialCharge`, `RadialOverlap`, `VPT_<...>`. |
 | **PL, dagger** | `Dagger_<orb>`, `DaggerHF_<orb>`, `DaggerAlln_<orb>`. |
 | **PL, 0vbb and double GT** | `M0nu_GT_<Ecl>_<src>[_<ff>]`, `M0nu_F_*`, `M0nu_T_*`, `M0nu_C_*`, `M0nuHeavy_*`, `M0nuIntegrand_*`, `M0nuR_*`, `DGT`, `DGTR_*`, `DGTRLocal_*`. |
-| **PL, dark matter** | `DMNREFT_<Op><IsoSV>_<q>_<J>`; the NREFT shorthands of rank L > 0 (`FM2/4`, `FPhipp2/4`, `FSigmap1/3/5`, `FSigmapp1/3/5`, `FDelta1/3/5`, `FPhitp2/4`, each with suffix `p` or `n` and `_<q>`) until the tensor operators of M15 (shape {L, 0, 0, 1}). |
+| **PL, dark matter** | `DMNREFT_<Op><IsoSV>_<q>_<J>`. (The NREFT shorthands of rank L > 0 -- `FM2/4`, `FPhipp2/4`, `FSigmap1/3/5`, `FSigmapp1/3/5`, `FDelta1/3/5`, `FPhitp2/4`, each with suffix `p` or `n` and `_<q>` -- are P1 rows with shape {L, 0, 0, 1} since the tensor driver (Al27 night); their valence files are `<stem>_<name>_2b.snt`.) |
 | **NS** | atomic `hfsNMS`, `hfsSMS`; any `RPA`/`TDA`-resummed variant. |
 
 The `src` parameter of the `M0nu` family is accepted by the old code but never read (R05); the new grammar keeps the token for compatibility and ignores it with a warning when `M0nu` becomes available.

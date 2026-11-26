@@ -22,6 +22,9 @@
 ///     (also in the re-normal-ordering).
 ///   * `tensor_ninej_threshold_1e8`: 9j skip threshold 1e-8 (not 1e-10) in
 ///     the tensor commutators of the flow.
+///   * `tensor_fork_ph_missing_rank_phase`: the fork's particle-hole tensor
+///     commutator omits (-1)^L (devel has it) when it reads Zbar through a
+///     swapped pair; affects odd L only (Sigma', Sigma'', Delta').
 ///   * `tokyo_fork_format`: the 79e9330 tokyo writers (7 significant digits,
 ///     absolute 1e-7 thresholds, Aref/Zref of the core, scalars and tensors).
 
@@ -41,6 +44,9 @@ struct CompatOptions {
   bool tensor_no_fork_diagonal_bug = false;
   /// `commutator::CommutatorOptions::tensor_ninej_threshold = 1e-8`.
   bool tensor_ninej_threshold_1e8 = false;
+  /// Fork particle-hole tensor commutator without the (-1)^L of devel for odd
+  /// L (`CommutatorOptions::tensor_fork_ph_missing_rank_phase`).
+  bool tensor_fork_ph_missing_rank_phase = false;
   /// `io::TokyoNumberFormat::kFork79e9330` / `io::TokyoFormat::kFork79e9330`.
   bool tokyo_fork_format = false;
   friend bool operator==(const CompatOptions&, const CompatOptions&) = default;
@@ -57,6 +63,7 @@ constexpr CompatOptions CompatOptionsFor(Compat c) noexcept {
       o.fork_step_defaults = true;
       o.tensor_no_fork_diagonal_bug = true;
       o.tensor_ninej_threshold_1e8 = true;
+      o.tensor_fork_ph_missing_rank_phase = true;
       o.tokyo_fork_format = true;
       break;
   }
