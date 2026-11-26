@@ -408,8 +408,8 @@ TEST(MagnusSolver, RestoreContinuesBitForBit) {
   auto capture = [&](const flow::MagnusSolver& s) {
     return [&snaps, &s](const flow::MagnusLoopState& st) {
       if (st.istep == 3) {
-        snaps.push_back({st, s.omegas(), s.saved_hamiltonian(),
-                         s.hamiltonian()});
+        snaps.push_back(
+            {st, s.omegas(), s.saved_hamiltonian(), s.hamiltonian()});
       }
     };
   };

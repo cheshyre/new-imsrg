@@ -11,7 +11,6 @@
 #include <vector>
 
 #include "imsrg/basis/model_space.h"
-
 #include "tests/unit/mbpt/mbpt_test_support.h"
 
 namespace imsrg::mbtest {
@@ -155,8 +154,7 @@ linalg::Matrix<double> RandomChannelOrthogonal(const basis::ModelSpace& ms,
 // vectors, virtuals carry no hole component, C is orthogonal and C(i,i) >= 0.
 TEST(MbptNaturalOrbitals, UseHfForHoleStatesMatchesForkAlgorithm) {
   const auto ms = basis::ModelSpace::FromNames(
-      basis::BasisTruncation{.emax = 4, .lmax = -1}, 16.0, "Al27",
-      "sd-shell");
+      basis::BasisTruncation{.emax = 4, .lmax = -1}, 16.0, "Al27", "sd-shell");
   const std::int64_t N = ms->num_orbits();
   bool fractional = false;
   for (std::int64_t i = 0; i < N; ++i) {
@@ -166,8 +164,9 @@ TEST(MbptNaturalOrbitals, UseHfForHoleStatesMatchesForkAlgorithm) {
   }
   ASSERT_TRUE(fractional);
   for (unsigned seed : {1U, 2U, 3U}) {
-    mbpt::NaturalOrbitals nat{RandomChannelOrthogonal(*ms, seed),
-                              std::vector<double>(static_cast<std::size_t>(N), 0.0)};
+    mbpt::NaturalOrbitals nat{
+        RandomChannelOrthogonal(*ms, seed),
+        std::vector<double>(static_cast<std::size_t>(N), 0.0)};
     const linalg::Matrix<double> expect =
         ForkUseHfForHoleStates(nat.c_hf2nat, *ms);
     mbpt::UseHfForHoleStates(nat, *ms);
@@ -181,7 +180,9 @@ TEST(MbptNaturalOrbitals, UseHfForHoleStatesMatchesForkAlgorithm) {
         max_diff = std::max(max_diff, std::abs(C(i, j) - expect(i, j)));
         if (ni > 1.0e-8) {
           EXPECT_EQ(C(j, i), j == i ? 1.0 : 0.0);  // hole column = e_i
-          if (j != i) EXPECT_EQ(C(i, j), 0.0);     // hole row of others
+          if (j != i) {
+            EXPECT_EQ(C(i, j), 0.0);  // hole row of others
+          }
         }
         double s = 0.0;
         for (std::int64_t k = 0; k < N; ++k) s += C(k, i) * C(k, j);
@@ -229,8 +230,8 @@ TEST(MbptNaturalOrbitals, AbsoluteOccupationSorting) {
   rho(ps[2], ps[2]) = -0.03;
   rho(ns[1], ns[1]) = 0.02;
   const auto signed_nat = mbpt::ComputeNaturalOrbitals(rho, *ms);
-  const auto abs_nat = mbpt::ComputeNaturalOrbitals(
-      rho, *ms, mbpt::NatSorting::kAbsDescending);
+  const auto abs_nat =
+      mbpt::ComputeNaturalOrbitals(rho, *ms, mbpt::NatSorting::kAbsDescending);
   auto occ = [](const mbpt::NaturalOrbitals& n, std::int64_t i) {
     return n.occupations[static_cast<std::size_t>(i)];
   };

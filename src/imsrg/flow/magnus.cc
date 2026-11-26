@@ -270,8 +270,7 @@ SolveResult MagnusSolver::Solve(const StatusCallback& on_status,
   // imsrg++ bumps domega to avoid machine-dependent splitting
   // (IMSRGSolver.cc:290); the bump persists, as the member is modified there.
   // A restored solver carries the bumped value already.
-  if (!resume &&
-      std::abs(solver_.omega_norm_max - solver_.domega) < 1.0e-6) {
+  if (!resume && std::abs(solver_.omega_norm_max - solver_.domega) < 1.0e-6) {
     solver_.domega += 1.0e-4;
     log::Info(
         "adjusting domega to {} to avoid numerical trouble, since "
@@ -294,8 +293,7 @@ SolveResult MagnusSolver::Solve(const StatusCallback& on_status,
     log::Info("restored the Magnus flow at stage {}, step {}, s = {}", stage_,
               resume->istep, s_);
   }
-  for (int istep = resume ? resume->istep + 1 : 1; s_ < solver_.smax;
-       ++istep) {
+  for (int istep = resume ? resume->istep + 1 : 1; s_ < solver_.smax; ++istep) {
     const double norm_eta = op::Norm(eta_);
     if (norm_eta < eta_criterion) {
       result.reason = StopReason::kConverged;

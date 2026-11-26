@@ -554,11 +554,11 @@ struct OutputConfig {
 
 /// `[checkpoint]`: flow checkpoints (Magnus, design/13 section 7.3).
 struct CheckpointConfig {
-  std::string directory;         ///< empty: no checkpoints
+  std::string directory;           ///< empty: no checkpoints
   double interval_minutes = 30.0;  ///< wall time between checkpoints; 0:
                                    ///< after every step
   OperatorFileKind format = OperatorFileKind::kNative;
-  bool restart = false;  ///< continue from the checkpoint in `directory`
+  bool restart = false;       ///< continue from the checkpoint in `directory`
   int abort_after_steps = 0;  ///< testing aid: stop with an error right after
                               ///< the checkpoint of this flow step (0: never)
   friend bool operator==(const CheckpointConfig&,

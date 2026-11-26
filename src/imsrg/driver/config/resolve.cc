@@ -23,6 +23,7 @@
 
 #include "imsrg/basis/nucleus.h"
 #include "imsrg/basis/valence_space.h"
+#include "imsrg/driver/config/compat.h"
 #include "imsrg/driver/config/schema_keys.h"
 
 namespace imsrg::driver {
@@ -418,6 +419,12 @@ void DeriveImsrgDefaults(const RawTree& tree, RunConfig& cfg) {
       cfg.imsrg.omega.hunter_gatherer = true;
     if (!tree.contains("imsrg.step.omega_norm_max"))
       cfg.imsrg.step.omega_norm_max = 0.1;
+  }
+
+  // Compat profile (design/50 section 5): the fork's step default.
+  if (CompatOptionsFor(cfg.run.compat).fork_step_defaults &&
+      !tree.contains("imsrg.step.domega")) {
+    cfg.imsrg.step.domega = 0.2;
   }
 
   if (!tree.contains("imsrg.steps"))

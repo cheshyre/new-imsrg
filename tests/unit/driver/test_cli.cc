@@ -266,7 +266,7 @@ TEST(DriverCli, InformationOutputs) {
     ++n;
     EXPECT_TRUE(Contains(r.out, key)) << key;
   }
-  EXPECT_EQ(n, 85);
+  EXPECT_EQ(n, 89);  // 85 imsrg-devel keys + 4 fork 79e9330 keys
 
   r = d.Run("--list-operators");
   EXPECT_EQ(r.code, 0) << r.err;

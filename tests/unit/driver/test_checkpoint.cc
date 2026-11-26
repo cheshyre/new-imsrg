@@ -87,7 +87,8 @@ TEST(Checkpoint, NativeRestartIsBitForBit) {
     ASSERT_FALSE(c.planned) << c.note;
     ASSERT_EQ(Stages(c).items.size(), 2u);
     for (std::size_t i = 0; i < 2; ++i) {
-      EXPECT_EQ(Stages(c).at(i)["steps"].number, Stages(a).at(i)["steps"].number);
+      EXPECT_EQ(Stages(c).at(i)["steps"].number,
+                Stages(a).at(i)["steps"].number);
       EXPECT_EQ(Stages(c).at(i)["s"].number, Stages(a).at(i)["s"].number);
       EXPECT_EQ(Stages(c).at(i)["e0"].number, Stages(a).at(i)["e0"].number);
     }
@@ -111,16 +112,19 @@ TEST(Checkpoint, Me2jpRestartWithinFloat32) {
   ASSERT_FALSE(a.planned) << a.note;
   const int steps1 = static_cast<int>(Stages(a).at(0)["steps"].number);
   const fs::path ck = FreshDir("ckpt32_dir");
-  EXPECT_THROW(RunWith("ckpt32_killed", Checkpoint(ck, "me2jp", steps1 + 2, false)),
-               std::runtime_error);
+  EXPECT_THROW(
+      RunWith("ckpt32_killed", Checkpoint(ck, "me2jp", steps1 + 2, false)),
+      std::runtime_error);
   ASSERT_TRUE(fs::exists(ck / "state.txt"));
-  const RunResult c = RunWith("ckpt32_restart", Checkpoint(ck, "me2jp", 0, true));
+  const RunResult c =
+      RunWith("ckpt32_restart", Checkpoint(ck, "me2jp", 0, true));
   ASSERT_FALSE(c.planned) << c.note;
   const double e0a = a.results["imsrg"]["e0"].number;
   const double e0c = c.results["imsrg"]["e0"].number;
-  std::printf("[checkpoint me2jp] E0 %.12f vs %.12f (diff %.3e), steps %g vs %g\n",
-              e0c, e0a, e0c - e0a, Stages(c).at(1)["steps"].number,
-              Stages(a).at(1)["steps"].number);
+  std::printf(
+      "[checkpoint me2jp] E0 %.12f vs %.12f (diff %.3e), steps %g vs %g\n", e0c,
+      e0a, e0c - e0a, Stages(c).at(1)["steps"].number,
+      Stages(a).at(1)["steps"].number);
   // float32 two-body parts (~6e-8 relative per element): owner O4 accepts a
   // restart within float32 precision, E0 to ~1e-6 MeV (observed 7e-9 MeV).
   EXPECT_NEAR(e0c, e0a, 1.0e-6);

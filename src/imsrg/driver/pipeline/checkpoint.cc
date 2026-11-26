@@ -153,9 +153,8 @@ FlowCheckpointer::FlowCheckpointer(const RunConfig& config, bool write_files)
 
 void FlowCheckpointer::Resume(const Checkpoint& c) {
   closed_written_ = c.omegas.size() - 1;
-  h_saved_written_ = c.omegas.size() > 1
-                         ? static_cast<int>(c.omegas.size()) - 1
-                         : -1;
+  h_saved_written_ =
+      c.omegas.size() > 1 ? static_cast<int>(c.omegas.size()) - 1 : -1;
   // Continue the sequence after the restored one (read from state.txt).
   std::ifstream in(dir_ / "state.txt");
   std::string key;
@@ -182,10 +181,10 @@ void FlowCheckpointer::OnStep(const flow::MagnusSolver& solver,
     Write(solver, state, finished);
   }
   if (abort_now) {
-    throw RuntimeError("checkpoint.abort_after_steps = " +
-                       std::to_string(abort_after_steps_) +
-                       " reached (testing aid): checkpoint written to '" +
-                       dir_.string() + "'");
+    throw RuntimeError(
+        "checkpoint.abort_after_steps = " + std::to_string(abort_after_steps_) +
+        " reached (testing aid): checkpoint written to '" + dir_.string() +
+        "'");
   }
 }
 
@@ -222,9 +221,9 @@ void FlowCheckpointer::Write(const flow::MagnusSolver& solver,
        << " " << Hex(state.ds) << " " << Hex(state.e_last) << " "
        << state.loop_gathers << " " << state.num_gathers << "\n";
     st << "solver " << Hex(so.smax) << " " << Hex(so.dsmax) << " "
-       << Hex(so.ds_0) << " " << Hex(so.domega) << " "
-       << Hex(so.omega_norm_max) << " " << Hex(so.eta_criterion) << " "
-       << so.magnus_adaptive << " " << so.hunter_gatherer << "\n";
+       << Hex(so.ds_0) << " " << Hex(so.domega) << " " << Hex(so.omega_norm_max)
+       << " " << Hex(so.eta_criterion) << " " << so.magnus_adaptive << " "
+       << so.hunter_gatherer << "\n";
     for (const FinishedStage& f : finished) {
       st << "stage " << f.stage << " " << f.generator << " " << f.result.steps
          << " " << Hex(f.result.s) << " " << Hex(f.result.e0) << " "
@@ -342,22 +341,20 @@ Checkpoint ReadCheckpoint(const RunConfig& config,
         std::to_string(hash) + ", now " +
         std::to_string(FlowConfigHash(config)) + ")");
   }
-  const OperatorFileKind kind = format == "native"
-                                    ? OperatorFileKind::kNative
-                                    : OperatorFileKind::kMe2jp;
+  const OperatorFileKind kind =
+      format == "native" ? OperatorFileKind::kNative : OperatorFileKind::kMe2jp;
   for (std::size_t k = 0; k + 1 < n; ++k) {
-    c.omegas.push_back(ReadStoredOperator(
-        dir / ("omega_" + Index(static_cast<int>(k))), ms, kind,
-        Hermiticity::kAntiHermitian));
+    c.omegas.push_back(
+        ReadStoredOperator(dir / ("omega_" + Index(static_cast<int>(k))), ms,
+                           kind, Hermiticity::kAntiHermitian));
   }
-  c.omegas.push_back(ReadStoredOperator(dir / ("omega_cur_" +
-                                               std::to_string(seq)),
-                                        ms, kind,
-                                        Hermiticity::kAntiHermitian));
+  c.omegas.push_back(
+      ReadStoredOperator(dir / ("omega_cur_" + std::to_string(seq)), ms, kind,
+                         Hermiticity::kAntiHermitian));
   if (n > 1) {
-    c.h_saved = ReadStoredOperator(
-        dir / ("h_saved_" + Index(static_cast<int>(n) - 1)), ms, kind,
-        Hermiticity::kHermitian);
+    c.h_saved =
+        ReadStoredOperator(dir / ("h_saved_" + Index(static_cast<int>(n) - 1)),
+                           ms, kind, Hermiticity::kHermitian);
   }
   c.h = ReadStoredOperator(dir / ("h_" + std::to_string(seq)), ms, kind,
                            Hermiticity::kHermitian);
@@ -374,37 +371,34 @@ void WriteOmegaStack(const fs::path& dir, const std::string& stem,
   std::vector<std::vector<std::string>> files;
   for (std::size_t k = 0; k < omegas.size(); ++k) {
     files.push_back(WriteStoredOperator(
-        dir / (stem + "_omega_" + Index(static_cast<int>(k))), omegas[k],
-        kind, "Omega " + std::to_string(k)));
+        dir / (stem + "_omega_" + Index(static_cast<int>(k))), omegas[k], kind,
+        "Omega " + std::to_string(k)));
   }
   if (c != nullptr) {
-    io::WriteFileAtomically(dir / (stem + "_basis.bin"),
-                            [&](std::ostream& out) {
-                              const auto r =
-                                  static_cast<std::uint64_t>(c->rows());
-                              const auto cc =
-                                  static_cast<std::uint64_t>(c->cols());
-                              out.write(reinterpret_cast<const char*>(&r), 8);
-                              out.write(reinterpret_cast<const char*>(&cc), 8);
-                              for (std::int64_t j = 0; j < c->cols(); ++j) {
-                                for (std::int64_t i = 0; i < c->rows(); ++i) {
-                                  const double x = (*c)(i, j);
-                                  out.write(
-                                      reinterpret_cast<const char*>(&x), 8);
-                                }
-                              }
-                            });
+    io::WriteFileAtomically(
+        dir / (stem + "_basis.bin"), [&](std::ostream& out) {
+          const auto r = static_cast<std::uint64_t>(c->rows());
+          const auto cc = static_cast<std::uint64_t>(c->cols());
+          out.write(reinterpret_cast<const char*>(&r), 8);
+          out.write(reinterpret_cast<const char*>(&cc), 8);
+          for (std::int64_t j = 0; j < c->cols(); ++j) {
+            for (std::int64_t i = 0; i < c->rows(); ++i) {
+              const double x = (*c)(i, j);
+              out.write(reinterpret_cast<const char*>(&x), 8);
+            }
+          }
+        });
   }
   io::WriteFileAtomically(dir / (stem + "_occ.dat"), [&](std::ostream& out) {
     out << "# n l 2j 2tz occupation (IMSRG model space)\n";
     for (std::int32_t a = 0; a < ms.num_orbits(); ++a) {
       const basis::Orbit& o = ms.basis().orbit(OrbitIndex(a));
-      out << o.n << " " << o.l << " " << o.j2.twice << " " << o.tz2.twice
-          << " " << Hex(ms.reference().occupation(OrbitIndex(a))) << "\n";
+      out << o.n << " " << o.l << " " << o.j2.twice << " " << o.tz2.twice << " "
+          << Hex(ms.reference().occupation(OrbitIndex(a))) << "\n";
     }
   });
-  io::WriteFileAtomically(dir / (stem + "_omegas.toml"),
-                          [&](std::ostream& out) {
+  io::WriteFileAtomically(dir / (stem + "_omegas.toml"), [&](std::ostream&
+                                                                 out) {
     out << "# Omega stack of an imsrg flow: apply in this order,\n"
         << "# O' = e^Om_n ... e^Om_0 O e^-Om_0 ... e^-Om_n (one BCH each)\n";
     out << "format = \""
@@ -416,8 +410,8 @@ void WriteOmegaStack(const fs::path& dir, const std::string& stem,
     out << "num_omegas = " << omegas.size() << "\n";
     out << "layout_hash = \"" << io::ModelSpaceLayoutHash(ms) << "\"\n";
     out << "occupations = \"" << stem << "_occ.dat\"\n";
-    if (c != nullptr) out << "basis_transformation = \"" << stem
-                          << "_basis.bin\"\n";
+    if (c != nullptr)
+      out << "basis_transformation = \"" << stem << "_basis.bin\"\n";
     out << "files = [\n";
     for (const auto& f : files) {
       out << "  [";

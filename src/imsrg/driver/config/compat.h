@@ -15,6 +15,8 @@
 /// archive, reference/06 section 4.1):
 ///   * `nat_sort_by_abs_occupation` (lead C): natural orbitals re-sorted by
 ///     |occupation| inside each channel (HFMBPT.cc:131-182).
+///   * `fork_step_defaults` (lead C): the fork's Parameters.hh default
+///     domega = 0.2 (imsrg-devel: 0.1) when imsrg.step.domega is not given.
 /// Planned for the same profile (leads A and B): tensor normal-ordering term
 /// for a == b, J_bra != J_ket omitted; 9j skip threshold 1e-8 in the tensor
 /// commutators; the 79e9330 tokyo writer format.
@@ -28,6 +30,8 @@ struct CompatOptions {
   /// Sort natural orbitals by descending |occupation| (fork 79e9330), instead
   /// of descending signed occupation (imsrg-devel).
   bool nat_sort_by_abs_occupation = false;
+  /// Default imsrg.step.domega = 0.2 (fork Parameters.hh:117) instead of 0.1.
+  bool fork_step_defaults = false;
   friend bool operator==(const CompatOptions&, const CompatOptions&) = default;
 };
 
@@ -39,6 +43,7 @@ constexpr CompatOptions CompatOptionsFor(Compat c) noexcept {
       break;
     case Compat::kImsrgFork79e9330:
       o.nat_sort_by_abs_occupation = true;
+      o.fork_step_defaults = true;
       break;
   }
   return o;

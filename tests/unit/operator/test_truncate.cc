@@ -2,8 +2,6 @@
 // Copyright 2026 The imsrg authors
 
 // Tests of op::Truncate (emax -> emax_imsrg restriction, design/50 C5).
-#include "imsrg/operator/truncate.h"
-
 #include <cstdint>
 #include <memory>
 
@@ -12,6 +10,7 @@
 #include "imsrg/base/error.h"
 #include "imsrg/basis/model_space.h"
 #include "imsrg/operator/random_operator.h"
+#include "imsrg/operator/truncate.h"
 
 namespace imsrg::op {
 namespace {
@@ -37,9 +36,7 @@ void CheckSubmatrix(Hermiticity h) {
   EXPECT_EQ(T.zero_body(), A.zero_body());
   const auto& sb = small->basis();
   const auto& bb = big->basis();
-  auto m = [&](std::int32_t a) {
-    return bb.index_of(sb.orbit(OrbitIndex(a)));
-  };
+  auto m = [&](std::int32_t a) { return bb.index_of(sb.orbit(OrbitIndex(a))); };
   const std::int32_t n = sb.num_orbits();
   for (std::int32_t a = 0; a < n; ++a)
     for (std::int32_t b = 0; b < n; ++b)
@@ -90,8 +87,8 @@ TEST(OperatorTruncate, MissingOrbitThrows) {
 }
 
 TEST(OperatorTruncate, OneBodyOperator) {
-  const Operator A = RandomOperator(Ms(3, "O16", "O16"),
-                                    OperatorSpec::Scalar(1), {.seed = 9});
+  const Operator A =
+      RandomOperator(Ms(3, "O16", "O16"), OperatorSpec::Scalar(1), {.seed = 9});
   const auto small = Ms(1, "O16", "O16");
   const Operator T = Truncate(A, small);
   EXPECT_EQ(T.spec().particle_rank, 1);

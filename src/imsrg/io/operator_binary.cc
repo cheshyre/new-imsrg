@@ -238,12 +238,13 @@ void WriteOperatorBinary(const std::filesystem::path& path,
   h.label = std::string(label);
   const std::span<const double> b1 = op.one_body().buffer().host_span();
   std::span<const double> b2;
-  if (op.two_body().allocated()) b2 = op.two_body().matrix().buffer().host_span();
+  if (op.two_body().allocated())
+    b2 = op.two_body().matrix().buffer().host_span();
   h.one_body_count = b1.size();
   h.two_body_count = b2.size();
   // Header length: everything WriteHeader emits.
-  const auto header_len = static_cast<std::uint32_t>(
-      2 * 8 + 8 * 4 + 8 + 4 + h.label.size() + 2 * 8);
+  const auto header_len = static_cast<std::uint32_t>(2 * 8 + 8 * 4 + 8 + 4 +
+                                                     h.label.size() + 2 * 8);
   WriteFileAtomically(path, [&](std::ostream& out) {
     out.write(kMagic, 8);
     Writer w(out);
@@ -274,9 +275,9 @@ op::Operator ReadOperatorBinary(const std::filesystem::path& path,
   if (h.layout_hash != ModelSpaceLayoutHash(*ms)) {
     std::ostringstream m;
     m << name << ": model-space layout hash " << std::hex << h.layout_hash
-      << " differs from the target's " << ModelSpaceLayoutHash(*ms)
-      << " (emax " << std::dec << h.emax << " in the file, "
-      << ms->basis().emax() << " here)";
+      << " differs from the target's " << ModelSpaceLayoutHash(*ms) << " (emax "
+      << std::dec << h.emax << " in the file, " << ms->basis().emax()
+      << " here)";
     throw InputError(m.str());
   }
   if (options.check_reference && h.reference_hash != ReferenceHash(*ms)) {

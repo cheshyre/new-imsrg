@@ -319,8 +319,9 @@ class Engine {
 
   bool is_magnus() const { return v_.index() == 0; }
   /// `on_step` is used by the Magnus solver only (checkpoints).
-  flow::SolveResult Solve(const flow::MagnusSolver::StatusCallback& cb,
-                          const flow::MagnusSolver::StepCallback& on_step = {}) {
+  flow::SolveResult Solve(
+      const flow::MagnusSolver::StatusCallback& cb,
+      const flow::MagnusSolver::StepCallback& on_step = {}) {
     if (auto* m = std::get_if<flow::MagnusSolver>(&v_)) {
       return m->Solve(cb, on_step);
     }

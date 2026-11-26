@@ -231,13 +231,11 @@ NaturalOrbitals ComputeNaturalOrbitals(const linalg::Matrix<double>& rho_hf,
     for (std::int64_t c = 0; c < n; ++c)
       src[static_cast<std::size_t>(c)] = n - 1 - c;
     if (sorting == NatSorting::kAbsDescending) {
-      std::stable_sort(src.begin(), src.end(),
-                       [&eig](std::int64_t x, std::int64_t y) {
-                         return std::abs(eig.eigenvalues[static_cast<
-                                    std::size_t>(x)]) >
-                                std::abs(eig.eigenvalues[static_cast<
-                                    std::size_t>(y)]);
-                       });
+      std::stable_sort(
+          src.begin(), src.end(), [&eig](std::int64_t x, std::int64_t y) {
+            return std::abs(eig.eigenvalues[static_cast<std::size_t>(x)]) >
+                   std::abs(eig.eigenvalues[static_cast<std::size_t>(y)]);
+          });
     }
     const int j2 = basis.orbit(oa).j2.twice;
     for (std::int64_t c = 0; c < n; ++c) {

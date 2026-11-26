@@ -33,14 +33,14 @@ std::uint64_t ReferenceHash(const basis::ModelSpace& ms);
 
 /// Header of a native operator file.
 struct OperatorFileHeader {
-  std::uint32_t version = 1;        ///< Format version.
-  std::uint64_t layout_hash = 0;    ///< `ModelSpaceLayoutHash`.
+  std::uint32_t version = 1;         ///< Format version.
+  std::uint64_t layout_hash = 0;     ///< `ModelSpaceLayoutHash`.
   std::uint64_t reference_hash = 0;  ///< `ReferenceHash`.
-  op::OperatorSpec spec;            ///< Rank, symmetry, hermiticity.
-  std::int32_t emax = 0;            ///< Basis emax.
-  std::int32_t e2max = 0;  ///< 2 emax (the basis has no e2max cut).
-  double hw = 0.0;         ///< Oscillator frequency, MeV.
-  std::string label;       ///< Free text (operator name, stage, ...).
+  op::OperatorSpec spec;             ///< Rank, symmetry, hermiticity.
+  std::int32_t emax = 0;             ///< Basis emax.
+  std::int32_t e2max = 0;            ///< 2 emax (the basis has no e2max cut).
+  double hw = 0.0;                   ///< Oscillator frequency, MeV.
+  std::string label;                 ///< Free text (operator name, stage, ...).
   std::uint64_t one_body_count = 0;  ///< Doubles of the one-body buffer.
   std::uint64_t two_body_count = 0;  ///< Doubles of the two-body buffer.
 };

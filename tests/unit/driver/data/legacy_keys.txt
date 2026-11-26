@@ -84,3 +84,6 @@ OperatorsPT1
 OperatorsRPA
 OperatorsTDA
 SPWF
+only_2b_omega_at_end
+reduced_232_impl
+imsrg3_commutator_depth

@@ -82,13 +82,13 @@ TEST(LegacyKeys, ListMatchesGoldenFile) {
   for (std::string line; std::getline(in, line);)
     if (!line.empty()) golden.push_back(line);
   const auto keys = LegacyKeys();
-  ASSERT_EQ(keys.size(), 86u);
+  ASSERT_EQ(keys.size(), 89u);
   ASSERT_EQ(golden.size(), keys.size());
   for (std::size_t i = 0; i < keys.size(); ++i)
     EXPECT_EQ(std::string(keys[i].key), golden[i]);
   std::set<std::string_view> unique;
   for (const auto& k : keys) unique.insert(k.key);
-  EXPECT_EQ(unique.size(), 86u);
+  EXPECT_EQ(unique.size(), 89u);
 }
 
 TEST(LegacyKeys, NewKeysAreSchemaPaths) {
@@ -121,7 +121,7 @@ TEST(LegacyKeys, FindAndText) {
   const std::string text = LegacyKeysText();
   std::size_t lines = 0;
   for (char c : text) lines += c == '\n';
-  EXPECT_EQ(lines, 87u);
+  EXPECT_EQ(lines, 90u);
   EXPECT_NE(text.find("2bme"), std::string::npos);
 }
 
@@ -598,6 +598,14 @@ TEST(LegacyWarnings, V21) {
   const auto ok = Tr({"basis=NAT", "use_NAT_occupations=true"});
   EXPECT_FALSE(Has(ok, "V-21"));
   EXPECT_EQ(Flag(ok, "natural_orbitals.use_occupations"), true);
+}
+
+TEST(LegacyKeys, ForkImsrg3KeysAcceptedAtDefaults) {
+  const auto ok = Tr({"only_2b_omega_at_end=false", "reduced_232_impl=false",
+                      "imsrg3_commutator_depth=100"});
+  EXPECT_FALSE(Has(ok, "E-LEGACY-NS"));
+  EXPECT_TRUE(Has(Tr({"reduced_232_impl=true"}), "E-LEGACY-NS"));
+  EXPECT_TRUE(Has(Tr({"imsrg3_commutator_depth=3"}), "E-LEGACY-NS"));
 }
 
 TEST(LegacyWarnings, V21UseHfReferenceInNat) {

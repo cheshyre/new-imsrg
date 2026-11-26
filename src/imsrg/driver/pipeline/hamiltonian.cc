@@ -83,6 +83,16 @@ void ToNaturalOrbitalBasis(const op::Operator& H, const op::No2bThreeBody* v3,
       rho_hf, out.hno.model_space(),
       compat.nat_sort_by_abs_occupation ? mbpt::NatSorting::kAbsDescending
                                         : mbpt::NatSorting::kSignedDescending);
+  {
+    const auto& basis = out.hno.model_space().basis();
+    for (std::int32_t a = 0; a < basis.num_orbits(); ++a) {
+      const basis::Orbit& o = basis.orbit(OrbitIndex(a));
+      log::Debug(
+          "NAT orbit {:3d}: n {} l {} 2j {} 2tz {:2d} occupation {:.16e}", a,
+          o.n, o.l, o.j2.twice, o.tz2.twice,
+          nat.occupations[static_cast<std::size_t>(a)]);
+    }
+  }
   if (config.natural_orbitals.use_hf_reference) {
     log::Info("NAT basis: setting occupied states back to HF");
     mbpt::UseHfForHoleStates(nat, out.hno.model_space());
@@ -333,8 +343,8 @@ op::Operator PrepareOperator(const OperatorRequest& request,
   } else if (ph.hf) {
     o = hf::ToHfBasis(o, *ph.hf);
   }
-  const auto no_ms = ph.ms_normal_ordering ? ph.ms_normal_ordering
-                                           : ph.hno.model_space_ptr();
+  const auto no_ms =
+      ph.ms_normal_ordering ? ph.ms_normal_ordering : ph.hno.model_space_ptr();
   if (no_ms != o.model_space_ptr()) o = op::WithModelSpace(o, no_ms);
   o = op::NormalOrder(o);
   // [imsrg.space]: normal ordered in the full space, then cut (imsrg++.cc:

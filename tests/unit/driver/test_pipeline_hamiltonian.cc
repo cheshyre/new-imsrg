@@ -145,17 +145,18 @@ TEST(PipelineHamiltonian, Al27NatWithHfReference) {
   const std::string ref =
       "[reference]\nnucleus = \"Al27\"\n[valence]\nspace = \"sd-shell\"\n";
   const std::string nat = "kind = \"nat\"\nmass_number = 27";
-  const std::string hfref =
-      "[natural_orbitals]\nuse_hf_reference = true\n";
-  const PreparedHamiltonian plain = PrepareHamiltonian(Load(Toml(ref, false, nat)));
+  const std::string hfref = "[natural_orbitals]\nuse_hf_reference = true\n";
+  const PreparedHamiltonian plain =
+      PrepareHamiltonian(Load(Toml(ref, false, nat)));
   RunConfig c = Load(Toml(ref, false, nat) + hfref);
   EXPECT_TRUE(c.natural_orbitals.use_hf_reference);
   const PreparedHamiltonian ph = PrepareHamiltonian(c);
   ASSERT_TRUE(ph.hf.has_value());
   ASSERT_TRUE(ph.nat.has_value());
   std::cout << "[dev] Al27 NAT(HF holes) E_ref - E_HF = "
-            << ph.e_reference - ph.hf->e_hf << ", plain NAT - E_HF = "
-            << plain.e_reference - plain.hf->e_hf << "\n";
+            << ph.e_reference - ph.hf->e_hf
+            << ", plain NAT - E_HF = " << plain.e_reference - plain.hf->e_hf
+            << "\n";
   EXPECT_NEAR(ph.e_reference, ph.hf->e_hf, 1.0e-9);
   EXPECT_GT(plain.e_reference, plain.hf->e_hf + 1.0e-6);
 
@@ -173,12 +174,12 @@ TEST(PipelineHamiltonian, Al27NatWithHfReference) {
       const auto i1 = static_cast<std::size_t>(ch[k].value());
       EXPECT_GE(std::abs(pc.nat_occupations[i0]),
                 std::abs(pc.nat_occupations[i1]));
-      resorted = resorted ||
-                 plain.nat_occupations[i0] != pc.nat_occupations[i0];
+      resorted =
+          resorted || plain.nat_occupations[i0] != pc.nat_occupations[i0];
     }
   }
-  std::cout << "[dev] Al27 emax 4: |occ| sorting changed a label: "
-            << resorted << "\n";
+  std::cout << "[dev] Al27 emax 4: |occ| sorting changed a label: " << resorted
+            << "\n";
 }
 
 // C5 (design/50): [imsrg.space] emax 4 -> 2 for the 27Al ensemble: H and the
@@ -191,7 +192,8 @@ TEST(PipelineHamiltonian, Al27ImsrgSpaceTruncation) {
   const std::string nat = "kind = \"nat\"\nmass_number = 27";
   const std::string extra =
       "[natural_orbitals]\nuse_hf_reference = true\n[imsrg.space]\nemax = 2\n";
-  const PreparedHamiltonian full = PrepareHamiltonian(Load(Toml(ref, false, nat)));
+  const PreparedHamiltonian full =
+      PrepareHamiltonian(Load(Toml(ref, false, nat)));
   const RunConfig c = Load(Toml(ref, false, nat) + extra);
   ASSERT_TRUE(c.imsrg.space.has_value());
   EXPECT_EQ(c.imsrg.space->e2max, 4);
@@ -210,14 +212,15 @@ TEST(PipelineHamiltonian, Al27ImsrgSpaceTruncation) {
   }
   EXPECT_NEAR(frac, 5.0 / 6.0, 1.0e-12);
   EXPECT_EQ(ms.reference().A(), 27.0);
-  const op::Operator expect = op::Truncate(ref_full.hno, ph.hno.model_space_ptr());
+  const op::Operator expect =
+      op::Truncate(ref_full.hno, ph.hno.model_space_ptr());
   EXPECT_EQ(ph.hno.zero_body(), ref_full.hno.zero_body());
   EXPECT_EQ(op::MaxAbsDifference(ph.hno, expect).max(), 0.0);
   const OperatorRequest rp2 = Request("Rp2");
   const op::Operator o = PrepareOperator(rp2, ph, c);
   EXPECT_EQ(&o.model_space(), &ph.hno.model_space());
-  const op::Operator of = op::Truncate(PrepareOperator(rp2, ref_full, c),
-                                       ph.hno.model_space_ptr());
+  const op::Operator of =
+      op::Truncate(PrepareOperator(rp2, ref_full, c), ph.hno.model_space_ptr());
   EXPECT_EQ(o.zero_body(), of.zero_body());
   EXPECT_EQ(op::MaxAbsDifference(o, of).max(), 0.0);
   (void)full;

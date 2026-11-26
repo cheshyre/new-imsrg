@@ -2,8 +2,6 @@
 // Copyright 2026 The imsrg authors
 
 // Native float64 operator files (design/19 section 3.2, design/50 C6).
-#include "imsrg/io/operator_binary.h"
-
 #include <unistd.h>
 
 #include <bit>
@@ -18,6 +16,7 @@
 
 #include "imsrg/base/error.h"
 #include "imsrg/basis/model_space.h"
+#include "imsrg/io/operator_binary.h"
 #include "imsrg/operator/random_operator.h"
 
 namespace imsrg::io {
@@ -32,8 +31,8 @@ std::shared_ptr<const basis::ModelSpace> Ms(int emax, const char* ref = "O16",
 }
 
 fs::path TmpDir() {
-  const fs::path d = fs::temp_directory_path() /
-                     ("imsrg_opbin_" + std::to_string(::getpid()));
+  const fs::path d =
+      fs::temp_directory_path() / ("imsrg_opbin_" + std::to_string(::getpid()));
   fs::create_directories(d);
   return d;
 }
@@ -51,7 +50,8 @@ void ExpectBitIdentical(const op::Operator& a, const op::Operator& b) {
 TEST(OperatorBinary, RoundTripIsBitExact) {
   const fs::path dir = TmpDir();
   for (int emax : {2, 4}) {
-    for (Hermiticity h : {Hermiticity::kHermitian, Hermiticity::kAntiHermitian}) {
+    for (Hermiticity h :
+         {Hermiticity::kHermitian, Hermiticity::kAntiHermitian}) {
       const auto ms = Ms(emax);
       const op::Operator A =
           op::RandomOperator(ms, op::OperatorSpec::Scalar(2, h),
@@ -102,8 +102,8 @@ TEST(OperatorBinary, LayoutAndReferenceMismatch) {
   const auto he4 = Ms(2, "He4", "O16");
   ASSERT_EQ(ModelSpaceLayoutHash(*he4), ModelSpaceLayoutHash(*Ms(2)));
   EXPECT_THROW(ReadOperatorBinary(dir / "a.opb", he4), InputError);
-  const op::Operator B = ReadOperatorBinary(dir / "a.opb", he4,
-                                            {.check_reference = false});
+  const op::Operator B =
+      ReadOperatorBinary(dir / "a.opb", he4, {.check_reference = false});
   EXPECT_EQ(A.two_body().matrix().buffer().ToVector(),
             B.two_body().matrix().buffer().ToVector());
   fs::remove_all(dir);

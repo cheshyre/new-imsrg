@@ -1338,3 +1338,17 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
   stable); ties keep the signed order here (`std::stable_sort`). Exact ties do not occur in practice.
   The C4 comparison against lead B's fork reference dumps is pending (only a test-side
   re-implementation of the fork loops so far).
+* **AL-C4** (lead C, C8) - The fork's `Parameters.hh` default is `domega = 0.2` (imsrg-devel 0.1);
+  the archive's template does not set it. With 0.1 our run of lead B's fork golden case
+  (`tests/golden/nreft/flow/fork-79e9330/nat_emax4_imsrg3`, branch feature/al27-nreft-operators)
+  differs by 5e-4 MeV in the .snt; with 0.2 H agrees to the printed precision (2B max 4.9e-7, 1B max
+  2.0e-6 on values ~10, zero body -339.425981 vs -339.426; TCM 1.4e-7). **Done:** compat option
+  `fork_step_defaults` sets domega = 0.2 unless given. The fork also has the keys
+  `only_2b_omega_at_end`, `reduced_232_impl`, `imsrg3_commutator_depth` (in the template); the legacy
+  layer now accepts them at their defaults (dropped) and rejects other values.
+* **AL-C5** (lead C, ME2JP io) - (a) design/19 §2's closed index formula
+  `e(e+1)+o_l+o_j+[proton]` is wrong (d3/2 lands at 10 instead of 8); the implementation uses the
+  file order `2*nlj + [proton]` (the doc's "equivalently" sentence). (b) Text ME2JP round trips are
+  bit exact except for entries with exactly one identical-orbit pair (x*sqrt2 then /sqrt2, within
+  2 ulp); native files are the exact format. (c) A `.bin` header without a tag is accepted. The
+  `asan` preset was not run (Mac-only preset). **Assumed:** fine; fix the formula in the doc.

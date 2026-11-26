@@ -51,11 +51,11 @@ struct FinishedStage {
 
 /// The contents of a checkpoint directory.
 struct Checkpoint {
-  flow::MagnusLoopState loop;          ///< State after the last saved step.
-  std::vector<FinishedStage> stages;   ///< Stages completed before it.
-  std::vector<op::Operator> omegas;    ///< The Omega stack, oldest first.
-  op::Operator h_saved;                ///< Empty for a one-entry stack.
-  op::Operator h;                      ///< H(s).
+  flow::MagnusLoopState loop;         ///< State after the last saved step.
+  std::vector<FinishedStage> stages;  ///< Stages completed before it.
+  std::vector<op::Operator> omegas;   ///< The Omega stack, oldest first.
+  op::Operator h_saved;               ///< Empty for a one-entry stack.
+  op::Operator h;                     ///< H(s).
 };
 
 /// Writes Magnus checkpoints into `checkpoint.directory` (design/13 7.3):
@@ -103,9 +103,9 @@ class FlowCheckpointer {
   int abort_after_steps_ = 0;
   std::uint64_t config_hash_ = 0;
   double last_write_ = 0.0;
-  int sequence_ = 0;          ///< Sequence number of the last checkpoint.
+  int sequence_ = 0;                ///< Sequence number of the last checkpoint.
   std::size_t closed_written_ = 0;  ///< Closed Omegas already on disk.
-  int h_saved_written_ = -1;  ///< Omega index whose H_saved is on disk.
+  int h_saved_written_ = -1;        ///< Omega index whose H_saved is on disk.
   int num_written_ = 0;
 };
 
