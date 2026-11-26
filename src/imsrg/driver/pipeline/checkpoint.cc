@@ -365,7 +365,8 @@ Checkpoint ReadCheckpoint(const RunConfig& config,
 
 void WriteOmegaStack(const fs::path& dir, const std::string& stem,
                      const std::vector<op::Operator>& omegas,
-                     OperatorFileKind kind, const linalg::Matrix<double>* c) {
+                     OperatorFileKind kind, const linalg::Matrix<double>* c,
+                     const basis::ModelSpace* ms_normal_ordering) {
   fs::create_directories(dir);
   const basis::ModelSpace& ms = omegas.front().model_space();
   std::vector<std::vector<std::string>> files;
@@ -389,14 +390,22 @@ void WriteOmegaStack(const fs::path& dir, const std::string& stem,
           }
         });
   }
-  io::WriteFileAtomically(dir / (stem + "_occ.dat"), [&](std::ostream& out) {
-    out << "# n l 2j 2tz occupation (IMSRG model space)\n";
-    for (std::int32_t a = 0; a < ms.num_orbits(); ++a) {
-      const basis::Orbit& o = ms.basis().orbit(OrbitIndex(a));
-      out << o.n << " " << o.l << " " << o.j2.twice << " " << o.tz2.twice << " "
-          << Hex(ms.reference().occupation(OrbitIndex(a))) << "\n";
-    }
-  });
+  const auto write_occ = [&](const std::string& name,
+                             const basis::ModelSpace& space, const char* what) {
+    io::WriteFileAtomically(dir / name, [&](std::ostream& out) {
+      out << "# n l 2j 2tz occupation (" << what << ")\n";
+      for (std::int32_t a = 0; a < space.num_orbits(); ++a) {
+        const basis::Orbit& o = space.basis().orbit(OrbitIndex(a));
+        out << o.n << " " << o.l << " " << o.j2.twice << " " << o.tz2.twice
+            << " " << Hex(space.reference().occupation(OrbitIndex(a))) << "\n";
+      }
+    });
+  };
+  write_occ(stem + "_occ.dat", ms, "IMSRG model space");
+  if (ms_normal_ordering != nullptr) {
+    write_occ(stem + "_occ_no.dat", *ms_normal_ordering,
+              "normal-ordering model space, basis.emax");
+  }
   io::WriteFileAtomically(dir / (stem + "_omegas.toml"), [&](std::ostream&
                                                                  out) {
     out << "# Omega stack of an imsrg flow: apply in this order,\n"
@@ -410,6 +419,11 @@ void WriteOmegaStack(const fs::path& dir, const std::string& stem,
     out << "num_omegas = " << omegas.size() << "\n";
     out << "layout_hash = \"" << io::ModelSpaceLayoutHash(ms) << "\"\n";
     out << "occupations = \"" << stem << "_occ.dat\"\n";
+    if (ms_normal_ordering != nullptr) {
+      out << "normal_ordering_emax = " << ms_normal_ordering->basis().emax()
+          << "\n";
+      out << "normal_ordering_occupations = \"" << stem << "_occ_no.dat\"\n";
+    }
     if (c != nullptr)
       out << "basis_transformation = \"" << stem << "_basis.bin\"\n";
     out << "files = [\n";

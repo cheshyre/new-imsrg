@@ -30,9 +30,10 @@ OUT="${G}/tensor"
 TMP="$(mktemp -d)"
 trap 'rm -rf "${TMP}"' EXIT
 mkdir -p "${TMP}/runs"
-# the script owns tests/golden/tensor: start from an empty directory (no stale files)
-rm -rf "${OUT}"
+# the script owns tests/golden/tensor except fork-79e9330/ (gen_golden_tensor_fork.sh): start
+# from an otherwise empty directory (no stale files)
 mkdir -p "${OUT}"
+find "${OUT}" -mindepth 1 -maxdepth 1 ! -name fork-79e9330 -exec rm -rf {} +
 INT=(2bme="${DATA}/VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz"
      file2e1max=14 file2e2max=28 file2lmax=14)
 CMDLOG="${TMP}/commands.txt"

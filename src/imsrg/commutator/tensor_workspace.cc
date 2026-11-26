@@ -415,7 +415,9 @@ void TensorCommutator(const op::Operator& X, const op::Operator& Y,
   if (opts.comm122) Comm122st(X, Y, Z, ws);
   if (opts.comm221 || opts.comm222_pp_hh)
     Comm222PpHh221st(X, Y, Z, ws, opts.comm221, opts.comm222_pp_hh);
-  if (opts.comm222_ph) Comm222Phst(X, Y, Z, ws, opts.ninej_threshold);
+  if (opts.comm222_ph)
+    Comm222Phst(X, Y, Z, ws, opts.ninej_threshold,
+                opts.fork_ph_missing_rank_phase);
 }
 
 op::Operator TensorCommutator(const op::Operator& X, const op::Operator& Y,

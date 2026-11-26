@@ -75,6 +75,8 @@ enum class OperatorKind {
   kIso2,         ///< total isospin squared, "Iso2"
   kTz2,          ///< isospin projection squared, "Tz2"
   kLdotS,        ///< one-body l.s, "LdotS"
+  kNreft,        ///< scalar dark-matter NREFT shorthand, "FM0p_<q>",
+                 ///< "FPhipp0n_<q>" (see opslib/nreft.h)
 };
 
 /// A typed operator parameter: integer, number (double), or a string (orbit

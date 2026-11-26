@@ -17,9 +17,17 @@
 ///     |occupation| inside each channel (HFMBPT.cc:131-182).
 ///   * `fork_step_defaults` (lead C): the fork's Parameters.hh default
 ///     domega = 0.2 (imsrg-devel: 0.1) when imsrg.step.domega is not given.
-/// Planned for the same profile (leads A and B): tensor normal-ordering term
-/// for a == b, J_bra != J_ket omitted; 9j skip threshold 1e-8 in the tensor
-/// commutators; the 79e9330 tokyo writer format.
+///   * `tokyo_writer_fork_79e9330` (lead B): the tokyo writers (scalar and
+///     tensor) in the fork format (7 significant digits, absolute 1e-7
+///     thresholds, core reference in the header).
+///   * `tensor_no_fork_diagonal_bug`: tensor normal ordering omits, for
+///     a == b, the channel pairs with ch(a h, J_bra) > ch(a h, J_ket)
+///     (also in the re-normal-ordering).
+///   * `tensor_ninej_threshold_1e8`: 9j skip threshold 1e-8 (not 1e-10) in
+///     the tensor commutators of the flow.
+///   * `tensor_fork_ph_missing_rank_phase`: the fork's particle-hole tensor
+///     commutator omits (-1)^L (devel has it) when it reads Zbar through a
+///     swapped pair; affects odd L only (Sigma', Sigma'', Delta').
 
 #include "imsrg/driver/config/schema.h"
 
@@ -32,6 +40,22 @@ struct CompatOptions {
   bool nat_sort_by_abs_occupation = false;
   /// Default imsrg.step.domega = 0.2 (fork Parameters.hh:117) instead of 0.1.
   bool fork_step_defaults = false;
+  /// Tokyo (.snt) writer in the fork 79e9330 format: 7 significant
+  /// digits (scientific, precision 6, width 18), one-body |v| < 1e-7 dropped
+  /// (absolute), two-body without threshold, zero body with 6 significant
+  /// digits, header Aref/Zref/A_for_kinetic_energy of the core reference (the
+  /// fork writes after SetReference(core): 16 8 16 for an sd-shell run).
+  /// The tensor writer uses `io::TokyoFormat::kFork79e9330` and the same
+  /// header.
+  bool tokyo_writer_fork_79e9330 = false;
+  /// Fork tensor normal-ordering bug
+  /// (`op::TensorNormalOrderOptions::fork79e9330_diagonal_bug`).
+  bool tensor_no_fork_diagonal_bug = false;
+  /// `commutator::CommutatorOptions::tensor_ninej_threshold = 1e-8`.
+  bool tensor_ninej_threshold_1e8 = false;
+  /// Fork particle-hole tensor commutator without the (-1)^L of devel for odd
+  /// L (`CommutatorOptions::tensor_fork_ph_missing_rank_phase`).
+  bool tensor_fork_ph_missing_rank_phase = false;
   friend bool operator==(const CompatOptions&, const CompatOptions&) = default;
 };
 
@@ -44,6 +68,10 @@ constexpr CompatOptions CompatOptionsFor(Compat c) noexcept {
     case Compat::kImsrgFork79e9330:
       o.nat_sort_by_abs_occupation = true;
       o.fork_step_defaults = true;
+      o.tokyo_writer_fork_79e9330 = true;
+      o.tensor_no_fork_diagonal_bug = true;
+      o.tensor_ninej_threshold_1e8 = true;
+      o.tensor_fork_ph_missing_rank_phase = true;
       break;
   }
   return o;

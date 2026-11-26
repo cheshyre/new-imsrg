@@ -61,6 +61,22 @@ struct PreparedHamiltonian {
   int proton_number = 0;
 };
 
+/// The oscillator model space of the configuration (basis.emax, lmax, hw,
+/// reference.nucleus and valence.space; the reference occupations of the
+/// nucleus).
+/// @throws ConfigError if neither reference.nucleus nor valence.space is set.
+std::shared_ptr<const basis::ModelSpace> MakeModelSpace(
+    const RunConfig& config);
+
+/// `[imsrg.space]` (design/50 C5, imsrg++.cc:887-929): the IMSRG model space
+/// with emax = imsrg.space.emax, the partition of the configuration's
+/// reference and valence space, and the occupations of `from` copied orbit by
+/// orbit (quantum numbers), so HF re-filling and fractional occupations
+/// survive. Precondition: `config.imsrg.space` is set.
+/// @throws ConfigError if e2max != 2 emax or occupied orbits are dropped.
+std::shared_ptr<const basis::ModelSpace> MakeImsrgModelSpace(
+    const RunConfig& config, const basis::ModelSpace& from);
+
 /// Builds the model space, reads the interaction(s), adds the kinetic energy
 /// (intrinsic Trel with the config's A, or lab-frame T) and the Lawson term
 /// (|beta_cm| > 1e-6: beta_cm * HCM(hw = beta_cm_hw)), solves Hartree-Fock

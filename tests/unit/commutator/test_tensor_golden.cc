@@ -29,9 +29,11 @@ fs::path Golden(const std::string& rel) {
   return fs::path(IMSRG_GOLDEN_DIR) / rel;
 }
 
-/// The term selection of imsrg++'s term names.
-TensorOptions TermOptions(const std::string& term) {
-  TensorOptions o;
+/// The term selection of imsrg++'s term names, on top of `base` (thresholds
+/// and compat switches).
+TensorOptions TermOptions(const std::string& term,
+                          const TensorOptions& base = TensorOptions{}) {
+  TensorOptions o = base;
   o.comm111 = o.comm121 = o.comm122 = o.comm221 = o.comm222_pp_hh =
       o.comm222_ph = false;
   if (term == "comm111st") o.comm111 = true;
@@ -41,7 +43,7 @@ TensorOptions TermOptions(const std::string& term) {
   if (term == "comm222_pp_hhst") o.comm222_pp_hh = true;
   if (term == "comm222_pp_hh_221st") o.comm221 = o.comm222_pp_hh = true;
   if (term == "comm222_phst") o.comm222_ph = true;
-  if (term == "all") o = TensorOptions{};
+  if (term == "all") o = base;
   return o;
 }
 
@@ -53,6 +55,11 @@ struct Case {
   std::string y_file;  ///< tdump of Y.
   std::string space;   ///< Dump whose header defines the model space.
   std::vector<std::string> terms;
+  TensorOptions base{};  ///< Threshold and compat switches of every term.
+  /// The single-term dumps hold only the upper one-body triangle (a <= b;
+  /// the fork's terms fill the lower one in CommutatorScalarTensor's final
+  /// Symmetrize): compare the one-body part of single terms there only.
+  bool upper_one_body_terms = false;
 };
 
 void RunCase(const Case& c) {
@@ -65,7 +72,7 @@ void RunCase(const Case& c) {
     SCOPED_TRACE(c.dir + " " + term + " X=" + c.x_name + " Y=" + c.y_name);
     const fs::path zf = Golden(c.dir) / ("Z_" + term + "__" + c.x_name + "__" +
                                          c.y_name + ".tdump");
-    op::Operator Z = TensorCommutator(X, Y, TermOptions(term), ws);
+    op::Operator Z = TensorCommutator(X, Y, TermOptions(term, c.base), ws);
     Z.SyncToHost();
     if (!fs::exists(zf)) {
       // imsrg++ wrote no file: the term vanishes identically.
@@ -83,6 +90,14 @@ void RunCase(const Case& c) {
         tmp.two_body().matrix().buffer() = ref.two_body().matrix().buffer();
       tmp.one_body().set_hermiticity(Z.hermiticity());
       ref = tmp;
+    }
+    if (c.upper_one_body_terms && term != "all") {
+      const std::int32_t n = Z.one_body().num_orbits();
+      for (std::int32_t a = 0; a < n; ++a)
+        for (std::int32_t b = 0; b < a; ++b) {
+          Z.one_body().set_element(OrbitIndex{a}, OrbitIndex{b}, 0.0);
+          ref.one_body().set_element(OrbitIndex{a}, OrbitIndex{b}, 0.0);
+        }
     }
     const double scale = std::max(1.0, op::MaxAbs(ref).max());
     const auto d = op::MaxAbsDifference(Z, ref);
@@ -149,6 +164,56 @@ TEST(TensorCommutatorGolden, Emax2OneBodyOperators) {
                "tensor/emax2_He4/inputs/random_A.dump", "E2",
                "tensor/emax2_He4/HF/E2.tdump",
                "tensor/emax2_He4/inputs/H_HF.dump", terms});
+}
+
+// The terms of the 79e9330 fork (tests/golden/tensor/fork-79e9330, generated
+// by tools/reference/gen_golden_tensor_fork.sh) with the fork-compat options
+// (9j threshold 1e-8, the odd-rank phase errors of the fork's comm222_phst,
+// QUESTIONS.md AL-F1): random anti-Hermitian scalar X, random Hermitian Y of
+// rank 1, 3, 1 (odd parity) and 2 (even control) with a two-body part.
+TEST(TensorCommutatorGolden, Fork79e9330CompatRandomTensors) {
+  const std::string dir = "tensor/fork-79e9330/emax2_He4/";
+  const std::vector<std::string> terms = {"comm111st",    "comm121st",
+                                          "comm122st",    "comm222_pp_hh_221st",
+                                          "comm222_phst", "all"};
+  TensorOptions fork;
+  fork.ninej_threshold = 1.0e-8;
+  fork.fork_ph_missing_rank_phase = true;
+  for (const char* y : {"rand_1_0_0_H_4", "rand_3_0_0_H_5", "rand_1_0_1_H_6",
+                        "rand_2_0_0_H_3"}) {
+    RunCase(Case{dir + "commutator", "A", dir + "inputs/random_A.dump", y,
+                 dir + "inputs/" + y + ".tdump", dir + "inputs/random_A.dump",
+                 terms, fork, true});
+  }
+}
+
+// Without the compat switch the new code differs from the fork for odd rank
+// only in comm222_phst: the even-rank control and the other terms agree with
+// the default phases.
+TEST(TensorCommutatorGolden, Fork79e9330DefaultPathEvenRankAndNonPhTerms) {
+  const std::string dir = "tensor/fork-79e9330/emax2_He4/";
+  TensorOptions fork_threshold;
+  fork_threshold.ninej_threshold = 1.0e-8;
+  RunCase(Case{dir + "commutator",
+               "A",
+               dir + "inputs/random_A.dump",
+               "rand_2_0_0_H_3",
+               dir + "inputs/rand_2_0_0_H_3.tdump",
+               dir + "inputs/random_A.dump",
+               {"comm222_phst", "all"},
+               fork_threshold,
+               true});
+  for (const char* y : {"rand_1_0_0_H_4", "rand_3_0_0_H_5"}) {
+    RunCase(Case{dir + "commutator",
+                 "A",
+                 dir + "inputs/random_A.dump",
+                 y,
+                 dir + "inputs/" + y + ".tdump",
+                 dir + "inputs/random_A.dump",
+                 {"comm111st", "comm121st", "comm122st", "comm222_pp_hh_221st"},
+                 fork_threshold,
+                 true});
+  }
 }
 
 }  // namespace

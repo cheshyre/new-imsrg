@@ -27,6 +27,21 @@ enum class ValenceWriteMode {
   kIsospinAveragedOperator
 };
 
+/// Number formatting and thresholds of `WriteTokyo`.
+enum class TokyoNumberFormat {
+  /// imsrg-devel: fixed, 16 decimals, relative thresholds, zero body with 9
+  /// digits.
+  kDevel,
+  /// The owner's imsrg++ fork at 79e9330 (compat "imsrg_fork_79e9330"), byte
+  /// for byte: one-body rows kept iff |v| >= 1e-7 (absolute); no two-body
+  /// threshold (zeros are written); integers width 4, values scientific with
+  /// 6 digits, width 18, no extra column spacing; zero body in the default
+  /// stream format (6 significant digits); the stream-state quirk that the
+  /// two-body count line prints hw as scientific (e.g. 1.600000e+01) iff at
+  /// least one one-body row was written.
+  kFork79e9330
+};
+
 /// Everything the header comments of the files record that the operator itself
 /// does not know (imsrg++ takes these from `ReadWrite` members and the model
 /// space). Only used for the comment lines; they never influence the numbers.
@@ -48,6 +63,8 @@ struct ValenceWriteOptions {
       0;  ///< Proton number of the reference state (comment only).
   double a_target =
       0.0;  ///< Target mass A used for the kinetic energy (comment only).
+  TokyoNumberFormat tokyo_format =
+      TokyoNumberFormat::kDevel;  ///< `WriteTokyo` only.
   std::string
       version;  ///< Code version string written to the first comment line.
 };

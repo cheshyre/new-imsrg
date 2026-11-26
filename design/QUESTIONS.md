@@ -1396,6 +1396,73 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
   keeps imsrg++'s formula (it drives the BCH thresholds the archive was produced with); whether the
   fork runs hit the NaN case is to be checked when the J=5 operators are reproduced (C8). A
   physically sensible norm ((2j_p+1) per element, or (2j_p+1)(2j_q+1)/(2L+1)) can be a named option.
+### Lead B (NREFT library, C1/C2)
+
+* **AL-B1** (lead B, FPhitp normalization) - `FPhitp<L><p|n>_<q>` (L = 2, 4) uses sqrt(4 pi) x
+  `Phitp(L, q)`, Hermitian, like FPhipp (reference/06 section 2.4; orchestrator's notes
+  `$IMSRG_WORK/inputs/al27/analysis/phitp-normalization-notes.md`). The constant lives only in
+  `opslib::nreft::PhitpShorthandPrefactor()`. **Assumed meanwhile:** sqrt(4 pi); owner to confirm.
+  **Answer (owner, 2026-11-26, via the orchestrator):** "The prefactor is good for now." (design/50 section 4).
+* **AL-B2** (lead B, NREFT table tolerance) - the fork's one-body tables are reproduced element by
+  element to 1e-12 relative, except near-zero elements: tables that vanish analytically (Delta'_J at
+  emax 2) or elements that are 1e-12 of the table at q = 1050 MeV carry only the rounding noise of
+  the alternating radial sums, in the fork as here (the fork's own FM0p_15 <0||10> and <10||0> differ
+  by 6e-14 relative). **Assumed meanwhile:** pass if |d| <= 1e-12 |ref| or |d| <= 1e-14 S_q, S_q =
+  the largest element of all fork tables at that q (the Wigner-symbol rule of design/30 section 2;
+  observed max |d|/S_q = 7.8e-15). Alternative: per-element error estimates from the magnitude of the
+  summed terms.
+  Update (later the same night): at emax 14 the fork itself is not exact (design/30 section 6,
+  row AL-B-1: up to 8.5e-7 relative, 1.5e-9 S_q). The port now sums in double-double and is
+  checked against a 50-digit mpmath reference (1e-12 rule, max 5.5e-13); the emax-14 fork
+  comparison only bounds the fork's error (1e-8 S_q).
+* **AL-B3** (lead B, fork NaNs at q = 0) - in the fork, `jdmho`/`jdpho` with multipole L = 0 contain
+  y^(-1/2) and give inf/NaN at q = 0; this reaches Phi'_1, Phi''_1, tilde-Phi'_1, Delta'_1 and
+  Mg(J, 0) at q = 0 (none of the archived shorthands; FPhitp2/4 are finite). The port reproduces the
+  fork (NaN), and the golden test skips non-finite fork values. **Assumed meanwhile:** keep NaN (only
+  reachable through raw blocks, not through any catalog name). Alternative: the analytic q -> 0 limit.
+* **AL-B4** (lead B, rank L > 0 NREFT operators) - the tensor storage of lead A
+  (`feature/m15-tensor-operators`) is not on develop yet; the L > 0 shorthands are planned catalog rows
+  and their tables are plain `OneBodyTable`s. **Assumed meanwhile:** wire them as tensor operators
+  (reduced one-body part, imsrg++ gauge) on a separate branch on top of A's branch, merged after it.
+* **AL-F1** (lead F ops, odd-rank NREFT tensors vs the fork goldens) - Against `tests/golden/nreft/flow/
+  fork-79e9330/{nat_emax2,nat_emax4_imsrg3}` (driver_al27_fork_golden) H, TCM, the scalar and the EVEN-rank
+  tensors (FM2p, FPhipp2n) agree to 1e-10 (printed precision), including the fork's tensor normal-ordering
+  bug (needed: without it 1e-2 off). The ODD-rank tensors (FSigmap1p/3n, FSigmapp1n, FDelta1p) deviate by up
+  to 1.6e-4 (emax 2) / 5.7e-4 (emax 4) in the final `.snt`, growing with the flow time; the first Magnus step
+  (only Omega x one-body Y) is exact, so the cause is in terms with a two-body Y. Source comparison fork
+  Commutator.cc vs devel TensorCommutators.cc: the fork's `comm222_phst` lacks (-1)^L at (a) the flipped
+  ket orientation of Ybar (`flipphaseY` in PhaseMatYJ1J2, fork 12696 vs devel phase(Jbra+Jket+Lambda)) and
+  (b) the reads of Zbar through swapped pairs (fork 12399, 12404 vs devel phase(Lambda+...)). Both are
+  emulated (compat `tensor_fork_ph_missing_rank_phase`, odd L only); this reduced the deviation 189 -> 25
+  rows at s = 0.1 and 3.6e-4 -> 5.6e-5 at the end, but not to zero. comm121st (fork form checked
+  numerically), comm122st, comm222_pp_hh_221st and the normal ordering were compared and are equivalent.
+  **Resolved (alf1, 2026-11-26):** the remaining cause was the fork's doubled Zbar columns: it stores
+  each cross-coupled ket pair twice (k <= j, and flipped k >= j with the Ybar part missing (-1)^L), and
+  the inverse transform reads the flipped half also for a DIAGONAL pair (`k>j?0:nkets` with k == j,
+  Commutator.cc:12399/12404/12472/12477), so for odd L the Xbar*Ybar part of those elements flips sign.
+  The emulation negated only k > j columns; comm222_phst now also keeps Xbar*YA in fork mode and reads
+  such elements as Zbar - 2 Xbar*YA. Per-term fork goldens (`tests/golden/tensor/fork-79e9330`,
+  `tools/reference/gen_golden_tensor_fork.sh`, forkharness commutator-tensor) agree to 1e-13 for ranks
+  1, 3 (both parities) and 2; driver_al27_fork_golden passes with the strict tolerance (odd-rank max dev
+  1.6e-4/5.7e-4 -> <= 1e-10, the printed precision). A fork bug, emulated only under the compat option
+  (design/30 section 6, row AL-F1); the default path stays imsrg-devel's (which our default matches for
+  ranks 1 and 2, commutator_tensor_golden).
+* **AL-F2** (lead F, C10 file names) - The transform farm writes the fork's names `<stem><name>.snt` /
+  `<stem><name>_2b.snt` (with `output.stem = "int"` exactly the archive's), the in-process driver keeps
+  `<stem>_<name>.snt` / `<stem>_<name>_2b.snt`. **Assumed:** keep both (no change for existing runs);
+  say if the in-process names should follow the fork under `run.compat`.
+* **AL-F3** (lead F, C10 cost model) - The static assignment weighs an item by num_omegas x the
+  block-gemm work of one [Omega, O] for its rank L (design/50 §6.1), assuming the same number of BCH
+  terms for every operator of a stack. Not yet timed at emax 10 (one item per rank makes it irrelevant
+  for the planned 2415-rank jobs; it matters only with fewer ranks than items). **Assumed:** fine until a
+  timing of one item at emax 10 exists; refit then.
+* **AL-F4** (lead F, C10 farm resubmission) - A killed farm job leaves `failed.txt` listing every item
+  (written first, rewritten at the end), and outputs are renamed into place; resubmission uses either
+  the failure manifest as the work list or the same list with `transform.skip_existing = true`.
+  **Assumed:** enough; a per-item progress log is not written.
+
+### Lead E (GPU, M14/C11/C12)
+
 * **AL-E-Q1** (lead E, M14/C11) - The Kokkos Kernels backend of the device BLAS
   (`IMSRG_DEVICE_BLAS=KOKKOSKERNELS`) is written but neither built nor measured: the 5.3.0 source
   tarball cannot be downloaded from an agent session (the worktree hook rejects commands with the
