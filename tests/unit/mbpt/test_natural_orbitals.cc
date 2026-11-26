@@ -117,9 +117,11 @@ linalg::Matrix<double> ForkUseHfForHoleStates(linalg::Matrix<double> C,
     for (std::int64_t j = 0; j < N; ++j)
       if (SameChannel(b, i, j)) C(j, i) *= 1 / std::sqrt(ii_overlap);
   }
-  for (std::int64_t i = 0; i < N; ++i)
-    if (C(i, i) < 0)
+  for (std::int64_t i = 0; i < N; ++i) {
+    if (C(i, i) < 0) {
       for (std::int64_t k = 0; k < N; ++k) C(k, i) *= -1;
+    }
+  }
   return C;
 }
 
