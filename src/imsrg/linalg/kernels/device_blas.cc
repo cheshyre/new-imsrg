@@ -65,7 +65,7 @@ void CheckRocblas(rocblas_status s, const char* what) {
 // Side streams for GroupedGemm: problems are spread over them and joined
 // back into the Kokkos stream by events, so small GEMMs of different channels
 // overlap on the device.
-constexpr int kSideStreams = 4;
+constexpr std::size_t kSideStreams = 4;
 
 // rocBLAS handles and streams, created on first use and never destroyed (the
 // process-wide equivalent of a BLAS library's internal state; a mutex makes
@@ -85,7 +85,7 @@ RocblasState& State() {
     CheckRocblas(rocblas_create_handle(&s->main), "rocblas_create_handle");
     CheckHip(hipEventCreateWithFlags(&s->start, hipEventDisableTiming),
              "hipEventCreate");
-    for (int i = 0; i < kSideStreams; ++i) {
+    for (std::size_t i = 0; i < kSideStreams; ++i) {
       CheckHip(hipStreamCreateWithFlags(&s->streams[i], hipStreamNonBlocking),
                "hipStreamCreate");
       CheckRocblas(rocblas_create_handle(&s->handles[i]),
@@ -129,7 +129,7 @@ void RunGemms(std::span<const GemmProblem> problems,
   }
   // Fork: the side streams wait for everything queued on the Kokkos stream.
   CheckHip(hipEventRecord(s.start, ks), "hipEventRecord");
-  for (int i = 0; i < kSideStreams; ++i)
+  for (std::size_t i = 0; i < kSideStreams; ++i)
     CheckHip(hipStreamWaitEvent(s.streams[i], s.start, 0),
              "hipStreamWaitEvent");
   // Largest first, each to the least loaded stream (deterministic; each C
@@ -147,7 +147,7 @@ void RunGemms(std::span<const GemmProblem> problems,
     RocGemm(s.handles[si], problems[i]);
   }
   // Join: the Kokkos stream waits for every side stream.
-  for (int i = 0; i < kSideStreams; ++i) {
+  for (std::size_t i = 0; i < kSideStreams; ++i) {
     CheckHip(hipEventRecord(s.done[i], s.streams[i]), "hipEventRecord");
     CheckHip(hipStreamWaitEvent(ks, s.done[i], 0), "hipStreamWaitEvent");
   }

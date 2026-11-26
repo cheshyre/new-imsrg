@@ -52,8 +52,8 @@ double ParseDouble(const std::string& s, const std::string& what) {
 
 std::uint64_t Fnv1a(const std::string& s) {
   std::uint64_t h = 0xcbf29ce484222325ULL;
-  for (const unsigned char c : s) {
-    h ^= c;
+  for (const char ch : s) {
+    h ^= static_cast<unsigned char>(ch);
     h *= 0x100000001b3ULL;
   }
   return h;

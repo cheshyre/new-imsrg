@@ -78,10 +78,6 @@ OneBodyArgs MakeOneBodyArgs(const op::Operator& X, const op::Operator& Y,
   return a;
 }
 
-IMSRG_INLINE_FUNCTION int Imin(int a, int b) { return a < b ? a : b; }
-IMSRG_INLINE_FUNCTION int Imax(int a, int b) { return a > b ? a : b; }
-IMSRG_INLINE_FUNCTION int Iabs(int a) { return a < 0 ? -a : a; }
-
 /// Flat description of the stored blocks of a tensor part and of their rows.
 struct BlockRows {
   exec::DeviceBuffer<std::int32_t> ch_bra, ch_ket, nbra, nket;
