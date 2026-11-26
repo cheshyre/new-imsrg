@@ -173,7 +173,25 @@ target_compile_definitions(imsrg_blas_lapack INTERFACE IMSRG_BLAS_ACCELERATE=${_
 if(_imsrg_blas_accel)
   target_compile_definitions(imsrg_blas_lapack INTERFACE ACCELERATE_NEW_LAPACK)
 endif()
-message(STATUS "BLAS/LAPACK backend: ${_imsrg_blas_name} (${BLAS_LIBRARIES})")
+# Serialize BLAS/LAPACK calls made from different host threads (design/12 section 3): the OpenMP
+# variant of cray-libsci (libsci_gnu_mp) crashes when two host threads call dgemm at once, even
+# with OMP_NUM_THREADS=1 (FP-Q6). Accelerate is reentrant and GroupedGemm relies on concurrent
+# calls with it, so the default is OFF there and ON for every other backend (a lock per call costs
+# nothing next to a gemm; it only matters when several host threads, e.g. Python threads, solve).
+if(_imsrg_blas_accel)
+  set(_imsrg_blas_serialize_default OFF)
+else()
+  set(_imsrg_blas_serialize_default ON)
+endif()
+option(IMSRG_BLAS_SERIALIZE "Serialize BLAS/LAPACK calls across host threads"
+       ${_imsrg_blas_serialize_default})
+if(IMSRG_BLAS_SERIALIZE)
+  target_compile_definitions(imsrg_blas_lapack INTERFACE IMSRG_BLAS_SERIALIZE=1)
+else()
+  target_compile_definitions(imsrg_blas_lapack INTERFACE IMSRG_BLAS_SERIALIZE=0)
+endif()
+message(STATUS "BLAS/LAPACK backend: ${_imsrg_blas_name} (${BLAS_LIBRARIES}), "
+               "calls serialized across host threads: ${IMSRG_BLAS_SERIALIZE}")
 # M5 (io): gzip streams over zlib (D4: no Boost.Iostreams).
 find_package(ZLIB REQUIRED)
 message(STATUS "zlib: ${ZLIB_LIBRARIES} (${ZLIB_VERSION_STRING})")

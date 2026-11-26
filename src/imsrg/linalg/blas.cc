@@ -25,6 +25,7 @@ int SyevdLower(int n, double* a, int lda, double* w) {
   int liwork = -1;
   double wq = 0.0;
   int iwq = 0;
+  const BlasCallGuard guard;  // held for both dsyevd calls
 #if defined(IMSRG_BLAS_ACCELERATE) && IMSRG_BLAS_ACCELERATE
   char jobz = 'V';
   char uplo = 'L';
@@ -131,8 +132,10 @@ constexpr double kConcurrentGemmMinFlops = 1.0e6;
 /// Accelerate, which keeps a call made inside a parallel region from
 /// oversubscribing the cores and whose results were measured to be
 /// independent of the schedule. OpenBLAS (pthreads) or MKL would need
-/// single-threaded calls per item first (M12-Q5).
-#if defined(IMSRG_BLAS_ACCELERATE) && IMSRG_BLAS_ACCELERATE
+/// single-threaded calls per item first (M12-Q5). Never when the calls are
+/// serialized anyway (`IMSRG_BLAS_SERIALIZE`).
+#if defined(IMSRG_BLAS_ACCELERATE) && IMSRG_BLAS_ACCELERATE && \
+    !(defined(IMSRG_BLAS_SERIALIZE) && IMSRG_BLAS_SERIALIZE)
 constexpr bool kConcurrentGroupedGemm = true;
 #else
 constexpr bool kConcurrentGroupedGemm = false;
