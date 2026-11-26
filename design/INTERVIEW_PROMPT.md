@@ -1,38 +1,46 @@
-# Prompt for the owner Q&A and design-interview session (after run 3)
+# Prompt for the owner Q&A and design-interview session (after run 3 and the Frontier port)
 
-> **Status:** written at the end of run 3 (2026-11-16/17) for the interview that follows it. The
-> interviews so far: 2026-11-13 (D25-D29), 2026-11-15 (D30-D42), 2026-11-16 (D44-D54, report
-> `design/reports/2026-11-16-owner-interview.md`). Run 3 added D55-D60 (check `00` for the next free
-> number). Every run-3 question below carries the assumption the run made, so the owner can
-> answer with one word. Run 3's report: `design/reports/2026-11-16-run3.md`; `develop` = 9e47646.
-> Method additions kept from the last interview: show the owner a progress bar of the agenda after
-> each round (owner request), and measure a numeric consequence live (a worker in a throwaway
-> worktree) when a decision hinges on it.
+> **Status:** written at the end of run 3 (2026-11-16/17), updated after the Frontier port
+> (2026-11-26) for the interview that follows both. The interviews so far: 2026-11-13 (D25-D29),
+> 2026-11-15 (D30-D42), 2026-11-16 (D44-D54, report `design/reports/2026-11-16-owner-interview.md`).
+> Run 3 added D55-D60 (check `00` for the next free number). Every open question below carries the
+> assumption that was made, so the owner can answer with one word. Reports: run 3
+> `design/reports/2026-11-16-run3.md`; Frontier port `design/reports/2026-11-26-frontier-port.md`;
+> `develop` = 0da2f62 (hub and GitHub). Method additions kept from the last interview: show the
+> owner a progress bar of the agenda after each round (owner request), and measure a numeric
+> consequence live (a worker in its own agent clone) when a decision hinges on it.
 
-**How to use:** after syncing the main checkout (QUESTIONS O1/O3), start an **interactive** Claude
-Code session (Opus) in `/Users/cheshyre/Downloads/new-imsrg` on `develop`, and paste everything
-below the line. Plan 60-90 minutes. The session only edits documentation; the next unsupervised
-run (`design/NEXT_SESSION_PROMPT.md`, run 4) builds on what it records.
+**How to use:** start an **interactive** Claude Code session (Opus) on a Frontier login node in the
+integrator's clone `$IMSRG_WORK/main` on `develop` (`git pull --ff-only origin develop` first), and
+paste everything below the line. Plan 75-100 minutes. The session only edits documentation; the
+next unsupervised run (`design/NEXT_SESSION_PROMPT.md`, run 4) builds on what it records.
 
 ---
 
 You will interview the owner of the imsrg rewrite (a modern C++20/Kokkos/MPI replacement of
-imsrg++). Two goals:
+imsrg++), which has just moved from the owner's Mac to OLCF Frontier (project nph123). Three goals:
 
-1. **Resolve the open questions** recorded during run 3 (2026-11-16/17) in `design/QUESTIONS.md`
-   ("Added during run 3"). Each one says which assumption the run made.
-2. **Decide the process and design points** needed for run 4 (the order of the work, the usage
-   rules after the cap breach, the MPI imbalance at 256 ranks), so run 4 can work without blocking.
+1. **Decide the Frontier proposals and questions** of the port session (2026-11-26) in
+   `design/QUESTIONS.md` ("Added during the Frontier port"): the agent-isolation scheme, the GitHub
+   policy, and FP-Q1..Q7. Each one says which assumption was made.
+2. **Resolve the open questions** recorded during run 3 (2026-11-16/17) in `design/QUESTIONS.md`
+   ("Added during run 3"). This interview was not held after run 3; the questions are still open.
+3. **Decide the process and design points** needed for run 4 on Frontier (the order of the work,
+   usage rules, compute allocations, MPI/GPU targets on Frontier), so run 4 can work without
+   blocking.
 
 ## Preparation (before your first question; <= 10 minutes, keep it to yourself)
 
-Read `AGENTS.md`, `design/STATUS.md`, `design/reports/2026-11-16-run3.md`,
-`design/00-requirements-and-decisions.md` (D55-D60), `design/QUESTIONS.md` (section "Added during
-run 3" only; everything before it is answered), and skim `design/40-roadmap.md`,
+Read `AGENTS.md`, `CLAUDE.md`, `design/STATUS.md`, `design/reports/2026-11-26-frontier-port.md`,
+`design/reports/2026-11-16-run3.md`, `design/00-requirements-and-decisions.md` (D55-D60),
+`design/41-agent-workflow.md` sections 2-3, `design/20-build-and-tooling.md` section 9,
+`design/QUESTIONS.md` (sections "Added during run 3" and "Added during the Frontier port" only;
+everything before them is answered), and skim `design/40-roadmap.md`,
 `design/benchmarks/imsrg3-n7-performance.md` and `design/benchmarks/mpi-scaling.md`. For every
 question on the agenda, note in 2-3 sentences the context (file/section), the options, the
-assumption the run made, and what would change under each answer. Look things up in the code only
-when needed to explain a consequence.
+assumption taken, and what would change under each answer. Look things up in the code only when
+needed to explain a consequence. Delegate big reading to a read-only subagent (Explore or
+`imsrg-reviewer`), which works in this clone without isolation.
 
 ## How to run the interview (the method that worked on 2026-11-15 and 2026-11-16)
 
@@ -55,25 +63,74 @@ when needed to explain a consequence.
   (a plain "Yes" to an either/or question, as happened with Q5), ask back before recording it.
 * If the owner wants to defer an item, record "deferred" with the reason and keep the assumption.
 * Edit documentation only. Exception: if the owner explicitly asks for a small code change during
-  the interview, make it on its own `feature/` branch with tests and merge it only after
-  `tools/ci.sh dev-openmp` passes; larger work goes into the next-session plan.
-* Work on a branch `feature/owner-answers-<date>` cut from `develop`; at the end,
-  `tools/ci.sh dev-openmp` must pass, then merge into `develop` with `--no-ff`. If the session runs
-  in an app worktree while `develop` is checked out in the main checkout, follow QUESTIONS O1/O3:
-  merge on your worktree branch, then `tools/ci.sh dev-openmp && git update-ref refs/heads/develop
-  <new> <old>` (never chain the update to a grep of the CI log). Git stays local: never push.
+  the interview, delegate it to an `imsrg-implementer` (it gets its own clone of the hub through the
+  WorktreeCreate hook, design/41 §3) and merge it only after `tools/ci.sh frontier-cpu` passes;
+  larger work goes into the next-session plan.
+* **Git and compute (Frontier, design/41 §2):** you are the integrator. Work on a branch
+  `feature/owner-answers-<date>` cut from `develop` in `$IMSRG_WORK/main`; commit with
+  `IMSRG_INTEGRATOR=1` (a pre-commit hook rejects commits without it). At the end: switch to
+  `develop`, `IMSRG_INTEGRATOR=1 git merge --no-ff` the branch, run `tools/ci.sh frontier-cpu` (it
+  needs a compute allocation named `imsrg`: `salloc -A nph123 -N 1 -t 02:00:00 -J imsrg --no-shell`
+  if `squeue -u $USER -n imsrg` shows none), and only if it prints `CI PASS frontier-cpu`:
+  `IMSRG_INTEGRATOR=1 git push origin develop`, then `git push github develop` (fast-forward
+  only; never force-push, never touch `main` or remote branches). The login node is for editing,
+  git and short commands; builds and tests run on the compute node (golden rule 10).
+
+## Agenda, part 0: the Frontier port (ask first; ids from `design/QUESTIONS.md`)
+
+Format: **id** - summary; *assumption taken*; what an answer changes.
+
+* **P-F1** - agent isolation: scheme (a), Claude Code's `isolation: worktree` with a WorktreeCreate
+  hook that clones the hub into `$IMSRG_WORK/agents/<name>`, a PreToolUse guard, hub and pre-commit
+  git hooks; tested and used by four agents in the port. *Assumed: (a) is the scheme (becomes a
+  D-row).* Sub-questions: who deletes merged and test branches on the hub, and when
+  (`feature/agent-aed5510638e6f6d22`, `feature/agent-ab7ad3f93c28d0a1e`, `feature/selftest` are
+  test leftovers); clones are retired by the integrator because Claude Code never calls
+  WorktreeRemove when a subagent finishes: fine?
+* **P-F2** - GitHub policy: only the integrator talks to GitHub; `--ff-only` in, `develop` out only
+  after CI and after the hub; no force-push, no remote branch deletion, `main` untouched; feature
+  branches stay on the hub. *Assumed: as proposed.* Should `main` follow `develop` at milestones
+  (by the owner), and should feature branches be mirrored to GitHub for review?
+* **FP-Q1** - install the new settings proposal (`design/claude-settings.proposed.json`: hub pushes,
+  `git fetch`, Slurm and module commands allowed; force pushes and remote deletions denied) as
+  `.claude/settings.local.json`? *Assumed: the Mac-era file stays until the owner installs it.*
+* **FP-Q2** - git identity set locally in `$IMSRG_WORK/main` (name and email of the existing
+  history), copied into agent clones. *Assumed: fine;* alternative: a global `~/.gitconfig`.
+* **FP-Q3** - compute allocations: chains of 1-node, 2-hour `batch` jobs named `imsrg`
+  (`--dependency=afterany`) shared by all agents with `srun --overlap`. For unattended 8-12 h
+  runs: acceptable for the nph123 allocation, or the `extended` partition, more nodes, a
+  reservation? How many node-hours may a run use?
+* **FP-Q4** - which generated emax-4 golden set is current: the Mac main checkout's
+  `build/golden-generated` (now `$IMSRG_WORK/golden-generated`, used by every preset) or
+  `$IMSRG_REFERENCE_ROOT/golden-generated-d35` (they differ file by file)? *Assumed: the former;*
+  the Frontier reference build reproduces it within 1e-15 relative, so it can also be regenerated.
+* **FP-Q5** - DIIS rounding sensitivity: our default HF (DIIS) stops after 8 iterations and moves
+  with rounding (an FMA build changed e1 by 1.2e-6), which the adaptive flow amplifies; the IT-14
+  solver-level tests now use imsrg++'s linear mixing (all 572 rows equal imsrg++ on Frontier). The
+  driver-level flow tests still use DIIS. *Assumed: fine for now.* Tighter DIIS convergence by
+  default, or linear mixing in every golden comparison?
+* **FP-Q6** - threaded cray-libsci crashes when two host threads call BLAS at once; `linalg` now
+  serializes all BLAS/LAPACK calls with one lock (`IMSRG_BLAS_SERIALIZE`, on except with
+  Accelerate). *Assumed: keep the lock;* alternative: link the serial libsci (no threaded BLAS
+  for large gemms).
+* **FP-Q7** - `frontier-serial` (debug Serial Kokkos): GCC's `-Wmaybe-uninitialized` inside
+  Kokkos' View copy is made non-fatal there, and `Imsrg3N7.He4Emax2OccNat3Cut` exceeds its 300 s
+  timeout. *Assumed: frontier-serial is not a merge gate.* Raise the timeout or label it slow for
+  serial builds?
+* **Owner facts:** is the full N2LO 3N file (D33) available yet? Any Frontier-specific limits the
+  runs must respect (quotas, node-hours, times of day)?
 
 ## Agenda, part 1: open questions of run 3 (ids from `design/QUESTIONS.md`)
 
 Format: **id** - summary; *assumption taken*; what an answer changes.
 
-**A. Owner actions and facts (ask first)**
-* **Main checkout:** was it re-synced (`git -C /Users/cheshyre/Downloads/new-imsrg reset --hard` when it
-  has no local edits) and `tools/reference/gen_golden_generated.sh` run there? (QUESTIONS O1/O3.)
+**A. Facts (no question needed; mention briefly)**
+* QUESTIONS O1/O3 (re-syncing the Mac main checkout) are obsolete on Frontier: the integrator's
+  clone follows `develop` directly.
 * **End-to-end check of D57: done (2026-11-17, no owner action).** imsrg++ (refharness) reads a
   `.me2j.bin` written by `tools/reference/me2j_text_to_bin.py` and gives bit-identical HF energy and
   dumps to the text file at emax 2; our `imsrg` binary does the same (`19-mexj-formats.md` section 3.1).
-* **Full N2LO 3N file** (D33): available yet? It would give full-flow goldens for IT-4/IT-5/IT-9.
+* The full N2LO 3N file (D33) is asked in part 0.
 
 **B. Flow and IMSRG(3) (IT3; high impact, focused questions)**
 * **IT3-Q2** - after the final hunter-gatherer gather the rebuilt H(s) has ||eta|| 2000-5000 times
@@ -176,11 +233,17 @@ Format: **id** - summary; *assumption taken*; what an answer changes.
 
 ## Agenda, part 2: decisions for the owner
 
+0. **What Frontier changes for run 4.** Run 4 is the first unattended run on Frontier (hub, agent
+   clones, compute allocations; `design/NEXT_SESSION_PROMPT.md` is already written for it). Should
+   it start with a short shake-down (one lead, one small milestone) before up to 3 parallel leads?
+   Do GPU work (M14, HIP runtime tests on MI250X; `frontier-hip` only compiles so far) and
+   multi-node MPI measurements move up now that the hardware is at hand? Should the problem-size
+   rules (golden rule 3, emax <= 6) change for benchmarks on Frontier compute nodes (512 GB)?
 1. **Order of run 4.** Proposal: (1) M12b phase 2 completion (row panels for comm122/ph, D9, D10 and
    lifting the D7 guard, D11, D12, weight recalibration); (2) N7 follow-ups (tiled `BuildH`, C15,
    partition timings, `imsrg3_batch_bytes`); (3) M15 tensor operators after M15-Q1..Q5 (goldens
    exist); (4) M16 formats; (5) fillers (Python hooks D51, run-2 section 7 cleanup). Is the order right? Should M15 go before M12b phase 2?
-2. **Pause and cap rules after the breach.** In run 3 an N7 lead ignored the 21:35 pause message and
+2. **Pause and cap rules after the breach** (run 3, still open). In run 3 an N7 lead ignored the 21:35 pause message and
    the window reached 97 % at 22:00 against the 90 % cap (D58); the lead was stopped at 22:01.
    Should the rules be stricter (pause message earlier, a mandatory TaskStop backstop for leads,
    a lower cap for the last hour before a deadline)? Which cap should apply in run 4?
@@ -194,9 +257,12 @@ Format: **id** - summary; *assumption taken*; what an answer changes.
    ranks, 3 % at 64 ranks only at emax 12 (58 % at emax 10, 146 % at emax 8) and 310-880 % at 256
    ranks, because comm122/ph go by whole channels. Is "row panels for comm122/ph first" the right
    priority, and are 22/64/256 ranks the right targets (which emax and E3max matter at 256 ranks)?
-5. **Process feedback on run 3:** fresh leads at each reset with hand-off notes, early merges of
+   On Frontier: one rank per node (OpenMP) or per GCD (8 per node, M14)? How many nodes may
+   scaling measurements use?
+5. **Process feedback on run 3 and the port:** fresh leads at each reset with hand-off notes, early merges of
    shared interfaces, planner and plan review outside the repository, orchestrator-run slow suites.
-   Anything to change? (Details: run-3 report section 6.)
+   Anything to change? (Details: run-3 report section 6; port report sections 3-4: four agents
+   in parallel clones on one shared node made a 113 s test time out once.)
 
 ## Recording the answers
 
@@ -204,9 +270,11 @@ Format: **id** - summary; *assumption taken*; what an answer changes.
   free-text answers; or "deferred: <reason>").
 * Decisions become rows in `design/00-requirements-and-decisions.md` with the next free D-number,
   marked *(user)*.
-* Update the affected design docs (`13`, `14`, `16`, `17`, `18`, `20`, `30`, `40`) and the plan in
-  `design/NEXT_SESSION_PROMPT.md` (priorities, inputs, the 3N file, the briefs).
+* Update the affected design docs (`13`, `14`, `16`, `17`, `18`, `20`, `30`, `40`, `41`) and the
+  plan in `design/NEXT_SESSION_PROMPT.md` (priorities, inputs, the 3N file, allocations, the
+  briefs); turn P-F1/P-F2 into D-rows and drop "proposal" from design/41 once decided.
 * Write `design/reports/<date>-owner-interview.md`: decisions taken, changed priorities, follow-up
   tasks for the next unsupervised run.
+* Merge and push as described under "Git and compute" above.
 * Finish with a short summary to the owner: what was decided, what was deferred, and whether the
   next unsupervised run is ready to start.
