@@ -5,6 +5,7 @@ imsrg_add_module(NAME io
   SOURCES
     input_stream.cc
     me2j.cc
+    mexj.cc
     no2b.cc
     valence_writers.cc
   DEPS operator basis base
