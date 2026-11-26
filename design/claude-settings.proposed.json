@@ -1,5 +1,5 @@
 {
-  "_comment": "PROPOSAL ONLY. Install it as .claude/settings.local.json in the main checkout (gitignored), without this _comment key, and rename an older .claude/settings.json there (its env block would otherwise still apply, since settings files are merged); see the pre-flight in design/NEXT_SESSION_PROMPT.md. The unattended run starts in the main checkout on develop (D31). Compaction (D31): the agent definitions set autoCompactWindow (absolute tokens; all models default to a 1M window): 600000 for the Sonnet/Haiku agents (~60%) and 800000 for imsrg-lead (~80%); the top-level autoCompactWindow below gives the orchestrator (main session) ~80%, and agents with their own frontmatter value do not inherit it. Do not set CLAUDE_AUTOCOMPACT_PCT_OVERRIDE (it also applies to subagents, on top of their windows) or CLAUDE_CODE_AUTO_COMPACT_WINDOW (it overrides all of these). The deny list blocks pushing, remote changes, the shared git stash, and history- or file-destroying commands (git clean would delete the untracked imsrg-devel/ and test inputs in the main checkout root). Allow rules are a convenience, not a security boundary. For a hard guarantee against pushing, the owner can also run: git -C /Users/cheshyre/Downloads/new-imsrg remote set-url --push origin DISABLED",
+  "_comment": "PROPOSAL ONLY (Frontier, 2026-11-26; the owner decides, P-F1/P-F2 in QUESTIONS.md). Install it as .claude/settings.local.json in the integrator's clone $IMSRG_WORK/main (gitignored), without this _comment key; Claude never edits that file itself. The hooks (WorktreeCreate/WorktreeRemove for the per-agent clones, the PreToolUse guard tools/hooks/agent_guard.py) live in the committed .claude/settings.json and need no entry here. Compaction (D31) unchanged: agent frontmatter sets autoCompactWindow (600000 Sonnet/Haiku, 800000 imsrg-lead), the top-level value below covers the main session; never set CLAUDE_AUTOCOMPACT_PCT_OVERRIDE or CLAUDE_CODE_AUTO_COMPACT_WINDOW. Changes against the Mac version: Homebrew rules removed; `git push origin *` and `git fetch *` allowed (agents push their feature branch to the hub; the hub's update hook and agent_guard.py reject develop/main and other remotes), Slurm commands for builds on the compute node allowed, `git push github *` stays a prompt for the integrator; force pushes, branch deletion on remotes, remote changes, the shared stash and history- or file-destroying commands stay denied. Allow rules are a convenience, not a security boundary: the git hooks and agent_guard.py are the enforcement.",
   "autoCompactWindow": 800000,
   "permissions": {
     "allow": [
@@ -10,7 +10,6 @@
       "Bash(ninja *)",
       "Bash(make *)",
       "Bash(ccache *)",
-      "Bash(mpirun *)",
       "Bash(clang-format *)",
       "Bash(.venv/bin/cpplint *)",
       "Bash(run-clang-tidy *)",
@@ -24,10 +23,6 @@
       "Bash(mv *)",
       "Bash(gzip -dc *)",
       "Bash(python3 *)",
-      "Bash(brew install *)",
-      "Bash(brew list*)",
-      "Bash(brew info*)",
-      "Bash(brew --prefix*)",
       "Bash(.venv/bin/pip *)",
       "Bash(.venv/bin/python *)",
       "Bash(.venv/bin/pytest *)",
@@ -47,10 +42,29 @@
       "Bash(git revert *)",
       "Bash(git worktree *)",
       "Bash(git submodule *)",
-      "Bash(git rev-parse *)"
+      "Bash(git rev-parse *)",
+      "Bash(git fetch *)",
+      "Bash(git push origin *)",
+      "Bash(git push -u origin *)",
+      "Bash(srun *)",
+      "Bash(squeue *)",
+      "Bash(sacct *)",
+      "Bash(scontrol show *)",
+      "Bash(module *)",
+      "Bash(source tools/lib/*)",
+      "Bash(.venv/bin/clang-format *)",
+      "Bash(.venv/bin/clang-tidy *)"
     ],
     "deny": [
-      "Bash(git push*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push --delete*)",
+      "Bash(git push origin --delete*)",
+      "Bash(git push origin :*)",
+      "Bash(git push github --delete*)",
+      "Bash(git push github :*)",
+      "Bash(git push * --force*)",
+      "Bash(git push * -f*)",
       "Bash(git remote*)",
       "Bash(git stash*)",
       "Bash(git clean*)",
@@ -59,7 +73,8 @@
       "Bash(git -C *)",
       "Bash(sudo *)",
       "Bash(rm -rf /*)",
-      "Bash(rm -rf ~*)"
+      "Bash(rm -rf ~*)",
+      "Bash(scancel *)"
     ]
   }
 }

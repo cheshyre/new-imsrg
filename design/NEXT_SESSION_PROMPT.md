@@ -14,22 +14,21 @@ D59 and D60 are the M12b and N7 decision rows of run 3) this prompt must reflect
 starts. This prompt starts the
 fourth run. (The prompts of earlier runs are in the git history of this file.)
 
-**Owner pre-flight (once, before launching):**
+**Owner pre-flight (once, before launching; Frontier since 2026-11-26):**
 
-1. Start the session (Opus) as usual: the desktop app opens it in a worktree (D44). Agent
-   definitions load at startup from `.claude/agents/`. Settings as in run 3
-   (`.claude/settings.local.json` from `design/claude-settings.proposed.json` without `_comment`; no
-   `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`; `"autoCompactWindow": 800000` for the orchestrator). Pick a
+1. Start the session (Opus) on a Frontier login node in the integrator's clone
+   `$IMSRG_WORK/main`, on `develop` (`git pull --ff-only origin develop`). Agent definitions and
+   hooks load at startup from `.claude/agents/` and the committed `.claude/settings.json`
+   (WorktreeCreate/WorktreeRemove/PreToolUse, design/41 §3). Permissions:
+   `.claude/settings.local.json` from `design/claude-settings.proposed.json` without `_comment`; no
+   `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`; `"autoCompactWindow": 800000` for the orchestrator. Pick a
    permission mode that does not stall. Disable connectors the run does not need.
-2. **Launch right after a reset of your 5-hour usage window** (run 3 measured the actual resets at
-   14:10, 19:10, 00:10, 05:10 JST; check yours). The usage schedule of the run is in the section
-   below (to be set in the interview).
-3. After the run (not before): re-sync the main checkout, whose files do not follow `develop` when
-   runs advance it from worktrees (`git -C /Users/cheshyre/Downloads/new-imsrg reset --hard` when it
-   has no local edits of yours), and regenerate its `build/golden-generated`
-   (`tools/reference/gen_golden_generated.sh`) if you run the tests there.
-4. Optional: `git config blame.ignoreRevsFile .git-blame-ignore-revs`;
-   `git -C /Users/cheshyre/Downloads/new-imsrg remote set-url --push origin DISABLED`.
+2. **Launch right after a reset of your 5-hour usage window** (check the reset times). The usage
+   schedule of the run is in the section below (to be set in the interview).
+3. A compute allocation: the orchestrator gets one itself
+   (`salloc -A nph123 -N 1 -t 02:00:00 -J imsrg --no-shell`) and queues the next with
+   `sbatch --dependency=afterany:<job> -J imsrg --wrap "sleep 7190"`.
+4. Optional: `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
 
 Then paste everything below the line.
 
@@ -90,52 +89,54 @@ in the answers in `design/QUESTIONS.md`. The most important:
   never in CI and without full flows: emax-8 IMSRG(2) benchmarks against imsrg++ (D40), single
   IMSRG(3) kernels at emax 4–6 with one operator under ~8 GB (D52), single IMSRG(2) commutators at
   emax 10–12 (D52).
-* Git is **local only**: feature branches → local `develop`. Never push, no PRs. Never touch `main`.
-  Runs start in an app worktree and advance `develop` with the staging procedure (D44, below).
+* Git goes through the hub (design/41 §2): agents push only their feature branch to the hub; the
+  orchestrator (integrator, `IMSRG_INTEGRATOR=1`) merges into `develop` in `$IMSRG_WORK/main`,
+  pushes `develop` to the hub after CI, and to GitHub only per the GitHub policy (P-F2). No PRs.
+  Never touch `main`.
 * **Golden rule 10:** file searches stay inside the project directories (never `find /`, `find ~`,
-  `mdfind`, `grep -r` outside them): a whole-disk search by a helper made macOS ask the owner for
-  access to other apps' data. **Put this rule into every brief you write.**
-* Homebrew and pip (shared venv) installs are allowed. The old imsrg-devel is built **outside** the
-  repo (pristine and D35-patched builds exist; the patch carries D47-D49).
+  `grep -r` outside them), and the Frontier login node only edits, runs git and short commands:
+  builds and tests go to the compute node. **Put this rule into every brief you write.**
+* pip installs into the shared venv are allowed (login node; compute nodes have no internet). The
+  old imsrg-devel is built **outside** the repo, under `$IMSRG_REFERENCE_BUILD` (see
+  `tools/reference/ref_env.sh` and design/20 §5).
 * Old-code bugs that change results: fix them, document them in `design/30-testing-and-validation.md`
   §6, and validate the fixed path another way. No compatibility switches (D35).
 * Tolerances: unit checks ~1e-10 relative; end to end 1e-4 MeV (HF, MBPT, perturbative triples) and
   1e-3 MeV (IMSRG(2)/(3) E0, valence-space elements). Always log the actual deviation (D19, D34).
-* `tools/ci.sh dev-openmp` stays under 5 minutes; longer tests get the `slow` label and run before
+* `tools/ci.sh frontier-cpu` stays under ~5 minutes of test time; longer tests get the `slow` label and run before
   merges that touch numerics (D42). Goldens are regenerated only through the scripted
   `tools/reference` commands, with the reason and old vs new numbers in the commit and a reviewer
   pass (D42).
 
 ## Where everything is
 
-* Repository: `/Users/cheshyre/Downloads/new-imsrg` (git), integration branch **`develop`**. The
-  session runs in an app worktree (D44). **Preflight:** in the worktree run
-  `git merge --ff-only develop` (the app creates the worktree branch from `main` = 71d5917, an
-  ancestor of `develop`); check `git merge-base --is-ancestor feature/design-plan develop`,
-  `git status --porcelain --untracked-files=no` (empty), then
-  `tools/reference/gen_golden_generated.sh` (the emax-4 dump tests **skip silently** without
-  `build/golden-generated`) and `tools/ci.sh dev-openmp` (`CI PASS dev-openmp`). If any check fails,
-  write `PREFLIGHT_FAILED.md` at the worktree root and stop. If the `imsrg-*` agent types are
-  unavailable, spawn `general-purpose` agents with the matching `model` and paste the body of the
-  corresponding `.claude/agents/*.md` into their prompt.
+* Repositories (design/41 §2): hub `$IMSRG_HUB`; the orchestrator works in `$IMSRG_WORK/main` on
+  `develop` (integration branch); code-writing agents get clones under `$IMSRG_WORK/agents/` from
+  the WorktreeCreate hook. **Preflight:** `git status --porcelain --untracked-files=no` (empty),
+  `git fetch origin && git merge --ff-only origin/develop`, `squeue -u $USER -n imsrg` (an
+  allocation), `ls $IMSRG_WORK/golden-generated` (the emax-4 dump tests **skip silently** without
+  it), then `tools/ci.sh frontier-cpu` (`CI PASS frontier-cpu`). If any check fails, write
+  `PREFLIGHT_FAILED.md` and stop. If the `imsrg-*` agent types are unavailable, spawn
+  `general-purpose` agents with the matching `model` and `isolation: "worktree"` and paste the
+  body of the corresponding `.claude/agents/*.md` into their prompt.
 * Read first: `AGENTS.md`, `CLAUDE.md`, `design/README.md`, `design/STATUS.md` (current state, log
-  of every merge), the run-3 report (`design/reports/2026-11-16-run3.md`), the run-2 report and the interview reports; the hand-off files `new-imsrg-reference/plans/handoff-n7.md` and `handoff-m12b.md`,
+  of every merge), the Frontier-port report (`design/reports/2026-11-26-frontier-port.md`), the
+  run-3 report (`design/reports/2026-11-16-run3.md`) and the interview reports; the hand-off files
+  `$IMSRG_REFERENCE_ROOT/plans/handoff-n7.md` and `handoff-m12b.md`,
   `design/00-requirements-and-decisions.md`, `design/40-roadmap.md`, `design/41-agent-workflow.md`.
   Leads read the other design docs and `design/reference/*.md` as their milestone requires; the
   orchestrator delegates big reading.
-* Toolchain (installed): Homebrew cmake, ninja, ccache, Open MPI, libomp, clang-format 23.1.5, LLVM
-  (clang-tidy 23.1.5 at `/opt/homebrew/opt/llvm/bin/clang-tidy`, `tools/lint.sh`), gsl, boost,
-  openblas; Apple clang 21; Kokkos 5.3.0 per backend in `~/.cache/imsrg-deps`; shared venv
-  `~/.cache/imsrg-deps/venv` (`.venv` symlink per checkout) with cpplint 2.0.2. A fresh worktree
-  needs only `tools/ci.sh dev-openmp` (~40 s submodule fetch on first use; 192 s in all).
-* Reference: source `/Users/cheshyre/Downloads/new-imsrg/imsrg-devel` (read-only); builds, harnesses
-  and plans in `/Users/cheshyre/Downloads/new-imsrg-reference/`: the **D35-patched** build
-  `build-d35/imsrg++` and `harness-build-d35/refharness` (default of every
-  `tools/reference/gen_golden_*.sh`), the pristine `build/`, `harness-build/`, and `plans/`. Golden
-  data: `tests/golden/` (README lists every file and command). After any change to the patch or to
-  `tools/reference`, rebuild `harness-build-d35` and regenerate `build/golden-generated` in every
-  checkout that runs the emax-4 tests.
-* Test inputs (never copy them into the repo), in `/Users/cheshyre/Downloads/new-imsrg/`:
+* Toolchain (design/20 §9): modules via `tools/lib/frontier_env.sh` (PrgEnv-gnu, gcc-native 14.2
+  through the Cray `CC` wrapper, cray-mpich, cray-libsci, cmake 4.1.5, ninja, ccache, Python 3.14;
+  rocm 7.0.2 for HIP); Kokkos 5.3.0 (openmp, serial, hip) and the shared venv (cpplint 2.0.2,
+  clang-format 23.1.5, clang-tidy 23.1.4) in `$IMSRG_DEPS_PREFIX`; ccache in `$CCACHE_DIR`.
+* Reference: source `$IMSRG_REFERENCE_ROOT/imsrg-devel` (read-only), SHA files and
+  `golden-generated-d35` there too; builds (pristine and **D35-patched** imsrg++ and
+  `harness-build-d35/refharness`, the default of every `tools/reference/gen_golden_*.sh`) under
+  `$IMSRG_REFERENCE_BUILD` (`tools/reference/ref_env.sh`). Golden data: `tests/golden/` (README
+  lists every file and command). After any change to the patch or to `tools/reference`, rebuild
+  `harness-build-d35` and regenerate `$IMSRG_WORK/golden-generated`.
+* Test inputs (never copy them into the repo), in `$IMSRG_WORK/inputs/`:
   * `VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz`: `file2e1max=14 file2e2max=28 file2lmax=14 hw=16`
   * `NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin`: `3bme_type=no2b file3e1max=6
     file3e2max=12 file3e3max=18 hw=16`. It holds **only the cE contact term** and stays the 3N test
@@ -148,7 +149,7 @@ in the answers in `design/QUESTIONS.md`. The most important:
 * **`develop` = 9e47646** at the last code merge (run 3 merges: 7fc0457, f40aa47, e6a59c0, cb07036,
   e739622, e9f156d, 538a82c, 3309163, 93e2d9f, 7bfba4e, fe3181b, 7a78f4d, a88f835, 04e8219,
   9e47646; table in the run-3 report §1). Update this hash from
-  `STATUS.md` after the interview merge. Preflight: `git merge --ff-only develop` in the worktree.
+  `STATUS.md` after the interview merge. Preflight: `git merge --ff-only origin/develop` in `$IMSRG_WORK/main`.
 * **Complete:** M0-M9, M10 (layout A, 3f2, triples, N7 and its performance work except C15), M11,
   M12a, MS and MS2, the interview tasks D47-D51. **Partial:** M12b: phase 1 (IMSRG(2) distributed,
   IT-11, collective driver with rank-0 output) and D7/D8 (distributed `op::ThreeBody`, generator 3B
@@ -158,7 +159,7 @@ in the answers in `design/QUESTIONS.md`. The most important:
 * **End to end:** IT-1..IT-10, IT-12, IT-14, IT-15, hunter-gatherer cases and IT-11 (MPI 2/4 ranks,
   max relative deviation 1.2e-16) pass; D48/D49 moved IT-2 HG, IT-10 and IT-8 by design (goldens
   regenerated, run-3 report §3). **CI:** on 93e2d9f 1231 unit, 69 integration, 18 MPI, 150 Python
-  (1 skipped), slow suite 7/7 in 1027 s (17 min on a quiet machine); `ci.sh dev-openmp` about 2 min.
+  (1 skipped), slow suite 7/7 in 1027 s (17 min on a quiet machine); `ci.sh frontier-cpu` about 2 min.
   On 7bfba4e: 1235 unit, 69 integration, 18 MPI, 150 Python (1 skipped); slow suite 7/7 in 940 s.
 * **Performance:** N7 commutator (O16, full, release) 255 -> 105 ms, 6.3 -> 1.15 s, 46.6 -> 6.2 s at
   emax 3 / 4 / 5 (about 1.7e10 multiply-adds/s); cost at emax 12 / E3max 16: 3.37e13 multiply-adds per
@@ -227,21 +228,21 @@ in the answers in `design/QUESTIONS.md`. The most important:
   uses `O5` and up; new questions go under a new "Added during run 4" heading in `QUESTIONS.md`.
 * **Every brief carries the current `develop` hash**, the golden rule 10 text, the emax rule with
   its exceptions, the usage/deadline wording, the license header, and the acceptance command.
-* **Merging (D44):** on the worktree branch or a detached HEAD at `develop`: `git merge --no-ff
-  --no-commit feature/<x>`, add the `STATUS.md` log entry, commit, then **one chained command**:
-  `tools/ci.sh dev-openmp && ctest --preset dev-openmp -L slow && git update-ref refs/heads/develop
-  <new> <old>` for numerics merges (`tools/ci.sh dev-openmp && git update-ref ...` otherwise), never
-  chained to a grep of the log (run 1 advanced `develop` after a failed CI that way). Run
-  `tools/lint.sh` on merges that add names (run 3: the allowlist needed `comm`, `ranges`,
-  `num_parts`, `part`).
-* **Debug crashes under lldb**, not by guessing (`lldb -b -o run -o bt`); keep Python development
+* **Merging (design/41 §2):** in `$IMSRG_WORK/main` on `develop`: `git fetch origin`,
+  `IMSRG_INTEGRATOR=1 git merge --no-ff --no-commit origin/feature/<x>`, add the `STATUS.md` log
+  entry, commit with `IMSRG_INTEGRATOR=1`, then **one chained command**:
+  `tools/ci.sh frontier-cpu && <slow suite on the compute node> && IMSRG_INTEGRATOR=1 git push origin develop`
+  for numerics merges (without the slow suite otherwise), never chained to a grep of the log. If
+  CI fails, `git reset --keep` to the previous `develop` (nothing was pushed) and fix it on the
+  branch. Run `tools/lint.sh` on merges that add names. Retire merged clones with
+  `tools/agent_retire.sh --all --merged`.
+* **Debug crashes under gdb**, not by guessing (`gdb -batch -ex run -ex bt`, on the compute node); keep Python development
   crashes out of the owner's session (pytest in a subprocess with a timeout).
 * **Reference goldens:** after any change to `tools/reference` or the patch, rebuild
-  `harness-build-d35` and regenerate `build/golden-generated` (patched harness) in every checkout.
+  `harness-build-d35` and regenerate `$IMSRG_WORK/golden-generated` (patched harness).
 * After an agent's work is merged, stop it (`TaskStop`) if it still waits on background work, and
-  check the shared venv for editable installs (`~/.cache/imsrg-deps/venv/bin/pip list | grep imsrg`);
-  remove them, because they shadow in-tree builds in other worktrees. A fresh worktree has empty
-  `extern/`: workers copy it from the lead's worktree.
+  check the shared venv for editable installs (`$IMSRG_DEPS_PREFIX/venv/bin/pip list | grep imsrg`);
+  remove them, because they shadow in-tree builds in other clones.
 * Tests must not share fixed file names in the system temp directory: use `tests/support/scratch_dir.h`.
 
 ## Briefs of run 3 (A, B, C, D phase 1): done
@@ -274,7 +275,7 @@ interview.
 > IT-11 on 2 and 4 ranks (rows distribution) with identical step counts and max relative deviation
 > <= 1e-12 (run 3 reached 1.2e-16), cost-model imbalance and communication tables for 22/64/256
 > ranks at emax 8/10/12 in `mpi-scaling.md`, the slow IT-11 cases under about 10 minutes in total,
-> `tools/ci.sh dev-openmp` + lint + dev-serial PASS, `ctest -L slow` PASS, one Opus review (read the
+> `tools/ci.sh frontier-cpu` + lint + `tools/ci.sh frontier-serial` PASS, `ctest -L slow` PASS, one Opus review (read the
 > diff while a Sonnet worker runs the tests). Write `handoff-m12b.md` at every wave and before every
 > pause. Report <= 250 words.
 
@@ -300,7 +301,7 @@ interview.
 > them while the other lead pauses, and record the 1-minute load at the start of each. Acceptance: all
 > term, IT-8, IT-9 and brute-force tests unchanged (bitwise where the arithmetic is unchanged, else
 > max|dZ| <= 1e-12 max(1, max|Z|)), before/after tables appended to the N7 report,
-> `tools/ci.sh dev-openmp` + lint PASS, `ctest -L slow` PASS (the orchestrator may run it), one short
+> `tools/ci.sh frontier-cpu` + lint PASS, `ctest -L slow` PASS (the orchestrator may run it), one short
 > Opus review. Write `handoff-n7.md` at every wave. Report <= 250 words.
 
 ## Brief E — M15 tensor operators (after the owner answered M15-Q1..Q5)
@@ -352,7 +353,7 @@ interview.
 ## Definition of done for the run
 
 At the end of the run (or when the budget runs low; write a draft report early as insurance):
-* all finished work is merged into `develop`, and `tools/ci.sh dev-openmp` passes on `develop`
+* all finished work is merged into `develop`, and `tools/ci.sh frontier-cpu` passes on `develop`
   (and `ctest -L slow` for numerics merges);
 * unfinished work sits on clearly named branches, with its state described in `STATUS.md` and a
   hand-off file for every lead;

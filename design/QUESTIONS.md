@@ -1184,3 +1184,47 @@ the orchestrator uses `O4` and up).
   Run 4: decide whether it becomes a runtime option; refit at another emax and thread count with a
   committed fit script; validate `n7_bench --row-overhead` (silently ignored without `--partition`
   or with `--partition-contiguous`) and add it to the usage text; P = 64 still has max/mean 1.16.
+
+## Added during the Frontier port
+
+Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an owner decision
+(D-rows) in the interview after the port; until then the session works as assumed.
+
+* **P-F1** (2026-11-26, isolation scheme) - **Proposal: scheme (a)**, Claude Code's own isolation:
+  `isolation: worktree` in `imsrg-lead`, `imsrg-implementer`, `imsrg-mechanic`, with the committed
+  `.claude/settings.json` hooks `WorktreeCreate` (clone the hub into `$IMSRG_WORK/agents/<name>` on
+  `feature/<name>`; workers of a lead start from the lead's pushed branch), `WorktreeRemove`
+  (`tools/agent_retire.sh`) and the `PreToolUse` guard `tools/hooks/agent_guard.py`; read-only
+  agents in the integrator's clone. Tested and working (design/41 §3); fallback (b),
+  `tools/agent_clone.sh` plus `cd <clone> &&` briefs, exists but was not needed. **Assumed
+  meanwhile:** (a) is in use. Open points: Claude Code never calls `WorktreeRemove` when a
+  subagent finishes, so clones accumulate until `tools/agent_retire.sh --all --merged`; the hub
+  keeps every pushed feature branch, including the test branches `feature/agent-aed5510638e6f6d22`,
+  `feature/agent-ab7ad3f93c28d0a1e` and `feature/selftest` of this session: delete merged or test
+  branches on the hub (who, when), or keep them all?
+* **P-F2** (2026-11-26, GitHub policy) - **Proposal:** only the integrator talks to GitHub
+  (`github` remote of `$IMSRG_WORK/main`); GitHub changes come in with `--ff-only` merges;
+  `develop` is pushed to the hub first and to GitHub only after `tools/ci.sh frontier-cpu` passed
+  on it; never force-push, never delete or rename a remote branch, never rewrite published
+  history; `main` is left alone; feature branches stay on the hub. Agents never touch GitHub (their
+  clones have no GitHub remote; `agent_guard.py` denies pushes elsewhere than `origin`).
+  **Assumed meanwhile:** as proposed. Question: should `main` follow `develop` at milestones
+  (fast-forward by the owner), and should feature branches be mirrored to GitHub for review?
+* **FP-Q1** (2026-11-26, settings) - `design/claude-settings.proposed.json` now proposes allow rules
+  for hub pushes (`git push origin *`), `git fetch`, Slurm and module commands, and denies force
+  pushes and remote branch deletion. **Assumed meanwhile:** the current
+  `.claude/settings.local.json` (Mac era) stays; the owner installs the proposal if wanted.
+* **FP-Q2** (2026-11-26, git identity) - the integrator's clone had no git identity, so commits
+  made by agents in clones were attributed to `mheinz@login10...`. **Assumed meanwhile:** set
+  `user.name`/`user.email` locally in `$IMSRG_WORK/main` to the identity of the existing history;
+  `tools/agent_clone.sh` copies it into each clone. A global `~/.gitconfig` would also work.
+* **FP-Q3** (2026-11-26, compute allocations) - builds and tests need an allocation; the session
+  keeps one 1-node `batch` job named `imsrg` (2 h limit) and queues the next with
+  `--dependency=afterany`. **Assumed meanwhile:** fine for supervised sessions; for long
+  unattended runs, is a chain of 2-hour jobs acceptable for the nph123 allocation, or should runs
+  use the `extended` partition / a reservation?
+* **FP-Q4** (2026-11-26, generated goldens) - the emax-4 dumps are shared by every clone in
+  `$IMSRG_WORK/golden-generated` (copied from the integrator's `build/golden-generated`, which
+  differs file by file from `$IMSRG_REFERENCE_ROOT/golden-generated-d35`; which one is newer is
+  not recorded). **Assumed meanwhile:** the presets point at `$IMSRG_WORK/golden-generated`.
+  Which of the two sets is current, and should the other be removed?

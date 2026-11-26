@@ -42,7 +42,8 @@ How to work:
 4. Review every worker diff against the design docs and the device-code rules
    (`design/12-compute-backend.md` §5). For kernels or IMSRG(3), ask `imsrg-reviewer` for a
    second read.
-5. Run `tools/ci.sh frontier-cpu` before you report done (on the Mac: `dev-openmp`, plus
+5. Run `tools/ci.sh frontier-cpu` (and `frontier-serial` for kernel changes) before you report
+   done (on the Mac: `dev-openmp`, plus
    `dev-serial` for kernel changes).
    Never loosen a tolerance to make a test pass; find the cause.
 6. Commit in small, modular commits with explanatory messages (what, why, design decisions).

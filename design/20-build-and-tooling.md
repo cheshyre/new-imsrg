@@ -335,7 +335,7 @@ Configure, builds and tests run on a compute node of a running allocation, norma
 512 GB). Compute nodes have no internet access: anything that downloads (pip, submodule fetches)
 runs on the login node.
 
-**Presets.** `frontier-cpu` (CI; Debug `-O1 -g`, Kokkos OpenMP, `CMAKE_CXX_COMPILER=CC`),
+**Presets.** `frontier-cpu` (CI; Debug `-O1 -g`, Kokkos OpenMP, `CMAKE_CXX_COMPILER=CC`), `frontier-serial` (the same with the debug Serial Kokkos, the Mac `dev-serial` equivalent),
 `frontier-cpu-release` (Release, `IMSRG_NATIVE_ARCH`, i.e. `-march=native` = znver3), `frontier-hip`
 (Release, hipcc, `IMSRG_BUILD_PYTHON=OFF`; compile check). All set
 `IMSRG_TEST_DATA_DIR=$IMSRG_WORK/inputs`, `IMSRG_GENERATED_GOLDEN_DIR=$IMSRG_WORK/golden-generated`

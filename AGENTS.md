@@ -75,7 +75,7 @@ source tools/lib/frontier_env.sh && imsrg_frontier_modules cpu
 imsrg_compute cmake --preset frontier-cpu && imsrg_compute cmake --build --preset frontier-cpu
 imsrg_compute ctest --preset frontier-cpu -L unit   # labels: unit, integration, mpi, slow, reference
 ```
-* Presets: `frontier-cpu` (CI: PrgEnv-gnu through the Cray `CC` wrapper, cray-mpich, cray-libsci,
+* Presets: `frontier-serial` (Kokkos Serial with debug checks, for kernel changes), `frontier-cpu` (CI: PrgEnv-gnu through the Cray `CC` wrapper, cray-mpich, cray-libsci,
   Kokkos OpenMP, Debug -O1 -g, MPI tests via nested `srun -n`), `frontier-cpu-release`,
   `frontier-hip` (hipcc, Kokkos HIP gfx90a + ZEN3). The Mac presets (`dev-openmp`, `dev-serial`,
   `release-openmp`, `asan`) are unchanged.

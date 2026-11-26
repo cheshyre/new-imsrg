@@ -130,6 +130,24 @@
       }
     },
     {
+      "name": "frontier-serial",
+      "displayName": "Frontier CPU (Serial, Debug -O1 -g)",
+      "description": "OLCF Frontier debugging build: as frontier-cpu with the Serial Kokkos backend ($IMSRG_DEPS_PREFIX/kokkos-serial: debug checks and bounds checking); run it for kernel changes.",
+      "inherits": [
+        "base",
+        "debug-flags"
+      ],
+      "cacheVariables": {
+        "IMSRG_KOKKOS_BACKEND": "serial",
+        "CMAKE_CXX_COMPILER": "CC",
+        "IMSRG_TEST_DATA_DIR": "$env{IMSRG_WORK}/inputs",
+        "IMSRG_GENERATED_GOLDEN_DIR": "$env{IMSRG_WORK}/golden-generated",
+        "MPIEXEC_EXECUTABLE": "/usr/bin/srun",
+        "MPIEXEC_NUMPROC_FLAG": "-n",
+        "IMSRG_MPIEXEC_PREFLAGS": "--overlap --cpu-bind=none -c 4"
+      }
+    },
+    {
       "name": "frontier-cpu-release",
       "displayName": "Frontier CPU (OpenMP, Release, ZEN3)",
       "description": "OLCF Frontier performance runs on the CPU: as frontier-cpu, Release, -march=native (ZEN3).",
@@ -196,6 +214,10 @@
     {
       "name": "frontier-hip",
       "configurePreset": "frontier-hip"
+    },
+    {
+      "name": "frontier-serial",
+      "configurePreset": "frontier-serial"
     }
   ],
   "testPresets": [
@@ -244,6 +266,11 @@
     {
       "name": "frontier-cpu-release",
       "configurePreset": "frontier-cpu-release",
+      "inherits": "test-base"
+    },
+    {
+      "name": "frontier-serial",
+      "configurePreset": "frontier-serial",
       "inherits": "test-base"
     }
   ]
