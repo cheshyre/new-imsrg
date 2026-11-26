@@ -49,3 +49,14 @@ imsrg_add_test(NAME hf_integration
 target_compile_definitions(hf_integration PRIVATE
   IMSRG_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/tests/golden"
   IMSRG_TEST_DATA_DIR="${IMSRG_TEST_DATA_DIR}")
+
+# Tensor operators in the HF basis (M15): imsrg++ HO goldens transformed with our HF C. The He4
+# case needs the me2j file and skips itself if it is absent.
+imsrg_add_test(NAME hf_tensor_transform
+  SOURCES test_tensor_transform.cc ${_hf_support} ${_imsrg_exec_main}
+  DEPS hf operator io opslib
+  LABELS integration
+  NO_GTEST_MAIN)
+target_compile_definitions(hf_tensor_transform PRIVATE
+  IMSRG_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/tests/golden"
+  IMSRG_TEST_DATA_DIR="${IMSRG_TEST_DATA_DIR}")
