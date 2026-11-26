@@ -212,10 +212,27 @@ Old `OperatorsRPA`/`OperatorsTDA`: not supported (no schema key).
 | `stem` | opt string | `<method>_<reference>_<valence>_hw<hw>_e<emax>_A<A>` using resolved values, `%g` formatting | base name for interaction/operator files. |
 | `flow_file` | opt path | `<directory>/<stem>.flow` | flow table. |
 | `valence_file_format` | enum `tokyo`, `nushellx`, `antoine` (PL, old code marks it buggy) | `tokyo` | format of the valence-space interaction/operator files. |
-| `write_omega` | bool | `false` | write Omega operators (and occupations, coefficient matrix) next to the interaction. |
-| `me2jp`, `me2jp_operators`, `omega` | planned (D54) | — | ME1J/ME2JP/ME3JP outputs of `19-mexj-formats.md`: the evolved H by default when `me2jp = true` (ME3JP when H has a 3B part), further scalar operators by name, the Omega stack (`omega = "me2jp"`) for a later `run.task = "transform"`; text, `.gz`, later `.bin`. Checkpoint/restart (`[checkpoint]`) uses the same files. E-PLANNED until the milestone after tensor operators. |
+| `write_omega` | bool | `false` | write the Omega stack after the flow (Magnus only; design/50 C6): `<stem>_omega_<k>.opb` (native) or `<stem>_omega_<k>.me1j` + `.me2jp.bin` (ME2JP), one file (pair) per Omega in the order of application, plus `<stem>_basis.bin` (the HO -> HF/NAT coefficient matrix C of the HF/NAT space: u64 rows, u64 cols, column-major f64), `<stem>_occ.dat` (`n l 2j 2tz occupation` of the IMSRG model space, hexfloat) and the manifest `<stem>_omegas.toml` (format, emax, e2max, hw, hermiticity, layout hash, file list). With `imsrg3.in_flow`: E-PLANNED. |
+| `omega_format` | enum `native`, `me2jp` | `native` | format of the `write_omega` files: native float64 binary (exact, design/19 §3.2) or ME1J + binary ME2JP (float32 two-body part, design/19 §3.1; owner O4: float32 is sufficient). The owner wants both, to be compared in the response farm. |
+| `me2jp`, `me2jp_operators` | planned (D54) | — | ME1J/ME2JP/ME3JP outputs of `19-mexj-formats.md`: the evolved H by default when `me2jp = true` (ME3JP when H has a 3B part), further scalar operators by name, the Omega stack (`omega = "me2jp"`) for a later `run.task = "transform"`; text, `.gz`, later `.bin`. Checkpoint/restart (`[checkpoint]`) uses the same files. E-PLANNED until the milestone after tensor operators. |
 | `write_ho_ops`, `write_hf_ops` | bool | `false` | write operators before the HF transformation / before the IMSRG flow (PL). |
 | `spwf` | array of strings | `[]` | orbits whose HF/NAT single-particle wave functions are written; `"valence"` = all valence orbits. |
+
+### 2.11 `[checkpoint]` (design/50 C7; Magnus IMSRG(2) only)
+
+| key | type | default | meaning |
+|---|---|---|---|
+| `directory` | path | `""` | checkpoint directory; empty = no checkpoints. Created if missing. |
+| `interval_minutes` | float >= 0 | `30.0` | wall time between checkpoints; `0` = after every step. |
+| `format` | enum `native`, `me2jp` | `native` | operator files of a checkpoint (see `output.omega_format`). A native restart continues bit for bit; an ME2JP restart within float32 precision (owner O4). |
+| `restart` | bool | `false` | continue the flow from the checkpoint in `directory` (HF/NAT and the operators are recomputed; the flow configuration must be unchanged: `FlowConfigHash` over the resolved TOML without `[output]`, `[checkpoint]`, `run.log_level`). |
+| `abort_after_steps` | int >= 0 | `0` | testing aid: stop with an error right after the checkpoint of this flow step (counted over all stages), simulating a killed job. |
+
+Contents of the directory (design/13 §7.3): `omega_<k>.*` once per closed Omega, `h_saved_<k>.*` once per
+Omega piece, `omega_cur_<seq>.*` and `h_<seq>.*` per checkpoint, `state.txt` (written last and atomically:
+config hash, format, sequence, Omega count, loop state and step options as hexfloats, finished stages).
+E-PLANNED with: methods other than `magnus`, hunter-gatherer, `imsrg3.in_flow`, perturbative triples.
+The flow file of a restarted run starts at the restored step.
 
 #### `results.json` schema
 

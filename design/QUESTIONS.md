@@ -1322,3 +1322,19 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
   meanwhile:** `frontier-serial` is not the merge gate (frontier-cpu is); raise the test's timeout
   or label it `slow` for serial builds? Owner to decide.
   **Answer (owner, 2026-11-26):** Label `Imsrg3N7.He4Emax2OccNat3Cut` `slow` under serial builds; the maybe-uninitialized warning stays non-fatal in frontier-serial; frontier-serial is not a merge gate.
+
+## Added during the Al27 night (2026-11-26)
+
+* **AL-C1** (lead C, C5 `[imsrg.space]`) - The two-body channels have no e2max cut, so
+  `imsrg.space.e2max < 2*imsrg.space.emax` is E-PLANNED (the 27Al runs use e2max = 2 emax = 20).
+  `e3max_imsrg`/`emax_3body_imsrg` are accepted and unused for IMSRG(2). **Assumed:** enough for the
+  task; an e2max cut belongs to `basis::TwoBodyChannels` later.
+* **AL-C2** (lead C, C7) - A restart re-runs HF/NAT (deterministic) instead of storing H_0; the flow
+  file of the restarted run starts at the restored step (not appended); the config hash covers every
+  key except `[output]`, `[checkpoint]` and `run.log_level`, so adding operators between kill and
+  restart is refused. **Assumed:** acceptable (HF at emax 14 is minutes against hours of flow); say if
+  H_0 should be stored or operators excluded from the hash.
+* **AL-C3** (lead C, C4) - The fork re-sorts NAT orbitals with `std::sort` on |occupation| (not
+  stable); ties keep the signed order here (`std::stable_sort`). Exact ties do not occur in practice.
+  The C4 comparison against lead B's fork reference dumps is pending (only a test-side
+  re-implementation of the fork loops so far).
