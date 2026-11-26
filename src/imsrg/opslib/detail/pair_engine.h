@@ -9,15 +9,19 @@
 /// `Calculate_p1p2` / `Calculate_r1r2`) and the host fills of one-body and
 /// two-body parts.
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 #include "imsrg/angmom/moshinsky.h"
 #include "imsrg/angmom/tables.h"
 #include "imsrg/base/types.h"
 #include "imsrg/basis/model_space.h"
 #include "imsrg/basis/orbit.h"
+#include "imsrg/exec/host_parallel.h"
+#include "imsrg/linalg/matrix_view.h"
 #include "imsrg/operator/operator.h"
 
 namespace imsrg::opslib::detail {
@@ -113,30 +117,51 @@ template <class Value>
 void AddTwoBody(op::Operator& op, double threshold, Value value) {
   const auto& chans = op.model_space().two_body();
   const auto& basis = op.model_space().basis();
+  // One task per (channel, bra row) on the host threads (the emax-14 TCm of
+  // the 27Al runs has ~1e9 entries). Row i writes (i, j >= i) and (j, i), so
+  // two rows never write the same element; `value` must be thread safe
+  // (PairEngine::Element is const and reads immutable tables).
+  // The views are taken up front: the first host access creates the host
+  // mirror, which must not happen concurrently (exec/device_buffer.h).
+  std::vector<linalg::MatrixView<double>> blocks;
+  blocks.reserve(static_cast<std::size_t>(chans.num_channels()));
   for (std::int32_t c = 0; c < chans.num_channels(); ++c) {
-    const ChannelIndex ch{c};
-    const basis::TwoBodyChannel& tbc = chans.channel(ch);
-    const auto kets = chans.channel_kets(ch);
-    auto block = op.two_body().host_block(ch);
-    const std::int32_t nk = static_cast<std::int32_t>(kets.size());
-    for (std::int32_t i = 0; i < nk; ++i) {
-      const basis::Ket& bra = chans.ket(kets[static_cast<std::size_t>(i)]);
-      const basis::Orbit& oa = basis.orbit(bra.p);
-      const basis::Orbit& ob = basis.orbit(bra.q);
-      for (std::int32_t j = i; j < nk; ++j) {
-        const basis::Ket& ket = chans.ket(kets[static_cast<std::size_t>(j)]);
-        const double v =
-            value(tbc, oa, ob, basis.orbit(ket.p), basis.orbit(ket.q));
-        if (std::abs(v) <= threshold || v == 0.0) {
-          continue;
-        }
-        block(i, j) += v;
-        if (j != i) {
-          block(j, i) += v;
-        }
-      }
-    }
+    blocks.push_back(op.two_body().host_block(ChannelIndex{c}));
   }
+  std::vector<std::int64_t> first_row(
+      static_cast<std::size_t>(chans.num_channels()) + 1, 0);
+  for (std::int32_t c = 0; c < chans.num_channels(); ++c) {
+    first_row[static_cast<std::size_t>(c) + 1] =
+        first_row[static_cast<std::size_t>(c)] +
+        static_cast<std::int64_t>(chans.channel_kets(ChannelIndex{c}).size());
+  }
+  exec::HostParallelForDynamic(
+      "imsrg::opslib::AddTwoBody", first_row.back(), [&](std::int64_t row) {
+        const auto it =
+            std::upper_bound(first_row.begin(), first_row.end(), row) - 1;
+        const auto c = static_cast<std::int32_t>(it - first_row.begin());
+        const auto i = static_cast<std::int32_t>(row - *it);
+        const ChannelIndex ch{c};
+        const basis::TwoBodyChannel& tbc = chans.channel(ch);
+        const auto kets = chans.channel_kets(ch);
+        linalg::MatrixView<double> block = blocks[static_cast<std::size_t>(c)];
+        const std::int32_t nk = static_cast<std::int32_t>(kets.size());
+        const basis::Ket& bra = chans.ket(kets[static_cast<std::size_t>(i)]);
+        const basis::Orbit& oa = basis.orbit(bra.p);
+        const basis::Orbit& ob = basis.orbit(bra.q);
+        for (std::int32_t j = i; j < nk; ++j) {
+          const basis::Ket& ket = chans.ket(kets[static_cast<std::size_t>(j)]);
+          const double v =
+              value(tbc, oa, ob, basis.orbit(ket.p), basis.orbit(ket.q));
+          if (std::abs(v) <= threshold || v == 0.0) {
+            continue;
+          }
+          block(i, j) += v;
+          if (j != i) {
+            block(j, i) += v;
+          }
+        }
+      });
 }
 
 }  // namespace imsrg::opslib::detail
