@@ -1322,3 +1322,27 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
   meanwhile:** `frontier-serial` is not the merge gate (frontier-cpu is); raise the test's timeout
   or label it `slow` for serial builds? Owner to decide.
   **Answer (owner, 2026-11-26):** Label `Imsrg3N7.He4Emax2OccNat3Cut` `slow` under serial builds; the maybe-uninitialized warning stays non-fatal in frontier-serial; frontier-serial is not a merge gate.
+
+## Added during the Al27 night (2026-11-26)
+
+* **AL-B1** (lead B, FPhitp normalization) - `FPhitp<L><p|n>_<q>` (L = 2, 4) uses sqrt(4 pi) x
+  `Phitp(L, q)`, Hermitian, like FPhipp (reference/06 section 2.4; orchestrator's notes
+  `$IMSRG_WORK/inputs/al27/analysis/phitp-normalization-notes.md`). The constant lives only in
+  `opslib::nreft::PhitpShorthandPrefactor()`. **Assumed meanwhile:** sqrt(4 pi); owner to confirm.
+* **AL-B2** (lead B, NREFT table tolerance) - the fork's one-body tables are reproduced element by
+  element to 1e-12 relative, except near-zero elements: tables that vanish analytically (Delta'_J at
+  emax 2) or elements that are 1e-12 of the table at q = 1050 MeV carry only the rounding noise of
+  the alternating radial sums, in the fork as here (the fork's own FM0p_15 <0||10> and <10||0> differ
+  by 6e-14 relative). **Assumed meanwhile:** pass if |d| <= 1e-12 |ref| or |d| <= 1e-14 S_q, S_q =
+  the largest element of all fork tables at that q (the Wigner-symbol rule of design/30 section 2;
+  observed max |d|/S_q = 7.8e-15). Alternative: per-element error estimates from the magnitude of the
+  summed terms.
+* **AL-B3** (lead B, fork NaNs at q = 0) - in the fork, `jdmho`/`jdpho` with multipole L = 0 contain
+  y^(-1/2) and give inf/NaN at q = 0; this reaches Phi'_1, Phi''_1, tilde-Phi'_1, Delta'_1 and
+  Mg(J, 0) at q = 0 (none of the archived shorthands; FPhitp2/4 are finite). The port reproduces the
+  fork (NaN), and the golden test skips non-finite fork values. **Assumed meanwhile:** keep NaN (only
+  reachable through raw blocks, not through any catalog name). Alternative: the analytic q -> 0 limit.
+* **AL-B4** (lead B, rank L > 0 NREFT operators) - the tensor storage of lead A
+  (`feature/m15-tensor-operators`) is not on develop yet; the L > 0 shorthands are planned catalog rows
+  and their tables are plain `OneBodyTable`s. **Assumed meanwhile:** wire them as tensor operators
+  (reduced one-body part, imsrg++ gauge) on a separate branch on top of A's branch, merged after it.

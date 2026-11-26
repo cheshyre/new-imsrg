@@ -284,6 +284,17 @@ and never includes the spin-orbit correction, which stays available as the separ
 (`RpSpinOrbitCorrection`, catalog name `Rso`; a charge radius adds `Rso/Z` explicitly). No imsrg++ compatibility switch: the goldens come from a patched
 imsrg-devel build (`30` §3).
 
+**DM NREFT (Al27 night, 2026-11-26; design/50 C2).** `opslib/nreft.h` ports the fork's
+`DM_NREFT` (79e9330): HO radial integrals `jho/jdmho/jdpho` in y = q^2/(4 hw m_N)
+(`detail/nreft_radial.h`), the blocks M, Ms(J,L), Mg(J,L), Phi', Phi'', tilde-Phi' = Phi' + Ms(J,J)/2,
+Sigma, Sigma', Sigma'', Delta, Delta' (`Family`), isospin selections p/n/+/-, the fork's channel sets
+and J = 0 non-reduced storage, as dense reduced one-body tables (`OneBodyTable`), and the shorthands
+`F<family><L><p|n>_<q>` (`ParseShorthand`; sqrt(4 pi) on FM, FPhipp and, pending the owner,
+FPhitp, `PhitpShorthandPrefactor()`; all Hermitian). Scalar (L = 0) shorthands build operators
+(`BuildScalarShorthand`, driver catalog P1 rows FM0p/n, FPhipp0p/n); L > 0 waits for the M15 tensor
+storage (planned catalog rows). Tested against the fork dumps (`tests/golden/nreft`, test
+`opslib_nreft`): 1e-12 relative or 1e-14 of the largest element at the same q (observed 7.8e-15).
+
 **Charge radius (D35, run 2; `driver/pipeline/charge_radius.h`).** The operator contract: `Rp2` is the
 intrinsic point-proton radius squared WITHOUT the spin-orbit term, `Rso` the spin-orbit correction (so
 imsrg++'s old `Rp2` equals our `Rp2 + Rso/Z` to 3.5e-17). The driver's output stage builds the charge
