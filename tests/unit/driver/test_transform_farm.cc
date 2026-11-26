@@ -33,8 +33,8 @@ TEST(TransformFarm, ReadWorkListSkipsCommentsAndReasons) {
     std::ofstream o(p);
     o << "# header\n  FM0p_15  \n\nTCM\tsome reason\n#x\r\nFDelta5n_1050\r\n";
   }
-  EXPECT_EQ(ReadWorkList(p), (std::vector<std::string>{"FM0p_15", "TCM",
-                                                       "FDelta5n_1050"}));
+  EXPECT_EQ(ReadWorkList(p),
+            (std::vector<std::string>{"FM0p_15", "TCM", "FDelta5n_1050"}));
   fs::remove(p);
   EXPECT_THROW(ReadWorkList(TempFile("does_not_exist")), InputError);
 }

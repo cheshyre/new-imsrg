@@ -26,8 +26,8 @@ namespace imsrg::op {
 /// in `O`'s basis (InputError otherwise); particle rank <= 2
 /// (NotImplementedError otherwise). Tensor operators: each stored block
 /// (ch_bra <= ch_ket) of the target gets the reduced normalized elements of
-/// the source (`TwoBody::get_normalized(.., J_bra, J_ket)`). Host loops; O(norb_t^2 + number of
-/// two-body elements of `target`).
+/// the source (`TwoBody::get_normalized(.., J_bra, J_ket)`). Host loops;
+/// O(norb_t^2 + number of two-body elements of `target`).
 Operator Truncate(const Operator& O,
                   std::shared_ptr<const basis::ModelSpace> target);
 

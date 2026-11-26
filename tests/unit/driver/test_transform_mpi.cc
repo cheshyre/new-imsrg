@@ -164,8 +164,8 @@ TEST(TransformMpi, FarmMatchesSerialInProcessTransform) {
       }
       EXPECT_EQ(names, (std::vector<std::string>{"E0", "FM0p_abc"}));
       for (int r = 0; r < world.size(); ++r) {
-        EXPECT_FALSE(fs::exists(farm_dir / ("failed.txt.rank" +
-                                            std::to_string(r))));
+        EXPECT_FALSE(
+            fs::exists(farm_dir / ("failed.txt.rank" + std::to_string(r))));
       }
     } catch (const std::exception& e) {
       ADD_FAILURE() << "rank 0 comparison: " << e.what();

@@ -103,9 +103,9 @@ op::Operator FinishOperator(const op::Operator& transformed,
                             const OperatorFrame& frame);
 
 /// Header and format options of the valence-space writers. With
-/// `compat.tokyo_writer_fork_79e9330` the fork's number format and its header values
-/// (Aref/Zref and A_for_kinetic_energy are those of the core, reference/06
-/// section 1.10).
+/// `compat.tokyo_writer_fork_79e9330` the fork's number format and its header
+/// values (Aref/Zref and A_for_kinetic_energy are those of the core,
+/// reference/06 section 1.10).
 io::ValenceWriteOptions MakeValenceWriteOptions(const RunConfig& config,
                                                 const OperatorFrame& frame,
                                                 io::ValenceWriteMode mode);

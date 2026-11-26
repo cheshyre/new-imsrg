@@ -4,9 +4,9 @@
 #include "imsrg/driver/pipeline/operator_frame.h"
 
 #include <cmath>
-#include <cstdlib>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <optional>
 #include <string>
 #include <utility>
@@ -206,8 +206,8 @@ std::string OperatorFileName(const std::string& stem, const std::string& name,
 void WriteTensorSnt(const std::filesystem::path& path, op::Operator O,
                     const RunConfig& config, const OperatorFrame& frame) {
   O.SyncToHost();
-  const io::ValenceWriteOptions v =
-      MakeValenceWriteOptions(config, frame, io::ValenceWriteMode::kHamiltonian);
+  const io::ValenceWriteOptions v = MakeValenceWriteOptions(
+      config, frame, io::ValenceWriteMode::kHamiltonian);
   io::TensorTokyoOptions t;
   t.format = CompatOptionsFor(config.run.compat).tokyo_writer_fork_79e9330
                  ? io::TokyoFormat::kFork79e9330

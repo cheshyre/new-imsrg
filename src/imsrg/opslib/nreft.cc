@@ -366,8 +366,8 @@ op::Operator BuildScalarShorthand(
         "NREFT shorthand with rank L > 0 needs tensor operators (M15)");
   }
   const OneBodyTable t = BuildShorthandTable(ms->basis(), s);
-  op::Operator o(ms,
-                 op::OperatorSpec::Scalar(particle_rank, Hermiticity::kHermitian));
+  op::Operator o(
+      ms, op::OperatorSpec::Scalar(particle_rank, Hermiticity::kHermitian));
   for (std::int32_t a = 0; a < t.num_orbits; ++a) {
     for (std::int32_t b = 0; b < t.num_orbits; ++b) {
       const double v = t.value(OrbitIndex{a}, OrbitIndex{b});

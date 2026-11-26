@@ -105,7 +105,8 @@ struct SharedMemory::Window {
 SharedMemory Communicator::AllocateShared(std::size_t bytes) const {
   SharedMemory m;
   m.window_ = std::make_shared<SharedMemory::Window>();
-  m.window_->heap = std::make_unique<std::byte[]>(std::max<std::size_t>(1, bytes));
+  m.window_->heap =
+      std::make_unique<std::byte[]>(std::max<std::size_t>(1, bytes));
   m.data_ = m.window_->heap.get();
   m.size_ = bytes;
   return m;

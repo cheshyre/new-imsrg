@@ -60,8 +60,7 @@ struct TransformContext {
 /// File of a finished operator: `<out_dir>/<stem><name>.snt` for scalars,
 /// `..._2b.snt` for tensors (the fork's `<intfile><op>` names).
 std::filesystem::path TransformOutputPath(const TransformContext& ctx,
-                                          const std::string& name,
-                                          bool tensor);
+                                          const std::string& name, bool tensor);
 
 /// The per-item computation, the unit a device version replaces: build the
 /// operator at basis.emax, change basis, normal order, truncate
@@ -76,10 +75,10 @@ std::filesystem::path TransformItem(const OperatorRequest& request,
 
 /// Outcome of `RunTransform` on this rank.
 struct TransformReport {
-  std::size_t num_items = 0;     ///< work items in total
-  std::size_t num_assigned = 0;  ///< items of this rank
+  std::size_t num_items = 0;                   ///< work items in total
+  std::size_t num_assigned = 0;                ///< items of this rank
   std::vector<std::filesystem::path> written;  ///< files of this rank
-  std::vector<Failure> failures;  ///< all ranks' failures (every rank)
+  std::vector<Failure> failures;       ///< all ranks' failures (every rank)
   std::size_t omega_window_bytes = 0;  ///< shared window per node
 };
 

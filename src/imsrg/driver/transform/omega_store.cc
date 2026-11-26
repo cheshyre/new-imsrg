@@ -8,6 +8,7 @@
 #include <cstring>
 #include <fstream>
 #include <map>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -66,7 +67,8 @@ fs::path StemOf(const std::string& name, const fs::path& dir) {
 
 OmegaManifest ReadOmegaManifest(const fs::path& path) {
   std::ifstream in(path);
-  if (!in) throw InputError("cannot read the Omega manifest '" + path.string() + "'");
+  if (!in)
+    throw InputError("cannot read the Omega manifest '" + path.string() + "'");
   const fs::path dir = path.parent_path();
   std::map<std::string, std::string> kv;
   OmegaManifest m;
@@ -136,8 +138,8 @@ OmegaManifest ReadOmegaManifest(const fs::path& path) {
   }
   const auto n = static_cast<std::size_t>(std::stoul(need("num_omegas")));
   if (n != m.omega_stems.size() || n == 0) {
-    throw InputError("Omega manifest '" + path.string() + "': num_omegas = " +
-                     std::to_string(n) + " but " +
+    throw InputError("Omega manifest '" + path.string() +
+                     "': num_omegas = " + std::to_string(n) + " but " +
                      std::to_string(m.omega_stems.size()) + " files");
   }
   return m;
@@ -167,17 +169,18 @@ std::vector<OccupationRow> ReadOccupations(const fs::path& path) {
   return rows;
 }
 
-std::vector<double> OccupationsInBasis(const std::vector<OccupationRow>& rows,
-                                       const basis::SingleParticleBasis& basis) {
+std::vector<double> OccupationsInBasis(
+    const std::vector<OccupationRow>& rows,
+    const basis::SingleParticleBasis& basis) {
   std::vector<double> occ(static_cast<std::size_t>(basis.num_orbits()), 0.0);
   for (const OccupationRow& r : rows) {
     const basis::Orbit o{r.n, r.l, TwoJ(r.j2), TwoTz(r.tz2)};
     const auto a = basis.find(o);
     if (!a) {
-      throw InputError("occupation file: orbit (n l 2j 2tz) = " +
-                       std::to_string(r.n) + " " + std::to_string(r.l) + " " +
-                       std::to_string(r.j2) + " " + std::to_string(r.tz2) +
-                       " is not in the basis");
+      throw InputError(
+          "occupation file: orbit (n l 2j 2tz) = " + std::to_string(r.n) + " " +
+          std::to_string(r.l) + " " + std::to_string(r.j2) + " " +
+          std::to_string(r.tz2) + " is not in the basis");
     }
     occ[a->ToSize()] = r.occupation;
   }
@@ -230,9 +233,8 @@ SharedOmegaStack::SharedOmegaStack(const OmegaManifest& manifest,
     try {
       auto* base = reinterpret_cast<double*>(memory_.data().data());
       for (std::size_t k = 0; k < num_; ++k) {
-        op::Operator o =
-            pipeline::ReadStoredOperator(manifest.omega_stems[k], ms_,
-                                         manifest.format, spec_.hermiticity);
+        op::Operator o = pipeline::ReadStoredOperator(
+            manifest.omega_stems[k], ms_, manifest.format, spec_.hermiticity);
         if (!o.spec().SameSymmetry(spec_) ||
             o.spec().particle_rank != spec_.particle_rank) {
           throw InputError("Omega file '" + manifest.omega_stems[k].string() +

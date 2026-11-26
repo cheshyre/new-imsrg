@@ -14,8 +14,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
-#include <cstdlib>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -143,8 +143,7 @@ void RunCase(const std::string& golden_dir, const std::string& tag) {
     src.legacy_args.push_back(tok);
   }
   src.set_overrides = {"run.compat=imsrg_fork_79e9330",
-                       "output.directory=" + dir.string(),
-                       "output.stem=int"};
+                       "output.directory=" + dir.string(), "output.stem=int"};
   src.command_line = "test_al27_fork_golden " + tag;
   const RunResult r = Execute(src, dir);
   if (r.planned) GTEST_SKIP() << "driver::run not ready: " << r.note;
@@ -172,10 +171,11 @@ void RunCase(const std::string& golden_dir, const std::string& tag) {
     EXPECT_LE(std::abs(a.zero_body - b.zero_body),
               5.0e-6 * std::abs(b.zero_body) + 1.0e-9)
         << golden << " zero body";
-    std::printf("[fork-golden] %-28s rows %5zu (only one side %zu) max dev %.2e"
-                " (%.2f of the tolerance) %s\n",
-                golden.c_str(), d.rows, d.only_one, d.max_abs, d.max_ratio,
-                d.worst.c_str());
+    std::printf(
+        "[fork-golden] %-28s rows %5zu (only one side %zu) max dev %.2e"
+        " (%.2f of the tolerance) %s\n",
+        golden.c_str(), d.rows, d.only_one, d.max_abs, d.max_ratio,
+        d.worst.c_str());
   }
 }
 

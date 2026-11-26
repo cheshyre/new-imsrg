@@ -21,7 +21,8 @@ namespace imsrg::driver::transform {
 
 std::vector<std::string> ReadWorkList(const std::filesystem::path& path) {
   std::ifstream in(path);
-  if (!in) throw InputError("cannot read the work list '" + path.string() + "'");
+  if (!in)
+    throw InputError("cannot read the work list '" + path.string() + "'");
   std::vector<std::string> names;
   std::string line;
   while (std::getline(in, line)) {
@@ -79,10 +80,9 @@ std::vector<int> AssignStatic(std::span<const double> costs, int num_ranks) {
   IMSRG_CHECK(num_ranks >= 1, "AssignStatic: num_ranks must be >= 1");
   std::vector<std::size_t> order(costs.size());
   std::iota(order.begin(), order.end(), std::size_t{0});
-  std::stable_sort(order.begin(), order.end(),
-                   [&](std::size_t i, std::size_t j) {
-                     return costs[i] > costs[j];
-                   });
+  std::stable_sort(
+      order.begin(), order.end(),
+      [&](std::size_t i, std::size_t j) { return costs[i] > costs[j]; });
   std::vector<double> load(static_cast<std::size_t>(num_ranks), 0.0);
   std::vector<int> owner(costs.size(), 0);
   for (const std::size_t i : order) {
@@ -96,7 +96,8 @@ std::vector<int> AssignStatic(std::span<const double> costs, int num_ranks) {
 
 void WriteFailureManifest(const std::filesystem::path& path,
                           std::span<const Failure> failures) {
-  if (path.has_parent_path()) std::filesystem::create_directories(path.parent_path());
+  if (path.has_parent_path())
+    std::filesystem::create_directories(path.parent_path());
   io::WriteFileAtomically(path, [&](std::ostream& out) {
     out << "# operators of run.task = \"transform\" that did not finish: "
         << failures.size() << "\n# name<TAB>reason (usable as "

@@ -79,8 +79,7 @@ Operator Truncate(const Operator& O,
                 tb.ket(tb.global_ket(chk, LocalKetIndex(j)));
             const double x = v.get_normalized(m(bra.p), m(bra.q), m(ket.p),
                                               m(ket.q), bc.two_j, kc.two_j);
-            out.two_body().set(chb, chk, LocalKetIndex(i), LocalKetIndex(j),
-                               x);
+            out.two_body().set(chb, chk, LocalKetIndex(i), LocalKetIndex(j), x);
           }
         }
       }

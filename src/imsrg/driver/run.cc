@@ -8,9 +8,9 @@
 #include "imsrg/driver/run.h"
 
 #include <cmath>
-#include <cstdlib>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -430,7 +430,8 @@ void WriteValenceFile(const fs::path& path, op::Operator O, const RunConfig& c,
                       const comm::Communicator& comm) {
   O.SyncToHost();
   if (!comm.is_root()) return;
-  const io::ValenceWriteOptions o = pipeline::MakeValenceWriteOptions(c, frame, mode);
+  const io::ValenceWriteOptions o =
+      pipeline::MakeValenceWriteOptions(c, frame, mode);
   if (c.output.valence_file_format == ValenceFileFormat::kNushellx) {
     fs::path base = path;
     io::WriteNushellxInt(base.replace_extension(".int"), O, o);
@@ -687,8 +688,8 @@ void TransformOperators(const std::vector<OperatorRequest>& requests,
                         const pipeline::OperatorFrame& frame,
                         const RunConfig& config, Engine& solver, bool magnus,
                         const std::shared_ptr<const basis::ModelSpace>& ms_flow,
-                        const fs::path& dir,
-                        const std::string& stem, const comm::Communicator& comm,
+                        const fs::path& dir, const std::string& stem,
+                        const comm::Communicator& comm,
                         std::vector<OperatorRecord>& ops) {
   const bool imsrg3 = config.imsrg3.in_flow;
   for (std::size_t i = 0; i < requests.size(); ++i) {
