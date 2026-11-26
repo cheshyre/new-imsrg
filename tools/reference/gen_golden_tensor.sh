@@ -79,9 +79,9 @@ run_rh ops_Ne20_HF dump-tensor emax=2 reference=Ne20 valence_space=Ne20 hw=16 ba
 put ops_Ne20_HF emax2_Ne20/HF E2.tdump M1.tdump Fermi.tdump GamowTeller.tdump
 # X inputs: He4 here; O16 reuses hf/emax2_O16_2N/HNO.dump and commutator/emax2_O16/random_A.dump
 # (checked below to agree with what the harness computes)
-put ops_He4_HF emax2_He4/inputs H_HF.dump
-# random_A (seed 7) is reference independent: the He4 matrix elements equal those of the O16 file
-# commutator/emax2_O16/random_A.dump (checked in tensor_golden_check.py), so it is not stored again
+put ops_He4_HF emax2_He4/inputs H_HF.dump random_A.dump
+# random_A (seed 7) is reference independent, but its values depend on the C++ standard library
+# (libc++ on the Mac, libstdc++ on Frontier), so the X input of the X=A goldens is stored here
 
 # --- 2. scalar-tensor commutator terms -------------------------------------------------------
 ALLTERMS=comm111st,comm121st,comm122st,comm221st,comm222_pp_hhst,comm222_pp_hh_221st,comm222_phst,all
@@ -112,8 +112,12 @@ for c in "${combos[@]}"; do
   i=$((i + 1))
 done
 # emax 1 inputs (X = H in the He4 HF basis, X = A): needed by readers of the emax-1 files
-run_rh inputs1 dump-tensor emax=1 reference=He4 valence_space=He4 hw=16 basis=HF ops=E2 write_h=true
-put inputs1 emax1_He4/inputs H_HF.dump random_A.dump
+# and the Y inputs of the emax-1 commutator and BCH goldens (E2 in the HF basis; the random tensors
+# are written exactly as commutator-tensor builds them: make_tensor_op returns rand_* before the HF
+# step), added in the Al27 night (2026-11-26) for the M15 acceptance tests
+Y1_OPS=E2,rand_2_0_0_H_3,rand_1_0_1_A_5,rand_1_1_0_H_4
+run_rh inputs1 dump-tensor emax=1 reference=He4 valence_space=He4 hw=16 basis=HF ops="${Y1_OPS}" write_h=true
+put inputs1 emax1_He4/inputs H_HF.dump random_A.dump $(tdumps "${Y1_OPS}")
 
 # --- 3. Magnus step: BCH_Transform(Y, Omega), Omega = s * random_A (seed 7), |Omega| = 0.3 ---
 run_rh bch2 bch-tensor emax=2 reference=He4 valence_space=He4 hw=16 Y=E2 omega_norm=0.3
