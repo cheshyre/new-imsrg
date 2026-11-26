@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -145,6 +146,94 @@ TEST(ValenceWritersGolden, HamiltonianMatchesImsrgpp) {
 
 TEST(ValenceWritersGolden, IsospinAveragedOperatorMatchesImsrgpp) {
   CheckMode(io::ValenceWriteMode::kIsospinAveragedOperator, "O16_sdshell_op");
+}
+
+/// Reads a scalar tokyo file written by the fork into a Hermitian operator
+/// (zero body from the header, one-body rows, normalized two-body rows).
+op::Operator ReadForkSnt(const fs::path& path,
+                         const std::shared_ptr<const basis::ModelSpace>& ms) {
+  op::Operator op(ms, op::OperatorSpec::Scalar(2, Hermiticity::kHermitian));
+  // kshell numbering: protons first, then neutrons, ascending orbit index.
+  std::vector<OrbitIndex> orb;
+  for (const int tz2 : {-1, 1})
+    for (const OrbitIndex o : ms->partition().valence())
+      if (ms->basis().orbit(o).tz2.twice == tz2) orb.push_back(o);
+  const auto lines = ReadLines(path);
+  std::size_t i = 0;
+  for (; i < lines.size(); ++i) {
+    const std::string key = "! Zero body term: ";
+    if (lines[i].rfind(key, 0) == 0) {
+      op.zero_body() = std::stod(lines[i].substr(key.size()));
+    }
+    if (lines[i] == "! interaction") break;
+  }
+  ++i;
+  const auto count = [&](std::size_t line) {
+    return static_cast<std::size_t>(std::stoul(Tokens(lines[line])[0]));
+  };
+  const std::size_t n1 = count(i++);
+  for (std::size_t k = 0; k < n1; ++k, ++i) {
+    const auto t = Tokens(lines[i]);
+    op.one_body().set(orb[std::stoul(t[0]) - 1], orb[std::stoul(t[1]) - 1],
+                      std::stod(t[2]));
+  }
+  const std::size_t n2 = count(i++);
+  for (std::size_t k = 0; k < n2; ++k, ++i) {
+    const auto t = Tokens(lines[i]);
+    op.two_body().set_normalized(
+        orb[std::stoul(t[0]) - 1], orb[std::stoul(t[1]) - 1],
+        orb[std::stoul(t[2]) - 1], orb[std::stoul(t[3]) - 1],
+        TwoJ(2 * std::stoi(t[4])), std::stod(t[5]));
+  }
+  return op;
+}
+
+void CheckForkRoundTrip(const std::string& name, io::ValenceWriteMode mode) {
+  const fs::path golden =
+      kGolden / "nreft/flow/fork-79e9330/nat_emax2" / (name + ".snt");
+  if (!fs::exists(golden)) GTEST_SKIP() << "golden not found: " << golden;
+  basis::BasisTruncation tr;
+  tr.emax = 2;
+  const auto ms = basis::ModelSpace::FromNames(tr, 16.0, "O16", "sd-shell");
+  const op::Operator op = ReadForkSnt(golden, ms);
+
+  io::ValenceWriteOptions opt;
+  opt.mode = mode;
+  opt.tokyo_format = io::TokyoNumberFormat::kFork79e9330;
+  opt.file_2n = "VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz";
+  opt.file_3n = "NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin";
+  opt.e1max = 2;
+  opt.e2max = 4;
+  opt.e3max = 6;
+  opt.hbar_omega = 16.0;
+  opt.a_ref = 16;
+  opt.z_ref = 8;
+  opt.a_target = 16.0;
+  opt.version = "N/A_N/A";
+  const fs::path out = fs::temp_directory_path() / ("imsrg_fork_" + name);
+  io::WriteTokyo(out, op, opt);
+  const auto g = ReadLines(out);
+  const auto w = ReadLines(golden);
+  EXPECT_EQ(g.size(), w.size()) << name;
+  for (std::size_t i = 0; i < std::min(g.size(), w.size()); ++i)
+    EXPECT_EQ(g[i], w[i]) << name << " line " << i + 1;
+  std::error_code ec;
+  fs::remove(out, ec);
+}
+
+TEST(ValenceWritersFork, IntSntByteForByte) {
+  CheckForkRoundTrip("int", io::ValenceWriteMode::kHamiltonian);
+}
+TEST(ValenceWritersFork, FM0pByteForByte) {
+  CheckForkRoundTrip("intFM0p_150",
+                     io::ValenceWriteMode::kIsospinAveragedOperator);
+}
+TEST(ValenceWritersFork, FPhipp0nByteForByte) {
+  CheckForkRoundTrip("intFPhipp0n_150",
+                     io::ValenceWriteMode::kIsospinAveragedOperator);
+}
+TEST(ValenceWritersFork, TcmByteForByte) {
+  CheckForkRoundTrip("intTCM", io::ValenceWriteMode::kIsospinAveragedOperator);
 }
 
 TEST(ValenceWriters, UnwritablePathThrows) {
