@@ -21,7 +21,10 @@
 # modules (frontier-hip: plus rocm) and runs configure, build and the tests on a compute node of a
 # running allocation through `srun --overlap` (IMSRG_SLURM_JOBID, SLURM_JOB_ID, or the newest
 # running job named `imsrg`); MPI tests start their ranks with a nested `srun -n`. The lint steps
-# stay on the login node. frontier-hip stops after the build (no GPU tests yet).
+# stay on the login node. frontier-hip stops after the build (compile check); frontier-hip-run
+# builds the same tree (preset frontier-hip, build/frontier-hip) and runs the unit and
+# integration tests on one GCD (`imsrg_compute_gpu`: srun --gpus=1 -c 7), M14. MPI tests are
+# skipped there (one GCD).
 #   IMSRG_COMPUTE_CPUS cores of the compute step (default 56; build jobs and test slots follow)
 set -uo pipefail
 
@@ -82,7 +85,10 @@ skip_step() {  # <name> <reason>
 if ! repo_root=$(imsrg_repo_root "$script_dir"); then
   finish "setup (not inside a git checkout)"
 fi
-build_dir=${IMSRG_BUILD_DIR:-$repo_root/build/$preset}
+# The CMake preset: frontier-hip-run tests the tree of frontier-hip.
+cmake_preset=$preset
+case $preset in frontier-hip-run) cmake_preset=frontier-hip ;; esac
+build_dir=${IMSRG_BUILD_DIR:-$repo_root/build/$cmake_preset}
 case $build_dir in
   /*) ;;
   *) build_dir="$PWD/$build_dir" ;;
@@ -91,15 +97,22 @@ cd "$repo_root" || finish "setup (cannot cd to $repo_root)"
 
 # On Frontier the heavy steps run on a compute node (`on_compute`); elsewhere `on_compute` is empty.
 on_compute=""
+on_test=""   # runs the test steps (frontier-hip-run: on one GCD)
 build_only=0
+gpu_tests=0
 case $preset in
   frontier-*)
     if ! imsrg_on_frontier; then finish "setup (preset $preset needs OLCF Frontier)"; fi
     toolchain=cpu
-    case $preset in frontier-hip*) toolchain=hip; build_only=1 ;; esac
+    case $preset in
+      frontier-hip-run) toolchain=hip; gpu_tests=1 ;;
+      frontier-hip*) toolchain=hip; build_only=1 ;;
+    esac
     imsrg_frontier_modules "$toolchain" || finish "setup (module load)"
     jobid=$(imsrg_frontier_jobid) || finish "setup (no compute allocation)"
     on_compute=imsrg_compute
+    on_test=imsrg_compute
+    if [ "$gpu_tests" -eq 1 ]; then on_test=imsrg_compute_gpu; fi
     ncpu=$IMSRG_COMPUTE_CPUS
     echo "[ci] Frontier: toolchain $toolchain, compute steps in job $jobid ($ncpu cores)" ;;
   *) ncpu=$(imsrg_ncpu) ;;
@@ -112,6 +125,8 @@ case $threads in
   ''|*[!0-9]*|0) threads=4 ;;
 esac
 test_jobs=$((ncpu / threads))
+# One GCD with 7 cores; the HIP build's host space is Serial: 6 test processes share the GCD.
+if [ "$gpu_tests" -eq 1 ]; then test_jobs=6; fi
 if [ "$test_jobs" -lt 1 ]; then test_jobs=1; fi
 python=python3
 if [ -x "$IMSRG_VENV/bin/python" ]; then python="$IMSRG_VENV/bin/python"; fi
@@ -140,7 +155,7 @@ step_submodules() {
 }
 
 step_configure() {
-  $on_compute cmake --preset "$preset" -B "$build_dir" -DIMSRG_WERROR=ON
+  $on_compute cmake --preset "$cmake_preset" -B "$build_dir" -DIMSRG_WERROR=ON
 }
 
 step_build() {
@@ -152,15 +167,15 @@ cache_value() {  # <variable>: value from the build tree's CMakeCache.txt
 }
 
 step_unit() {
-  $on_compute ctest --test-dir "$build_dir" -L '^unit$' -LE '^slow$' --output-on-failure --no-tests=error \
+  $on_test ctest --test-dir "$build_dir" -L '^unit$' -LE '^slow$' --output-on-failure --no-tests=error \
     -j "$test_jobs"
 }
 
 step_integration() {
-  $on_compute ctest --test-dir "$build_dir" -L '^integration$' -LE '^(slow|mpi)$' --output-on-failure \
+  $on_test ctest --test-dir "$build_dir" -L '^integration$' -LE '^(slow|mpi)$' --output-on-failure \
     --no-tests=ignore -j "$test_jobs" || return 1
   if ls tests/integration/test_*.py >/dev/null 2>&1; then
-    IMSRG_BUILD_DIR="$build_dir" $on_compute "$python" -m pytest -q tests/integration -m "not slow"
+    IMSRG_BUILD_DIR="$build_dir" $on_test "$python" -m pytest -q tests/integration -m "not slow"
   fi
 }
 
@@ -269,8 +284,9 @@ else
   skip_step "integration tests" "input data not found in '${data_dir:-unset}'"
 fi
 
-case $(cache_value IMSRG_ENABLE_MPI) in
-  ON|on|TRUE|true|YES|yes|1|Y|y) run_step "mpi tests" step_mpi ;;
+case $gpu_tests:$(cache_value IMSRG_ENABLE_MPI) in
+  1:*) skip_step "mpi tests" "one GCD (frontier-hip-run)" ;;
+  0:ON|0:on|0:TRUE|0:true|0:YES|0:yes|0:1|0:Y|0:y) run_step "mpi tests" step_mpi ;;
   *) skip_step "mpi tests" "IMSRG_ENABLE_MPI is off" ;;
 esac
 
