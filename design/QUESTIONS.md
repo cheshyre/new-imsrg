@@ -1396,3 +1396,27 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
   keeps imsrg++'s formula (it drives the BCH thresholds the archive was produced with); whether the
   fork runs hit the NaN case is to be checked when the J=5 operators are reproduced (C8). A
   physically sensible norm ((2j_p+1) per element, or (2j_p+1)(2j_q+1)/(2L+1)) can be a named option.
+* **AL-E-Q1** (lead E, M14/C11) - The Kokkos Kernels backend of the device BLAS
+  (`IMSRG_DEVICE_BLAS=KOKKOSKERNELS`) is written but neither built nor measured: the 5.3.0 source
+  tarball cannot be downloaded from an agent session (the worktree hook rejects commands with the
+  GitHub URL), compute nodes have no internet, and the Frontier `kokkos-kernels` modules (3.x-4.6)
+  do not match Kokkos 5.3. **Assumed:** rocBLAS stays the hip default until someone puts
+  `kokkos-kernels-5.3.0.tar.gz` into `$IMSRG_DEPS_PREFIX/src/` and runs
+  `tools/bootstrap_deps.sh --backends hip`; the GEMMs are only 11-14 % of the GPU time, so the
+  choice matters little (design/benchmarks/gpu-m14.md, proposed D-row there).
+* **AL-E-Q2** (lead E, M14) - `flow_generator3_kernel` Bitwise* (5 tests) fail on the GCD: the
+  atan generator kinds use device `Kokkos::atan` against host `std::atan` in the reference loop
+  (22-281 of 74497 elements differ, max relative 4e-16; not FMA, `-ffp-contract=off` is set for
+  frontier-hip). **Assumed:** left failing (no tolerance loosened); options: compare with a few-ulp
+  tolerance on device backends only, or evaluate the atan on the host into a table. Owner to choose.
+* **AL-E-Q3** (lead E, M14, follows FP-Q6) - With the default Frontier CPU BLAS (threaded
+  `libsci_gnu_mp` behind the `IMSRG_BLAS_SERIALIZE` lock, sequential GroupedGemm) the scalar
+  commutator is 6-7x slower than with the serial `libsci_gnu`, `IMSRG_BLAS_SERIALIZE=OFF` and the
+  new `IMSRG_BLAS_CONCURRENT=ON` (emax 8, 56 cores: 430 vs 65 ms). **Assumed:** presets unchanged
+  (the owner kept the lock, FP-Q6); proposal: switch the `frontier-cpu*` presets to the serial
+  libsci with concurrent items after the Python two-thread test passes with it.
+* **AL-E-Q4** (lead E, M14/C12) - Distributing one commutator over GCDs (M12b phase 1) is much
+  slower than one GCD (emax 10: 78 ms on 1 GCD, 454 / 656 ms on 2 / 8 GCDs): the combine copies Z
+  to the host and reduces with host MPI every commutator, and the owned-column paths keep their
+  host shapes. **Assumed:** flows run one rank per GCD (8 independent flows per node); GPU-aware
+  MPI and device shapes for the distributed paths are later work.
