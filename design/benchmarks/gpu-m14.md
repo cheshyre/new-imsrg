@@ -77,8 +77,10 @@ the host uses it always. Remaining hot spot: the phst inverse (~80 % at emax 10 
 `tools/bench/compare_dumps.py host.bin device.bin` compares them (max|dZ| / max(1, max|Z|) per
 part, tolerance 1e-12). GPU (rocBLAS, device shapes) vs CPU (OpenMP, libsci): scalar emax 8
 1.0e-15, emax 10 2.0e-15; tensor rank 5 emax 8 3.5e-15, rank 2 emax 6 1.7e-15 (worst part).
-All goldens pass on the GCD (frontier-hip-run: 1328 of 1333 unit tests, all 76 integration
-tests; the 5 failures are the bitwise atan tests of AL-E-Q2).
+All goldens pass on the GCD (after merging develop 2026-11-26 14:00: 1352 of 1357 unit tests, all
+85 integration tests with three at a time; the 5 failures are the bitwise atan tests of AL-E-Q2).
+The HIP build's host space is Serial (AL-E-Q5), so host-side parts (tables, generator, IMSRG(3)
+host loops) run on one core there.
 
 ## Device BLAS: rocBLAS vs Kokkos Kernels (owner rule: vendor path only at >= 5x)
 

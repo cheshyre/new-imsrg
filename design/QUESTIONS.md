@@ -1487,3 +1487,9 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
   to the host and reduces with host MPI every commutator, and the owned-column paths keep their
   host shapes. **Assumed:** flows run one rank per GCD (8 independent flows per node); GPU-aware
   MPI and device shapes for the distributed paths are later work.
+* **AL-E-Q5** (lead E, M14) - The HIP Kokkos build (`kokkos-hip`) has a Serial host space, so
+  every host-parallel part (`HostParallelForDynamic`, host loops of the generator and normal
+  ordering, the tensor table builds) runs on one core in the GPU build: the IMSRG(3) N7 driver
+  test takes ~155 s, CPU-bound, on a GCD (113 s on frontier-cpu). **Assumed:** unchanged (the
+  IMSRG(2) commutators run on the device); adding `Kokkos_ENABLE_OPENMP` to kokkos-hip (HIP + OpenMP
+  host) would give each rank its 7 cores. Owner/integrator to decide with the C12 layout.
