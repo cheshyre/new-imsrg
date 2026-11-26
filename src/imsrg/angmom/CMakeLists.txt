@@ -5,4 +5,5 @@ imsrg_add_module(NAME angmom
     moshinsky.cc
     tables.cc
     sixj3_table.cc
+    tensor_tables.cc
   DEPS base exec)
