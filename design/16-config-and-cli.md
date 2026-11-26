@@ -664,13 +664,13 @@ has no `include_spin_orbit` parameter (done, run 2); `Rso` is implemented in `Pr
 
 | phase | operators |
 |---|---|
-| **P1** (scalar, J=0, dTz=0, parity 0, rank <= 2) | kinetic/CM: `Trel`, `TCM`, `Tlab`, `TrelMassCorrection`, `HCM`, `HCM_<hw>`, `VCM_<hw>`, `R2CM`; radii: `Rp2`, `Rn2`, `Rm2`, `Rm2lab`, `Rp2Z_<Z>`, `Rp2AZ_<A>_<Z>`, `Rn2Z_<Z>`, `R2_p1`, `R2_n1`, `R2_p2`, `R2_n2`, `Rso`; monopole `E0`; number/density: `OccRef`, `OneOcc_<orb>`, `AllOcc_<orb>`, `OBD_<orb>_<orb>`, `rhop_<r>`, `rhon_<r>`, `rhop_all`, `rhon_all`, `rhocentralp_<rmax>`, `rhocentraln_<rmax>`; isospin: `Iso2`, `Tz2`; `LdotS`. |
+| **P1** (scalar, J=0, dTz=0, parity 0, rank <= 2) | kinetic/CM: `Trel`, `TCM`, `Tlab`, `TrelMassCorrection`, `HCM`, `HCM_<hw>`, `VCM_<hw>`, `R2CM`; radii: `Rp2`, `Rn2`, `Rm2`, `Rm2lab`, `Rp2Z_<Z>`, `Rp2AZ_<A>_<Z>`, `Rn2Z_<Z>`, `R2_p1`, `R2_n1`, `R2_p2`, `R2_n2`, `Rso`; monopole `E0`; number/density: `OccRef`, `OneOcc_<orb>`, `AllOcc_<orb>`, `OBD_<orb>_<orb>`, `rhop_<r>`, `rhon_<r>`, `rhop_all`, `rhon_all`, `rhocentralp_<rmax>`, `rhocentraln_<rmax>`; isospin: `Iso2`, `Tz2`; `LdotS`; dark-matter NREFT scalars `FM0p_<q>`, `FM0n_<q>`, `FPhipp0p_<q>`, `FPhipp0n_<q>` (q in MeV; fork 79e9330 shorthands, `opslib/nreft.h`). |
 | **PL, later scalar potentials** | `VCoul`, `VCentralCoul`, `VMinnesota`, `VGaus_<s>`, `VGausCSB_<s>`, `VBareDelta`, `VSDI_<V0>_<R>`, `VWS_<V0>_<R0>_<a0>`, `HOtrap_<hw>`, `QdotQ*`, `VQQ`, `L2rel`, `FFp_<q>`, `FFn_<q>`, `protonFBC_<nu>`, `neutronFBC_<nu>`. |
 | **PL, tensor** | `E1`..`E6`, `E2int`, `nE2`, `M1`..`M5`, `M1p`, `M1n`, `M1S`, `M1L`, `Sigma`, `Sigma_p`, `Sigma_n`, `ISM`, `IVM`, `ISQ`, `IVQ`, `ISO`, `IVO`, `IVD`, `ISD_<Rms>`, `Schiff_<R>`, `Anapole`, `GamowTeller`. |
 | **PL, charge changing / parity odd** | `Fermi`, `AxialCharge`, `RadialOverlap`, `VPT_<...>`. |
 | **PL, dagger** | `Dagger_<orb>`, `DaggerHF_<orb>`, `DaggerAlln_<orb>`. |
 | **PL, 0vbb and double GT** | `M0nu_GT_<Ecl>_<src>[_<ff>]`, `M0nu_F_*`, `M0nu_T_*`, `M0nu_C_*`, `M0nuHeavy_*`, `M0nuIntegrand_*`, `M0nuR_*`, `DGT`, `DGTR_*`, `DGTRLocal_*`. |
-| **PL, dark matter** | `DMNREFT_<Op><IsoSV>_<q>_<J>`. |
+| **PL, dark matter** | `DMNREFT_<Op><IsoSV>_<q>_<J>`; the NREFT shorthands of rank L > 0 (`FM2/4`, `FPhipp2/4`, `FSigmap1/3/5`, `FSigmapp1/3/5`, `FDelta1/3/5`, `FPhitp2/4`, each with suffix `p` or `n` and `_<q>`) until the tensor operators of M15 (shape {L, 0, 0, 1}). |
 | **NS** | atomic `hfsNMS`, `hfsSMS`; any `RPA`/`TDA`-resummed variant. |
 
 The `src` parameter of the `M0nu` family is accepted by the old code but never read (R05); the new grammar keeps the token for compatibility and ignores it with a warning when `M0nu` becomes available.
