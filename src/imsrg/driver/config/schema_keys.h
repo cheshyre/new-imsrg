@@ -69,6 +69,11 @@ void VisitSchema(Config& c, Visitor&& v) {
   v.Field(KeyInfo{"run.log_level", "stdout verbosity: quiet, normal, debug",
                   "normal"},
           c.run.log_level);
+  v.Field(KeyInfo{"run.compat",
+                  "compatibility profile: none, imsrg_fork_79e9330 (named "
+                  "internal options, design/50 section 5)",
+                  "none"},
+          c.run.compat);
   // [basis]
   v.Field(KeyInfo{"basis.emax", "single-particle truncation e = 2n + l",
                   "required", true},
@@ -195,6 +200,11 @@ void VisitSchema(Config& c, Visitor&& v) {
   v.Field(KeyInfo{"natural_orbitals.order",
                   "NAT orbit labelling: occupation, energy", "occupation"},
           c.natural_orbitals.order);
+  v.Field(KeyInfo{"natural_orbitals.use_hf_reference",
+                  "reset occupied NAT orbitals to the HF orbitals (fork "
+                  "use_HF_reference_in_NAT)",
+                  "false"},
+          c.natural_orbitals.use_hf_reference);
   // [imsrg]
   v.Field(KeyInfo{"imsrg.method", "solver", "magnus"}, c.imsrg.method);
   v.Field(KeyInfo{"imsrg.steps", "decoupling stages (1 or 2)",

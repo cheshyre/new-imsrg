@@ -18,6 +18,7 @@
 #include "imsrg/base/error.h"
 #include "imsrg/base/log.h"
 #include "imsrg/basis/model_space.h"
+#include "imsrg/driver/config/compat.h"
 #include "imsrg/driver/operators/operator_request.h"
 #include "imsrg/io/me2j.h"
 #include "imsrg/io/no2b.h"
@@ -66,13 +67,24 @@ void RejectPlanned(const RunConfig& c) {
 /// occupations in that basis (`hf::SolutionInBasis`) and the Hamiltonian
 /// normal ordered in it. Replaces `out.hno` and `out.e_reference` and fills
 /// `out.nat` (its C maps the oscillator basis to the NAT basis).
+/// With `natural_orbitals.use_hf_reference` the occupied orbitals are reset
+/// to the HF orbitals (`mbpt::UseHfForHoleStates`), and the compat option
+/// `nat_sort_by_abs_occupation` orders the NAT orbitals by |occupation|.
 void ToNaturalOrbitalBasis(const op::Operator& H, const op::No2bThreeBody* v3,
-                           const hf::HFOptions& ho, PreparedHamiltonian& out) {
+                           const hf::HFOptions& ho, const RunConfig& config,
+                           PreparedHamiltonian& out) {
   IMSRG_CHECK(out.hf.has_value(), "the NAT basis is built on an HF solution");
   op::Operator hno = out.hno;  // Mbpt2DensityMatrix syncs its argument
   const linalg::Matrix<double> rho_hf = mbpt::Mbpt2DensityMatrix(hno);
-  const mbpt::NaturalOrbitals nat =
-      mbpt::ComputeNaturalOrbitals(rho_hf, out.hno.model_space());
+  const CompatOptions compat = CompatOptionsFor(config.run.compat);
+  mbpt::NaturalOrbitals nat = mbpt::ComputeNaturalOrbitals(
+      rho_hf, out.hno.model_space(),
+      compat.nat_sort_by_abs_occupation ? mbpt::NatSorting::kAbsDescending
+                                        : mbpt::NatSorting::kSignedDescending);
+  if (config.natural_orbitals.use_hf_reference) {
+    log::Info("NAT basis: setting occupied states back to HF");
+    mbpt::UseHfForHoleStates(nat, out.hno.model_space());
+  }
   const linalg::Matrix<double> c_ho2nat = mbpt::Matmul(out.hf->C, nat.c_hf2nat);
   hf::HFResult r =
       hf::SolutionInBasis(H, v3, c_ho2nat, out.hf->occupations, ho);
@@ -163,7 +175,9 @@ void SolveReferenceState(const op::Operator& H, const op::No2bThreeBody* v3p,
     out.hno = hf::NormalOrderedHamiltonian(H, v3p, r, ho);
     out.e_reference = r.e_hf;
     out.hf = std::move(r);
-    if (b.kind == BasisKind::kNat) ToNaturalOrbitalBasis(H, v3p, ho, out);
+    if (b.kind == BasisKind::kNat) {
+      ToNaturalOrbitalBasis(H, v3p, ho, config, out);
+    }
   } else {
     out.hno = v3p ? op::NormalOrder(H, *v3p) : op::NormalOrder(H);
     out.e_reference = out.hno.zero_body();

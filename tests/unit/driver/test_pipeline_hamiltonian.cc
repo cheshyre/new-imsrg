@@ -136,6 +136,50 @@ TEST(PipelineHamiltonian, Ne20Sd) {
   EXPECT_EQ(ph.proton_number, 10);
 }
 
+// C4 (design/50): 27Al ensemble reference (sd shell) at emax 4, NAT basis with
+// the holes reset to HF (fork use_HF_reference_in_NAT): E_ref(NAT) = E_HF.
+// With the compat profile the NAT orbitals are ordered by |occupation|.
+TEST(PipelineHamiltonian, Al27NatWithHfReference) {
+  if (!Have(kVnn)) GTEST_SKIP() << "missing " << kVnn;
+  const std::string ref =
+      "[reference]\nnucleus = \"Al27\"\n[valence]\nspace = \"sd-shell\"\n";
+  const std::string nat = "kind = \"nat\"\nmass_number = 27";
+  const std::string hfref =
+      "[natural_orbitals]\nuse_hf_reference = true\n";
+  const PreparedHamiltonian plain = PrepareHamiltonian(Load(Toml(ref, false, nat)));
+  RunConfig c = Load(Toml(ref, false, nat) + hfref);
+  EXPECT_TRUE(c.natural_orbitals.use_hf_reference);
+  const PreparedHamiltonian ph = PrepareHamiltonian(c);
+  ASSERT_TRUE(ph.hf.has_value());
+  ASSERT_TRUE(ph.nat.has_value());
+  std::cout << "[dev] Al27 NAT(HF holes) E_ref - E_HF = "
+            << ph.e_reference - ph.hf->e_hf << ", plain NAT - E_HF = "
+            << plain.e_reference - plain.hf->e_hf << "\n";
+  EXPECT_NEAR(ph.e_reference, ph.hf->e_hf, 1.0e-9);
+  EXPECT_GT(plain.e_reference, plain.hf->e_hf + 1.0e-6);
+
+  RunConfig cc = Load("[run]\ncompat = \"imsrg_fork_79e9330\"\n" +
+                      Toml(ref, false, nat) + hfref);
+  EXPECT_EQ(cc.run.compat, Compat::kImsrgFork79e9330);
+  const PreparedHamiltonian pc = PrepareHamiltonian(cc);
+  EXPECT_NEAR(pc.e_reference, pc.hf->e_hf, 1.0e-9);
+  const auto& basis = pc.hno.model_space().basis();
+  bool resorted = false;
+  for (std::int32_t a = 0; a < basis.num_orbits(); ++a) {
+    const auto ch = basis.SameLjtz(OrbitIndex(a));
+    for (std::size_t k = 1; k < ch.size(); ++k) {
+      const auto i0 = static_cast<std::size_t>(ch[k - 1].value());
+      const auto i1 = static_cast<std::size_t>(ch[k].value());
+      EXPECT_GE(std::abs(pc.nat_occupations[i0]),
+                std::abs(pc.nat_occupations[i1]));
+      resorted = resorted ||
+                 plain.nat_occupations[i0] != pc.nat_occupations[i0];
+    }
+  }
+  std::cout << "[dev] Al27 emax 4: |occ| sorting changed a label: "
+            << resorted << "\n";
+}
+
 TEST(PipelineHamiltonian, Rp2ZeroBodyMatchesIt6) {
   if (!Have(kVnn)) GTEST_SKIP() << "missing " << kVnn;
   const RunConfig cfg = Load(Toml(kO16, false));

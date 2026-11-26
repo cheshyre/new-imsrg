@@ -364,6 +364,11 @@ void Checker::HamiltonianBasis() {
       Strict("V-21", "natural_orbitals.order",
              "natural_orbitals.order requires basis.kind = \"nat\"");
     }
+    if (cfg_.natural_orbitals.use_hf_reference != nat_def.use_hf_reference) {
+      Strict("V-21", "natural_orbitals.use_hf_reference",
+             "natural_orbitals.use_hf_reference requires basis.kind = "
+             "\"nat\"");
+    }
   }
   if (cfg_.basis.kind == BasisKind::kOscillator &&
       in_tree("hartree_fock.freeze_occupations") &&

@@ -32,6 +32,7 @@ Conventions: keys are `snake_case`; enum values are lower `snake_case` strings (
 | `task` | enum `imsrg`, `hf`, `mp3`, `fci_export` | `imsrg` | `hf`: stop after HF/basis + normal ordering (old `method=HF`); `mp3`: stop after MBPT(3) diagnostics (old `method=MP3`); `fci_export`: vacuum HF + write FCI interaction (old `method=FCI`, PL). |
 | `scratch_dir` | string | `""` | directory for Omega spill files; used only when `imsrg.omega.storage="scratch"`. Probed for writability at preflight. |
 | `log_level` | enum `quiet`, `normal`, `debug` | `normal` | stdout verbosity (new key; no legacy equivalent). |
+| `compat` | enum `none`, `imsrg_fork_79e9330` | `none` | compatibility profile (design/50 §5): one key that switches on named internal options reproducing another code version; `none` is the fixed behaviour. The options and their profiles are listed in `src/imsrg/driver/config/compat.h` (`CompatOptions`). `imsrg_fork_79e9330`: `nat_sort_by_abs_occupation` (NAT orbitals ordered by \|occupation\|, fork HFMBPT.cc:131-182); leads A/B add the tensor normal-ordering, 9j-threshold and writer options. No legacy equivalent. |
 
 ### 2.2 `[basis]` (model space and single-particle basis)
 
@@ -104,6 +105,7 @@ For single-reference runs set only `reference.nucleus`.
 | `hartree_fock.freeze_occupations` | bool | `false` | keep reference occupations fixed (default: fractional/ensemble occupations may follow HF energies). Ignored for `basis.kind="oscillator"`. |
 | `natural_orbitals.use_occupations` | bool | `false` | use NAT occupations for the reference (PL: `E-PLANNED`, M9-Q3). |
 | `natural_orbitals.order` | enum `occupation`, `energy` | `occupation` | orbit labelling order. Only valid with `basis.kind="nat"`; `energy` is PL (`E-PLANNED`, M9-Q3). |
+| `natural_orbitals.use_hf_reference` | bool | `false` | reset the occupied natural orbitals to the HF orbitals, orthogonalize the virtuals against them (Gram-Schmidt in orbit order) and rebuild density and Fock matrix (fork imsrg++ 79e9330 `use_HF_reference_in_NAT`, `UseHFForHoleStates`; `mbpt::UseHfForHoleStates`). E_ref(NAT) = E_HF. Only valid with `basis.kind="nat"` (V-21). |
 
 ### 2.7 `[imsrg]`
 
@@ -493,6 +495,7 @@ Columns: old key (type) | new key | type / enum | old default | status | notes. 
 | `use_NAT_occupations` | `natural_orbitals.use_occupations` | bool | `false` | S | |
 | `order_NAT_by_energy` | `natural_orbitals.order="energy"` | bool | `false` | C | overrides `NAT_order` when true (old behaviour, kept in legacy only). |
 | `NAT_order` | `natural_orbitals.order` | `occupation`,`energy` | `occupation` | S | |
+| `use_HF_reference_in_NAT` | `natural_orbitals.use_hf_reference` | bool | `false` | S | key of the fork 79e9330 (not in imsrg-devel's `Parameters.hh`); the legacy table has 86 keys. Dropped with V-21 unless `basis=NAT`. |
 | `store_3bme_pn` | `interaction.three_body.store_pn` | bool | `false` | S | |
 | `discard_residual_input3N` | `imsrg3.discard_residual_input_3n` | bool | `false` | S | old: also forces normal-ordering rank 2 even without IMSRG3; same here. |
 | `only_2b_eta` | `imsrg3.only_2b_eta` | bool | `false` | S | no-op without IMSRG(3); rule L2. |
@@ -699,7 +702,7 @@ Errors are collected; each rule has an id used in tests. TOML = strict; "legacy:
 ### 5.3 Hamiltonian and basis
 
 * V-20 `hamiltonian.trap_hw` set requires `kinetic="lab"`.
-* V-21 `natural_orbitals.order`/`use_occupations` set requires `basis.kind="nat"` (TOML). Legacy: ignored with warning when `basis != NAT` (old behaviour).
+* V-21 `natural_orbitals.order`/`use_occupations`/`use_hf_reference` set requires `basis.kind="nat"` (TOML). Legacy: ignored with warning when `basis != NAT` (old behaviour).
 * V-22 `basis.kind="oscillator"` with `hartree_fock.freeze_occupations` set: warning.
 * V-23 `mass_number` default needs a resolvable nucleus (`reference.nucleus` or valence-space core); else error "set basis.mass_number".
 

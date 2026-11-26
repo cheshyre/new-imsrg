@@ -65,6 +65,9 @@ enum class No2bPrecision { kSingle, kHalf };
 enum class HartreeFockMixing { kDiis, kLinear };
 /// `natural_orbitals.order`.
 enum class NatOrder { kOccupation, kEnergy };
+/// `run.compat`: a named compatibility profile that switches on the internal
+/// options of `CompatOptions` (driver/config/compat.h; design/50 section 5).
+enum class Compat { kNone, kImsrgFork79e9330 };
 /// `imsrg.method`: the solver.
 enum class Method {
   kMagnus,
@@ -216,6 +219,9 @@ IMSRG_DRIVER_ENUM_TRAITS(No2bPrecision, "NO2B precision",
 IMSRG_DRIVER_ENUM_TRAITS(HartreeFockMixing, "Hartree-Fock mixing",
                          {HartreeFockMixing::kDiis, "diis"},
                          {HartreeFockMixing::kLinear, "linear"});
+IMSRG_DRIVER_ENUM_TRAITS(Compat, "compatibility profile",
+                         {Compat::kNone, "none"},
+                         {Compat::kImsrgFork79e9330, "imsrg_fork_79e9330"});
 IMSRG_DRIVER_ENUM_TRAITS(NatOrder, "natural-orbital order",
                          {NatOrder::kOccupation, "occupation"},
                          {NatOrder::kEnergy, "energy"});
@@ -292,6 +298,8 @@ struct TaskConfig {
   std::string scratch_dir;  ///< Omega spill directory (used iff
                             ///< imsrg.omega.storage = scratch)
   LogLevel log_level = LogLevel::kNormal;
+  /// Compatibility profile (default: none = the fixed behaviour).
+  Compat compat = Compat::kNone;
   friend bool operator==(const TaskConfig&, const TaskConfig&) = default;
 };
 
@@ -397,6 +405,9 @@ struct HartreeFockConfig {
 struct NaturalOrbitalsConfig {
   bool use_occupations = false;
   NatOrder order = NatOrder::kOccupation;
+  /// Reset the occupied natural orbitals to the HF orbitals (fork imsrg++
+  /// `use_HF_reference_in_NAT`, `mbpt::UseHfForHoleStates`).
+  bool use_hf_reference = false;
   friend bool operator==(const NaturalOrbitalsConfig&,
                          const NaturalOrbitalsConfig&) = default;
 };

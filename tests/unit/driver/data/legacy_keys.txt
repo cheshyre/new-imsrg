@@ -34,6 +34,7 @@ physical_system
 freeze_occupations
 discard_no2b_from_3n
 use_NAT_occupations
+use_HF_reference_in_NAT
 order_NAT_by_energy
 NAT_order
 store_3bme_pn
