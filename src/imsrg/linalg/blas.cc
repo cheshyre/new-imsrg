@@ -15,6 +15,7 @@
 #include "imsrg/base/error.h"
 #include "imsrg/exec/host_parallel.h"
 #include "imsrg/linalg/detail/blas.h"
+#include "imsrg/linalg/detail/gemm_check.h"
 
 namespace imsrg::linalg {
 namespace detail {
@@ -142,6 +143,14 @@ constexpr bool kConcurrentGroupedGemm = false;
 #endif
 
 }  // namespace
+
+namespace detail {
+
+double CheckGemmProblem(const GemmProblem& p) {
+  return CheckGemm<double>(p.A, p.opA, p.B, p.opB, p.C);
+}
+
+}  // namespace detail
 
 void Gemm(double alpha, MatrixView<const double> A, Op opA,
           MatrixView<const double> B, Op opB, double beta,
