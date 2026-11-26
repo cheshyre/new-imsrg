@@ -15,8 +15,10 @@
 #include "imsrg/commutator/detail/work_items.h"
 #include "imsrg/commutator/detail/workspace_impl.h"
 #include "imsrg/commutator/imsrg3.h"
+#include "imsrg/commutator/tensor.h"
 #include "imsrg/commutator/three_body.h"
 #include "imsrg/exec/device_buffer.h"
+#include "imsrg/operator/arithmetic.h"
 #include "imsrg/operator/norms.h"
 
 namespace imsrg::commutator {
@@ -194,6 +196,27 @@ void Commutator(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   IMSRG_CHECK(ws.Compatible(Y),
               "commutator: Y is not on the workspace's model space");
   IMSRG_CHECK(&Z != &X && &Z != &Y, "commutator: Z must not alias X or Y");
+
+  // Tensor operands (M15): [scalar, tensor] and [tensor, scalar] = -[scalar,
+  // tensor] go to the scalar-tensor commutator, IMSRG(2) only. Every rank of a
+  // distributed workspace computes the full (deterministic) result.
+  if (!X.spec().is_scalar() || !Y.spec().is_scalar()) {
+    if (!opts.terms.ThreeBodyTerms().empty()) {
+      throw NotImplementedError(
+          "commutator: IMSRG(3) terms with tensor operators");
+    }
+    TensorOptions to;
+    to.ninej_threshold = opts.tensor_ninej_threshold;
+    if (X.spec().is_scalar()) {
+      TensorCommutator(X, Y, Z, to, ws.tensor());
+    } else if (Y.spec().is_scalar()) {
+      TensorCommutator(Y, X, Z, to, ws.tensor());
+      op::Scale(Z, -1.0);
+    } else {
+      throw NotImplementedError("commutator: [tensor, tensor] (imsrg++ exits)");
+    }
+    return;
+  }
 
   const TermMask m = opts.terms;
   const TermMask m3 = m.ThreeBodyTerms();
