@@ -208,40 +208,69 @@ void Comm121ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   const std::int32_t* orbits = impl.ob_orbits.device_data();
   const int norb = impl.tables.orbits().num_orbits;
   const exec::Index nentries = static_cast<exec::Index>(impl.ob_orbits.size());
-  exec::ParallelFor(
-      "commutator::comm121ss", nentries, IMSRG_LAMBDA(const exec::Index e) {
-        const int i = owner[e];
-        const int j = orbits[e];
-        const int ji = a.j2[i];
-        const int jj = a.j2[j];
-        double z = 0.0;
-        for (int p = 0; p < norb; ++p) {
-          const int jp = a.j2[p];
-          for (int k = a.ch1.offsets[p]; k < a.ch1.offsets[p + 1]; ++k) {
-            const int q = a.ch1.orbits[k];
-            const double dn = a.occ[p] - a.occ[q];
-            if (dn == 0.0) continue;
-            const double xab = a.x(p, q);
-            const double yab = a.y(p, q);
-            if (xab == 0.0 && yab == 0.0) continue;
-            const int jq = a.j2[q];
-            const int lo1 = jq > ji ? jq - ji : ji - jq;
-            const int lo2 = jp > jj ? jp - jj : jj - jp;
-            const int lo = lo1 > lo2 ? lo1 : lo2;
-            const int hi1 = jq + ji;
-            const int hi2 = jp + jj;
-            const int hi = hi1 < hi2 ? hi1 : hi2;
-            double s = 0.0;
-            for (int two_J = lo; two_J <= hi; two_J += 2) {
-              const double ybar = yv.get_unnormalized(q, i, p, j, two_J);
-              const double xbar = xv.get_unnormalized(q, i, p, j, two_J);
-              s += (two_J + 1) * (xab * ybar - yab * xbar);
-            }
-            z += dn * s;
-          }
-        }
-        z1(i, j) += z / (ji + 1);
-      });
+  // The contribution of orbit p (its q loop) to Z1(i, j), in host order.
+  const auto add_orbit =
+      IMSRG_LAMBDA(int i, int j, int ji, int jj, int p, double& z) {
+    const int jp = a.j2[p];
+    for (int k = a.ch1.offsets[p]; k < a.ch1.offsets[p + 1]; ++k) {
+      const int q = a.ch1.orbits[k];
+      const double dn = a.occ[p] - a.occ[q];
+      if (dn == 0.0) continue;
+      const double xab = a.x(p, q);
+      const double yab = a.y(p, q);
+      if (xab == 0.0 && yab == 0.0) continue;
+      const int jq = a.j2[q];
+      const int lo1 = jq > ji ? jq - ji : ji - jq;
+      const int lo2 = jp > jj ? jp - jj : jj - jp;
+      const int lo = lo1 > lo2 ? lo1 : lo2;
+      const int hi1 = jq + ji;
+      const int hi2 = jp + jj;
+      const int hi = hi1 < hi2 ? hi1 : hi2;
+      double s = 0.0;
+      for (int two_J = lo; two_J <= hi; two_J += 2) {
+        const double ybar = yv.get_unnormalized(q, i, p, j, two_J);
+        const double xbar = xv.get_unnormalized(q, i, p, j, two_J);
+        s += (two_J + 1) * (xab * ybar - yab * xbar);
+      }
+      z += dn * s;
+    }
+  };
+  if constexpr (exec::kDeviceKernels) {
+    // Device shape (M14): one team per (i, j), threads reducing over p (a
+    // thread per (i, j) gave a few hundred items). Order differs from the host.
+    exec::TeamOptions opts;
+    opts.team_size = 64;
+    opts.vector_length = 1;
+    exec::TeamFor(
+        "commutator::comm121ss_team", static_cast<int>(nentries), opts,
+        IMSRG_LAMBDA(const exec::TeamMember& member) {
+          const exec::Index e = member.league_rank();
+          const int i = owner[e];
+          const int j = orbits[e];
+          const int ji = a.j2[i];
+          const int jj = a.j2[j];
+          double z = 0.0;
+          Kokkos::parallel_reduce(
+              Kokkos::TeamThreadRange(member, norb),
+              [&](const int p, double& part) {
+                add_orbit(i, j, ji, jj, p, part);
+              },
+              z);
+          Kokkos::single(Kokkos::PerTeam(member),
+                         [&]() { z1(i, j) += z / (ji + 1); });
+        });
+  } else {
+    exec::ParallelFor(
+        "commutator::comm121ss", nentries, IMSRG_LAMBDA(const exec::Index e) {
+          const int i = owner[e];
+          const int j = orbits[e];
+          const int ji = a.j2[i];
+          const int jj = a.j2[j];
+          double z = 0.0;
+          for (int p = 0; p < norb; ++p) add_orbit(i, j, ji, jj, p, z);
+          z1(i, j) += z / (ji + 1);
+        });
+  }
   exec::Fence("commutator::comm121ss");
 }
 
