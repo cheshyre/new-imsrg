@@ -19,6 +19,21 @@
 
 namespace imsrg::it {
 
+struct Json;
+
+/// Object members in file order. A class (not a bare vector alias) with
+/// special members defined after `Json` is complete: clang with libstdc++
+/// instantiates the vector members eagerly while the element is incomplete.
+class JsonFields : public std::vector<std::pair<std::string, Json>> {
+ public:
+  JsonFields();
+  ~JsonFields();
+  JsonFields(const JsonFields& other);
+  JsonFields(JsonFields&& other) noexcept;
+  JsonFields& operator=(const JsonFields& other);
+  JsonFields& operator=(JsonFields&& other) noexcept;
+};
+
 /// One JSON value. Numbers are `double`; `null` has kind Null.
 struct Json {
   enum class Kind { kNull, kBool, kNumber, kString, kArray, kObject };
@@ -27,8 +42,7 @@ struct Json {
   double number = 0.0;
   std::string text;
   std::vector<Json> items;  ///< array elements
-  std::vector<std::pair<std::string, Json>>
-      fields;  ///< object members, in file order
+  JsonFields fields;        ///< object members, in file order
 
   /// True if this is an object with member `key`.
   bool has(const std::string& key) const {
@@ -47,6 +61,13 @@ struct Json {
   /// Number of array elements.
   std::size_t size() const { return items.size(); }
 };
+
+inline JsonFields::JsonFields() = default;
+inline JsonFields::~JsonFields() = default;
+inline JsonFields::JsonFields(const JsonFields& other) = default;
+inline JsonFields::JsonFields(JsonFields&& other) noexcept = default;
+inline JsonFields& JsonFields::operator=(const JsonFields& other) = default;
+inline JsonFields& JsonFields::operator=(JsonFields&& other) noexcept = default;
 
 namespace detail {
 

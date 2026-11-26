@@ -30,8 +30,23 @@ struct RawValue;
 
 /// A TOML array.
 using RawArray = std::vector<RawValue>;
-/// A TOML (inline) table, keys in source order.
-using RawTable = std::vector<std::pair<std::string, RawValue>>;
+/// A TOML (inline) table, keys in source order: a vector of (key, value)
+/// pairs. A class (not an alias) so that its special members are defined
+/// after `RawValue` is complete: `RawValue` holds it in a `std::variant`, and
+/// clang with libstdc++ instantiates the (constexpr) vector members of an
+/// alias eagerly, while the element type is still incomplete.
+class RawTable : public std::vector<std::pair<std::string, RawValue>> {
+ public:
+  using Base = std::vector<std::pair<std::string, RawValue>>;
+  using Base::Base;
+
+  RawTable();
+  ~RawTable();
+  RawTable(const RawTable& other);
+  RawTable(RawTable&& other) noexcept;
+  RawTable& operator=(const RawTable& other);
+  RawTable& operator=(RawTable&& other) noexcept;
+};
 
 /// One untyped value with its origin. Integers and floats stay distinct (TOML
 /// semantics), so the resolver can reject `emax = 4.5` but accept `hw = 16`.
@@ -53,6 +68,13 @@ struct RawValue {
     return std::get_if<T>(&data);
   }
 };
+
+inline RawTable::RawTable() = default;
+inline RawTable::~RawTable() = default;
+inline RawTable::RawTable(const RawTable& other) = default;
+inline RawTable::RawTable(RawTable&& other) noexcept = default;
+inline RawTable& RawTable::operator=(const RawTable& other) = default;
+inline RawTable& RawTable::operator=(RawTable&& other) noexcept = default;
 
 /// The flat raw tree: dotted path -> value. Setting a path twice keeps the last
 /// value.

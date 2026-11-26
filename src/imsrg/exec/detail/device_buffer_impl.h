@@ -102,8 +102,11 @@ inline constexpr std::string_view kDefaultLabel = "imsrg::DeviceBuffer";
 
 }  // namespace detail
 
+// User-provided (not `= default`): a defaulted constructor is implicitly
+// `__host__ __device__` under hipcc/clang and would reference the host-only
+// `~unique_ptr` (exception cleanup path). A user-provided one is host-only.
 template <class T>
-DeviceBuffer<T>::DeviceBuffer() noexcept = default;
+DeviceBuffer<T>::DeviceBuffer() noexcept : impl_(nullptr) {}
 
 template <class T>
 DeviceBuffer<T>::DeviceBuffer(std::size_t n, std::string_view label)

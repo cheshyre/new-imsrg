@@ -29,12 +29,27 @@
 
 namespace imsrg::hftest {
 
+struct Json;
+
+/// Object members in file order. A class (not a bare vector alias) with
+/// special members defined after `Json` is complete: clang with libstdc++
+/// instantiates the vector members eagerly while the element is incomplete.
+class JsonMembers : public std::vector<std::pair<std::string, Json>> {
+ public:
+  JsonMembers();
+  ~JsonMembers();
+  JsonMembers(const JsonMembers& other);
+  JsonMembers(JsonMembers&& other) noexcept;
+  JsonMembers& operator=(const JsonMembers& other);
+  JsonMembers& operator=(JsonMembers&& other) noexcept;
+};
+
 /// A JSON value reduced to what the golden files contain: numbers, arrays,
 /// objects.
 struct Json {
   double number = 0.0;
   std::vector<Json> items;
-  std::vector<std::pair<std::string, Json>> members;
+  JsonMembers members;
 
   const Json& at(const std::string& key) const {
     for (const auto& [k, v] : members) {
@@ -48,6 +63,14 @@ struct Json {
     return out;
   }
 };
+
+inline JsonMembers::JsonMembers() = default;
+inline JsonMembers::~JsonMembers() = default;
+inline JsonMembers::JsonMembers(const JsonMembers& other) = default;
+inline JsonMembers::JsonMembers(JsonMembers&& other) noexcept = default;
+inline JsonMembers& JsonMembers::operator=(const JsonMembers& other) = default;
+inline JsonMembers& JsonMembers::operator=(JsonMembers&& other) noexcept =
+    default;
 
 class JsonParser {
  public:
