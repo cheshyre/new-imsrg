@@ -464,6 +464,33 @@ IMSRG_INLINE_FUNCTION int BraChannel(const TwoBodyView& v, int c, int i,
 
 /// Z1 += sum_c sum_J (2J + 1) / (2 j_i + 1) (n_c Mpp~(ci,cj;J) + (1 - n_c)
 /// Mhh~(ci,cj;J)). Distributed: only the (c, J) of active channels.
+/// Adds orbit c's contribution to Z1(i, j) of comm221ss (the J sum), in
+/// the order of the host loop.
+IMSRG_FORCEINLINE_FUNCTION void Add221Orbit(const Ladder221Args& a, int i,
+                                            int j, int ji, int jj, int c,
+                                            double& z) {
+  const double wp = a.occ[c];
+  const double wh = 1.0 - a.occ[c];
+  const int jc = a.j2[c];
+  const int lo1 = jc > ji ? jc - ji : ji - jc;
+  const int lo2 = jc > jj ? jc - jj : jj - jc;
+  const int lo = lo1 > lo2 ? lo1 : lo2;
+  const int hi1 = jc + ji;
+  const int hi2 = jc + jj;
+  const int hi = hi1 < hi2 ? hi1 : hi2;
+  for (int two_J = lo; two_J <= hi; two_J += 2) {
+    if (a.active != nullptr) {
+      // Distributed: channels without owned blocks hold stale data.
+      const int ch = BraChannel(a.mpp, c, i, two_J);
+      if (ch < 0 || a.active[ch] == 0) continue;
+    }
+    double s = 0.0;
+    if (wp != 0.0) s += wp * a.mpp.get_unnormalized(c, i, c, j, two_J);
+    if (wh != 0.0) s += wh * a.mhh.get_unnormalized(c, i, c, j, two_J);
+    z += (two_J + 1) * s;
+  }
+}
+
 void Add221(op::Operator& Z, Workspace::Impl& impl, const op::Operator& X) {
   Ladder221Args a;
   a.mpp = impl.two_body_view(X);
@@ -478,38 +505,45 @@ void Add221(op::Operator& Z, Workspace::Impl& impl, const op::Operator& X) {
     a.active = impl.work_device.ladder_active.device_data();
   a.z1 = Z.one_body().device_view();
   a.num_orbits = impl.tables.orbits().num_orbits;
-  exec::ParallelFor(
-      "commutator::comm221ss", static_cast<exec::Index>(impl.ob_orbits.size()),
-      IMSRG_LAMBDA(const exec::Index e) {
-        const int i = a.owner[e];
-        const int j = a.orbits[e];
-        const int ji = a.j2[i];
-        const int jj = a.j2[j];
-        double z = 0.0;
-        for (int c = 0; c < a.num_orbits; ++c) {
-          const double wp = a.occ[c];
-          const double wh = 1.0 - a.occ[c];
-          const int jc = a.j2[c];
-          const int lo1 = jc > ji ? jc - ji : ji - jc;
-          const int lo2 = jc > jj ? jc - jj : jj - jc;
-          const int lo = lo1 > lo2 ? lo1 : lo2;
-          const int hi1 = jc + ji;
-          const int hi2 = jc + jj;
-          const int hi = hi1 < hi2 ? hi1 : hi2;
-          for (int two_J = lo; two_J <= hi; two_J += 2) {
-            if (a.active != nullptr) {
-              // Distributed: channels without owned blocks hold stale data.
-              const int ch = BraChannel(a.mpp, c, i, two_J);
-              if (ch < 0 || a.active[ch] == 0) continue;
-            }
-            double s = 0.0;
-            if (wp != 0.0) s += wp * a.mpp.get_unnormalized(c, i, c, j, two_J);
-            if (wh != 0.0) s += wh * a.mhh.get_unnormalized(c, i, c, j, two_J);
-            z += (two_J + 1) * s;
-          }
-        }
-        a.z1(i, j) += z / (ji + 1);
-      });
+  const auto items = static_cast<exec::Index>(impl.ob_orbits.size());
+  if constexpr (exec::kDeviceKernels) {
+    // Device shape (M14): one team per (i, j), its threads reducing over the
+    // orbits c (a thread per (i, j) gave the GPU a few hundred items). The
+    // reduction order differs from the host loop.
+    exec::TeamOptions opts;
+    opts.team_size = 64;
+    opts.vector_length = 1;
+    exec::TeamFor(
+        "commutator::comm221ss_team", static_cast<int>(items), opts,
+        IMSRG_LAMBDA(const exec::TeamMember& member) {
+          const exec::Index e = member.league_rank();
+          const int i = a.owner[e];
+          const int j = a.orbits[e];
+          const int ji = a.j2[i];
+          const int jj = a.j2[j];
+          double z = 0.0;
+          Kokkos::parallel_reduce(
+              Kokkos::TeamThreadRange(member, a.num_orbits),
+              [&](const int c, double& part) {
+                Add221Orbit(a, i, j, ji, jj, c, part);
+              },
+              z);
+          Kokkos::single(Kokkos::PerTeam(member),
+                         [&]() { a.z1(i, j) += z / (ji + 1); });
+        });
+  } else {
+    exec::ParallelFor(
+        "commutator::comm221ss", items, IMSRG_LAMBDA(const exec::Index e) {
+          const int i = a.owner[e];
+          const int j = a.orbits[e];
+          const int ji = a.j2[i];
+          const int jj = a.j2[j];
+          double z = 0.0;
+          for (int c = 0; c < a.num_orbits; ++c)
+            Add221Orbit(a, i, j, ji, jj, c, z);
+          a.z1(i, j) += z / (ji + 1);
+        });
+  }
   exec::Fence("commutator::comm221ss");
 }
 

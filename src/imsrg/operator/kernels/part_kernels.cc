@@ -18,7 +18,12 @@ namespace imsrg::op::detail {
 namespace {
 
 /// Elements per chunk of `WeightedBlockSumOfSquares` (one parallel work item).
-constexpr std::int64_t kNormChunkSize = 4096;
+/// Device backends use short chunks (M14): with 4096 an emax-8 operator gives
+/// ~1700 items, one sequential strided loop each, and the norm took 3.4 ms
+/// on an MI250X GCD (a third of the kernel time of a flow). The chunking
+/// fixes the summation order, so device and host norms differ in the last
+/// bits.
+constexpr std::int64_t kNormChunkSize = exec::kDeviceKernels ? 16 : 4096;
 
 /// Last block b in [0, num_blocks) with offsets(b) <= e (so, with empty blocks
 /// skipped, the block that contains e). Precondition: offsets(0) <= e <
