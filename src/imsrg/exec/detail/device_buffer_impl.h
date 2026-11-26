@@ -181,6 +181,11 @@ template <class T>
 void DeviceBuffer<T>::fill(T value) {
   if (size() > 0) {
     detail::FillView<T>(impl_->dev, value);
+    // A separate host mirror gets the same value, so both images agree
+    // without a sync (set_zero followed by host reads is common).
+    if (impl_->has_host && !impl_->aliases()) {
+      Kokkos::deep_copy(impl_->host, value);
+    }
   }
 }
 

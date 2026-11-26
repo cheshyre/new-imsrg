@@ -95,7 +95,9 @@ class DeviceBuffer {
   void resize(std::size_t n);
 
   /// Sets every element to `value` with a device kernel (asynchronous on async
-  /// backends). Complexity O(size()), embarrassingly parallel.
+  /// backends); a separate host mirror, if it exists, is set too (so the
+  /// mirror needs no `SyncToHost()` afterwards). Complexity O(size()),
+  /// embarrassingly parallel.
   void fill(T value);
 
   /// Copies `src` to the device data. Precondition: `src.size() == size()`
