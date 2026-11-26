@@ -47,6 +47,9 @@ git -C "$dest" checkout --quiet -b "$branch" --track "origin/$base" >&2
 # A new branch tracks the base for `git pull`; pushes go to a same-named branch on the hub.
 git -C "$dest" config push.default current
 git -C "$dest" config imsrg.agentBase "$base"
+# Creation record for tools/agent_retire.sh --merged: the commit the clone started from and when.
+git -C "$dest" config imsrg.baseCommit "$(git -C "$dest" rev-parse HEAD)"
+git -C "$dest" config imsrg.createdAt "$(date +%s)"
 # Commit identity: that of the integrator's clone, if it has one.
 for key in user.name user.email; do
   if value=$(git -C "$source_clone" config "$key"); then git -C "$dest" config "$key" "$value"; fi
