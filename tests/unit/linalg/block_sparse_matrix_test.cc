@@ -60,6 +60,7 @@ TEST(LinalgBlockSparse, ZeroInitAndHostBlockAliasing) {
 TEST(LinalgBlockSparse, DeepCopy) {
   BlockSparseMatrix<double> m(Shapes());
   m.host_block(0)(1, 1) = 3.0;
+  m.buffer().SyncToDevice();  // copies carry the device data only
   BlockSparseMatrix<double> c = m;
   EXPECT_EQ(c.host_block(0)(1, 1), 3.0);
   c.host_block(0)(1, 1) = 4.0;

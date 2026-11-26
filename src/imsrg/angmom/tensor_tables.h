@@ -87,6 +87,59 @@ struct NineJView {
   const double* data = nullptr;           ///< The values of all boxes.
   std::int32_t emax = -1;                 ///< Single-particle 2j bound.
 
+  /// The values {A B C; D E F; G H lambda} for fixed A, B, D, E, G, H as a
+  /// function of the integers (C, F): `s(C, F)` returns exactly what
+  /// `operator()` returns, for C in A x B and F in D x E (the caller's loops
+  /// must stay inside these triangles: no range check per call). An invalid
+  /// fixed argument gives a slice that returns 0.0. Hoists the box lookup out
+  /// of C, F loops (M14). O(1).
+  struct Slice {
+    const double* p = nullptr;
+    std::int32_t c0 = 0;
+    std::int32_t f0 = 0;
+    std::int64_t sc = 0;
+    std::int64_t sf = 0;
+    IMSRG_INLINE_FUNCTION double operator()(std::int32_t C,
+                                            std::int32_t F) const noexcept {
+      return p == nullptr ? 0.0 : p[(C - c0) * sc + (F - f0) * sf];
+    }
+  };
+
+  /// The slice for fixed A, B, D, E, G, H (see `Slice`). O(1).
+  IMSRG_INLINE_FUNCTION Slice MakeSlice(TwoJ A, TwoJ B, TwoJ D, TwoJ E, TwoJ G,
+                                        TwoJ H) const noexcept {
+    Slice s;
+    const std::int32_t tmax = 2 * emax + 1;
+    if (data == nullptr || (A.twice & 1) == 0 || (B.twice & 1) == 0 ||
+        (D.twice & 1) == 0 || (E.twice & 1) == 0 || A.twice > tmax ||
+        B.twice > tmax || D.twice > tmax || E.twice > tmax || A.twice < 1 ||
+        B.twice < 1 || D.twice < 1 || E.twice < 1 || (G.twice & 1) != 0 ||
+        (H.twice & 1) != 0)
+      return s;
+    const std::int32_t f0 = Abs(D.twice - E.twice) / 2;
+    const std::int32_t nf = (D.twice + E.twice) / 2 - f0 + 1;
+    const std::int32_t g0 = Abs(A.twice - D.twice) / 2;
+    const std::int32_t ng = (A.twice + D.twice) / 2 - g0 + 1;
+    const std::int32_t h0 = Abs(B.twice - E.twice) / 2;
+    const std::int32_t nh = (B.twice + E.twice) / 2 - h0 + 1;
+    const std::int32_t g = G.twice / 2 - g0;
+    const std::int32_t h = H.twice / 2 - h0;
+    if (g < 0 || g >= ng || h < 0 || h >= nh) return s;
+    const std::int32_t nj = emax + 1;
+    const std::int64_t q = ((static_cast<std::int64_t>((A.twice - 1) / 2) * nj +
+                             (B.twice - 1) / 2) *
+                                nj +
+                            (D.twice - 1) / 2) *
+                               nj +
+                           (E.twice - 1) / 2;
+    s.c0 = Abs(A.twice - B.twice) / 2;
+    s.f0 = f0;
+    s.sf = static_cast<std::int64_t>(ng) * nh;
+    s.sc = static_cast<std::int64_t>(nf) * s.sf;
+    s.p = data + offsets[q] + static_cast<std::int64_t>(g) * nh + h;
+    return s;
+  }
+
   /// {A B C; D E F; G H lambda} with single-particle A, B, D, E (odd 2j <= 2
   /// emax + 1) and integer C, F, G, H; 0.0 if C, F, G or H lies outside its
   /// triangle range (C in A x B, F in D x E, G in A x D, H in B x E), if

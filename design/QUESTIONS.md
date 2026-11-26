@@ -1460,3 +1460,56 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
   (written first, rewritten at the end), and outputs are renamed into place; resubmission uses either
   the failure manifest as the work list or the same list with `transform.skip_existing = true`.
   **Assumed:** enough; a per-item progress log is not written.
+
+### Lead E (GPU, M14/C11/C12)
+
+* **AL-E-Q1** (lead E, M14/C11) - The Kokkos Kernels backend of the device BLAS
+  (`IMSRG_DEVICE_BLAS=KOKKOSKERNELS`) is written but neither built nor measured: the 5.3.0 source
+  tarball cannot be downloaded from an agent session (the worktree hook rejects commands with the
+  GitHub URL), compute nodes have no internet, and the Frontier `kokkos-kernels` modules (3.x-4.6)
+  do not match Kokkos 5.3. **Assumed:** rocBLAS stays the hip default until someone puts
+  `kokkos-kernels-5.3.0.tar.gz` into `$IMSRG_DEPS_PREFIX/src/` and runs
+  `tools/bootstrap_deps.sh --backends hip`; the GEMMs are only 11-14 % of the GPU time, so the
+  choice matters little (design/benchmarks/gpu-m14.md, proposed D-row there).
+* **AL-E-Q2** (lead E, M14) - `flow_generator3_kernel` Bitwise* (5 tests) fail on the GCD: the
+  atan generator kinds use device `Kokkos::atan` against host `std::atan` in the reference loop
+  (22-281 of 74497 elements differ, max relative 4e-16; not FMA, `-ffp-contract=off` is set for
+  frontier-hip). **Assumed:** left failing (no tolerance loosened); options: compare with a few-ulp
+  tolerance on device backends only, or evaluate the atan on the host into a table. Owner to choose.
+* **AL-E-Q3** (lead E, M14, follows FP-Q6) - With the default Frontier CPU BLAS (threaded
+  `libsci_gnu_mp` behind the `IMSRG_BLAS_SERIALIZE` lock, sequential GroupedGemm) the scalar
+  commutator is 6-7x slower than with the serial `libsci_gnu`, `IMSRG_BLAS_SERIALIZE=OFF` and the
+  new `IMSRG_BLAS_CONCURRENT=ON` (emax 8, 56 cores: 430 vs 65 ms). **Assumed:** presets unchanged
+  (the owner kept the lock, FP-Q6); proposal: switch the `frontier-cpu*` presets to the serial
+  libsci with concurrent items after the Python two-thread test passes with it.
+* **AL-E-Q4** (lead E, M14/C12) - Distributing one commutator over GCDs (M12b phase 1) is much
+  slower than one GCD (emax 10: 78 ms on 1 GCD, 454 / 656 ms on 2 / 8 GCDs): the combine copies Z
+  to the host and reduces with host MPI every commutator, and the owned-column paths keep their
+  host shapes. **Assumed:** flows run one rank per GCD (8 independent flows per node); GPU-aware
+  MPI and device shapes for the distributed paths are later work.
+* **AL-E-Q5** (lead E, M14) - The HIP Kokkos build (`kokkos-hip`) has a Serial host space, so
+  every host-parallel part (`HostParallelForDynamic`, host loops of the generator and normal
+  ordering, the tensor table builds) runs on one core in the GPU build: the IMSRG(3) N7 driver
+  test takes ~155 s, CPU-bound, on a GCD (113 s on frontier-cpu). **Assumed:** unchanged (the
+  IMSRG(2) commutators run on the device); adding `Kokkos_ENABLE_OPENMP` to kokkos-hip (HIP + OpenMP
+  host) would give each rank its 7 cores. Measured with such a Kokkos (built in the agent clone,
+build/kokkos-hip-omp, OMP_NUM_THREADS=7): O16 emax 8 Magnus flow on one GCD 28.0 -> 23.9 s;
+commutators and the tensor first call unchanged. Owner/integrator to decide with the C12 layout.
+* **AL-D1** (lead D, C7 at production size) - A restart re-runs the whole preparation (me2j and
+  48 GB NO2B read, HF, NAT, NO2B contraction): ~16 min of every 2-hour job at emax 14 (13 %), and
+  the 30-minute checkpoint interval loses up to 30 min more per job boundary (the N2LOsat run lost
+  21 stage-2 steps). Restarts are bit-identical across nodes (checked at stage 2, steps 79/80).
+  **Assumed:** acceptable tonight; for the farm and longer chains, store H_0 (emax 10, ~0.3 GB)
+  and the NAT C in the checkpoint so a restart skips the readers and HF (answers AL-C2), and write a
+  checkpoint on SIGTERM / before the job's end (Slurm `--signal`).
+* **AL-D2** (lead D, NAT) - Our MBPT(2) density matrix dropped the PP elements between a particle
+  and a partially filled hole (imsrg++ tests 1 - n_b); fixed (commit "Include partially filled
+  orbits ..."). This was a bug of the port, not of imsrg++, so it is not in design/30 §6. AL-C3's
+  pending comparison against fork dumps: done indirectly, emax 6 and 14 EMP2/EMP3/E_Nat agree with
+  the fork build to all printed digits.
+* **AL-D3** (lead D, writer) - Under `compat = "imsrg_fork_79e9330"` the driver still writes the
+  imsrg-devel tokyo format: relative two-body threshold 1e-7 x norm2b drops 15 of the 158 archived
+  TCM two-body elements (|v| <= 1.07e-3; the 143 written agree to 5e-9). H is unaffected (all 158
+  written, max deviation 5e-7). **Assumed:** lead B's `TokyoNumberFormat::kFork79e9330`
+  (feature/al27-tokyo-fork-format) gets selected by the compat profile when that branch merges
+  (one line in driver `TokyoOptions`); not done here to keep the branches disjoint.

@@ -5,12 +5,14 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <cstdlib>
 #include <utility>
 #include <vector>
 
 #include "imsrg/base/assert.h"
 #include "imsrg/basis/orbit.h"
+#include "imsrg/exec/host_parallel.h"
 
 namespace imsrg::hf::detail {
 
@@ -31,27 +33,30 @@ void FillBlockMonopoles(const op::TwoBody& tb,
                         linalg::Matrix<double>& vmon,
                         linalg::Matrix<double>& vmon_exch) {
   const auto nk = static_cast<std::int64_t>(ks.size());
-  // Upper triangle (ket >= bra), mirrored: both matrices are symmetric.
-  for (std::int64_t bra = 0; bra < nk; ++bra) {
-    const OrbitIndex a{ks[static_cast<std::size_t>(bra)][0]};
-    const OrbitIndex b{ks[static_cast<std::size_t>(bra)][1]};
-    const int ja = two_j[static_cast<std::size_t>(a.value())];
-    const int jb = two_j[static_cast<std::size_t>(b.value())];
-    for (std::int64_t ket = bra; ket < nk; ++ket) {
-      const OrbitIndex c{ks[static_cast<std::size_t>(ket)][0]};
-      const OrbitIndex d{ks[static_cast<std::size_t>(ket)][1]};
-      double v = 0.0;
-      double vx = 0.0;
-      for (int J2 = std::abs(ja - jb); J2 <= ja + jb; J2 += 2) {
-        v += (J2 + 1) * tb.get_unnormalized(a, b, c, d, TwoJ{J2});
-        vx += (J2 + 1) * tb.get_unnormalized(a, b, d, c, TwoJ{J2});
-      }
-      vmon(bra, ket) = v;
-      vmon(ket, bra) = v;
-      vmon_exch(bra, ket) = vx;
-      vmon_exch(ket, bra) = vx;
-    }
-  }
+  // Upper triangle (ket >= bra), mirrored: both matrices are symmetric. One
+  // host task per bra row: row `bra` writes (bra, ket >= bra) and (ket, bra),
+  // so rows never write the same element.
+  exec::HostParallelForDynamic(
+      "imsrg::hf::Monopole2B", nk, [&](std::int64_t bra) {
+        const OrbitIndex a{ks[static_cast<std::size_t>(bra)][0]};
+        const OrbitIndex b{ks[static_cast<std::size_t>(bra)][1]};
+        const int ja = two_j[static_cast<std::size_t>(a.value())];
+        const int jb = two_j[static_cast<std::size_t>(b.value())];
+        for (std::int64_t ket = bra; ket < nk; ++ket) {
+          const OrbitIndex c{ks[static_cast<std::size_t>(ket)][0]};
+          const OrbitIndex d{ks[static_cast<std::size_t>(ket)][1]};
+          double v = 0.0;
+          double vx = 0.0;
+          for (int J2 = std::abs(ja - jb); J2 <= ja + jb; J2 += 2) {
+            v += (J2 + 1) * tb.get_unnormalized(a, b, c, d, TwoJ{J2});
+            vx += (J2 + 1) * tb.get_unnormalized(a, b, d, c, TwoJ{J2});
+          }
+          vmon(bra, ket) = v;
+          vmon(ket, bra) = v;
+          vmon_exch(bra, ket) = vx;
+          vmon_exch(ket, bra) = vx;
+        }
+      });
 }
 
 }  // namespace
@@ -152,40 +157,68 @@ Monopole3B::Monopole3B(const op::Operator& H, const op::No2bThreeBody& v3,
     return basis.orbit(OrbitIndex{i});
   };
 
+  // One host task per (i, j) pair (the emax-14 / e3max-24 27Al runs have
+  // ~2e8 monopoles, each a sum of get_pn calls). Each task fills its own
+  // lists, concatenated in the serial (i, j) order afterwards, so keys_ and
+  // values_ are identical to a serial loop (and Apply sums in the same order).
+  std::vector<std::array<std::int32_t, 2>> pairs;
   for (std::int32_t i = 0; i < norb_; ++i) {
-    const auto& oi = orb(i);
     for (std::int32_t j : *channel_of[static_cast<std::size_t>(i)]) {
-      if (j < i) continue;
-      const auto& oj = orb(j);
-      for (std::int32_t a = 0; a < norb_; ++a) {
-        const auto& oa = orb(a);
-        for (std::int32_t b : *channel_of[static_cast<std::size_t>(a)]) {
-          const auto& ob = orb(b);
-          for (std::int32_t c = 0; c < norb_; ++c) {
-            const auto& oc = orb(c);
-            if (oa.e() + oc.e() + oi.e() > e3max) continue;
-            for (std::int32_t d : *channel_of[static_cast<std::size_t>(c)]) {
-              const auto& od = orb(d);
-              if (ob.e() + od.e() + oj.e() > e3max) continue;
-              if ((oi.l + oa.l + ob.l + oj.l + oc.l + od.l) % 2 != 0) continue;
-              double v = 0.0;
-              const int jlo = std::abs(oa.j2.twice - oc.j2.twice) / 2;
-              const int jhi = (oa.j2.twice + oc.j2.twice) / 2;
-              // imsrg++ passes the integer J itself as the J2 argument (no
-              // (2J+1) weight).
-              for (int J = jlo; J <= jhi; ++J)
-                v += v3.get_pn(oa, oc, oi, ob, od, oj, J);
-              if (v == 0.0) continue;
-              keys_.push_back(
-                  {static_cast<std::int16_t>(i), static_cast<std::int16_t>(j),
-                   static_cast<std::int16_t>(a), static_cast<std::int16_t>(b),
-                   static_cast<std::int16_t>(c), static_cast<std::int16_t>(d)});
-              values_.push_back(v / static_cast<double>(oi.j2.twice + 1));
+      if (j >= i) pairs.push_back({i, j});
+    }
+  }
+  std::vector<std::vector<Key>> task_keys(pairs.size());
+  std::vector<std::vector<double>> task_values(pairs.size());
+  exec::HostParallelForDynamic(
+      "imsrg::hf::Monopole3B", static_cast<std::int64_t>(pairs.size()),
+      [&](std::int64_t t) {
+        const std::int32_t i = pairs[static_cast<std::size_t>(t)][0];
+        const std::int32_t j = pairs[static_cast<std::size_t>(t)][1];
+        auto& keys = task_keys[static_cast<std::size_t>(t)];
+        auto& values = task_values[static_cast<std::size_t>(t)];
+        const auto& oi = orb(i);
+        const auto& oj = orb(j);
+        for (std::int32_t a = 0; a < norb_; ++a) {
+          const auto& oa = orb(a);
+          for (std::int32_t b : *channel_of[static_cast<std::size_t>(a)]) {
+            const auto& ob = orb(b);
+            for (std::int32_t c = 0; c < norb_; ++c) {
+              const auto& oc = orb(c);
+              if (oa.e() + oc.e() + oi.e() > e3max) continue;
+              for (std::int32_t d : *channel_of[static_cast<std::size_t>(c)]) {
+                const auto& od = orb(d);
+                if (ob.e() + od.e() + oj.e() > e3max) continue;
+                if ((oi.l + oa.l + ob.l + oj.l + oc.l + od.l) % 2 != 0) {
+                  continue;
+                }
+                double v = 0.0;
+                const int jlo = std::abs(oa.j2.twice - oc.j2.twice) / 2;
+                const int jhi = (oa.j2.twice + oc.j2.twice) / 2;
+                // imsrg++ passes the integer J itself as the J2 argument (no
+                // (2J+1) weight).
+                for (int J = jlo; J <= jhi; ++J)
+                  v += v3.get_pn(oa, oc, oi, ob, od, oj, J);
+                if (v == 0.0) continue;
+                keys.push_back(
+                    {static_cast<std::int16_t>(i), static_cast<std::int16_t>(j),
+                     static_cast<std::int16_t>(a), static_cast<std::int16_t>(b),
+                     static_cast<std::int16_t>(c),
+                     static_cast<std::int16_t>(d)});
+                values.push_back(v / static_cast<double>(oi.j2.twice + 1));
+              }
             }
           }
         }
-      }
-    }
+      });
+  std::size_t total = 0;
+  for (const auto& k : task_keys) total += k.size();
+  keys_.reserve(total);
+  values_.reserve(total);
+  for (std::size_t t = 0; t < pairs.size(); ++t) {
+    keys_.insert(keys_.end(), task_keys[t].begin(), task_keys[t].end());
+    values_.insert(values_.end(), task_values[t].begin(), task_values[t].end());
+    std::vector<Key>().swap(task_keys[t]);
+    std::vector<double>().swap(task_values[t]);
   }
 }
 

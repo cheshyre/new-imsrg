@@ -42,3 +42,8 @@ target_include_directories(n7_bench PRIVATE "${PROJECT_SOURCE_DIR}")
 target_compile_definitions(n7_bench PRIVATE IMSRG_BENCH_GIT_HASH="${_bench_git_hash}")
 target_link_libraries(n7_bench PRIVATE imsrg::commutator imsrg::comm imsrg::operator imsrg::exec
                                        imsrg::basis imsrg::warnings)
+
+# One BCH transform (M14: device residency of a BCH series).
+add_executable(bch_bench bch_bench.cc)
+target_link_libraries(bch_bench PRIVATE imsrg::flow imsrg::commutator imsrg::operator imsrg::exec
+                                        imsrg::basis imsrg::warnings)

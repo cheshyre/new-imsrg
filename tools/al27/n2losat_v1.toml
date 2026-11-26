@@ -1,0 +1,132 @@
+# 27Al production flow, N2LOsat, variant 1 (reproduction of the fork 79e9330
+# archive, design/50 section 2 and section 5). Translated from the archived
+# SLURM template (inputs/al27/al27_provenance/templates/SLURM_template_N2LOsat.sh)
+# with `imsrg --print-config <legacy args>`, then: run.compat set,
+# imsrg.step.domega and ds_0 removed (the compat profile supplies the fork
+# default domega = 0.2; ds_0 has no effect with magnus), [checkpoint] enabled.
+# Operators: TCM only (NREFT: lead B, tensors: lead A).
+
+
+[run]
+task = "imsrg"
+scratch_dir = ""
+log_level = "normal"
+compat = "imsrg_fork_79e9330"
+
+[basis]
+emax = 14
+hw = 16.0
+e3max = 24
+mass_number = 27
+kind = "nat"
+
+[reference]
+nucleus = "Al27"
+
+[valence]
+space = "sd-shell"
+
+[hamiltonian]
+kinetic = "intrinsic"
+beta_cm = 0.0
+beta_cm_hw = 16.0
+nucleon_mass_correction = false
+relativistic_correction = false
+
+[interaction.two_body]
+file = "/lustre/orion/nph123/proj-shared/nuccor_interactions/me_matthias/MEs/NNLOsat/TwBME-HO_NN-only_N2LO_sat_bare_hw16.0_emax16_e2max32.me2j.gz"
+format = "me2j"
+e1max = 16
+e2max = 32
+lmax = 16
+
+[interaction.three_body]
+file = "/lustre/orion/nph123/proj-shared/nuccor_interactions/me_matthias/MEs/NNLOsat/NO2B_ThBME_N2LOsat_3NFJmax15_IS_hw16.0_ms16_32_24.stream.bin"
+type = "no2b"
+format = "me3j"
+no2b_precision = "single"
+e1max = 16
+e3max = 24
+e2max = 32
+store_pn = false
+discard_no2b_after_hf = false
+
+[hartree_fock]
+mixing = "linear"
+freeze_occupations = false
+
+[natural_orbitals]
+use_occupations = false
+order = "occupation"
+use_hf_reference = true
+
+[imsrg]
+method = "magnus"
+steps = 2
+use_brueckner_bch = false
+goose_tank = false
+perturbative_triples = false
+
+[imsrg.generator]
+core = "atan"
+valence = "shell_model_atan"
+qtransfer_n = 1
+
+[imsrg.denominator]
+partitioning = "epstein_nesbet"
+delta = 0.0
+
+[imsrg.step]
+smax = 100.0
+dsmax = 0.5
+omega_norm_max = 50000.0
+eta_criterion = 0.001
+ode_tolerance = 9.9999999999999995e-07
+
+[imsrg.omega]
+storage = "memory"
+hunter_gatherer = false
+
+[imsrg.space]
+emax = 10
+e2max = 20
+e3max = 10
+emax_3body = 6
+
+[imsrg3]
+in_flow = false
+at_end = false
+variant = "full"
+factorized = false
+factorized_1b_intermediates = true
+factorized_2b_intermediates = false
+no_qqq = false
+only_2b_eta = false
+only_2b_omega = false
+discard_residual_input_3n = false
+threebody_threshold = 0.0
+
+[operators]
+list = ["TCM"]
+first_order = []
+from_file = []
+
+[output]
+directory = "/lustre/orion/nph123/scratch/mheinz/imsrg/runs/al27/v1/N2LOsat"
+stem = "N2LOsat"
+flow_file = "/lustre/orion/nph123/scratch/mheinz/imsrg/runs/al27/v1/N2LOsat/flow.txt"
+valence_file_format = "tokyo"
+write_omega = true
+omega_format = "native"
+omega_second_format = true
+write_ho_ops = false
+write_hf_ops = false
+spwf = []
+
+[checkpoint]
+directory = "/lustre/orion/nph123/scratch/mheinz/imsrg/runs/al27/v1/N2LOsat/checkpoint"
+interval_minutes = 30.0
+format = "native"
+restart = false
+abort_after_steps = 0
+

@@ -287,6 +287,13 @@ PreparedHamiltonian PrepareHamiltonian(const RunConfig& config) {
     log::Info("IMSRG space: emax = {} ({} orbits), EMP2 = {:.8f} MeV",
               config.imsrg.space->emax, out.hno.model_space().num_orbits(),
               mbpt::Mp2Energy(h));
+    // imsrg++.cc:946-957 prints MBPT(3) in the IMSRG space as well (a cheap
+    // check against archived logs, e.g. the 27Al runs of design/50).
+    const mbpt::Mp3Energy e3 = mbpt::ComputeMp3Energy(h);
+    log::Info(
+        "IMSRG space: E3_pp = {:.6f} E3_hh = {:.6f} E3_ph = {:.6f} "
+        "EMP3 = {:.6f} MeV",
+        e3.pp, e3.hh, e3.ph, e3.total);
   }
   return out;
 }

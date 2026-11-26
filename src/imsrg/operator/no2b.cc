@@ -17,13 +17,6 @@ namespace imsrg::op {
 
 namespace {
 
-std::uint64_t StateKey(std::int32_t a, std::int32_t b, std::int32_t c,
-                       std::int32_t tab) noexcept {
-  return static_cast<std::uint64_t>(a) | (static_cast<std::uint64_t>(b) << 16) |
-         (static_cast<std::uint64_t>(c) << 32) |
-         (static_cast<std::uint64_t>(tab) << 48);
-}
-
 // Twice-unit triangle condition including the parity of the sum.
 bool Triangle2(std::int32_t a, std::int32_t b, std::int32_t c) noexcept {
   return (a + b + c) % 2 == 0 && c >= std::abs(a - b) && c <= a + b;
@@ -93,16 +86,17 @@ const IsospinCgTables& IsospinCg() {
   return *kTables;
 }
 
-/// Fills `ch.states` with the basis states (a <= b, c, t_ab) of the channel
+/// Calls `emit(a, b, c, t_ab, index, phase)` for the basis states (a <= b, c,
+/// t_ab) of the channel
 /// (J2, P2, J1, P1, T3) in the order a, b, c, t_ab (a state with a == b and
-/// odd J2 + t_ab is absent; the swapped key carries the exchange phase) and
-/// returns their number.
-template <class Channel>
+/// odd J2 + t_ab is absent), first for (a, b) with phase 1 and then for
+/// (b, a) with the exchange phase, and returns their number.
+template <class Emit>
 std::int32_t FillChannelStates(const No2bTruncation& t,
                                const std::vector<IsospinOrbit>& orbits,
                                std::int32_t J2, std::int32_t P2,
                                std::int32_t J1, std::int32_t P1,
-                               std::int32_t T3, Channel& ch) {
+                               std::int32_t T3, Emit&& emit) {
   const auto norb = static_cast<std::int32_t>(orbits.size());
   std::int32_t ndim = 0;
   for (std::int32_t ia = 0; ia < norb; ++ia) {
@@ -127,8 +121,8 @@ std::int32_t FillChannelStates(const No2bTruncation& t,
           if ((J2 + tab) % 2 == 0 && ia == ib) continue;
           const std::int32_t ph =
               1 - 2 * (((oa.j2.twice + ob.j2.twice) / 2 + J2 + tab) % 2);
-          ch.states[StateKey(ia, ib, ic, tab)] = {ndim, 1};
-          ch.states[StateKey(ib, ia, ic, tab)] = {ndim, ph};
+          emit(ia, ib, ic, tab, ndim, 1);
+          emit(ib, ia, ic, tab, ndim, ph);
           ++ndim;
         }
       }
@@ -163,6 +157,8 @@ No2bThreeBody::No2bThreeBody(const No2bTruncation& t) : trunc_(t) {
                                            (o.j2.twice - 2 * o.l + 1) / 2)] = i;
   }
   const std::int32_t j2max = std::min(2 * t.lmax + 1, t.e2max + 1);
+  const auto nsq = static_cast<std::size_t>(norb);
+  state_base_.assign(nsq * nsq * nsq * 2, -1);
   channel_lookup_.assign(static_cast<std::size_t>(j2max + 1) * 2 *
                              static_cast<std::size_t>(t.lmax + 1) * 2 * 2,
                          -1);
@@ -178,8 +174,12 @@ No2bThreeBody::No2bThreeBody(const No2bTruncation& t) : trunc_(t) {
             ch.J1 = J1;
             ch.P1 = P1;
             ch.T3 = T3;
-            const std::int32_t ndim =
-                FillChannelStates(t, orbits_, J2, P2, J1, P1, T3, ch);
+            const std::int32_t ndim = FillChannelStates(
+                t, orbits_, J2, P2, J1, P1, T3,
+                [&](std::int32_t a, std::int32_t b, std::int32_t c,
+                    std::int32_t tab, std::int32_t index, std::int32_t phase) {
+                  AddState(J2, T3, a, b, c, tab, index, phase);
+                });
             if (ndim < 1) continue;
             ch.num_states = ndim;
             ch.offset = offset;
@@ -194,6 +194,54 @@ No2bThreeBody::No2bThreeBody(const No2bTruncation& t) : trunc_(t) {
     }
   }
   values_.assign(offset, 0.0F);
+}
+
+void No2bThreeBody::AddState(std::int32_t J2, std::int32_t T3, std::int32_t a,
+                             std::int32_t b, std::int32_t c, std::int32_t tab,
+                             std::int32_t index, std::int32_t phase) {
+  const auto nsq = static_cast<std::size_t>(orbits_.size());
+  const std::size_t key =
+      ((static_cast<std::size_t>(a) * nsq + static_cast<std::size_t>(b)) * nsq +
+       static_cast<std::size_t>(c)) *
+          2 +
+      static_cast<std::size_t>(tab);
+  const std::int32_t ja = orbits_[static_cast<std::size_t>(a)].j2.twice;
+  const std::int32_t jb = orbits_[static_cast<std::size_t>(b)].j2.twice;
+  const std::int32_t lo = std::abs(ja - jb) / 2;
+  const std::int32_t hi = (ja + jb) / 2;
+  if (state_base_[key] < 0) {
+    IMSRG_CHECK(
+        state_slots_.size() + static_cast<std::size_t>(hi - lo + 1) * 2 <
+            static_cast<std::size_t>(INT32_MAX),
+        "No2bThreeBody: state table overflow");
+    state_base_[key] = static_cast<std::int32_t>(state_slots_.size());
+    state_slots_.resize(
+        state_slots_.size() + static_cast<std::size_t>(hi - lo + 1) * 2, -1);
+  }
+  state_slots_[static_cast<std::size_t>(state_base_[key] + (J2 - lo) * 2 +
+                                        (T3 - 1) / 2)] =
+      index * 2 + (phase < 0 ? 1 : 0);
+}
+
+No2bThreeBody::IsospinState No2bThreeBody::LookupState(
+    const Channel& ch, std::int32_t a, std::int32_t b, std::int32_t c,
+    std::int32_t tab) const noexcept {
+  const auto nsq = static_cast<std::size_t>(orbits_.size());
+  const std::size_t key =
+      ((static_cast<std::size_t>(a) * nsq + static_cast<std::size_t>(b)) * nsq +
+       static_cast<std::size_t>(c)) *
+          2 +
+      static_cast<std::size_t>(tab);
+  const std::int32_t base = state_base_[key];
+  if (base < 0) return IsospinState{};
+  const std::int32_t ja = orbits_[static_cast<std::size_t>(a)].j2.twice;
+  const std::int32_t jb = orbits_[static_cast<std::size_t>(b)].j2.twice;
+  const std::int32_t lo = std::abs(ja - jb) / 2;
+  if (ch.J2 < lo || ch.J2 > (ja + jb) / 2) return IsospinState{};
+  const std::int32_t s = state_slots_[static_cast<std::size_t>(
+      base + (ch.J2 - lo) * 2 + (ch.T3 - 1) / 2)];
+  if (s < 0) return IsospinState{};
+  return IsospinState{s / 2, (s % 2) != 0 ? -1 : 1};
 }
 
 std::optional<std::int32_t> No2bThreeBody::isospin_orbit_index(
@@ -227,11 +275,11 @@ std::optional<std::int32_t> No2bThreeBody::channel_index(
   return c;
 }
 
-void No2bThreeBody::set_isospin(std::int32_t a, std::int32_t b, std::int32_t c,
-                                std::int32_t Tab, std::int32_t d,
-                                std::int32_t e, std::int32_t f,
-                                std::int32_t Tde, std::int32_t J2,
-                                std::int32_t twoT, double v) {
+std::int32_t No2bThreeBody::isospin_channel(std::int32_t a, std::int32_t b,
+                                            std::int32_t c, std::int32_t d,
+                                            std::int32_t e, std::int32_t f,
+                                            std::int32_t J2,
+                                            std::int32_t twoT) const {
   const auto norb = static_cast<std::int32_t>(orbits_.size());
   for (std::int32_t i : {a, b, c, d, e, f}) {
     IMSRG_CHECK(i >= 0 && i < norb,
@@ -252,18 +300,38 @@ void No2bThreeBody::set_isospin(std::int32_t a, std::int32_t b, std::int32_t c,
               "No2bThreeBody::set_isospin: pair parities differ");
   const auto ch = channel_index(J2, P2, oc.j2.twice, P1, twoT);
   IMSRG_CHECK(ch.has_value(), "No2bThreeBody::set_isospin: channel not stored");
-  const Channel& channel = channels_[static_cast<std::size_t>(*ch)];
-  const auto bra = channel.states.find(StateKey(a, b, c, Tab));
-  const auto ket = channel.states.find(StateKey(d, e, f, Tde));
+  return *ch;
+}
+
+No2bThreeBody::IsospinState No2bThreeBody::isospin_state(
+    std::int32_t channel, std::int32_t a, std::int32_t b, std::int32_t c,
+    std::int32_t Tab) const noexcept {
+  return LookupState(channels_[static_cast<std::size_t>(channel)], a, b, c,
+                     Tab);
+}
+
+void No2bThreeBody::set_resolved(std::int32_t channel, IsospinState bra,
+                                 IsospinState ket, double v) {
   IMSRG_CHECK(
-      bra != channel.states.end() && ket != channel.states.end(),
+      bra.index >= 0 && ket.index >= 0,
       "No2bThreeBody::set_isospin: state not stored (truncation or Pauli)");
-  const auto ib = static_cast<std::size_t>(bra->second.first);
-  const auto ik = static_cast<std::size_t>(ket->second.first);
+  const Channel& ch = channels_[static_cast<std::size_t>(channel)];
+  const auto ib = static_cast<std::size_t>(bra.index);
+  const auto ik = static_cast<std::size_t>(ket.index);
   const std::size_t hi = std::max(ib, ik);
   const std::size_t lo = std::min(ib, ik);
-  const std::int32_t ph = bra->second.second * ket->second.second;
-  values_[channel.offset + hi * (hi + 1) / 2 + lo] = static_cast<float>(v * ph);
+  const std::int32_t ph = bra.phase * ket.phase;
+  values_[ch.offset + hi * (hi + 1) / 2 + lo] = static_cast<float>(v * ph);
+}
+
+void No2bThreeBody::set_isospin(std::int32_t a, std::int32_t b, std::int32_t c,
+                                std::int32_t Tab, std::int32_t d,
+                                std::int32_t e, std::int32_t f,
+                                std::int32_t Tde, std::int32_t J2,
+                                std::int32_t twoT, double v) {
+  const std::int32_t ch = isospin_channel(a, b, c, d, e, f, J2, twoT);
+  set_resolved(ch, isospin_state(ch, a, b, c, Tab),
+               isospin_state(ch, d, e, f, Tde), v);
 }
 
 double No2bThreeBody::get_isospin(std::int32_t a, std::int32_t b,
@@ -289,14 +357,14 @@ double No2bThreeBody::get_isospin(std::int32_t a, std::int32_t b,
   const auto ch = channel_index(J2, P2, oc.j2.twice, P1, twoT);
   if (!ch) return 0.0;
   const Channel& channel = channels_[static_cast<std::size_t>(*ch)];
-  const auto bra = channel.states.find(StateKey(a, b, c, Tab));
-  const auto ket = channel.states.find(StateKey(d, e, f, Tde));
-  if (bra == channel.states.end() || ket == channel.states.end()) return 0.0;
-  const auto ib = static_cast<std::size_t>(bra->second.first);
-  const auto ik = static_cast<std::size_t>(ket->second.first);
+  const IsospinState bra = LookupState(channel, a, b, c, Tab);
+  const IsospinState ket = LookupState(channel, d, e, f, Tde);
+  if (bra.index < 0 || ket.index < 0) return 0.0;
+  const auto ib = static_cast<std::size_t>(bra.index);
+  const auto ik = static_cast<std::size_t>(ket.index);
   const std::size_t hi = std::max(ib, ik);
   const std::size_t lo = std::min(ib, ik);
-  const std::int32_t ph = bra->second.second * ket->second.second;
+  const std::int32_t ph = bra.phase * ket.phase;
   return ph *
          static_cast<double>(values_[channel.offset + hi * (hi + 1) / 2 + lo]);
 }

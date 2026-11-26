@@ -35,6 +35,14 @@
 
 namespace imsrg::exec {
 
+/// True if kernels run on an accelerator (CUDA/HIP), not on host threads.
+/// Kernels with a host-tuned shape (one thread per row looping over a long
+/// ragged range) select a device shape with more, shorter items by it (M14);
+/// both shapes must do the same per-element arithmetic, so results agree
+/// bitwise across the choice.
+inline constexpr bool kDeviceKernels =
+    !std::is_same_v<DefaultExecSpace, HostExecSpace>;
+
 /// Member type handed to team kernels.
 using TeamMember = Kokkos::TeamPolicy<DefaultExecSpace>::member_type;
 
@@ -230,6 +238,41 @@ void TeamFor(const char* name, int league_size, int team_size,
   opts.level = ScratchLevel::kLevel0;
   opts.scratch_bytes = scratch_bytes_per_team;
   TeamFor(name, league_size, opts, f);
+}
+
+/// Ragged nested loop: `body(i, k)` for every item i in [0, n) and k in
+/// [0, count(i)). The pairs must be independent (each writes its own
+/// elements). Host backends: `ParallelForDynamic` over i with the k loop
+/// inside (the host-tuned shape, same order). Device backends
+/// (`kDeviceKernels`): one team per item with its threads over k, for items
+/// whose k iterations are expensive (cheap ones are better flattened).
+/// `count` and `body` are `IMSRG_LAMBDA`s with value captures; per-item
+/// quantities are recomputed by `body` per pair. Asynchronous on async
+/// backends.
+template <class Count, class Body>
+void NestedFor(const char* name, Index n, const Count& count,
+               const Body& body) {
+  IMSRG_CHECK(n >= 0, name);
+  if constexpr (kDeviceKernels) {
+    IMSRG_CHECK(n <= Index{2147483647}, name);
+    TeamOptions opts;
+    opts.schedule = Schedule::kDynamic;
+    opts.team_size = 64;
+    opts.vector_length = 1;
+    TeamFor(
+        name, static_cast<int>(n), opts,
+        KOKKOS_LAMBDA(const TeamMember& member) {
+          const Index i = member.league_rank();
+          Kokkos::parallel_for(Kokkos::TeamThreadRange(member, count(i)),
+                               [&](const Index k) { body(i, k); });
+        });
+  } else {
+    ParallelForDynamic(
+        name, n, KOKKOS_LAMBDA(const Index i) {
+          const Index m = count(i);
+          for (Index k = 0; k < m; ++k) body(i, k);
+        });
+  }
 }
 
 /// Waits for all work on the default execution space.

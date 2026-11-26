@@ -43,6 +43,7 @@
 #include "imsrg/commutator/detail/workspace_impl.h"
 #include "imsrg/exec/kokkos_backend.h"
 #include "imsrg/linalg/blas.h"
+#include "imsrg/linalg/device_blas.h"
 
 namespace imsrg::commutator::terms {
 
@@ -348,10 +349,6 @@ void Comm222PhssGeneral(const op::Operator& X, const op::Operator& Y,
   const int num_cc = pd.num_cc;
   const auto g_total = static_cast<exec::Index>(
       distributed ? pd.general.owned_total : pd.general.g_off_host.back());
-  // Host BLAS only; device backends need a device gemm (design/12 section 3).
-  IMSRG_CHECK(pd.general.z.host_is_device(),
-              "comm222_phss: host BLAS on device memory; needs a device gemm "
-              "(GPU backends)");
   // Two passes share the A and B scratch (each 2 Ncc x nk): Z = A0 B0 + A1 B1
   // with, for kappa = (a, b) a pair of K and ordered cc pairs (p, q),
   //   pass 0: A0(alpha, kappa) =  D_kappa Xbar(alpha-pair, kappa),
@@ -410,7 +407,7 @@ void Comm222PhssGeneral(const op::Operator& X, const op::Operator& Y,
     }
     exec::Fence("commutator::comm222_phss_general::fill");
     for (auto& gemm : gemm_list) gemm.beta = pass == 0 ? 0.0 : 1.0;
-    linalg::GroupedGemm(gemm_list);
+    linalg::DeviceGroupedGemm(gemm_list);
   }
 
   double* z2 = Z.two_body().matrix().buffer().device_data();
@@ -461,6 +458,130 @@ void Comm222PhssGeneral(const op::Operator& X, const op::Operator& Y,
 }
 
 }  // namespace
+
+/// Ket a of the inverse Pandya transform (one item of
+/// comm222_phss::inverse): its orbits, J range, local-index table and the
+/// end of its (parity, Tz) class in `class_kets`. O(log classes).
+struct InverseKet {
+  int last = 0;  ///< End of the class of a in `class_kets`.
+  int i = 0, j = 0, ji = 0, jj = 0;
+  int jmin_a = 0, jmax_a = 0;
+  int cls = 0;  ///< Two-body channel of the class at J: 3 (2J) + cls.
+  const std::int32_t* lit_a = nullptr;
+};
+static_assert(std::is_trivially_copyable_v<InverseKet>);
+
+IMSRG_FORCEINLINE_FUNCTION InverseKet MakeInverseKet(const PhArgs& a,
+                                                     exec::Index e) noexcept {
+  const auto& tb = a.zv.tb;
+  const int* j2 = tb.orbit_j2;
+  const int cl = detail::FindBlock(a.pv.class_offset, a.pv.num_classes, e);
+  InverseKet k;
+  k.last = a.pv.class_offset[cl + 1];
+  const int ka = a.pv.class_kets[e];
+  k.i = tb.ket_p[ka];
+  k.j = tb.ket_q[ka];
+  k.ji = j2[k.i];
+  k.jj = j2[k.j];
+  k.jmin_a = (k.ji > k.jj ? k.ji - k.jj : k.jj - k.ji) / 2;
+  k.jmax_a = (k.ji + k.jj) / 2;
+  k.lit_a = tb.local_index_table + tb.ket_J_offsets[ka] - k.jmin_a;
+  k.cls = tb.orbit_tz2[k.i] + tb.orbit_tz2[k.j] + 2 +
+          (tb.orbit_l[k.i] + tb.orbit_l[k.j]) % 2;
+  return k;
+}
+
+/// The inverse Pandya transform for the ket pair (a, b = class_kets[pb]),
+/// b >= a in the class: the two zbar values per J' depend only on the four
+/// orbits, not on J, so they are gathered once and reused for every J the two
+/// kets share; writes Z(ij, kl; J) of the upper triangle and its mirror hZ Z.
+/// Every element is written by exactly one pair, so pairs run concurrently
+/// without atomics. O((J range) x (J' range)).
+IMSRG_FORCEINLINE_FUNCTION void InversePair(const PhArgs& a,
+                                            const InverseKet& ket, int pb,
+                                            double* z2,
+                                            const std::int64_t* block_offset) {
+  const auto& tb = a.zv.tb;
+  const int* j2 = tb.orbit_j2;
+  const int i = ket.i;
+  const int j = ket.j;
+  const int ji = ket.ji, jj = ket.jj;
+  const int jmin_a = ket.jmin_a;
+  const int jmax_a = ket.jmax_a;
+  const std::int32_t* lit_a = ket.lit_a;
+  const int cls = ket.cls;
+  const auto iabs = [](int v) { return v < 0 ? -v : v; };
+  const auto imax = [](int u, int v) { return u > v ? u : v; };
+  const auto imin = [](int u, int v) { return u < v ? u : v; };
+  const int kb = a.pv.class_kets[pb];
+  const int k = tb.ket_p[kb];
+  const int l = tb.ket_q[kb];
+  const int jk = j2[k], jl = j2[l];
+  const int jmin_b = iabs(jk - jl) / 2;
+  const int jlo = imax(jmin_a, jmin_b);
+  const int jhi = imin(jmax_a, (jk + jl) / 2);
+  if (jlo > jhi) return;
+  const std::int32_t* lit_b =
+      tb.local_index_table + tb.ket_J_offsets[kb] - jmin_b;
+  const int lo2 = imin(imax(iabs(ji - jl), iabs(jj - jk)),
+                       imax(iabs(jj - jl), iabs(ji - jk)));
+  const int hi2 = imax(imin(ji + jl, jj + jk), imin(jj + jl, ji + jk));
+  const int jp0 = lo2 / 2;
+  const int jp1 = hi2 / 2;
+  const CcTerm t1 = MakeCcTerm(a, i, l, k, j);
+  const CcTerm t2 = MakeCcTerm(a, j, l, k, i);
+  double zbar1[kMaxJp];
+  double zbar2[kMaxJp];
+  // Distributed: the masked reads leave only the owned cc channels
+  // nonzero, so skip the pair when all vanish and trim the J' loop to
+  // the span of nonzero entries (skipped terms add exactly 0). The
+  // serial path keeps the full range (bitwise identical).
+  int jq0 = jp0;
+  int jq1 = jp1;
+  for (int Jp = jp0; Jp <= jp1; ++Jp) {
+    zbar1[Jp - jp0] = CcValue(a, t1, Jp);
+    zbar2[Jp - jp0] = CcValue(a, t2, Jp);
+  }
+  if (a.owned != nullptr) {
+    while (jq0 <= jq1 && zbar1[jq0 - jp0] == 0.0 && zbar2[jq0 - jp0] == 0.0) {
+      ++jq0;
+    }
+    while (jq1 >= jq0 && zbar1[jq1 - jp0] == 0.0 && zbar2[jq1 - jp0] == 0.0) {
+      --jq1;
+    }
+    if (jq0 > jq1) return;
+  }
+  for (int J = jlo; J <= jhi; ++J) {
+    const std::int32_t ib = lit_a[J];
+    if (ib < 0) continue;
+    const std::int32_t ik = lit_b[J];
+    if (ik < 0) continue;
+    const int ch = 6 * J + cls;
+    const std::int64_t n = tb.channel_num_kets[ch];
+    double* zb = z2 + block_offset[ch];
+    const double ph_ij = ParitySign((ji + jj) / 2 - J);
+    const double* row1 =
+        a.sj.row(TwoJ{ji}, TwoJ{jj}, TwoJ{2 * J}, TwoJ{jk}, TwoJ{jl});
+    const double* row2 =
+        a.sj.row(TwoJ{jj}, TwoJ{ji}, TwoJ{2 * J}, TwoJ{jk}, TwoJ{jl});
+    double z = 0.0;
+    for (int Jp = jq0; Jp <= jq1; ++Jp) {
+      const double s1 = row1[Jp];
+      const double s2 = row2[Jp];
+      double t = 0.0;
+      if (s1 != 0.0) t += s1 * zbar1[Jp - jp0];
+      if (s2 != 0.0) t -= ph_ij * s2 * zbar2[Jp - jp0];
+      z += (2 * Jp + 1) * t;
+    }
+    // imsrg++ normalization: divide by sqrt(2) per equal-orbit pair
+    // (exact constants::kSqrt2).
+    if (i == j) z /= constants::kSqrt2;
+    if (k == l) z /= constants::kSqrt2;
+    zb[ib + ik * n] += z;
+    // Z is (anti-)Hermitian with sign hZ = -hX hY.
+    if (ib != ik) zb[ik + ib * n] -= a.hxhy * z;
+  }
+}
 
 void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                  Workspace& ws) {
@@ -543,13 +664,9 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
         });
   }
   exec::Fence("commutator::comm222_phss::fill");
-  // Host BLAS only; device backends need a device gemm (design/12 section 3).
-  IMSRG_CHECK(pd.w.host_is_device(),
-              "comm222_phss: host BLAS on device memory; needs a device gemm "
-              "(GPU backends)");
-  linalg::GroupedGemm(pd.distributed
-                          ? pd.gemms_owned
-                          : pd.gemms);  // left halves: W(:, 0 .. Ncc) = XK YK
+  linalg::DeviceGroupedGemm(
+      pd.distributed ? pd.gemms_owned
+                     : pd.gemms);  // left halves: W(:, 0 .. Ncc) = XK YK
 
   // The right half of W needs YK_R(kappa ^ 1, beta) = hY phi_kappa phi_beta
   // YK(kappa, beta). With YK'(kappa, beta) = phi_kappa YK(kappa ^ 1, beta)
@@ -577,9 +694,9 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
         }
       });
   exec::Fence("commutator::comm222_phss::flip");
-  linalg::GroupedGemm(pd.distributed
-                          ? pd.gemms_right_owned
-                          : pd.gemms_right);  // W'(:, Ncc .. 2 Ncc) = XK YK'
+  linalg::DeviceGroupedGemm(
+      pd.distributed ? pd.gemms_right_owned
+                     : pd.gemms_right);  // W'(:, Ncc .. 2 Ncc) = XK YK'
 
   // Combine W in place into the stored half of the Pandya-transformed result:
   //   left block  (beta < Ncc):  W(alpha, beta) - hX hY W(beta, alpha),
@@ -589,20 +706,27 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   // Item (c, beta) owns the pairs {(alpha, beta), (beta, alpha)} and
   // {(alpha, Ncc + beta), (beta, Ncc + alpha)} for alpha <= beta, so every
   // element is read and written by exactly one item (no separate ZB buffer).
-  exec::ParallelForDynamic(
-      "commutator::comm222_phss::combine", cc_kets,
-      IMSRG_LAMBDA(const exec::Index i) {
-        const exec::Index e = OwnedKet(a, i);
-        const int c = detail::FindBlock(ket_off, num_cc, e);
-        if (a.pv.nk[c] == 0) return;  // W stays zero
-        const std::int64_t n = a.pv.ncc[c];
-        const std::int64_t beta = e - ket_off[c];
-        double* w = a.pv.w + a.pv.w_off[c];
-        const int* kp = a.pv.ket_p + ket_off[c];
-        const int* kq = a.pv.ket_q + ket_off[c];
-        const int* j2 = a.zv.tb.orbit_j2;
-        const double phi_b = ParitySign((j2[kp[beta]] + j2[kq[beta]]) / 2);
-        for (std::int64_t alpha = 0; alpha <= beta; ++alpha) {
+  if (exec::kDeviceKernels && !pd.distributed) {
+    // Device shape (M14): one thread per element (alpha, beta) of the left
+    // halves of all W blocks; the items alpha <= beta do the work of the loop
+    // below (coalesced in alpha, the transposed reads go through the cache).
+    const std::int64_t* w_off = a.pv.w_off;
+    exec::ParallelFor(
+        "commutator::comm222_phss::combine_flat", pd.w_off_host.back(),
+        IMSRG_LAMBDA(const exec::Index e) {
+          const int c = detail::FindBlock(w_off, num_cc, e);
+          if (a.pv.nk[c] == 0) return;  // W stays zero
+          const std::int64_t n = a.pv.ncc[c];
+          const std::int64_t local = e - w_off[c];
+          if (local >= n * n) return;  // right half: done by the left item
+          const std::int64_t beta = local / n;
+          const std::int64_t alpha = local - beta * n;
+          if (alpha > beta) return;
+          double* w = a.pv.w + w_off[c];
+          const int* kp = a.pv.ket_p + ket_off[c];
+          const int* kq = a.pv.ket_q + ket_off[c];
+          const int* j2 = a.zv.tb.orbit_j2;
+          const double phi_b = ParitySign((j2[kp[beta]] + j2[kq[beta]]) / 2);
           const std::int64_t ab = alpha + beta * n;
           const std::int64_t ba = beta + alpha * n;
           const double x = w[ab];
@@ -616,8 +740,39 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
           const double v = w[br];
           w[ar] = a.hy * phi_b * (u + v);
           if (alpha != beta) w[br] = a.hy * phi_a * (v + u);
-        }
-      });
+        });
+  } else {
+    exec::ParallelForDynamic(
+        "commutator::comm222_phss::combine", cc_kets,
+        IMSRG_LAMBDA(const exec::Index i) {
+          const exec::Index e = OwnedKet(a, i);
+          const int c = detail::FindBlock(ket_off, num_cc, e);
+          if (a.pv.nk[c] == 0) return;  // W stays zero
+          const std::int64_t n = a.pv.ncc[c];
+          const std::int64_t beta = e - ket_off[c];
+          double* w = a.pv.w + a.pv.w_off[c];
+          const int* kp = a.pv.ket_p + ket_off[c];
+          const int* kq = a.pv.ket_q + ket_off[c];
+          const int* j2 = a.zv.tb.orbit_j2;
+          const double phi_b = ParitySign((j2[kp[beta]] + j2[kq[beta]]) / 2);
+          for (std::int64_t alpha = 0; alpha <= beta; ++alpha) {
+            const std::int64_t ab = alpha + beta * n;
+            const std::int64_t ba = beta + alpha * n;
+            const double x = w[ab];
+            const double y = w[ba];
+            w[ab] = x - a.hxhy * y;
+            if (alpha != beta) w[ba] = y - a.hxhy * x;
+            const double phi_a =
+                ParitySign((j2[kp[alpha]] + j2[kq[alpha]]) / 2);
+            const std::int64_t ar = alpha + (n + beta) * n;
+            const std::int64_t br = beta + (n + alpha) * n;
+            const double u = w[ar];
+            const double v = w[br];
+            w[ar] = a.hy * phi_b * (u + v);
+            if (alpha != beta) w[br] = a.hy * phi_a * (v + u);
+          }
+        });
+  }
   exec::Fence("commutator::comm222_phss::combine");
 
   // Inverse transform over pairs of kets: item = ket a = (i, j) of a class
@@ -632,102 +787,33 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   // (2 emax + 2 <= kMaxJp is checked when the Pandya data are built.)
   double* z2 = Z.two_body().matrix().buffer().device_data();
   const std::int64_t* block_offset = impl.block_offsets.device_data();
-  exec::ParallelForDynamic(
-      "commutator::comm222_phss::inverse",
-      static_cast<exec::Index>(pd.num_class_kets),
-      IMSRG_LAMBDA(const exec::Index e) {
-        const auto& tb = a.zv.tb;
-        const int* j2 = tb.orbit_j2;
-        const int cl =
-            detail::FindBlock(a.pv.class_offset, a.pv.num_classes, e);
-        const int last = a.pv.class_offset[cl + 1];
-        const int ka = a.pv.class_kets[e];
-        const int i = tb.ket_p[ka];
-        const int j = tb.ket_q[ka];
-        const int ji = j2[i], jj = j2[j];
-        const int jmin_a = (ji > jj ? ji - jj : jj - ji) / 2;
-        const int jmax_a = (ji + jj) / 2;
-        const std::int32_t* lit_a =
-            tb.local_index_table + tb.ket_J_offsets[ka] - jmin_a;
-        // Two-body channel of the class at J: 3 (2J) + cls.
-        const int cls = tb.orbit_tz2[i] + tb.orbit_tz2[j] + 2 +
-                        (tb.orbit_l[i] + tb.orbit_l[j]) % 2;
-        const auto iabs = [](int v) { return v < 0 ? -v : v; };
-        const auto imax = [](int u, int v) { return u > v ? u : v; };
-        const auto imin = [](int u, int v) { return u < v ? u : v; };
-        for (int pb = static_cast<int>(e); pb < last; ++pb) {
-          const int kb = a.pv.class_kets[pb];
-          const int k = tb.ket_p[kb];
-          const int l = tb.ket_q[kb];
-          const int jk = j2[k], jl = j2[l];
-          const int jmin_b = iabs(jk - jl) / 2;
-          const int jlo = imax(jmin_a, jmin_b);
-          const int jhi = imin(jmax_a, (jk + jl) / 2);
-          if (jlo > jhi) continue;
-          const std::int32_t* lit_b =
-              tb.local_index_table + tb.ket_J_offsets[kb] - jmin_b;
-          const int lo2 = imin(imax(iabs(ji - jl), iabs(jj - jk)),
-                               imax(iabs(jj - jl), iabs(ji - jk)));
-          const int hi2 = imax(imin(ji + jl, jj + jk), imin(jj + jl, ji + jk));
-          const int jp0 = lo2 / 2;
-          const int jp1 = hi2 / 2;
-          const CcTerm t1 = MakeCcTerm(a, i, l, k, j);
-          const CcTerm t2 = MakeCcTerm(a, j, l, k, i);
-          double zbar1[kMaxJp];
-          double zbar2[kMaxJp];
-          // Distributed: the masked reads leave only the owned cc channels
-          // nonzero, so skip the pair when all vanish and trim the J' loop to
-          // the span of nonzero entries (skipped terms add exactly 0). The
-          // serial path keeps the full range (bitwise identical).
-          int jq0 = jp0;
-          int jq1 = jp1;
-          for (int Jp = jp0; Jp <= jp1; ++Jp) {
-            zbar1[Jp - jp0] = CcValue(a, t1, Jp);
-            zbar2[Jp - jp0] = CcValue(a, t2, Jp);
-          }
-          if (a.owned != nullptr) {
-            while (jq0 <= jq1 && zbar1[jq0 - jp0] == 0.0 &&
-                   zbar2[jq0 - jp0] == 0.0) {
-              ++jq0;
-            }
-            while (jq1 >= jq0 && zbar1[jq1 - jp0] == 0.0 &&
-                   zbar2[jq1 - jp0] == 0.0) {
-              --jq1;
-            }
-            if (jq0 > jq1) continue;
-          }
-          for (int J = jlo; J <= jhi; ++J) {
-            const std::int32_t ib = lit_a[J];
-            if (ib < 0) continue;
-            const std::int32_t ik = lit_b[J];
-            if (ik < 0) continue;
-            const int ch = 6 * J + cls;
-            const std::int64_t n = tb.channel_num_kets[ch];
-            double* zb = z2 + block_offset[ch];
-            const double ph_ij = ParitySign((ji + jj) / 2 - J);
-            const double* row1 =
-                a.sj.row(TwoJ{ji}, TwoJ{jj}, TwoJ{2 * J}, TwoJ{jk}, TwoJ{jl});
-            const double* row2 =
-                a.sj.row(TwoJ{jj}, TwoJ{ji}, TwoJ{2 * J}, TwoJ{jk}, TwoJ{jl});
-            double z = 0.0;
-            for (int Jp = jq0; Jp <= jq1; ++Jp) {
-              const double s1 = row1[Jp];
-              const double s2 = row2[Jp];
-              double t = 0.0;
-              if (s1 != 0.0) t += s1 * zbar1[Jp - jp0];
-              if (s2 != 0.0) t -= ph_ij * s2 * zbar2[Jp - jp0];
-              z += (2 * Jp + 1) * t;
-            }
-            // imsrg++ normalization: divide by sqrt(2) per equal-orbit pair
-            // (exact constants::kSqrt2).
-            if (i == j) z /= constants::kSqrt2;
-            if (k == l) z /= constants::kSqrt2;
-            zb[ib + ik * n] += z;
-            // Z is (anti-)Hermitian with sign hZ = -hX hY.
-            if (ib != ik) zb[ik + ib * n] -= a.hxhy * z;
-          }
-        }
-      });
+  const auto num_class_kets = static_cast<exec::Index>(pd.num_class_kets);
+  if constexpr (exec::kDeviceKernels) {
+    // Device shape (M14): one team per ket a, its threads over the partners
+    // b (a thread per ket starves the GPU: ~1e4 kets with ragged loops).
+    exec::TeamOptions opts;
+    opts.schedule = exec::Schedule::kDynamic;
+    opts.team_size = 64;
+    opts.vector_length = 1;
+    exec::TeamFor(
+        "commutator::comm222_phss::inverse_team",
+        static_cast<int>(num_class_kets), opts,
+        IMSRG_LAMBDA(const exec::TeamMember& member) {
+          const exec::Index e = member.league_rank();
+          const InverseKet ka = MakeInverseKet(a, e);
+          Kokkos::parallel_for(
+              Kokkos::TeamThreadRange(member, static_cast<int>(e), ka.last),
+              [&](const int pb) { InversePair(a, ka, pb, z2, block_offset); });
+        });
+  } else {
+    exec::ParallelForDynamic(
+        "commutator::comm222_phss::inverse", num_class_kets,
+        IMSRG_LAMBDA(const exec::Index e) {
+          const InverseKet ka = MakeInverseKet(a, e);
+          for (int pb = static_cast<int>(e); pb < ka.last; ++pb)
+            InversePair(a, ka, pb, z2, block_offset);
+        });
+  }
   exec::Fence("commutator::comm222_phss");
 }
 

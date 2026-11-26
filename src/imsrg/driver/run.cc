@@ -896,6 +896,15 @@ void FinishRun(const RunConfig& config, const pipeline::PreparedHamiltonian& ph,
     pipeline::WriteOmegaStack(dir, stem, solver.magnus_solver().omegas(),
                               config.output.omega_format, c,
                               frame.ms_normal_ordering.get());
+    if (config.output.omega_second_format) {
+      const bool native =
+          config.output.omega_format == OperatorFileKind::kNative;
+      pipeline::WriteOmegaStack(
+          dir, stem + (native ? "_me2jp" : "_native"),
+          solver.magnus_solver().omegas(),
+          native ? OperatorFileKind::kMe2jp : OperatorFileKind::kNative, c,
+          frame.ms_normal_ordering.get());
+    }
   }
   std::optional<ChargeRadiusRecord> radius;
   if (radius_slots) radius = MakeChargeRadiusRecord(ops, *radius_slots, ph);

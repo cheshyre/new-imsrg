@@ -106,6 +106,21 @@ TEST(Checkpoint, NativeRestartIsBitForBit) {
   }
 }
 
+TEST(Checkpoint, OmegaSecondFormatWritesBoth) {
+  if (!fs::exists(DataFile(TwoBodyName()))) GTEST_SKIP() << "missing 2N file";
+  const fs::path dir = FreshDir("ckpt_both");
+  driver::ConfigSources src;
+  src.config_text = Al27Toml(dir, "") + "omega_second_format = true\n";
+  const RunResult r = Execute(src, dir);
+  ASSERT_FALSE(r.planned) << r.note;
+  const std::string stem = r.config.output.stem;
+  EXPECT_TRUE(fs::exists(dir / (stem + "_omegas.toml")));
+  EXPECT_TRUE(fs::exists(dir / (stem + "_omega_000.opb")));
+  EXPECT_TRUE(fs::exists(dir / (stem + "_me2jp_omegas.toml")));
+  EXPECT_TRUE(fs::exists(dir / (stem + "_me2jp_omega_000.me2jp.bin")));
+  EXPECT_TRUE(fs::exists(dir / (stem + "_me2jp_omega_000.me1j")));
+}
+
 TEST(Checkpoint, Me2jpRestartWithinFloat32) {
   if (!fs::exists(DataFile(TwoBodyName()))) GTEST_SKIP() << "missing 2N file";
   const RunResult a = RunWith("ckpt32_ref", "");

@@ -261,6 +261,7 @@ TEST(OdeFlow, NanIsDivergenceNotSmax) {
     op::Operator h0 = Emax2Hno();
     h0.one_body().set(OrbitIndex{0}, OrbitIndex{0},
                       std::numeric_limits<double>::quiet_NaN());
+    h0.SyncToDevice();
     flow::OdeSolver s(method, std::move(h0), {}, Options(2.0), 1.0e-6,
                       flow::GeneratorOptions{});
     const flow::SolveResult r = s.Solve();

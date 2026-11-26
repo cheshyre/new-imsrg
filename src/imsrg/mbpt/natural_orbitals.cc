@@ -52,10 +52,14 @@ void FillPpBlock(const Ctx& x, linalg::Matrix<double>& rho_pp) {
   const auto& ref = x.ref;
   const auto particles = ref.particles();
   const auto holes = ref.holes();
-  // PP block: a, b particles in the same channel, b <= a.
+  // PP block: a a particle, b <= a in the same channel with 1 - n_b >= the
+  // cut, so b may be a partially filled hole of an ensemble reference
+  // (imsrg++ HFMBPT.cc DensityMatrixPP tests (1 - occ) for b, not the
+  // particle list; e.g. 27Al: a = proton 1d5/2, b = proton 0d5/2, n = 5/6).
   for (const OrbitIndex a : particles) {
     for (const OrbitIndex b : ms.basis().SameLjtz(a)) {
-      if (b.value() > a.value() || ref.occupation(b) >= basis::kOccupationCut)
+      if (b.value() > a.value() ||
+          1.0 - ref.occupation(b) < basis::kOccupationCut)
         continue;
       double r = 0.0;
       for (const OrbitIndex c : particles)
@@ -134,7 +138,9 @@ void FillPhBlock(const Ctx& x, linalg::Matrix<double>& rho_ph) {
   // PH block, two terms.
   for (const OrbitIndex i : holes) {
     for (const OrbitIndex a : ms.basis().SameLjtz(i)) {
-      if (ref.occupation(a) >= basis::kOccupationCut) continue;  // a particle
+      // imsrg++ tests 1 - n_a (a may be partially filled; a == i drops out
+      // through e_a - e_i = 0).
+      if (1.0 - ref.occupation(a) < basis::kOccupationCut) continue;
       const double eai = x.e(a) - x.e(i);
       double r1 = 0.0;
       for (const OrbitIndex b : particles)

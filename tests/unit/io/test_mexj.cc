@@ -78,10 +78,10 @@ Oracle MakeOracle(int emax) {
       for (int r = 0; r <= p; ++r) {
         for (int s = 0; s <= r; ++s) {
           if (r == p && s > q) continue;
-          const auto& P = o.orbs[p];
-          const auto& Q = o.orbs[q];
-          const auto& R = o.orbs[r];
-          const auto& S = o.orbs[s];
+          const auto& P = o.orbs[static_cast<std::size_t>(p)];
+          const auto& Q = o.orbs[static_cast<std::size_t>(q)];
+          const auto& R = o.orbs[static_cast<std::size_t>(r)];
+          const auto& S = o.orbs[static_cast<std::size_t>(s)];
           if ((P.l + Q.l + R.l + S.l) % 2 != 0) continue;
           if (P.tz2 + Q.tz2 != R.tz2 + S.tz2) continue;
           int lo = 0;
@@ -106,7 +106,10 @@ Oracle MakeOracle(int emax) {
 }
 
 int PairPhase(const Oracle& o, int a, int b, int J) {
-  const int k = (o.orbs[a].j2 + o.orbs[b].j2) / 2 - J;
+  const int k = (o.orbs[static_cast<std::size_t>(a)].j2 +
+                 o.orbs[static_cast<std::size_t>(b)].j2) /
+                    2 -
+                J;
   return (std::abs(k) % 2 == 0) ? -1 : +1;  // -(-1)^k
 }
 
@@ -134,7 +137,7 @@ double OracleValue(const Oracle& o, int h, int a, int b, int c, int d, int J) {
         if (sab != 0) ph *= PairPhase(o, a, b, J);
         if (scd != 0) ph *= PairPhase(o, c, d, J);
         if (sx != 0) ph *= h;
-        return ph * it->second.values[idx];
+        return ph * it->second.values[static_cast<std::size_t>(idx)];
       }
     }
   }
@@ -281,9 +284,11 @@ TEST(Mexj, OwnersExample) {
 
 TEST(Mexj, TableRejectsBadInput) {
   EXPECT_THROW(Me2jpTable(1, Hermiticity::kHermitian, {1.0, 2.0}), InputError);
-  EXPECT_THROW(Me2jpTable(0, Hermiticity::kNonHermitian,
-                          std::vector<double>(Me2jpValueCount(0), 1.0)),
-               InputError);
+  EXPECT_THROW(
+      Me2jpTable(0, Hermiticity::kNonHermitian,
+                 std::vector<double>(
+                     static_cast<std::size_t>(Me2jpValueCount(0)), 1.0)),
+      InputError);
 }
 
 // -----------------------------------------------------------------------------

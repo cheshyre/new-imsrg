@@ -228,8 +228,8 @@ void BuildGemmProblems(PandyaData& d, std::int32_t ncc) {
     const std::int64_t n = d.ncc_host[cs];
     const std::int64_t nk = d.nk_host[cs];
     // k == 0 (nk == 0) blocks are skipped: their W stays zero
-    // (zero-initialized, never written). The problems run on host BLAS (see the
-    // host_is_device check in comm222_phss, design/12 section 3).
+    // (zero-initialized, never written). The problems run on the device BLAS
+    // (linalg::DeviceGroupedGemm, design/12 section 3).
     if (n == 0 || nk == 0) continue;
     // W(:, 0 .. Ncc) = XK YK, and after the in-place row-pair flip of YK
     // W(:, Ncc .. 2 Ncc) = XK YK' (see the scratch layout in pandya.h).

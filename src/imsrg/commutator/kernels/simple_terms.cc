@@ -8,6 +8,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <vector>
 
 #include "imsrg/base/assert.h"
 #include "imsrg/base/constants.h"
@@ -16,6 +17,7 @@
 #include "imsrg/commutator/detail/workspace_impl.h"
 #include "imsrg/exec/kokkos_backend.h"
 #include "imsrg/linalg/blas.h"
+#include "imsrg/linalg/device_blas.h"
 
 namespace imsrg::commutator::terms {
 
@@ -175,22 +177,15 @@ void Comm220ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
 void Comm111ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                Workspace& ws) {
   detail::CheckTermInputs(X, Y, Z, ws);
-  // Host BLAS on the one-body matrices (tiny: norb^3). GPU backends will route
-  // gemm to device BLAS; until then wait for pending device work before
-  // touching the data.
-  exec::Fence("commutator::comm111ss");
+  // Device BLAS on the one-body matrices (tiny: norb^3), ordered after the
+  // pending kernels like a kernel (design/12 section 3).
   const auto x1 = std::as_const(X).one_body().device_view();
   const auto y1 = std::as_const(Y).one_body().device_view();
   const auto z1 = Z.one_body().device_view();
-  // Host BLAS only: on a device backend the buffers are not host-addressable
-  // (design/12 section 3).
-  IMSRG_CHECK(Z.one_body().buffer().host_is_device(),
-              "comm111ss: host BLAS on device memory; needs a device gemm (GPU "
-              "backends)");
-  linalg::Gemm(1.0, x1, linalg::Op::kNoTrans, y1, linalg::Op::kNoTrans, 1.0,
-               z1);
-  linalg::Gemm(-1.0, y1, linalg::Op::kNoTrans, x1, linalg::Op::kNoTrans, 1.0,
-               z1);
+  linalg::DeviceGemm(1.0, x1, linalg::Op::kNoTrans, y1, linalg::Op::kNoTrans,
+                     1.0, z1);
+  linalg::DeviceGemm(-1.0, y1, linalg::Op::kNoTrans, x1, linalg::Op::kNoTrans,
+                     1.0, z1);
 }
 
 void Comm121ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
@@ -213,40 +208,69 @@ void Comm121ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   const std::int32_t* orbits = impl.ob_orbits.device_data();
   const int norb = impl.tables.orbits().num_orbits;
   const exec::Index nentries = static_cast<exec::Index>(impl.ob_orbits.size());
-  exec::ParallelFor(
-      "commutator::comm121ss", nentries, IMSRG_LAMBDA(const exec::Index e) {
-        const int i = owner[e];
-        const int j = orbits[e];
-        const int ji = a.j2[i];
-        const int jj = a.j2[j];
-        double z = 0.0;
-        for (int p = 0; p < norb; ++p) {
-          const int jp = a.j2[p];
-          for (int k = a.ch1.offsets[p]; k < a.ch1.offsets[p + 1]; ++k) {
-            const int q = a.ch1.orbits[k];
-            const double dn = a.occ[p] - a.occ[q];
-            if (dn == 0.0) continue;
-            const double xab = a.x(p, q);
-            const double yab = a.y(p, q);
-            if (xab == 0.0 && yab == 0.0) continue;
-            const int jq = a.j2[q];
-            const int lo1 = jq > ji ? jq - ji : ji - jq;
-            const int lo2 = jp > jj ? jp - jj : jj - jp;
-            const int lo = lo1 > lo2 ? lo1 : lo2;
-            const int hi1 = jq + ji;
-            const int hi2 = jp + jj;
-            const int hi = hi1 < hi2 ? hi1 : hi2;
-            double s = 0.0;
-            for (int two_J = lo; two_J <= hi; two_J += 2) {
-              const double ybar = yv.get_unnormalized(q, i, p, j, two_J);
-              const double xbar = xv.get_unnormalized(q, i, p, j, two_J);
-              s += (two_J + 1) * (xab * ybar - yab * xbar);
-            }
-            z += dn * s;
-          }
-        }
-        z1(i, j) += z / (ji + 1);
-      });
+  // The contribution of orbit p (its q loop) to Z1(i, j), in host order.
+  const auto add_orbit =
+      IMSRG_LAMBDA(int i, int j, int ji, int jj, int p, double& z) {
+    const int jp = a.j2[p];
+    for (int k = a.ch1.offsets[p]; k < a.ch1.offsets[p + 1]; ++k) {
+      const int q = a.ch1.orbits[k];
+      const double dn = a.occ[p] - a.occ[q];
+      if (dn == 0.0) continue;
+      const double xab = a.x(p, q);
+      const double yab = a.y(p, q);
+      if (xab == 0.0 && yab == 0.0) continue;
+      const int jq = a.j2[q];
+      const int lo1 = jq > ji ? jq - ji : ji - jq;
+      const int lo2 = jp > jj ? jp - jj : jj - jp;
+      const int lo = lo1 > lo2 ? lo1 : lo2;
+      const int hi1 = jq + ji;
+      const int hi2 = jp + jj;
+      const int hi = hi1 < hi2 ? hi1 : hi2;
+      double s = 0.0;
+      for (int two_J = lo; two_J <= hi; two_J += 2) {
+        const double ybar = yv.get_unnormalized(q, i, p, j, two_J);
+        const double xbar = xv.get_unnormalized(q, i, p, j, two_J);
+        s += (two_J + 1) * (xab * ybar - yab * xbar);
+      }
+      z += dn * s;
+    }
+  };
+  if constexpr (exec::kDeviceKernels) {
+    // Device shape (M14): one team per (i, j), threads reducing over p (a
+    // thread per (i, j) gave a few hundred items). Order differs from the host.
+    exec::TeamOptions opts;
+    opts.team_size = 64;
+    opts.vector_length = 1;
+    exec::TeamFor(
+        "commutator::comm121ss_team", static_cast<int>(nentries), opts,
+        IMSRG_LAMBDA(const exec::TeamMember& member) {
+          const exec::Index e = member.league_rank();
+          const int i = owner[e];
+          const int j = orbits[e];
+          const int ji = a.j2[i];
+          const int jj = a.j2[j];
+          double z = 0.0;
+          Kokkos::parallel_reduce(
+              Kokkos::TeamThreadRange(member, norb),
+              [&](const int p, double& part) {
+                add_orbit(i, j, ji, jj, p, part);
+              },
+              z);
+          Kokkos::single(Kokkos::PerTeam(member),
+                         [&]() { z1(i, j) += z / (ji + 1); });
+        });
+  } else {
+    exec::ParallelFor(
+        "commutator::comm121ss", nentries, IMSRG_LAMBDA(const exec::Index e) {
+          const int i = owner[e];
+          const int j = orbits[e];
+          const int ji = a.j2[i];
+          const int jj = a.j2[j];
+          double z = 0.0;
+          for (int p = 0; p < norb; ++p) add_orbit(i, j, ji, jj, p, z);
+          z1(i, j) += z / (ji + 1);
+        });
+  }
   exec::Fence("commutator::comm121ss");
 }
 
@@ -351,6 +375,83 @@ void Comm122ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   const auto columns =
       static_cast<exec::Index>(owned ? impl.work_device.comm122_columns.size()
                                      : impl.entry_channel.size());
+  if (exec::kDeviceKernels && !owned) {
+    // Device shape (M14): the bra part as GEMMs. B = Lx Y - Ly X per channel,
+    // with the lifted one-body operators Lx(r, m) = sum over the lifted
+    // entries t of row r with lm[t] = m of lcoef[t] x1(from[t], to[t]) (Ly
+    // with y1) stored densely in two-body layout: one thread per row builds
+    // its row, then two grouped device GEMMs (the lifted lists are sparse,
+    // ~10-20 entries per row, but dense GEMMs on the matrix cores beat the
+    // gathers). The summation order differs from the host loops (not
+    // bitwise equal to the host shape).
+    exec::DeviceBuffer<double> lx(static_cast<std::size_t>(total),
+                                  "imsrg::comm122ss::lx");
+    exec::DeviceBuffer<double> ly(static_cast<std::size_t>(total),
+                                  "imsrg::comm122ss::ly");
+    double* lxd = lx.device_data();
+    double* lyd = ly.device_data();
+    exec::ParallelFor(
+        "commutator::comm122ss::lift", columns,
+        IMSRG_LAMBDA(const exec::Index e) {
+          const int ch = entry_channel[e];
+          const std::int64_t off = block_offset[ch];
+          const std::int64_t n = num_kets[ch];
+          const std::int64_t r = e - channel_ket_offset[ch];
+          const std::int64_t rb = row_base[ch];
+          for (int t = entry_offset[rb + r]; t < entry_offset[rb + r + 1];
+               ++t) {
+            const std::int64_t idx = off + r + lm[t] * n;
+            lxd[idx] += lcoef[t] * x1(lfrom[t], lto[t]);
+            lyd[idx] += lcoef[t] * y1(lfrom[t], lto[t]);
+          }
+        });
+    std::vector<linalg::GemmProblem> first;
+    std::vector<linalg::GemmProblem> second;
+    for (const auto& info : Z.two_body().matrix().blocks()) {
+      const std::int64_t n = info.rows;
+      if (n == 0 || info.row_block != info.col_block) continue;
+      const std::int64_t off = info.offset;
+      const linalg::MatrixView<double> bv{bsc + off, n, n, n};
+      if (yd != nullptr) {
+        first.push_back(linalg::GemmProblem{
+            1.0, linalg::MatrixView<const double>{lxd + off, n, n, n},
+            linalg::Op::kNoTrans,
+            linalg::MatrixView<const double>{yd + off, n, n, n},
+            linalg::Op::kNoTrans, 0.0, bv});
+      }
+      if (xd != nullptr) {
+        second.push_back(linalg::GemmProblem{
+            -1.0, linalg::MatrixView<const double>{lyd + off, n, n, n},
+            linalg::Op::kNoTrans,
+            linalg::MatrixView<const double>{xd + off, n, n, n},
+            linalg::Op::kNoTrans, yd != nullptr ? 1.0 : 0.0, bv});
+      }
+    }
+    linalg::DeviceGroupedGemm(first);
+    linalg::DeviceGroupedGemm(second);
+    exec::ParallelFor(
+        "commutator::comm122ss_flat", total, IMSRG_LAMBDA(const exec::Index e) {
+          const int ch = detail::FindBlock(block_offset, nch, e);
+          const std::int64_t off = block_offset[ch];
+          const std::int64_t n = num_kets[ch];
+          const std::int64_t local = e - off;
+          const std::int64_t c = local / n;
+          const std::int64_t r = local - c * n;
+          if (r > c) return;  // the item (c, r) writes this element
+          double* zb = z2 + off;
+          double* bb = bsc + off;
+          const double b_rc = bb[r + c * n];
+          const double b_cr = bb[c + r * n];
+          const double z = b_rc + hz * b_cr;
+          zb[r + c * n] += z;
+          if (r < c) zb[c + r * n] += hz * z;
+        });
+    // Pass 2 of the column shape zeroes the scratch as it goes; here no
+    // element may be zeroed before its mirror item has read it.
+    ws.impl().ladder.pp.product.fill(0.0);
+    exec::Fence("commutator::comm122ss");
+    return;
+  }
   exec::ParallelForDynamic(
       "commutator::comm122ss::bra", columns,
       IMSRG_LAMBDA(const exec::Index col) {
