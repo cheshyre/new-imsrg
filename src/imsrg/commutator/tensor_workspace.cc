@@ -12,9 +12,12 @@
 #include <utility>
 #include <vector>
 
+#include "imsrg/angmom/wigner.h"
 #include "imsrg/base/assert.h"
+#include "imsrg/base/constants.h"
 #include "imsrg/base/error.h"
 #include "imsrg/basis/orbit.h"
+#include "imsrg/basis/two_body_channels.h"
 #include "imsrg/commutator/detail/tensor_impl.h"
 #include "imsrg/commutator/tensor.h"
 #include "imsrg/operator/two_body.h"
@@ -86,10 +89,176 @@ TensorRankData& TensorContext::rank(const op::OperatorSpec& spec) {
         rows[static_cast<std::size_t>(a)].push_back(b);
   auto data = std::make_unique<TensorRankData>(
       TensorRankData{angmom::LambdaSixJTable(basis.emax(), spec.rank_J),
-                     nullptr, MakeCsr(rows)});
+                     nullptr,
+                     MakeCsr(rows),
+                     rows,
+                     {}});
   auto& ref = *data;
   ranks.emplace(key, std::move(data));
   return ref;
+}
+
+EntryList EntryListBuilder::Finish() const {
+  EntryList l;
+  const auto up32 = [](const std::vector<std::int32_t>& v, const char* tag) {
+    exec::DeviceBuffer<std::int32_t> b(v.size(), tag);
+    if (!v.empty()) b.CopyFromHost(v);
+    return b;
+  };
+  l.offsets = up32(offsets_, "imsrg::EntryList::offsets");
+  l.m = up32(m_, "imsrg::EntryList::m");
+  l.from = up32(from_, "imsrg::EntryList::from");
+  l.to = up32(to_, "imsrg::EntryList::to");
+  l.coef = exec::DeviceBuffer<double>(coef_.size(), "imsrg::EntryList::coef");
+  if (!coef_.empty()) l.coef.CopyFromHost(coef_);
+  return l;
+}
+
+namespace {
+
+/// The ket (a, b) (this order) in channel `ch`: its local index, and the
+/// exchange phase times sqrt2^[a == b] of its unnormalized -> stored
+/// conversion. False if the ket is not in the channel.
+bool LiftedKet(const basis::TwoBodyChannels& chans, ChannelIndex ch, int a,
+               int b, int* local, double* factor) {
+  const bool swap = a > b;
+  const int lo = swap ? b : a;
+  const int hi = swap ? a : b;
+  const auto loc =
+      chans.local_index(ch, chans.ket_index(OrbitIndex{lo}, OrbitIndex{hi}));
+  if (!loc) return false;
+  double c = (a == b) ? constants::kSqrt2 : 1.0;
+  if (swap) {
+    const auto orbits = chans.orbits();
+    c *= basis::ExchangePhase(orbits[static_cast<std::size_t>(a)].j2,
+                              orbits[static_cast<std::size_t>(b)].j2,
+                              chans.channel(ch).two_j);
+  }
+  *local = static_cast<int>(loc->value());
+  *factor = c;
+  return true;
+}
+
+}  // namespace
+
+const LiftedKets& TensorContext::lifted_kets() {
+  if (lifted_built) return lifted_kets_data;
+  const auto& chans = ms->two_body();
+  const auto& basis = ms->basis();
+  EntryListBuilder b;
+  for (std::int32_t c = 0; c < chans.num_channels(); ++c) {
+    const ChannelIndex ch{c};
+    for (const KetIndex kidx : chans.channel_kets(ch)) {
+      const int i = chans.ket(kidx).p.value();
+      const int j = chans.ket(kidx).q.value();
+      int m = 0;
+      double f = 0.0;
+      for (const OrbitIndex p : basis.SameLjtz(OrbitIndex{i}))
+        if (LiftedKet(chans, ch, p.value(), j, &m, &f))
+          b.Add(m, i, p.value(), f);
+      b.EndRow();
+      for (const OrbitIndex p : basis.SameLjtz(OrbitIndex{j}))
+        if (LiftedKet(chans, ch, i, p.value(), &m, &f))
+          b.Add(m, j, p.value(), f);
+      b.EndRow();
+    }
+  }
+  lifted_kets_data.list = b.Finish();
+  lifted_built = true;
+  return lifted_kets_data;
+}
+
+const Comm122Lists& TensorContext::comm122_lists(
+    const op::OperatorSpec& spec, const std::vector<std::int32_t>& ch_bra,
+    const std::vector<std::int32_t>& ch_ket) {
+  TensorRankData& rd = rank(spec);
+  Comm122Lists& out = rd.comm122;
+  if (out.built && out.block_ch_bra == ch_bra && out.block_ch_ket == ch_ket)
+    return out;
+  const auto& chans = ms->two_body();
+  const auto orbits = chans.orbits();
+  const auto sixjl = rd.sixj_lambda.host_view();
+  const auto jtwo = [&](int o) {
+    return orbits[static_cast<std::size_t>(o)].j2;
+  };
+  EntryListBuilder b1, b2, b3, b4;
+  std::vector<std::int32_t> col_off{0};
+  for (std::size_t k = 0; k < ch_bra.size(); ++k) {
+    const ChannelIndex cb{ch_bra[k]};
+    const ChannelIndex ck{ch_ket[k]};
+    const TwoJ tj1 = chans.channel(cb).two_j;  // 2 J_bra
+    const TwoJ tj2 = chans.channel(ck).two_j;  // 2 J_ket
+    const std::int32_t nb = chans.channel(cb).num_kets;
+    const std::int32_t nk = chans.channel(ck).num_kets;
+    int m = 0;
+    double f = 0.0;
+    for (std::int32_t ib = 0; ib < nb; ++ib) {
+      const KetIndex g = chans.global_ket(cb, LocalKetIndex{ib});
+      const int i = chans.ket(g).p.value();
+      const int j = chans.ket(g).q.value();
+      const TwoJ ji = jtwo(i);
+      const TwoJ jj = jtwo(j);
+      // c1: Y1(i, p) X2(p j; kl) with X2 in channel ck.
+      for (const std::int32_t p :
+           rd.tensor_ch1_rows[static_cast<std::size_t>(i)]) {
+        const TwoJ ja = jtwo(p);
+        if (!angmom::Triangle(tj2, ja, jj)) continue;
+        if (!LiftedKet(chans, ck, p, j, &m, &f)) continue;
+        const double c = -sixjl(tj2, tj1, ji, ja, jj) * f;
+        if (c != 0.0) b1.Add(m, i, p, c);
+      }
+      b1.EndRow();
+      // c2: Y1(j, p) X2(p i; kl).
+      for (const std::int32_t p :
+           rd.tensor_ch1_rows[static_cast<std::size_t>(j)]) {
+        const TwoJ ja = jtwo(p);
+        if (!angmom::Triangle(tj2, ja, ji)) continue;
+        if (!LiftedKet(chans, ck, p, i, &m, &f)) continue;
+        const double c = sixjl(tj2, tj1, jj, ja, ji) * f;
+        if (c != 0.0) b2.Add(m, j, p, c);
+      }
+      b2.EndRow();
+    }
+    for (std::int32_t ik = 0; ik < nk; ++ik) {
+      const KetIndex g = chans.global_ket(ck, LocalKetIndex{ik});
+      const int kk = chans.ket(g).p.value();
+      const int l = chans.ket(g).q.value();
+      const TwoJ jk = jtwo(kk);
+      const TwoJ jl = jtwo(l);
+      // c3: Y1(p, kk) X2(ij; l p) with X2 in channel cb.
+      for (const std::int32_t p :
+           rd.tensor_ch1_rows[static_cast<std::size_t>(kk)]) {
+        const TwoJ ja = jtwo(p);
+        if (!angmom::Triangle(tj1, ja, jl)) continue;
+        if (!LiftedKet(chans, cb, l, p, &m, &f)) continue;
+        const double c = -sixjl(tj1, tj2, jk, ja, jl) * f;
+        if (c != 0.0) b3.Add(m, p, kk, c);
+      }
+      b3.EndRow();
+      // c4: Y1(p, l) X2(ij; kk p).
+      for (const std::int32_t p :
+           rd.tensor_ch1_rows[static_cast<std::size_t>(l)]) {
+        const TwoJ ja = jtwo(p);
+        if (!angmom::Triangle(tj1, ja, jk)) continue;
+        if (!LiftedKet(chans, cb, kk, p, &m, &f)) continue;
+        const double c = sixjl(tj1, tj2, jl, ja, jk) * f;
+        if (c != 0.0) b4.Add(m, p, l, c);
+      }
+      b4.EndRow();
+    }
+    col_off.push_back(col_off.back() + nk);
+  }
+  out.block_ch_bra = ch_bra;
+  out.block_ch_ket = ch_ket;
+  out.bra1 = b1.Finish();
+  out.bra2 = b2.Finish();
+  out.ket3 = b3.Finish();
+  out.ket4 = b4.Finish();
+  out.col_offset =
+      exec::DeviceBuffer<std::int32_t>(col_off.size(), "imsrg::col_offset");
+  out.col_offset.CopyFromHost(col_off);
+  out.built = true;
+  return out;
 }
 
 const angmom::NineJTable& TensorContext::ninej(const op::OperatorSpec& spec,
