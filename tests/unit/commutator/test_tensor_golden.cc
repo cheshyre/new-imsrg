@@ -98,6 +98,9 @@ void RunCase(const Case& c) {
           Z.one_body().set_element(OrbitIndex{a}, OrbitIndex{b}, 0.0);
           ref.one_body().set_element(OrbitIndex{a}, OrbitIndex{b}, 0.0);
         }
+      // Host writes: publish them before the (device) comparison.
+      Z.SyncToDevice();
+      ref.SyncToDevice();
     }
     const double scale = std::max(1.0, op::MaxAbs(ref).max());
     const auto d = op::MaxAbsDifference(Z, ref);

@@ -131,6 +131,7 @@ void CheckTensor(std::int32_t rank_J, Parity parity, std::int32_t dtz,
                                       kc.two_j, next());
         }
     }
+  A.SyncToDevice();  // host writes above; Truncate syncs to host first
   const Operator T = Truncate(A, small);
   A.SyncToHost();
   T.SyncToHost();
