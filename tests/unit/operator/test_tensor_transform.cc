@@ -393,8 +393,9 @@ void CheckCase(const ModelSpacePtr& ms, const Case& c,
               << d.max_diff_one << " 2B " << d.max_diff_two << "\n";
     EXPECT_LE(d.max_diff_one, 1.0e-12 * std::max(1.0, d.max_ref));
     EXPECT_LE(d.max_diff_two, 1.0e-12 * std::max(1.0, d.max_ref));
-    if (MaxAbs(in).two_body > 0.0)
+    if (MaxAbs(in).two_body > 0.0) {
       EXPECT_GT(d.num_two, 0) << "no nonzero two-body sample";
+    }
   }
 }
 
