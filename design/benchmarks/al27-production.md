@@ -83,6 +83,16 @@ them; the driver must select it under `compat = "imsrg_fork_79e9330"` (AL-D3). I
 native float64) and `N2LOsat_me2jp_omega_00{0,1}.me1j/.me2jp.bin` (74 MB each, float32), with
 manifests, basis C and occupations, in `$IMSRG_WORK/runs/al27/v1/N2LOsat/`.
 
+## 3b. DeltaN2LOGO(394) (`tools/al27/dn2logo_v1.toml`)
+
+| Quantity | archive (README 3.3) | ours |
+|---|---|---|
+| HF iterations, e1/e2/e3 | 29, 505.9244222 / -705.5858928 / 88.7038044 | 29, 505.9244222 / -705.5858928 / 88.7038044 |
+| E_HF (= E_Nat) | -110.9576662 | -110.95766616 |
+| EMP2 (emax 14) | -104.47937337 | -104.47937337 |
+| EMP2 / EMP3 (emax 10) | -104.362419 / -9.735131 | -104.362419 / -9.735131 |
+| Stage 1 end: steps, s, E0, eta 2b, Omega 2b | 30, 11.30557, -157.357310359, 8.27e-4, 2.2179 | 30, 11.30557, -157.357310359, 8.27073e-4, 2.217947 |
+
 ## 4. Timings (N2LOsat, one node, 56 threads, release build)
 
 | Step | ours | imsrg++ archive (48 threads, JUWELS) |
