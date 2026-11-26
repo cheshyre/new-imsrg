@@ -99,6 +99,17 @@ TEST(Resolve, hf_mixing_defaults_to_diis_in_toml_and_linear_in_legacy) {
             HartreeFockMixing::kLinear);
 }
 
+// Compat profile imsrg_fork_79e9330 (design/50 section 5): the fork's
+// Parameters.hh default domega = 0.2 unless domega is given.
+TEST(Resolve, fork_compat_profile_sets_domega_default) {
+  EXPECT_EQ(ResolveTree(Minimal()).config.imsrg.step.domega, 0.1);
+  const auto fork = With(Minimal(), {{"run.compat", S("imsrg_fork_79e9330")}});
+  EXPECT_EQ(ResolveTree(fork).config.imsrg.step.domega, 0.2);
+  EXPECT_EQ(ResolveTree(fork).config.run.compat, Compat::kImsrgFork79e9330);
+  const auto given = With(fork, {{"imsrg.step.domega", D(0.05)}});
+  EXPECT_EQ(ResolveTree(given).config.imsrg.step.domega, 0.05);
+}
+
 TEST(Resolve, hf_mixing_explicit_value_wins_in_both_modes) {
   const auto lin = With(Minimal(), {{"hartree_fock.mixing", S("linear")}});
   const auto diis = With(Minimal(), {{"hartree_fock.mixing", S("diis")}});

@@ -129,6 +129,22 @@ reach the same float32 values. Our reader, `imsrg method=HF emax=2 reference=He4
 imsrg++'s value, double-precision HF arithmetic). Not checked: the ME3J `.bin` (reader not written),
 emax above 2 (the reading code is the same; the emax-2 prefix of the file is what is read).
 
+### 3.2 Native binary operator format (design/50 C6, 2026-11-26)
+
+Not an exchange format: the exact (float64) storage of our own operators, used for stored Omegas
+(`output.write_omega`, `output.omega_format = "native"`) and flow checkpoints (`[checkpoint]`,
+`format = "native"`). `io::WriteOperatorBinary` / `io::ReadOperatorBinary`
+(`src/imsrg/io/operator_binary.h`). Layout, little-endian: magic `IMSRGOPB`; u32 format version (1);
+u32 header length; header: u64 model-space layout hash (FNV-1a over the orbits (n, l, 2j, 2tz), hw and
+the two-body channels with their kets), u64 reference hash (occupation bit patterns), i32
+particle_rank, rank_J, parity, delta_Tz, hermiticity, delta_particle_number, emax, e2max (= 2 emax),
+f64 hw, u32 label length + label bytes, u64 one-body and two-body buffer counts; then f64 zero body,
+the raw one-body buffer and the raw two-body block buffer exactly as stored; then a u64 FNV-1a
+checksum of everything after the magic. The reader checks the layout hash (always), the reference
+hash (optional), counts, exact size and checksum. Files are written to `<path>.tmp.<pid>` and renamed,
+so a crash never leaves a partial file under the final name. Round trips are bit for bit; three-body
+parts are not supported yet (IMSRG(3) Omegas later).
+
 ## 4. ME1J
 
 ```

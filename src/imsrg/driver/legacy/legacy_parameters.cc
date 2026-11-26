@@ -31,9 +31,11 @@ constexpr LegacyStatus kC = LegacyStatus::kChanged;
 constexpr LegacyStatus kNS = LegacyStatus::kNotSupported;
 constexpr LegacyStatus kPL = LegacyStatus::kPlanned;
 
-// The 85 keys of Parameters.hh in declaration order (design/16 sections
+// The 85 keys of Parameters.hh in declaration order, plus the fork 79e9330 keys
+// use_HF_reference_in_NAT, only_2b_omega_at_end, reduced_232_impl and
+// imsrg3_commutator_depth (89) (design/16 sections
 // 3.1-3.4).
-constexpr std::array<LegacyKeyInfo, 85> kKeys = {{
+constexpr std::array<LegacyKeyInfo, 89> kKeys = {{
     {"2bme", K::kString, "none", kS, "interaction.two_body.file",
      "none = no 2N input (error unless fmt2=schematic, 2bme=Minnesota); "
      "oakridge sp,vnn -> 2 "
@@ -112,6 +114,9 @@ constexpr std::array<LegacyKeyInfo, 85> kKeys = {{
      "bool; dropped (W-L1) without 3bme"},
     {"use_NAT_occupations", K::kString, "false", kS,
      "natural_orbitals.use_occupations", "dropped (V-21) unless basis=NAT"},
+    {"use_HF_reference_in_NAT", K::kString, "false", kS,
+     "natural_orbitals.use_hf_reference",
+     "fork 79e9330 key; dropped (V-21) unless basis=NAT"},
     {"order_NAT_by_energy", K::kString, "false", kC, "natural_orbitals.order",
      "true -> order=energy, overriding NAT_order"},
     {"NAT_order", K::kString, "occupation", kS, "natural_orbitals.order",
@@ -195,6 +200,14 @@ constexpr std::array<LegacyKeyInfo, 85> kKeys = {{
     {"OperatorsTDA", K::kVector, "", kNS, "",
      "TDA-resummed operator corrections are not supported"},
     {"SPWF", K::kVector, "", kS, "output.spwf", "strings, parsed later"},
+    // Keys of the fork imsrg++ 79e9330 (27Al archive, design/50) that only
+    // concern IMSRG(3) variants: accepted at their defaults and dropped.
+    {"only_2b_omega_at_end", K::kString, "false", kS, "-",
+     "fork 79e9330 key; only false accepted (dropped)"},
+    {"reduced_232_impl", K::kString, "false", kS, "-",
+     "fork 79e9330 key; only false accepted (dropped)"},
+    {"imsrg3_commutator_depth", K::kInt, "100", kS, "-",
+     "fork 79e9330 key; only 100 accepted (dropped)"},
 }};
 
 // -----------------------------------------------------------------------------
@@ -377,6 +390,7 @@ constexpr std::array kDirectBools = std::to_array<DirectBool>({
     {"discard_no2b_from_3n", "interaction.three_body.discard_no2b_after_hf",
      true},
     {"use_NAT_occupations", "natural_orbitals.use_occupations", false},
+    {"use_HF_reference_in_NAT", "natural_orbitals.use_hf_reference", false},
     {"store_3bme_pn", "interaction.three_body.store_pn", true},
     {"discard_residual_input3N", "imsrg3.discard_residual_input_3n", false},
     {"only_2b_eta", "imsrg3.only_2b_eta", false},
@@ -923,6 +937,19 @@ class Translator {
                      e->value + "'",
                  ArgRef(*e));
     }
+    // Fork 79e9330 IMSRG(3) keys: only their defaults (dropped).
+    for (const auto& [key, def] :
+         {std::pair<std::string_view, std::string_view>{"only_2b_omega_at_end",
+                                                        "false"},
+          {"reduced_232_impl", "false"},
+          {"imsrg3_commutator_depth", "100"}}) {
+      if (const Entry* e = get(key); e && e->value != def) {
+        AddError("E-LEGACY-NS", std::string(key),
+                 "the fork 79e9330 option '" + std::string(key) +
+                     "' is supported only at its default " + std::string(def),
+                 ArgRef(*e));
+      }
+    }
     if (const Entry* e = get("atomicZ"))
       AddError("E-LEGACY-NS", "atomicZ",
                "atomic systems are not supported by imsrg", ArgRef(*e));
@@ -1331,6 +1358,7 @@ class Translator {
     if (tree_str("basis.kind").value_or("hf") != "nat") {
       for (std::string_view key : {std::string_view("use_NAT_occupations"),
                                    std::string_view("NAT_order"),
+                                   std::string_view("use_HF_reference_in_NAT"),
                                    std::string_view("order_NAT_by_energy")}) {
         if (!given(key)) continue;
         Warn("V-21", std::string(key),
@@ -1339,6 +1367,7 @@ class Translator {
       }
       Drop("natural_orbitals.use_occupations");
       Drop("natural_orbitals.order");
+      Drop("natural_orbitals.use_hf_reference");
     }
   }
 

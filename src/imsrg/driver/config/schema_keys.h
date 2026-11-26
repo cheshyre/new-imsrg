@@ -69,6 +69,11 @@ void VisitSchema(Config& c, Visitor&& v) {
   v.Field(KeyInfo{"run.log_level", "stdout verbosity: quiet, normal, debug",
                   "normal"},
           c.run.log_level);
+  v.Field(KeyInfo{"run.compat",
+                  "compatibility profile: none, imsrg_fork_79e9330 (named "
+                  "internal options, design/50 section 5)",
+                  "none"},
+          c.run.compat);
   // [basis]
   v.Field(KeyInfo{"basis.emax", "single-particle truncation e = 2n + l",
                   "required", true},
@@ -195,6 +200,11 @@ void VisitSchema(Config& c, Visitor&& v) {
   v.Field(KeyInfo{"natural_orbitals.order",
                   "NAT orbit labelling: occupation, energy", "occupation"},
           c.natural_orbitals.order);
+  v.Field(KeyInfo{"natural_orbitals.use_hf_reference",
+                  "reset occupied NAT orbitals to the HF orbitals (fork "
+                  "use_HF_reference_in_NAT)",
+                  "false"},
+          c.natural_orbitals.use_hf_reference);
   // [imsrg]
   v.Field(KeyInfo{"imsrg.method", "solver", "magnus"}, c.imsrg.method);
   v.Field(KeyInfo{"imsrg.steps", "decoupling stages (1 or 2)",
@@ -327,6 +337,11 @@ void VisitSchema(Config& c, Visitor&& v) {
           c.output.valence_file_format);
   v.Field(KeyInfo{"output.write_omega", "write Omega operators", "false"},
           c.output.write_omega);
+  v.Field(KeyInfo{"output.omega_format",
+                  "format of the Omega files: native (float64, exact) or "
+                  "me2jp (ME1J + float32 binary ME2JP)",
+                  "native"},
+          c.output.omega_format);
   v.Field(KeyInfo{"output.write_ho_ops", "write operators before HF", "false",
                   false, false, PL},
           c.output.write_ho_ops);
@@ -337,6 +352,25 @@ void VisitSchema(Config& c, Visitor&& v) {
       KeyInfo{"output.spwf",
               "orbits whose single-particle wave functions are written", "[]"},
       c.output.spwf);
+  // [checkpoint]
+  v.Field(KeyInfo{"checkpoint.directory",
+                  "flow checkpoint directory (empty: no checkpoints)", "\"\""},
+          c.checkpoint.directory);
+  v.Field(KeyInfo{"checkpoint.interval_minutes",
+                  "wall time between checkpoints (0: every step)", "30.0"},
+          c.checkpoint.interval_minutes);
+  v.Field(KeyInfo{"checkpoint.format",
+                  "operator files of a checkpoint: native or me2jp", "native"},
+          c.checkpoint.format);
+  v.Field(KeyInfo{"checkpoint.restart",
+                  "continue the flow from the checkpoint in the directory",
+                  "false"},
+          c.checkpoint.restart);
+  v.Field(KeyInfo{"checkpoint.abort_after_steps",
+                  "testing aid: fail right after the checkpoint of this flow "
+                  "step (0: never)",
+                  "0"},
+          c.checkpoint.abort_after_steps);
 }
 
 /// All schema keys in canonical order (keys of optional tables included).

@@ -65,6 +65,9 @@ enum class No2bPrecision { kSingle, kHalf };
 enum class HartreeFockMixing { kDiis, kLinear };
 /// `natural_orbitals.order`.
 enum class NatOrder { kOccupation, kEnergy };
+/// `run.compat`: a named compatibility profile that switches on the internal
+/// options of `CompatOptions` (driver/config/compat.h; design/50 section 5).
+enum class Compat { kNone, kImsrgFork79e9330 };
 /// `imsrg.method`: the solver.
 enum class Method {
   kMagnus,
@@ -95,6 +98,10 @@ enum class Generator {
 enum class Partitioning { kEpsteinNesbet, kMollerPlesset, kMpIsospin };
 /// `imsrg.omega.storage`.
 enum class OmegaStorage { kMemory, kScratch, kDiscard };
+/// File format of stored operators (Omegas, checkpoints; design/50 C6):
+/// native float64 binary (exact) or ME1J + binary ME2JP (float32 two-body
+/// part, design/19 section 3.1).
+enum class OperatorFileKind { kNative, kMe2jp };
 /// `imsrg3.variant`.
 enum class Imsrg3Variant { kFull, kN7, kMp4 };
 /// `output.valence_file_format`.
@@ -216,6 +223,9 @@ IMSRG_DRIVER_ENUM_TRAITS(No2bPrecision, "NO2B precision",
 IMSRG_DRIVER_ENUM_TRAITS(HartreeFockMixing, "Hartree-Fock mixing",
                          {HartreeFockMixing::kDiis, "diis"},
                          {HartreeFockMixing::kLinear, "linear"});
+IMSRG_DRIVER_ENUM_TRAITS(Compat, "compatibility profile",
+                         {Compat::kNone, "none"},
+                         {Compat::kImsrgFork79e9330, "imsrg_fork_79e9330"});
 IMSRG_DRIVER_ENUM_TRAITS(NatOrder, "natural-orbital order",
                          {NatOrder::kOccupation, "occupation"},
                          {NatOrder::kEnergy, "energy"});
@@ -245,6 +255,9 @@ IMSRG_DRIVER_ENUM_TRAITS(Partitioning, "denominator partitioning",
                          {Partitioning::kMollerPlesset, "moller_plesset"},
                          {Partitioning::kMpIsospin, "mp_isospin",
                           Phase::kPlanned});
+IMSRG_DRIVER_ENUM_TRAITS(OperatorFileKind, "operator file format",
+                         {OperatorFileKind::kNative, "native"},
+                         {OperatorFileKind::kMe2jp, "me2jp"});
 IMSRG_DRIVER_ENUM_TRAITS(OmegaStorage, "Omega storage",
                          {OmegaStorage::kMemory, "memory"},
                          {OmegaStorage::kScratch, "scratch", Phase::kPlanned},
@@ -292,6 +305,8 @@ struct TaskConfig {
   std::string scratch_dir;  ///< Omega spill directory (used iff
                             ///< imsrg.omega.storage = scratch)
   LogLevel log_level = LogLevel::kNormal;
+  /// Compatibility profile (default: none = the fixed behaviour).
+  Compat compat = Compat::kNone;
   friend bool operator==(const TaskConfig&, const TaskConfig&) = default;
 };
 
@@ -397,6 +412,9 @@ struct HartreeFockConfig {
 struct NaturalOrbitalsConfig {
   bool use_occupations = false;
   NatOrder order = NatOrder::kOccupation;
+  /// Reset the occupied natural orbitals to the HF orbitals (fork imsrg++
+  /// `use_HF_reference_in_NAT`, `mbpt::UseHfForHoleStates`).
+  bool use_hf_reference = false;
   friend bool operator==(const NaturalOrbitalsConfig&,
                          const NaturalOrbitalsConfig&) = default;
 };
@@ -526,10 +544,25 @@ struct OutputConfig {
   std::string flow_file;  ///< resolved: <directory>/<stem>.flow
   ValenceFileFormat valence_file_format = ValenceFileFormat::kTokyo;
   bool write_omega = false;
+  /// Format of the Omega files of `write_omega`.
+  OperatorFileKind omega_format = OperatorFileKind::kNative;
   bool write_ho_ops = false;      ///< planned
   bool write_hf_ops = false;      ///< planned
   std::vector<std::string> spwf;  ///< orbit labels or "valence"
   friend bool operator==(const OutputConfig&, const OutputConfig&) = default;
+};
+
+/// `[checkpoint]`: flow checkpoints (Magnus, design/13 section 7.3).
+struct CheckpointConfig {
+  std::string directory;           ///< empty: no checkpoints
+  double interval_minutes = 30.0;  ///< wall time between checkpoints; 0:
+                                   ///< after every step
+  OperatorFileKind format = OperatorFileKind::kNative;
+  bool restart = false;       ///< continue from the checkpoint in `directory`
+  int abort_after_steps = 0;  ///< testing aid: stop with an error right after
+                              ///< the checkpoint of this flow step (0: never)
+  friend bool operator==(const CheckpointConfig&,
+                         const CheckpointConfig&) = default;
 };
 
 /// Where a configuration came from (design/16 section 1.7). Written as
@@ -560,6 +593,7 @@ struct RunConfig {
   Imsrg3Config imsrg3;
   OperatorsConfig operators;
   OutputConfig output;
+  CheckpointConfig checkpoint;
   Provenance provenance;  ///< metadata only: excluded from operator==
 
   /// Field-by-field equality of every section except `provenance`.
@@ -569,7 +603,7 @@ struct RunConfig {
            a.interaction == b.interaction && a.hartree_fock == b.hartree_fock &&
            a.natural_orbitals == b.natural_orbitals && a.imsrg == b.imsrg &&
            a.imsrg3 == b.imsrg3 && a.operators == b.operators &&
-           a.output == b.output;
+           a.output == b.output && a.checkpoint == b.checkpoint;
   }
 };
 
