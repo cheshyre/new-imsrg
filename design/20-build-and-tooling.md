@@ -238,6 +238,25 @@ As implemented in M0:
   `new-imsrg-reference/build` for the standalone build, and `add_subdirectory(<src> build)` in the
   wrapper `tools/reference/CMakeLists.txt` (binary dir `new-imsrg-reference/harness-build`).
   The wrapper also needs its own `find_package(OpenMP)` (imported targets are directory-scoped).
+* **Frontier (2026-11-26).** All paths come from `tools/reference/ref_env.sh` (sourced by every
+  script): `REF_ROOT` = `$IMSRG_REFERENCE_ROOT` (SHA files, read-only), `REF_BUILD` =
+  `$IMSRG_REFERENCE_BUILD`, else `$IMSRG_WORK/reference-build` (all copies, builds, runs; the SHA
+  files it writes there are used only when `REF_ROOT` has none), `REF_SRC` = `$REF_ROOT/imsrg-devel`,
+  `DATA` = `$IMSRG_TEST_DATA_DIR`, else `$IMSRG_WORK/inputs`; without `IMSRG_WORK` the Mac
+  defaults apply. Build on a compute node (no internet there, nothing to download):
+  `source tools/lib/frontier_env.sh; imsrg_compute tools/reference/build_imsrg_devel.sh patched`
+  (then `all` for the pristine pair; about 1 min each on 56 cores). The script loads the CPU modules of
+  section 9 plus `gsl/2.8 boost/1.88.0` (the login node's system Boost is 1.66, the compute nodes have
+  none) and uses the Cray wrappers `cc`/`CC` (gcc 14.2, cray-libsci as BLAS). What differed from
+  the Mac: (1) the hard-coded `BLA_VENDOR OpenBLAS` finds nothing, so `-DBLAS_LIBRARIES=sci_gnu_mp`
+  is preset (the wrapper links libsci itself); (2) gcc 14 needs `<cstdint>` in
+  `imsrg_util/Pwd.hh`, supplied by `-DCMAKE_CXX_FLAGS="-include cstdint"` instead of a source patch;
+  (3) the wrappers default to static linking, so `CRAYPE_LINK_TYPE=dynamic` and
+  `CMAKE_POSITION_INDEPENDENT_CODE=ON` for `libIMSRG.so`. The source checksum equals the Mac one
+  (`ddcbf1af...`). Regenerated `golden-generated` agrees with the Mac files to about 1e-15 relative
+  in the physics numbers (E_HF, MP2, norms) and 1e-13 absolute in the dumps; the entries below
+  about 1e-17 are rounding noise that the dumps write or omit differently.
+
 
 ## 6. Plain Makefile (later, M13)
 

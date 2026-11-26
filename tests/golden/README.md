@@ -237,3 +237,9 @@ Raw labelled format `# imsrg-tensor-dump raw v0` (`*.tdump`), described with ims
 
 New refharness subcommands: `dump-tensor`, `commutator-tensor`, `bch-tensor` (`tools/reference/rh_tensor.cpp`). Rebuild the patched harness with
 `FRESH=1 tools/reference/build_imsrg_devel.sh patched-harness` when its CMake cache points at another checkout.
+
+**Frontier builds (added 2026-11-26).** The provenance lines above keep the Mac paths. On OLCF Frontier the
+reference builds (`build-d35`, `harness-build-d35`, `harness-build`, ...) live in
+`$IMSRG_WORK/reference-build` (`tools/reference/ref_env.sh`), the pristine source and the SHA files in
+`$IMSRG_REFERENCE_ROOT` (`/ccs/proj/nph123/mheinz/imsrg/reference`), the inputs in `$IMSRG_WORK/inputs`.
+The stamp is the same (`ddcbf1af...+d35-patch:3b0ff5eed6806a72`); see design/20 section 5.
