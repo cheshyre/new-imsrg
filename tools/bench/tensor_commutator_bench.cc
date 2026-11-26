@@ -22,6 +22,7 @@
 #include <cstring>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "imsrg/base/types.h"
 #include "imsrg/basis/model_space.h"
@@ -90,6 +91,26 @@ op::Operator RandomTensor(std::shared_ptr<const imsrg::basis::ModelSpace> ms,
   return t;
 }
 
+/// Writes the zero-, one- and two-body parts of `z` as raw native doubles
+/// (zero body, then the 1B and the 2B buffers) to `path`, for comparing
+/// device and host results (M14, tools/bench/compare_dumps.py).
+bool DumpOperator(const op::Operator& z, const std::string& path) {
+  std::FILE* f = std::fopen(path.c_str(), "wb");
+  if (f == nullptr) return false;
+  const double z0 = z.zero_body();
+  const std::vector<double> z1 = z.one_body().buffer().ToVector();
+  const std::vector<double> z2 = z.two_body().matrix().buffer().ToVector();
+  const std::uint64_t n1 = z1.size();
+  const std::uint64_t n2 = z2.size();
+  bool ok = std::fwrite(&n1, sizeof n1, 1, f) == 1 &&
+            std::fwrite(&n2, sizeof n2, 1, f) == 1 &&
+            std::fwrite(&z0, sizeof z0, 1, f) == 1 &&
+            std::fwrite(z1.data(), sizeof(double), z1.size(), f) == z1.size() &&
+            std::fwrite(z2.data(), sizeof(double), z2.size(), f) == z2.size();
+  ok = (std::fclose(f) == 0) && ok;
+  return ok;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -100,6 +121,7 @@ int main(int argc, char** argv) {
   int reps = 1;
   std::string reference = "O16";
   std::string valence = "O16";
+  std::string dump;
   for (int i = 1; i + 1 < argc; i += 2) {
     const std::string k = argv[i];
     const char* v = argv[i + 1];
@@ -109,6 +131,7 @@ int main(int argc, char** argv) {
     if (k == "--reps") reps = std::atoi(v);
     if (k == "--reference") reference = v;
     if (k == "--valence") valence = v;
+    if (k == "--dump") dump = v;
   }
   const auto ms = imsrg::basis::ModelSpace::FromNames(
       imsrg::basis::BasisTruncation{emax}, 16.0, reference, valence);
@@ -157,5 +180,10 @@ int main(int argc, char** argv) {
   struct rusage ru;
   getrusage(RUSAGE_SELF, &ru);
   std::printf("  peak RSS %.2f GB\n", static_cast<double>(ru.ru_maxrss) / 1e6);
+  // Z holds the full commutator of the last ("all") timing loop.
+  if (!dump.empty() && !DumpOperator(Z, dump)) {
+    std::fprintf(stderr, "error: cannot write %s\n", dump.c_str());
+    return 1;
+  }
   return 0;
 }

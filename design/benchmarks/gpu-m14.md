@@ -21,13 +21,16 @@ reference), `tools/bench/tensor_commutator_bench` (scalar X, Hermitian rank-L te
 
 | emax | GPU, 1 GCD | CPU 56 cores, serial libsci + concurrent | CPU 56 cores, default BLAS | CPU 16 cores, default | speed-up GCD / 56 cores |
 |-----:|-----------:|-----------------------------------------:|---------------------------:|----------------------:|------------------------:|
-| 8 | **21.7** | 65 | 430-590 | 170-186 | 3.0x |
-| 10 | **77.6** | 339 | - | - | 4.4x |
+| 8 | **16.4** | 65 | 430-590 | 170-186 | 4.0x |
+| 10 | **64.0** | 339 | - | - | 5.3x |
 
-Per term at emax 10 (ms): GPU / CPU (serial libsci, 56): comm221 12.9 / 137, comm122 25.8 / 56,
-pp_hh 9.3 / 150, ph 33.9 / 127, pp_hh_221 14.8 / 156. GPU history at emax 10: 105 ms with the
+Per term at emax 10 (ms): GPU / CPU (serial libsci, 56): comm221 12.8 / 137, comm122 12.6 / 56,
+pp_hh 9.7 / 150, ph 34.2 / 127, pp_hh_221 14.9 / 156. GPU history at emax 10: 105 ms with the
 host-shaped kernels (only the GEMMs moved to rocBLAS) -> 103 (team-per-column variants, no gain)
--> 78 ms (flat element kernels). At emax 8 the host-shaped kernels took 102 ms (ph inverse alone
+-> 78 ms (flat element kernels) -> 64 ms (comm122 bra part as dense GEMMs of the lifted one-body
+operators). Remaining hot spot: the ph inverse transform (25 ms, team per ket). A hoisted
+variant of the tensor phst inverse (9j box and cc indices per element, private arrays) was
+slower (2133 -> 2367 ms at emax 10 rank 5, register spills) and was dropped. At emax 8 the host-shaped kernels took 102 ms (ph inverse alone
 73 ms: one thread per ket starves the GPU).
 
 **Finding for the CPU (FP-Q6):** with the default BLAS setup the CPU commutator is 6-7x slower
@@ -58,12 +61,21 @@ GPU history at emax 8 rank 5: 1105 ms (GEMMs on rocBLAS, host-shaped kernels) ->
 -> 467 ms (comm122st NestedFor, 136 -> 98 ms). Remaining hot spot: the phst inverse transform
 (9j x Zbar gathers, ~2/3 of the time at emax 10).
 
+## Device vs host results
+
+`commutator_bench --dump` / `tensor_commutator_bench --dump` write [X, Y] as raw doubles;
+`tools/bench/compare_dumps.py host.bin device.bin` compares them (max|dZ| / max(1, max|Z|) per
+part, tolerance 1e-12). GPU (rocBLAS, device shapes) vs CPU (OpenMP, libsci): scalar emax 8
+1.0e-15, emax 10 2.0e-15; tensor rank 5 emax 8 3.5e-15, rank 2 emax 6 1.7e-15 (worst part).
+All goldens pass on the GCD (frontier-hip-run: 1328 of 1333 unit tests, all 76 integration
+tests; the 5 failures are the bitwise atan tests of AL-E-Q2).
+
 ## Device BLAS: rocBLAS vs Kokkos Kernels (owner rule: vendor path only at >= 5x)
 
 * **rocBLAS** (implemented, default for hip): `rocblas_dgemm` on the Kokkos stream; grouped calls
   fork onto 4 side streams (largest problem first, least loaded stream) and join with events.
   GEMM share of the kernel time: scalar emax 10 12.5 ms of ~110 ms (11 %, 248 GEMMs per
-  commutator); tensor emax 10 rank 2 ~14 % (3888 GEMMs per three calls).
+  commutator) before the comm122 GEMMs, ~26 ms of ~64 ms (~40 %) after them; tensor emax 10 rank 2 ~14 % (3888 GEMMs per three calls).
 * **Kokkos Kernels**: the backend is written (`IMSRG_DEVICE_BLAS=KOKKOSKERNELS`, KokkosBlas::gemm
   on LayoutLeft subviews; `tools/bootstrap_deps.sh` builds `kokkoskernels-hip` from a tarball)
   but **not measured**: the Kokkos Kernels 5.3.0 source could not be downloaded from the agent
@@ -72,10 +84,11 @@ GPU history at emax 8 rank 5: 1105 ms (GEMMs on rocBLAS, host-shaped kernels) ->
   To measure: put `kokkos-kernels-5.3.0.tar.gz` into `$IMSRG_DEPS_PREFIX/src/`, run
   `tools/bootstrap_deps.sh --backends hip` on the compute node, configure frontier-hip with
   `-DIMSRG_DEVICE_BLAS=KOKKOSKERNELS`, rerun the three benchmarks.
-* **Bound on the choice:** the GEMMs are 11-14 % of the GPU time, so even a Kokkos Kernels GEMM
-  5x slower than rocBLAS (plausible: rocBLAS uses the MFMA matrix cores) would cost 45-55 % in
-  total, and an equally fast one would gain nothing. Per the owner's rule the vendor path can only
-  be justified if KK's GEMMs are >= 5x slower; that needs the measurement above.
+* **Bound on the choice:** the GEMMs are ~14 % of the tensor and ~40 % of the scalar GPU time.
+  A Kokkos Kernels GEMM 5x slower than rocBLAS (plausible: rocBLAS uses the MFMA matrix cores)
+  would make the tensor commutator ~1.6x and the scalar one ~2.6x slower in total; an equally
+  fast one would gain nothing. Per the owner's rule the vendor path is preferred only if the
+  measured benefit is >= 5x; that needs the measurement above.
 
 **Proposed D-row (pending the KK measurement):** "M14 device BLAS: `linalg::DeviceGemm` /
 `DeviceGroupedGemm` with configure-time backends HOST (CPU), ROCBLAS, KOKKOSKERNELS. Default
