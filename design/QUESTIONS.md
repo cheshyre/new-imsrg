@@ -1322,3 +1322,32 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
   meanwhile:** `frontier-serial` is not the merge gate (frontier-cpu is); raise the test's timeout
   or label it `slow` for serial builds? Owner to decide.
   **Answer (owner, 2026-11-26):** Label `Imsrg3N7.He4Emax2OccNat3Cut` `slow` under serial builds; the maybe-uninitialized warning stays non-fatal in frontier-serial; frontier-serial is not a merge gate.
+
+## Added during the Al27 night (2026-11-26)
+
+### Lead A (M15 tensor operators, capability C3)
+
+* **AL-A-Q1** (2026-11-26) - Seeded random operators depend on the C++ standard library. The Frontier
+  harness (libstdc++) gives other `random_A` / `rand_*` values than the Mac (libc++), so every tensor
+  golden built from them changed when `gen_golden_tensor.sh` was rerun on Frontier (deterministic ones
+  agree to <= 1.5e-14). **Assumed:** the tensor goldens were regenerated on Frontier and made
+  self-contained (their random inputs are stored); the scalar `commutator/emax2_O16/random_A.dump`
+  (Mac) stays as it is. Other golden scripts that build random operators will show the same effect
+  when rerun on Frontier.
+* **AL-A-Q2** (2026-11-26) - Memory of the tensor particle-hole term. The rewrite keeps Zbar for all
+  cross-coupled channel pairs over ALL ordered pairs (rows and columns), about 4x imsrg++'s Zbar
+  (which uses c3 <= c4 and unordered rows with phase bookkeeping). Fine up to emax 6; estimated
+  ~10-20 GB at emax 10 with rank 5. The 9j table (one dense box per (A, B, D, E)) is 35 MB at emax 6
+  and ~1.1 GB at emax 10, built serially with Wigner9j (minutes at emax 10). **Assumed:** acceptable
+  for the first milestone; before the farm (C10/C11): use the Zbar symmetries (c3 <= c4, unordered
+  rows), tile the channel pairs, and cache/parallelize the 9j table (or evaluate 9j from 6j tables on
+  the device).
+* **AL-A-Q3** (2026-11-26) - imsrg-devel's fix of the tensor normal ordering (`ME *= 2` for a == b,
+  J_bra != J_ket, Operator.cc:555-558) is right only for Hermitian tensors; for an anti-Hermitian
+  tensor the two orientations cancel (and devel's mirror `O(b,a) = herm * O(a,b)` flips the diagonal
+  sign on every update). **Assumed:** the rewrite sums both orientations explicitly (correct for both
+  hermiticities); the fork's bug is the option `TensorNormalOrderOptions::fork79e9330_diagonal_bug`.
+  All 27Al operators are Hermitian, so this only matters for anti-Hermitian tensors.
+* **AL-A-Q4** (2026-11-26) - `[scalar, tensor]` with a one-body Y: imsrg++ gives Z Y's particle rank,
+  the rewrite gives Z max(rank X, rank Y) (so comm122st is kept for a one-body Y). BCH promotes Y to
+  rank 2 first in both codes, so transformed operators agree. **Assumed:** keep the rewrite's rule.
