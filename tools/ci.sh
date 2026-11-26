@@ -172,8 +172,12 @@ step_unit() {
 }
 
 step_integration() {
+  # On one GCD the long integration tests (IMSRG(3) N7, ~155 s alone, host part single-threaded
+  # in the HIP build) exceed their 300 s timeout when six share the device: three at a time.
+  local jobs_it=$test_jobs
+  if [ "$gpu_tests" -eq 1 ]; then jobs_it=3; fi
   $on_test ctest --test-dir "$build_dir" -L '^integration$' -LE '^(slow|mpi)$' --output-on-failure \
-    --no-tests=ignore -j "$test_jobs" || return 1
+    --no-tests=ignore -j "$jobs_it" || return 1
   if ls tests/integration/test_*.py >/dev/null 2>&1; then
     IMSRG_BUILD_DIR="$build_dir" $on_test "$python" -m pytest -q tests/integration -m "not slow"
   fi
