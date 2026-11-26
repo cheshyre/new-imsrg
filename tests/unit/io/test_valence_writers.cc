@@ -63,7 +63,9 @@ double CompareFiles(const fs::path& got, const fs::path& want,
   for (std::size_t i = 0; i < n; ++i) {
     const bool comment = !w[i].empty() && w[i][0] == '!';
     if (comment) {
-      if (i != 0) EXPECT_EQ(g[i], w[i]) << tag << " line " << i + 1;
+      if (i != 0) {
+        EXPECT_EQ(g[i], w[i]) << tag << " line " << i + 1;
+      }
       continue;
     }
     const auto tg = Tokens(g[i]);

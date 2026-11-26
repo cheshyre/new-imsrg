@@ -126,7 +126,9 @@ TEST(TwoBodyChannels, LookupsAndMembership) {
         EXPECT_EQ(a.tz2.twice + b.tz2.twice, c.two_tz.twice);
         EXPECT_GE(a.j2.twice + b.j2.twice, c.two_j.twice);
         EXPECT_LE(std::abs(a.j2.twice - b.j2.twice), c.two_j.twice);
-        if (kt.p == kt.q) EXPECT_EQ(c.J() % 2, 0);
+        if (kt.p == kt.q) {
+          EXPECT_EQ(c.J() % 2, 0);
+        }
       }
     }
     EXPECT_EQ(total, allowed_pairs);

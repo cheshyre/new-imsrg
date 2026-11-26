@@ -863,15 +863,18 @@ class Translator {
     // imsrg3 variant.
     const Entry* n7 = get("imsrg3_n7");
     const Entry* mp4 = get("imsrg3_mp4");
-    const auto n7v = n7 ? ParseBool(*n7, "imsrg3_n7") : std::nullopt;
-    const auto mp4v = mp4 ? ParseBool(*mp4, "imsrg3_mp4") : std::nullopt;
-    if (n7v && mp4v && *n7v && *mp4v)
+    // An unparsable value was reported by ParseBool; it counts as false here.
+    const bool n7v =
+        n7 != nullptr && ParseBool(*n7, "imsrg3_n7").value_or(false);
+    const bool mp4v =
+        mp4 != nullptr && ParseBool(*mp4, "imsrg3_mp4").value_or(false);
+    if (n7v && mp4v)
       AddError("E-LEGACY-VALUE", "imsrg3.variant",
                "imsrg3_n7=true and imsrg3_mp4=true are exclusive",
                ArgRef(*mp4));
-    else if (n7v && *n7v)
+    else if (n7v)
       PutS("imsrg3.variant", "n7", ArgRef(*n7));
-    else if (mp4v && *mp4v)
+    else if (mp4v)
       PutS("imsrg3.variant", "mp4", ArgRef(*mp4));
   }
 

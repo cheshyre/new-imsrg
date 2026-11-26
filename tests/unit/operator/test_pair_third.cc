@@ -165,7 +165,9 @@ TEST(PairThirdIndex, ChannelAndTripleRangesAreContiguous) {
         local = pt.state_end(ti);
       }
       EXPECT_EQ(local, pt.num_states(chi));
-      if (kc.dim == 0) EXPECT_EQ(pt.num_states(chi), 0);
+      if (kc.dim == 0) {
+        EXPECT_EQ(pt.num_states(chi), 0);
+      }
       flat += local;
     }
     EXPECT_EQ(flat, pt.num_states());
@@ -197,7 +199,9 @@ TEST(PairThirdIndex, StatesAreWellFormed) {
       EXPECT_EQ(tjpq % 2, 0);
       EXPECT_TRUE(tjpq >= std::abs(jp - jq) && tjpq <= jp + jq);
       EXPECT_TRUE(tjpq >= std::abs(jr - two_j) && tjpq <= jr + two_j);
-      if (p == q) EXPECT_EQ((tjpq / 2) % 2, 0);
+      if (p == q) {
+        EXPECT_EQ((tjpq / 2) % 2, 0);
+      }
     }
   }
 }

@@ -418,7 +418,9 @@ void TwoStage(const std::string& method, const char* gdir, const char* tag,
               e0 - e0_gold);
   // The golden's last flow line is the last hunter step, not the rebuilt H
   // (D48): the .snt (rebuilt H) is compared at 1e-9 instead.
-  if (!sc.hg) EXPECT_NEAR(e0, e0_gold, 1.0e-3);
+  if (!sc.hg) {
+    EXPECT_NEAR(e0, e0_gold, 1.0e-3);
+  }
   const double tol = sc.hg ? 1.0e-9 : 1.0e-3;
 
   ASSERT_EQ(r.results["valence_interaction"].kind, Json::Kind::kString);

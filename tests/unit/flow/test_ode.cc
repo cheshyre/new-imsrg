@@ -206,7 +206,9 @@ TEST(OdeFlow, EtaCriterionIsADouble) {
       if (crit > norm_eta) {
         EXPECT_EQ(r.reason, flow::StopReason::kConverged);
         EXPECT_DOUBLE_EQ(r.e0, e0_initial);
-        if (m == flow::OdeMethod::kRk4) EXPECT_EQ(r.steps, 0);
+        if (m == flow::OdeMethod::kRk4) {
+          EXPECT_EQ(r.steps, 0);
+        }
       } else {
         EXPECT_NE(r.e0, e0_initial);
       }
