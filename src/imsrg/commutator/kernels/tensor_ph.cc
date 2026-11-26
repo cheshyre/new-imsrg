@@ -19,6 +19,7 @@
 #include "imsrg/commutator/tensor.h"
 #include "imsrg/exec/kokkos_backend.h"
 #include "imsrg/linalg/blas.h"
+#include "imsrg/linalg/device_blas.h"
 
 namespace imsrg::commutator::tensor_terms {
 
@@ -379,10 +380,10 @@ void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
           ybd + yb_off[static_cast<std::size_t>(P)], n3, m4, n3};
       linalg::MatrixView<const double> X4{
           xcd + xc_off[static_cast<std::size_t>(c4)], n4, m4, n4};
-      linalg::Gemm(1.0, X3, linalg::Op::kNoTrans, YA, linalg::Op::kNoTrans, 0.0,
-                   Zm);
-      linalg::Gemm(-1.0 * hX, YB, linalg::Op::kNoTrans, X4, linalg::Op::kTrans,
-                   1.0, Zm);
+      linalg::DeviceGemm(1.0, X3, linalg::Op::kNoTrans, YA,
+                         linalg::Op::kNoTrans, 0.0, Zm);
+      linalg::DeviceGemm(-1.0 * hX, YB, linalg::Op::kNoTrans, X4,
+                         linalg::Op::kTrans, 1.0, Zm);
     }
   }
   // 4. Inverse transform into the stored blocks of Z.

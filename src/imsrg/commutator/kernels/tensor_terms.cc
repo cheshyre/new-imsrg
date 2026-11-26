@@ -20,6 +20,7 @@
 #include "imsrg/commutator/tensor.h"
 #include "imsrg/exec/kokkos_backend.h"
 #include "imsrg/linalg/blas.h"
+#include "imsrg/linalg/device_blas.h"
 
 namespace imsrg::commutator::tensor_terms {
 

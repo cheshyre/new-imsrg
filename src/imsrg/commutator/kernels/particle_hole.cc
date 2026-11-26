@@ -43,6 +43,7 @@
 #include "imsrg/commutator/detail/workspace_impl.h"
 #include "imsrg/exec/kokkos_backend.h"
 #include "imsrg/linalg/blas.h"
+#include "imsrg/linalg/device_blas.h"
 
 namespace imsrg::commutator::terms {
 
@@ -348,10 +349,6 @@ void Comm222PhssGeneral(const op::Operator& X, const op::Operator& Y,
   const int num_cc = pd.num_cc;
   const auto g_total = static_cast<exec::Index>(
       distributed ? pd.general.owned_total : pd.general.g_off_host.back());
-  // Host BLAS only; device backends need a device gemm (design/12 section 3).
-  IMSRG_CHECK(pd.general.z.host_is_device(),
-              "comm222_phss: host BLAS on device memory; needs a device gemm "
-              "(GPU backends)");
   // Two passes share the A and B scratch (each 2 Ncc x nk): Z = A0 B0 + A1 B1
   // with, for kappa = (a, b) a pair of K and ordered cc pairs (p, q),
   //   pass 0: A0(alpha, kappa) =  D_kappa Xbar(alpha-pair, kappa),
@@ -410,7 +407,7 @@ void Comm222PhssGeneral(const op::Operator& X, const op::Operator& Y,
     }
     exec::Fence("commutator::comm222_phss_general::fill");
     for (auto& gemm : gemm_list) gemm.beta = pass == 0 ? 0.0 : 1.0;
-    linalg::GroupedGemm(gemm_list);
+    linalg::DeviceGroupedGemm(gemm_list);
   }
 
   double* z2 = Z.two_body().matrix().buffer().device_data();
@@ -543,13 +540,9 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
         });
   }
   exec::Fence("commutator::comm222_phss::fill");
-  // Host BLAS only; device backends need a device gemm (design/12 section 3).
-  IMSRG_CHECK(pd.w.host_is_device(),
-              "comm222_phss: host BLAS on device memory; needs a device gemm "
-              "(GPU backends)");
-  linalg::GroupedGemm(pd.distributed
-                          ? pd.gemms_owned
-                          : pd.gemms);  // left halves: W(:, 0 .. Ncc) = XK YK
+  linalg::DeviceGroupedGemm(
+      pd.distributed ? pd.gemms_owned
+                     : pd.gemms);  // left halves: W(:, 0 .. Ncc) = XK YK
 
   // The right half of W needs YK_R(kappa ^ 1, beta) = hY phi_kappa phi_beta
   // YK(kappa, beta). With YK'(kappa, beta) = phi_kappa YK(kappa ^ 1, beta)
@@ -577,9 +570,9 @@ void Comm222Phss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
         }
       });
   exec::Fence("commutator::comm222_phss::flip");
-  linalg::GroupedGemm(pd.distributed
-                          ? pd.gemms_right_owned
-                          : pd.gemms_right);  // W'(:, Ncc .. 2 Ncc) = XK YK'
+  linalg::DeviceGroupedGemm(
+      pd.distributed ? pd.gemms_right_owned
+                     : pd.gemms_right);  // W'(:, Ncc .. 2 Ncc) = XK YK'
 
   // Combine W in place into the stored half of the Pandya-transformed result:
   //   left block  (beta < Ncc):  W(alpha, beta) - hX hY W(beta, alpha),

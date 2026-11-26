@@ -25,6 +25,7 @@
 #include "imsrg/commutator/detail/workspace_impl.h"
 #include "imsrg/exec/kokkos_backend.h"
 #include "imsrg/linalg/blas.h"
+#include "imsrg/linalg/device_blas.h"
 #include "imsrg/operator/operator_spec.h"
 
 namespace imsrg::commutator {
@@ -259,11 +260,7 @@ void ProductsInto(const op::Operator& X, const op::Operator& Y,
                    beta);
     }
   }
-  // Host BLAS only; device backends need a device gemm (design/12 section 3).
-  IMSRG_CHECK(
-      lad.pp.product.host_is_device(),
-      "ladder: host BLAS on device memory; needs a device gemm (GPU backends)");
-  linalg::GroupedGemm(lad.problems);
+  linalg::DeviceGroupedGemm(lad.problems);
 }
 
 }  // namespace

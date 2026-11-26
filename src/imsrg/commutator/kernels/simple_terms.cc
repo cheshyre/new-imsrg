@@ -16,6 +16,7 @@
 #include "imsrg/commutator/detail/workspace_impl.h"
 #include "imsrg/exec/kokkos_backend.h"
 #include "imsrg/linalg/blas.h"
+#include "imsrg/linalg/device_blas.h"
 
 namespace imsrg::commutator::terms {
 
@@ -175,22 +176,15 @@ void Comm220ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
 void Comm111ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                Workspace& ws) {
   detail::CheckTermInputs(X, Y, Z, ws);
-  // Host BLAS on the one-body matrices (tiny: norb^3). GPU backends will route
-  // gemm to device BLAS; until then wait for pending device work before
-  // touching the data.
-  exec::Fence("commutator::comm111ss");
+  // Device BLAS on the one-body matrices (tiny: norb^3), ordered after the
+  // pending kernels like a kernel (design/12 section 3).
   const auto x1 = std::as_const(X).one_body().device_view();
   const auto y1 = std::as_const(Y).one_body().device_view();
   const auto z1 = Z.one_body().device_view();
-  // Host BLAS only: on a device backend the buffers are not host-addressable
-  // (design/12 section 3).
-  IMSRG_CHECK(Z.one_body().buffer().host_is_device(),
-              "comm111ss: host BLAS on device memory; needs a device gemm (GPU "
-              "backends)");
-  linalg::Gemm(1.0, x1, linalg::Op::kNoTrans, y1, linalg::Op::kNoTrans, 1.0,
-               z1);
-  linalg::Gemm(-1.0, y1, linalg::Op::kNoTrans, x1, linalg::Op::kNoTrans, 1.0,
-               z1);
+  linalg::DeviceGemm(1.0, x1, linalg::Op::kNoTrans, y1, linalg::Op::kNoTrans,
+                     1.0, z1);
+  linalg::DeviceGemm(-1.0, y1, linalg::Op::kNoTrans, x1, linalg::Op::kNoTrans,
+                     1.0, z1);
 }
 
 void Comm121ss(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
