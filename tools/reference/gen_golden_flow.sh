@@ -6,11 +6,12 @@
 #      the checkout this script lives in), IMSRG_REFERENCE_SHA_FILE (default: the D35 patched build's).
 # Needs the same input as gen_golden_e2e.sh (default me2j path in rh_common). OMP_NUM_THREADS=8.
 set -euo pipefail
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ref_env.sh"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "${HERE}/../.." && pwd)"
-ROOT="${IMSRG_REFERENCE_ROOT:-/Users/cheshyre/Downloads/new-imsrg-reference}"
+ROOT="${REF_BUILD}"
 RH="${1:-${ROOT}/harness-build-d35/refharness}"
-export IMSRG_REFERENCE_SHA_FILE="${IMSRG_REFERENCE_SHA_FILE:-${ROOT}/REFERENCE_SRC_SHA256_D35}"
+export IMSRG_REFERENCE_SHA_FILE="${IMSRG_REFERENCE_SHA_FILE:-${REF_SHA_D35}}"
 OUT="${IMSRG_GOLDEN_E2E_OUT:-${REPO}/tests/golden/e2e}"
 FLOW_JOBS="${FLOW_JOBS:-IT-2 IT-2-HG IT-10}"
 export OMP_NUM_THREADS=8

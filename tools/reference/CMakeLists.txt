@@ -7,7 +7,17 @@
 cmake_minimum_required(VERSION 3.25)
 project(imsrg_refharness LANGUAGES C CXX)
 
-set(IMSRG_REFERENCE_SRC "/Users/cheshyre/Downloads/new-imsrg-reference/imsrg-devel-src/src"
+# build_imsrg_devel.sh always passes -DIMSRG_REFERENCE_SRC; the default is only for manual use.
+if(DEFINED ENV{IMSRG_REFERENCE_BUILD})
+  set(_imsrg_ref_build "$ENV{IMSRG_REFERENCE_BUILD}")
+elseif(DEFINED ENV{IMSRG_WORK})
+  set(_imsrg_ref_build "$ENV{IMSRG_WORK}/reference-build")
+elseif(DEFINED ENV{IMSRG_REFERENCE_ROOT})
+  set(_imsrg_ref_build "$ENV{IMSRG_REFERENCE_ROOT}")
+else()
+  set(_imsrg_ref_build "/Users/cheshyre/Downloads/new-imsrg-reference")
+endif()
+set(IMSRG_REFERENCE_SRC "${_imsrg_ref_build}/imsrg-devel-src/src"
     CACHE PATH "imsrg-devel src/ directory (a pristine copy; never the read-only original)")
 if(NOT EXISTS "${IMSRG_REFERENCE_SRC}/CMakeLists.txt")
   message(FATAL_ERROR "IMSRG_REFERENCE_SRC=${IMSRG_REFERENCE_SRC} has no CMakeLists.txt")

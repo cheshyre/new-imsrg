@@ -7,11 +7,12 @@
 # Environment: REFHARNESS (default $IMSRG_REFERENCE_ROOT/harness-build-d35/refharness); the harness
 #   must contain the write-valence subcommand.
 set -euo pipefail
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ref_env.sh"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "${HERE}/../.." && pwd)"
-RH="${REFHARNESS:-${IMSRG_REFERENCE_ROOT:-/Users/cheshyre/Downloads/new-imsrg-reference}/harness-build-d35/refharness}"
+RH="${REFHARNESS:-${REF_BUILD}/harness-build-d35/refharness}"
 # D35: default = the patched harness (harness-build-d35) and its version string (tests/golden/README.md).
-export IMSRG_REFERENCE_SHA_FILE="${IMSRG_REFERENCE_SHA_FILE:-${IMSRG_REFERENCE_ROOT:-/Users/cheshyre/Downloads/new-imsrg-reference}/REFERENCE_SRC_SHA256_D35}"
+export IMSRG_REFERENCE_SHA_FILE="${IMSRG_REFERENCE_SHA_FILE:-${REF_SHA_D35}}"
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-8}"
 G="${REPO}/tests/golden"
 OUT="${G}/io"

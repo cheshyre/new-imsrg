@@ -12,20 +12,20 @@
 #
 # Usage: tools/reference/gen_golden_factorized.sh
 set -euo pipefail
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ref_env.sh"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "${HERE}/../.." && pwd)"
-R="/Users/cheshyre/Downloads/new-imsrg-reference"
+R="${REF_BUILD}"
 RH="${REFHARNESS:-${R}/harness-build-3f2/refharness}"
-DATA="${IMSRG_TEST_DATA_DIR:-/Users/cheshyre/Downloads/new-imsrg}"
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-8}"
 TMP="$(mktemp -d)"
 trap 'rm -rf "${TMP}"' EXIT
 
 # The dumps' source line names the D35-patched reference build.
 mkdir -p "${TMP}/refroot"
-cp "${R}/REFERENCE_SRC_SHA256_D35" "${TMP}/refroot/REFERENCE_SRC_SHA256"
+cp "${REF_SHA_D35}" "${TMP}/refroot/REFERENCE_SRC_SHA256"
 export IMSRG_REFERENCE_ROOT="${TMP}/refroot"
-export IMSRG_REFERENCE_SHA_FILE="${R}/REFERENCE_SRC_SHA256_D35"
+export IMSRG_REFERENCE_SHA_FILE="${REF_SHA_D35}"
 
 GOLD="${REPO}/tests/golden/factorized"
 CIN="${REPO}/tests/golden/commutator/emax2_O16"

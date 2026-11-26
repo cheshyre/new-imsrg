@@ -14,45 +14,68 @@
 #                                                                       (default: all)
 #
 #   imsrg     configure + build the old library (libIMSRG.so) and the imsrg++ executable,
-#             with the old src/CMakeLists.txt as the CMake root (build dir: $REF_ROOT/build)
+#             with the old src/CMakeLists.txt as the CMake root (build dir: $REF_BUILD/build)
 #   harness   configure + build refharness through tools/reference/CMakeLists.txt, which pulls
-#             the old src in via add_subdirectory (build dir: $REF_ROOT/harness-build)
+#             the old src in via add_subdirectory (build dir: $REF_BUILD/harness-build)
 #   checksum  print the reference version string (sha256 over src/, the tree has no .git)
 #
 #   patched          owner decision D35: a SECOND, patched build, in directories of its own; the
 #                    pristine copy and the pristine build directories above are never touched.
-#                    Copies the pristine src/ into $REF_ROOT/imsrg-devel-src-d35/, applies
+#                    Copies the pristine src/ into $REF_BUILD/imsrg-devel-src-d35/, applies
 #                    tools/reference/patches/imsrg-devel-d35.patch (Tcm without the 1e-7 two-body
 #                    threshold; Rp2 without the spin-orbit correction), then builds imsrg++ into
-#                    $REF_ROOT/build-d35/ and refharness into $REF_ROOT/harness-build-d35/
+#                    $REF_BUILD/build-d35/ and refharness into $REF_BUILD/harness-build-d35/
 #                    (override: HARNESS_BUILD_DIR_D35). Writes the version string of the patched
-#                    goldens to $REF_ROOT/REFERENCE_SRC_SHA256_D35 ("<pristine sha>+d35-patch:<patch
+#                    goldens to $REF_BUILD/REFERENCE_SRC_SHA256_D35 ("<pristine sha>+d35-patch:<patch
 #                    sha prefix>"; the gen scripts read it through IMSRG_REFERENCE_SHA_FILE).
 #   patched-imsrg    only the imsrg++ part of `patched`
 #   patched-harness  only the refharness part of `patched`
 #
-# Environment overrides:
-#   IMSRG_REFERENCE_SOURCE  reference checkout   (default /Users/cheshyre/Downloads/new-imsrg/imsrg-devel)
-#   IMSRG_REFERENCE_ROOT    build root           (default /Users/cheshyre/Downloads/new-imsrg-reference)
+# Environment overrides (precedence and defaults: tools/reference/ref_env.sh):
+#   IMSRG_REFERENCE_SOURCE  pristine reference checkout, read-only
+#                           (default $IMSRG_REFERENCE_ROOT/imsrg-devel, else the Mac path)
+#   IMSRG_REFERENCE_ROOT    holds the SHA files (and, on the Mac, also the builds); read-only on
+#                           Frontier (/ccs/proj/nph123/mheinz/imsrg/reference)
+#   IMSRG_REFERENCE_BUILD   build root: every copy, build directory and output below
+#                           (default $IMSRG_WORK/reference-build if IMSRG_WORK is set, else
+#                           IMSRG_REFERENCE_ROOT). The SHA files are written here; the gen
+#                           scripts prefer the ones in IMSRG_REFERENCE_ROOT when present.
 #   BUILD_JOBS              parallel jobs        (default: number of cores)
 #   FRESH=1                 reconfigure from scratch (cmake --fresh), e.g. after a toolchain change
 #   IMSRG_REFERENCE_SDK     macOS SDK path (default: probed, see pick_sdk below)
-#   HARNESS_BUILD_DIR       harness build dir (default $REF_ROOT/harness-build); use a separate
+#   HARNESS_BUILD_DIR       harness build dir (default $REF_BUILD/harness-build); use a separate
 #                           one per concurrent task (never two builds in one build dir)
+#
+# Frontier (OLCF): run it on a compute node (`imsrg_compute tools/reference/build_imsrg_devel.sh
+# patched`, see tools/lib/frontier_env.sh). The script loads the CPU toolchain (PrgEnv-gnu, Cray CC
+# wrapper = gcc 14.2, cray-libsci as BLAS/LAPACK) plus the modules gsl/2.8 and boost/1.88.0
+# itself; zlib is the system one. The login node only has an old system Boost (1.66), the compute
+# nodes none, hence the module.
 #
 # Toolchain that worked (2026-11-11, macOS 26 arm64): Apple clang 21, cmake 4.4.5, ninja,
 # Homebrew libomp (OpenMP via OpenMP_ROOT), openblas, gsl, boost 1.92 (headers), system zlib.
 set -euo pipefail
 
 stage="${1:-all}"
-REF_SRC="${IMSRG_REFERENCE_SOURCE:-/Users/cheshyre/Downloads/new-imsrg/imsrg-devel}"
-REF_ROOT="${IMSRG_REFERENCE_ROOT:-/Users/cheshyre/Downloads/new-imsrg-reference}"
-JOBS="${BUILD_JOBS:-$(sysctl -n hw.ncpu 2>/dev/null || nproc)}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BREW="$(brew --prefix 2>/dev/null || echo /opt/homebrew)"
+. "${HERE}/ref_env.sh"   # REF_ROOT, REF_BUILD, REF_SRC, DATA
+JOBS="${BUILD_JOBS:-$(sysctl -n hw.ncpu 2>/dev/null || nproc)}"
 
-COPY="${REF_ROOT}/imsrg-devel-src"   # pristine copy; COPY/src is the CMake source dir
-COPY_D35="${REF_ROOT}/imsrg-devel-src-d35"   # patched copy (D35); COPY_D35/src is the CMake source dir
+ON_FRONTIER=0
+if [[ "${LMOD_SYSTEM_NAME:-}" == frontier ]]; then
+  ON_FRONTIER=1
+  # shellcheck disable=SC1091
+  . "${HERE}/../lib/frontier_env.sh"
+  imsrg_frontier_modules cpu
+  module load gsl/2.8 boost/1.88.0 >/dev/null 2>&1 || {
+    echo "ERROR: module load gsl/2.8 boost/1.88.0 failed" >&2; exit 1; }
+else
+  BREW="$(brew --prefix 2>/dev/null || echo /opt/homebrew)"
+fi
+mkdir -p "${REF_BUILD}"
+
+COPY="${REF_BUILD}/imsrg-devel-src"   # pristine copy; COPY/src is the CMake source dir
+COPY_D35="${REF_BUILD}/imsrg-devel-src-d35"   # patched copy (D35); COPY_D35/src is the CMake source dir
 PATCH_D35="${HERE}/patches/imsrg-devel-d35.patch"
 
 # sha256 over all files of <dir>/src (relative paths, sorted, .DS_Store ignored).
@@ -74,7 +97,11 @@ make_copy() {
     exit 1
   fi
   echo "reference src/ sha256 (tree checksum): $a"
-  echo "$a" > "${REF_ROOT}/REFERENCE_SRC_SHA256"
+  echo "$a" > "${REF_BUILD}/REFERENCE_SRC_SHA256"
+  if [[ "${REF_ROOT}" != "${REF_BUILD}" && -f "${REF_ROOT}/REFERENCE_SRC_SHA256" \
+        && "$(cat "${REF_ROOT}/REFERENCE_SRC_SHA256")" != "$a" ]]; then
+    echo "WARNING: ${REF_ROOT}/REFERENCE_SRC_SHA256 differs from the computed ${a}" >&2
+  fi
 }
 
 # Patched copy (D35): pristine src/ -> COPY_D35/src, then the patch. Never touches COPY.
@@ -89,7 +116,7 @@ make_copy_d35() {
   local ph0 stamp; ph0="$(shasum -a 256 "${PATCH_D35}" | cut -c1-16)"
   stamp="${COPY_D35}/.d35-patch-applied"
   if [[ -f "${stamp}" && "$(cat "${stamp}")" == "$(src_checksum "${REF_SRC}")+d35-patch:${ph0}" ]]; then
-    cp "${stamp}" "${REF_ROOT}/REFERENCE_SRC_SHA256_D35"
+    cp "${stamp}" "${REF_BUILD}/REFERENCE_SRC_SHA256_D35"
     echo "patched copy already up to date: $(cat "${stamp}")"
     return 0
   fi
@@ -112,9 +139,13 @@ make_copy_d35() {
   grep -q '^# (d35) use the real binary directory' "${COPY_D35}/src/CMakeLists.txt" \
     || { echo "ERROR: CMakeLists.txt build-dir fix did not apply" >&2; exit 1; }
   local ph; ph="$(shasum -a 256 "${PATCH_D35}" | cut -c1-16)"
-  echo "${a}+d35-patch:${ph}" > "${REF_ROOT}/REFERENCE_SRC_SHA256_D35"
-  cp "${REF_ROOT}/REFERENCE_SRC_SHA256_D35" "${stamp}"
-  echo "patched reference version: $(cat "${REF_ROOT}/REFERENCE_SRC_SHA256_D35")"
+  echo "${a}+d35-patch:${ph}" > "${REF_BUILD}/REFERENCE_SRC_SHA256_D35"
+  cp "${REF_BUILD}/REFERENCE_SRC_SHA256_D35" "${stamp}"
+  echo "patched reference version: $(cat "${REF_BUILD}/REFERENCE_SRC_SHA256_D35")"
+  if [[ "${REF_ROOT}" != "${REF_BUILD}" && -f "${REF_ROOT}/REFERENCE_SRC_SHA256_D35" \
+        && "$(cat "${REF_ROOT}/REFERENCE_SRC_SHA256_D35")" != "$(cat "${stamp}")" ]]; then
+    echo "WARNING: ${REF_ROOT}/REFERENCE_SRC_SHA256_D35 differs from the version above" >&2
+  fi
 }
 
 # Common cache settings for both builds.
@@ -128,12 +159,37 @@ common_args=(
   -G Ninja
   -DCMAKE_BUILD_TYPE=Release
   -DCMAKE_POLICY_VERSION_MINIMUM=3.5
-  -DCMAKE_C_COMPILER=clang
-  -DCMAKE_CXX_COMPILER=clang++
-  -DOpenMP_ROOT="${BREW}/opt/libomp"
-  -DCMAKE_PREFIX_PATH="${BREW}/opt/openblas;${BREW}/opt/gsl;${BREW}/opt/boost;${BREW}/opt/libomp;${BREW}"
   -DIMSRG_BUILD_PYTHON_BINDINGS=OFF
 )
+if [[ ${ON_FRONTIER} == 1 ]]; then
+  #  * Cray wrappers cc/CC: gcc 14.2 plus cray-libsci (BLAS/LAPACK) and cray-mpich implicitly.
+  #  * The old CMakeLists hard-codes BLA_VENDOR=OpenBLAS, which finds nothing here. The wrapper
+  #    links libsci by itself, so BLAS_LIBRARIES is preset to the libsci library (FindBLAS then
+  #    only runs its link test); the vendor name is then irrelevant.
+  #  * GSL and Boost come from the modules (GSL_ROOT_DIR, BOOST_ROOT, CMAKE_PREFIX_PATH).
+  #  * libIMSRG.so is shared: the wrapper must link dynamically and the objects must be PIC.
+  export CRAYPE_LINK_TYPE=dynamic
+  common_args+=(
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+    -DCMAKE_C_COMPILER=cc
+    -DCMAKE_CXX_COMPILER=CC
+    -DBLA_VENDOR=All
+    -DBLAS_LIBRARIES="sci_gnu_mp"
+    # gcc 14 no longer includes <cstdint> transitively (imsrg_util/Pwd.hh uses uint64_t); the
+    # pristine sources stay untouched, the header is force-included instead.
+    "-DCMAKE_CXX_FLAGS=-include cstdint"
+    -DCMAKE_POLICY_DEFAULT_CMP0144=NEW
+  )
+else
+  #  * OpenMP_ROOT: Apple clang has no bundled OpenMP runtime; CMake's FindOpenMP finds brew's
+  #    libomp from this hint and adds -Xclang -fopenmp.
+  common_args+=(
+    -DCMAKE_C_COMPILER=clang
+    -DCMAKE_CXX_COMPILER=clang++
+    -DOpenMP_ROOT="${BREW}/opt/libomp"
+    -DCMAKE_PREFIX_PATH="${BREW}/opt/openblas;${BREW}/opt/gsl;${BREW}/opt/boost;${BREW}/opt/libomp;${BREW}"
+  )
+fi
 if command -v ccache >/dev/null 2>&1; then
   common_args+=(-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache)
 fi
@@ -166,7 +222,7 @@ build_imsrg() {
   make_copy
   # The old src/CMakeLists.txt overrides CMAKE_CURRENT_BINARY_DIR to "../build" and generates
   # version.cc there, so the binary dir must itself be called "build" (then ../build == .).
-  local bdir="${REF_ROOT}/build"
+  local bdir="${REF_BUILD}/build"
   cmake -S "${COPY}/src" -B "${bdir}" "${common_args[@]}"
   cmake --build "${bdir}" --target imsrg++ IMSRG -j "${JOBS}"
   ls -l "${bdir}/imsrg++" "${bdir}/libIMSRG.so"
@@ -174,7 +230,7 @@ build_imsrg() {
 
 build_harness() {
   make_copy
-  local bdir="${HARNESS_BUILD_DIR:-${REF_ROOT}/harness-build}"
+  local bdir="${HARNESS_BUILD_DIR:-${REF_BUILD}/harness-build}"
   cmake -S "${HERE}" -B "${bdir}" "${common_args[@]}" \
         -DIMSRG_REFERENCE_SRC="${COPY}/src"
   cmake --build "${bdir}" --target refharness -j "${JOBS}"
@@ -183,7 +239,7 @@ build_harness() {
 
 build_imsrg_d35() {
   make_copy_d35
-  local bdir="${REF_ROOT}/build-d35"
+  local bdir="${REF_BUILD}/build-d35"
   cmake -S "${COPY_D35}/src" -B "${bdir}" "${common_args[@]}"
   cmake --build "${bdir}" --target imsrg++ IMSRG -j "${JOBS}"
   ls -l "${bdir}/imsrg++" "${bdir}/libIMSRG.so"
@@ -191,7 +247,7 @@ build_imsrg_d35() {
 
 build_harness_d35() {
   make_copy_d35
-  local bdir="${HARNESS_BUILD_DIR_D35:-${REF_ROOT}/harness-build-d35}"
+  local bdir="${HARNESS_BUILD_DIR_D35:-${REF_BUILD}/harness-build-d35}"
   cmake -S "${HERE}" -B "${bdir}" "${common_args[@]}" \
         -DIMSRG_REFERENCE_SRC="${COPY_D35}/src"
   cmake --build "${bdir}" --target refharness -j "${JOBS}"
