@@ -41,28 +41,35 @@ libsci is reentrant, FP-Q6), after checking the Python thread test with it.
 
 ## Tensor commutator (all scalar-tensor terms, ms)
 
-| emax | rank | GPU, 1 GCD | CPU 56 cores (serial libsci + concurrent) | speed-up |
-|-----:|-----:|-----------:|------------------------------------------:|---------:|
-| 8 | 5 | **389** (first call 3.3 s) | 2617 (first call 19.3 s) | 6.7x |
-| 10 | 2 | **869** (first call 3.1 s) | 6752 (first call 16.7 s) | 7.8x |
-| 10 | 5 | **2456** (first call 13.0 s) | 21534 (first call 86.7 s) | 8.8x |
+| emax | rank | GPU, 1 GCD | CPU 56 cores, final code | CPU 56 cores, before M14 | GCD / CPU final |
+|-----:|-----:|-----------:|-------------------------:|-------------------------:|----------------:|
+| 8 | 5 | **261** (first call 3.1 s) | 1134 (first call 17.8 s) | 5298 | 4.3x |
+| 10 | 2 | **875** (first call 3.2 s) | 3888 (first call 13.7 s) | 6752 | 4.4x |
+| 10 | 5 | **1509** (first call 11.3 s) | 7408 (first call 72.7 s) | 21534 | 4.9x |
 
-Per term, emax 10 rank 5 (ms), GPU / CPU: comm121st 90 / 18, comm122st 114 / 1477, comm221st
-99 / 1102, pp_hh 101 / 1102, comm222_phst 2150 / 18933. Device memory at emax 10 rank 5: peak
-23.2 GB of the 64 GB HBM (sysfs `mem_info_vram_used`, sampled every 0.2 s; the comm122st GEMM
-path adds four Z-sized scratch buffers), host RSS 3.6 GB; it fits. The CPU column is the same code (the device shapes keep the host order).
-The new tensor ladder (occupation weights folded into scaled copies of the scalar X, grouped
-GEMMs) also helps the CPU: emax 8 rank 5 comm221st 2074 -> 135 ms and comm222_pp_hhst 2097 -> 134
-ms, all terms 5298 -> 2617 ms on 56 cores. Lead A measured 63 s at 16 threads (default BLAS,
-before the comm122st lists) for emax 10 rank 5.
+"Before M14" = the merged M15 code (host tensor ladder, element-wise phst inverse) with the serial
+libsci and concurrent GroupedGemm. Two M14 changes help the CPU as much as the GPU: the tensor
+ladder (occupation weights folded into scaled copies of the scalar X, grouped GEMMs: emax 8 rank
+5 comm221st 2074 -> 135 ms, comm222_pp_hhst 2097 -> 134 ms) and the quadruple form of the phst
+inverse transform (below: emax 10 rank 5 18.9 -> 4.9 s, rank 2 5.3 -> 2.4 s). Lead A measured
+63 s at 16 threads (default BLAS) for emax 10 rank 5 before M14.
+
+Per term, emax 10 rank 5 (ms), GPU / CPU final: comm121st 89 / 18, comm122st 114 / 1477,
+comm221st 98 / ~1100, pp_hh 102 / ~1100, comm222_phst 1206 / 4861. Device memory at emax 10 rank
+5: peak 23.2 GB of the 64 GB HBM (sysfs `mem_info_vram_used`, sampled every 0.2 s; the comm122st
+GEMM path adds four Z-sized scratch buffers), host RSS 3.6 GB; it fits.
 
 GPU history at emax 8 rank 5: 1105 ms (GEMMs on rocBLAS, host-shaped kernels) -> 505 ms
 (comm221st team reduction over orbits, 319 -> 18.5 ms; phst inverse NestedFor, 617 -> 310 ms)
 -> 467 ms (comm122st NestedFor, 136 -> 98 ms) -> 389 ms (comm122st as GEMMs: the lifted scalar
 one-body operators L, R per channel and the part-2 lists folded into B, K, then
 G1 = L_b Y + B X_kk, G2 = X_bb K - Y R_k^T, four grouped GEMM calls; 98 -> 21 ms; emax 10 rank 5
-883 -> 114 ms). Remaining hot spot: the phst inverse transform (9j x Zbar gathers, ~7/8 of the
-time at emax 10 rank 5).
+883 -> 114 ms) -> 261 ms (phst inverse in quadruple form: one team per ket pair gathers the
+Zbar^{J3 J4} values once into team scratch for all (J1, J2) blocks instead of once per block,
+9j box looked up once per (J1, J2); bitwise equal to the element form; 310 -> 180 ms, emax 10
+rank 5 2150 -> 1206 ms). On the device the quadruple form is used for L >= 3 only (emax 10,
+element / quad ms: L = 1 275 / 583, 2 675 / 775, 3 1173 / 944, 4 1642 / 1094, 5 2150 / 1206);
+the host uses it always. Remaining hot spot: the phst inverse (~80 % at emax 10 rank 5).
 
 ## Device vs host results
 
