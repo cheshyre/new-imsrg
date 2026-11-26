@@ -17,6 +17,7 @@ imsrg_add_module(NAME operator
     operator_dump.cc
     normal_ordering.cc
     normal_ordering_no2b.cc
+    normal_ordering_tensor.cc
     no2b.cc
     basis_transform.cc
     random_operator.cc
