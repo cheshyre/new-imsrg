@@ -37,7 +37,7 @@ namespace imsrg::driver {
 // -----------------------------------------------------------------------------
 
 /// `run.task`: where the run stops.
-enum class Task { kImsrg, kHf, kMp3, kFciExport };
+enum class Task { kImsrg, kHf, kMp3, kFciExport, kTransform };
 /// `run.log_level`: stdout verbosity.
 enum class LogLevel { kQuiet, kNormal, kDebug };
 /// `basis.kind`: basis the Hamiltonian is normal ordered in.
@@ -188,7 +188,8 @@ std::vector<std::string_view> EnumNames() {
 
 IMSRG_DRIVER_ENUM_TRAITS(Task, "task", {Task::kImsrg, "imsrg"},
                          {Task::kHf, "hf"}, {Task::kMp3, "mp3"},
-                         {Task::kFciExport, "fci_export", Phase::kPlanned});
+                         {Task::kFciExport, "fci_export", Phase::kPlanned},
+                         {Task::kTransform, "transform"});
 IMSRG_DRIVER_ENUM_TRAITS(LogLevel, "log level", {LogLevel::kQuiet, "quiet"},
                          {LogLevel::kNormal, "normal"},
                          {LogLevel::kDebug, "debug"});
@@ -565,6 +566,17 @@ struct CheckpointConfig {
                          const CheckpointConfig&) = default;
 };
 
+/// `[transform]`: `run.task = "transform"`, the operator farm over stored
+/// Omegas (design/50 C10, design/16 section 2).
+struct TransformConfig {
+  std::string manifest;   ///< `<stem>_omegas.toml` of output.write_omega
+  std::string work_list;  ///< file: one operator name per line (# comments)
+  std::string failure_manifest;  ///< empty: <output.directory>/failed.txt
+  bool skip_existing = false;    ///< skip items whose output file exists
+  friend bool operator==(const TransformConfig&,
+                         const TransformConfig&) = default;
+};
+
 /// Where a configuration came from (design/16 section 1.7). Written as
 /// `[provenance]` into `resolved_config.toml`, ignored when that file is read
 /// back, and not part of equality.
@@ -594,6 +606,7 @@ struct RunConfig {
   OperatorsConfig operators;
   OutputConfig output;
   CheckpointConfig checkpoint;
+  TransformConfig transform;
   Provenance provenance;  ///< metadata only: excluded from operator==
 
   /// Field-by-field equality of every section except `provenance`.
@@ -603,7 +616,8 @@ struct RunConfig {
            a.interaction == b.interaction && a.hartree_fock == b.hartree_fock &&
            a.natural_orbitals == b.natural_orbitals && a.imsrg == b.imsrg &&
            a.imsrg3 == b.imsrg3 && a.operators == b.operators &&
-           a.output == b.output && a.checkpoint == b.checkpoint;
+           a.output == b.output && a.checkpoint == b.checkpoint &&
+           a.transform == b.transform;
   }
 };
 

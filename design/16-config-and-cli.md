@@ -29,10 +29,10 @@ Conventions: keys are `snake_case`; enum values are lower `snake_case` strings (
 
 | key | type | default | meaning |
 |---|---|---|---|
-| `task` | enum `imsrg`, `hf`, `mp3`, `fci_export` | `imsrg` | `hf`: stop after HF/basis + normal ordering (old `method=HF`); `mp3`: stop after MBPT(3) diagnostics (old `method=MP3`); `fci_export`: vacuum HF + write FCI interaction (old `method=FCI`, PL). |
+| `task` | enum `imsrg`, `hf`, `mp3`, `fci_export`, `transform` | `imsrg` | `hf`: stop after HF/basis + normal ordering (old `method=HF`); `mp3`: stop after MBPT(3) diagnostics (old `method=MP3`); `fci_export`: vacuum HF + write FCI interaction (old `method=FCI`, PL); `transform`: no HF and no flow, transform operators with stored Omegas (`[transform]`, section 2.11b; design/50 C10). |
 | `scratch_dir` | string | `""` | directory for Omega spill files; used only when `imsrg.omega.storage="scratch"`. Probed for writability at preflight. |
 | `log_level` | enum `quiet`, `normal`, `debug` | `normal` | stdout verbosity (new key; no legacy equivalent). |
-| `compat` | enum `none`, `imsrg_fork_79e9330` | `none` | compatibility profile (design/50 §5): one key that switches on named internal options reproducing another code version; `none` is the fixed behaviour. The options and their profiles are listed in `src/imsrg/driver/config/compat.h` (`CompatOptions`). `imsrg_fork_79e9330`: `nat_sort_by_abs_occupation` (NAT orbitals ordered by \|occupation\|, fork HFMBPT.cc:131-182), `fork_step_defaults` (`imsrg.step.domega` defaults to the fork's 0.2 instead of 0.1); leads A/B add the tensor normal-ordering, 9j-threshold and writer options. No legacy equivalent. |
+| `compat` | enum `none`, `imsrg_fork_79e9330` | `none` | compatibility profile (design/50 §5): one key that switches on named internal options reproducing another code version; `none` is the fixed behaviour. The options and their profiles are listed in `src/imsrg/driver/config/compat.h` (`CompatOptions`). `imsrg_fork_79e9330`: `nat_sort_by_abs_occupation` (NAT orbitals ordered by \|occupation\|, fork HFMBPT.cc:131-182), `fork_step_defaults` (`imsrg.step.domega` defaults to the fork's 0.2 instead of 0.1), `tensor_no_fork_diagonal_bug` (fork's tensor normal ordering omits one orientation for a == b, also in the re-normal-ordering), `tensor_ninej_threshold_1e8` (9j skip threshold 1e-8 in the flow's tensor commutators), `tokyo_writer_fork_79e9330` (79e9330 writers for scalar and tensor `.snt`: 7 significant digits, absolute 1e-7 thresholds, header A/Z of the core). No legacy equivalent. |
 
 ### 2.2 `[basis]` (model space and single-particle basis)
 
@@ -233,6 +233,22 @@ Omega piece, `omega_cur_<seq>.*` and `h_<seq>.*` per checkpoint, `state.txt` (wr
 config hash, format, sequence, Omega count, loop state and step options as hexfloats, finished stages).
 E-PLANNED with: methods other than `magnus`, hunter-gatherer, `imsrg3.in_flow`, perturbative triples.
 The flow file of a restarted run starts at the restored step.
+
+### 2.11b `[transform]` (design/50 C10; `run.task = "transform"`)
+
+The configuration is the flow's (`resolved_config.toml` of the run that wrote the Omegas, with
+`run.task = "transform"`): basis, reference, valence space, `[imsrg.space]`, `run.compat` and the
+interaction file names (header only) must be those of the flow; nothing is read but the manifest's
+files. Every rank of the job takes a static share of the work list (cost-weighted, design/50 §6) and
+writes `<output.directory>/<output.stem><name>.snt` (scalars, isospin-averaged operator mode) or
+`..._2b.snt` (tensors), the fork's names. Omegas are read once per node into MPI shared memory.
+
+| key | type | default | meaning |
+|---|---|---|---|
+| `manifest` | path | `""` (required) | `<stem>_omegas.toml` written by `output.write_omega` (format native or me2jp, the Omega files in the order to apply them, C, occupations, layout hash). |
+| `work_list` | path | `""` | file with one operator name per line (`#` comments, blank lines ignored); appended to `operators.list`. |
+| `failure_manifest` | path | `""` | operators that did not finish, one `name<TAB>reason` per line, written by rank 0 at the end (always written, empty on success; usable as the next `work_list`). Empty: `<output.directory>/failed.txt`. Rank 0 first writes it with EVERY item ("job did not complete"), so a killed job leaves a complete list; it is rewritten at the end. |
+| `skip_existing` | bool | `false` | skip items whose output file exists (outputs are written to a temporary name and renamed, so an existing file is complete): resume a killed farm with the same work list. |
 
 #### `results.json` schema
 
@@ -700,7 +716,7 @@ has no `include_spin_orbit` parameter (done, run 2); `Rso` is implemented in `Pr
 | **PL, charge changing / parity odd** | `Fermi`, `AxialCharge`, `RadialOverlap`, `VPT_<...>`. |
 | **PL, dagger** | `Dagger_<orb>`, `DaggerHF_<orb>`, `DaggerAlln_<orb>`. |
 | **PL, 0vbb and double GT** | `M0nu_GT_<Ecl>_<src>[_<ff>]`, `M0nu_F_*`, `M0nu_T_*`, `M0nu_C_*`, `M0nuHeavy_*`, `M0nuIntegrand_*`, `M0nuR_*`, `DGT`, `DGTR_*`, `DGTRLocal_*`. |
-| **PL, dark matter** | `DMNREFT_<Op><IsoSV>_<q>_<J>`; the NREFT shorthands of rank L > 0 (`FM2/4`, `FPhipp2/4`, `FSigmap1/3/5`, `FSigmapp1/3/5`, `FDelta1/3/5`, `FPhitp2/4`, each with suffix `p` or `n` and `_<q>`) until the tensor operators of M15 (shape {L, 0, 0, 1}). |
+| **PL, dark matter** | `DMNREFT_<Op><IsoSV>_<q>_<J>`. (The NREFT shorthands of rank L > 0 -- `FM2/4`, `FPhipp2/4`, `FSigmap1/3/5`, `FSigmapp1/3/5`, `FDelta1/3/5`, `FPhitp2/4`, each with suffix `p` or `n` and `_<q>` -- are P1 rows with shape {L, 0, 0, 1} since the tensor driver (Al27 night); their valence files are `<stem>_<name>_2b.snt`.) |
 | **NS** | atomic `hfsNMS`, `hfsSMS`; any `RPA`/`TDA`-resummed variant. |
 
 The `src` parameter of the `M0nu` family is accepted by the old code but never read (R05); the new grammar keeps the token for compatibility and ignores it with a warning when `M0nu` becomes available.

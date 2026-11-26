@@ -148,7 +148,7 @@ void AddP1Rows(std::vector<OperatorCatalogEntry>& v) {
   v.push_back(P1("Tz2", none, K::kTz2, 2, "isospin projection squared Tz^2"));
   v.push_back(P1("LdotS", none, K::kLdotS, 1, "one-body l.s"));
   // Scalar (L = 0) dark-matter NREFT shorthands, FM0{p,n}_<q> and
-  // FPhipp0{p,n}_<q>; the higher L are planned rows (AddNreftPlannedRows).
+  // FPhipp0{p,n}_<q>; the higher L are tensor rows (AddNreftPlannedRows).
   v.push_back(P1("FM0p", Params(kQ), K::kNreft, 1,
                  "NREFT charge M_0 (protons), sqrt(4 pi) M_0(q); fork "
                  "79e9330 shorthand"));
@@ -161,8 +161,8 @@ void AddP1Rows(std::vector<OperatorCatalogEntry>& v) {
                  "NREFT Phi''_0 (neutrons); fork 79e9330 shorthand"));
 }
 
-/// The rank L > 0 NREFT shorthands as planned rows, shape {L, 0, 0, 1}: even
-/// J has normal and odd J abnormal parity, and both operators are
+/// The rank L > 0 NREFT shorthands (tensor operators, M15), shape {L, 0, 0, 1}:
+/// even J has normal and odd J abnormal parity, and both operators are
 /// parity-even. The names live in a leaked vector (static storage), so the
 /// catalog's string_views stay valid.
 void AddNreftPlannedRows(std::vector<OperatorCatalogEntry>& v) {
@@ -188,9 +188,12 @@ void AddNreftPlannedRows(std::vector<OperatorCatalogEntry>& v) {
   for (const auto& f : families) {
     for (const int L : f.ranks) {
       for (int t = 0; t < 2; ++t) {
-        v.push_back(Later((*kNames)[i++], Phase::kPlanned, {L, 0, 0, 1},
-                          "NREFT rank-L shorthand, <name>_<q>; needs tensor "
-                          "operators (M15)"));
+        OperatorCatalogEntry e =
+            P1((*kNames)[i++], Params(kQ), OperatorKind::kNreft, 1,
+               "NREFT rank-L tensor shorthand <name>_<q> (reduced elements); "
+               "fork 79e9330");
+        e.shape = OperatorShape{L, 0, 0, 1};
+        v.push_back(e);
       }
     }
   }

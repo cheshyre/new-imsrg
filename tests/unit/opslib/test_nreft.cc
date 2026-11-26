@@ -22,6 +22,7 @@
 #include <gtest/gtest.h>
 
 #include "imsrg/basis/single_particle_basis.h"
+#include "imsrg/operator/norms.h"
 #include "imsrg/opslib/detail/nreft_radial.h"
 #include "imsrg/opslib/nreft.h"
 
@@ -461,6 +462,41 @@ TEST(NreftRadial, Hyp1F1KnownValues) {
   EXPECT_DOUBLE_EQ(detail::GammaOfHalf(7),
                    15.0 / 8.0 * std::sqrt(std::numbers::pi));
   EXPECT_DOUBLE_EQ(detail::GammaOfHalf(8), 6.0);
+}
+
+TEST(NreftTensor, ShorthandOperatorsMatchTableAndAreHermitianTensors) {
+  const auto ms = basis::ModelSpace::FromNames({.emax = 2}, 16.0, "O16", "O16");
+  const auto& basis = ms->basis();
+  for (const char* name :
+       {"FM2p_150", "FSigmap1n_600", "FDelta3p_15", "FPhitp4n_150"}) {
+    SCOPED_TRACE(name);
+    const Shorthand sh = *ParseShorthand(name);
+    const OneBodyTable t = BuildShorthandTable(basis, sh);
+    const op::Operator o = BuildShorthandOperator(ms, sh);
+    EXPECT_EQ(o.spec().rank_J, sh.L);
+    EXPECT_EQ(o.spec().parity, Parity::kEven);
+    EXPECT_EQ(o.spec().delta_Tz, 0);
+    EXPECT_EQ(o.spec().hermiticity, Hermiticity::kHermitian);
+    double tmax = 0.0;
+    for (double v : t.values) tmax = std::max(tmax, std::abs(v));
+    ASSERT_GT(tmax, 0.0);
+    for (std::int32_t a = 0; a < t.num_orbits; ++a) {
+      for (std::int32_t b = 0; b < t.num_orbits; ++b) {
+        const OrbitIndex ia{a};
+        const OrbitIndex ib{b};
+        EXPECT_EQ(o.one_body().get(ia, ib), t.value(ia, ib));
+        const int dj2 = basis.orbit(ia).j2.twice - basis.orbit(ib).j2.twice;
+        const double ph = (dj2 / 2) % 2 == 0 ? 1.0 : -1.0;
+        const double lhs = o.one_body().get(ib, ia);
+        const double rhs = ph * o.one_body().get(ia, ib);
+        EXPECT_LE(std::abs(lhs - rhs),
+                  std::max(1.0e-12 * std::abs(rhs), 1.0e-14 * tmax));
+      }
+    }
+    const double n1 = op::OneBodyNorm(o);
+    EXPECT_TRUE(std::isfinite(n1));
+    EXPECT_GT(n1, 0.0);
+  }
 }
 
 }  // namespace

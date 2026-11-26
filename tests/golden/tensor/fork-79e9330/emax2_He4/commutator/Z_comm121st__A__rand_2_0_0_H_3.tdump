@@ -1,0 +1,42 @@
+# imsrg-tensor-dump raw v0 (M15 reference prep, run 3; NOT the final OperatorDump format)
+source imsrg-fork-79e9330 d02cbb5d022a29ce4d40622e8c51d720dea7ad76e68263be8dc192ea197ea311+cxx14:175987a0848827f7 forkharness commutator-tensor
+command commutator-tensor emax=2 reference=He4 term comm121st
+operator [A,rand_2_0_0_H_3] term comm121st
+basis HO emax 2 hw 16 reference He4
+spec rank_J 2 parity 0 delta_Tz 0 hermiticity H particle_rank 2 reduced 1
+convention as tools/reference/rh_tensor.cpp (reduced matrix elements as stored by imsrg++, normalized antisymmetrized 2B pairs p<=q, r<=s, ch_bra<=ch_ket blocks)
+norbits 12
+orbit 0 0 0 1 -1 1
+orbit 1 0 0 1 1 1
+orbit 2 0 1 3 -1 0
+orbit 3 0 1 3 1 0
+orbit 4 0 1 1 -1 0
+orbit 5 0 1 1 1 0
+orbit 6 0 2 5 -1 0
+orbit 7 0 2 5 1 0
+orbit 8 0 2 3 -1 0
+orbit 9 0 2 3 1 0
+orbit 10 1 0 1 -1 0
+orbit 11 1 0 1 1 0
+zero_body 0
+one_body 18
+1b 0 6 -2.0862212414916521
+1b 0 8 -7.2038859247279543
+1b 1 7 0.040434969289882439
+1b 1 9 -0.40267005918109178
+1b 2 2 7.6907495935125665
+1b 2 4 -6.4628603869985026
+1b 3 3 15.757759297970123
+1b 3 5 -2.3074617099969839
+1b 6 6 -2.3186852729364849
+1b 6 8 2.4134931346098574
+1b 6 10 -0.88672684622727038
+1b 7 7 -9.4781657217772306
+1b 7 9 1.3289448301337066
+1b 7 11 8.5662330719868116
+1b 8 8 1.4615353994520988
+1b 8 10 8.3563447742480026
+1b 9 9 9.8856120676508805
+1b 9 11 0.52856456197339885
+two_body 0 blocks 0
+end
