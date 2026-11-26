@@ -3,6 +3,7 @@
 
 #include "imsrg/operator/norms.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -10,6 +11,7 @@
 
 #include "imsrg/base/assert.h"
 #include "imsrg/operator/detail/part_kernels.h"
+#include "imsrg/operator/two_body.h"
 
 namespace imsrg::op {
 
@@ -19,6 +21,28 @@ double OneBodyNorm(const Operator& op) {
   const std::int32_t n = basis.num_orbits();
   const std::vector<double> data = op.one_body().buffer().ToVector();
   double sum = 0.0;
+  if (!op.spec().is_scalar()) {
+    // imsrg++ Operator::OneBodyNorm with its integer degeneracy factor; note
+    // that it mixes 2j with the undoubled rank_J (kept: it drives the BCH
+    // thresholds and must agree with the reference).
+    const std::int32_t L = op.spec().rank_J;
+    for (std::int32_t p = 0; p < n; ++p) {
+      const basis::Orbit& op_ = basis.orbit(OrbitIndex{p});
+      const std::int32_t jp = op_.j2.twice;
+      for (std::int32_t q = 0; q < n; ++q) {
+        const basis::Orbit& oq = basis.orbit(OrbitIndex{q});
+        if (!ConnectsOrbits(op.spec(), op_, oq)) continue;
+        const std::int32_t jq = oq.j2.twice;
+        const std::int32_t deg =
+            (jp + 1) * ((std::min(jq, jp + L) - std::max(-jq, jp - L)) / 2 + 1);
+        const double v =
+            data[static_cast<std::size_t>(p) +
+                 static_cast<std::size_t>(q) * static_cast<std::size_t>(n)];
+        sum += v * v * deg;
+      }
+    }
+    return std::sqrt(sum);
+  }
   for (std::int32_t p = 0; p < n; ++p) {
     const double w =
         static_cast<double>(basis.orbit(OrbitIndex{p}).j2.twice + 1);
@@ -48,9 +72,18 @@ double TwoBodyNorm(const Operator& op) {
     // BlockSparseMatrix stores its blocks contiguously, in block order.
     IMSRG_CHECK(info.offset == offsets.back(),
                 "two_body_norm: blocks are not contiguous");
-    const double w = static_cast<double>(
-        2 * channels[static_cast<std::size_t>(info.row_block.value())].J() + 1);
-    weights.push_back(w * w);
+    if (tb.is_tensor()) {
+      // imsrg++ TwoBodyME::Norm for reduced elements: weight 1/(2 rank_J + 1)
+      // per element, and a factor 2 for the implied transposed off-diagonal
+      // block.
+      const double w = 1.0 / (2.0 * tb.rank_J() + 1.0);
+      weights.push_back((info.row_block == info.col_block ? 1.0 : 2.0) * w * w);
+    } else {
+      const double w = static_cast<double>(
+          2 * channels[static_cast<std::size_t>(info.row_block.value())].J() +
+          1);
+      weights.push_back(w * w);
+    }
     offsets.push_back(info.offset + info.rows * info.cols);
   }
   const double sum =

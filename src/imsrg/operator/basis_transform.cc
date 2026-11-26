@@ -8,7 +8,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <utility>
+#include <vector>
 
 #include "imsrg/base/assert.h"
 #include "imsrg/base/error.h"
@@ -81,19 +83,31 @@ Operator TransformBasis(const Operator& op,
                  linalg::Op::kNoTrans, 0.0, out.one_body().host_view());
   }
 
-  // Two-body: V' = D^T V D per channel.
+  // Two-body: V' = D^T V D per channel, or D_bra^T V D_ket per stored block of
+  // a tensor (C does not mix (l, 2j, tz2), so D maps each channel onto itself
+  // and reduced elements transform like plain ones).
   if (csrc.two_body().allocated()) {
     const basis::TwoBodyChannels& chans = csrc.two_body().channels();
-    for (std::int32_t c = 0; c < chans.num_channels(); ++c) {
-      const ChannelIndex ch{c};
-      const std::int64_t n = chans.channel(ch).num_kets;
-      if (n == 0) continue;
-      const linalg::Matrix<double> D = ChannelTransform(chans, ch, C);
-      linalg::Matrix<double> tmp(n, n);
-      linalg::Gemm(1.0, csrc.two_body().host_block(ch), linalg::Op::kNoTrans,
-                   D.const_view(), linalg::Op::kNoTrans, 0.0, tmp.view());
-      linalg::Gemm(1.0, D.const_view(), linalg::Op::kTrans, tmp.const_view(),
-                   linalg::Op::kNoTrans, 0.0, out.two_body().host_block(ch));
+    std::vector<std::optional<linalg::Matrix<double>>> D(
+        static_cast<std::size_t>(chans.num_channels()));
+    const auto transform_of = [&](ChannelIndex ch) -> const auto& {
+      auto& d = D[ch.ToSize()];
+      if (!d) d = ChannelTransform(chans, ch, C);
+      return *d;
+    };
+    for (const auto& info : csrc.two_body().matrix().blocks()) {
+      const ChannelIndex cb{info.row_block.value()};
+      const ChannelIndex ck{info.col_block.value()};
+      if (info.rows == 0 || info.cols == 0) continue;
+      const linalg::Matrix<double>& Db = transform_of(cb);
+      const linalg::Matrix<double>& Dk = transform_of(ck);
+      linalg::Matrix<double> tmp(info.rows, info.cols);
+      linalg::Gemm(1.0, csrc.two_body().host_block(cb, ck),
+                   linalg::Op::kNoTrans, Dk.const_view(), linalg::Op::kNoTrans,
+                   0.0, tmp.view());
+      linalg::Gemm(1.0, Db.const_view(), linalg::Op::kTrans, tmp.const_view(),
+                   linalg::Op::kNoTrans, 0.0,
+                   out.two_body().host_block(cb, ck));
     }
   }
   out.SyncToDevice();

@@ -26,6 +26,10 @@ namespace imsrg::op {
 ///   new kets (p'q') (columns), D = C_{pp'} C_{qq'} + [p != q] C_{qp'} C_{pq'}
 ///   (-1)^(j_p + j_q - J + 1), times sqrt(2) if p == q and divided by sqrt(2)
 ///   if p' == q' (normalized kets).
+/// Tensor operators (reduced elements, M15): the same formulas, the two-body
+/// part per stored block (ch_bra, ch_ket) as V' = D_bra^T V D_ket; valid
+/// because C is block diagonal in (l, 2j, tz2), which the Wigner-Eckart
+/// reduction does not mix.
 /// The result is on the same model space with the same spec (use
 /// `WithModelSpace` to attach other occupations, e.g. after a HF re-filling).
 /// @throws InvariantError if C is not norb x norb.

@@ -352,23 +352,26 @@ bool MBasis::IsKeptTriple(int a, int b, int c) const {
 
 // --------------------------------------------------------------- MOperator
 
-MOperator::MOperator(int num_states) : n_(num_states) {
+MOperator::MOperator(int num_states, int max_rank)
+    : n_(num_states), max_rank_(max_rank) {
+  IMSRG_CHECK(max_rank >= 0 && max_rank <= 3, "MOperator: max_rank in 0..3");
   const auto n = static_cast<std::size_t>(n_);
   n2_ = n_ * (n_ - 1) / 2;
   n3_ = n_ * (n_ - 1) * (n_ - 2) / 6;
   one_.assign(n * n, 0.0);
   two_.assign(static_cast<std::size_t>(n2_) * static_cast<std::size_t>(n2_),
               0.0);
-  three_.assign(static_cast<std::size_t>(n3_) * static_cast<std::size_t>(n3_),
-                0.0);
   pair_index_.assign(n * n, -1);
-  triple_index_.assign(n * n * n, -1);
   std::int32_t k = 0;
   for (int p = 0; p < n_; ++p) {
     for (int q = p + 1; q < n_; ++q) {
       pair_index_[static_cast<std::size_t>(p * n_ + q)] = k++;
     }
   }
+  if (max_rank_ < 3) return;
+  three_.assign(static_cast<std::size_t>(n3_) * static_cast<std::size_t>(n3_),
+                0.0);
+  triple_index_.assign(n * n * n, -1);
   k = 0;
   for (int p = 0; p < n_; ++p) {
     for (int q = p + 1; q < n_; ++q) {
@@ -391,6 +394,7 @@ double MOperator::Get(int rank, std::span<const int> out,
   const int so = SortSign(rank, o);
   const int si = SortSign(rank, i);
   if (so == 0 || si == 0) return 0.0;
+  if (rank == 3 && max_rank_ < 3) return 0.0;
   const double sign = static_cast<double>(so * si);
   if (rank == 1) {
     return one_[static_cast<std::size_t>(o[0] * n_ + i[0])];
@@ -424,6 +428,8 @@ void MOperator::Add(int rank, std::span<const int> out, std::span<const int> in,
   const int so = SortSign(rank, o);
   const int si = SortSign(rank, i);
   if (so == 0 || si == 0) return;
+  IMSRG_CHECK(rank < 3 || max_rank_ == 3,
+              "MOperator::Add: no rank-3 storage (max_rank < 3)");
   const double x = static_cast<double>(so * si) * v;
   if (rank == 1) {
     one_[static_cast<std::size_t>(o[0] * n_ + i[0])] += x;
@@ -489,6 +495,9 @@ void MOperator::Axpy(double f, const MOperator& other) {
   zero_ += f * other.zero_;
   for (std::size_t i = 0; i < one_.size(); ++i) one_[i] += f * other.one_[i];
   for (std::size_t i = 0; i < two_.size(); ++i) two_[i] += f * other.two_[i];
+  if (other.three_.empty()) return;
+  IMSRG_CHECK(three_.size() == other.three_.size(),
+              "MOperator::Axpy: rank-3 storage missing in the target");
   for (std::size_t i = 0; i < three_.size(); ++i) {
     three_[i] += f * other.three_[i];
   }
@@ -659,7 +668,7 @@ void ExpandThreeBody(const op::Operator& X, const MBasis& mb, MOperator& A) {
 MOperator Expand(const op::Operator& X, const MBasis& mb) {
   X.SyncToHost();
   const int n = mb.size();
-  MOperator A(n);
+  MOperator A(n, X.spec().particle_rank);
   A.zero_body() = X.zero_body();
   ExpandOneBody(X, mb, A);
   ExpandTwoBody(X, mb, A);
@@ -678,9 +687,9 @@ struct CoupledTerm {
   double coef;
 };
 
-/// Terms of the two-orbit state |(p q) J M = J>.
-std::vector<CoupledTerm> CoupleTwo(const MBasis& mb, int orb_p, int orb_q,
-                                   int two_j) {
+/// Terms of the two-orbit state |(p q) J M>.
+std::vector<CoupledTerm> CoupleTwoAt(const MBasis& mb, int orb_p, int orb_q,
+                                     int two_j, int two_m) {
   std::vector<CoupledTerm> out;
   const int fp = mb.FirstOfOrbit(orb_p);
   const int jp = mb.StateAt(fp).two_j;
@@ -688,13 +697,19 @@ std::vector<CoupledTerm> CoupleTwo(const MBasis& mb, int orb_p, int orb_q,
     const int a = mb.Index(orb_p, mp);
     const int fq = mb.FirstOfOrbit(orb_q);
     const int jq = mb.StateAt(fq).two_j;
-    const int mq = two_j - mp;
+    const int mq = two_m - mp;
     if (std::abs(mq) > jq) continue;
     const int b = mb.Index(orb_q, mq);
-    const double c = Cg(jp, mp, jq, mq, two_j, two_j);
+    const double c = Cg(jp, mp, jq, mq, two_j, two_m);
     if (c != 0.0) out.push_back({{a, b, 0}, c});
   }
   return out;
+}
+
+/// Terms of the two-orbit state |(p q) J M = J>.
+std::vector<CoupledTerm> CoupleTwo(const MBasis& mb, int orb_p, int orb_q,
+                                   int two_j) {
+  return CoupleTwoAt(mb, orb_p, orb_q, two_j, two_j);
 }
 
 /// Terms of the three-orbit state |((a b) Jab c) J, 2M = 1>.
@@ -841,6 +856,237 @@ op::Operator Contract(const MOperator& A,
   return Z;
 }
 
+// ------------------------------------------------------------ Tensor parts
+
+namespace {
+
+/// (-1)^n for any integer n.
+int Sign(int n) { return (n % 2 == 0) ? 1 : -1; }
+
+/// The Wigner-Eckart coefficient g CG(j m lambda mu | j' m') / sqrt(2j' + 1) of
+/// the file comment of `ExpandTensor` (all arguments doubled; `phase` is the
+/// exponent of the gauge phase (-1)^phase). 0 if a selection rule fails.
+double WignerEckart(int two_jp, int two_mp, int two_j, int two_m, int two_lam,
+                    int two_mu, int phase) {
+  if (two_mp != two_m + two_mu) return 0.0;
+  const double c = Cg(two_j, two_m, two_lam, two_mu, two_jp, two_mp);
+  if (c == 0.0) return 0.0;
+  return static_cast<double>(Sign(phase)) * c /
+         std::sqrt(static_cast<double>(two_jp + 1));
+}
+
+/// Gauge exponent of the one-body element (bra j', ket j).
+int OneBodyPhase(const TensorGauge& g, int two_jp, int two_j) {
+  return g.one_body_phase ? (two_jp - two_j) / 2 : 0;
+}
+
+/// Gauge exponent of the two-body element (bra pair J', ket pair J, rank).
+int TwoBodyPhase(const TensorGauge& g, int two_jp, int two_j, int rank_J) {
+  return (g.two_body_phase ? (two_jp - two_j) / 2 : 0) +
+         (g.two_body_rank_phase ? rank_J : 0);
+}
+
+}  // namespace
+
+MOperator ExpandTensor(const op::Operator& T, const MBasis& mb, TwoM two_mu,
+                       const TensorGauge& gauge) {
+  T.SyncToHost();
+  const op::OperatorSpec& spec = T.spec();
+  const int n = mb.size();
+  const int mu = two_mu.twice;
+  const int two_lam = 2 * spec.rank_J;
+  const int par = static_cast<int>(spec.parity);
+  MOperator A(n, spec.particle_rank >= 2 ? 2 : 1);
+  // One body.
+  for (int a = 0; a < n; ++a) {
+    for (int b = 0; b < n; ++b) {
+      const MState& sa = mb.StateAt(a);
+      const MState& sb = mb.StateAt(b);
+      if (sa.two_m != sb.two_m + mu) continue;
+      if ((sa.l + sb.l + par) % 2 != 0) continue;
+      if (std::abs(sa.two_tz - sb.two_tz) != 2 * spec.delta_Tz) continue;
+      const double w =
+          WignerEckart(sa.two_j, sa.two_m, sb.two_j, sb.two_m, two_lam, mu,
+                       OneBodyPhase(gauge, sa.two_j, sb.two_j));
+      if (w == 0.0) continue;
+      const int ia[1] = {a};
+      const int ib[1] = {b};
+      A.Set(1, ia, ib,
+            w * T.one_body().get(OrbitIndex{sa.orbit}, OrbitIndex{sb.orbit}));
+    }
+  }
+  if (!T.two_body().allocated()) return A;
+  // Two body.
+  for (int a = 0; a < n; ++a) {
+    for (int b = a + 1; b < n; ++b) {
+      const MState& sa = mb.StateAt(a);
+      const MState& sb = mb.StateAt(b);
+      const int two_mb = sa.two_m + sb.two_m;
+      for (int c = 0; c < n; ++c) {
+        for (int d = c + 1; d < n; ++d) {
+          const MState& sc = mb.StateAt(c);
+          const MState& sd = mb.StateAt(d);
+          const int two_mk = sc.two_m + sd.two_m;
+          if (two_mb != two_mk + mu) continue;
+          if ((sa.l + sb.l + sc.l + sd.l + par) % 2 != 0) continue;
+          if (std::abs(sa.two_tz + sb.two_tz - sc.two_tz - sd.two_tz) !=
+              2 * spec.delta_Tz) {
+            continue;
+          }
+          double v = 0.0;
+          const int jb_lo =
+              std::max(std::abs(sa.two_j - sb.two_j), std::abs(two_mb));
+          const int jb_hi = sa.two_j + sb.two_j;
+          const int jk_lo =
+              std::max(std::abs(sc.two_j - sd.two_j), std::abs(two_mk));
+          const int jk_hi = sc.two_j + sd.two_j;
+          for (int two_jb = jb_lo; two_jb <= jb_hi; two_jb += 2) {
+            const double cg_b =
+                Cg(sa.two_j, sa.two_m, sb.two_j, sb.two_m, two_jb, two_mb);
+            if (cg_b == 0.0) continue;
+            for (int two_jk = jk_lo; two_jk <= jk_hi; two_jk += 2) {
+              if (two_jb < std::abs(two_jk - two_lam) ||
+                  two_jb > two_jk + two_lam) {
+                continue;
+              }
+              const double cg_k =
+                  Cg(sc.two_j, sc.two_m, sd.two_j, sd.two_m, two_jk, two_mk);
+              if (cg_k == 0.0) continue;
+              const double w = WignerEckart(
+                  two_jb, two_mb, two_jk, two_mk, two_lam, mu,
+                  TwoBodyPhase(gauge, two_jb, two_jk, spec.rank_J));
+              if (w == 0.0) continue;
+              v += cg_b * cg_k * w *
+                   T.two_body().get_unnormalized(
+                       OrbitIndex{sa.orbit}, OrbitIndex{sb.orbit},
+                       OrbitIndex{sc.orbit}, OrbitIndex{sd.orbit}, TwoJ{two_jb},
+                       TwoJ{two_jk});
+            }
+          }
+          if (v != 0.0) {
+            const int o[2] = {a, b};
+            const int i[2] = {c, d};
+            A.Set(2, o, i, v);
+          }
+        }
+      }
+    }
+  }
+  return A;
+}
+
+op::Operator ContractTensor(const MOperator& A,
+                            std::shared_ptr<const basis::ModelSpace> ms,
+                            const op::OperatorSpec& spec, TwoM two_mu,
+                            const TensorGauge& gauge) {
+  IMSRG_CHECK(ms != nullptr, "ContractTensor: null model space");
+  IMSRG_CHECK(spec.particle_rank <= 2, "ContractTensor: particle_rank <= 2");
+  const MBasis mb(*ms);
+  IMSRG_CHECK(mb.size() == A.num_states(),
+              "ContractTensor: operator and model space disagree");
+  const int mu = two_mu.twice;
+  const int two_lam = 2 * spec.rank_J;
+  op::Operator Z(ms, spec);
+  Z.zero_body() = 0.0;
+  // One body: least squares over m of the ket.
+  const int no = ms->num_orbits();
+  for (int a = 0; a < no; ++a) {
+    const basis::Orbit& oa = ms->basis().orbit(OrbitIndex{a});
+    for (int b = 0; b < no; ++b) {
+      const basis::Orbit& ob = ms->basis().orbit(OrbitIndex{b});
+      if (!op::ConnectsOrbits(spec, oa, ob)) continue;
+      double num = 0.0;
+      double den = 0.0;
+      const int ph = OneBodyPhase(gauge, oa.j2.twice, ob.j2.twice);
+      for (int mk = -ob.j2.twice; mk <= ob.j2.twice; mk += 2) {
+        const int mbra = mk + mu;
+        if (std::abs(mbra) > oa.j2.twice) continue;
+        const double w =
+            WignerEckart(oa.j2.twice, mbra, ob.j2.twice, mk, two_lam, mu, ph);
+        if (w == 0.0) continue;
+        const int ia[1] = {mb.Index(a, mbra)};
+        const int ib[1] = {mb.Index(b, mk)};
+        num += w * A.Get(1, ia, ib);
+        den += w * w;
+      }
+      if (den > 0.0) {
+        Z.one_body().set_element(OrbitIndex{a}, OrbitIndex{b}, num / den);
+      }
+    }
+  }
+  if (spec.particle_rank >= 2) {
+    const basis::TwoBodyChannels& chans = ms->two_body();
+    // terms[ch][M index][ket] with 2M = -2J + 2 index.
+    std::vector<std::vector<std::vector<std::vector<CoupledTerm>>>> terms(
+        static_cast<std::size_t>(chans.num_channels()));
+    for (std::int32_t c = 0; c < chans.num_channels(); ++c) {
+      const ChannelIndex ch{c};
+      const int nk = chans.channel(ch).num_kets;
+      const int two_j = chans.channel(ch).two_j.twice;
+      auto& tc = terms[static_cast<std::size_t>(c)];
+      tc.resize(static_cast<std::size_t>(two_j + 1));
+      for (int im = 0; im <= two_j; ++im) {
+        auto& tm = tc[static_cast<std::size_t>(im)];
+        tm.resize(static_cast<std::size_t>(nk));
+        for (int i = 0; i < nk; ++i) {
+          const auto& k = chans.ket(chans.global_ket(ch, LocalKetIndex{i}));
+          tm[static_cast<std::size_t>(i)] =
+              CoupleTwoAt(mb, k.p.value(), k.q.value(), two_j, -two_j + 2 * im);
+        }
+      }
+    }
+    auto& m = Z.two_body().matrix();
+    for (std::size_t kb = 0; kb < m.num_blocks(); ++kb) {
+      const auto info = m.block_info(kb);
+      const ChannelIndex cb{info.row_block.value()};
+      const ChannelIndex ck{info.col_block.value()};
+      const int two_jb = chans.channel(cb).two_j.twice;
+      const int two_jk = chans.channel(ck).two_j.twice;
+      const int ph = TwoBodyPhase(gauge, two_jb, two_jk, spec.rank_J);
+      for (std::int64_t i = 0; i < info.rows; ++i) {
+        const auto& bra =
+            chans.ket(chans.global_ket(cb, LocalKetIndex{static_cast<int>(i)}));
+        for (std::int64_t j = 0; j < info.cols; ++j) {
+          const auto& ket = chans.ket(
+              chans.global_ket(ck, LocalKetIndex{static_cast<int>(j)}));
+          double num = 0.0;
+          double den = 0.0;
+          for (int mk = -two_jk; mk <= two_jk; mk += 2) {
+            const int mbra = mk + mu;
+            if (std::abs(mbra) > two_jb) continue;
+            const double w =
+                WignerEckart(two_jb, mbra, two_jk, mk, two_lam, mu, ph);
+            if (w == 0.0) continue;
+            double coupled = 0.0;
+            const auto& tb =
+                terms[static_cast<std::size_t>(cb.value())]
+                     [static_cast<std::size_t>((mbra + two_jb) / 2)]
+                     [static_cast<std::size_t>(i)];
+            const auto& tk = terms[static_cast<std::size_t>(ck.value())]
+                                  [static_cast<std::size_t>((mk + two_jk) / 2)]
+                                  [static_cast<std::size_t>(j)];
+            for (const CoupledTerm& x : tb) {
+              for (const CoupledTerm& y : tk) {
+                coupled += x.coef * y.coef *
+                           A.Get(2, std::span<const int>(x.m.data(), 2),
+                                 std::span<const int>(y.m.data(), 2));
+              }
+            }
+            num += w * coupled;
+            den += w * w;
+          }
+          if (den == 0.0) continue;
+          m.host_block(kb)(i, j) =
+              (num / den) / std::sqrt((bra.p == bra.q ? 2.0 : 1.0) *
+                                      (ket.p == ket.q ? 2.0 : 1.0));
+        }
+      }
+    }
+  }
+  Z.SyncToDevice();
+  return Z;
+}
+
 // ------------------------------------------------------------- Commutator
 
 namespace {
@@ -882,31 +1128,41 @@ std::vector<Pattern> BuildPatterns(const MOperator& A, int nA,
 }  // namespace
 
 MOperator CommutatorPart(const MOperator& A, int nA, const MOperator& B, int nB,
-                         int nC, const MBasis& mb) {
+                         int nC, const MBasis& mb, const TensorShift& shift) {
   IMSRG_CHECK(nA >= 0 && nA <= 3 && nB >= 0 && nB <= 3 && nC >= 0 && nC <= 3,
               "CommutatorPart: ranks must be in 0..3");
   IMSRG_CHECK(A.num_states() == mb.size() && B.num_states() == mb.size(),
               "CommutatorPart: operator and basis disagree");
-  MOperator Z(mb.size());
+  MOperator Z(mb.size(), nC);
   const std::vector<Pattern> patterns = BuildPatterns(A, nA, B, nB, nC, mb);
   if (patterns.empty()) return Z;
   const auto groups = GroupedTuples(mb, nC);
-  for (const auto& [key, tuples] : groups) {
-    for (const Labels& out : tuples) {
-      for (const Labels& in : tuples) {
-        double c = 0.0;
-        for (const Pattern& p : patterns) {
-          const MOperator& X = p.swapped ? B : A;
-          const MOperator& Y = p.swapped ? A : B;
-          const double v = EvaluatePattern(X, Y, p, nC, out.data(), in.data());
-          c += p.swapped ? -v : v;
-        }
-        if (c == 0.0) continue;
-        if (nC == 0) {
-          Z.zero_body() += c;
-        } else {
-          Z.Add(nC, std::span<const int>(out.data(), static_cast<size_t>(nC)),
-                std::span<const int>(in.data(), static_cast<size_t>(nC)), c);
+  for (const auto& [key_in, tuples_in] : groups) {
+    const auto [m_in, par_in, tz_in] = key_in;
+    for (int sgn = -1; sgn <= 1; sgn += 2) {
+      if (shift.two_dtz == 0 && sgn == 1) continue;
+      const std::tuple<int, int, int> key_out = {m_in + shift.two_mu,
+                                                 (par_in + shift.parity) % 2,
+                                                 tz_in + sgn * shift.two_dtz};
+      const auto it = groups.find(key_out);
+      if (it == groups.end()) continue;
+      for (const Labels& out : it->second) {
+        for (const Labels& in : tuples_in) {
+          double c = 0.0;
+          for (const Pattern& p : patterns) {
+            const MOperator& X = p.swapped ? B : A;
+            const MOperator& Y = p.swapped ? A : B;
+            const double v =
+                EvaluatePattern(X, Y, p, nC, out.data(), in.data());
+            c += p.swapped ? -v : v;
+          }
+          if (c == 0.0) continue;
+          if (nC == 0) {
+            Z.zero_body() += c;
+          } else {
+            Z.Add(nC, std::span<const int>(out.data(), static_cast<size_t>(nC)),
+                  std::span<const int>(in.data(), static_cast<size_t>(nC)), c);
+          }
         }
       }
     }
@@ -915,13 +1171,13 @@ MOperator CommutatorPart(const MOperator& A, int nA, const MOperator& B, int nB,
 }
 
 MOperator Commutator(const MOperator& A, const MOperator& B, const MBasis& mb,
-                     int max_rank) {
-  MOperator Z(mb.size());
+                     int max_rank, const TensorShift& shift) {
+  MOperator Z(mb.size(), max_rank);
   for (int nC = 0; nC <= max_rank; ++nC) {
     for (int nA = 0; nA <= 3; ++nA) {
       for (int nB = 0; nB <= 3; ++nB) {
         if (nA == 0 || nB == 0) continue;  // commutes with a number
-        Z.Axpy(1.0, CommutatorPart(A, nA, B, nB, nC, mb));
+        Z.Axpy(1.0, CommutatorPart(A, nA, B, nB, nC, mb, shift));
       }
     }
   }

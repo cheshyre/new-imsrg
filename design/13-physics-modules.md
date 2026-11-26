@@ -42,6 +42,17 @@ implementing a module.**
   reduced 2B normal-ordering branch zeroes non-Hermitian entries. Write a unit test for each
   that demonstrates the correct behaviour.
 
+**Tensor operators (M15, implemented 2026-11-26).** `OperatorSpec` accepts rank_J 0..(2 emax+1),
+parity ±, delta_Tz 0..2 (particle_rank <= 2, Hermitian or anti-Hermitian); every non-scalar spec is
+stored REDUCED as imsrg++ stores it (M15-Q1..Q3; the m-scheme oracle shows this is plain Edmonds
+reduction for 1B and pairs alike, AL-A-Q5). `TwoBody` keeps one block per channel pair ch_bra <= ch_ket
+allowed by `ConnectsChannels` (D25); getters with (J_bra, J_ket) apply h (-1)^(J_bra-J_ket) for the
+other orientation. Norms copy imsrg++ (1B integer degeneracy incl. its quirk AL-A-Q6, 2B weight
+1/(2L+1), x2 off-diagonal). `TransformBasis` handles tensors (D_bra^T V D_ket). `NormalOrderTensor`
+/ `ReNormalOrder` (ensemble -> core) sum both channel orientations; the fork's diagonal omission is
+`TensorNormalOrderOptions::fork79e9330_diagonal_bug` (design/30 section 6, M15-1). I/O: raw `.tdump`
+reader/writer (`tensor_dump.h`), `io::WriteTensorTokyo` (fork 79e9330 and devel formats).
+
 ## 3. io (reference: `reference/04` §4–5)
 
 Phase-1 formats, in this order:
@@ -191,6 +202,16 @@ to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9. In the driver (run 2): IT
   formulas with plain loops for any hermiticity. Validation: imsrg-devel goldens at emax 1-2
   (all hermiticity pairs, closed and open shell) and fast vs reference on random operators,
   all deviations below 2e-15 relative; benchmark in `design/benchmarks/imsrg2-commutators.md`.
+
+**Scalar-tensor commutators (M15).** `commutator/tensor.h`: `TensorCommutator(X, Y)` for scalar X
+and tensor Y with comm111st, 121st, 122st, 222_pp_hh_221st (1B/2B parts separable) and 222_phst in
+imsrg-devel's formulas and triangle/mirror conventions; `Commutator()` dispatches tensor operands
+(so `BchTransform` and `MagnusSolver::Transform` work for tensors). Tables per rank: {J1 J2 L; ja jb jc}
+and a dense 9j box table whose entries below `ninej_threshold` are zeroed (devel 1e-10, fork 1e-8).
+The ph term Pandya-transforms over all ordered cross-coupled pairs and stores Zbar for c3 <= c4.
+Validation: imsrg-devel goldens (emax 1-2, all terms, four hermiticity pairs, BCH), m-scheme brute
+force for ranks 0-5 and fractional occupations. Cost (O16, 16 threads, rank 5): 0.9 s at emax 6, 9 s
+at emax 8 per commutator (`tools/bench/tensor_commutator_bench`); memory and GPU follow-ups AL-A-Q2.
 
 ## 7. flow (reference: `reference/03`)
 

@@ -136,16 +136,23 @@ for nuc_dir, prefix, mine, theirs in [
     b = parse_v1(theirs)
     dev = max([abs(a.get(k, 0.0) - b.get(k, 0.0)) for k in set(a) | set(b)] + [0.0])
     checks["input_equal:" + prefix] = dev
-    if dev > 1e-12:
+    # random_A depends on the C++ standard library's random distributions: the Mac (libc++)
+    # golden differs from a Frontier (libstdc++) harness run, so it is recorded, not required
+    # (the tensor goldens store their own random_A inputs since 2026-11-26).
+    if dev > 1e-12 and prefix != "O16 random_A":
         bad.append((prefix, dev))
 
 # 3b. random_A (seed 7) is reference independent: He4 run == the O16 golden file
 a = parse_v1(os.path.join(tmp, "runs", "ops_He4_HF", "random_A.dump"))
 b = parse_v1(os.path.join(golden, "commutator", "emax2_O16", "random_A.dump"))
 dev = max([abs(a.get(k, 0.0) - b.get(k, 0.0)) for k in set(a) | set(b)] + [0.0])
-checks["input_equal:He4 random_A vs O16 random_A"] = dev
+checks["input_equal:He4 random_A vs O16 random_A"] = dev  # informational, see above
+# required instead: the He4 and O16 runs of this harness agree (random_A is reference independent)
+c = parse_v1(os.path.join(tmp, "runs", "ops_O16_HF", "random_A.dump"))
+dev = max([abs(a.get(k, 0.0) - c.get(k, 0.0)) for k in set(a) | set(c)] + [0.0])
+checks["input_equal:He4 random_A vs O16 random_A (this run)"] = dev
 if dev > 1e-12:
-    bad.append(("He4 random_A", dev))
+    bad.append(("He4 random_A (this run)", dev))
 
 # 4. result.json
 runs = OrderedDict()

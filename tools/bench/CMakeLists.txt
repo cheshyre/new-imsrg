@@ -16,6 +16,11 @@ target_compile_definitions(commutator_bench PRIVATE IMSRG_BENCH_GIT_HASH="${_ben
 target_link_libraries(commutator_bench PRIVATE imsrg::commutator imsrg::comm imsrg::operator imsrg::exec
                                                imsrg::basis imsrg::warnings)
 
+# Scalar-tensor commutator benchmark (M15).
+add_executable(tensor_commutator_bench tensor_commutator_bench.cc)
+target_link_libraries(tensor_commutator_bench PRIVATE imsrg::commutator imsrg::operator imsrg::exec
+                                                      imsrg::basis imsrg::warnings)
+
 # IMSRG(3) three-body storage layout benchmark (design/14 section 2,
 # design/benchmarks/imsrg3-layout.md).
 add_subdirectory(imsrg3_layout)

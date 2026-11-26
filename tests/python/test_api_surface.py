@@ -155,9 +155,9 @@ def test_error_mapping_of_minimal_failing_calls(o16_emax2):
     with pytest.raises(imsrg.ImsrgError):
         o16_emax2.channel(10**6)
     with pytest.raises(imsrg.NotImplementedError):
-        imsrg.Operator(o16_emax2, imsrg.OperatorSpec(rank_J=2))
+        imsrg.Operator(o16_emax2, imsrg.OperatorSpec(rank_J=2, particle_rank=3))
     with pytest.raises(builtins.NotImplementedError):  # also catchable as the builtin
-        imsrg.Operator(o16_emax2, imsrg.OperatorSpec(rank_J=2))
+        imsrg.Operator(o16_emax2, imsrg.OperatorSpec(rank_J=2, particle_rank=3))
     with pytest.raises(imsrg.ConfigError):
         imsrg.load_config(text="[basis]\nemaxx = 2\n")
     with pytest.raises(imsrg.InputError):

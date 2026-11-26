@@ -18,6 +18,7 @@
 namespace imsrg::commutator {
 
 class ThreeBodyContext;
+class TensorWorkspace;
 
 /// Whether the constructor of a `Workspace` builds the IMSRG(3) tables
 /// (`ThreeBodyContext`).
@@ -107,6 +108,10 @@ class Workspace {
   /// The communicator of `WorkspaceOptions::comm` (serial by default).
   const comm::Communicator& comm() const noexcept { return comm_; }
 
+  /// The scalar-tensor commutator tables (`TensorWorkspace`, tensor.h) on
+  /// this workspace's model space, built on first use (M15). Not thread safe.
+  TensorWorkspace& tensor();
+
   /// The tables of the IMSRG(3) terms (`ThreeBodyContext`, three_body.h).
   /// Built by the constructor iff `WorkspaceOptions::three_body_context` is
   /// `kAuto` and the model space has a three-body space, or later by
@@ -142,6 +147,7 @@ class Workspace {
   comm::Communicator comm_;
   std::unique_ptr<Impl> impl_;
   std::unique_ptr<ThreeBodyContext> three_body_;
+  std::unique_ptr<TensorWorkspace> tensor_;
 };
 
 }  // namespace imsrg::commutator
