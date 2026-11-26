@@ -12,6 +12,7 @@
 #                               of this user named $IMSRG_SLURM_JOBNAME (default `imsrg`)
 #   imsrg_compute <cmd...>      runs <cmd> on that job's first node: srun --overlap, one task with
 #                               $IMSRG_COMPUTE_CPUS cores (default 56), no CPU binding, full env
+#   imsrg_compute_gpu <cmd...>  the same with 7 cores and one GCD (--gpus=1), M14
 #
 # Get an allocation once (login node):  salloc -A nph123 -N 1 -t 02:00:00 -J imsrg --no-shell
 # Several agents may share it: every step uses --overlap.
@@ -68,4 +69,12 @@ imsrg_compute() {
   j=$(imsrg_frontier_jobid) || return 1
   srun --jobid="$j" --overlap -N 1 -n 1 -c "$IMSRG_COMPUTE_CPUS" --cpu-bind=none \
     --export=ALL "$@"
+}
+
+# Like imsrg_compute, but one task with 7 cores and one GCD (the job must hold GPUs, e.g. the
+# 8 MI250X GCDs of a full node).
+imsrg_compute_gpu() {
+  local j
+  j=$(imsrg_frontier_jobid) || return 1
+  srun --jobid="$j" --overlap -N 1 -n 1 -c 7 --gpus=1 --cpu-bind=none --export=ALL "$@"
 }
