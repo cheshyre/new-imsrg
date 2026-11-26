@@ -109,6 +109,8 @@ struct InverseArgs {
   const std::int64_t* zbar_off = nullptr;
   const std::int32_t* cc_size = nullptr;  ///< Pairs per cc channel.
   const double* zbar = nullptr;
+  /// Fork mode only: the part Xbar3[:, ph3] YA of `zbar` (same layout).
+  const double* zbar_xy = nullptr;
   std::int32_t ncc = 0;
   int L = 0;
   int hZ = 1;
@@ -160,22 +162,47 @@ struct InverseArgs {
                     cc_size[ca]];
   }
 
+  /// The fork's "flipped" copy of a column whose pair is diagonal (c == d):
+  /// the fork stores every ket pair twice (k <= j and, flipped, k >= j), so a
+  /// diagonal pair (j, j) has a second column built from the flipped Ybar
+  /// whose (-1)^L is missing. Its Xbar YA part therefore has the opposite
+  /// sign for odd L: Stored - 2 Xbar YA.
+  IMSRG_INLINE_FUNCTION double StoredFlippedDiagonal(int ca, int cb, int a,
+                                                     int b, int Ja, int c,
+                                                     int Jb) const {
+    const int P = pair_of[ca * ncc + cb];
+    if (P < 0) return 0.0;
+    const std::int64_t e =
+        zbar_off[P] + cc.local_index(a, b, Ja) +
+        static_cast<std::int64_t>(cc.local_index(c, c, Jb)) * cc_size[ca];
+    return zbar[e] - 2.0 * zbar_xy[e];
+  }
+
   /// The fork's reading of Zbar^{J3 J4}_{(il),(kj)} (Commutator.cc:12396-
   /// 12405): the stored rows are the pairs (a, b) with a <= b; the others
   /// are reached through the swap of both pairs, with the phases
   /// (-1)^(J3 - J4 + j_i + j_j + j_k + j_l) (c3 <= c4, i > l) and
   /// (-1)^(j_i + j_j + j_k + j_l) (c3 > c4, k > j), which lack the factor
   /// (-1)^L of imsrg-devel. The matrices must have been built with the sign
-  /// error of the fork (YA columns of pairs (k, j) with k > j negated).
+  /// error of the fork (YA columns of pairs (k, j) with k > j negated). The
+  /// fork reads the flipped half of its doubled columns also for a diagonal
+  /// pair ((k > j ? 0 : nkets) with k == j, Commutator.cc:12399 and 12404,
+  /// 12472 and 12477): `StoredFlippedDiagonal`.
   IMSRG_INLINE_FUNCTION double ZbarFork(int i, int ll, int k, int j, int J3,
                                         int J4, int c3, int c4) const {
     const int S = (j2[i] + j2[j] + j2[k] + j2[ll]) / 2;
     if (c3 <= c4) {
       if (i <= ll) return Stored(c3, c4, i, ll, J3, k, j, J4);
-      return hZ * Phase(J3 - J4 + S) * Stored(c3, c4, ll, i, J3, j, k, J4);
+      const double z = (k == j)
+                           ? StoredFlippedDiagonal(c3, c4, ll, i, J3, j, J4)
+                           : Stored(c3, c4, ll, i, J3, j, k, J4);
+      return hZ * Phase(J3 - J4 + S) * z;
     }
-    if (k <= j) return hZ * Phase(J3 - J4) * Stored(c4, c3, k, j, J4, i, ll, J3);
-    return Phase(S) * Stored(c4, c3, j, k, J4, ll, i, J3);
+    if (k <= j)
+      return hZ * Phase(J3 - J4) * Stored(c4, c3, k, j, J4, i, ll, J3);
+    const double z = (i == ll) ? StoredFlippedDiagonal(c4, c3, j, k, J4, i, J3)
+                               : Stored(c4, c3, j, k, J4, ll, i, J3);
+    return Phase(S) * z;
   }
 };
 static_assert(std::is_trivially_copyable_v<InverseArgs>);
@@ -302,6 +329,12 @@ void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                                 "imsrg::ph::ybarB");
   exec::DeviceBuffer<double> zb(static_cast<std::size_t>(zb_off.back()),
                                 "imsrg::ph::zbar");
+  // Fork mode (odd L): the Xbar YA part of Zbar, see
+  // `InverseArgs::StoredFlippedDiagonal`.
+  const bool fork_odd = fork_ph_missing_rank_phase && (L % 2 != 0);
+  exec::DeviceBuffer<double> zxy(
+      fork_odd ? static_cast<std::size_t>(zb_off.back()) : 0,
+      "imsrg::ph::zbar_xy");
 
   const std::int32_t nch = ctx.tables.two_body().num_channels;
   const auto xoff = detail::BlockOffsetTable(X.two_body(), nch);
@@ -359,7 +392,7 @@ void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
     // The fork's flipped orientation (k > j) of the ket pair of Ybar lacks
     // (-1)^L (Commutator.cc:12696 vs TensorCommutators.cc phase(Jbra + Jket +
     // Lambda)); only odd L is affected.
-    const bool fork_flip = fork_ph_missing_rank_phase && (L % 2 != 0);
+    const bool fork_flip = fork_odd;
     exec::ParallelFor(
         "commutator::comm222_phst::ybar", e_off.back(),
         IMSRG_LAMBDA(const exec::Index e) {
@@ -422,6 +455,13 @@ void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
           xcd + xc_off[static_cast<std::size_t>(c4)], n4, m4, n4};
       linalg::Gemm(1.0, X3, linalg::Op::kNoTrans, YA, linalg::Op::kNoTrans, 0.0,
                    Zm);
+      if (fork_odd) {
+        linalg::MatrixView<double> Zx{
+            zxy.device_data() + zb_off[static_cast<std::size_t>(P)], n3, n4,
+            n3};
+        linalg::Gemm(1.0, X3, linalg::Op::kNoTrans, YA, linalg::Op::kNoTrans,
+                     0.0, Zx);
+      }
       linalg::Gemm(-1.0 * hX, YB, linalg::Op::kNoTrans, X4, linalg::Op::kTrans,
                    1.0, Zm);
     }
@@ -459,7 +499,8 @@ void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   v.ncc = ncc;
   v.L = L;
   v.hZ = hZ;
-  v.fork_odd_rank_phase = fork_ph_missing_rank_phase && (L % 2 != 0);
+  v.fork_odd_rank_phase = fork_odd;
+  v.zbar_xy = fork_odd ? zxy.device_data() : nullptr;
   v.ch_bra = d_zcb.device_data();
   v.ch_ket = d_zck.device_data();
   v.nbra = d_znb.device_data();

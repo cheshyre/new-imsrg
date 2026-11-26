@@ -47,7 +47,10 @@ struct TensorOptions {
   /// reads Zbar^{J3 J4}_{(il),(kj)} through the stored (min, max) pair it
   /// omits the factor (-1)^L that imsrg-devel includes (Commutator.cc:
   /// 12396-12405 vs TensorCommutators.cc phase(Lambda + J3 + J4 + ...)); the
-  /// affected elements get the opposite sign. No effect for even L.
+  /// affected elements get the opposite sign. Its flipped copy of the Ybar
+  /// columns (k > j, also read for diagonal pairs k == j) lacks the same
+  /// factor (Commutator.cc:12696). A fork bug (design/30 section 6, AL-F1);
+  /// no effect for even L.
   bool fork_ph_missing_rank_phase = false;
   /// Evaluate comm111st.
   bool comm111 = true;
