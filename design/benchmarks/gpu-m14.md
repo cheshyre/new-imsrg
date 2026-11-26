@@ -21,8 +21,8 @@ reference), `tools/bench/tensor_commutator_bench` (scalar X, Hermitian rank-L te
 
 | emax | GPU, 1 GCD | CPU 56 cores, serial libsci + concurrent | CPU 56 cores, default BLAS | CPU 16 cores, default | speed-up GCD / 56 cores |
 |-----:|-----------:|-----------------------------------------:|---------------------------:|----------------------:|------------------------:|
-| 8 | **16.4** | 65 | 430-590 | 170-186 | 4.0x |
-| 10 | **64.0** | 339 | - | - | 5.3x |
+| 8 | **13.0** | 65 | 430-590 | 170-186 | 5.0x |
+| 10 | **58.0** | 339 | - | - | 5.8x |
 
 Per term at emax 10 (ms): GPU / CPU (serial libsci, 56): comm221 12.8 / 137, comm122 12.6 / 56,
 pp_hh 9.7 / 150, ph 34.2 / 127, pp_hh_221 14.9 / 156. GPU history at emax 10: 105 ms with the
@@ -70,6 +70,24 @@ Zbar^{J3 J4} values once into team scratch for all (J1, J2) blocks instead of on
 rank 5 2150 -> 1206 ms). On the device the quadruple form is used for L >= 3 only (emax 10,
 element / quad ms: L = 1 275 / 583, 2 675 / 775, 3 1173 / 944, 4 1642 / 1094, 5 2150 / 1206);
 the host uses it always. Remaining hot spot: the phst inverse (~80 % at emax 10 rank 5).
+
+## Full IMSRG(2) Magnus flow (O16, IT-2 settings, 2N only, atan generator)
+
+`apps/imsrg/imsrg 2bme=<EM500 me2j> emax=E reference=O16 valence_space=O16 method=magnus` (the
+settings of `tools/bench/flow_bench.sh`), flow time = last `wall_s` of the flow file; emax 8 is a
+D40 benchmark exception.
+
+| emax | GPU, 1 GCD | CPU 56 cores (serial libsci + concurrent) | speed-up | steps, E0 |
+|-----:|-----------:|------------------------------------------:|---------:|-----------|
+| 6 | **8.6 s** | 17.3 s | 2.0x | 219, -171.232126375213 (both, to 2e-13) |
+| 8 | **28.0 s** | 81.1 s | 2.9x | 209, -172.796123844736 (both, to 3e-13) |
+
+History of the GPU flow: emax 6 24.0 s / emax 8 41.6 s before the norm fix -> 8.6 / 28.0 s. The
+two-body norm (`WeightedBlockSumOfSquares`, 4096-element chunks per work item) was a third of
+the flow's kernel time (3.4 ms per call at emax 8, ~16 norms per step); with 16-element chunks
+on the device it takes 0.5 ms. comm221ss and comm121ss (one thread per (i, j) pair) became one
+team per pair (emax 8: 2.6 -> ~0.6 ms and 1.1 -> 0.15 ms). At emax 6 the remaining host time is
+launch overhead (HSA runtime, ~250 small rocBLAS calls per commutator).
 
 ## Device vs host results
 
