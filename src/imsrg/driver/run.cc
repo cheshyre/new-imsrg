@@ -37,6 +37,7 @@
 #include "imsrg/driver/pipeline/hamiltonian.h"
 #include "imsrg/driver/pipeline/mpi_sync.h"
 #include "imsrg/driver/pipeline/operator_frame.h"
+#include "imsrg/driver/transform/transform_task.h"
 #include "imsrg/flow/magnus.h"
 #include "imsrg/flow/ode.h"
 #include "imsrg/flow/triples.h"
@@ -893,7 +894,8 @@ void FinishRun(const RunConfig& config, const pipeline::PreparedHamiltonian& ph,
       c = &ph.hf->C;
     }
     pipeline::WriteOmegaStack(dir, stem, solver.magnus_solver().omegas(),
-                              config.output.omega_format, c);
+                              config.output.omega_format, c,
+                              frame.ms_normal_ordering.get());
   }
   std::optional<ChargeRadiusRecord> radius;
   if (radius_slots) radius = MakeChargeRadiusRecord(ops, *radius_slots, ph);
@@ -917,6 +919,11 @@ void Run(const RunConfig& config, const comm::Communicator& comm) {
   log::DefaultLogger().set_rank(comm.rank());
   const fs::path dir(config.output.directory);
   if (comm.is_root()) WriteResolvedConfig(config, dir / "resolved_config.toml");
+  if (config.run.task == Task::kTransform) {
+    // The operator farm over stored Omegas (design/50 C10): no HF, no flow.
+    transform::RunTransform(config, comm);
+    return;
+  }
   RejectPlanned(config);
 
   pipeline::PreparedHamiltonian ph = pipeline::PrepareHamiltonian(config);

@@ -80,7 +80,11 @@ op::Operator BuildBareOperator(const OperatorRequest& request,
     case OperatorKind::kNreft: {
       const auto s = opslib::nreft::ParseShorthand(request.canonical_name);
       IMSRG_CHECK(s.has_value());
-      return opslib::nreft::BuildShorthandOperator(ms, *s);
+      // One-body only (particle rank 1): the operator has no two-body part
+      // before the BCH (which promotes it to rank 2 at emax_imsrg), and a
+      // zero two-body part at basis.emax 14 would cost up to 20 GB for a
+      // rank-5 tensor (design/50 section 6). The results are the same bits.
+      return opslib::nreft::BuildShorthandOperator(ms, *s, 1);
     }
     case OperatorKind::kRp2:
       return opslib::Rp2(ms, A, Z);

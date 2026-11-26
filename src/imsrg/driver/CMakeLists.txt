@@ -23,6 +23,9 @@ imsrg_add_module(NAME driver
     pipeline/hamiltonian.cc
     pipeline/mpi_sync.cc
     pipeline/operator_frame.cc
+    transform/farm.cc
+    transform/omega_store.cc
+    transform/transform_task.cc
     run.cc
   DEPS base exec comm basis operator io opslib hf mbpt commutator flow
   PRIVATE_LIBS tomlplusplus::tomlplusplus)

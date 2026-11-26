@@ -28,6 +28,9 @@ target_compile_definitions(driver_legacy PRIVATE
 # Operator-name grammar and catalog (item 9).
 imsrg_add_test(NAME driver_operators SOURCES test_operator_request.cc DEPS driver LABELS unit)
 
+# run.task = "transform": work list, cost model, static assignment, failure manifest (design/50 C10).
+imsrg_add_test(NAME driver_transform_farm SOURCES test_transform_farm.cc DEPS driver LABELS unit)
+
 # Golden equivalence of the design/16 2.11 examples, TOML vs legacy (item 6), and the
 # RunConfig -> TOML -> RunConfig round trip (item 7).
 imsrg_add_test(NAME driver_golden SOURCES test_golden_equivalence.cc test_round_trip.cc
@@ -58,7 +61,7 @@ target_compile_definitions(driver_pipeline_hamiltonian PRIVATE
 # pipeline in process and compare with tests/golden/e2e; skip without the input files.
 imsrg_add_test(NAME driver_integration
   SOURCES ${_it_support} test_integration.cc test_hunter_gatherer.cc test_stage_two_options.cc test_results_schema.cc
-  test_imsrg3f2.cc test_checkpoint.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
+  test_imsrg3f2.cc test_checkpoint.cc test_transform_task.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
   DEPS driver LABELS integration NO_GTEST_MAIN)
 target_compile_definitions(driver_integration PRIVATE
   "IMSRG_SOURCE_DIR=\"${PROJECT_SOURCE_DIR}\""
@@ -114,6 +117,19 @@ foreach(_ranks 2 4)
     DEPS driver comm LABELS mpi MPI_RANKS ${_ranks} NO_GTEST_MAIN TIMEOUT 600)
   if(TARGET driver_mpi_${_ranks}ranks)
     target_compile_definitions(driver_mpi_${_ranks}ranks PRIVATE
+      "IMSRG_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden\""
+      "IMSRG_TEST_DATA_DIR=\"${IMSRG_TEST_DATA_DIR}\"")
+  endif()
+endforeach()
+
+# run.task = "transform" on 2 and 4 ranks (design/50 C10): node-shared Omega window, static assignment,
+# failure manifest; the farm's files equal the serial in-process transform byte for byte.
+foreach(_ranks 2 4)
+  imsrg_add_test(NAME driver_transform_mpi_${_ranks}ranks
+    SOURCES ${_it_support} test_transform_mpi.cc ${PROJECT_SOURCE_DIR}/tests/support/mpi_test_main.cc
+    DEPS driver comm LABELS mpi MPI_RANKS ${_ranks} NO_GTEST_MAIN TIMEOUT 900)
+  if(TARGET driver_transform_mpi_${_ranks}ranks)
+    target_compile_definitions(driver_transform_mpi_${_ranks}ranks PRIVATE
       "IMSRG_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden\""
       "IMSRG_TEST_DATA_DIR=\"${IMSRG_TEST_DATA_DIR}\"")
   endif()
