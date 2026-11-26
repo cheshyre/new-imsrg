@@ -149,15 +149,18 @@ std::optional<Shorthand> ParseShorthand(std::string_view name);
 OneBodyTable BuildShorthandTable(const basis::SingleParticleBasis& basis,
                                  const Shorthand& s);
 
-/// The scalar (L = 0: FM0, FPhipp0) shorthand as a Hermitian particle-rank-2
-/// operator with zero two-body part; elements are plain matrix elements.
+/// The scalar (L = 0: FM0, FPhipp0) shorthand as a Hermitian operator of
+/// `particle_rank` 2 (zero two-body part) or 1 (no two-body part: what the
+/// transform farm builds at basis.emax 14, where an allocated two-body part
+/// would cost up to 20 GB for rank 5); elements are plain matrix elements.
 /// @throws InputError if `s.L != 0` (rank L > 0 needs tensor operators,
 ///         milestone M15).
 op::Operator BuildScalarShorthand(
-    const std::shared_ptr<const basis::ModelSpace>& ms, const Shorthand& s);
+    const std::shared_ptr<const basis::ModelSpace>& ms, const Shorthand& s,
+    std::int32_t particle_rank = 2);
 
 /// The shorthand as an operator of any rank: `BuildScalarShorthand` for L = 0;
-/// for L > 0 a Hermitian, particle-rank-2, parity-even, delta_Tz 0 tensor
+/// for L > 0 a Hermitian, parity-even, delta_Tz 0 tensor
 /// operator of rank_J = L with reduced one-body elements <a||O||b> in
 /// imsrg++'s gauge (design/10 section 3.3) and a zero two-body part. Every
 /// element (a, b) of `BuildShorthandTable` is written directly (both
@@ -165,8 +168,10 @@ op::Operator BuildScalarShorthand(
 /// O(b,a) = (-1)^(j_a - j_b) O(a,b) (the fork's tables do, to rounding).
 /// Even-J normal-parity and odd-J abnormal-parity shorthands are both parity
 /// even. Complexity O(num_orbits^2) table entries.
+/// `particle_rank` as for `BuildScalarShorthand` (2: zero two-body part).
 op::Operator BuildShorthandOperator(
-    const std::shared_ptr<const basis::ModelSpace>& ms, const Shorthand& s);
+    const std::shared_ptr<const basis::ModelSpace>& ms, const Shorthand& s,
+    std::int32_t particle_rank = 2);
 
 }  // namespace imsrg::opslib::nreft
 

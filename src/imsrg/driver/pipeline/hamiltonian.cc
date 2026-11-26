@@ -110,15 +110,8 @@ void ToNaturalOrbitalBasis(const op::Operator& H, const op::No2bThreeBody* v3,
   out.nat_occupations = nat.occupations;
 }
 
-std::shared_ptr<const basis::ModelSpace> MakeModelSpace(
-    const RunConfig& config);
+}  // namespace
 
-/// `[imsrg.space]` (design/50 C5, imsrg++.cc:887-929): the IMSRG model space
-/// with emax = imsrg.space.emax, the partition of the configuration's
-/// reference and valence space, and the occupations of `from` copied orbit by
-/// orbit (quantum numbers), so HF re-filling and fractional occupations
-/// survive. e2max must be 2 emax (the two-body channels have no e2max cut
-/// yet).
 std::shared_ptr<const basis::ModelSpace> MakeImsrgModelSpace(
     const RunConfig& config, const basis::ModelSpace& from) {
   const ImsrgSpaceConfig& sp = *config.imsrg.space;
@@ -152,7 +145,6 @@ std::shared_ptr<const basis::ModelSpace> MakeImsrgModelSpace(
       basis, std::move(occ), from.reference().name()));
 }
 
-/// Builds the oscillator model space of the configuration.
 std::shared_ptr<const basis::ModelSpace> MakeModelSpace(
     const RunConfig& config) {
   const BasisConfig& b = config.basis;
@@ -171,6 +163,8 @@ std::shared_ptr<const basis::ModelSpace> MakeModelSpace(
       basis::BasisTruncation{.emax = b.emax, .lmax = lmax}, b.hw, reference,
       valence);
 }
+
+namespace {
 
 /// Adds the kinetic energy of the configuration to `H`.
 void AddKineticEnergy(op::Operator& H, const RunConfig& config,

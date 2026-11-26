@@ -359,13 +359,15 @@ OneBodyTable BuildShorthandTable(const basis::SingleParticleBasis& basis,
 }
 
 op::Operator BuildScalarShorthand(
-    const std::shared_ptr<const basis::ModelSpace>& ms, const Shorthand& s) {
+    const std::shared_ptr<const basis::ModelSpace>& ms, const Shorthand& s,
+    std::int32_t particle_rank) {
   if (s.L != 0) {
     throw InputError(
         "NREFT shorthand with rank L > 0 needs tensor operators (M15)");
   }
   const OneBodyTable t = BuildShorthandTable(ms->basis(), s);
-  op::Operator o(ms, op::OperatorSpec::Scalar(2, Hermiticity::kHermitian));
+  op::Operator o(ms,
+                 op::OperatorSpec::Scalar(particle_rank, Hermiticity::kHermitian));
   for (std::int32_t a = 0; a < t.num_orbits; ++a) {
     for (std::int32_t b = 0; b < t.num_orbits; ++b) {
       const double v = t.value(OrbitIndex{a}, OrbitIndex{b});
@@ -377,10 +379,12 @@ op::Operator BuildScalarShorthand(
 }
 
 op::Operator BuildShorthandOperator(
-    const std::shared_ptr<const basis::ModelSpace>& ms, const Shorthand& s) {
-  if (s.L == 0) return BuildScalarShorthand(ms, s);
+    const std::shared_ptr<const basis::ModelSpace>& ms, const Shorthand& s,
+    std::int32_t particle_rank) {
+  if (s.L == 0) return BuildScalarShorthand(ms, s, particle_rank);
   const OneBodyTable t = BuildShorthandTable(ms->basis(), s);
-  op::OperatorSpec spec = op::OperatorSpec::Scalar(2, Hermiticity::kHermitian);
+  op::OperatorSpec spec =
+      op::OperatorSpec::Scalar(particle_rank, Hermiticity::kHermitian);
   spec.rank_J = s.L;
   spec.parity = Parity::kEven;
   spec.delta_Tz = 0;

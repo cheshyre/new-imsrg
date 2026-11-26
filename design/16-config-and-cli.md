@@ -29,7 +29,7 @@ Conventions: keys are `snake_case`; enum values are lower `snake_case` strings (
 
 | key | type | default | meaning |
 |---|---|---|---|
-| `task` | enum `imsrg`, `hf`, `mp3`, `fci_export` | `imsrg` | `hf`: stop after HF/basis + normal ordering (old `method=HF`); `mp3`: stop after MBPT(3) diagnostics (old `method=MP3`); `fci_export`: vacuum HF + write FCI interaction (old `method=FCI`, PL). |
+| `task` | enum `imsrg`, `hf`, `mp3`, `fci_export`, `transform` | `imsrg` | `hf`: stop after HF/basis + normal ordering (old `method=HF`); `mp3`: stop after MBPT(3) diagnostics (old `method=MP3`); `fci_export`: vacuum HF + write FCI interaction (old `method=FCI`, PL); `transform`: no HF and no flow, transform operators with stored Omegas (`[transform]`, section 2.11b; design/50 C10). |
 | `scratch_dir` | string | `""` | directory for Omega spill files; used only when `imsrg.omega.storage="scratch"`. Probed for writability at preflight. |
 | `log_level` | enum `quiet`, `normal`, `debug` | `normal` | stdout verbosity (new key; no legacy equivalent). |
 | `compat` | enum `none`, `imsrg_fork_79e9330` | `none` | compatibility profile (design/50 §5): one key that switches on named internal options reproducing another code version; `none` is the fixed behaviour. The options and their profiles are listed in `src/imsrg/driver/config/compat.h` (`CompatOptions`). `imsrg_fork_79e9330`: `nat_sort_by_abs_occupation` (NAT orbitals ordered by \|occupation\|, fork HFMBPT.cc:131-182), `fork_step_defaults` (`imsrg.step.domega` defaults to the fork's 0.2 instead of 0.1), `tensor_no_fork_diagonal_bug` (fork's tensor normal ordering omits one orientation for a == b, also in the re-normal-ordering), `tensor_ninej_threshold_1e8` (9j skip threshold 1e-8 in the flow's tensor commutators), `tokyo_writer_fork_79e9330` (79e9330 writers for scalar and tensor `.snt`: 7 significant digits, absolute 1e-7 thresholds, header A/Z of the core). No legacy equivalent. |
@@ -233,6 +233,22 @@ Omega piece, `omega_cur_<seq>.*` and `h_<seq>.*` per checkpoint, `state.txt` (wr
 config hash, format, sequence, Omega count, loop state and step options as hexfloats, finished stages).
 E-PLANNED with: methods other than `magnus`, hunter-gatherer, `imsrg3.in_flow`, perturbative triples.
 The flow file of a restarted run starts at the restored step.
+
+### 2.11b `[transform]` (design/50 C10; `run.task = "transform"`)
+
+The configuration is the flow's (`resolved_config.toml` of the run that wrote the Omegas, with
+`run.task = "transform"`): basis, reference, valence space, `[imsrg.space]`, `run.compat` and the
+interaction file names (header only) must be those of the flow; nothing is read but the manifest's
+files. Every rank of the job takes a static share of the work list (cost-weighted, design/50 §6) and
+writes `<output.directory>/<output.stem><name>.snt` (scalars, isospin-averaged operator mode) or
+`..._2b.snt` (tensors), the fork's names. Omegas are read once per node into MPI shared memory.
+
+| key | type | default | meaning |
+|---|---|---|---|
+| `manifest` | path | `""` (required) | `<stem>_omegas.toml` written by `output.write_omega` (format native or me2jp, the Omega files in the order to apply them, C, occupations, layout hash). |
+| `work_list` | path | `""` | file with one operator name per line (`#` comments, blank lines ignored); appended to `operators.list`. |
+| `failure_manifest` | path | `""` | operators that did not finish, one `name<TAB>reason` per line, written by rank 0 at the end (always written, empty on success; usable as the next `work_list`). Empty: `<output.directory>/failed.txt`. Rank 0 first writes it with EVERY item ("job did not complete"), so a killed job leaves a complete list; it is rewritten at the end. |
+| `skip_existing` | bool | `false` | skip items whose output file exists (outputs are written to a temporary name and renamed, so an existing file is complete): resume a killed farm with the same work list. |
 
 #### `results.json` schema
 
