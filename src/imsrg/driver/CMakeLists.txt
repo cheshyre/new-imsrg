@@ -22,6 +22,7 @@ imsrg_add_module(NAME driver
     pipeline/checkpoint.cc
     pipeline/hamiltonian.cc
     pipeline/mpi_sync.cc
+    pipeline/operator_frame.cc
     run.cc
   DEPS base exec comm basis operator io opslib hf mbpt commutator flow
   PRIVATE_LIBS tomlplusplus::tomlplusplus)

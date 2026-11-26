@@ -17,9 +17,13 @@
 ///     |occupation| inside each channel (HFMBPT.cc:131-182).
 ///   * `fork_step_defaults` (lead C): the fork's Parameters.hh default
 ///     domega = 0.2 (imsrg-devel: 0.1) when imsrg.step.domega is not given.
-/// Planned for the same profile (leads A and B): tensor normal-ordering term
-/// for a == b, J_bra != J_ket omitted; 9j skip threshold 1e-8 in the tensor
-/// commutators; the 79e9330 tokyo writer format.
+///   * `tensor_no_fork_diagonal_bug`: tensor normal ordering omits, for
+///     a == b, the channel pairs with ch(a h, J_bra) > ch(a h, J_ket)
+///     (also in the re-normal-ordering).
+///   * `tensor_ninej_threshold_1e8`: 9j skip threshold 1e-8 (not 1e-10) in
+///     the tensor commutators of the flow.
+///   * `tokyo_fork_format`: the 79e9330 tokyo writers (7 significant digits,
+///     absolute 1e-7 thresholds, Aref/Zref of the core, scalars and tensors).
 
 #include "imsrg/driver/config/schema.h"
 
@@ -32,6 +36,13 @@ struct CompatOptions {
   bool nat_sort_by_abs_occupation = false;
   /// Default imsrg.step.domega = 0.2 (fork Parameters.hh:117) instead of 0.1.
   bool fork_step_defaults = false;
+  /// Fork tensor normal-ordering bug
+  /// (`op::TensorNormalOrderOptions::fork79e9330_diagonal_bug`).
+  bool tensor_no_fork_diagonal_bug = false;
+  /// `commutator::CommutatorOptions::tensor_ninej_threshold = 1e-8`.
+  bool tensor_ninej_threshold_1e8 = false;
+  /// `io::TokyoNumberFormat::kFork79e9330` / `io::TokyoFormat::kFork79e9330`.
+  bool tokyo_fork_format = false;
   friend bool operator==(const CompatOptions&, const CompatOptions&) = default;
 };
 
@@ -44,6 +55,9 @@ constexpr CompatOptions CompatOptionsFor(Compat c) noexcept {
     case Compat::kImsrgFork79e9330:
       o.nat_sort_by_abs_occupation = true;
       o.fork_step_defaults = true;
+      o.tensor_no_fork_diagonal_bug = true;
+      o.tensor_ninej_threshold_1e8 = true;
+      o.tokyo_fork_format = true;
       break;
   }
   return o;

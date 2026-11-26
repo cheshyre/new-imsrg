@@ -98,5 +98,80 @@ TEST(OperatorTruncate, OneBodyOperator) {
             A.one_body().get(OrbitIndex(0), OrbitIndex(0)));
 }
 
+// Tensor two-body part: every stored reduced element of the target equals the
+// source element of the same orbits (looked up through the getters).
+void CheckTensor(std::int32_t rank_J, Parity parity, std::int32_t dtz,
+                 Hermiticity h) {
+  const auto big = Ms(4, "Al27", "sd-shell");
+  const auto small = Ms(2, "Al27", "sd-shell");
+  OperatorSpec spec = OperatorSpec::Scalar(2, h);
+  spec.rank_J = rank_J;
+  spec.parity = parity;
+  spec.delta_Tz = dtz;
+  Operator A(big, spec);
+  const auto& btb = big->two_body();
+  std::uint64_t state = 12345;
+  auto next = [&state]() {
+    state = state * 6364136223846793005ULL + 1442695040888963407ULL;
+    return static_cast<double>(state >> 11) * 0x1.0p-53 - 0.5;
+  };
+  for (std::int32_t cb = 0; cb < btb.num_channels(); ++cb)
+    for (std::int32_t ck = cb; ck < btb.num_channels(); ++ck) {
+      if (!A.two_body().block_index(ChannelIndex(cb), ChannelIndex(ck)))
+        continue;
+      const auto& bc = btb.channel(ChannelIndex(cb));
+      const auto& kc = btb.channel(ChannelIndex(ck));
+      for (std::int32_t i = 0; i < bc.num_kets; ++i)
+        for (std::int32_t j = (cb == ck ? i : 0); j < kc.num_kets; ++j) {
+          const auto& bra = btb.ket(btb.global_ket(ChannelIndex(cb),
+                                                   LocalKetIndex(i)));
+          const auto& ket = btb.ket(btb.global_ket(ChannelIndex(ck),
+                                                   LocalKetIndex(j)));
+          A.two_body().set_normalized(bra.p, bra.q, ket.p, ket.q, bc.two_j,
+                                      kc.two_j, next());
+        }
+    }
+  const Operator T = Truncate(A, small);
+  A.SyncToHost();
+  T.SyncToHost();
+  EXPECT_EQ(T.spec(), spec);
+  const auto& tb = small->two_body();
+  const auto& sb = small->basis();
+  const auto& bb = big->basis();
+  auto m = [&](OrbitIndex a) { return bb.index_of(sb.orbit(a)); };
+  std::int64_t count = 0;
+  for (std::int32_t cb = 0; cb < tb.num_channels(); ++cb)
+    for (std::int32_t ck = 0; ck < tb.num_channels(); ++ck) {
+      const auto& bc = tb.channel(ChannelIndex(cb));
+      const auto& kc = tb.channel(ChannelIndex(ck));
+      for (std::int32_t i = 0; i < bc.num_kets; ++i)
+        for (std::int32_t j = 0; j < kc.num_kets; ++j) {
+          const auto& bra = tb.ket(tb.global_ket(ChannelIndex(cb),
+                                                 LocalKetIndex(i)));
+          const auto& ket = tb.ket(tb.global_ket(ChannelIndex(ck),
+                                                 LocalKetIndex(j)));
+          const double t = T.two_body().get_normalized(
+              bra.p, bra.q, ket.p, ket.q, bc.two_j, kc.two_j);
+          EXPECT_EQ(t, A.two_body().get_normalized(m(bra.p), m(bra.q),
+                                                   m(ket.p), m(ket.q),
+                                                   bc.two_j, kc.two_j));
+          count += t != 0.0;
+        }
+    }
+  EXPECT_GT(count, 500);
+}
+
+TEST(OperatorTruncate, TensorRank2Even) {
+  CheckTensor(2, Parity::kEven, 0, Hermiticity::kHermitian);
+}
+
+TEST(OperatorTruncate, TensorRank1OddAntiHermitian) {
+  CheckTensor(1, Parity::kOdd, 0, Hermiticity::kAntiHermitian);
+}
+
+TEST(OperatorTruncate, TensorChargeChanging) {
+  CheckTensor(1, Parity::kEven, 1, Hermiticity::kHermitian);
+}
+
 }  // namespace
 }  // namespace imsrg::op
