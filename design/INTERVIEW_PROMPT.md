@@ -12,13 +12,13 @@
 
 **How to use:** start an **interactive** Claude Code session (Opus) on a Frontier login node in the
 integrator's clone `$IMSRG_WORK/main` on `develop` (`git pull --ff-only origin develop` first), and
-paste everything below the line. Plan 75-100 minutes. The session only edits documentation; the
+paste everything below the line. Plan about 2-2.5 hours: the interview proper, then the plan for the owner's weekend task. The session only edits documentation; the
 next unsupervised run (`design/NEXT_SESSION_PROMPT.md`, run 4) builds on what it records.
 
 ---
 
 You will interview the owner of the imsrg rewrite (a modern C++20/Kokkos/MPI replacement of
-imsrg++), which has just moved from the owner's Mac to OLCF Frontier (project nph123). Three goals:
+imsrg++), which has just moved from the owner's Mac to OLCF Frontier (project nph123). Four goals:
 
 1. **Decide the Frontier proposals and questions** of the port session (2026-11-26) in
    `design/QUESTIONS.md` ("Added during the Frontier port"): the agent-isolation scheme, the GitHub
@@ -28,6 +28,10 @@ imsrg++), which has just moved from the owner's Mac to OLCF Frontier (project np
 3. **Decide the process and design points** needed for run 4 on Frontier (the order of the work,
    usage rules, compute allocations, MPI/GPU targets on Frontier), so run 4 can work without
    blocking.
+4. **Plan the owner's big task for an unsupervised weekend session** (part 3 below): when the
+   interview proper is done, ask the owner about it, develop the plan with them, and merge it with
+   the existing development plan into `design/NEXT_SESSION_PROMPT.md`. Tell the owner at the start
+   that this part comes last, and keep enough of the session for it (at least 45 minutes).
 
 ## Preparation (before your first question; <= 10 minutes, keep it to yourself)
 
@@ -264,6 +268,35 @@ Format: **id** - summary; *assumption taken*; what an answer changes.
    Anything to change? (Details: run-3 report section 6; port report sections 3-4: four agents
    in parallel clones on one shared node made a 113 s test time out once.)
 
+## Agenda, part 3: the weekend task (after parts 0-2 are recorded)
+
+The owner has a big task for an unsupervised weekend session. You do not know it yet: ask.
+
+1. **Ask first, open-ended:** what the task is, why it matters now, what "done" looks like at the
+   end of the weekend, and what may be left half-done. Then ask the questions the answers leave
+   open (one batch at a time, recommendation first), for example: which milestones or design docs
+   it touches (`design/40-roadmap.md`), the physics acceptance tests and reference numbers
+   (goldens, imsrg++ runs through `tools/reference`, tolerances of `design/30` §2), new inputs or
+   files the owner must provide, problem sizes and whether golden rule 3 needs a benchmark
+   exception, GPU or multi-node needs, and anything the run must never do.
+2. **Weekend logistics** (ask; recommend from run 3 and the port): start and end times (the owner's
+   time zone), the usage rules for 5-hour windows and the weekly budget over ~48-60 h (part 2,
+   items 2-3), the compute allocation plan (FP-Q3: chained 2-hour jobs, `extended` partition, more
+   nodes, a reservation; node-hour budget), where and how often the run reports progress
+   (`design/STATUS.md`, an interim report), whether it may push `develop` to GitHub during the
+   run, and what happens if it gets stuck (park the task and continue with the existing plan).
+3. **Develop the plan with the owner:** split the task into briefs for leads (goal, acceptance
+   tests, docs to read, files to touch, branch names, dependencies, at most 3 leads at once,
+   `isolation: worktree` clones from the hub), with checkpoints that leave `develop` green and
+   useful after each merge. Show the plan, revise it with the owner, and get an explicit OK.
+4. **Merge it with the existing plan:** decide with the owner how the weekend task and the run-4
+   plan (part 2, item 1: M12b phase 2, N7 follow-ups, M15, M16, fillers) relate: the weekend task
+   first and the existing briefs as fillers when it blocks, interleaved, or the weekend task only.
+   Then rewrite `design/NEXT_SESSION_PROMPT.md` as the prompt of the weekend session (title,
+   owner pre-flight, usage schedule, the briefs in order, definition of done), keeping its
+   Frontier sections; add the task to `design/40-roadmap.md` (and design docs if it is a new
+   milestone), record its decisions as D-rows, and write it up in the interview report.
+
 ## Recording the answers
 
 * In `design/QUESTIONS.md`: under each question, `**Answer (owner, <date>):** ...` (verbatim for
@@ -276,5 +309,6 @@ Format: **id** - summary; *assumption taken*; what an answer changes.
 * Write `design/reports/<date>-owner-interview.md`: decisions taken, changed priorities, follow-up
   tasks for the next unsupervised run.
 * Merge and push as described under "Git and compute" above.
-* Finish with a short summary to the owner: what was decided, what was deferred, and whether the
-  next unsupervised run is ready to start.
+* Finish with a short summary to the owner: what was decided, what was deferred, the weekend plan
+  in a few lines, and whether the weekend session is ready to start (and what the owner must do
+  before launching it).
