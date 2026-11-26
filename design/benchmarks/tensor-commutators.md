@@ -18,3 +18,8 @@ Notes: the first call is dominated by the serial 9j table build (parallel since;
 at emax 10). comm122st (element-wise, getter lookups) and comm222_phst (Pandya with 9j sums, host
 BLAS) dominate; both are GPU/tuning targets for the farm (C10/C11). Zbar storage was halved after
 these runs (c3 <= c4 via the tensor hermiticity relation).
+
+**After the c3 <= c4 Zbar storage and the parallel 9j build** (same setup, emax 8, rank 5): first
+call 11.0 s (was 26.1 s), comm222_phst 6.7 s, peak RSS 2.19 GB (was 3.29 GB). Phases of comm222_phst
+(temporary timers): Xbar 18 ms, Ybar pieces 0.91 s, gemms 0.11 s, **inverse transform 5.5 s**
+(about 5e9 9j x Zbar gathers: N_Z elements x J3 x J4 x 2; embarrassingly parallel, a GPU target).
