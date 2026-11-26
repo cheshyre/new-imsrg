@@ -35,3 +35,34 @@ imsrg_add_test(NAME commutator_ref_mscheme
   DEPS commutator_ref commutator operator
   LABELS unit
   NO_GTEST_MAIN)
+
+# The m-scheme tensor oracle (Wigner-Eckart expansion, shifted Wick engine):
+# against the imsrg-devel tensor goldens, then (round trip, scalar-tensor
+# commutator beyond the goldens: ranks up to 5, fractional occupations).
+set(_imsrg_tensor_ms_support
+    "${PROJECT_SOURCE_DIR}/tests/unit/commutator_ref/tensor_mscheme_support.cc")
+
+imsrg_add_test(NAME commutator_ref_mscheme_tensor_golden
+  SOURCES test_mscheme_tensor_golden.cc ${_imsrg_exec_main} ${_imsrg_comm_support}
+          ${_imsrg_tensor_ms_support}
+  DEPS commutator_ref operator
+  LABELS unit
+  NO_GTEST_MAIN)
+target_compile_definitions(commutator_ref_mscheme_tensor_golden PRIVATE
+  IMSRG_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/tests/golden")
+
+imsrg_add_test(NAME commutator_ref_mscheme_tensor_roundtrip
+  SOURCES test_mscheme_tensor_roundtrip.cc ${_imsrg_exec_main} ${_imsrg_comm_support}
+          ${_imsrg_tensor_ms_support}
+  DEPS commutator_ref operator
+  LABELS unit
+  NO_GTEST_MAIN)
+
+# Scalar-tensor commutators (all terms) against the m-scheme at emax 2: ranks
+# up to 5, both parities, fractional occupations.
+imsrg_add_test(NAME commutator_ref_mscheme_tensor_comm
+  SOURCES test_mscheme_tensor_comm.cc ${_imsrg_exec_main} ${_imsrg_comm_support}
+          ${_imsrg_tensor_ms_support}
+  DEPS commutator_ref commutator operator
+  LABELS unit
+  NO_GTEST_MAIN)
