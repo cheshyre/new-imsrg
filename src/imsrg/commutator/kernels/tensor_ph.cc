@@ -198,7 +198,8 @@ void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   };
   // Channel pairs (c3, c4).
   std::vector<std::int32_t> p3, p4;
-  std::vector<std::int32_t> pair_of(static_cast<std::size_t>(ncc) * ncc, -1);
+  std::vector<std::int32_t> pair_of(
+      static_cast<std::size_t>(ncc) * static_cast<std::size_t>(ncc), -1);
   std::vector<std::int64_t> ya_off{0}, yb_off{0}, zb_off{0};
   std::vector<std::int64_t> e_off{0};
   std::vector<char> xc_needed(static_cast<std::size_t>(ncc), 0);
@@ -221,7 +222,8 @@ void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
       const int t3 = cc.tz[static_cast<std::size_t>(c3)];
       const int t4 = cc.tz[static_cast<std::size_t>(c4)];
       if (!(t3 + t4 == dTz || std::abs(t3 - t4) == dTz)) continue;
-      pair_of[static_cast<std::size_t>(c3) * ncc + c4] =
+      pair_of[static_cast<std::size_t>(c3) * static_cast<std::size_t>(ncc) +
+              static_cast<std::size_t>(c4)] =
           static_cast<std::int32_t>(p3.size());
       p3.push_back(c3);
       p4.push_back(c4);

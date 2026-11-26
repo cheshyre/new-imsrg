@@ -48,7 +48,8 @@ Operator NormalOrderTensor(const Operator& op,
   for (std::int32_t h = 0; h < norb; ++h)
     if (occupations[static_cast<std::size_t>(h)] >= basis::kOccupationCut)
       holes.push_back(h);
-  std::vector<double> delta(static_cast<std::size_t>(norb) * norb, 0.0);
+  std::vector<double> delta(
+      static_cast<std::size_t>(norb) * static_cast<std::size_t>(norb), 0.0);
   for (std::int32_t a = 0; a < norb; ++a) {
     const basis::Orbit& oa = sp.orbit(OrbitIndex{a});
     const int ja = oa.j2.twice;
@@ -86,14 +87,16 @@ Operator NormalOrderTensor(const Operator& op,
           }
         }
       }
-      delta[static_cast<std::size_t>(a) + static_cast<std::size_t>(b) * norb] =
+      delta[static_cast<std::size_t>(a) +
+            static_cast<std::size_t>(b) * static_cast<std::size_t>(norb)] =
           s * sum;
     }
   }
   for (std::int32_t a = 0; a < norb; ++a)
     for (std::int32_t b = 0; b < norb; ++b) {
-      const double d = delta[static_cast<std::size_t>(a) +
-                             static_cast<std::size_t>(b) * norb];
+      const double d =
+          delta[static_cast<std::size_t>(a) +
+                static_cast<std::size_t>(b) * static_cast<std::size_t>(norb)];
       if (d == 0.0) continue;
       result.one_body().set_element(
           OrbitIndex{a}, OrbitIndex{b},

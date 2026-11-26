@@ -125,7 +125,9 @@ const CrossCoupled& TensorContext::cross_coupled() {
   cc.parity.resize(cc.J.size());
   cc.tz.resize(cc.J.size());
   cc.offset.assign(cc.J.size() + 1, 0);
-  cc.local.assign(static_cast<std::size_t>(n) * n * (jmax + 1), -1);
+  cc.local.assign(static_cast<std::size_t>(n) * static_cast<std::size_t>(n) *
+                      static_cast<std::size_t>(jmax + 1),
+                  -1);
   for (std::int32_t c = 0; c < cc.num_channels; ++c) {
     const auto& pc = pairs[static_cast<std::size_t>(c)];
     cc.J[static_cast<std::size_t>(c)] = c / 4;
@@ -137,8 +139,10 @@ const CrossCoupled& TensorContext::cross_coupled() {
     for (std::size_t k = 0; k < pc.size(); ++k) {
       cc.pair_a.push_back(pc[k].first);
       cc.pair_b.push_back(pc[k].second);
-      cc.local[(static_cast<std::size_t>(pc[k].first) * n + pc[k].second) *
-                   (jmax + 1) +
+      cc.local[(static_cast<std::size_t>(pc[k].first) *
+                    static_cast<std::size_t>(n) +
+                static_cast<std::size_t>(pc[k].second)) *
+                   static_cast<std::size_t>(jmax + 1) +
                static_cast<std::size_t>(c / 4)] = static_cast<std::int32_t>(k);
     }
   }
@@ -152,12 +156,14 @@ const CrossCoupled& TensorContext::cross_coupled() {
 
 exec::DeviceBuffer<std::int64_t> BlockOffsetTable(const op::TwoBody& part,
                                                   std::int32_t num_channels) {
-  std::vector<std::int64_t> t(
-      static_cast<std::size_t>(num_channels) * num_channels, -1);
+  std::vector<std::int64_t> t(static_cast<std::size_t>(num_channels) *
+                                  static_cast<std::size_t>(num_channels),
+                              -1);
   if (part.allocated()) {
     for (const auto& info : part.matrix().blocks()) {
       if (info.rows == 0 || info.cols == 0) continue;
-      t[static_cast<std::size_t>(info.row_block.value()) * num_channels +
+      t[static_cast<std::size_t>(info.row_block.value()) *
+            static_cast<std::size_t>(num_channels) +
         static_cast<std::size_t>(info.col_block.value())] = info.offset;
     }
   }

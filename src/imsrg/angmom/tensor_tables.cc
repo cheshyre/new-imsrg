@@ -64,9 +64,8 @@ NineJTable::NineJTable(int emax, int lambda, double skip_threshold)
     : emax_(emax), lambda_(lambda), threshold_(skip_threshold) {
   IMSRG_CHECK(emax >= 0 && lambda >= 0 && skip_threshold >= 0.0,
               "NineJTable: emax, lambda and the threshold must be >= 0");
-  const int nj = emax + 1;
-  std::vector<std::int64_t> offsets(static_cast<std::size_t>(nj) * nj * nj *
-                                    nj);
+  const auto nj = static_cast<std::size_t>(emax + 1);
+  std::vector<std::int64_t> offsets(nj * nj * nj * nj);
   std::int64_t total = 0;
   std::size_t q = 0;
   for (int A = 1; A <= 2 * emax + 1; A += 2)

@@ -161,7 +161,8 @@ Operator ReadTensorDump(std::istream& in, std::string_view name,
         Fail(name, ln, "malformed 2b record");
       std::size_t o[4];
       for (int k = 0; k < 4; ++k) {
-        o[k] = static_cast<std::size_t>(ToInt(name, ln, t[1 + k]));
+        o[k] = static_cast<std::size_t>(
+            ToInt(name, ln, t[static_cast<std::size_t>(1 + k)]));
         if (o[k] >= map.size()) Fail(name, ln, "orbit index out of range");
       }
       const auto bra =
