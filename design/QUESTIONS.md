@@ -1364,3 +1364,9 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
   orbits ..."). This was a bug of the port, not of imsrg++, so it is not in design/30 §6. AL-C3's
   pending comparison against fork dumps: done indirectly, emax 6 and 14 EMP2/EMP3/E_Nat agree with
   the fork build to all printed digits.
+* **AL-D3** (lead D, writer) - Under `compat = "imsrg_fork_79e9330"` the driver still writes the
+  imsrg-devel tokyo format: relative two-body threshold 1e-7 x norm2b drops 15 of the 158 archived
+  TCM two-body elements (|v| <= 1.07e-3; the 143 written agree to 5e-9). H is unaffected (all 158
+  written, max deviation 5e-7). **Assumed:** lead B's `TokyoNumberFormat::kFork79e9330`
+  (feature/al27-tokyo-fork-format) gets selected by the compat profile when that branch merges
+  (one line in driver `TokyoOptions`); not done here to keep the branches disjoint.

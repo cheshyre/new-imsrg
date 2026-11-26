@@ -12,7 +12,12 @@ file are compared against 0 (the 79e9330 writer drops 1b elements below
 1e-7). Prints the zero-body terms, the maximum absolute deviation of the 1b
 and 2b parts, the worst elements, and exits 1 if the maximum exceeds --tol.
 
+With --isospin-average-test, the pn two-body elements of the test file are
+replaced by the average with their isospin mirror, as the 79e9330 writer does
+for operators (mode "op", design/reference/06 section 1.10; not for H).
+
 usage: compare_snt.py <reference.snt> <test.snt> [--tol 1e-4] [--top 10]
+                      [--isospin-average-test]
 """
 
 import argparse
@@ -82,6 +87,20 @@ def canonical(a, b, c, d, J):
     return (a, b, c, d, J), phase
 
 
+def isospin_average(two):
+    def mirror(o):
+        return (o[0], o[1], o[2], -o[3])
+
+    out = {}
+    for (a, b, c, d, J), v in two.items():
+        if a[3] == b[3]:
+            out[(a, b, c, d, J)] = v
+            continue
+        key, phase = canonical(mirror(a), mirror(b), mirror(c), mirror(d), J)
+        out[(a, b, c, d, J)] = 0.5 * (v + phase * two.get(key, 0.0))
+    return out
+
+
 def compare(ref, test, label, top):
     keys = set(ref) | set(test)
     rows = []
@@ -106,9 +125,12 @@ def main():
     p.add_argument("test")
     p.add_argument("--tol", type=float, default=1.0e-4)
     p.add_argument("--top", type=int, default=10)
+    p.add_argument("--isospin-average-test", action="store_true")
     a = p.parse_args()
     z_r, one_r, two_r = parse(a.ref)
     z_t, one_t, two_t = parse(a.test)
+    if a.isospin_average_test:
+        two_t = isospin_average(two_t)
     print(f"zero body: ref {z_r} test {z_t}")
     m1 = compare(one_r, one_t, "1b", a.top)
     m2 = compare(two_r, two_t, "2b", a.top)

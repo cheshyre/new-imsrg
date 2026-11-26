@@ -56,5 +56,46 @@ could not see it. Fixed in `mbpt/natural_orbitals.cc` with a transcription test;
 | Stage 1 end: steps, s, E0 | 37, 13.32201, -131.499115156 | 37, 13.32201, -131.499115156 |
 | Stage 1 end: eta 1b/2b, Omega 1b/2b | 6.10784e-4 / 6.93899e-4, 0.387846026 / 2.492488952 | 6.10784e-4 / 6.93899e-4, 0.387846026 / 2.492488952 |
 | Stage 2 step 1: E0 | -134.053288279 | -134.053288282 |
+| Stage 2 steps 50 / 78 / 99: E0 | -196.430219541 / -205.902296147 / -209.800918884 | -196.430219541 / -205.902296147 / -209.800918885 |
+| Stage 2 end: steps, s, E0 | 272, 57.65518, -213.961459717 | 272, 57.65518, -213.961459718 |
+| Stage 2 end: eta 2b, Omega 2b | 9.74e-4, 7.8282 | 9.74269e-4, 7.828197 |
+| Zero body of H in `.snt` (16O NO) | -118.293 | -118.292961 |
+| TCM zero body, HF / IMSRG (27Al NO) | 9.232568390638519 / 6.956645787278085 | 9.232568390638521 / 6.956645787282553 |
 
-## 4. Timings
+The flow crossed a job boundary: checkpoint 1 (stage 2, step 78) was written on frontier00016,
+the job ended at step 99, and the restart on frontier02161 (a later job, after a pause) reproduced
+steps 79 and 80 bit for bit and continued to the end.
+
+**Valence Hamiltonian `.snt`** (`tools/al27/compare_snt.py` against the archived
+`J00011053_..._INTFILE.snt`, identical in all N2LOsat jobs): all 6 one-body and 158 two-body
+elements present, **max |diff| 5.0e-7** (1b 4.5e-7), i.e. the rounding of the archive's 7
+significant digits; target 1e-4.
+
+**TCM `.snt`**: the 6 one-body elements agree to 4.7e-8 and the 143 two-body elements we write
+agree to 5.0e-9. Our writer (imsrg-devel format) drops two-body elements below 1e-7 times the 2B
+norm of TCM in the emax-10 space (threshold ~1e-3 here); the fork writes all of them, so 15
+archived elements (|v| <= 1.07e-3) are missing from our file. Lead B's fork number format
+(`TokyoNumberFormat::kFork79e9330`, branch feature/al27-tokyo-fork-format, not merged here) writes
+them; the driver must select it under `compat = "imsrg_fork_79e9330"` (AL-D3). Isospin averaging
+(`--isospin-average-test`) changes nothing for TCM at this precision.
+
+**Omegas** (both formats, `omega_second_format`): `N2LOsat_omega_00{0,1}.opb` (293 MB each,
+native float64) and `N2LOsat_me2jp_omega_00{0,1}.me1j/.me2jp.bin` (74 MB each, float32), with
+manifests, basis C and occupations, in `$IMSRG_WORK/runs/al27/v1/N2LOsat/`.
+
+## 4. Timings (N2LOsat, one node, 56 threads, release build)
+
+| Step | ours | imsrg++ archive (48 threads, JUWELS) |
+|---|---|---|
+| me2j read (emax 16 file) + TRel (Moshinsky e2max 28) | ~4 min | |
+| NO2B read (48 GB) | ~6-10 min (I/O bound, ~80 MB/s) | 379 s |
+| HF (33 iterations) + NAT + NO2B contraction + truncation + MBPT | ~3-5 min | |
+| preparation in total (start to flow step 0) | 16-17 min | 2670 s (44.5 min) |
+| stage 1, per step (37 steps) | 13.8 s | 21.2 s |
+| stage 2, per step (steps 79-272) | 26.4 s (24.6 s at step 80, 27.8 s at the end) | 35.4 s |
+| checkpoint write (H, H_saved, 2 Omegas, native, Lustre) | 1.1-2.3 s | - |
+| TCM transform + both writers + Omegas in two formats | ~2 min | |
+| peak RSS | 65.8 GB | 78.7 GB |
+| whole flow (both stages), without the job boundary | ~1 h 36 min + prep | 3.6 h (13843 s incl. 5 operators) |
+
+The restart costs the whole preparation again (AL-D1). GPU not used yet (M14).
