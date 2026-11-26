@@ -201,6 +201,10 @@ void Checker::ImsrgRanges() {
   NeedPos("imsrg.step.eta_criterion", im.step.eta_criterion);
   NeedPos("imsrg.step.ode_tolerance", im.step.ode_tolerance);
   NeedGe("imsrg.generator.qtransfer_n", im.generator.qtransfer_n, 1);
+  NeedGe("checkpoint.interval_minutes", cfg_.checkpoint.interval_minutes,
+         0.0);
+  NeedGe("checkpoint.abort_after_steps", cfg_.checkpoint.abort_after_steps,
+         0);
   if (im.space) {
     NeedGe("imsrg.space.emax", im.space->emax, 0);
     NeedGe("imsrg.space.e2max", im.space->e2max, 0);

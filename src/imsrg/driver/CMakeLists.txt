@@ -19,6 +19,7 @@ imsrg_add_module(NAME driver
     legacy/legacy_parameters.cc
     operators/operator_request.cc
     pipeline/charge_radius.cc
+    pipeline/checkpoint.cc
     pipeline/hamiltonian.cc
     pipeline/mpi_sync.cc
     run.cc
