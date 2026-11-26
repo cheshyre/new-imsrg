@@ -1,7 +1,7 @@
 # 41 — Agent workflow (how the unsupervised session works)
 
 *Frontier layout since 2026-11-26: sections 2 and 3 describe the hub and the per-agent clones;
-the owner interview after the Frontier port decides proposals P-F1 and P-F2.*
+the owner decided P-F1 and P-F2 on 2026-11-26 (D61, D62).*
 
 ## 1. Roles and models *(user: "Opus agents orchestrate bigger efforts, which then orchestrate Haiku or Sonnet agents for small tasks")*
 
@@ -16,7 +16,7 @@ the owner interview after the Frontier port decides proposals P-F1 and P-F2.*
 Nesting is supported (up to 3 levels below the main session by default), so the
 orchestrator → lead → worker structure works as described.
 
-## 2. Git workflow (hub on Frontier, since 2026-11-26; proposal P-F1, owner interview decides)
+## 2. Git workflow (hub on Frontier, since 2026-11-26; D61)
 
 * Repositories: the bare **hub** `$IMSRG_HUB` holds every branch; `$IMSRG_WORK/main` is the
   **integrator's clone** (remotes `origin` = hub, `github` = `$IMSRG_GITHUB`), used by the main
@@ -37,10 +37,11 @@ orchestrator → lead → worker structure works as described.
   `tools/ci.sh frontier-cpu` on the merged result (plus `ctest -L slow` for numerics merges),
   then `git push origin develop` and `git push github develop`. If a merge breaks `develop`,
   revert the merge commit and fix it on the branch.
-* **GitHub policy (proposal P-F2).** Only the integrator fetches, pulls and pushes `github`:
+* **GitHub policy (D62).** Only the integrator fetches, pulls and pushes `github`:
   GitHub changes come in with `git merge --ff-only`; `develop` goes to GitHub only after CI passed
   and after it was pushed to the hub; never force-push, never delete or rename a remote branch,
-  never rewrite published history, `main` stays untouched. Feature branches are not pushed to
+  never rewrite published history; `main` is fast-forwarded to `develop` only by the owner, at
+  milestones (agents and the integrator never touch it). Feature branches are not pushed to
   GitHub.
 * **Enforcement** (`tools/install_git_hooks.sh`): the hub's `update` hook rejects every update of
   `main`, updates of `develop` without `IMSRG_INTEGRATOR=1`, tags, and (with
@@ -54,7 +55,7 @@ orchestrator → lead → worker structure works as described.
   agents, resume each with `SendMessage` after the reset. An owner interview follows every run
   (D42).
 
-## 3. Parallel work: one clone per code-writing agent (proposal P-F1, scheme (a))
+## 3. Parallel work: one clone per code-writing agent (D61, scheme (a))
 
 * **Who gets a clone.** `imsrg-lead`, `imsrg-implementer` and `imsrg-mechanic` declare
   `isolation: worktree` in their frontmatter. Read-only agents (`imsrg-reviewer`, Explore, Plan,

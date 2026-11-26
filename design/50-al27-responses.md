@@ -102,7 +102,7 @@ numbers: `$IMSRG_WORK/inputs/al27/analysis/phitp-normalization-notes.md`):
   exactly the odd-multipole Σ', Σ'', Δ. It is the transverse partner of Φ''; the paper's
   long-wavelength ratio Φ̃'_2/Φ''_2 = √(3/2) holds between the columns only with a common prefactor.
 
-**Choice (pending the owner's confirmation, 2026-11-26 20:00 EST):** `FPhitp<L><p|n>_<q> =
+**Decision (owner, 2026-11-26: "The prefactor is good for now."):** `FPhitp<L><p|n>_<q> =
 √(4π)·DM_NREFT::Phitp(L, q)`, L = 2, 4, Hermitian. q → 0: FPhitp2 → −(1/(2√5))[l⊗σ]_2 per
 nucleon, FPhipp2 → −(1/√30)[l⊗σ]_2 (0d5/2 diagonal reduced element of FPhitp2: −1.4967).
 
