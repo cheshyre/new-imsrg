@@ -11,9 +11,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <memory>
 #include <ostream>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "imsrg/base/assert.h"
 #include "imsrg/base/error.h"
@@ -39,8 +41,8 @@ double PairFactor(bool pq_identical, bool rs_identical) noexcept {
   return 1.0;
 }
 
-std::int64_t Key(std::int64_t n, std::int32_t p, std::int32_t q,
-                 std::int32_t r, std::int32_t s) {
+std::int64_t Key(std::int64_t n, std::int32_t p, std::int32_t q, std::int32_t r,
+                 std::int32_t s) {
   return ((static_cast<std::int64_t>(p) * n + q) * n + r) * n + s;
 }
 
@@ -50,8 +52,8 @@ std::string HermString(Hermiticity h) {
 
 std::string HeaderLine(std::string_view tag, const op::Operator& op,
                        std::string_view name) {
-  return std::string(tag) + " emax=" +
-         std::to_string(op.model_space().basis().emax()) +
+  return std::string(tag) +
+         " emax=" + std::to_string(op.model_space().basis().emax()) +
          " herm=" + HermString(op.hermiticity()) + " op=" + std::string(name) +
          " code=imsrg";
 }
@@ -222,12 +224,10 @@ class ValueSource {
     }
     if (size < static_cast<std::uintmax_t>(kBinaryHeaderBytes) ||
         (size - kBinaryHeaderBytes) % 4 != 0 ||
-        static_cast<std::int64_t>((size - kBinaryHeaderBytes) / 4) <
-            expected) {
-      throw InputError("'" + path.string() + "': binary file has " +
-                       std::to_string(size) +
-                       " bytes, expected 255 + 4n with n >= " +
-                       std::to_string(expected));
+        static_cast<std::int64_t>((size - kBinaryHeaderBytes) / 4) < expected) {
+      throw InputError(
+          "'" + path.string() + "': binary file has " + std::to_string(size) +
+          " bytes, expected 255 + 4n with n >= " + std::to_string(expected));
     }
     ValueSource s(path);
     s.bin_.open(path, std::ios::binary);
@@ -320,8 +320,7 @@ std::vector<NljjtOrbit> NljjtOrbits(std::int32_t emax) {
   for (std::int32_t e = 0; e <= emax; ++e) {
     for (std::int32_t l = e % 2; l <= e; l += 2) {
       const std::int32_t n = (e - l) / 2;
-      for (std::int32_t j2 = std::max(2 * l - 1, 1); j2 <= 2 * l + 1;
-           j2 += 2) {
+      for (std::int32_t j2 = std::max(2 * l - 1, 1); j2 <= 2 * l + 1; j2 += 2) {
         out.push_back({n, l, j2, +1});
         out.push_back({n, l, j2, -1});
       }
@@ -355,10 +354,9 @@ JRange Me2jpJRange(const NljjtOrbit& p, const NljjtOrbit& q,
 
 std::int64_t Me2jpValueCount(std::int32_t emax) {
   std::int64_t n = 0;
-  ForEachMe2jpRecord(emax, [&](std::int32_t, std::int32_t, std::int32_t,
-                               std::int32_t, const JRange& r) {
-    n += r.size();
-  });
+  ForEachMe2jpRecord(emax,
+                     [&](std::int32_t, std::int32_t, std::int32_t, std::int32_t,
+                         const JRange& r) { n += r.size(); });
   return n;
 }
 
@@ -424,7 +422,7 @@ double Me2jpTable::Get(std::int32_t p, std::int32_t q, std::int32_t r,
   if (r > p || (r == p && s > q)) {
     std::swap(p, r);
     std::swap(q, s);
-    phase *= static_cast<double>(HermiticitySign(hermiticity_));
+    phase *= static_cast<double>(op::HermiticitySign(hermiticity_));
   }
   const auto block = FindBlock(p, q, r, s);
   if (!block || !block->range.contains(J)) return 0.0;
@@ -491,25 +489,25 @@ void WriteMe2jp(const std::filesystem::path& path, const op::Operator& op,
                   static_cast<std::streamsize>(4 * buf.size()));
         buf.clear();
       };
-      ForEachMe2jpRecord(emax, [&](std::int32_t p, std::int32_t q,
-                                   std::int32_t r, std::int32_t s,
-                                   const JRange& range) {
-        for (std::int32_t J = range.jmin; J <= range.jmax; ++J) {
-          buf.push_back(static_cast<float>(value(p, q, r, s, J)));
-          if (buf.size() == kChunkFloats) flush();
-        }
-      });
+      ForEachMe2jpRecord(
+          emax, [&](std::int32_t p, std::int32_t q, std::int32_t r,
+                    std::int32_t s, const JRange& range) {
+            for (std::int32_t J = range.jmin; J <= range.jmax; ++J) {
+              buf.push_back(static_cast<float>(value(p, q, r, s, J)));
+              if (buf.size() == kChunkFloats) flush();
+            }
+          });
       flush();
     } else {
       out << header << '\n';
       TextSink sink(out);
-      ForEachMe2jpRecord(emax, [&](std::int32_t p, std::int32_t q,
-                                   std::int32_t r, std::int32_t s,
-                                   const JRange& range) {
-        for (std::int32_t J = range.jmin; J <= range.jmax; ++J) {
-          sink.Put(value(p, q, r, s, J));
-        }
-      });
+      ForEachMe2jpRecord(
+          emax, [&](std::int32_t p, std::int32_t q, std::int32_t r,
+                    std::int32_t s, const JRange& range) {
+            for (std::int32_t J = range.jmin; J <= range.jmax; ++J) {
+              sink.Put(value(p, q, r, s, J));
+            }
+          });
       sink.Finish();
     }
   });
@@ -552,11 +550,10 @@ op::Operator ReadMe1jMe2jp(const std::filesystem::path& me1j_path,
     }
   }
 
-  ValueSource src =
-      IsBinary(me2jp_path)
-          ? ValueSource::Binary(me2jp_path, "me2jp", emax, h,
-                                Me2jpValueCount(emax))
-          : ValueSource::Text(me2jp_path, "me2jp", emax, h);
+  ValueSource src = IsBinary(me2jp_path)
+                        ? ValueSource::Binary(me2jp_path, "me2jp", emax, h,
+                                              Me2jpValueCount(emax))
+                        : ValueSource::Text(me2jp_path, "me2jp", emax, h);
   op::TwoBody& tb = O.two_body();
   ForEachMe2jpRecord(emax, [&](std::int32_t p, std::int32_t q, std::int32_t r,
                                std::int32_t s, const JRange& range) {

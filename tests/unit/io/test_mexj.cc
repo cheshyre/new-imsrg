@@ -15,6 +15,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -178,9 +179,8 @@ TEST(Mexj, Counts) {
     const Oracle o = MakeOracle(emax);
     EXPECT_EQ(Me2jpValueCount(emax), o.count) << emax;
     std::int64_t records = 0;
-    ForEachMe2jpRecord(emax, [&](int, int, int, int, const JRange&) {
-      ++records;
-    });
+    ForEachMe2jpRecord(emax,
+                       [&](int, int, int, int, const JRange&) { ++records; });
     EXPECT_EQ(records, static_cast<std::int64_t>(o.records.size())) << emax;
     const std::int64_t n = (emax + 1) * (emax + 2);
     EXPECT_EQ(Me1jValueCount(emax), 1 + n * (n + 1) / 2);
@@ -216,8 +216,8 @@ TEST_P(Sentinel, EveryRecordEveryJEveryOrdering) {
           for (int J = 0; J <= jtop; ++J) {
             const double want = OracleValue(o, h, a, b, c, d, J);
             const double got = table.Get(a, b, c, d, J);
-            ASSERT_EQ(got, want) << a << "," << b << "," << c << "," << d
-                                 << " J=" << J;
+            ASSERT_EQ(got, want)
+                << a << "," << b << "," << c << "," << d << " J=" << J;
             if (want != 0.0) ++nonzero;
           }
         }
@@ -229,9 +229,9 @@ TEST_P(Sentinel, EveryRecordEveryJEveryOrdering) {
   for (const Key4& k : o.order) {
     const OracleRecord& rec = o.records.at(k);
     for (std::size_t i = 0; i < rec.values.size(); ++i) {
-      EXPECT_EQ(table.Get(k[0], k[1], k[2], k[3],
-                          rec.jmin + static_cast<int>(i)),
-                rec.values[i]);
+      EXPECT_EQ(
+          table.Get(k[0], k[1], k[2], k[3], rec.jmin + static_cast<int>(i)),
+          rec.values[i]);
     }
     // Lower bound and upper bound of the stored range: exactly 0.0.
     EXPECT_EQ(table.Get(k[0], k[1], k[2], k[3], rec.jmin - 1), 0.0);
@@ -281,10 +281,9 @@ TEST(Mexj, OwnersExample) {
 
 TEST(Mexj, TableRejectsBadInput) {
   EXPECT_THROW(Me2jpTable(1, Hermiticity::kHermitian, {1.0, 2.0}), InputError);
-  EXPECT_THROW(
-      Me2jpTable(0, Hermiticity::kNonHermitian,
-                 std::vector<double>(Me2jpValueCount(0), 1.0)),
-      InputError);
+  EXPECT_THROW(Me2jpTable(0, Hermiticity::kNonHermitian,
+                          std::vector<double>(Me2jpValueCount(0), 1.0)),
+               InputError);
 }
 
 // -----------------------------------------------------------------------------
@@ -341,7 +340,6 @@ void ExpectSameOperator(const op::Operator& x, const op::Operator& y,
           << what << " 1b " << a << "," << b;
     }
   }
-  std::int64_t inexact = 0;
   std::int64_t nonzero = 0;
   ForEachElement(ms, [&](OrbitIndex a, OrbitIndex b, OrbitIndex c, OrbitIndex d,
                          int J, int ident) {
@@ -352,14 +350,12 @@ void ExpectSameOperator(const op::Operator& x, const op::Operator& y,
       // x -> x * sqrt(2) -> / sqrt(2) cannot be the identity for every double
       // (the product has fewer representable values in one binade), so one
       // identical pair allows 2 ulp; all other classes must be bit exact.
-      if (u != v) ++inexact;
       ASSERT_LE(UlpDistance(u, v), 2) << what << " J=" << J;
     } else {
       ASSERT_EQ(u, v) << what << " J=" << J << " ident=" << ident;
     }
   });
   EXPECT_GT(nonzero, 0) << what;
-  RecordProperty("inexact_one_identical_pair", std::to_string(inexact));
 }
 
 class RoundTrip : public ::testing::TestWithParam<std::tuple<int, int>> {};
@@ -379,9 +375,10 @@ TEST_P(RoundTrip, TextBitForBit) {
   std::ifstream in(f2);
   std::string header;
   std::getline(in, header);
-  EXPECT_EQ(header, std::string("me2jp emax=") + std::to_string(emax) +
-                        " herm=" + (h == Hermiticity::kHermitian ? "+1" : "-1") +
-                        " op=random code=imsrg");
+  EXPECT_EQ(header,
+            std::string("me2jp emax=") + std::to_string(emax) +
+                " herm=" + (h == Hermiticity::kHermitian ? "+1" : "-1") +
+                " op=random code=imsrg");
   const op::Operator R = ReadMe1jMe2jp(f1, f2, ms, h);
   ExpectSameOperator(O, R, "text emax " + std::to_string(emax));
   // A second generation writes the same text.
@@ -403,7 +400,8 @@ INSTANTIATE_TEST_SUITE_P(Mexj, RoundTrip,
 
 TEST(Mexj, BinaryRoundTrip) {
   for (int emax : {2, 4}) {
-    for (Hermiticity h : {Hermiticity::kHermitian, Hermiticity::kAntiHermitian}) {
+    for (Hermiticity h :
+         {Hermiticity::kHermitian, Hermiticity::kAntiHermitian}) {
       const auto ms = MakeMs(emax);
       const op::Operator O = MakeRandom(ms, h, 11);
       test_support::ScratchDir dir;
@@ -411,8 +409,8 @@ TEST(Mexj, BinaryRoundTrip) {
       const fs::path f2 = dir.path() / "x.me2jp.bin";
       WriteMe1j(f1, O, "random");
       WriteMe2jp(f2, O, "random");
-      EXPECT_EQ(fs::file_size(f2), static_cast<std::uintmax_t>(
-                                       255 + 4 * Me2jpValueCount(emax)));
+      EXPECT_EQ(fs::file_size(f2),
+                static_cast<std::uintmax_t>(255 + 4 * Me2jpValueCount(emax)));
       const op::Operator R = ReadMe1jMe2jp(f1, f2, ms, h);
       std::int64_t checked = 0;
       ForEachElement(*ms, [&](OrbitIndex a, OrbitIndex b, OrbitIndex c,
@@ -453,8 +451,8 @@ TEST(Mexj, PrefixReading) {
       const auto m = [&](OrbitIndex x) {
         return *ms4->basis().find(ms2->basis().orbit(x));
       };
-      const double want = O4.two_body().get_normalized(m(a), m(b), m(c), m(d),
-                                                       TwoJ{2 * J});
+      const double want =
+          O4.two_body().get_normalized(m(a), m(b), m(c), m(d), TwoJ{2 * J});
       const double got = R.two_body().get_normalized(a, b, c, d, TwoJ{2 * J});
       if (bin) {
         ASSERT_LE(std::abs(got - want), 1.0e-6 * (std::abs(want) + 1.0e-3));
@@ -515,8 +513,8 @@ TEST(Mexj, ReaderErrors) {
 
 TEST(Mexj, WriterRejectsNonHermitian) {
   const auto ms = MakeMs(1);
-  const op::Operator O(
-      ms, op::OperatorSpec::Scalar(2, Hermiticity::kNonHermitian));
+  const op::Operator O(ms,
+                       op::OperatorSpec::Scalar(2, Hermiticity::kNonHermitian));
   test_support::ScratchDir dir;
   EXPECT_THROW(WriteMe2jp(dir.path() / "x.me2jp", O, "n"), NotImplementedError);
   EXPECT_THROW(WriteMe1j(dir.path() / "x.me1j", O, "n"), NotImplementedError);
