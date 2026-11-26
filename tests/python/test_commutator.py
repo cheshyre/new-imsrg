@@ -139,8 +139,8 @@ def test_non_hermitian_operands(he4):
 
 def test_unsupported_requests_raise(he4):
     ms = he4["random_A1"].model_space
-    with pytest.raises(imsrg.NotImplementedError):  # tensor operators are not implemented yet
-        imsrg.Operator(ms, imsrg.OperatorSpec(rank_J=2))
+    with pytest.raises(imsrg.NotImplementedError):  # tensors with a 3B part are not implemented
+        imsrg.Operator(ms, imsrg.OperatorSpec(rank_J=2, particle_rank=3))
     with pytest.raises(TypeError):
         comm.commutator(he4["random_A1"], he4["random_H1"], terms=[Term.Comm110ss], options=comm.CommutatorOptions())
     with pytest.raises(ValueError):

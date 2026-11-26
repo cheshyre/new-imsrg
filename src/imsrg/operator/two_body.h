@@ -20,7 +20,8 @@
 
 namespace imsrg::op {
 
-/// Two-body part V^J_{pq,rs} = <pq; J|V|rs; J> of a scalar operator.
+/// Two-body part V^J_{pq,rs} = <pq; J|V|rs; J> of a scalar operator, or the
+/// reduced elements <pq; J_bra||V||rs; J_ket> of a tensor operator.
 ///
 /// Conventions (identical to imsrg++, design/00 D11):
 /// * kets |pq; J> with p <= q are the kets of `basis::TwoBodyChannels`; the
@@ -36,8 +37,18 @@ namespace imsrg::op {
 /// channels in channel order (empty channels as 0 x 0 blocks), so block k is
 /// channel k (`block_index`). Both triangles are stored. The blocks lie back to
 /// back in one device buffer (`matrix()`), so whole-part operations are flat
-/// kernels and channel products are (grouped) gemms. Tensor operators (later)
-/// will add off-diagonal channel blocks; `block_index` hides the difference.
+/// kernels and channel products are (grouped) gemms.
+///
+/// Tensor layout (non-scalar spec, design/00 D25, imsrg++
+/// `TwoBodyME::Allocate`): one dense block per channel pair (ch_bra, ch_ket)
+/// with ch_bra <= ch_ket, |J_bra - J_ket| <= rank_J <= J_bra + J_ket,
+/// |Tz_bra - Tz_ket| == delta_Tz and parity_bra + parity_ket + parity even,
+/// in lexicographic (ch_bra, ch_ket) order (imsrg++'s map order; empty
+/// channels give 0-size blocks). Diagonal blocks store both triangles. The
+/// elements are reduced and normalized; blocks with ch_bra > ch_ket follow
+/// from the hermiticity, <cd J_ket||V||ab J_bra> = h (-1)^(J_bra - J_ket)
+/// <ab J_bra||V||cd J_ket> (h = +1 Hermitian, -1 anti-Hermitian), which the
+/// tensor element getters apply.
 ///
 /// Memory model: as `OneBody` (element accessors use the host mirror; sync
 /// explicitly on backends with separate device memory).
@@ -50,8 +61,9 @@ class TwoBody {
   /// Empty part without blocks (particle_rank 1, or a default-constructed
   /// operator).
   TwoBody() = default;
-  /// Zero part for `spec` on `ms`: one block per channel if spec.particle_rank
-  /// >= 2, no blocks otherwise. Preconditions: `ms` non-null and
+  /// Zero part for `spec` on `ms`: if spec.particle_rank >= 2 one block per
+  /// channel (scalar) or per allocated channel pair (tensor, see above), no
+  /// blocks otherwise. Preconditions: `ms` non-null and
   /// `Validate(spec)` passed (IMSRG_CHECK).
   TwoBody(std::shared_ptr<const basis::ModelSpace> ms,
           const OperatorSpec& spec);
@@ -71,9 +83,15 @@ class TwoBody {
   /// Changes the hermiticity flag; the data are not touched.
   void set_hermiticity(Hermiticity h) noexcept { hermiticity_ = h; }
 
+  /// True if the part uses the tensor layout (built for a non-scalar spec).
+  bool is_tensor() const noexcept { return tensor_; }
+  /// Tensor rank J of the operator the part was built for (0 for scalars).
+  std::int32_t rank_J() const noexcept { return rank_J_; }
+
   /// Storage index of the block (ch_bra, ch_ket), or nullopt if that block is
-  /// not stored (for scalars: ch_bra != ch_ket, or no blocks). Scalars: the
-  /// index is ch_bra. O(1).
+  /// not stored (scalars: ch_bra != ch_ket, or no blocks; tensors: not an
+  /// allocated pair with ch_bra <= ch_ket). Scalars: the index is ch_bra, O(1);
+  /// tensors: O(log(number of blocks)).
   std::optional<std::size_t> block_index(ChannelIndex ch_bra,
                                          ChannelIndex ch_ket) const noexcept;
 
@@ -115,8 +133,45 @@ class TwoBody {
   ///         connected.
   void AddNormalized(OrbitIndex a, OrbitIndex b, OrbitIndex c, OrbitIndex d,
                      TwoJ J, double v);
+  /// Tensor parts: normalized reduced <ab; J_bra||V||cd; J_ket> for orbits in
+  /// any order (exchange phases applied); a pair (ch_bra, ch_ket) with ch_bra >
+  /// ch_ket is read from the stored transposed block with the hermiticity
+  /// phase h (-1)^(J_bra - J_ket) (imsrg++ `GetTBME_J_norm(J_bra, J_ket,
+  /// ...)`). Scalar parts: `get_normalized(a, b, c, d, J_bra)` if J_bra ==
+  /// J_ket, else 0. Returns 0 for non-existing kets or pairs that are not
+  /// connected. Host mirror. O(log blocks).
+  double get_normalized(OrbitIndex a, OrbitIndex b, OrbitIndex c, OrbitIndex d,
+                        TwoJ J_bra, TwoJ J_ket) const;
+  /// sqrt((1 + delta_ab)(1 + delta_cd)) times the tensor `get_normalized`
+  /// (imsrg++ `GetTBME_J(J_bra, J_ket, ...)`).
+  double get_unnormalized(OrbitIndex a, OrbitIndex b, OrbitIndex c,
+                          OrbitIndex d, TwoJ J_bra, TwoJ J_ket) const;
+  /// Tensor parts: sets the normalized reduced <ab; J_bra||V||cd; J_ket> = v
+  /// (orbits in any order) in its stored block (through the hermiticity
+  /// phase if ch_bra > ch_ket) and, inside a diagonal block, the partner
+  /// element with h. Scalar parts: `set_normalized(a, b, c, d, J)` with J_bra
+  /// == J_ket required. Host mirror.
+  /// @throws InvariantError if a ket does not exist or the pair is not
+  ///         connected.
+  void set_normalized(OrbitIndex a, OrbitIndex b, OrbitIndex c, OrbitIndex d,
+                      TwoJ J_bra, TwoJ J_ket, double v);
+
   /// Sets every element to zero (device kernel).
   void set_zero();
+
+  /// Host-mirror view of the stored block (ch_bra, ch_ket). Precondition: the
+  /// block is stored (IMSRG_CHECK).
+  linalg::MatrixView<double> host_block(ChannelIndex ch_bra,
+                                        ChannelIndex ch_ket);
+  /// Read-only host-mirror view of the stored block (ch_bra, ch_ket).
+  linalg::MatrixView<const double> host_block(ChannelIndex ch_bra,
+                                              ChannelIndex ch_ket) const;
+  /// Device view of the stored block (ch_bra, ch_ket).
+  linalg::MatrixView<double> device_block(ChannelIndex ch_bra,
+                                          ChannelIndex ch_ket);
+  /// Read-only device view of the stored block (ch_bra, ch_ket).
+  linalg::MatrixView<const double> device_block(ChannelIndex ch_bra,
+                                                ChannelIndex ch_ket) const;
 
   /// Host-mirror view of the block of channel `ch` (scalar operators).
   /// Precondition: allocated.
@@ -142,8 +197,25 @@ class TwoBody {
  private:
   std::shared_ptr<const basis::ModelSpace> ms_;
   Hermiticity hermiticity_ = Hermiticity::kHermitian;
+  bool tensor_ = false;
+  std::int32_t rank_J_ = 0;
   linalg::BlockSparseMatrix<double> matrix_;
 };
+
+/// True if an operator of kind `spec` connects the orbits a and b (in either
+/// order): triangle(j_a, j_b, rank_J), l_a + l_b + parity even and |tz2_a -
+/// tz2_b| == 2 delta_Tz (imsrg++ `Operator::SetUpOneBodyChannels`). For a
+/// scalar spec: equal (2j, parity, tz2). O(1).
+bool ConnectsOrbits(const OperatorSpec& spec, const basis::Orbit& a,
+                    const basis::Orbit& b) noexcept;
+
+/// True if a tensor of kind `spec` connects the channels `bra` and `ket` (in
+/// either order): |J_bra - J_ket| <= rank_J <= J_bra + J_ket, |Tz_bra -
+/// Tz_ket| == delta_Tz and parity_bra + parity_ket + parity even (imsrg++
+/// `TwoBodyME::Allocate`). For a scalar spec: bra == ket. O(1).
+bool ConnectsChannels(const OperatorSpec& spec,
+                      const basis::TwoBodyChannel& bra,
+                      const basis::TwoBodyChannel& ket) noexcept;
 
 }  // namespace imsrg::op
 

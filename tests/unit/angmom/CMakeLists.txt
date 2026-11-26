@@ -77,3 +77,10 @@ imsrg_add_test(NAME angmom_tables
   DEPS angmom exec
   LABELS unit
   NO_GTEST_MAIN)
+
+# --- Rank-lambda tables of the tensor commutators (M15) ------------------------------------------
+imsrg_add_test(NAME angmom_tensor_tables
+  SOURCES tensor_tables_test.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
+  DEPS angmom exec
+  LABELS unit
+  NO_GTEST_MAIN)

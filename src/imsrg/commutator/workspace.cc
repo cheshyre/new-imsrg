@@ -12,6 +12,7 @@
 #include "imsrg/base/error.h"
 #include "imsrg/commutator/detail/work_items.h"
 #include "imsrg/commutator/detail/workspace_impl.h"
+#include "imsrg/commutator/tensor.h"
 #include "imsrg/commutator/three_body.h"
 
 namespace imsrg::commutator {
@@ -137,6 +138,11 @@ void Workspace::BuildThreeBodyContext() {
 Workspace::~Workspace() = default;
 Workspace::Workspace(Workspace&&) noexcept = default;
 Workspace& Workspace::operator=(Workspace&&) noexcept = default;
+
+TensorWorkspace& Workspace::tensor() {
+  if (!tensor_) tensor_ = std::make_unique<TensorWorkspace>(ms_);
+  return *tensor_;
+}
 
 bool Workspace::Compatible(const op::Operator& op) const noexcept {
   if (op.empty()) return false;

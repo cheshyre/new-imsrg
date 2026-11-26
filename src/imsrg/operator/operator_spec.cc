@@ -52,14 +52,22 @@ void Validate(const OperatorSpec& s) {
     throw InputError("operator delta_particle_number must be -1, 0 or 1, got " +
                      std::to_string(s.delta_particle_number));
   }
-  if (s.rank_J != 0)
-    throw NotImplementedError(
-        "tensor operators (rank_J > 0) are not implemented");
-  if (s.parity != Parity::kEven) {
-    throw NotImplementedError("parity-changing operators are not implemented");
+  if (s.delta_Tz > 2) {
+    throw InputError("operator delta_Tz must be 0, 1 or 2, got " +
+                     std::to_string(s.delta_Tz));
   }
-  if (s.delta_Tz != 0)
-    throw NotImplementedError("Tz-changing operators are not implemented");
+  if (!s.is_scalar()) {
+    if (s.particle_rank > 2) {
+      throw NotImplementedError(
+          "tensor operators (rank_J > 0, parity- or Tz-changing) with a "
+          "three-body part are not implemented");
+    }
+    if (s.hermiticity == Hermiticity::kNonHermitian) {
+      throw NotImplementedError(
+          "non-Hermitian tensor operators are not implemented (imsrg++ "
+          "stores only ch_bra <= ch_ket blocks of (anti-)Hermitian tensors)");
+    }
+  }
   if (s.delta_particle_number != 0) {
     throw NotImplementedError(
         "non-number-conserving operators are not implemented");

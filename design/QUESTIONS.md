@@ -1352,3 +1352,47 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
   bit exact except for entries with exactly one identical-orbit pair (x*sqrt2 then /sqrt2, within
   2 ulp); native files are the exact format. (c) A `.bin` header without a tag is accepted. The
   `asan` preset was not run (Mac-only preset). **Assumed:** fine; fix the formula in the doc.
+### Lead A (M15 tensor operators, capability C3)
+
+* **AL-A-Q1** (2026-11-26) - Seeded random operators depend on the C++ standard library. The Frontier
+  harness (libstdc++) gives other `random_A` / `rand_*` values than the Mac (libc++), so every tensor
+  golden built from them changed when `gen_golden_tensor.sh` was rerun on Frontier (deterministic ones
+  agree to <= 1.5e-14). **Assumed:** the tensor goldens were regenerated on Frontier and made
+  self-contained (their random inputs are stored); the scalar `commutator/emax2_O16/random_A.dump`
+  (Mac) stays as it is. Other golden scripts that build random operators will show the same effect
+  when rerun on Frontier.
+* **AL-A-Q2** (2026-11-26) - Memory of the tensor particle-hole term. The rewrite keeps Zbar for all
+  cross-coupled channel pairs over ALL ordered pairs (rows and columns), about 4x imsrg++'s Zbar
+  (which uses c3 <= c4 and unordered rows with phase bookkeeping). Fine up to emax 6; estimated
+  ~10-20 GB at emax 10 with rank 5. The 9j table (one dense box per (A, B, D, E)) is 35 MB at emax 6
+  and ~1.1 GB at emax 10, built serially with Wigner9j (minutes at emax 10). **Assumed:** acceptable
+  for the first milestone; before the farm (C10/C11): use the Zbar symmetries (c3 <= c4, unordered
+  rows), tile the channel pairs, and cache/parallelize the 9j table (or evaluate 9j from 6j tables on
+  the device).
+* **AL-A-Q3** (2026-11-26) - imsrg-devel's fix of the tensor normal ordering (`ME *= 2` for a == b,
+  J_bra != J_ket, Operator.cc:555-558) is right only for Hermitian tensors; for an anti-Hermitian
+  tensor the two orientations cancel (and devel's mirror `O(b,a) = herm * O(a,b)` flips the diagonal
+  sign on every update). **Assumed:** the rewrite sums both orientations explicitly (correct for both
+  hermiticities); the fork's bug is the option `TensorNormalOrderOptions::fork79e9330_diagonal_bug`.
+  All 27Al operators are Hermitian, so this only matters for anti-Hermitian tensors.
+* **AL-A-Q4** (2026-11-26) - `[scalar, tensor]` with a one-body Y: imsrg++ gives Z Y's particle rank,
+  the rewrite gives Z max(rank X, rank Y) (so comm122st is kept for a one-body Y). BCH promotes Y to
+  rank 2 first in both codes, so transformed operators agree. **Assumed:** keep the rewrite's rule.
+* **AL-A-Q5** (2026-11-26) - Storage convention of reduced elements (follow-up to M15-Q1). The m-scheme
+  oracle (`commutator_ref::mscheme::ExpandTensor`) reproduces every emax-1 tensor golden (all terms, four
+  hermiticity pairs, 1.7e-15) only with PLAIN Edmonds reduction, <j'm'|T_mu|jm> = <j m L mu|j' m'> R /
+  sqrt(2j'+1), for one-body elements and J-coupled pairs alike; extra phases (-1)^(j_bra-j_ket),
+  (-1)^(J_bra-J_ket) or (-1)^L deviate by O(1). So imsrg++'s storage IS Edmonds; the "gauge" of
+  design/15 is a property of the closed forms of its operator builders (E2, GT), i.e. of which physical
+  operator a name denotes. **Assumed:** the rewrite stores what imsrg++ stores (owner answer to M15-Q1
+  holds unchanged); the NREFT builders (lead B) must reproduce the fork's closed forms, and an Edmonds
+  converter at the edges is then the identity on storage. Worth a line in design/15.
+* **AL-A-Q6** (2026-11-26, reviewer finding) - imsrg++'s tensor one-body norm uses the integer
+  degeneracy `(2j_p+1) * ((min(2j_q, 2j_p + L) - max(-2j_q, 2j_p - L)) / 2 + 1)`, which mixes 2j with
+  the undoubled rank and can be NEGATIVE (2j_p = 21, 2j_q = 11, L = 5 gives -22; first possible at
+  emax 10 with rank 5, i.e. in the 27Al Sigma'/Sigma''/Delta J=5 operators). A negative weighted sum
+  makes the norm NaN, and imsrg++'s BCH then never meets `||nested|| < epsilon` and runs to 40 nested
+  commutators, while the rewrite's BCH stops at the first non-finite norm. **Assumed:** the rewrite
+  keeps imsrg++'s formula (it drives the BCH thresholds the archive was produced with); whether the
+  fork runs hit the NaN case is to be checked when the J=5 operators are reproduced (C8). A
+  physically sensible norm ((2j_p+1) per element, or (2j_p+1)(2j_q+1)/(2L+1)) can be a named option.

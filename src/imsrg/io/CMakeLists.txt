@@ -7,6 +7,7 @@ imsrg_add_module(NAME io
     me2j.cc
     mexj.cc
     no2b.cc
+    tensor_writers.cc
     valence_writers.cc
     operator_binary.cc
   DEPS operator basis base

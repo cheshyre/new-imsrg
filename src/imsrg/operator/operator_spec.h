@@ -16,11 +16,21 @@
 
 namespace imsrg::op {
 
-/// What an `Operator` represents. Only scalar, number-conserving operators with
-/// particle_rank 1 or 2 are implemented now; the other fields exist so that
-/// tensor (rank_J > 0), parity-changing, Tz-changing and odd-particle-number
-/// ("dagger") operators can be added later without changing the type.
-/// `validate` rejects what is not implemented. Trivially copyable value type.
+/// What an `Operator` represents. Implemented: scalar, number-conserving
+/// operators with particle_rank 1 to 3, and (milestone M15) number-conserving
+/// tensor operators (rank_J > 0, or parity- or Tz-changing; particle_rank 1 or
+/// 2, Hermitian or anti-Hermitian). Odd-particle-number ("dagger") operators
+/// can be added later without changing the type. `Validate` rejects what is
+/// not implemented. Trivially copyable value type.
+///
+/// Tensor conventions (imsrg++, owner answers to M15-Q1..Q3): every operator
+/// that is not `is_scalar()` stores REDUCED matrix elements in imsrg++'s gauge
+/// (`<a||O||b>` = imsrg++ `OneBody(a, b)`, `<ab J_bra||O||cd J_ket>` =
+/// imsrg++'s normalized 2B element, `TwoBody` stores only blocks with
+/// ch_bra <= ch_ket); Hermitian means O(b, a) = (-1)^(j_a - j_b) O(a, b) and
+/// <cd J_ket||O||ab J_bra> = (-1)^(J_bra - J_ket) <ab J_bra||O||cd J_ket>,
+/// anti-Hermitian adds a minus sign. Operators with delta_Tz > 0 are stored as
+/// O + O^dagger (both Tz orderings), so they are Hermitian like imsrg++'s.
 struct OperatorSpec {
   /// Highest stored n-body part: 1 (0B + 1B), 2 (0B + 1B + 2B) or 3 (adds a 3B
   /// part, milestone M10). imsrg++ `particle_rank`.
@@ -56,6 +66,10 @@ struct OperatorSpec {
   constexpr bool is_scalar() const noexcept {
     return rank_J == 0 && parity == Parity::kEven && delta_Tz == 0;
   }
+  /// True if the matrix elements are stored reduced (every non-scalar
+  /// operator, including the J = 0 parity- or Tz-changing ones; imsrg++
+  /// `is_reduced` as set by its constructor).
+  constexpr bool is_reduced() const noexcept { return !is_scalar(); }
   /// True if the operator conserves the particle number.
   constexpr bool is_number_conserving() const noexcept {
     return delta_particle_number == 0;
@@ -99,9 +113,10 @@ Hermiticity HermiticityFromCode(char c);
 /// Checks a spec before an operator is built from it.
 /// @throws InputError if a value is invalid: particle_rank outside 1..3, rank_J
 ///         < 0, delta_Tz < 0, or delta_particle_number outside -1..1.
+/// @throws InputError also for delta_Tz > 2.
 /// @throws NotImplementedError for valid specs that are not implemented yet:
-///         non-scalar (tensor, parity- or Tz-changing), non-number-conserving,
-///         or particle_rank 3.
+///         non-number-conserving operators, and non-scalar operators with
+///         particle_rank 3 or hermiticity NonHermitian.
 void Validate(const OperatorSpec& spec);
 
 }  // namespace imsrg::op

@@ -43,6 +43,7 @@
 #include <span>
 #include <vector>
 
+#include "imsrg/base/types.h"
 #include "imsrg/basis/model_space.h"
 #include "imsrg/operator/operator.h"
 #include "imsrg/operator/operator_spec.h"
@@ -108,8 +109,12 @@ class MBasis {
 /// (pairs p < q, triples p < q < r; dense over bra x ket). Value type.
 class MOperator {
  public:
-  /// Zero operator on `num_states` m-states (0 for an empty operator).
-  explicit MOperator(int num_states = 0);
+  /// Zero operator on `num_states` m-states (0 for an empty operator). Only
+  /// the parts of rank <= `max_rank` (0..3) are allocated: the rank-3 part
+  /// needs (N choose 3)^2 doubles (790 MB at N = 40, emax 2), so tensor
+  /// checks beyond emax 1 pass `max_rank` 2. `Get` of an unallocated part is
+  /// 0; `Add`/`Set` of one is a precondition violation.
+  explicit MOperator(int num_states = 0, int max_rank = 3);
 
   MOperator(const MOperator&) = default;
   MOperator& operator=(const MOperator&) = default;
@@ -150,6 +155,7 @@ class MOperator {
 
  private:
   int n_ = 0;
+  int max_rank_ = 3;
   int n2_ = 0;  // number of pairs
   int n3_ = 0;  // number of triples
   double zero_ = 0.0;
@@ -183,24 +189,109 @@ op::Operator Contract(const MOperator& A,
                       std::shared_ptr<const basis::ModelSpace> ms,
                       const op::OperatorSpec& spec);
 
+/// Quantum-number shift of the OUTPUT of a commutator whose factors are not
+/// all scalars: the coefficient A_{out; in} may be nonzero only if
+/// 2M_out = 2M_in + two_mu, the parities differ by `parity`, and the sums of
+/// 2tz differ by +-`two_dtz` (both signs; a delta_Tz > 0 tensor is stored as O
+/// + O^dagger, so both directions occur). The default (all zero) is the scalar
+/// selection rule. Value type.
+struct TensorShift {
+  int two_mu = 0;   ///< 2 mu of the tensor component (M_out - M_in, doubled).
+  int parity = 0;   ///< 0 even, 1 odd operator.
+  int two_dtz = 0;  ///< 2 delta_Tz = |change of the sum of 2tz|.
+};
+
+/// Optional extra phases between imsrg++'s reduced elements and the
+/// Wigner-Eckart theorem of `ExpandTensor`. The DEFAULT (all false) is the
+/// convention that reproduces the imsrg-devel goldens (the test
+/// commutator_ref_mscheme_tensor_golden sweeps all eight combinations: only
+/// the default matches, to 1e-15; every other one deviates by O(1)). The knobs
+/// exist so that this statement stays checkable. Value type.
+struct TensorGauge {
+  /// One-body elements carry the extra phase (-1)^(j_bra - j_ket).
+  bool one_body_phase = false;
+  /// Two-body elements carry the extra phase (-1)^(J_bra - J_ket).
+  bool two_body_phase = false;
+  /// Two-body elements carry the extra phase (-1)^rank_J relative to the
+  /// one-body ones.
+  bool two_body_rank_phase = false;
+};
+
+/// m-scheme operator of the component `mu` (2 mu = `two_mu.twice`) of a tensor
+/// operator `T` of rank lambda = `T.spec().rank_J` (scalars included, with mu =
+/// 0), by the Wigner-Eckart theorem with the reduced elements of `T`:
+///
+///   <j' m'| T_mu |j m> = <j m lambda mu | j' m'> / sqrt(2 j' + 1) R(j', j),
+///
+/// R the stored reduced element and <j m lambda mu | j' m'> a Clebsch-Gordan
+/// coefficient (the ket coupled to the tensor gives the bra). This is exactly
+/// Edmonds' definition with (-1)^(j'-m') (j' lambda j; -m' mu m) <j'||T||j>
+/// (checked with sympy for several (j', j, lambda, mu, m): the ratio is 1).
+/// One-body: R = `T.one_body().get(a', a)`. Two-body: the bra pair is coupled
+/// to J_bra, the ket pair to J_ket, and R is the UNNORMALIZED antisymmetrized
+/// reduced element `T.two_body().get_unnormalized(p q r s, J_bra, J_ket)`, so
+///   A_{ab;cd} = sum_{J_bra, J_ket} CG(ja ma jb mb | Jb Mb) CG(jc mc jd md |
+///               Jk Mk) <Jb Mb|T_mu|Jk Mk>,    sorted m-state pairs a < b, c <
+///               d.
+///
+/// THE CONVENTION OF IMSRG++ (found by comparison with the tensor goldens of
+/// all four (X, Y) combinations of tests/golden/tensor/emax1_He4, total and
+/// per output rank and term, max deviation 1e-15, independent of mu): imsrg++
+/// stores reduced elements in EDMONDS' convention for the one-body part and
+/// for J-coupled pairs ALIKE: bra j' on the left, no extra phase, the same
+/// 1/sqrt(2 J_bra + 1) for pairs as for single particles, a pair |pq; J> being
+/// sum CG(jp mp jq mq | J M) a+_p a+_q |0> with p before q. Extra phases
+/// `TensorGauge` ((-1)^(j_bra - j_ket) on the one-body part, or (-1)^(J_bra -
+/// J_ket) on the pairs, or (-1)^lambda between them) are NOT consistent with
+/// the commutator (relative deviations 1.0 to 1.3), so the gauge remark of
+/// design/15 (imsrg++ one-body closed forms equal (-1)^(j_bra - j_ket) times
+/// the Edmonds element) concerns the physical operators' definitions, not the
+/// storage convention of the reduced elements of the code. Cost O(N^4 J^2).
+/// Syncs `T` to the host. Returns an operator with ranks up to 2.
+MOperator ExpandTensor(const op::Operator& T, const MBasis& basis, TwoM two_mu,
+                       const TensorGauge& gauge = {});
+
+/// Inverse of `ExpandTensor` for one component: the tensor operator on `ms`
+/// with spec `spec` (rank_J, parity, delta_Tz, hermiticity, particle_rank 1 or
+/// 2) whose reduced elements are R = A_coupled / (g CG / sqrt(2 j_bra + 1)),
+/// where A_coupled is the m-scheme matrix element (one-body: A_{a m'; b m};
+/// two- body: the CG-coupled pair element <Jb Mb|A|Jk Mk>) and the coefficient
+/// is taken in the LEAST-SQUARES sense over all allowed m of the ket,
+///   R = sum_m w_m A_m / sum_m w_m^2,  w_m = g CG / sqrt(2 j_bra + 1),
+/// so a deviation from the Wigner-Eckart structure (an operator that is not a
+/// pure component mu of a rank-lambda tensor) shows as a mismatch in the round
+/// trip, never as a silently picked configuration. Zero-body part: not set (0).
+/// Two-body elements are the normalized stored ones (division by sqrt((1 +
+/// delta_pq)(1 + delta_rs))); the stored blocks ch_bra <= ch_ket are filled
+/// completely (both triangles of diagonal blocks). The result is synchronized
+/// to the device. Cost O(N^4 J^2).
+op::Operator ContractTensor(const MOperator& A,
+                            std::shared_ptr<const basis::ModelSpace> ms,
+                            const op::OperatorSpec& spec, TwoM two_mu,
+                            const TensorGauge& gauge = {});
+
 /// One part of the commutator, [A^(nA), B^(nB)]^(nC) = engine(A, B) -
 /// engine(B, A), as an `MOperator` holding only the rank-`nC` part (the
 /// others are zero): a generic Wick engine over all numbers k1 (contractions
 /// of an annihilator of the first factor with a creator of the second, weight
 /// 1 - n) and k2 (creator with annihilator, weight n) with k1 + k2 = nA + nB -
 /// nC. Evaluated for sorted output labels only; outputs violating the
-/// conservation of sum 2m, parity or 2Tz are skipped, and rank-3 outputs
-/// outside the kept three-body space of `basis` are left zero. nA, nB, nC in
+/// conservation of sum 2m, parity or 2Tz are skipped
+/// (for scalars; `shift` replaces the selection rule for a tensor factor, see
+/// `TensorShift`), and rank-3 outputs outside the kept three-body space of
+/// `basis` are left zero. nA, nB, nC in
 /// 0..3 (the rank-nA part of `A` and rank-nB part of `B` are used).
 /// Complexity: O(#outputs * #shuffles * N^(k1 + k2)) element lookups.
 MOperator CommutatorPart(const MOperator& A, int nA, const MOperator& B, int nB,
-                         int nC, const MBasis& basis);
+                         int nC, const MBasis& basis,
+                         const TensorShift& shift = {});
 
 /// [A, B] = sum over nA, nB in 0..3 and nC in 0..`max_rank` of
 /// `CommutatorPart` (a rank-3 part needs the slow [3,3]->3 pieces; pass
 /// `max_rank` 2 to skip it).
 MOperator Commutator(const MOperator& A, const MOperator& B,
-                     const MBasis& basis, int max_rank = 3);
+                     const MBasis& basis, int max_rank = 3,
+                     const TensorShift& shift = {});
 
 }  // namespace imsrg::commutator_ref::mscheme
 

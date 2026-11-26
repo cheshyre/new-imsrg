@@ -156,6 +156,10 @@ struct CommutatorOptions {
   /// `threebody_threshold`, Commutator.cc:396). Default 0: always, unless an
   /// operand is exactly zero.
   double threebody_threshold = 0.0;
+  /// Scalar-tensor commutators (M15, `TensorCommutator`): 9j symbols with
+  /// |9j| below this are skipped in the particle-hole term (imsrg-devel
+  /// 1e-10; the 79e9330 fork used 1e-8, design/50 section 5).
+  double tensor_ninej_threshold = 1.0e-10;
 };
 
 }  // namespace imsrg::commutator
