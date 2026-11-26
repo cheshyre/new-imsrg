@@ -189,7 +189,7 @@
         "IMSRG_MPIEXEC_PREFLAGS": "--overlap --cpu-bind=none -c 4",
         "BLAS_LIBRARIES": "$env{CRAY_LIBSCI_PREFIX_DIR}/lib/libsci_gnu.so",
         "LAPACK_LIBRARIES": "$env{CRAY_LIBSCI_PREFIX_DIR}/lib/libsci_gnu.so",
-        "CMAKE_CXX_FLAGS": "--gcc-install-dir=/usr/lib64/gcc/x86_64-suse-linux/14"
+        "CMAKE_CXX_FLAGS": "--gcc-install-dir=/usr/lib64/gcc/x86_64-suse-linux/14 -ffp-contract=off"
       }
     }
   ],
