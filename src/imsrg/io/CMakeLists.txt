@@ -7,5 +7,6 @@ imsrg_add_module(NAME io
     me2j.cc
     no2b.cc
     valence_writers.cc
+    operator_binary.cc
   DEPS operator basis base
   PRIVATE_LIBS ZLIB::ZLIB)

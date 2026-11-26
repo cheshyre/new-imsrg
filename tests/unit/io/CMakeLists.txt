@@ -59,3 +59,10 @@ imsrg_add_test(NAME io_valence_writers
   LABELS integration reference
   NO_GTEST_MAIN)
 target_compile_definitions(io_valence_writers PRIVATE IMSRG_GOLDEN_DIR="${_imsrg_golden_dir}")
+
+# Native float64 operator files (design/19 section 3.2).
+imsrg_add_test(NAME io_operator_binary
+  SOURCES test_operator_binary.cc ${_imsrg_exec_main}
+  DEPS io
+  LABELS unit
+  NO_GTEST_MAIN)
