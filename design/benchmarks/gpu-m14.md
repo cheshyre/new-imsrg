@@ -87,7 +87,8 @@ two-body norm (`WeightedBlockSumOfSquares`, 4096-element chunks per work item) w
 the flow's kernel time (3.4 ms per call at emax 8, ~16 norms per step); with 16-element chunks
 on the device it takes 0.5 ms. comm221ss and comm121ss (one thread per (i, j) pair) became one
 team per pair (emax 8: 2.6 -> ~0.6 ms and 1.1 -> 0.15 ms). At emax 6 the remaining host time is
-launch overhead (HSA runtime, ~250 small rocBLAS calls per commutator).
+launch overhead (HSA runtime, ~250 small rocBLAS calls per commutator). With an OpenMP host space
+in the HIP Kokkos (experiment, AL-E-Q5; 7 threads) the emax 8 flow takes 23.9 s instead of 28.0 s.
 
 ## Device vs host results
 

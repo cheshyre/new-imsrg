@@ -1492,4 +1492,6 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
   ordering, the tensor table builds) runs on one core in the GPU build: the IMSRG(3) N7 driver
   test takes ~155 s, CPU-bound, on a GCD (113 s on frontier-cpu). **Assumed:** unchanged (the
   IMSRG(2) commutators run on the device); adding `Kokkos_ENABLE_OPENMP` to kokkos-hip (HIP + OpenMP
-  host) would give each rank its 7 cores. Owner/integrator to decide with the C12 layout.
+  host) would give each rank its 7 cores. Measured with such a Kokkos (built in the agent clone,
+build/kokkos-hip-omp, OMP_NUM_THREADS=7): O16 emax 8 Magnus flow on one GCD 28.0 -> 23.9 s;
+commutators and the tensor first call unchanged. Owner/integrator to decide with the C12 layout.
