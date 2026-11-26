@@ -25,6 +25,9 @@
 ///     (also in the re-normal-ordering).
 ///   * `tensor_ninej_threshold_1e8`: 9j skip threshold 1e-8 (not 1e-10) in
 ///     the tensor commutators of the flow.
+///   * `tensor_fork_ph_missing_rank_phase`: the fork's particle-hole tensor
+///     commutator omits (-1)^L (devel has it) when it reads Zbar through a
+///     swapped pair; affects odd L only (Sigma', Sigma'', Delta').
 
 #include "imsrg/driver/config/schema.h"
 
@@ -50,6 +53,9 @@ struct CompatOptions {
   bool tensor_no_fork_diagonal_bug = false;
   /// `commutator::CommutatorOptions::tensor_ninej_threshold = 1e-8`.
   bool tensor_ninej_threshold_1e8 = false;
+  /// Fork particle-hole tensor commutator without the (-1)^L of devel for odd
+  /// L (`CommutatorOptions::tensor_fork_ph_missing_rank_phase`).
+  bool tensor_fork_ph_missing_rank_phase = false;
   friend bool operator==(const CompatOptions&, const CompatOptions&) = default;
 };
 
@@ -65,6 +71,7 @@ constexpr CompatOptions CompatOptionsFor(Compat c) noexcept {
       o.tokyo_writer_fork_79e9330 = true;
       o.tensor_no_fork_diagonal_bug = true;
       o.tensor_ninej_threshold_1e8 = true;
+      o.tensor_fork_ph_missing_rank_phase = true;
       break;
   }
   return o;

@@ -207,6 +207,7 @@ void Commutator(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
     }
     TensorOptions to;
     to.ninej_threshold = opts.tensor_ninej_threshold;
+    to.fork_ph_missing_rank_phase = opts.tensor_fork_ph_missing_rank_phase;
     to.comm111 = opts.terms.test(Term::kComm111ss);
     to.comm121 = opts.terms.test(Term::kComm121ss);
     to.comm122 = opts.terms.test(Term::kComm122ss);

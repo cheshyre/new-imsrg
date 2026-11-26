@@ -1419,3 +1419,19 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
   (`feature/m15-tensor-operators`) is not on develop yet; the L > 0 shorthands are planned catalog rows
   and their tables are plain `OneBodyTable`s. **Assumed meanwhile:** wire them as tensor operators
   (reduced one-body part, imsrg++ gauge) on a separate branch on top of A's branch, merged after it.
+* **AL-F1** (lead F ops, odd-rank NREFT tensors vs the fork goldens) - Against `tests/golden/nreft/flow/
+  fork-79e9330/{nat_emax2,nat_emax4_imsrg3}` (driver_al27_fork_golden) H, TCM, the scalar and the EVEN-rank
+  tensors (FM2p, FPhipp2n) agree to 1e-10 (printed precision), including the fork's tensor normal-ordering
+  bug (needed: without it 1e-2 off). The ODD-rank tensors (FSigmap1p/3n, FSigmapp1n, FDelta1p) deviate by up
+  to 1.6e-4 (emax 2) / 5.7e-4 (emax 4) in the final `.snt`, growing with the flow time; the first Magnus step
+  (only Omega x one-body Y) is exact, so the cause is in terms with a two-body Y. Source comparison fork
+  Commutator.cc vs devel TensorCommutators.cc: the fork's `comm222_phst` lacks (-1)^L at (a) the flipped
+  ket orientation of Ybar (`flipphaseY` in PhaseMatYJ1J2, fork 12696 vs devel phase(Jbra+Jket+Lambda)) and
+  (b) the reads of Zbar through swapped pairs (fork 12399, 12404 vs devel phase(Lambda+...)). Both are
+  emulated (compat `tensor_fork_ph_missing_rank_phase`, odd L only); this reduced the deviation 189 -> 25
+  rows at s = 0.1 and 3.6e-4 -> 5.6e-5 at the end, but not to zero. comm121st (fork form checked
+  numerically), comm122st, comm222_pp_hh_221st and the normal ordering were compared and are equivalent.
+  Remaining cause unknown (another odd-L difference in comm222_phst, or in the emulation of the stored
+  matrices). **Assumed meanwhile:** keep the emulation; the odd-rank files are NOT within the 5e-7 rule
+  (the integration test compares them with the strict rule and therefore fails for them; no tolerance
+  was loosened).

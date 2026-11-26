@@ -8,6 +8,7 @@
 #include "imsrg/driver/run.h"
 
 #include <cmath>
+#include <cstdlib>
 #include <cstdint>
 #include <cstdio>
 #include <filesystem>
@@ -612,6 +613,8 @@ FlowStart MakeFlowStart(const RunConfig& config,
   if (CompatOptionsFor(config.run.compat).tensor_ninej_threshold_1e8) {
     copts.tensor_ninej_threshold = 1.0e-8;
   }
+  copts.tensor_fork_ph_missing_rank_phase =
+      CompatOptionsFor(config.run.compat).tensor_fork_ph_missing_rank_phase;
   return start;
 }
 
