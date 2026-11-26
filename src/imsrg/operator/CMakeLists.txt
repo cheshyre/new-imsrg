@@ -19,6 +19,7 @@ imsrg_add_module(NAME operator
     normal_ordering_no2b.cc
     no2b.cc
     basis_transform.cc
+    truncate.cc
     random_operator.cc
     pair_third.cc
     kernels/part_kernels.cc
