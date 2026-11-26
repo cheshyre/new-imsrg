@@ -204,7 +204,8 @@ namespace {
 struct BlockRows {
   exec::DeviceBuffer<std::int32_t> ch_bra, ch_ket, nbra, nket;
   exec::DeviceBuffer<std::int64_t> offset;
-  exec::DeviceBuffer<std::int32_t> row_offset;  ///< Per block + total.
+  exec::DeviceBuffer<std::int32_t> row_offset;         ///< Per block + total.
+  std::vector<std::int32_t> host_ch_bra, host_ch_ket;  ///< Host copies.
   std::int32_t num_blocks = 0;
   std::int32_t num_rows = 0;
 };
@@ -233,6 +234,8 @@ BlockRows MakeBlockRows(const op::TwoBody& part) {
   r.row_offset = dev32(ro);
   r.offset = exec::DeviceBuffer<std::int64_t>(off.size(), "imsrg::BlockRows");
   if (!off.empty()) r.offset.CopyFromHost(off);
+  r.host_ch_bra = cb;
+  r.host_ch_ket = ck;
   r.num_blocks = static_cast<std::int32_t>(cb.size());
   r.num_rows = ro.back();
   return r;
@@ -259,6 +262,18 @@ BlockRowsView ViewOf(const BlockRows& r) {
                        r.num_blocks};
 }
 
+/// Everything the comm122st kernel reads beyond `OneBodyArgs`.
+struct Comm122Args {
+  BlockRowsView br;
+  const std::int32_t* ket_offset = nullptr;  ///< Flat ket row per channel.
+  detail::EntryListView lifted;              ///< Part 1 (two lists per row).
+  detail::EntryListView bra1, bra2, ket3, ket4;  ///< Part 2.
+  const std::int32_t* col_offset = nullptr;
+  std::int64_t num_channels = 0;
+  double* zd = nullptr;
+};
+static_assert(std::is_trivially_copyable_v<Comm122Args>);
+
 }  // namespace
 
 void Comm122st(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
@@ -272,20 +287,32 @@ void Comm122st(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   const auto yoff = detail::BlockOffsetTable(Y.two_body(), nch);
   const OneBodyArgs a = MakeOneBodyArgs(X, Y, Z, ctx, rd, xoff, yoff, hZ);
   const BlockRows rows = MakeBlockRows(Z.two_body());
-  const BlockRowsView br = ViewOf(rows);
+  const auto& lifted = ctx.lifted_kets();
+  const auto& lists =
+      ctx.comm122_lists(Y.spec(), rows.host_ch_bra, rows.host_ch_ket);
+  Comm122Args k;
+  k.br = ViewOf(rows);
+  k.ket_offset = ctx.tables.two_body().channel_ket_offset;
+  k.lifted = lifted.list.view();
+  k.bra1 = lists.bra1.view();
+  k.bra2 = lists.bra2.view();
+  k.ket3 = lists.ket3.view();
+  k.ket4 = lists.ket4.view();
+  k.col_offset = lists.col_offset.device_data();
+  k.num_channels = nch;
+  k.zd = Z.two_body().matrix().buffer().device_data();
   const basis::TwoBodyTableView tb = ctx.tables.two_body();
-  double* zd = Z.two_body().matrix().buffer().device_data();
   exec::ParallelForDynamic(
       "commutator::comm122st", rows.num_rows,
       IMSRG_LAMBDA(const exec::Index rr) {
-        const int k = detail::FindBlock(br.row_offset, br.num_blocks, rr);
-        const int ibra = static_cast<int>(rr) - br.row_offset[k];
-        const int cb = br.ch_bra[k];
-        const int ck = br.ch_ket[k];
+        const int blk = detail::FindBlock(k.br.row_offset, k.br.num_blocks, rr);
+        const int ibra = static_cast<int>(rr) - k.br.row_offset[blk];
+        const int cb = k.br.ch_bra[blk];
+        const int ck = k.br.ch_ket[blk];
         const int J1 = tb.channel_two_j[cb] / 2;
         const int J2 = tb.channel_two_j[ck] / 2;
-        const int nb = br.nbra[k];
-        const int nk = br.nket[k];
+        const int nb = k.br.nbra[blk];
+        const int nk = k.br.nket[blk];
         const double hat = Kokkos::sqrt((2.0 * J1 + 1) * (2.0 * J2 + 1));
         const KetIndex gb =
             tb.global_ket(ChannelIndex{cb}, LocalKetIndex{ibra});
@@ -293,6 +320,31 @@ void Comm122st(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
         const int j = tb.ket_q[gb.value()];
         const int ji = a.j2[i];
         const int jj = a.j2[j];
+        // Stored blocks of Y (part 1) and of the scalar X (part 2), if any.
+        const std::int64_t yo =
+            (a.y2.data == nullptr)
+                ? -1
+                : a.y2.block_offset[cb * k.num_channels + ck];
+        const double* yb = (yo >= 0) ? a.y2.data + yo : nullptr;
+        const std::int64_t xbo =
+            (a.x2.data == nullptr)
+                ? -1
+                : a.x2.block_offset[cb * k.num_channels + cb];
+        const std::int64_t xko =
+            (a.x2.data == nullptr)
+                ? -1
+                : a.x2.block_offset[ck * k.num_channels + ck];
+        const double* xbb = (xbo >= 0) ? a.x2.data + xbo : nullptr;  // (cb, cb)
+        const double* xkk = (xko >= 0) ? a.x2.data + xko : nullptr;  // (ck, ck)
+        const bool dij = (i == j);
+        const int row_b = k.ket_offset[cb] + ibra;
+        const int a1b = k.lifted.offsets[2 * row_b];
+        const int a1e = k.lifted.offsets[2 * row_b + 1];
+        const int a2e = k.lifted.offsets[2 * row_b + 2];
+        const int b1b = k.bra1.offsets[k.br.row_offset[blk] + ibra];
+        const int b1e = k.bra1.offsets[k.br.row_offset[blk] + ibra + 1];
+        const int b2b = k.bra2.offsets[k.br.row_offset[blk] + ibra];
+        const int b2e = k.bra2.offsets[k.br.row_offset[blk] + ibra + 1];
         const int iket_end = (cb == ck) ? ibra + 1 : nk;
         for (int iket = 0; iket < iket_end; ++iket) {
           const KetIndex gk =
@@ -301,90 +353,93 @@ void Comm122st(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
           const int l = tb.ket_q[gk.value()];
           const int jk = a.j2[kk];
           const int jl = a.j2[l];
+          const bool dkl = (kk == l);
+          const int row_k = k.ket_offset[ck] + iket;
+          const std::int64_t col = k.col_offset[blk] + iket;
+          // Part 1: scalar one-body X1 with the tensor two-body Y2.
           double c1 = 0.0, c2 = 0.0, c3 = 0.0, c4 = 0.0;
-          for (int e = a.sc1.offsets[i]; e < a.sc1.offsets[i + 1]; ++e) {
-            const int p = a.sc1.items[e];
-            c1 +=
-                a.x1(i, p) * a.y2.get_unnormalized(p, j, kk, l, 2 * J1, 2 * J2);
-          }
-          if (i == j) {
-            c2 = c1;
-          } else {
-            for (int e = a.sc1.offsets[j]; e < a.sc1.offsets[j + 1]; ++e) {
-              const int p = a.sc1.items[e];
-              c2 += a.x1(j, p) *
-                    a.y2.get_unnormalized(i, p, kk, l, 2 * J1, 2 * J2);
+          if (yb != nullptr) {
+            const double* ycol = yb + static_cast<std::int64_t>(iket) * nb;
+            for (int e = a1b; e < a1e; ++e)
+              c1 += a.x1(k.lifted.from[e], k.lifted.to[e]) * k.lifted.coef[e] *
+                    ycol[k.lifted.m[e]];
+            if (dij) {
+              c2 = c1;
+            } else {
+              for (int e = a1e; e < a2e; ++e)
+                c2 += a.x1(k.lifted.from[e], k.lifted.to[e]) *
+                      k.lifted.coef[e] * ycol[k.lifted.m[e]];
             }
-          }
-          for (int e = a.sc1.offsets[kk]; e < a.sc1.offsets[kk + 1]; ++e) {
-            const int p = a.sc1.items[e];
-            c3 +=
-                a.x1(p, kk) * a.y2.get_unnormalized(i, j, p, l, 2 * J1, 2 * J2);
-          }
-          if (kk == l) {
-            c4 = c3;
-          } else {
-            for (int e = a.sc1.offsets[l]; e < a.sc1.offsets[l + 1]; ++e) {
-              const int p = a.sc1.items[e];
-              c4 += a.x1(p, l) *
-                    a.y2.get_unnormalized(i, j, kk, p, 2 * J1, 2 * J2);
+            const int ka = k.lifted.offsets[2 * row_k];
+            const int kb = k.lifted.offsets[2 * row_k + 1];
+            const int ke = k.lifted.offsets[2 * row_k + 2];
+            for (int e = ka; e < kb; ++e)
+              c3 += a.x1(k.lifted.to[e], k.lifted.from[e]) * k.lifted.coef[e] *
+                    yb[ibra + static_cast<std::int64_t>(k.lifted.m[e]) * nb];
+            if (dkl) {
+              c4 = c3;
+            } else {
+              for (int e = kb; e < ke; ++e)
+                c4 += a.x1(k.lifted.to[e], k.lifted.from[e]) *
+                      k.lifted.coef[e] *
+                      yb[ibra + static_cast<std::int64_t>(k.lifted.m[e]) * nb];
             }
+            // The unnormalized elements carry sqrt2 for k == l (bra lists) or
+            // i == j (ket lists).
+            const double sbra = dkl ? constants::kSqrt2 : 1.0;
+            const double sket = dij ? constants::kSqrt2 : 1.0;
+            c1 *= sbra;
+            c2 *= sbra;
+            c3 *= sket;
+            c4 *= sket;
           }
           double cijkl = c1 + c2 - c3 - c4;
+          // Part 2: tensor one-body Y1 with the scalar two-body X2.
           c1 = c2 = c3 = c4 = 0.0;
           const int ph1 = Phase((ji + jj) / 2 + J2 + a.L);
           const int ph23 = Phase(J1 - J2 + a.L);
           const int ph4 = Phase((jk + jl) / 2 - J1 + a.L);
-          for (int e = a.tc1.offsets[i]; e < a.tc1.offsets[i + 1]; ++e) {
-            const int p = a.tc1.items[e];
-            const int ja = a.j2[p];
-            if (!angmom::Triangle(TwoJ{2 * J2}, TwoJ{ja}, TwoJ{jj})) continue;
-            c1 -= a.sixjL(TwoJ{2 * J2}, TwoJ{2 * J1}, TwoJ{ji}, TwoJ{ja},
-                          TwoJ{jj}) *
-                  a.y1(i, p) *
-                  a.x2.get_unnormalized(p, j, kk, l, 2 * J2, 2 * J2);
+          if (xkk != nullptr) {
+            const double* xcol = xkk + static_cast<std::int64_t>(iket) * nk;
+            for (int e = b1b; e < b1e; ++e)
+              c1 += a.y1(k.bra1.from[e], k.bra1.to[e]) * k.bra1.coef[e] *
+                    xcol[k.bra1.m[e]];
+            for (int e = b2b; e < b2e; ++e)
+              c2 += a.y1(k.bra2.from[e], k.bra2.to[e]) * k.bra2.coef[e] *
+                    xcol[k.bra2.m[e]];
+            if (dkl) {
+              c1 *= constants::kSqrt2;
+              c2 *= constants::kSqrt2;
+            }
           }
-          for (int e = a.tc1.offsets[j]; e < a.tc1.offsets[j + 1]; ++e) {
-            const int p = a.tc1.items[e];
-            const int ja = a.j2[p];
-            if (!angmom::Triangle(TwoJ{2 * J2}, TwoJ{ja}, TwoJ{ji})) continue;
-            c2 += a.sixjL(TwoJ{2 * J2}, TwoJ{2 * J1}, TwoJ{jj}, TwoJ{ja},
-                          TwoJ{ji}) *
-                  a.y1(j, p) *
-                  a.x2.get_unnormalized(p, i, kk, l, 2 * J2, 2 * J2);
-          }
-          for (int e = a.tc1.offsets[kk]; e < a.tc1.offsets[kk + 1]; ++e) {
-            const int p = a.tc1.items[e];
-            const int ja = a.j2[p];
-            if (!angmom::Triangle(TwoJ{2 * J1}, TwoJ{ja}, TwoJ{jl})) continue;
-            c3 -= a.sixjL(TwoJ{2 * J1}, TwoJ{2 * J2}, TwoJ{jk}, TwoJ{ja},
-                          TwoJ{jl}) *
-                  a.y1(p, kk) *
-                  a.x2.get_unnormalized(i, j, l, p, 2 * J1, 2 * J1);
-          }
-          if (kk == l) {
-            c4 = -c3;
-          } else {
-            for (int e = a.tc1.offsets[l]; e < a.tc1.offsets[l + 1]; ++e) {
-              const int p = a.tc1.items[e];
-              const int ja = a.j2[p];
-              if (!angmom::Triangle(TwoJ{2 * J1}, TwoJ{ja}, TwoJ{jk})) continue;
-              c4 += a.sixjL(TwoJ{2 * J1}, TwoJ{2 * J2}, TwoJ{jl}, TwoJ{ja},
-                            TwoJ{jk}) *
-                    a.y1(p, l) *
-                    a.x2.get_unnormalized(i, j, kk, p, 2 * J1, 2 * J1);
+          if (xbb != nullptr) {
+            const int c3b = k.ket3.offsets[col];
+            const int c3e = k.ket3.offsets[col + 1];
+            for (int e = c3b; e < c3e; ++e)
+              c3 += a.y1(k.ket3.from[e], k.ket3.to[e]) * k.ket3.coef[e] *
+                    xbb[ibra + static_cast<std::int64_t>(k.ket3.m[e]) * nb];
+            if (dkl) {
+              c4 = -c3;
+            } else {
+              const int c4b = k.ket4.offsets[col];
+              const int c4e = k.ket4.offsets[col + 1];
+              for (int e = c4b; e < c4e; ++e)
+                c4 += a.y1(k.ket4.from[e], k.ket4.to[e]) * k.ket4.coef[e] *
+                      xbb[ibra + static_cast<std::int64_t>(k.ket4.m[e]) * nb];
+            }
+            if (dij) {
+              c3 *= constants::kSqrt2;
+              c4 *= constants::kSqrt2;
             }
           }
           cijkl += hat * (ph1 * c1 + ph23 * c2 + ph23 * c3 + ph4 * c4);
-          const bool dij = (i == j);
-          const bool dkl = (kk == l);
           const double norm =
               (dij == dkl) ? (dij ? 2.0 : 1.0) : constants::kSqrt2;
           const double v = cijkl / norm;
-          double* blk = zd + br.offset[k];
-          blk[ibra + static_cast<std::int64_t>(iket) * nb] += v;
+          double* zb = k.zd + k.br.offset[blk];
+          zb[ibra + static_cast<std::int64_t>(iket) * nb] += v;
           if (cb == ck && iket < ibra)
-            blk[iket + static_cast<std::int64_t>(ibra) * nb] += a.hZ * v;
+            zb[iket + static_cast<std::int64_t>(ibra) * nb] += a.hZ * v;
         }
       });
   exec::Fence("commutator::comm122st");

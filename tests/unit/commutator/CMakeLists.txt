@@ -181,3 +181,12 @@ imsrg_add_test(NAME commutator_tensor_golden
   NO_GTEST_MAIN)
 target_compile_definitions(commutator_tensor_golden PRIVATE
   IMSRG_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/tests/golden")
+
+# Fast comm122st (lifted one-body lists) against the element-wise kernel kept
+# as a reference implementation (tensor_comm122_ref.cc).
+imsrg_add_test(NAME commutator_tensor_comm122
+  SOURCES test_tensor_comm122.cc tensor_comm122_ref.cc ${_imsrg_exec_main}
+          ${_imsrg_comm_support}
+  DEPS commutator operator
+  LABELS unit
+  NO_GTEST_MAIN)
