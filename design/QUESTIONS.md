@@ -1495,3 +1495,21 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
   host) would give each rank its 7 cores. Measured with such a Kokkos (built in the agent clone,
 build/kokkos-hip-omp, OMP_NUM_THREADS=7): O16 emax 8 Magnus flow on one GCD 28.0 -> 23.9 s;
 commutators and the tensor first call unchanged. Owner/integrator to decide with the C12 layout.
+* **AL-D1** (lead D, C7 at production size) - A restart re-runs the whole preparation (me2j and
+  48 GB NO2B read, HF, NAT, NO2B contraction): ~16 min of every 2-hour job at emax 14 (13 %), and
+  the 30-minute checkpoint interval loses up to 30 min more per job boundary (the N2LOsat run lost
+  21 stage-2 steps). Restarts are bit-identical across nodes (checked at stage 2, steps 79/80).
+  **Assumed:** acceptable tonight; for the farm and longer chains, store H_0 (emax 10, ~0.3 GB)
+  and the NAT C in the checkpoint so a restart skips the readers and HF (answers AL-C2), and write a
+  checkpoint on SIGTERM / before the job's end (Slurm `--signal`).
+* **AL-D2** (lead D, NAT) - Our MBPT(2) density matrix dropped the PP elements between a particle
+  and a partially filled hole (imsrg++ tests 1 - n_b); fixed (commit "Include partially filled
+  orbits ..."). This was a bug of the port, not of imsrg++, so it is not in design/30 §6. AL-C3's
+  pending comparison against fork dumps: done indirectly, emax 6 and 14 EMP2/EMP3/E_Nat agree with
+  the fork build to all printed digits.
+* **AL-D3** (lead D, writer) - Under `compat = "imsrg_fork_79e9330"` the driver still writes the
+  imsrg-devel tokyo format: relative two-body threshold 1e-7 x norm2b drops 15 of the 158 archived
+  TCM two-body elements (|v| <= 1.07e-3; the 143 written agree to 5e-9). H is unaffected (all 158
+  written, max deviation 5e-7). **Assumed:** lead B's `TokyoNumberFormat::kFork79e9330`
+  (feature/al27-tokyo-fork-format) gets selected by the compat profile when that branch merges
+  (one line in driver `TokyoOptions`); not done here to keep the branches disjoint.

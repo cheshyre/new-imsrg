@@ -7,11 +7,13 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <span>
 #include <vector>
 
 #include "imsrg/angmom/wigner.h"
 #include "imsrg/base/assert.h"
+#include "imsrg/exec/host_parallel.h"
 
 namespace imsrg::angmom {
 
@@ -201,19 +203,27 @@ MoshinskyTable::MoshinskyTable(int e2max)
       pos[static_cast<std::size_t>(((u[0] * nl + u[1]) * nn + u[2]) * nl +
                                    u[3])] = static_cast<std::int32_t>(j);
     }
+    const std::int64_t first = next;
     for (int lambda = 0; lambda <= E; ++lambda) {
       off[static_cast<std::size_t>(E * (e2max + 1) + lambda)] = next;
-      for (std::int64_t icm = 0; icm < K; ++icm) {
-        const auto& c = t[static_cast<std::size_t>(icm)];
-        for (std::int64_t ilab = 0; ilab < K; ++ilab) {
-          const auto& u = t[static_cast<std::size_t>(ilab)];
-          out[static_cast<std::size_t>(next + icm * K + ilab)] =
-              Moshinsky(HoNL{c[0], c[1]}, HoNL{c[2], c[3]}, HoNL{u[0], u[1]},
-                        HoNL{u[2], u[3]}, lambda);
-        }
-      }
       next += K * K;
     }
+    // The brackets are independent and expensive (double-double sums; the
+    // emax-14 TCm needs e2max = 28, 1.9e8 values): one task per (lambda, cm
+    // tuple) row on the host threads.
+    exec::HostParallelForDynamic(
+        "imsrg::MoshinskyTable::fill", (E + 1) * K, [&](std::int64_t row) {
+          const auto lambda = static_cast<int>(row / K);
+          const std::int64_t icm = row % K;
+          const std::int64_t base = first + row * K;
+          const auto& c = t[static_cast<std::size_t>(icm)];
+          for (std::int64_t ilab = 0; ilab < K; ++ilab) {
+            const auto& u = t[static_cast<std::size_t>(ilab)];
+            out[static_cast<std::size_t>(base + ilab)] =
+                Moshinsky(HoNL{c[0], c[1]}, HoNL{c[2], c[3]}, HoNL{u[0], u[1]},
+                          HoNL{u[2], u[3]}, lambda);
+          }
+        });
   }
   IMSRG_CHECK(next == static_cast<std::int64_t>(out.size()),
               "MoshinskyTable: size mismatch");

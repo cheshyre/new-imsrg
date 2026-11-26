@@ -213,7 +213,16 @@ void FillBlock(Source& src, const std::vector<FileOrbit>& orbs,
     src.Skip(n);
     return;
   }
+  const std::int32_t a = cidx[i1], b = cidx[i2], c = cidx[i3], d = cidx[i4],
+                     e = cidx[i5], f = cidx[i6];
+  using State = op::No2bThreeBody::IsospinState;
   for (std::int32_t J = jmin; J <= jmax; ++J) {
+    // Channels and states are resolved lazily, once per J (not per value):
+    // channel per T3, bra state per (T12, T3), ket state per (T45, T3).
+    std::int32_t ch[2] = {-1, -1};
+    State bra[2][2], ket[2][2];
+    bool have_bra[2][2] = {{false, false}, {false, false}};
+    bool have_ket[2][2] = {{false, false}, {false, false}};
     for (std::int32_t T12 : {0, 1}) {
       for (std::int32_t T45 : {0, 1}) {
         for (std::int32_t T3 = 1; T3 <= std::min(2 * T12 + 1, 2 * T45 + 1);
@@ -222,9 +231,18 @@ void FillBlock(Source& src, const std::vector<FileOrbit>& orbs,
           if (i1 == i2 && (J + T12) % 2 == 0) continue;  // Pauli
           if (i4 == i5 && (J + T45) % 2 == 0) continue;
           if (std::abs(static_cast<double>(v)) > kStoreCut) {
-            v3.set_isospin(cidx[i1], cidx[i2], cidx[i3], T12, cidx[i4],
-                           cidx[i5], cidx[i6], T45, J, T3,
-                           static_cast<double>(v));
+            const std::int32_t k = T3 / 2;
+            if (ch[k] < 0) ch[k] = v3.isospin_channel(a, b, c, d, e, f, J, T3);
+            if (!have_bra[T12][k]) {
+              bra[T12][k] = v3.isospin_state(ch[k], a, b, c, T12);
+              have_bra[T12][k] = true;
+            }
+            if (!have_ket[T45][k]) {
+              ket[T45][k] = v3.isospin_state(ch[k], d, e, f, T45);
+              have_ket[T45][k] = true;
+            }
+            v3.set_resolved(ch[k], bra[T12][k], ket[T45][k],
+                            static_cast<double>(v));
             ++rep.values_stored;
           }
         }

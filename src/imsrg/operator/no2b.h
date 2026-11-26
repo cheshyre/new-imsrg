@@ -13,7 +13,6 @@
 #include <optional>
 #include <span>
 #include <type_traits>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -112,6 +111,9 @@ class No2bThreeBody {
   }
   /// Number of stored values (sum over channels of n (n + 1) / 2).
   std::size_t size() const noexcept { return values_.size(); }
+  /// The stored values (channel after channel, lower triangle by rows), for
+  /// tests and serialization.
+  std::span<const float> values() const noexcept { return values_; }
 
   /// Sets W^{J2 T3}_{(ab) Tab c, (de) Tde f} = v (isospin orbit indices; twoT =
   /// 2T = 1 or 3), imsrg++ `SetME_iso_no2b`: the value is stored with the
@@ -125,6 +127,32 @@ class No2bThreeBody {
                    std::int32_t Tab, std::int32_t d, std::int32_t e,
                    std::int32_t f, std::int32_t Tde, std::int32_t J2,
                    std::int32_t twoT, double v);
+  /// A state of a channel resolved by `isospin_state`: its index in the channel
+  /// and the ordering phase (+-1) of (a, b); index < 0 means not stored.
+  struct IsospinState {
+    std::int32_t index = -1;
+    std::int32_t phase = 0;
+  };
+  /// Channel index of the elements with orbits a b c / d e f, J2 and twoT, for
+  /// repeated use with `isospin_state` and `set_resolved` (the fast path of
+  /// readers: resolve once per (J2, twoT), not once per value).
+  /// @throws InvariantError exactly as `set_isospin` for orbit indices out of
+  ///         range, j_c != j_f, parity mismatches or an absent channel.
+  /// Complexity: O(1).
+  std::int32_t isospin_channel(std::int32_t a, std::int32_t b, std::int32_t c,
+                               std::int32_t d, std::int32_t e, std::int32_t f,
+                               std::int32_t J2, std::int32_t twoT) const;
+  /// The state (a b)Tab c of channel `channel` (from `isospin_channel`), with
+  /// index -1 if it is not stored. Complexity: one hash lookup.
+  IsospinState isospin_state(std::int32_t channel, std::int32_t a,
+                             std::int32_t b, std::int32_t c,
+                             std::int32_t Tab) const noexcept;
+  /// Stores v for the resolved bra and ket states of `channel`; identical to
+  /// the `set_isospin` store (including the float rounding of v * phase).
+  /// @throws InvariantError if the channel or a state is invalid.
+  /// Complexity: O(1), no lookups.
+  void set_resolved(std::int32_t channel, IsospinState bra, IsospinState ket,
+                    double v);
   /// imsrg++ `GetME_iso_no2b`: the stored value times the ordering phases, or 0
   /// if the element is not part of the storage (including out-of-range
   /// indices).
@@ -152,11 +180,14 @@ class No2bThreeBody {
     std::int32_t J2 = 0, P2 = 0, J1 = 0, P1 = 0, T3 = 0;
     std::int32_t num_states = 0;
     std::size_t offset = 0;  // into values_
-    // key(a, b, c, Tab) -> state index (both orderings of a, b) and ordering
-    // phase
-    std::unordered_map<std::uint64_t, std::pair<std::int32_t, std::int32_t>>
-        states;
   };
+  // Registers the state (a b) tab c with `index` and ordering `phase` in the
+  // channel (J2, T3) (construction only).
+  void AddState(std::int32_t J2, std::int32_t T3, std::int32_t a,
+                std::int32_t b, std::int32_t c, std::int32_t tab,
+                std::int32_t index, std::int32_t phase);
+  IsospinState LookupState(const Channel& ch, std::int32_t a, std::int32_t b,
+                           std::int32_t c, std::int32_t tab) const noexcept;
   std::optional<std::int32_t> channel_index(std::int32_t J2, std::int32_t P2,
                                             std::int32_t J1, std::int32_t P1,
                                             std::int32_t T3) const noexcept;
@@ -170,6 +201,11 @@ class No2bThreeBody {
   std::int32_t orbit_stride_n_ = 0;
   std::vector<std::int32_t>
       channel_lookup_;  // dense (J2, P2, J1, P1, T3) -> channel or -1
+  // States: ((a * norb + b) * norb + c) * 2 + Tab -> first slot in
+  // state_slots_ or -1; slots [(J2 - |ja - jb| / 2) * 2 + (T3 - 1) / 2] hold
+  // 2 * state index + (phase < 0), or -1 if the state is not in the channel.
+  std::vector<std::int32_t> state_base_;
+  std::vector<std::int32_t> state_slots_;
   std::vector<float> values_;
 };
 

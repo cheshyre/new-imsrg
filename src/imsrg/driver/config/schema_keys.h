@@ -343,6 +343,11 @@ void VisitSchema(Config& c, Visitor&& v) {
                   "me2jp (ME1J + float32 binary ME2JP)",
                   "native"},
           c.output.omega_format);
+  v.Field(KeyInfo{"output.omega_second_format",
+                  "with write_omega: also write the Omegas in the other "
+                  "format (stem <stem>_me2jp or <stem>_native)",
+                  "false"},
+          c.output.omega_second_format);
   v.Field(KeyInfo{"output.write_ho_ops", "write operators before HF", "false",
                   false, false, PL},
           c.output.write_ho_ops);
