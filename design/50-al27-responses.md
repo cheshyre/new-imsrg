@@ -88,7 +88,23 @@ and J=1 operators. The shell-model step is out of scope (`.snt` only).
 
 ## 4. Tilde Phi' normalization
 
-Pending the analysis of Fitzpatrick et al. 2013 (owner's PDF); recorded here when decided.
+Analysis of Fitzpatrick et al. 2013, JCAP02(2013)004 (owner's PDF; notes with equations and page
+numbers: `$IMSRG_WORK/inputs/al27/analysis/phitp-normalization-notes.md`):
+
+* The paper gives none of its operators (eq. 3.15) a √(4π) of its own; every response carries the
+  same 4π/(2J_i+1) (eqs. 3.13/3.20, Table 1). The paper alone does not explain the fork's split
+  (√(4π) on FM and FPhipp, 1 on FSigmap/FSigmapp/FDelta); it resembles the Hoferichter et al. 2016
+  convention, which normalizes F^M and F^Φ'' so that F^M(0) = A.
+* The fork's `Phitp = Phip + 0.5*Ms(J,J)` equals the paper's Φ̃' = Φ' + ½ Σ_J (sign, factor, index).
+  Φ̃' is Hermitian (eq. D.1, same symmetry as M), normal parity, even multipoles only: J = 2, 4
+  survive for the J = 5/2⁺ ground state.
+* Φ̃' falls in the symmetry class of M and Φ'' (even, normal parity), and the prefactor-1 group is
+  exactly the odd-multipole Σ', Σ'', Δ. It is the transverse partner of Φ''; the paper's
+  long-wavelength ratio Φ̃'_2/Φ''_2 = √(3/2) holds between the columns only with a common prefactor.
+
+**Choice (pending the owner's confirmation, 2026-11-26 20:00 EST):** `FPhitp<L><p|n>_<q> =
+√(4π)·DM_NREFT::Phitp(L, q)`, L = 2, 4, Hermitian. q → 0: FPhitp2 → −(1/(2√5))[l⊗σ]_2 per
+nucleon, FPhipp2 → −(1/√30)[l⊗σ]_2 (0d5/2 diagonal reduced element of FPhitp2: −1.4967).
 
 ## 5. Fork compatibility profile (variant 1)
 
