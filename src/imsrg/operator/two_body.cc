@@ -4,9 +4,11 @@
 #include "imsrg/operator/two_body.h"
 
 #include <cmath>
+#include <cstdlib>
 #include <utility>
 #include <vector>
 
+#include "imsrg/angmom/wigner.h"
 #include "imsrg/base/assert.h"
 #include "imsrg/base/error.h"
 
@@ -61,12 +63,55 @@ std::optional<Location> Locate(const basis::TwoBodyChannels& tb, OrbitIndex a,
 
 }  // namespace
 
+bool ConnectsChannels(const OperatorSpec& spec,
+                      const basis::TwoBodyChannel& bra,
+                      const basis::TwoBodyChannel& ket) noexcept {
+  const std::int32_t Jb = bra.J();
+  const std::int32_t Jk = ket.J();
+  const std::int32_t L = spec.rank_J;
+  if (L < std::abs(Jb - Jk) || L > Jb + Jk) return false;
+  if (std::abs(bra.Tz() - ket.Tz()) != spec.delta_Tz) return false;
+  const std::int32_t par = static_cast<std::int32_t>(bra.parity) +
+                           static_cast<std::int32_t>(ket.parity) +
+                           static_cast<std::int32_t>(spec.parity);
+  return par % 2 == 0;
+}
+
+bool ConnectsOrbits(const OperatorSpec& spec, const basis::Orbit& a,
+                    const basis::Orbit& b) noexcept {
+  if (!angmom::Triangle(a.j2, b.j2, TwoJ{2 * spec.rank_J})) return false;
+  if ((a.l + b.l + static_cast<std::int32_t>(spec.parity)) % 2 != 0)
+    return false;
+  return std::abs(a.tz2.twice - b.tz2.twice) == 2 * spec.delta_Tz;
+}
+
 TwoBody::TwoBody(std::shared_ptr<const basis::ModelSpace> ms,
                  const OperatorSpec& spec)
-    : ms_(std::move(ms)), hermiticity_(spec.hermiticity) {
+    : ms_(std::move(ms)),
+      hermiticity_(spec.hermiticity),
+      tensor_(!spec.is_scalar()),
+      rank_J_(spec.rank_J) {
   IMSRG_CHECK(ms_ != nullptr);
   if (spec.particle_rank < 2) return;
   const auto& tb = ms_->two_body();
+  if (tensor_) {
+    std::vector<linalg::BlockShape> shapes;
+    for (std::int32_t cb = 0; cb < tb.num_channels(); ++cb) {
+      const auto& bra = tb.channel(ChannelIndex{cb});
+      for (std::int32_t ck = cb; ck < tb.num_channels(); ++ck) {
+        const auto& ket = tb.channel(ChannelIndex{ck});
+        if (!ConnectsChannels(spec, bra, ket)) continue;
+        shapes.push_back({linalg::BlockIndex{cb}, linalg::BlockIndex{ck},
+                          bra.num_kets, ket.num_kets});
+      }
+    }
+    // An operator without any connected pair still counts as allocated (a
+    // 0 x 0 placeholder block), so particle_rank 2 implies allocated().
+    if (shapes.empty())
+      shapes.push_back({linalg::BlockIndex{0}, linalg::BlockIndex{0}, 0, 0});
+    matrix_ = linalg::BlockSparseMatrix<double>(shapes, "imsrg::op::TwoBody");
+    return;
+  }
   std::vector<linalg::BlockShape> shapes;
   shapes.reserve(static_cast<std::size_t>(tb.num_channels()));
   for (std::int32_t ch = 0; ch < tb.num_channels(); ++ch) {
@@ -83,6 +128,11 @@ const basis::TwoBodyChannels& TwoBody::channels() const {
 
 std::optional<std::size_t> TwoBody::block_index(
     ChannelIndex ch_bra, ChannelIndex ch_ket) const noexcept {
+  if (tensor_) {
+    if (ch_bra > ch_ket) return std::nullopt;
+    return matrix_.find_block(linalg::BlockIndex{ch_bra.value()},
+                              linalg::BlockIndex{ch_ket.value()});
+  }
   if (ch_bra != ch_ket || ch_bra.value() < 0 ||
       ch_bra.ToSize() >= matrix_.num_blocks()) {
     return std::nullopt;
@@ -112,6 +162,7 @@ void TwoBody::set(ChannelIndex ch_bra, ChannelIndex ch_ket, LocalKetIndex i,
 
 double TwoBody::get_normalized(OrbitIndex a, OrbitIndex b, OrbitIndex c,
                                OrbitIndex d, TwoJ J) const {
+  if (tensor_) return get_normalized(a, b, c, d, J, J);
   if (!allocated()) return 0.0;
   const auto loc = Locate(channels(), a, b, c, d, J);
   if (!loc) return 0.0;
@@ -124,8 +175,70 @@ double TwoBody::get_unnormalized(OrbitIndex a, OrbitIndex b, OrbitIndex c,
   return f * get_normalized(a, b, c, d, J);
 }
 
+double TwoBody::get_normalized(OrbitIndex a, OrbitIndex b, OrbitIndex c,
+                               OrbitIndex d, TwoJ J_bra, TwoJ J_ket) const {
+  if (!allocated()) return 0.0;
+  if (!tensor_) {
+    return J_bra == J_ket ? get_normalized(a, b, c, d, J_bra) : 0.0;
+  }
+  const auto& tb = channels();
+  const auto bra = LocateSide(tb, a, b, J_bra);
+  if (!bra) return 0.0;
+  const auto ket = LocateSide(tb, c, d, J_ket);
+  if (!ket) return 0.0;
+  const double phase = bra->phase * ket->phase;
+  if (bra->ch <= ket->ch) {
+    const auto k = block_index(bra->ch, ket->ch);
+    if (!k) return 0.0;
+    return phase * matrix_.host_block(*k)(bra->idx.value(), ket->idx.value());
+  }
+  const auto k = block_index(ket->ch, bra->ch);
+  if (!k) return 0.0;
+  const std::int32_t dJ = (J_bra.twice - J_ket.twice) / 2;
+  const double herm = HermiticitySign(hermiticity_) * ((dJ % 2 == 0) ? 1 : -1);
+  return herm * phase *
+         matrix_.host_block(*k)(ket->idx.value(), bra->idx.value());
+}
+
+double TwoBody::get_unnormalized(OrbitIndex a, OrbitIndex b, OrbitIndex c,
+                                 OrbitIndex d, TwoJ J_bra, TwoJ J_ket) const {
+  const double f = std::sqrt((a == b ? 2.0 : 1.0) * (c == d ? 2.0 : 1.0));
+  return f * get_normalized(a, b, c, d, J_bra, J_ket);
+}
+
+void TwoBody::set_normalized(OrbitIndex a, OrbitIndex b, OrbitIndex c,
+                             OrbitIndex d, TwoJ J_bra, TwoJ J_ket, double v) {
+  if (!tensor_) {
+    IMSRG_CHECK(J_bra == J_ket);
+    set_normalized(a, b, c, d, J_bra, v);
+    return;
+  }
+  IMSRG_CHECK(allocated());
+  const auto& tb = channels();
+  auto bra = LocateSide(tb, a, b, J_bra);
+  auto ket = LocateSide(tb, c, d, J_ket);
+  IMSRG_CHECK(bra.has_value() && ket.has_value());
+  double stored = bra->phase * ket->phase * v;
+  if (bra->ch > ket->ch) {
+    const std::int32_t dJ = (J_bra.twice - J_ket.twice) / 2;
+    stored *= HermiticitySign(hermiticity_) * ((dJ % 2 == 0) ? 1 : -1);
+    std::swap(bra, ket);
+  }
+  const auto k = block_index(bra->ch, ket->ch);
+  IMSRG_CHECK(k.has_value());
+  const auto blk = matrix_.host_block(*k);
+  blk(bra->idx.value(), ket->idx.value()) = stored;
+  if (bra->ch == ket->ch && bra->idx != ket->idx)
+    blk(ket->idx.value(), bra->idx.value()) =
+        HermiticitySign(hermiticity_) * stored;
+}
+
 void TwoBody::set_normalized(OrbitIndex a, OrbitIndex b, OrbitIndex c,
                              OrbitIndex d, TwoJ J, double v) {
+  if (tensor_) {
+    set_normalized(a, b, c, d, J, J, v);
+    return;
+  }
   IMSRG_CHECK(allocated());
   const auto loc = Locate(channels(), a, b, c, d, J);
   IMSRG_CHECK(loc.has_value());
@@ -138,6 +251,10 @@ void TwoBody::set_normalized(OrbitIndex a, OrbitIndex b, OrbitIndex c,
 
 void TwoBody::AddNormalized(OrbitIndex a, OrbitIndex b, OrbitIndex c,
                             OrbitIndex d, TwoJ J, double v) {
+  if (tensor_) {
+    set_normalized(a, b, c, d, J, J, get_normalized(a, b, c, d, J, J) + v);
+    return;
+  }
   IMSRG_CHECK(allocated());
   const auto loc = Locate(channels(), a, b, c, d, J);
   IMSRG_CHECK(loc.has_value());
@@ -155,6 +272,31 @@ void TwoBody::AddNormalized(OrbitIndex a, OrbitIndex b, OrbitIndex c,
 
 void TwoBody::set_zero() {
   if (matrix_.total_size() > 0) matrix_.buffer().fill(0.0);
+}
+
+linalg::MatrixView<double> TwoBody::host_block(ChannelIndex ch_bra,
+                                               ChannelIndex ch_ket) {
+  const auto k = block_index(ch_bra, ch_ket);
+  IMSRG_CHECK(k.has_value());
+  return matrix_.host_block(*k);
+}
+linalg::MatrixView<const double> TwoBody::host_block(
+    ChannelIndex ch_bra, ChannelIndex ch_ket) const {
+  const auto k = block_index(ch_bra, ch_ket);
+  IMSRG_CHECK(k.has_value());
+  return std::as_const(matrix_).host_block(*k);
+}
+linalg::MatrixView<double> TwoBody::device_block(ChannelIndex ch_bra,
+                                                 ChannelIndex ch_ket) {
+  const auto k = block_index(ch_bra, ch_ket);
+  IMSRG_CHECK(k.has_value());
+  return matrix_.device_block(*k);
+}
+linalg::MatrixView<const double> TwoBody::device_block(
+    ChannelIndex ch_bra, ChannelIndex ch_ket) const {
+  const auto k = block_index(ch_bra, ch_ket);
+  IMSRG_CHECK(k.has_value());
+  return std::as_const(matrix_).device_block(*k);
 }
 
 linalg::MatrixView<double> TwoBody::host_block(ChannelIndex ch) {

@@ -59,7 +59,8 @@ template <class Config, class Visitor>
 void VisitSchema(Config& c, Visitor&& v) {
   constexpr Phase PL = Phase::kPlanned;
   // [run]
-  v.Field(KeyInfo{"run.task", "where the run stops: imsrg, hf, mp3, fci_export",
+  v.Field(KeyInfo{"run.task",
+                  "what the run does: imsrg, hf, mp3, fci_export, transform",
                   "imsrg"},
           c.run.task);
   v.Field(
@@ -371,6 +372,27 @@ void VisitSchema(Config& c, Visitor&& v) {
                   "step (0: never)",
                   "0"},
           c.checkpoint.abort_after_steps);
+  // [transform]
+  v.Field(KeyInfo{"transform.manifest",
+                  "Omega manifest (<stem>_omegas.toml) for run.task = "
+                  "transform",
+                  "\"\""},
+          c.transform.manifest);
+  v.Field(KeyInfo{"transform.work_list",
+                  "file with one operator name per line (appended to "
+                  "operators.list)",
+                  "\"\""},
+          c.transform.work_list);
+  v.Field(KeyInfo{"transform.failure_manifest",
+                  "operators that did not finish (empty: "
+                  "<output.directory>/failed.txt)",
+                  "\"\""},
+          c.transform.failure_manifest);
+  v.Field(KeyInfo{"transform.skip_existing",
+                  "skip work items whose output file already exists (resume "
+                  "an interrupted farm)",
+                  "false"},
+          c.transform.skip_existing);
 }
 
 /// All schema keys in canonical order (keys of optional tables included).

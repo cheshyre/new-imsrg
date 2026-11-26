@@ -12,6 +12,7 @@
 /// results agree element by element (tested against imsrg-devel goldens at
 /// 1e-10).
 #include <cstdint>
+#include <memory>
 #include <span>
 
 #include "imsrg/operator/no2b.h"
@@ -37,8 +38,8 @@ enum class NormalOrderDirection : std::int8_t { kToReference, kToVacuum };
 /// The result is on the same model space with the same spec.
 /// @throws InvariantError if `occupations.size()` differs from the number of
 ///         orbits.
-/// @throws NotImplementedError for non-scalar operators (by construction none
-///         exist yet).
+/// Non-scalar operators are passed to `NormalOrderTensor` with default
+/// options.
 Operator NormalOrder(const Operator& op, std::span<const double> occupations,
                      NormalOrderDirection direction);
 
@@ -49,6 +50,56 @@ Operator NormalOrder(const Operator& op);
 /// Inverse of `NormalOrder(op)`: from the reference of the model space back to
 /// the vacuum (imsrg++ `UndoNormalOrdering`).
 Operator UndoNormalOrder(const Operator& op);
+
+/// Options of the tensor normal ordering. Value type.
+struct TensorNormalOrderOptions {
+  /// Reproduce the 79e9330 fork's bug (design/reference/06 section 4.1;
+  /// fixed in imsrg-devel Operator.cc:555-558, "bug found by Antoine Belley,
+  /// May 2025"): for a == b the contributions of channel pairs with ch(a h,
+  /// J_bra) > ch(a h, J_ket) are omitted, i.e. only the stored-block
+  /// orientation of each J_bra != J_ket pair is summed on the diagonal of the
+  /// one-body part. Default false: the correct sum.
+  bool fork79e9330_diagonal_bug = false;
+};
+
+/// Normal ordering of a TENSOR operator (reduced elements, `OperatorSpec::
+/// is_reduced()`) w.r.t. the occupations n (imsrg++ `DoNormalOrdering2`,
+/// reduced branch, Operator.cc:526-560): for every connected orbit pair (a,
+/// b),
+///   O_ab += s sum_h n_h sum_{J_bra, J_ket} hat(J_bra) hat(J_ket)
+///           (-1)^(j_a + j_h - J_ket - L) {J_bra J_ket L; j_b j_a j_h}
+///           <a h; J_bra||V||b h; J_ket>
+/// (unnormalized V, all channel orientations; s = +1 ToReference, -1
+/// ToVacuum; h over the orbits with n_h >= 1e-6). No zero-body part, the
+/// two-body part is unchanged, so ToVacuum is the exact inverse. Host code,
+/// O(norb^2 holes J^2).
+/// @throws InvariantError for scalar operators or a wrong occupation count.
+Operator NormalOrderTensor(const Operator& op,
+                           std::span<const double> occupations,
+                           NormalOrderDirection direction,
+                           const TensorNormalOrderOptions& options = {});
+
+/// `NormalOrderTensor` w.r.t. the reference of the operator's model space.
+Operator NormalOrderTensor(const Operator& op,
+                           const TensorNormalOrderOptions& options = {});
+
+/// Inverse of `NormalOrderTensor(op, options)`.
+Operator UndoNormalOrderTensor(const Operator& op,
+                               const TensorNormalOrderOptions& options = {});
+
+/// Re-normal-ordering to another reference (imsrg++.cc:1500-1519, the
+/// valence-space step after the flow: `UndoNormalOrdering()` w.r.t. the
+/// ensemble reference, `SetModelSpace(ms2)`, `DoNormalOrdering()` w.r.t. the
+/// core): undoes the normal ordering w.r.t. the reference of `op`'s model
+/// space, normal orders w.r.t. the reference of `target` and returns the
+/// result on `target`, which must have the same single-particle basis.
+/// Scalars use `NormalOrder` (the zero-body part changes too), tensors
+/// `NormalOrderTensor` with `options` in both steps (the fork applied its bug
+/// in both). Zero- to two-body parts only.
+/// @throws InvariantError if the bases differ or `target` is null.
+Operator ReNormalOrder(const Operator& op,
+                       std::shared_ptr<const basis::ModelSpace> target,
+                       const TensorNormalOrderOptions& options = {});
 
 /// imsrg++ `DoNormalOrdering3` (Operator.cc:582-674) for an operator whose 0B +
 /// 1B + 2B parts are `op` and whose three-body part is the NO2B input `v3`: the

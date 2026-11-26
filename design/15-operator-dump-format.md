@@ -129,6 +129,11 @@ end
    from the closed forms only). This is a pure bra/ket "gauge" `(-1)^{J_bra} (-1)^{-J_ket}`,
    which telescopes in `[scalar, tensor]` commutators, but the new code must either reproduce the
    closed forms above or convert at the edges (question M15-Q1).
+   *Storage convention (found 2026-11-26, AL-A-Q5):* the m-scheme oracle of the rewrite reproduces
+   all emax-1 commutator goldens only if the STORED reduced elements follow plain Edmonds reduction,
+   <j'm'|T_mu|jm> = <j m L mu|j' m'> R / sqrt(2j'+1), for single particles and J-coupled pairs alike;
+   the phase above is a property of imsrg++'s closed-form operator definitions (which operator a
+   name denotes), not of the reduction convention.
 3. **Hermiticity.** All of these are flagged Hermitian and `OneBody(b,a) = (-1)^{(2j_a-2j_b)/2} OneBody(a,b)`
    (`Operator::Symmetrize`, `Operator.cc:1833-1850`; the same relation holds for the reduced 2B elements,
    `TwoBodyME::AddToTBME` swaps `ch_bra > ch_ket` with `phase(J_new_bra - J_new_ket)`, `TwoBodyME.cc:307-316`;

@@ -25,3 +25,13 @@ imsrg_add_test(NAME opslib_timing
   DEPS opslib operator
   LABELS unit
   NO_GTEST_MAIN)
+
+# NREFT one-body tables against the fork 79e9330 dumps (tests/golden/nreft), q -> 0 limits, parser.
+imsrg_add_test(NAME opslib_nreft
+  SOURCES test_nreft.cc ${_imsrg_exec_main}
+  DEPS opslib operator
+  LABELS unit
+  NO_GTEST_MAIN)
+target_compile_definitions(opslib_nreft PRIVATE
+  IMSRG_GOLDEN_DIR="${PROJECT_SOURCE_DIR}/tests/golden"
+  IMSRG_GENERATED_GOLDEN_DIR="${IMSRG_GENERATED_GOLDEN_DIR}")

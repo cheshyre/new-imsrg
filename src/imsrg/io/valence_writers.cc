@@ -170,14 +170,18 @@ struct Row2 {
 /// that survive the threshold.
 std::vector<Row1> CollectTokyoOneBody(const op::Operator& op,
                                       const ValenceNumbering& num,
-                                      double norm1b) {
+                                      double norm1b, bool fork) {
   const ModelSpace& ms = op.model_space();
   std::vector<Row1> one;
   for (const OrbitIndex a : ms.partition().valence())
     for (const OrbitIndex b : ms.partition().valence()) {
       if (a < b) continue;
       const double obme = op.one_body().get(a, b);
-      if (std::abs(obme) < 1.0e-7 * norm1b || norm1b < 1.0e-8) continue;
+      if (fork) {
+        if (std::abs(obme) < 1.0e-7) continue;
+      } else if (std::abs(obme) < 1.0e-7 * norm1b || norm1b < 1.0e-8) {
+        continue;
+      }
       one.push_back({num.file_index[static_cast<std::size_t>(a.value())],
                      num.file_index[static_cast<std::size_t>(b.value())],
                      obme});
@@ -191,11 +195,11 @@ std::vector<Row2> CollectTokyoTwoBody(const op::Operator& op,
                                       ValenceWriteMode mode,
                                       const ValenceNumbering& num,
                                       const std::vector<bool>& is_valence,
-                                      double norm2b) {
+                                      double norm2b, bool fork) {
   std::vector<Row2> two;
-  if (norm2b >= 1.0e-7) {
+  if (fork || norm2b >= 1.0e-7) {
     ForEachValenceTbme(op, mode, is_valence, [&](const TbmeRecord& r) {
-      if (std::abs(r.value) < norm2b * 1.0e-7) return;
+      if (!fork && std::abs(r.value) < norm2b * 1.0e-7) return;
       auto idx = [&](OrbitIndex o) {
         return num.file_index[static_cast<std::size_t>(o.value())];
       };
@@ -210,9 +214,11 @@ std::vector<Row2> CollectTokyoTwoBody(const op::Operator& op,
 /// file.
 void WriteTokyoModelSpace(std::ostream& out, const op::Operator& op,
                           const ValenceNumbering& num, std::int32_t Zcore,
-                          std::int32_t Ncore) {
+                          std::int32_t Ncore, bool fork) {
   const auto& basis = op.model_space().basis();
-  out << "! Zero body term: " << std::setprecision(9) << op.zero_body() << "\n";
+  out << "! Zero body term: ";
+  if (!fork) out << std::setprecision(9);
+  out << op.zero_body() << "\n";
   out << "! \n";
   out << "! model space\n";
   out << std::setw(kWint) << num.num_protons << std::setw(kWint)
@@ -300,19 +306,37 @@ void WriteTokyo(const std::filesystem::path& path, const op::Operator& op,
   const std::vector<bool> is_valence = ValenceMask(ms);
   const std::int32_t Zcore = RoundToInt(ms.partition().Z_core());
   const std::int32_t Ncore = RoundToInt(ms.partition().A_core()) - Zcore;
-  const double norm1b = op::OneBodyNorm(op);
-  const double norm2b = op::TwoBodyNorm(op);
+  const bool fork = options.tokyo_format == TokyoNumberFormat::kFork79e9330;
+  const double norm1b = fork ? 0.0 : op::OneBodyNorm(op);
+  const double norm2b = fork ? 0.0 : op::TwoBodyNorm(op);
 
-  const std::vector<Row1> one = CollectTokyoOneBody(op, num, norm1b);
+  const std::vector<Row1> one = CollectTokyoOneBody(op, num, norm1b, fork);
   const std::vector<Row2> two =
-      CollectTokyoTwoBody(op, options.mode, num, is_valence, norm2b);
+      CollectTokyoTwoBody(op, options.mode, num, is_valence, norm2b, fork);
 
   std::ofstream out = OpenForWriting(path);
   WriteProvenance(out, options);
-  WriteTokyoModelSpace(out, op, num, Zcore, Ncore);
+  WriteTokyoModelSpace(out, op, num, Zcore, Ncore, fork);
 
   out << "! interaction\n";
   out << one.size() << " " << 0 << " " << options.hbar_omega << "\n";
+  if (fork) {
+    // The fork leaves scientific/precision 6 set by its first one-body row, so
+    // the two-body count line prints hw in scientific format after any row.
+    for (const Row1& r : one)
+      out << std::setw(kWint) << r.a << std::setw(kWint) << r.b << std::setw(18)
+          << std::setiosflags(std::ios::scientific) << std::setprecision(6)
+          << r.v << "\n";
+    out << two.size() << " " << 0 << " " << options.hbar_omega << "\n";
+    for (const Row2& r : two)
+      out << std::setw(kWint) << r.a << std::setw(kWint) << r.b
+          << std::setw(kWint) << r.c << std::setw(kWint) << r.d
+          << std::setw(kWint) << r.J << std::setw(18)
+          << std::setiosflags(std::ios::scientific) << std::setprecision(6)
+          << r.v << "\n";
+    CheckWritten(out, path);
+    return;
+  }
   for (const Row1& r : one)
     out << std::setw(kWint) << r.a << std::setw(kWint) << r.b << "   "
         << std::setw(16) << std::setiosflags(std::ios::fixed)

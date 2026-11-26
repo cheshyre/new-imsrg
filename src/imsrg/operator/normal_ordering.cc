@@ -137,10 +137,8 @@ Operator NormalOrder(const Operator& op, std::span<const double> occupations,
   const std::int32_t norb = sp.num_orbits();
   IMSRG_CHECK(static_cast<std::int32_t>(occupations.size()) == norb,
               "normal_order: one occupation per orbit required");
-  if (!op.spec().is_scalar()) {
-    throw NotImplementedError(
-        "normal_order: only scalar operators are supported");
-  }
+  if (!op.spec().is_scalar())
+    return NormalOrderTensor(op, occupations, direction);
 
   const double s = direction == NormalOrderDirection::kToReference ? 1.0 : -1.0;
   Operator result = op;

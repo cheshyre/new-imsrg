@@ -122,9 +122,15 @@ Checkpoint ReadCheckpoint(const RunConfig& config,
 /// the occupations `<stem>_occ.dat` (`n l 2j 2tz occupation`, IMSRG model
 /// space) and the manifest `<stem>_omegas.toml` (format, emax, e2max, hw,
 /// hermiticity, the files in the order to apply them, the model-space hash).
+/// With `ms_normal_ordering` (the basis.emax space the operators are normal
+/// ordered in, design/50 C10) also `<stem>_occ_no.dat` (its occupations, same
+/// format) and the manifest keys `normal_ordering_emax`,
+/// `normal_ordering_occupations`: what `run.task = "transform"` needs to
+/// rebuild the operators' frame without HF.
 void WriteOmegaStack(const std::filesystem::path& dir, const std::string& stem,
                      const std::vector<op::Operator>& omegas,
-                     OperatorFileKind kind, const linalg::Matrix<double>* c);
+                     OperatorFileKind kind, const linalg::Matrix<double>* c,
+                     const basis::ModelSpace* ms_normal_ordering = nullptr);
 
 }  // namespace imsrg::driver::pipeline
 

@@ -17,10 +17,12 @@ imsrg_add_module(NAME operator
     operator_dump.cc
     normal_ordering.cc
     normal_ordering_no2b.cc
+    normal_ordering_tensor.cc
     no2b.cc
     basis_transform.cc
     truncate.cc
     random_operator.cc
+    tensor_dump.cc
     pair_third.cc
     kernels/part_kernels.cc
   DEPS basis linalg angmom exec base)

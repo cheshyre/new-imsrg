@@ -233,7 +233,13 @@ Raw labelled format `# imsrg-tensor-dump raw v0` (`*.tdump`), described with ims
 | `emax2_Ne20/HF` | open shell (0d5/2 occupation 1/3): `E2 M1 Fermi GamowTeller` |
 | `emax2_{He4,O16}/commutator` | `CommutatorScalarTensor` terms for X = HF-basis H (O16 also reuses `hf/emax2_O16_2N/HNO.dump`) or seeded random anti-Hermitian A (He4: `emax2_He4/inputs/H_HF.dump`, A = `commutator/emax2_O16/random_A.dump`), Y = E2, GamowTeller: `comm111st comm121st all` (identically zero terms are not written, see `result.json`) |
 | `emax1_He4/commutator` | all seven terms and `all` for X in {H, A} and seeded random tensors Y (`rand_J_dTz_parity_H|A_seed`; every 2B term nonzero), the four hermiticity pairs |
+| `emax1_He4/inputs` | X inputs `H_HF.dump`, `random_A.dump` (OperatorDump v1) and the Y inputs `E2.tdump`, `rand_*.tdump` of the emax-1 commutator and BCH goldens (added 2026-11-26); `emax2_He4/inputs` holds `H_HF.dump` and `random_A.dump` |
 | `emax{1,2}_He4/bch` | `BCH::BCH_Transform(Y, Omega)`, Omega = s random_A, \|Omega\| = 0.3 (Y = E2 at emax 2; E2 and two random tensors at emax 1) |
+
+**Regenerated on Frontier (2026-11-26):** the seeded random operators (`random_A`, `rand_*`) come from the C++ standard
+library's distributions, so the Frontier (libstdc++) harness gives other values than the Mac (libc++) one; every golden
+that depends on them changed, the deterministic ones agree with the Mac files to <= 1.5e-14. The tensor goldens are
+self-contained (their random inputs are stored); `commutator/emax2_O16/random_A.dump` (Mac) is no longer their X input.
 
 New refharness subcommands: `dump-tensor`, `commutator-tensor`, `bch-tensor` (`tools/reference/rh_tensor.cpp`). Rebuild the patched harness with
 `FRESH=1 tools/reference/build_imsrg_devel.sh patched-harness` when its CMake cache points at another checkout.
@@ -243,3 +249,17 @@ reference builds (`build-d35`, `harness-build-d35`, `harness-build`, ...) live i
 `$IMSRG_WORK/reference-build` (`tools/reference/ref_env.sh`), the pristine source and the SHA files in
 `$IMSRG_REFERENCE_ROOT` (`/ccs/proj/nph123/mheinz/imsrg/reference`), the inputs in `$IMSRG_WORK/inputs`.
 The stamp is the same (`ddcbf1af...+d35-patch:3b0ff5eed6806a72`); see design/20 section 5.
+
+## `nreft/` -- the owner's imsrg++ fork at 79e9330 (27Al NREFT task, added 2026-11-26)
+
+Generated ONLY by `tools/reference/gen_golden_nreft.sh` from the fork builds of
+`tools/reference/build_fork.sh` (design/50-al27-responses.md C1). Stamps: `FORK_79E9330_SRC_SHA256` =
+`d02cbb5d...+cxx14:175987a0848827f7` (79e9330 + the C++14 one-liner 25c88ede), phipfix variant
+`...+phipfix:b6a30e650cf30c16` (Phip not anti-Hermitian, Phitp Hermitian). Total < 1 MB.
+
+| File / directory | Content |
+|---|---|
+| `bare_emax2.txt` | `forkharness nreft-bare 2 16 all`: one-body tables (HO basis, hw 16) of FM/FPhipp L=0,2,4, FSigmap/FSigmapp/FDelta L=1,3,5 (p, n) and the raw blocks M, Phipp, Phip, Phitp, Sigma, Sigmap, Sigmapp, Delta, Deltap (J=0..5), Ms(J,L), Mg(J,L) (p), q = 0, 15, 150, 600, 1050 MeV. q = 0 entries with L = 0 derivative integrals are NaN in the fork (y^(-1/2)); tests skip non-finite values |
+| `bare_emax4_shorthands.txt` | the shorthands only, emax 4 |
+| `flow/fork-79e9330/{nat_emax2,nat_emax4_imsrg3}` | the fork's `imsrg++`: Al27 / sd-shell, NAT with `use_HF_reference_in_NAT`, NSmagnus, test interaction (2N + 3N of AGENTS.md), emax 2 and emax 4 with emax_imsrg 3; `.snt` of H, TCM and NREFT operators at q = 150 MeV (79e9330 writers), stdout (HF/NAT/flow numbers, `<op>_HF`/`<op>_IMSRG`), occupations, `intC.mat` (C_HO2NAT, armadillo binary; with the bare tables, C^T O C and the 27Al occupations reproduce the printed `<op>_HF` to all 16 digits), `cmd.txt`. Reruns differ at 1e-15 in the 16-digit files (OpenMP reduction order), not in the `.snt` |
+| `flow/fork-79e9330-phipfix/...` | the same runs with the phipfix build: `intDMNREFT_Phitpp_150_2_2b.snt` (raw tilde-Phi'_2, protons) and stdout |

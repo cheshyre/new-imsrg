@@ -74,6 +74,11 @@ op::OperatorSpec CommutatorSpec(const op::OperatorSpec& x,
 ///         space (`Workspace::three_body_context()` null).
 /// Complexity: IMSRG(2): dominated by the 2B terms, O(sum over channels of
 /// N^3) GEMMs; IMSRG(3): see the terms in imsrg3.h.
+/// Tensor operands (M15): [scalar, tensor] is `TensorCommutator` and [tensor,
+/// scalar] = -[scalar, tensor], with the scalar-tensor terms selected by the
+/// corresponding scalar terms of `opts.terms` (111, 121, 122, 221, 222 pp/hh,
+/// 222 ph; the zero-body terms do not exist for tensors) and the 9j threshold
+/// `opts.tensor_ninej_threshold`; every rank computes the full result.
 void Commutator(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
                 const CommutatorOptions& opts, Workspace& ws);
 

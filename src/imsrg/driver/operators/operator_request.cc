@@ -42,6 +42,8 @@ constexpr OpParamSpec kOrbit2[] = {
     {"orbit2", OpParamType::kOrbit, false, "ket orbit, e.g. p0s1"}};
 constexpr OpParamSpec kR[] = {
     {"r", OpParamType::kNumber, true, "radius in fm"}};
+constexpr OpParamSpec kQ[] = {
+    {"q", OpParamType::kNumber, true, "momentum transfer q in MeV"}};
 constexpr OpParamSpec kRmax[] = {
     {"rmax", OpParamType::kNumber, true, "sphere radius in fm"}};
 
@@ -145,6 +147,56 @@ void AddP1Rows(std::vector<OperatorCatalogEntry>& v) {
   v.push_back(P1("Iso2", none, K::kIso2, 2, "total isospin squared T^2"));
   v.push_back(P1("Tz2", none, K::kTz2, 2, "isospin projection squared Tz^2"));
   v.push_back(P1("LdotS", none, K::kLdotS, 1, "one-body l.s"));
+  // Scalar (L = 0) dark-matter NREFT shorthands, FM0{p,n}_<q> and
+  // FPhipp0{p,n}_<q>; the higher L are tensor rows (AddNreftPlannedRows).
+  v.push_back(P1("FM0p", Params(kQ), K::kNreft, 1,
+                 "NREFT charge M_0 (protons), sqrt(4 pi) M_0(q); fork "
+                 "79e9330 shorthand"));
+  v.push_back(P1("FM0n", Params(kQ), K::kNreft, 1,
+                 "NREFT charge M_0 (neutrons), sqrt(4 pi) M_0(q); fork "
+                 "79e9330 shorthand"));
+  v.push_back(P1("FPhipp0p", Params(kQ), K::kNreft, 1,
+                 "NREFT Phi''_0 (protons); fork 79e9330 shorthand"));
+  v.push_back(P1("FPhipp0n", Params(kQ), K::kNreft, 1,
+                 "NREFT Phi''_0 (neutrons); fork 79e9330 shorthand"));
+}
+
+/// The rank L > 0 NREFT shorthands (tensor operators, M15), shape {L, 0, 0, 1}:
+/// even J has normal and odd J abnormal parity, and both operators are
+/// parity-even. The names live in a leaked vector (static storage), so the
+/// catalog's string_views stay valid.
+void AddNreftPlannedRows(std::vector<OperatorCatalogEntry>& v) {
+  struct Family {
+    const char* prefix;
+    std::vector<int> ranks;
+  };
+  const std::vector<Family> families = {
+      {"FM", {2, 4}},          {"FPhipp", {2, 4}},    {"FSigmap", {1, 3, 5}},
+      {"FSigmapp", {1, 3, 5}}, {"FDelta", {1, 3, 5}}, {"FPhitp", {2, 4}}};
+  static const auto* const kNames = new std::vector<std::string>([&] {
+    std::vector<std::string> names;
+    for (const auto& f : families) {
+      for (const int L : f.ranks) {
+        for (const char* t : {"p", "n"}) {
+          names.push_back(std::string(f.prefix) + std::to_string(L) + t);
+        }
+      }
+    }
+    return names;
+  }());
+  std::size_t i = 0;
+  for (const auto& f : families) {
+    for (const int L : f.ranks) {
+      for (int t = 0; t < 2; ++t) {
+        OperatorCatalogEntry e =
+            P1((*kNames)[i++], Params(kQ), OperatorKind::kNreft, 1,
+               "NREFT rank-L tensor shorthand <name>_<q> (reduced elements); "
+               "fork 79e9330");
+        e.shape = OperatorShape{L, 0, 0, 1};
+        v.push_back(e);
+      }
+    }
+  }
 }
 
 void AddPlannedRows(std::vector<OperatorCatalogEntry>& v) {
@@ -240,6 +292,7 @@ void AddPlannedRows(std::vector<OperatorCatalogEntry>& v) {
      "DGT with surface localization, DGTRLocal_<r12>");
   pl("DMNREFT", {0, 0, 0, 1},
      "dark-matter NR-EFT operator, DMNREFT_<Op><IsoSV>_<q>_<J>");
+  AddNreftPlannedRows(v);
 }
 
 void AddNotSupportedRows(std::vector<OperatorCatalogEntry>& v) {

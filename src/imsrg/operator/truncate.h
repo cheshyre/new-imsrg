@@ -23,10 +23,11 @@ namespace imsrg::op {
 /// are cut as they are (imsrg++ does the same); the reference of `target` is
 /// only attached. Spec and hermiticity are copied.
 /// Preconditions: `target` uses the same hw and every orbit of `target` exists
-/// in `O`'s basis (InputError otherwise); particle rank <= 2 and, for a
-/// two-body part, a scalar operator (NotImplementedError otherwise: tensor
-/// storage and 3B truncation come later). Host loops; O(norb_t^2 + number of
-/// two-body elements of `target`).
+/// in `O`'s basis (InputError otherwise); particle rank <= 2
+/// (NotImplementedError otherwise). Tensor operators: each stored block
+/// (ch_bra <= ch_ket) of the target gets the reduced normalized elements of
+/// the source (`TwoBody::get_normalized(.., J_bra, J_ket)`). Host loops;
+/// O(norb_t^2 + number of two-body elements of `target`).
 Operator Truncate(const Operator& O,
                   std::shared_ptr<const basis::ModelSpace> target);
 

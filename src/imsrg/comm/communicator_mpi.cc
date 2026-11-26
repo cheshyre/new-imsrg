@@ -286,4 +286,55 @@ Communicator Communicator::Duplicate() const {
   return Communicator(Wrap(dup, true));
 }
 
+Communicator Communicator::SplitShared() const {
+  if (impl_->serial) return *this;
+  MPI_Comm sub = MPI_COMM_NULL;
+  CheckMpi(MPI_Comm_split_type(impl_->comm, MPI_COMM_TYPE_SHARED, impl_->rank,
+                               MPI_INFO_NULL, &sub),
+           "MPI_Comm_split_type");
+  return Communicator(Wrap(sub, true));
+}
+
+struct SharedMemory::Window {
+  std::unique_ptr<std::byte[]> heap;  // serial communicator only
+  MPI_Win win = MPI_WIN_NULL;
+
+  Window() = default;
+  Window(const Window&) = delete;
+  Window& operator=(const Window&) = delete;
+  ~Window() {
+    if (win == MPI_WIN_NULL) return;
+    int finalized = 0;
+    MPI_Finalized(&finalized);
+    if (finalized == 0) MPI_Win_free(&win);
+  }
+};
+
+SharedMemory Communicator::AllocateShared(std::size_t bytes) const {
+  SharedMemory m;
+  m.window_ = std::make_shared<SharedMemory::Window>();
+  m.size_ = bytes;
+  if (impl_->serial) {
+    m.window_->heap =
+        std::make_unique<std::byte[]>(std::max<std::size_t>(1, bytes));
+    m.data_ = m.window_->heap.get();
+    return m;
+  }
+  // All memory on rank 0 (at least one byte, so the query returns a valid
+  // address), none on the others.
+  const auto mine = static_cast<MPI_Aint>(
+      impl_->rank == 0 ? std::max<std::size_t>(1, bytes) : 0);
+  void* base = nullptr;
+  CheckMpi(MPI_Win_allocate_shared(mine, 1, MPI_INFO_NULL, impl_->comm, &base,
+                                   &m.window_->win),
+           "MPI_Win_allocate_shared");
+  MPI_Aint size0 = 0;
+  int disp = 0;
+  void* p0 = nullptr;
+  CheckMpi(MPI_Win_shared_query(m.window_->win, 0, &size0, &disp, &p0),
+           "MPI_Win_shared_query");
+  m.data_ = static_cast<std::byte*>(p0);
+  return m;
+}
+
 }  // namespace imsrg::comm

@@ -1352,3 +1352,111 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
   bit exact except for entries with exactly one identical-orbit pair (x*sqrt2 then /sqrt2, within
   2 ulp); native files are the exact format. (c) A `.bin` header without a tag is accepted. The
   `asan` preset was not run (Mac-only preset). **Assumed:** fine; fix the formula in the doc.
+### Lead A (M15 tensor operators, capability C3)
+
+* **AL-A-Q1** (2026-11-26) - Seeded random operators depend on the C++ standard library. The Frontier
+  harness (libstdc++) gives other `random_A` / `rand_*` values than the Mac (libc++), so every tensor
+  golden built from them changed when `gen_golden_tensor.sh` was rerun on Frontier (deterministic ones
+  agree to <= 1.5e-14). **Assumed:** the tensor goldens were regenerated on Frontier and made
+  self-contained (their random inputs are stored); the scalar `commutator/emax2_O16/random_A.dump`
+  (Mac) stays as it is. Other golden scripts that build random operators will show the same effect
+  when rerun on Frontier.
+* **AL-A-Q2** (2026-11-26) - Memory of the tensor particle-hole term. The rewrite keeps Zbar for all
+  cross-coupled channel pairs over ALL ordered pairs (rows and columns), about 4x imsrg++'s Zbar
+  (which uses c3 <= c4 and unordered rows with phase bookkeeping). Fine up to emax 6; estimated
+  ~10-20 GB at emax 10 with rank 5. The 9j table (one dense box per (A, B, D, E)) is 35 MB at emax 6
+  and ~1.1 GB at emax 10, built serially with Wigner9j (minutes at emax 10). **Assumed:** acceptable
+  for the first milestone; before the farm (C10/C11): use the Zbar symmetries (c3 <= c4, unordered
+  rows), tile the channel pairs, and cache/parallelize the 9j table (or evaluate 9j from 6j tables on
+  the device).
+* **AL-A-Q3** (2026-11-26) - imsrg-devel's fix of the tensor normal ordering (`ME *= 2` for a == b,
+  J_bra != J_ket, Operator.cc:555-558) is right only for Hermitian tensors; for an anti-Hermitian
+  tensor the two orientations cancel (and devel's mirror `O(b,a) = herm * O(a,b)` flips the diagonal
+  sign on every update). **Assumed:** the rewrite sums both orientations explicitly (correct for both
+  hermiticities); the fork's bug is the option `TensorNormalOrderOptions::fork79e9330_diagonal_bug`.
+  All 27Al operators are Hermitian, so this only matters for anti-Hermitian tensors.
+* **AL-A-Q4** (2026-11-26) - `[scalar, tensor]` with a one-body Y: imsrg++ gives Z Y's particle rank,
+  the rewrite gives Z max(rank X, rank Y) (so comm122st is kept for a one-body Y). BCH promotes Y to
+  rank 2 first in both codes, so transformed operators agree. **Assumed:** keep the rewrite's rule.
+* **AL-A-Q5** (2026-11-26) - Storage convention of reduced elements (follow-up to M15-Q1). The m-scheme
+  oracle (`commutator_ref::mscheme::ExpandTensor`) reproduces every emax-1 tensor golden (all terms, four
+  hermiticity pairs, 1.7e-15) only with PLAIN Edmonds reduction, <j'm'|T_mu|jm> = <j m L mu|j' m'> R /
+  sqrt(2j'+1), for one-body elements and J-coupled pairs alike; extra phases (-1)^(j_bra-j_ket),
+  (-1)^(J_bra-J_ket) or (-1)^L deviate by O(1). So imsrg++'s storage IS Edmonds; the "gauge" of
+  design/15 is a property of the closed forms of its operator builders (E2, GT), i.e. of which physical
+  operator a name denotes. **Assumed:** the rewrite stores what imsrg++ stores (owner answer to M15-Q1
+  holds unchanged); the NREFT builders (lead B) must reproduce the fork's closed forms, and an Edmonds
+  converter at the edges is then the identity on storage. Worth a line in design/15.
+* **AL-A-Q6** (2026-11-26, reviewer finding) - imsrg++'s tensor one-body norm uses the integer
+  degeneracy `(2j_p+1) * ((min(2j_q, 2j_p + L) - max(-2j_q, 2j_p - L)) / 2 + 1)`, which mixes 2j with
+  the undoubled rank and can be NEGATIVE (2j_p = 21, 2j_q = 11, L = 5 gives -22; first possible at
+  emax 10 with rank 5, i.e. in the 27Al Sigma'/Sigma''/Delta J=5 operators). A negative weighted sum
+  makes the norm NaN, and imsrg++'s BCH then never meets `||nested|| < epsilon` and runs to 40 nested
+  commutators, while the rewrite's BCH stops at the first non-finite norm. **Assumed:** the rewrite
+  keeps imsrg++'s formula (it drives the BCH thresholds the archive was produced with); whether the
+  fork runs hit the NaN case is to be checked when the J=5 operators are reproduced (C8). A
+  physically sensible norm ((2j_p+1) per element, or (2j_p+1)(2j_q+1)/(2L+1)) can be a named option.
+### Lead B (NREFT library, C1/C2)
+
+* **AL-B1** (lead B, FPhitp normalization) - `FPhitp<L><p|n>_<q>` (L = 2, 4) uses sqrt(4 pi) x
+  `Phitp(L, q)`, Hermitian, like FPhipp (reference/06 section 2.4; orchestrator's notes
+  `$IMSRG_WORK/inputs/al27/analysis/phitp-normalization-notes.md`). The constant lives only in
+  `opslib::nreft::PhitpShorthandPrefactor()`. **Assumed meanwhile:** sqrt(4 pi); owner to confirm.
+  **Answer (owner, 2026-11-26, via the orchestrator):** "The prefactor is good for now." (design/50 section 4).
+* **AL-B2** (lead B, NREFT table tolerance) - the fork's one-body tables are reproduced element by
+  element to 1e-12 relative, except near-zero elements: tables that vanish analytically (Delta'_J at
+  emax 2) or elements that are 1e-12 of the table at q = 1050 MeV carry only the rounding noise of
+  the alternating radial sums, in the fork as here (the fork's own FM0p_15 <0||10> and <10||0> differ
+  by 6e-14 relative). **Assumed meanwhile:** pass if |d| <= 1e-12 |ref| or |d| <= 1e-14 S_q, S_q =
+  the largest element of all fork tables at that q (the Wigner-symbol rule of design/30 section 2;
+  observed max |d|/S_q = 7.8e-15). Alternative: per-element error estimates from the magnitude of the
+  summed terms.
+  Update (later the same night): at emax 14 the fork itself is not exact (design/30 section 6,
+  row AL-B-1: up to 8.5e-7 relative, 1.5e-9 S_q). The port now sums in double-double and is
+  checked against a 50-digit mpmath reference (1e-12 rule, max 5.5e-13); the emax-14 fork
+  comparison only bounds the fork's error (1e-8 S_q).
+* **AL-B3** (lead B, fork NaNs at q = 0) - in the fork, `jdmho`/`jdpho` with multipole L = 0 contain
+  y^(-1/2) and give inf/NaN at q = 0; this reaches Phi'_1, Phi''_1, tilde-Phi'_1, Delta'_1 and
+  Mg(J, 0) at q = 0 (none of the archived shorthands; FPhitp2/4 are finite). The port reproduces the
+  fork (NaN), and the golden test skips non-finite fork values. **Assumed meanwhile:** keep NaN (only
+  reachable through raw blocks, not through any catalog name). Alternative: the analytic q -> 0 limit.
+* **AL-B4** (lead B, rank L > 0 NREFT operators) - the tensor storage of lead A
+  (`feature/m15-tensor-operators`) is not on develop yet; the L > 0 shorthands are planned catalog rows
+  and their tables are plain `OneBodyTable`s. **Assumed meanwhile:** wire them as tensor operators
+  (reduced one-body part, imsrg++ gauge) on a separate branch on top of A's branch, merged after it.
+* **AL-F1** (lead F ops, odd-rank NREFT tensors vs the fork goldens) - Against `tests/golden/nreft/flow/
+  fork-79e9330/{nat_emax2,nat_emax4_imsrg3}` (driver_al27_fork_golden) H, TCM, the scalar and the EVEN-rank
+  tensors (FM2p, FPhipp2n) agree to 1e-10 (printed precision), including the fork's tensor normal-ordering
+  bug (needed: without it 1e-2 off). The ODD-rank tensors (FSigmap1p/3n, FSigmapp1n, FDelta1p) deviate by up
+  to 1.6e-4 (emax 2) / 5.7e-4 (emax 4) in the final `.snt`, growing with the flow time; the first Magnus step
+  (only Omega x one-body Y) is exact, so the cause is in terms with a two-body Y. Source comparison fork
+  Commutator.cc vs devel TensorCommutators.cc: the fork's `comm222_phst` lacks (-1)^L at (a) the flipped
+  ket orientation of Ybar (`flipphaseY` in PhaseMatYJ1J2, fork 12696 vs devel phase(Jbra+Jket+Lambda)) and
+  (b) the reads of Zbar through swapped pairs (fork 12399, 12404 vs devel phase(Lambda+...)). Both are
+  emulated (compat `tensor_fork_ph_missing_rank_phase`, odd L only); this reduced the deviation 189 -> 25
+  rows at s = 0.1 and 3.6e-4 -> 5.6e-5 at the end, but not to zero. comm121st (fork form checked
+  numerically), comm122st, comm222_pp_hh_221st and the normal ordering were compared and are equivalent.
+  **Resolved (alf1, 2026-11-26):** the remaining cause was the fork's doubled Zbar columns: it stores
+  each cross-coupled ket pair twice (k <= j, and flipped k >= j with the Ybar part missing (-1)^L), and
+  the inverse transform reads the flipped half also for a DIAGONAL pair (`k>j?0:nkets` with k == j,
+  Commutator.cc:12399/12404/12472/12477), so for odd L the Xbar*Ybar part of those elements flips sign.
+  The emulation negated only k > j columns; comm222_phst now also keeps Xbar*YA in fork mode and reads
+  such elements as Zbar - 2 Xbar*YA. Per-term fork goldens (`tests/golden/tensor/fork-79e9330`,
+  `tools/reference/gen_golden_tensor_fork.sh`, forkharness commutator-tensor) agree to 1e-13 for ranks
+  1, 3 (both parities) and 2; driver_al27_fork_golden passes with the strict tolerance (odd-rank max dev
+  1.6e-4/5.7e-4 -> <= 1e-10, the printed precision). A fork bug, emulated only under the compat option
+  (design/30 section 6, row AL-F1); the default path stays imsrg-devel's (which our default matches for
+  ranks 1 and 2, commutator_tensor_golden).
+* **AL-F2** (lead F, C10 file names) - The transform farm writes the fork's names `<stem><name>.snt` /
+  `<stem><name>_2b.snt` (with `output.stem = "int"` exactly the archive's), the in-process driver keeps
+  `<stem>_<name>.snt` / `<stem>_<name>_2b.snt`. **Assumed:** keep both (no change for existing runs);
+  say if the in-process names should follow the fork under `run.compat`.
+* **AL-F3** (lead F, C10 cost model) - The static assignment weighs an item by num_omegas x the
+  block-gemm work of one [Omega, O] for its rank L (design/50 §6.1), assuming the same number of BCH
+  terms for every operator of a stack. Not yet timed at emax 10 (one item per rank makes it irrelevant
+  for the planned 2415-rank jobs; it matters only with fewer ranks than items). **Assumed:** fine until a
+  timing of one item at emax 10 exists; refit then.
+* **AL-F4** (lead F, C10 farm resubmission) - A killed farm job leaves `failed.txt` listing every item
+  (written first, rewritten at the end), and outputs are renamed into place; resubmission uses either
+  the failure manifest as the work list or the same list with `transform.skip_existing = true`.
+  **Assumed:** enough; a per-item progress log is not written.

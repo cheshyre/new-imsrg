@@ -101,6 +101,11 @@ TEST(OperatorRequest, EveryP1RowParsesAndRoundTrips) {
       {"Iso2", OperatorKind::kIso2, {}, "Iso2"},
       {"Tz2", OperatorKind::kTz2, {}, "Tz2"},
       {"LdotS", OperatorKind::kLdotS, {}, "LdotS"},
+      {"FM0p_150", OperatorKind::kNreft, {150.0}, "FM0p_150"},
+      {"FM0p_150.0", OperatorKind::kNreft, {150.0}, "FM0p_150"},
+      {"FM0n_0", OperatorKind::kNreft, {0.0}, "FM0n_0"},
+      {"FPhipp0p_15.5", OperatorKind::kNreft, {15.5}, "FPhipp0p_15.5"},
+      {"FPhipp0n_100", OperatorKind::kNreft, {100.0}, "FPhipp0n_100"},
   };
   for (const auto& c : cases) {
     SCOPED_TRACE(c.spec);
@@ -175,6 +180,26 @@ TEST(OperatorRequest, InlineTableErrors) {
   EXPECT_EQ(code_of({{"name", Str("OneOcc")}, {"orbit", Str("p9s1")}}),
             "E-OP-ORBIT");
   EXPECT_EQ(code_of({{"name", Str("Rp2Z")}, {"z", Num(8.5)}}), "E-OP-PARAMS");
+}
+
+TEST(OperatorRequest, NreftShorthands) {
+  const RawValue specs[] = {
+      Table({{"name", Str("FPhipp0n")}, {"q", Num(15.5)}})};
+  auto r = ParseOperatorList(specs, kInfo, "operators.list");
+  ASSERT_TRUE(r.has_value());
+  ASSERT_EQ(r.value().size(), 1u);
+  EXPECT_EQ(r.value()[0].kind, OperatorKind::kNreft);
+  EXPECT_EQ(r.value()[0].params, (std::vector<OpParam>{15.5}));
+  // Rank L > 0 shorthands are tensor operators (M15): valid, with the rank in
+  // the shape.
+  for (const char* name : {"FSigmap1p_150", "FPhitp2n_0", "FM2p_150"}) {
+    const auto rr = ParseOperatorSpec(name, kInfo);
+    ASSERT_TRUE(rr.has_value()) << name;
+    EXPECT_EQ(rr.value().front().kind, OperatorKind::kNreft);
+  }
+  EXPECT_EQ(ErrorsOf("FM1p_10")[0].code, "E-OP-UNKNOWN");
+  EXPECT_EQ(ErrorsOf("FM0p")[0].code, "E-OP-PARAMS");
+  EXPECT_EQ(ErrorsOf("FM0p_-1")[0].code, "E-OP-PARAMS");
 }
 
 TEST(OperatorRequest, WrongArityAndType) {
