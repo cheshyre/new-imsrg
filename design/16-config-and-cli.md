@@ -163,6 +163,15 @@ Generator enum: `white`, `atan`, `imaginary_time`, `wegner`, `qtransfer_atan`, `
 | `e3max` | opt int | `min(basis.e3max, 3*imsrg.space.emax)` | |
 | `emax_3body` | opt int | `imsrg.space.emax` | emax for 3-body operators in the IMSRG part. |
 
+Implemented for IMSRG(2) (design/50 C5, 2026-11-26; imsrg++.cc:887-929, reference/06 §1.5): after HF/NAT
+and normal ordering in the `basis.emax` space, H is cut to the IMSRG space with `op::Truncate`
+(zero body copied, 1B/2B submatrices, orbits matched by (n, l, 2j, 2tz), no re-normal-ordering; EMP2 is
+logged again); the IMSRG model space keeps the reference occupations orbit by orbit (fractional ones
+included; an error if occupied orbits would be dropped). Operators are normal ordered in the full space
+and cut the same way (`pipeline::PrepareOperator`). Restrictions (`E-PLANNED`): `e2max < 2*emax` (the
+two-body channels have no e2max cut yet), IMSRG(3) and perturbative triples together with
+`[imsrg.space]`; `e3max` and `emax_3body` are resolved but unused for IMSRG(2).
+
 ### 2.8 `[imsrg3]`
 
 Whole table absent or all-default = IMSRG(2). Non-default keys without `in_flow` or `at_end` are errors in TOML (except `factorized`, which works with IMSRG(2) storage).

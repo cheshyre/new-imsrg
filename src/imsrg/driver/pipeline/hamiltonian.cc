@@ -13,6 +13,7 @@
 #include <string>
 #include <utility>
 #include <variant>
+#include <vector>
 
 #include "imsrg/base/assert.h"
 #include "imsrg/base/error.h"
@@ -28,6 +29,7 @@
 #include "imsrg/operator/basis_transform.h"
 #include "imsrg/operator/no2b.h"
 #include "imsrg/operator/normal_ordering.h"
+#include "imsrg/operator/truncate.h"
 #include "imsrg/opslib/center_of_mass.h"
 #include "imsrg/opslib/kinetic.h"
 #include "imsrg/opslib/radius.h"
@@ -94,6 +96,48 @@ void ToNaturalOrbitalBasis(const op::Operator& H, const op::No2bThreeBody* v3,
             out.hf->e_hf);
   out.nat = std::move(r);
   out.nat_occupations = nat.occupations;
+}
+
+std::shared_ptr<const basis::ModelSpace> MakeModelSpace(
+    const RunConfig& config);
+
+/// `[imsrg.space]` (design/50 C5, imsrg++.cc:887-929): the IMSRG model space
+/// with emax = imsrg.space.emax, the partition of the configuration's
+/// reference and valence space, and the occupations of `from` copied orbit by
+/// orbit (quantum numbers), so HF re-filling and fractional occupations
+/// survive. e2max must be 2 emax (the two-body channels have no e2max cut
+/// yet).
+std::shared_ptr<const basis::ModelSpace> MakeImsrgModelSpace(
+    const RunConfig& config, const basis::ModelSpace& from) {
+  const ImsrgSpaceConfig& sp = *config.imsrg.space;
+  if (sp.e2max != 2 * sp.emax) {
+    Planned("imsrg.space.e2max < 2*imsrg.space.emax");
+  }
+  RunConfig c = config;
+  c.basis.emax = sp.emax;
+  const auto naive = MakeModelSpace(c);
+  const auto& basis = naive->basis();
+  std::vector<double> occ(static_cast<std::size_t>(basis.num_orbits()));
+  for (std::int32_t a = 0; a < basis.num_orbits(); ++a) {
+    occ[static_cast<std::size_t>(a)] = from.reference().occupation(
+        from.basis().index_of(basis.orbit(OrbitIndex(a))));
+  }
+  // Holes outside the IMSRG space would be lost silently.
+  double n_from = 0.0, n_to = 0.0;
+  for (std::int32_t a = 0; a < from.num_orbits(); ++a) {
+    n_from += (from.basis().orbit(OrbitIndex(a)).j2.twice + 1) *
+              from.reference().occupation(OrbitIndex(a));
+  }
+  for (std::int32_t a = 0; a < basis.num_orbits(); ++a) {
+    n_to += (basis.orbit(OrbitIndex(a)).j2.twice + 1) *
+            occ[static_cast<std::size_t>(a)];
+  }
+  if (std::abs(n_from - n_to) > 1.0e-8) {
+    throw ConfigError("imsrg.space.emax = " + std::to_string(sp.emax) +
+                      " drops occupied orbits of the reference");
+  }
+  return naive->WithReference(basis::Reference::FromOccupations(
+      basis, std::move(occ), from.reference().name()));
 }
 
 /// Builds the oscillator model space of the configuration.
@@ -267,6 +311,16 @@ PreparedHamiltonian PrepareHamiltonian(const RunConfig& config) {
     log::Info("EMP2 = {:.8f} MeV", out.e_mp2);
   }
   if (lawson) out.hno -= 1.5 * beta * config.hamiltonian.beta_cm_hw;
+  if (config.imsrg.space) {
+    // Cut the normal-ordered pieces (no re-normal-ordering, imsrg++.cc:927).
+    out.ms_normal_ordering = out.hno.model_space_ptr();
+    out.hno = op::Truncate(out.hno,
+                           MakeImsrgModelSpace(config, out.hno.model_space()));
+    op::Operator h = out.hno;
+    log::Info("IMSRG space: emax = {} ({} orbits), EMP2 = {:.8f} MeV",
+              config.imsrg.space->emax, out.hno.model_space().num_orbits(),
+              mbpt::Mp2Energy(h));
+  }
   return out;
 }
 
@@ -279,9 +333,14 @@ op::Operator PrepareOperator(const OperatorRequest& request,
   } else if (ph.hf) {
     o = hf::ToHfBasis(o, *ph.hf);
   }
-  const auto hno_ms = ph.hno.model_space_ptr();
-  if (hno_ms != o.model_space_ptr()) o = op::WithModelSpace(o, hno_ms);
-  return op::NormalOrder(o);
+  const auto no_ms = ph.ms_normal_ordering ? ph.ms_normal_ordering
+                                           : ph.hno.model_space_ptr();
+  if (no_ms != o.model_space_ptr()) o = op::WithModelSpace(o, no_ms);
+  o = op::NormalOrder(o);
+  // [imsrg.space]: normal ordered in the full space, then cut (imsrg++.cc:
+  // 1427-1475).
+  if (ph.ms_normal_ordering) o = op::Truncate(o, ph.hno.model_space_ptr());
+  return o;
 }
 
 }  // namespace imsrg::driver::pipeline

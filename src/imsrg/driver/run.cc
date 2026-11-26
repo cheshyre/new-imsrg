@@ -70,7 +70,9 @@ void RejectPlanned(const RunConfig& c) {
   }
   if (c.imsrg.use_brueckner_bch) Planned("imsrg.use_brueckner_bch");
   if (c.imsrg.goose_tank) Planned("imsrg.goose_tank");
-  if (c.imsrg.space) Planned("[imsrg.space] (IMSRG model-space truncation)");
+  if (c.imsrg.space && (c.imsrg3.active() || c.imsrg.perturbative_triples)) {
+    Planned("[imsrg.space] with IMSRG(3) or perturbative triples");
+  }
   if (c.imsrg3.at_end) Planned("imsrg3.at_end");
   if (c.imsrg3.in_flow) {
     if (c.imsrg3.variant != Imsrg3Variant::kN7) {
