@@ -376,4 +376,23 @@ op::Operator BuildScalarShorthand(
   return o;
 }
 
+op::Operator BuildShorthandOperator(
+    const std::shared_ptr<const basis::ModelSpace>& ms, const Shorthand& s) {
+  if (s.L == 0) return BuildScalarShorthand(ms, s);
+  const OneBodyTable t = BuildShorthandTable(ms->basis(), s);
+  op::OperatorSpec spec = op::OperatorSpec::Scalar(2, Hermiticity::kHermitian);
+  spec.rank_J = s.L;
+  spec.parity = Parity::kEven;
+  spec.delta_Tz = 0;
+  op::Operator o(ms, spec);
+  for (std::int32_t a = 0; a < t.num_orbits; ++a) {
+    for (std::int32_t b = 0; b < t.num_orbits; ++b) {
+      const double v = t.value(OrbitIndex{a}, OrbitIndex{b});
+      if (v != 0.0) o.one_body().set_element(OrbitIndex{a}, OrbitIndex{b}, v);
+    }
+  }
+  o.SyncToDevice();
+  return o;
+}
+
 }  // namespace imsrg::opslib::nreft

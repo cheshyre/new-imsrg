@@ -156,6 +156,18 @@ OneBodyTable BuildShorthandTable(const basis::SingleParticleBasis& basis,
 op::Operator BuildScalarShorthand(
     const std::shared_ptr<const basis::ModelSpace>& ms, const Shorthand& s);
 
+/// The shorthand as an operator of any rank: `BuildScalarShorthand` for L = 0;
+/// for L > 0 a Hermitian, particle-rank-2, parity-even, delta_Tz 0 tensor
+/// operator of rank_J = L with reduced one-body elements <a||O||b> in
+/// imsrg++'s gauge (design/10 section 3.3) and a zero two-body part. Every
+/// element (a, b) of `BuildShorthandTable` is written directly (both
+/// triangles); the table's triangles already satisfy the tensor Hermiticity
+/// O(b,a) = (-1)^(j_a - j_b) O(a,b) (the fork's tables do, to rounding).
+/// Even-J normal-parity and odd-J abnormal-parity shorthands are both parity
+/// even. Complexity O(num_orbits^2) table entries.
+op::Operator BuildShorthandOperator(
+    const std::shared_ptr<const basis::ModelSpace>& ms, const Shorthand& s);
+
 }  // namespace imsrg::opslib::nreft
 
 #endif  // IMSRG_OPSLIB_NREFT_H_
