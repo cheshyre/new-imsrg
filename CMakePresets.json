@@ -126,7 +126,8 @@
         "IMSRG_GENERATED_GOLDEN_DIR": "$env{IMSRG_WORK}/golden-generated",
         "MPIEXEC_EXECUTABLE": "/usr/bin/srun",
         "MPIEXEC_NUMPROC_FLAG": "-n",
-        "IMSRG_MPIEXEC_PREFLAGS": "--overlap --cpu-bind=none -c 4"
+        "IMSRG_MPIEXEC_PREFLAGS": "--overlap --cpu-bind=none -c 4",
+        "MPI_CXX_LIB_NAMES": "mpi_gnu"
       }
     },
     {
@@ -144,7 +145,8 @@
         "IMSRG_GENERATED_GOLDEN_DIR": "$env{IMSRG_WORK}/golden-generated",
         "MPIEXEC_EXECUTABLE": "/usr/bin/srun",
         "MPIEXEC_NUMPROC_FLAG": "-n",
-        "IMSRG_MPIEXEC_PREFLAGS": "--overlap --cpu-bind=none -c 4"
+        "IMSRG_MPIEXEC_PREFLAGS": "--overlap --cpu-bind=none -c 4",
+        "MPI_CXX_LIB_NAMES": "mpi_gnu"
       }
     },
     {
@@ -163,13 +165,14 @@
         "IMSRG_GENERATED_GOLDEN_DIR": "$env{IMSRG_WORK}/golden-generated",
         "MPIEXEC_EXECUTABLE": "/usr/bin/srun",
         "MPIEXEC_NUMPROC_FLAG": "-n",
-        "IMSRG_MPIEXEC_PREFLAGS": "--overlap --cpu-bind=none -c 4"
+        "IMSRG_MPIEXEC_PREFLAGS": "--overlap --cpu-bind=none -c 4",
+        "MPI_CXX_LIB_NAMES": "mpi_gnu"
       }
     },
     {
       "name": "frontier-hip",
       "displayName": "Frontier GPU (Kokkos HIP gfx90a, Release)",
-      "description": "OLCF Frontier MI250X: hipcc (rocm module), Kokkos HIP from $IMSRG_DEPS_PREFIX/kokkos-hip (gfx90a, ZEN3 host), cray-mpich through MPI_HOME, cray-libsci for host BLAS/LAPACK. Compile check for now; the Python module is off.",
+      "description": "OLCF Frontier MI250X: hipcc (rocm module), Kokkos HIP from $IMSRG_DEPS_PREFIX/kokkos-hip (gfx90a, ZEN3 host), cray-mpich through MPI_HOME, cray-libsci (libsci_gnu.so, named explicitly: hipcc does not link it implicitly) for host BLAS/LAPACK. Compile check for now; the Python module is off.",
       "inherits": [
         "base"
       ],
@@ -182,7 +185,10 @@
         "IMSRG_GENERATED_GOLDEN_DIR": "$env{IMSRG_WORK}/golden-generated",
         "MPIEXEC_EXECUTABLE": "/usr/bin/srun",
         "MPIEXEC_NUMPROC_FLAG": "-n",
-        "IMSRG_MPIEXEC_PREFLAGS": "--overlap --cpu-bind=none -c 4"
+        "IMSRG_MPIEXEC_PREFLAGS": "--overlap --cpu-bind=none -c 4",
+        "BLAS_LIBRARIES": "$env{CRAY_LIBSCI_PREFIX_DIR}/lib/libsci_gnu.so",
+        "LAPACK_LIBRARIES": "$env{CRAY_LIBSCI_PREFIX_DIR}/lib/libsci_gnu.so",
+        "CMAKE_CXX_FLAGS": "--gcc-install-dir=/usr/lib64/gcc/x86_64-suse-linux/14"
       }
     }
   ],
