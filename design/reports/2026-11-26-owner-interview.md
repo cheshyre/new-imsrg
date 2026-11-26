@@ -36,8 +36,8 @@ its own hub clone and on its own node:
 | B | C1 fork reference build (+ phip_fix variant) and goldens, C2 NREFT library, fork tokyo format | fork tables to 1e-12; fork's own emax-14 radial sums off by 8.5e-7 (AL-B-1, fixed with double-double); four fork scalar `.snt` byte for byte | 941b692 |
 | F | C10 `transform` farm (cost model, LPT, failure manifest, Omegas in MPI shared memory), tensor NREFT in the driver | farm = in-process transform byte for byte (native), 1e-9 with ME2JP; odd-rank fork mismatch AL-F1 found and fixed as a fork bug (missing (-1)^L for diagonal cross-coupled pairs) | e17f6b2 |
 | — | agent_retire safety (keeps fresh/unpushed clones) | | 9fb645e |
-| D | C9 production-size scalar run (N2LOsat variant 1) | see §3 | — |
-| E | C11 GPU path (M14) | see §3 | — |
+| D | C9 production-size flows (both Hamiltonians, variant 1) | see §3 | cfe9a2f |
+| E | C11 GPU path (M14) | see §3 | a519728 |
 
 Incidents: three usage-limit stops (07:10, ~10:20, ~15:00; three Opus leads exhaust a 5-hour window
 in ~2.5-3 h); the 2-hour batch chains lapsed during the second stop (the upkeep tick does not fire
@@ -47,7 +47,34 @@ allows one running job per user.
 
 ## 3. State at the start of part 2
 
-(Filled in from the 19:30 reports of leads D and E.)
+`develop` = cfe9a2f (CI PASS frontier-cpu, pushed to the hub and GitHub).
+
+**Production flows reproduce the archive (lead D; `design/benchmarks/al27-production.md`).** Both
+Hamiltonians, variant 1 (unsplit Magnus, compat profile), HF/NAT at emax 14 / e3max 24, IMSRG(2) at
+emax 10, CPU only: every printed digit of README §3.3 agrees (HF iterations 33 / 29, e1/e2/e3hf,
+E_HF, EMP2 at emax 14, EMP2/EMP3 at emax 10, stage ends 37 + 272 and 30 + 253 steps with s, E0,
+eta and Omega norms; final E0 -213.961459718 vs -213.961459717 and -217.066364762 exactly). H `.snt`
+max deviation 5.0e-7 (the archive's 7-digit rounding); TCM `.snt` elements within 5e-9, with 15/8
+small elements (up to 1.1e-3) that the fork writes and the devel threshold drops (AL-D3: fixed by the
+fork tokyo format under compat, already in develop; to be verified). Found and fixed: our MBPT(2)
+density dropped particle x partially-filled-hole terms (EMP2 off by 0.026 MeV). Timings: setup
+17 min (imsrg++ 44), flow steps 13.8 / 26.4 s (imsrg++ 21.2 / 35.4), checkpoint 1-2 s, peak 66 GB;
+restarts across 2-hour jobs bit for bit. Omegas of both flows in both formats in
+`$IMSRG_WORK/runs/al27/v1/`.
+
+**GPU (lead E; `design/benchmarks/gpu-m14.md`).** rocBLAS device gemms and device IMSRG(2) scalar and
+tensor kernels; one GCD vs 56 CPU cores: scalar commutator emax 10 58 vs 339 ms (5.8x), tensor rank 5
+emax 10 1.5 vs 7.4 s (4.9x, 23 GB HBM), O16 Magnus flow emax 8 28 vs 81 s. GPU vs CPU <= 3.5e-15
+relative; `tools/ci.sh frontier-hip-run` 1352/1357 (five bitwise atan tests of the 3B generator,
+device vs host atan 4e-16, AL-E-Q2). One commutator over 2 or 8 GCDs is slower than one GCD
+(AL-E-Q4): one flow per GCD. Kokkos Kernels backend written but unmeasured (tarball, AL-E-Q1);
+gemms are 14-40 % of GPU time. CPU side also 3x faster for rank-5 tensors; serial libsci plus
+`IMSRG_BLAS_CONCURRENT` 6-7x faster on the CPU (AL-E-Q3, relates to FP-Q6).
+
+**Not yet done for the weekend:** the GPU path is not yet used by the flow driver or the farm
+end to end; no farm run at emax 10 (one-item timing open); variants 2 and 3 not started; Tilde
+Phi' only at the operator level; the isospin-averaging example (C14); the hub-branch clean-up
+script (D61); the DIIS/linear-mixing change (D64); AL-D1 (every restart re-runs the 17-min setup).
 
 ## 4. Open points for part 2
 
