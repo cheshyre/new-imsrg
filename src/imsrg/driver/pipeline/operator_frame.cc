@@ -4,9 +4,9 @@
 #include "imsrg/driver/pipeline/operator_frame.h"
 
 #include <cmath>
-#include <cstdlib>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <optional>
 #include <string>
 #include <utility>
@@ -32,6 +32,13 @@ namespace {
 }
 
 }  // namespace
+
+void ApplyCompatCommutatorOptions(const RunConfig& config,
+                                  commutator::CommutatorOptions& copts) {
+  const CompatOptions c = CompatOptionsFor(config.run.compat);
+  if (c.tensor_ninej_threshold_1e8) copts.tensor_ninej_threshold = 1.0e-8;
+  copts.tensor_fork_ph_missing_rank_phase = c.tensor_fork_ph_missing_rank_phase;
+}
 
 std::vector<double> CoreOccupations(const basis::ModelSpace& ms) {
   std::vector<double> occ(static_cast<std::size_t>(ms.num_orbits()), 0.0);
@@ -199,8 +206,8 @@ std::string OperatorFileName(const std::string& stem, const std::string& name,
 void WriteTensorSnt(const std::filesystem::path& path, op::Operator O,
                     const RunConfig& config, const OperatorFrame& frame) {
   O.SyncToHost();
-  const io::ValenceWriteOptions v =
-      MakeValenceWriteOptions(config, frame, io::ValenceWriteMode::kHamiltonian);
+  const io::ValenceWriteOptions v = MakeValenceWriteOptions(
+      config, frame, io::ValenceWriteMode::kHamiltonian);
   io::TensorTokyoOptions t;
   t.format = CompatOptionsFor(config.run.compat).tokyo_writer_fork_79e9330
                  ? io::TokyoFormat::kFork79e9330

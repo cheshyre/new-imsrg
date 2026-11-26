@@ -322,9 +322,8 @@ SharedMemory Communicator::AllocateShared(std::size_t bytes) const {
   }
   // All memory on rank 0 (at least one byte, so the query returns a valid
   // address), none on the others.
-  const auto mine =
-      static_cast<MPI_Aint>(impl_->rank == 0 ? std::max<std::size_t>(1, bytes)
-                                             : 0);
+  const auto mine = static_cast<MPI_Aint>(
+      impl_->rank == 0 ? std::max<std::size_t>(1, bytes) : 0);
   void* base = nullptr;
   CheckMpi(MPI_Win_allocate_shared(mine, 1, MPI_INFO_NULL, impl_->comm, &base,
                                    &m.window_->win),

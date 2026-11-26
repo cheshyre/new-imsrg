@@ -569,10 +569,10 @@ struct CheckpointConfig {
 /// `[transform]`: `run.task = "transform"`, the operator farm over stored
 /// Omegas (design/50 C10, design/16 section 2).
 struct TransformConfig {
-  std::string manifest;  ///< `<stem>_omegas.toml` of output.write_omega
+  std::string manifest;   ///< `<stem>_omegas.toml` of output.write_omega
   std::string work_list;  ///< file: one operator name per line (# comments)
   std::string failure_manifest;  ///< empty: <output.directory>/failed.txt
-  bool skip_existing = false;  ///< skip items whose output file exists
+  bool skip_existing = false;    ///< skip items whose output file exists
   friend bool operator==(const TransformConfig&,
                          const TransformConfig&) = default;
 };

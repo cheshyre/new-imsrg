@@ -124,3 +124,38 @@ Budget: 50,000 node-hours until the end of the weekend (Knoxville), standard par
 node each (512 GB host for the 3N files and HF at emax 14; GPUs for the IMSRG(2) commutators).
 Farm: one MPI rank per GCD (8 per node); one variant ≈ 4828 ranks ≈ 604 nodes, all three ≈ 14,500
 ranks ≈ 1,810 nodes. Frontier batch limits: 184+ nodes → 12 h jobs.
+
+### 6.1 Transform farm (C10, lead F, 2026-11-26)
+
+`run.task = "transform"` (design/16 §2.11b; `src/imsrg/driver/transform/`), Slurm template
+`tools/al27/farm_sweep.sh FLOW_DIR` (one job per flow directory = Hamiltonian x variant x Omega
+format), work list `tools/al27/make_work_list.py` (34 x 71 names + TCM = 2415 lines).
+
+* **Layout:** one MPI rank per GCD, 8 per node, `-c 7`, `--gpu-bind=closest` (the device path of
+  lead E slots into `transform::TransformItem`, the per-item unit; today it runs on the host).
+  One work item per rank: 2415 ranks = 302 nodes per (Hamiltonian, variant, format); variant 1 with
+  both Omega formats and two Hamiltonians = 9660 ranks = 1208 nodes; all three variants (native only)
+  = 14,490 ranks = 1812 nodes, all four sets with the ME2JP comparison 19,320 ranks = 2415 nodes.
+* **Cost model (static, written down in `farm.h`):** cost(item) = num_omegas x W(L), W(L) = sum over
+  the stored two-body blocks (ch_bra <= ch_ket allowed by rank L) of n_bra n_ket (n_bra + n_ket), the
+  block-gemm multiply-adds of one [Omega, O]; the BCH terms per Omega are taken equal for all items.
+  At emax 10: W(L)/W(0) = 1.97, 2.86, 3.61, 4.20, 4.57 for L = 1..5. Assignment: longest
+  processing time first (deterministic, no communication); with one item per rank it is the identity
+  up to order, with fewer ranks than items it balances to <= mean + one item.
+* **Memory per rank (estimates from the channel counts, emax 14 -> 10, e2max 2 emax):** a scalar
+  two-body part is 3.9 GB at emax 14 (TCM only; the NREFT operators are built one-body only, else a
+  rank-5 tensor would take 20.5 GB at emax 14) and 0.29 GB at emax 10; a rank-L tensor at emax 10
+  0.58 / 0.84 / 1.06 / 1.25 / 1.37 GB (L = 1..5). BCH keeps ~4 operators plus the tensor
+  particle-hole scratch (AL-A-Q2: 10-20 GB at rank 5 until the Zbar symmetries are used): <= ~25 GB
+  per rank, ~200 GB per node of 512 GB; TCM peaks at ~12 GB during the emax-14 basis change.
+* **Omegas once per node:** node rank 0 reads them into an MPI shared window
+  (`comm::Communicator::AllocateShared`), 0.29 GB per Omega at emax 10: the unsplit variants (2
+  Omegas) 0.6 GB per node, the split variant (omega_norm_max 0.25; O(100) Omegas expected, to be
+  measured) ~30 GB per node instead of 8x that. A rank materializes one Omega at a time.
+* **Failure manifest:** `failed.txt` (name, reason) is written with every item first and rewritten
+  at the end, so a killed job leaves a complete list; resubmit with it as the work list, or with the
+  same list and `transform.skip_existing = true` (outputs are renamed into place, an existing file is
+  complete).
+* **Not done yet:** a timing of one item at emax 10 (needed for the walltime; the template uses 2 h),
+  the device path, measuring the split-variant Omega count.
+

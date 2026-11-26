@@ -33,8 +33,8 @@ TEST(TransformFarm, ReadWorkListSkipsCommentsAndReasons) {
     std::ofstream o(p);
     o << "# header\n  FM0p_15  \n\nTCM\tsome reason\n#x\r\nFDelta5n_1050\r\n";
   }
-  EXPECT_EQ(ReadWorkList(p), (std::vector<std::string>{"FM0p_15", "TCM",
-                                                       "FDelta5n_1050"}));
+  EXPECT_EQ(ReadWorkList(p),
+            (std::vector<std::string>{"FM0p_15", "TCM", "FDelta5n_1050"}));
   fs::remove(p);
   EXPECT_THROW(ReadWorkList(TempFile("does_not_exist")), InputError);
 }
@@ -58,14 +58,17 @@ TEST(TransformFarm, CommutatorWeightScalarAndTensor) {
     scalar += 2.0 * ch.num_kets * ch.num_kets * ch.num_kets;
   }
   EXPECT_DOUBLE_EQ(CommutatorWeight(*ms, 0, Parity::kEven), scalar);
-  // More channel pairs for higher rank: the cost grows with L.
-  double last = scalar;
+  // Rank 1 has more channel pairs than a scalar; at emax 3 the high ranks
+  // run out of channel pairs (at emax 10 the weight grows up to L = 5,
+  // design/50 section 6.1), so only positivity is checked beyond L = 1.
+  EXPECT_GT(CommutatorWeight(*ms, 1, Parity::kEven), scalar);
   for (int L = 1; L <= 5; ++L) {
     const double w = CommutatorWeight(*ms, L, Parity::kEven);
     std::printf("rank %d weight / scalar = %.3f\n", L, w / scalar);
-    EXPECT_GT(w, last);
-    last = w;
+    EXPECT_GT(w, 0.0);
   }
+  // Parity-odd operators connect channels of opposite parity only.
+  EXPECT_GT(CommutatorWeight(*ms, 1, Parity::kOdd), 0.0);
 }
 
 TEST(TransformFarm, ItemCostUsesTheShorthandRank) {

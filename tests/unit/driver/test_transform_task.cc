@@ -33,9 +33,9 @@ namespace fs = std::filesystem;
 /// Operators of the test: scalars (TCM has a two-body part) and tensors of
 /// rank 1 and 2 (NREFT shorthands, one-body at basis.emax).
 const std::vector<std::string>& OperatorNames() {
-  static const auto* const kNames = new std::vector<std::string>{
-      "TCM", "FM0p_150", "FPhipp0n_150", "FM2p_150", "FSigmap1p_150",
-      "FDelta1p_150"};
+  static const auto* const kNames =
+      new std::vector<std::string>{"TCM",      "FM0p_150",      "FPhipp0n_150",
+                                   "FM2p_150", "FSigmap1p_150", "FDelta1p_150"};
   return *kNames;
 }
 
@@ -71,9 +71,9 @@ void RunToml(const std::string& toml) {
   driver::ConfigSources src;
   src.config_text = toml;
   auto loaded = driver::LoadConfig(src);
-  ASSERT_TRUE(loaded.has_value()) << (loaded.has_value()
-                                          ? std::string()
-                                          : loaded.error().front().ToString());
+  ASSERT_TRUE(loaded.has_value())
+      << (loaded.has_value() ? std::string()
+                             : loaded.error().front().ToString());
   driver::Run(loaded.value());
 }
 
@@ -102,16 +102,17 @@ TEST(TransformTask, MatchesInProcessTransform) {
   for (const std::string format : {"native", "me2jp"}) {
     SCOPED_TRACE(format);
     const fs::path flow_dir = FreshDir("transform_flow_" + format);
-    RunToml(Al27Toml(flow_dir, "",
-                     "write_omega = true\nomega_format = \"" + format + "\"\n"));
+    RunToml(
+        Al27Toml(flow_dir, "",
+                 "write_omega = true\nomega_format = \"" + format + "\"\n"));
     const fs::path manifest = flow_dir / "int_omegas.toml";
     ASSERT_TRUE(fs::exists(manifest));
     ASSERT_TRUE(fs::exists(flow_dir / "int_occ_no.dat"));
 
     const fs::path farm_dir = FreshDir("transform_farm_" + format);
-    RunToml(Al27Toml(farm_dir, "task = \"transform\"\n",
-                     "\n[transform]\nmanifest = \"" + manifest.string() +
-                         "\"\n"));
+    RunToml(
+        Al27Toml(farm_dir, "task = \"transform\"\n",
+                 "\n[transform]\nmanifest = \"" + manifest.string() + "\"\n"));
     // The failure manifest lists nothing.
     const auto failed = SntRows(farm_dir / "failed.txt");
     EXPECT_TRUE(failed.empty());
@@ -175,9 +176,8 @@ TEST(TransformTask, FailureManifestListsBrokenItems) {
     if (line.empty() || line[0] == '#') continue;
     failed.push_back(line.substr(0, line.find('\t')));
   }
-  EXPECT_EQ(failed,
-            (std::vector<std::string>{"FNoSuchFamily0p_150", "E0",
-                                      "FM0p_abc"}));
+  EXPECT_EQ(failed, (std::vector<std::string>{"FNoSuchFamily0p_150", "E0",
+                                              "FM0p_abc"}));
   EXPECT_TRUE(fs::exists(farm_dir / "intFM0n_150.snt"));
 }
 

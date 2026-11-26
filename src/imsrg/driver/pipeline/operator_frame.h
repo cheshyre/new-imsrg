@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "imsrg/basis/model_space.h"
+#include "imsrg/commutator/options.h"
 #include "imsrg/driver/config/schema.h"
 #include "imsrg/driver/operators/operator_request.h"
 #include "imsrg/driver/pipeline/hamiltonian.h"
@@ -54,6 +55,13 @@ struct OperatorFrame {
   /// Options of the tensor normal ordering (compat: fork diagonal bug).
   op::TensorNormalOrderOptions tensor_no;
 };
+
+/// Sets the tensor-commutator options of the compat profile of
+/// `config.run.compat` in `copts` (9j threshold, fork particle-hole phase).
+/// The one place both the flow (`driver::Run`) and the transform farm take
+/// them from, so both transform operators with the same commutators.
+void ApplyCompatCommutatorOptions(const RunConfig& config,
+                                  commutator::CommutatorOptions& copts);
 
 /// Occupations of the core of `ms` (1 for core orbits, 0 otherwise).
 std::vector<double> CoreOccupations(const basis::ModelSpace& ms);
@@ -95,9 +103,9 @@ op::Operator FinishOperator(const op::Operator& transformed,
                             const OperatorFrame& frame);
 
 /// Header and format options of the valence-space writers. With
-/// `compat.tokyo_writer_fork_79e9330` the fork's number format and its header values
-/// (Aref/Zref and A_for_kinetic_energy are those of the core, reference/06
-/// section 1.10).
+/// `compat.tokyo_writer_fork_79e9330` the fork's number format and its header
+/// values (Aref/Zref and A_for_kinetic_energy are those of the core,
+/// reference/06 section 1.10).
 io::ValenceWriteOptions MakeValenceWriteOptions(const RunConfig& config,
                                                 const OperatorFrame& frame,
                                                 io::ValenceWriteMode mode);

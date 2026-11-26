@@ -48,7 +48,10 @@ std::optional<OperatorRequest> ParseItem(const std::string& name,
                                          std::string& error) {
   auto r = ParseOperatorSpec(name, ModelSpaceInfo{.emax = config.basis.emax});
   if (!r) {
-    error = r.error().ToString();
+    error.clear();
+    for (const ConfigIssue& issue : r.error()) {
+      error += (error.empty() ? "" : "; ") + issue.ToString();
+    }
     return std::nullopt;
   }
   if (r.value().size() != 1) {
@@ -84,11 +87,11 @@ pipeline::OperatorFrame MakeFrameFromManifest(const RunConfig& config,
   if (manifest.basis_transformation) {
     f.c = ReadBasisTransformation(*manifest.basis_transformation);
     if (f.c->rows() != bb.num_orbits() || f.c->cols() != bb.num_orbits()) {
-      throw InputError(
-          "transform: the basis transformation is " +
-          std::to_string(f.c->rows()) + " x " + std::to_string(f.c->cols()) +
-          ", the basis.emax space has " + std::to_string(bb.num_orbits()) +
-          " orbits");
+      throw InputError("transform: the basis transformation is " +
+                       std::to_string(f.c->rows()) + " x " +
+                       std::to_string(f.c->cols()) +
+                       ", the basis.emax space has " +
+                       std::to_string(bb.num_orbits()) + " orbits");
     }
   } else if (config.basis.kind != BasisKind::kOscillator) {
     throw InputError("transform: the manifest has no basis_transformation");
@@ -115,17 +118,17 @@ pipeline::OperatorFrame MakeFrameFromManifest(const RunConfig& config,
   } else if (!config.imsrg.space) {
     std::vector<double> occ =
         OccupationsInBasis(ReadOccupations(manifest.occupations), bb);
-    f.ms_normal_ordering = f.ms_bare->WithReference(
-        basis::Reference::FromOccupations(bb, std::move(occ),
-                                          f.ms_bare->reference().name()));
+    f.ms_normal_ordering =
+        f.ms_bare->WithReference(basis::Reference::FromOccupations(
+            bb, std::move(occ), f.ms_bare->reference().name()));
   } else {
     throw InputError(
         "transform: with [imsrg.space] the manifest must name "
         "normal_ordering_occupations (written since design/50 C10)");
   }
-  f.ms_imsrg = config.imsrg.space
-                   ? pipeline::MakeImsrgModelSpace(config, *f.ms_normal_ordering)
-                   : f.ms_normal_ordering;
+  f.ms_imsrg = config.imsrg.space ? pipeline::MakeImsrgModelSpace(
+                                        config, *f.ms_normal_ordering)
+                                  : f.ms_normal_ordering;
   const basis::ModelSpace& mi = *f.ms_imsrg;
   if (io::ModelSpaceLayoutHash(mi) != manifest.layout_hash ||
       mi.basis().emax() != manifest.emax ||
@@ -149,9 +152,7 @@ pipeline::OperatorFrame MakeFrameFromManifest(const RunConfig& config,
 commutator::CommutatorOptions TransformCommutatorOptions(
     const RunConfig& config) {
   commutator::CommutatorOptions copts;
-  if (CompatOptionsFor(config.run.compat).tensor_ninej_threshold_1e8) {
-    copts.tensor_ninej_threshold = 1.0e-8;
-  }
+  pipeline::ApplyCompatCommutatorOptions(config, copts);
   return copts;
 }
 
@@ -163,8 +164,8 @@ fs::path TransformOutputPath(const TransformContext& ctx,
 fs::path TransformItem(const OperatorRequest& request,
                        const TransformContext& ctx) {
   const pipeline::OperatorFrame& frame = *ctx.frame;
-  op::Operator O = flow::WithParticleRank(
-      pipeline::PrepareOperator(request, frame), 2);
+  op::Operator O =
+      flow::WithParticleRank(pipeline::PrepareOperator(request, frame), 2);
   // e^Omega_n ... e^Omega_0 O e^-Omega_0 ... e^-Omega_n, one BCH series per
   // Omega (flow::MagnusSolver::Transform; imsrg++ Transform_Partial).
   for (std::size_t k = 0; k < ctx.omegas->size(); ++k) {
@@ -174,7 +175,8 @@ fs::path TransformItem(const OperatorRequest& request,
   op::Operator F = pipeline::FinishOperator(O, frame);
   F.SyncToHost();
   const bool tensor = !F.spec().is_scalar();
-  const fs::path path = TransformOutputPath(ctx, request.canonical_name, tensor);
+  const fs::path path =
+      TransformOutputPath(ctx, request.canonical_name, tensor);
   // Written under a temporary name and renamed: an existing output is
   // complete (transform.skip_existing).
   fs::path tmp = path;
@@ -225,10 +227,10 @@ TransformReport RunTransform(const RunConfig& config,
   std::vector<double> costs;
   for (std::size_t i = 0; i < names.size(); ++i) {
     requests.push_back(ParseItem(names[i], config, parse_errors[i]));
-    costs.push_back(requests.back() ? ItemCost(*requests.back(),
-                                               *frame.ms_imsrg,
-                                               manifest.omega_stems.size())
-                                    : 0.0);
+    costs.push_back(requests.back()
+                        ? ItemCost(*requests.back(), *frame.ms_imsrg,
+                                   manifest.omega_stems.size())
+                        : 0.0);
   }
   const std::vector<int> owner = AssignStatic(costs, comm.size());
 
@@ -299,7 +301,8 @@ TransformReport RunTransform(const RunConfig& config,
       const auto t_item = std::chrono::steady_clock::now();
       report.written.push_back(TransformItem(*requests[i], ctx));
       ok[i] = 1;
-      log::Info("transform: {} done in {:.2f} s", names[i], SecondsSince(t_item));
+      log::Info("transform: {} done in {:.2f} s", names[i],
+                SecondsSince(t_item));
     } catch (const std::exception& e) {
       mine.push_back({names[i], e.what()});
       log::Warn("transform: {} FAILED: {}", names[i], e.what());

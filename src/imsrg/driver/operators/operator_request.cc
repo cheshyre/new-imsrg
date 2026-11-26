@@ -161,8 +161,8 @@ void AddP1Rows(std::vector<OperatorCatalogEntry>& v) {
                  "NREFT Phi''_0 (neutrons); fork 79e9330 shorthand"));
 }
 
-/// The rank L > 0 NREFT shorthands (tensor operators, M15), shape {L, 0, 0, 1}: even
-/// J has normal and odd J abnormal parity, and both operators are
+/// The rank L > 0 NREFT shorthands (tensor operators, M15), shape {L, 0, 0, 1}:
+/// even J has normal and odd J abnormal parity, and both operators are
 /// parity-even. The names live in a leaked vector (static storage), so the
 /// catalog's string_views stay valid.
 void AddNreftPlannedRows(std::vector<OperatorCatalogEntry>& v) {

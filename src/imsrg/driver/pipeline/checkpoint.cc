@@ -391,8 +391,7 @@ void WriteOmegaStack(const fs::path& dir, const std::string& stem,
         });
   }
   const auto write_occ = [&](const std::string& name,
-                             const basis::ModelSpace& space,
-                             const char* what) {
+                             const basis::ModelSpace& space, const char* what) {
     io::WriteFileAtomically(dir / name, [&](std::ostream& out) {
       out << "# n l 2j 2tz occupation (" << what << ")\n";
       for (std::int32_t a = 0; a < space.num_orbits(); ++a) {

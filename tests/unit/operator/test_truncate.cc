@@ -123,10 +123,10 @@ void CheckTensor(std::int32_t rank_J, Parity parity, std::int32_t dtz,
       const auto& kc = btb.channel(ChannelIndex(ck));
       for (std::int32_t i = 0; i < bc.num_kets; ++i)
         for (std::int32_t j = (cb == ck ? i : 0); j < kc.num_kets; ++j) {
-          const auto& bra = btb.ket(btb.global_ket(ChannelIndex(cb),
-                                                   LocalKetIndex(i)));
-          const auto& ket = btb.ket(btb.global_ket(ChannelIndex(ck),
-                                                   LocalKetIndex(j)));
+          const auto& bra =
+              btb.ket(btb.global_ket(ChannelIndex(cb), LocalKetIndex(i)));
+          const auto& ket =
+              btb.ket(btb.global_ket(ChannelIndex(ck), LocalKetIndex(j)));
           A.two_body().set_normalized(bra.p, bra.q, ket.p, ket.q, bc.two_j,
                                       kc.two_j, next());
         }
@@ -146,15 +146,15 @@ void CheckTensor(std::int32_t rank_J, Parity parity, std::int32_t dtz,
       const auto& kc = tb.channel(ChannelIndex(ck));
       for (std::int32_t i = 0; i < bc.num_kets; ++i)
         for (std::int32_t j = 0; j < kc.num_kets; ++j) {
-          const auto& bra = tb.ket(tb.global_ket(ChannelIndex(cb),
-                                                 LocalKetIndex(i)));
-          const auto& ket = tb.ket(tb.global_ket(ChannelIndex(ck),
-                                                 LocalKetIndex(j)));
+          const auto& bra =
+              tb.ket(tb.global_ket(ChannelIndex(cb), LocalKetIndex(i)));
+          const auto& ket =
+              tb.ket(tb.global_ket(ChannelIndex(ck), LocalKetIndex(j)));
           const double t = T.two_body().get_normalized(
               bra.p, bra.q, ket.p, ket.q, bc.two_j, kc.two_j);
-          EXPECT_EQ(t, A.two_body().get_normalized(m(bra.p), m(bra.q),
-                                                   m(ket.p), m(ket.q),
-                                                   bc.two_j, kc.two_j));
+          EXPECT_EQ(t,
+                    A.two_body().get_normalized(m(bra.p), m(bra.q), m(ket.p),
+                                                m(ket.q), bc.two_j, kc.two_j));
           count += t != 0.0;
         }
     }
