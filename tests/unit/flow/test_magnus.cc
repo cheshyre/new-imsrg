@@ -376,3 +376,102 @@ TEST(MagnusSolver, StopsWhenConverged) {
 
 }  // namespace
 }  // namespace imsrg
+
+namespace imsrg {
+namespace {
+
+// A captured checkpoint: loop state plus copies of the operators.
+struct Snapshot {
+  flow::MagnusLoopState state;
+  std::vector<op::Operator> omegas;
+  op::Operator h_saved;
+  op::Operator h;
+};
+
+void ExpectSameOperator(const op::Operator& a, const op::Operator& b) {
+  EXPECT_EQ(a.zero_body(), b.zero_body());
+  EXPECT_EQ(op::MaxAbsDifference(a, b).max(), 0.0);
+}
+
+// Checkpoint/restart (design/50 C7): a two-stage flow with Omega splits,
+// restored from a step in stage 1 and from a step in stage 2, continues bit
+// for bit to the same result as the uninterrupted flow.
+TEST(MagnusSolver, RestoreContinuesBitForBit) {
+  flow::SolverOptions o = ShortFlow(0.8);
+  o.omega_norm_max = 0.1;  // several Omegas per stage
+  const op::Operator h0 = Emax2Hno();
+  const flow::GeneratorOptions g1{};
+  flow::GeneratorOptions g2{};
+  g2.kind = flow::GeneratorKind::kWhite;
+
+  std::vector<Snapshot> snaps;
+  auto capture = [&](const flow::MagnusSolver& s) {
+    return [&snaps, &s](const flow::MagnusLoopState& st) {
+      if (st.istep == 3) {
+        snaps.push_back({st, s.omegas(), s.saved_hamiltonian(),
+                         s.hamiltonian()});
+      }
+    };
+  };
+  flow::MagnusSolver a(h0, o, g1);
+  const flow::SolveResult a1 = a.Solve({}, capture(a));
+  a.set_generator(g2);
+  a.set_smax(1.6);
+  const flow::SolveResult a2 = a.Solve({}, capture(a));
+  ASSERT_EQ(snaps.size(), 2u);
+  ASSERT_GT(snaps[0].omegas.size(), 1u);  // a split happened before step 3
+  ASSERT_GT(a2.steps, 3);
+
+  // Restart in stage 1.
+  {
+    flow::MagnusSolver b(h0, o, g1);
+    b.Restore(snaps[0].state, g1, snaps[0].omegas, snaps[0].h_saved,
+              snaps[0].h);
+    const flow::SolveResult b1 = b.Solve();
+    EXPECT_EQ(b1.steps, a1.steps);
+    EXPECT_EQ(b1.s, a1.s);
+    EXPECT_EQ(b1.e0, a1.e0);
+    b.set_generator(g2);
+    b.set_smax(1.6);
+    const flow::SolveResult b2 = b.Solve();
+    EXPECT_EQ(b2.steps, a2.steps);
+    EXPECT_EQ(b2.e0, a2.e0);
+    ASSERT_EQ(b.omegas().size(), a.omegas().size());
+    for (std::size_t i = 0; i < a.omegas().size(); ++i)
+      ExpectSameOperator(b.omegas()[i], a.omegas()[i]);
+    ExpectSameOperator(b.hamiltonian(), a.hamiltonian());
+  }
+  // Restart in stage 2 (the generator and smax come from the checkpoint).
+  {
+    flow::MagnusSolver c(h0, o, g1);
+    c.Restore(snaps[1].state, g2, snaps[1].omegas, snaps[1].h_saved,
+              snaps[1].h);
+    std::vector<flow::FlowStatus> lines;
+    const flow::SolveResult c2 =
+        c.Solve([&](const flow::FlowStatus& st) { lines.push_back(st); });
+    ASSERT_FALSE(lines.empty());
+    EXPECT_EQ(lines.front().stage, 2);
+    EXPECT_EQ(lines.front().istep, 4);
+    EXPECT_EQ(c2.steps, a2.steps);
+    EXPECT_EQ(c2.s, a2.s);
+    EXPECT_EQ(c2.e0, a2.e0);
+    ExpectSameOperator(c.hamiltonian(), a.hamiltonian());
+    ASSERT_EQ(c.omegas().size(), a.omegas().size());
+    ExpectSameOperator(c.omegas().back(), a.omegas().back());
+  }
+}
+
+TEST(MagnusSolver, RestoreRejectsHunterGatherer) {
+  flow::SolverOptions o = ShortFlow(0.5);
+  o.hunter_gatherer = true;
+  flow::MagnusSolver s(Emax2Hno(), o, flow::GeneratorOptions{});
+  flow::MagnusLoopState st;
+  st.stage = 1;
+  st.solver = o;
+  EXPECT_THROW(s.Restore(st, flow::GeneratorOptions{}, s.omegas(),
+                         op::Operator(), s.hamiltonian()),
+               InputError);
+}
+
+}  // namespace
+}  // namespace imsrg

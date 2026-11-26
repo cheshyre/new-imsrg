@@ -9,7 +9,10 @@
 #include <chrono>
 #include <cmath>
 #include <memory>
+#include <optional>
+#include <string>
 #include <utility>
+#include <vector>
 
 #include "imsrg/base/assert.h"
 #include "imsrg/base/error.h"
@@ -222,12 +225,53 @@ FlowStatus MagnusSolver::Status(int istep, double ds) const {
   return st;
 }
 
-SolveResult MagnusSolver::Solve(const StatusCallback& on_status) {
+void MagnusSolver::Restore(const MagnusLoopState& state,
+                           const GeneratorOptions& generator,
+                           std::vector<op::Operator> omegas,
+                           op::Operator h_saved, op::Operator h) {
+  if (state.solver.hunter_gatherer || solver_.hunter_gatherer) {
+    throw InputError(
+        "MagnusSolver::Restore: hunter-gatherer flows cannot be restored yet");
+  }
+  if (omegas.empty()) {
+    throw InputError("MagnusSolver::Restore: empty Omega stack");
+  }
+  auto check = [this](const op::Operator& o, const char* what) {
+    if (o.empty() || !op::SameModelSpace(o, h0_) ||
+        o.spec().particle_rank != h0_.spec().particle_rank) {
+      throw InputError(std::string("MagnusSolver::Restore: ") + what +
+                       " is not on the solver's model space or has another "
+                       "particle rank");
+    }
+  };
+  for (const op::Operator& o : omegas) check(o, "an Omega");
+  check(h, "H(s)");
+  if (omegas.size() > 1) check(h_saved, "H_saved");
+  ValidateSolverOptions(state.solver);
+  solver_ = state.solver;
+  generator_ = generator;
+  omegas_ = std::move(omegas);
+  h_saved_ = omegas_.size() > 1 ? std::move(h_saved) : op::Operator();
+  h_ = std::move(h);
+  s_ = state.s;
+  num_gathers_ = state.num_gathers;
+  stage_ = state.stage - 1;  // Solve increments it
+  eta_ = op::Operator(h0_.model_space_ptr(),
+                      GeneratorSpec(h0_.spec(), generator_.kind));
+  resume_ = state;
+}
+
+SolveResult MagnusSolver::Solve(const StatusCallback& on_status,
+                                const StepCallback& on_step) {
   ++stage_;
   ComputeGenerator(h_, eta_, generator_);
+  const std::optional<MagnusLoopState> resume = std::move(resume_);
+  resume_.reset();
   // imsrg++ bumps domega to avoid machine-dependent splitting
   // (IMSRGSolver.cc:290); the bump persists, as the member is modified there.
-  if (std::abs(solver_.omega_norm_max - solver_.domega) < 1.0e-6) {
+  // A restored solver carries the bumped value already.
+  if (!resume &&
+      std::abs(solver_.omega_norm_max - solver_.domega) < 1.0e-6) {
     solver_.domega += 1.0e-4;
     log::Info(
         "adjusting domega to {} to avoid numerical trouble, since "
@@ -236,16 +280,22 @@ SolveResult MagnusSolver::Solve(const StatusCallback& on_status) {
   }
   // D47: a double (imsrg++ rounds it through float, quirk P7).
   const double eta_criterion = solver_.eta_criterion;
-  double e_last = h0_.zero_body();
+  double e_last = resume ? resume->e_last : h0_.zero_body();
   // Used only if magnus_adaptive is off: imsrg++'s member ds is set to ds_0
   // and capped by SetDsmax (IMSRGSolver.cc:201-205).
-  double ds = std::min(solver_.ds_0, solver_.dsmax);
-  if (on_status) on_status(Status(0, 0.0));
+  double ds = resume ? resume->ds : std::min(solver_.ds_0, solver_.dsmax);
+  if (on_status && !resume) on_status(Status(0, 0.0));
 
-  int loop_gathers = 0;
+  int loop_gathers = resume ? resume->loop_gathers : 0;
   SolveResult result;
   result.reason = StopReason::kSmaxReached;
-  for (int istep = 1; s_ < solver_.smax; ++istep) {
+  if (resume) {
+    result.steps = resume->istep;
+    log::Info("restored the Magnus flow at stage {}, step {}, s = {}", stage_,
+              resume->istep, s_);
+  }
+  for (int istep = resume ? resume->istep + 1 : 1; s_ < solver_.smax;
+       ++istep) {
     const double norm_eta = op::Norm(eta_);
     if (norm_eta < eta_criterion) {
       result.reason = StopReason::kConverged;
@@ -277,6 +327,18 @@ SolveResult MagnusSolver::Solve(const StatusCallback& on_status) {
     if (on_status) on_status(Status(istep, ds));
     result.steps = istep;
     e_last = h_.zero_body();
+    if (on_step) {
+      MagnusLoopState st;
+      st.stage = stage_;
+      st.istep = istep;
+      st.s = s_;
+      st.ds = ds;
+      st.e_last = e_last;
+      st.loop_gathers = loop_gathers;
+      st.num_gathers = num_gathers_;
+      st.solver = solver_;
+      on_step(st);
+    }
   }
   // imsrg++ Solve() gathers once more at the end (IMSRGSolver.cc:236-239).
   if (solver_.hunter_gatherer) {
