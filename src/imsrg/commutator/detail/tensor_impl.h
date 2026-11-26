@@ -171,6 +171,80 @@ IMSRG_INLINE_FUNCTION int CrossCoupledChannel(const std::int32_t* l,
   return 4 * J + 2 * t + par;
 }
 
+/// Entries of a list set: entry e of row r in [offsets[r], offsets[r + 1]).
+/// Each entry is "one-body element (from, to) times `coef` times the element
+/// in row/column `m` of a two-body block". Trivially copyable.
+struct EntryListView {
+  const std::int32_t* offsets = nullptr;
+  const std::int32_t* m = nullptr;
+  const std::int32_t* from = nullptr;
+  const std::int32_t* to = nullptr;
+  const double* coef = nullptr;
+};
+static_assert(std::is_trivially_copyable_v<EntryListView>);
+
+/// Owner of an `EntryListView` (host-built, device copy).
+struct EntryList {
+  exec::DeviceBuffer<std::int32_t> offsets, m, from, to;
+  exec::DeviceBuffer<double> coef;
+  /// Device view.
+  EntryListView view() const {
+    return EntryListView{offsets.device_data(), m.device_data(),
+                         from.device_data(), to.device_data(),
+                         coef.device_data()};
+  }
+};
+
+/// Host-side builder of an `EntryList`: add the entries of row 0, 1, ... in
+/// order, calling `EndRow` after each row; `Finish` uploads the lists.
+class EntryListBuilder {
+ public:
+  /// Appends an entry to the current row.
+  void Add(std::int32_t m, std::int32_t from, std::int32_t to, double coef) {
+    m_.push_back(m);
+    from_.push_back(from);
+    to_.push_back(to);
+    coef_.push_back(coef);
+  }
+  /// Closes the current row.
+  void EndRow() { offsets_.push_back(static_cast<std::int32_t>(m_.size())); }
+  /// Uploads the lists to the device.
+  EntryList Finish() const;
+
+ private:
+  std::vector<std::int32_t> offsets_{0}, m_, from_, to_;
+  std::vector<double> coef_;
+};
+
+/// The "lifted one-body" lists of comm122st part 1 (scalar X1, tensor Y2),
+/// independent of the tensor rank. With r = `channel_ket_offset[ch] + local`
+/// the flat row of the ket (i, j) at the channel's J, list row 2 r is side A
+/// and list row 2 r + 1 is side B. Side A: p in the scalar one-body channel of
+/// i, the lifted ket (p, j) (from = i, to = p); side B: p in the channel of j,
+/// the lifted ket (i, p) (from = j, to = p). The entry coefficient is the
+/// exchange phase times sqrt2^[lifted pair has equal orbits]; m is the local
+/// index of the lifted ket in the same channel (entries whose ket does not
+/// exist are omitted).
+struct LiftedKets {
+  EntryList list;
+};
+
+/// The rank-dependent entry lists of comm122st part 2 (tensor Y1, scalar X2)
+/// for the stored blocks of the output (`blocks` = (row channel, column
+/// channel) in storage order). Bra lists are indexed by the row of the
+/// concatenated block rows, ket lists by the row of the concatenated block
+/// columns (`col_offset`).
+struct Comm122Lists {
+  std::vector<std::int32_t> block_ch_bra, block_ch_ket;  ///< Layout key.
+  /// bra1: p in tensor channel of i, X2 row (p, j) (sign and 6j in coef);
+  /// bra2: p in channel of j, X2 row (p, i); ket3: p in channel of kk, X2
+  /// column (l, p); ket4: p in channel of l, X2 column (kk, p). `from`/`to`
+  /// index the one-body tensor Y1.
+  EntryList bra1, bra2, ket3, ket4;
+  exec::DeviceBuffer<std::int32_t> col_offset;  ///< Per block + total.
+  bool built = false;
+};
+
 /// Tables that depend on the operator's symmetry (lambda, parity, delta_Tz)
 /// and the 9j threshold.
 struct TensorRankData {
@@ -178,6 +252,9 @@ struct TensorRankData {
   std::unique_ptr<angmom::NineJTable> ninej;  ///< Built on first ph use.
   /// One-body connections of the tensor: orbits b with ConnectsOrbits(a, b).
   Csr tensor_ch1;
+  /// Host copy of `tensor_ch1` (rows).
+  std::vector<std::vector<std::int32_t>> tensor_ch1_rows;
+  Comm122Lists comm122;  ///< Built on first comm122st call.
 };
 
 /// Everything the scalar-tensor kernels share for one model space.
@@ -194,6 +271,8 @@ struct TensorContext {
   std::int32_t num_particles = 0;
   CrossCoupled cc;  ///< Built on first ph use.
   bool cc_built = false;
+  LiftedKets lifted_kets_data;  ///< Built on first comm122st use.
+  bool lifted_built = false;
   /// Per (rank_J, parity, delta_Tz).
   std::map<std::tuple<int, int, int>, std::unique_ptr<TensorRankData>> ranks;
 
@@ -205,6 +284,15 @@ struct TensorContext {
                                   double threshold);
   /// The cross-coupled structure (built on first use).
   const CrossCoupled& cross_coupled();
+  /// The rank-independent lifted lists of comm122st part 1 (built on first
+  /// use).
+  const LiftedKets& lifted_kets();
+  /// The part-2 lists of comm122st for the stored blocks (`ch_bra[k]`,
+  /// `ch_ket[k]`) of the output and the tensor rank data `rd` of `spec`
+  /// (rebuilt if the block layout differs from the cached one).
+  const Comm122Lists& comm122_lists(const op::OperatorSpec& spec,
+                                    const std::vector<std::int32_t>& ch_bra,
+                                    const std::vector<std::int32_t>& ch_ket);
 };
 
 /// Block offset table of a two-body part for `TensorTwoBodyView` (scalar
