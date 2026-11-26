@@ -58,7 +58,7 @@ target_compile_definitions(driver_pipeline_hamiltonian PRIVATE
 # pipeline in process and compare with tests/golden/e2e; skip without the input files.
 imsrg_add_test(NAME driver_integration
   SOURCES ${_it_support} test_integration.cc test_hunter_gatherer.cc test_stage_two_options.cc test_results_schema.cc
-  test_imsrg3f2.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
+  test_imsrg3f2.cc test_checkpoint.cc ${PROJECT_SOURCE_DIR}/tests/support/exec_gtest_main.cc
   DEPS driver LABELS integration NO_GTEST_MAIN)
 target_compile_definitions(driver_integration PRIVATE
   "IMSRG_SOURCE_DIR=\"${PROJECT_SOURCE_DIR}\""

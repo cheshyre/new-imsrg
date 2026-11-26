@@ -51,6 +51,10 @@ struct PreparedHamiltonian {
   /// basis, or the oscillator basis for basis.kind = oscillator (there the
   /// Fock matrix is not diagonal and the value is only indicative).
   double e_mp2 = 0.0;
+  /// With `[imsrg.space]`: the model space of the HF/NAT step (emax =
+  /// basis.emax) in which operators are normal ordered before they are
+  /// truncated to the IMSRG space (`hno`'s model space). Null otherwise.
+  std::shared_ptr<const basis::ModelSpace> ms_normal_ordering;
   /// Mass number used for the kinetic energy (config basis.mass_number).
   int mass_number = 0;
   /// Proton number of the reference (for Rp2 and friends).

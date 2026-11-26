@@ -13,11 +13,13 @@
 #include <string>
 #include <utility>
 #include <variant>
+#include <vector>
 
 #include "imsrg/base/assert.h"
 #include "imsrg/base/error.h"
 #include "imsrg/base/log.h"
 #include "imsrg/basis/model_space.h"
+#include "imsrg/driver/config/compat.h"
 #include "imsrg/driver/operators/operator_request.h"
 #include "imsrg/io/me2j.h"
 #include "imsrg/io/no2b.h"
@@ -27,6 +29,7 @@
 #include "imsrg/operator/basis_transform.h"
 #include "imsrg/operator/no2b.h"
 #include "imsrg/operator/normal_ordering.h"
+#include "imsrg/operator/truncate.h"
 #include "imsrg/opslib/center_of_mass.h"
 #include "imsrg/opslib/kinetic.h"
 #include "imsrg/opslib/nreft.h"
@@ -67,13 +70,34 @@ void RejectPlanned(const RunConfig& c) {
 /// occupations in that basis (`hf::SolutionInBasis`) and the Hamiltonian
 /// normal ordered in it. Replaces `out.hno` and `out.e_reference` and fills
 /// `out.nat` (its C maps the oscillator basis to the NAT basis).
+/// With `natural_orbitals.use_hf_reference` the occupied orbitals are reset
+/// to the HF orbitals (`mbpt::UseHfForHoleStates`), and the compat option
+/// `nat_sort_by_abs_occupation` orders the NAT orbitals by |occupation|.
 void ToNaturalOrbitalBasis(const op::Operator& H, const op::No2bThreeBody* v3,
-                           const hf::HFOptions& ho, PreparedHamiltonian& out) {
+                           const hf::HFOptions& ho, const RunConfig& config,
+                           PreparedHamiltonian& out) {
   IMSRG_CHECK(out.hf.has_value(), "the NAT basis is built on an HF solution");
   op::Operator hno = out.hno;  // Mbpt2DensityMatrix syncs its argument
   const linalg::Matrix<double> rho_hf = mbpt::Mbpt2DensityMatrix(hno);
-  const mbpt::NaturalOrbitals nat =
-      mbpt::ComputeNaturalOrbitals(rho_hf, out.hno.model_space());
+  const CompatOptions compat = CompatOptionsFor(config.run.compat);
+  mbpt::NaturalOrbitals nat = mbpt::ComputeNaturalOrbitals(
+      rho_hf, out.hno.model_space(),
+      compat.nat_sort_by_abs_occupation ? mbpt::NatSorting::kAbsDescending
+                                        : mbpt::NatSorting::kSignedDescending);
+  {
+    const auto& basis = out.hno.model_space().basis();
+    for (std::int32_t a = 0; a < basis.num_orbits(); ++a) {
+      const basis::Orbit& o = basis.orbit(OrbitIndex(a));
+      log::Debug(
+          "NAT orbit {:3d}: n {} l {} 2j {} 2tz {:2d} occupation {:.16e}", a,
+          o.n, o.l, o.j2.twice, o.tz2.twice,
+          nat.occupations[static_cast<std::size_t>(a)]);
+    }
+  }
+  if (config.natural_orbitals.use_hf_reference) {
+    log::Info("NAT basis: setting occupied states back to HF");
+    mbpt::UseHfForHoleStates(nat, out.hno.model_space());
+  }
   const linalg::Matrix<double> c_ho2nat = mbpt::Matmul(out.hf->C, nat.c_hf2nat);
   hf::HFResult r =
       hf::SolutionInBasis(H, v3, c_ho2nat, out.hf->occupations, ho);
@@ -83,6 +107,48 @@ void ToNaturalOrbitalBasis(const op::Operator& H, const op::No2bThreeBody* v3,
             out.hf->e_hf);
   out.nat = std::move(r);
   out.nat_occupations = nat.occupations;
+}
+
+std::shared_ptr<const basis::ModelSpace> MakeModelSpace(
+    const RunConfig& config);
+
+/// `[imsrg.space]` (design/50 C5, imsrg++.cc:887-929): the IMSRG model space
+/// with emax = imsrg.space.emax, the partition of the configuration's
+/// reference and valence space, and the occupations of `from` copied orbit by
+/// orbit (quantum numbers), so HF re-filling and fractional occupations
+/// survive. e2max must be 2 emax (the two-body channels have no e2max cut
+/// yet).
+std::shared_ptr<const basis::ModelSpace> MakeImsrgModelSpace(
+    const RunConfig& config, const basis::ModelSpace& from) {
+  const ImsrgSpaceConfig& sp = *config.imsrg.space;
+  if (sp.e2max != 2 * sp.emax) {
+    Planned("imsrg.space.e2max < 2*imsrg.space.emax");
+  }
+  RunConfig c = config;
+  c.basis.emax = sp.emax;
+  const auto naive = MakeModelSpace(c);
+  const auto& basis = naive->basis();
+  std::vector<double> occ(static_cast<std::size_t>(basis.num_orbits()));
+  for (std::int32_t a = 0; a < basis.num_orbits(); ++a) {
+    occ[static_cast<std::size_t>(a)] = from.reference().occupation(
+        from.basis().index_of(basis.orbit(OrbitIndex(a))));
+  }
+  // Holes outside the IMSRG space would be lost silently.
+  double n_from = 0.0, n_to = 0.0;
+  for (std::int32_t a = 0; a < from.num_orbits(); ++a) {
+    n_from += (from.basis().orbit(OrbitIndex(a)).j2.twice + 1) *
+              from.reference().occupation(OrbitIndex(a));
+  }
+  for (std::int32_t a = 0; a < basis.num_orbits(); ++a) {
+    n_to += (basis.orbit(OrbitIndex(a)).j2.twice + 1) *
+            occ[static_cast<std::size_t>(a)];
+  }
+  if (std::abs(n_from - n_to) > 1.0e-8) {
+    throw ConfigError("imsrg.space.emax = " + std::to_string(sp.emax) +
+                      " drops occupied orbits of the reference");
+  }
+  return naive->WithReference(basis::Reference::FromOccupations(
+      basis, std::move(occ), from.reference().name()));
 }
 
 /// Builds the oscillator model space of the configuration.
@@ -164,7 +230,9 @@ void SolveReferenceState(const op::Operator& H, const op::No2bThreeBody* v3p,
     out.hno = hf::NormalOrderedHamiltonian(H, v3p, r, ho);
     out.e_reference = r.e_hf;
     out.hf = std::move(r);
-    if (b.kind == BasisKind::kNat) ToNaturalOrbitalBasis(H, v3p, ho, out);
+    if (b.kind == BasisKind::kNat) {
+      ToNaturalOrbitalBasis(H, v3p, ho, config, out);
+    }
   } else {
     out.hno = v3p ? op::NormalOrder(H, *v3p) : op::NormalOrder(H);
     out.e_reference = out.hno.zero_body();
@@ -259,6 +327,16 @@ PreparedHamiltonian PrepareHamiltonian(const RunConfig& config) {
     log::Info("EMP2 = {:.8f} MeV", out.e_mp2);
   }
   if (lawson) out.hno -= 1.5 * beta * config.hamiltonian.beta_cm_hw;
+  if (config.imsrg.space) {
+    // Cut the normal-ordered pieces (no re-normal-ordering, imsrg++.cc:927).
+    out.ms_normal_ordering = out.hno.model_space_ptr();
+    out.hno = op::Truncate(out.hno,
+                           MakeImsrgModelSpace(config, out.hno.model_space()));
+    op::Operator h = out.hno;
+    log::Info("IMSRG space: emax = {} ({} orbits), EMP2 = {:.8f} MeV",
+              config.imsrg.space->emax, out.hno.model_space().num_orbits(),
+              mbpt::Mp2Energy(h));
+  }
   return out;
 }
 
@@ -271,9 +349,14 @@ op::Operator PrepareOperator(const OperatorRequest& request,
   } else if (ph.hf) {
     o = hf::ToHfBasis(o, *ph.hf);
   }
-  const auto hno_ms = ph.hno.model_space_ptr();
-  if (hno_ms != o.model_space_ptr()) o = op::WithModelSpace(o, hno_ms);
-  return op::NormalOrder(o);
+  const auto no_ms =
+      ph.ms_normal_ordering ? ph.ms_normal_ordering : ph.hno.model_space_ptr();
+  if (no_ms != o.model_space_ptr()) o = op::WithModelSpace(o, no_ms);
+  o = op::NormalOrder(o);
+  // [imsrg.space]: normal ordered in the full space, then cut (imsrg++.cc:
+  // 1427-1475).
+  if (ph.ms_normal_ordering) o = op::Truncate(o, ph.hno.model_space_ptr());
+  return o;
 }
 
 }  // namespace imsrg::driver::pipeline

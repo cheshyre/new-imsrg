@@ -26,9 +26,12 @@ struct NatResult {
   double e_hf_nat = 0.0;          ///< E_HF in the NAT basis
 };
 
-/// Runs HF, the MBPT(2) density, natural orbitals and builds the NAT-basis
-/// Hamiltonian.
-NatResult BuildNat(op::Operator H, const op::No2bThreeBody* v3);
+/// Runs HF, the MBPT(2) density, natural orbitals (ordered by `sorting`;
+/// holes reset to the HF orbitals if `use_hf_holes`, fork
+/// `use_HF_reference_in_NAT`) and builds the NAT-basis Hamiltonian.
+NatResult BuildNat(
+    op::Operator H, const op::No2bThreeBody* v3, bool use_hf_holes = false,
+    mbpt::NatSorting sorting = mbpt::NatSorting::kSignedDescending);
 
 }  // namespace imsrg::mbtest
 

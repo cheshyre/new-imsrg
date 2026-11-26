@@ -32,6 +32,7 @@
 #include "imsrg/driver/config/writer.h"
 #include "imsrg/driver/operators/operator_request.h"
 #include "imsrg/driver/pipeline/charge_radius.h"
+#include "imsrg/driver/pipeline/checkpoint.h"
 #include "imsrg/driver/pipeline/hamiltonian.h"
 #include "imsrg/driver/pipeline/mpi_sync.h"
 #include "imsrg/flow/magnus.h"
@@ -70,7 +71,9 @@ void RejectPlanned(const RunConfig& c) {
   }
   if (c.imsrg.use_brueckner_bch) Planned("imsrg.use_brueckner_bch");
   if (c.imsrg.goose_tank) Planned("imsrg.goose_tank");
-  if (c.imsrg.space) Planned("[imsrg.space] (IMSRG model-space truncation)");
+  if (c.imsrg.space && (c.imsrg3.active() || c.imsrg.perturbative_triples)) {
+    Planned("[imsrg.space] with IMSRG(3) or perturbative triples");
+  }
   if (c.imsrg3.at_end) Planned("imsrg3.at_end");
   if (c.imsrg3.in_flow) {
     if (c.imsrg3.variant != Imsrg3Variant::kN7) {
@@ -87,7 +90,29 @@ void RejectPlanned(const RunConfig& c) {
   if (c.output.valence_file_format == ValenceFileFormat::kAntoine) {
     Planned("output.valence_file_format = \"antoine\"");
   }
-  if (c.output.write_omega) Planned("output.write_omega");
+  if (c.output.write_omega && c.imsrg.method != Method::kMagnus) {
+    throw ConfigError(
+        "output.write_omega requires imsrg.method = \"magnus\" (the flow "
+        "methods keep no Omega)");
+  }
+  if (c.output.write_omega && c.imsrg3.in_flow) {
+    Planned("output.write_omega with imsrg3.in_flow (three-body Omegas)");
+  }
+  if (!c.checkpoint.directory.empty()) {
+    if (c.imsrg.method != Method::kMagnus) {
+      Planned("[checkpoint] for imsrg.method other than \"magnus\"");
+    }
+    if (c.imsrg.omega.hunter_gatherer) {
+      Planned("[checkpoint] with imsrg.omega.hunter_gatherer");
+    }
+    if (c.imsrg3.in_flow) Planned("[checkpoint] with imsrg3.in_flow");
+    if (c.imsrg.perturbative_triples) {
+      Planned("[checkpoint] with imsrg.perturbative_triples");
+    }
+  }
+  if (c.checkpoint.restart && c.checkpoint.directory.empty()) {
+    throw ConfigError("checkpoint.restart requires checkpoint.directory");
+  }
   if (!c.operators.first_order.empty()) Planned("operators.first_order");
   if (!c.operators.from_file.empty()) Planned("operators.from_file");
 }
@@ -293,8 +318,14 @@ class Engine {
   explicit Engine(flow::OdeSolver&& s) : v_(std::move(s)) {}
 
   bool is_magnus() const { return v_.index() == 0; }
-  flow::SolveResult Solve(const flow::MagnusSolver::StatusCallback& cb) {
-    return std::visit([&](auto& s) { return s.Solve(cb); }, v_);
+  /// `on_step` is used by the Magnus solver only (checkpoints).
+  flow::SolveResult Solve(
+      const flow::MagnusSolver::StatusCallback& cb,
+      const flow::MagnusSolver::StepCallback& on_step = {}) {
+    if (auto* m = std::get_if<flow::MagnusSolver>(&v_)) {
+      return m->Solve(cb, on_step);
+    }
+    return std::get<flow::OdeSolver>(v_).Solve(cb);
   }
   void set_generator(const flow::GeneratorOptions& g) {
     std::visit([&](auto& s) { s.set_generator(g); }, v_);
@@ -688,7 +719,8 @@ TriplesRecord EvaluatePerturbativeTriples(
 /// Runs stage 2 (the valence generator with a new Omega) and records it.
 void RunValenceStage(Engine& solver, FlowLog& flow_log, const RunConfig& config,
                      const basis::ModelSpace& ms,
-                     std::vector<StageRecord>& stages) {
+                     std::vector<StageRecord>& stages,
+                     const flow::MagnusSolver::StepCallback& on_step) {
   const StepConfig& step = config.imsrg.step;
   // New Omega. D47: stage 2 integrates [s_1, s_1 + smax] for every method
   // (s continues across the stages); imsrg++ doubled smax for Magnus only
@@ -702,8 +734,8 @@ void RunValenceStage(Engine& solver, FlowLog& flow_log, const RunConfig& config,
   log::Info("Setting generator to {}", ToString(val_gen));
   solver.set_generator(MakeGeneratorOptions(config, val_gen, ms));
   solver.set_solver_options(so2);
-  stages.push_back(
-      {2, std::string(ToString(val_gen)), solver.Solve(std::ref(flow_log))});
+  stages.push_back({2, std::string(ToString(val_gen)),
+                    solver.Solve(std::ref(flow_log), on_step)});
 }
 
 /// Transforms the requested operators to the end of the flow, writes their
@@ -790,28 +822,66 @@ Engine MakeEngine(const RunConfig& config,
 
 /// Runs stage 1, the perturbative triples and the optional valence stage,
 /// appending the stage records and logging their summary.
+/// With `[checkpoint]` every Magnus step goes through `ckpt`; a `restored`
+/// checkpoint (checkpoint.restart) skips the stages it has finished and
+/// continues its stage from the saved step (design/13 section 7.3).
 void RunStages(Engine& solver, FlowLog& flow_log, const RunConfig& config,
                const pipeline::PreparedHamiltonian& ph,
                const basis::ModelSpace& ms, bool magnus,
                std::vector<StageRecord>& stages,
-               std::optional<TriplesRecord>& triples) {
+               std::optional<TriplesRecord>& triples,
+               pipeline::FlowCheckpointer& ckpt,
+               std::optional<pipeline::Checkpoint> restored) {
   const Generator core_gen = config.imsrg.generator.core;
-  log::Info("Setting generator to {}", ToString(core_gen));
-  stages.push_back(
-      {1, std::string(ToString(core_gen)), solver.Solve(std::ref(flow_log))});
+  std::vector<pipeline::FinishedStage> finished;
+  flow::MagnusSolver::StepCallback on_step;
+  if (ckpt.enabled()) {
+    on_step = [&](const flow::MagnusLoopState& st) {
+      ckpt.OnStep(solver.magnus_solver(), st, finished);
+    };
+  }
+  int start_stage = 1;
+  if (restored) {
+    start_stage = restored->loop.stage;
+    for (const pipeline::FinishedStage& f : restored->stages) {
+      stages.push_back({f.stage, f.generator, f.result});
+    }
+    finished = restored->stages;
+    const Generator g =
+        start_stage == 1 ? core_gen : config.imsrg.generator.valence;
+    ckpt.Resume(*restored);
+    solver.magnus_solver().Restore(
+        restored->loop, MakeGeneratorOptions(config, g, ms),
+        std::move(restored->omegas), std::move(restored->h_saved),
+        std::move(restored->h));
+    log::Info("Restarting stage {} ({}) from the checkpoint", start_stage,
+              ToString(g));
+  }
+  if (start_stage == 1) {
+    log::Info("Setting generator to {}", ToString(core_gen));
+    stages.push_back({1, std::string(ToString(core_gen)),
+                      solver.Solve(std::ref(flow_log), on_step)});
+    finished.push_back(
+        {stages.back().stage, stages.back().generator, stages.back().result});
+  }
 
   // ---- Perturbative triples after stage 1 (imsrg++.cc:1100-1108, before the
   // second stage; H(s) and the Omega stack are those of stage 1).
-  if (config.imsrg.perturbative_triples && magnus &&
+  if (config.imsrg.perturbative_triples && magnus && start_stage == 1 &&
       stages.back().result.reason != flow::StopReason::kDiverged) {
     triples = EvaluatePerturbativeTriples(solver, ph, config);
   }
 
   const bool second_stage =
       config.imsrg.steps > 1 && config.valence.has_valence_space();
-  if (second_stage &&
-      stages.back().result.reason != flow::StopReason::kDiverged) {
-    RunValenceStage(solver, flow_log, config, ms, stages);
+  if (start_stage == 2) {
+    // The restored solver carries the stage-2 generator, step options and
+    // Omega stack.
+    stages.push_back({2, std::string(ToString(config.imsrg.generator.valence)),
+                      solver.Solve(std::ref(flow_log), on_step)});
+  } else if (second_stage &&
+             stages.back().result.reason != flow::StopReason::kDiverged) {
+    RunValenceStage(solver, flow_log, config, ms, stages, on_step);
   }
   for (const StageRecord& st : stages) {
     log::Info(
@@ -869,6 +939,18 @@ void FinishRun(const RunConfig& config, const pipeline::PreparedHamiltonian& ph,
   // Omega stack.
   TransformOperators(requests, ph, config, solver, magnus, start.ms_flow,
                      renormal, dir, stem, comm, ops);
+  // ---- output.write_omega (design/50 C6): the Omega stack plus what a later
+  // transformation needs (basis C, occupations, manifest).
+  if (config.output.write_omega && comm.is_root()) {
+    const linalg::Matrix<double>* c = nullptr;
+    if (ph.nat) {
+      c = &ph.nat->C;
+    } else if (ph.hf) {
+      c = &ph.hf->C;
+    }
+    pipeline::WriteOmegaStack(dir, stem, solver.magnus_solver().omegas(),
+                              config.output.omega_format, c);
+  }
   std::optional<ChargeRadiusRecord> radius;
   if (radius_slots) radius = MakeChargeRadiusRecord(ops, *radius_slots, ph);
   ops.resize(config.operators.list.size());  // drop the internal Rso
@@ -935,7 +1017,14 @@ void Run(const RunConfig& config, const comm::Communicator& comm) {
       [&solver]() -> const op::Operator& { return solver.hamiltonian(); });
   std::vector<StageRecord> stages;
   std::optional<TriplesRecord> triples;
-  RunStages(solver, flow_log, config, ph, ms, magnus, stages, triples);
+  pipeline::FlowCheckpointer ckpt(config, comm.is_root());
+  std::optional<pipeline::Checkpoint> restored;
+  if (config.checkpoint.restart) {
+    // Every rank reads the same files (identical bits on all ranks).
+    restored = pipeline::ReadCheckpoint(config, start.ms_flow);
+  }
+  RunStages(solver, flow_log, config, ph, ms, magnus, stages, triples, ckpt,
+            std::move(restored));
   FinishRun(config, ph, solver, start, magnus, requests, radius_slots, stages,
             triples, comm, ops);
 }

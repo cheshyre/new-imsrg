@@ -5,9 +5,10 @@
 #define IMSRG_DRIVER_LEGACY_LEGACY_PARAMETERS_H_
 /// @file
 /// The legacy layer (design/16 section 3): imsrg++'s `key=value` command line
-/// (the 85 keys of `Parameters.hh`) translated into the raw tree of the new
-/// schema, with the shorthand methods, sentinel conversions, quirk decisions
-/// Q1-Q16 and warning rules L1-L3 of design/16 3.5-3.6.
+/// (the 85 keys of `Parameters.hh` plus the fork key `use_HF_reference_in_NAT`)
+/// translated into the raw tree of the new schema, with the shorthand methods,
+/// sentinel conversions, quirk decisions Q1-Q16 and warning rules L1-L3 of
+/// design/16 3.5-3.6.
 ///
 /// The translator never parses operator names (that is
 /// `operators/operator_request`), never resolves derived values (that is
@@ -44,8 +45,8 @@ struct LegacyKeyInfo {
   std::string_view note;  ///< one line (sentinels, shorthands, messages)
 };
 
-/// All 85 keys of `Parameters.hh`, in its order (strings, doubles, ints,
-/// vectors).
+/// All 85 keys of `Parameters.hh` in its order (plus use_HF_reference_in_NAT)
+/// (strings, doubles, ints, vectors).
 std::span<const LegacyKeyInfo> LegacyKeys() noexcept;
 
 /// The row of `key` (exact, case sensitive), or nullptr.

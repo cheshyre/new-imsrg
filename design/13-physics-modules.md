@@ -265,6 +265,26 @@ to 3e-9; IT-5 NAT E_HF to 2e-10 and NAT E_MP2 to 4e-9. In the driver (run 2): IT
 * Flow log: CSV with a header (s, E0, ‖η‖, ‖Ω‖, ds, MP2 estimate, wall time) plus the same
   lines to stdout. The integration tests parse the CSV.
 
+### 7.3 Checkpoint and restart (design/50 C7, 2026-11-26)
+
+* Solver side (`flow/magnus.h`): `Solve(on_status, on_step)` calls `on_step(MagnusLoopState)` after
+  every completed step; `MagnusLoopState` = stage, step, s, ds, the E0 of the divergence guard, gather
+  counts and the step options in force (domega bump included). With H(s), H_saved and the Omega stack
+  this fixes the rest of the stage. `MagnusSolver::Restore(state, generator, omegas, h_saved, h)` puts a
+  freshly constructed solver into that state; the next `Solve` recomputes eta from H(s) and continues
+  from the next step (no domega bump, no istep-0 line). The loop itself is unchanged. With the exact
+  operators the continuation is bit for bit (test `MagnusSolver.RestoreContinuesBitForBit`).
+  Hunter-gatherer restores are refused (the gatherer changes in place; later).
+* Driver side (`driver/pipeline/checkpoint.{h,cc}`, `[checkpoint]` of design/16 §2.11):
+  `FlowCheckpointer` writes, when `interval_minutes` of wall time have passed, the closed Omegas once,
+  the H_saved of the current piece once, the current Omega and H(s), then `state.txt` atomically, then
+  removes the previous per-step files, so the directory always holds one complete checkpoint. Only
+  rank 0 writes. A restart (`checkpoint.restart`) re-runs HF/NAT (deterministic), checks the flow
+  configuration hash, reads the checkpoint on every rank, restores the finished stage records and
+  continues the stage in progress; stage 2 is entered directly when the checkpoint is in stage 2.
+* Formats: native float64 (`io::WriteOperatorBinary`, bit-exact restart) or ME1J + float32 binary
+  ME2JP (restart within float32 precision, owner answer to O4).
+
 ## 8. opslib (reference: `reference/05` §1)
 
 Phase 1 (scalar): kinetic energy T (with A-dependence, `A` parameter), intrinsic kinetic energy

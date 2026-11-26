@@ -26,6 +26,12 @@ target_compile_definitions(io_me2j_golden PRIVATE
   IMSRG_TEST_DATA_DIR="${IMSRG_TEST_DATA_DIR}"
   IMSRG_GENERATED_GOLDEN_DIR="${IMSRG_GENERATED_GOLDEN_DIR}")
 
+imsrg_add_test(NAME io_mexj
+  SOURCES test_mexj.cc ${_imsrg_exec_main}
+  DEPS io
+  LABELS unit
+  NO_GTEST_MAIN)
+
 imsrg_add_test(NAME io_no2b
   SOURCES test_no2b.cc ${_imsrg_exec_main}
   DEPS io
@@ -59,3 +65,10 @@ imsrg_add_test(NAME io_valence_writers
   LABELS integration reference
   NO_GTEST_MAIN)
 target_compile_definitions(io_valence_writers PRIVATE IMSRG_GOLDEN_DIR="${_imsrg_golden_dir}")
+
+# Native float64 operator files (design/19 section 3.2).
+imsrg_add_test(NAME io_operator_binary
+  SOURCES test_operator_binary.cc ${_imsrg_exec_main}
+  DEPS io
+  LABELS unit
+  NO_GTEST_MAIN)

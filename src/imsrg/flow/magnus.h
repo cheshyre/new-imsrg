@@ -13,6 +13,7 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "imsrg/commutator/options.h"
@@ -91,6 +92,22 @@ struct SolveResult {
   StopReason reason = StopReason::kSmaxReached;
 };
 
+/// The scalar loop state of the Magnus solver after a completed step: with
+/// H(s), H_saved and the Omega stack it is everything `Solve` needs to
+/// continue the stage exactly as if it had not stopped (flow checkpoints,
+/// design/13 section 7.3). eta(s) is recomputed from H(s) on restore.
+struct MagnusLoopState {
+  int stage = 0;         ///< 1-based stage (number of `Solve` calls).
+  int istep = 0;         ///< Steps completed in this stage.
+  double s = 0.0;        ///< Flow parameter after the step.
+  double ds = 0.0;       ///< The step just taken (reused only when
+                         ///< `magnus_adaptive` is off).
+  double e_last = 0.0;   ///< E0 of H(s) (divergence guard of the next step).
+  int loop_gathers = 0;  ///< Gathers of this stage so far (hunter-gatherer).
+  int num_gathers = 0;   ///< Gathers over the solver's lifetime.
+  SolverOptions solver;  ///< Step options in force (domega bump included).
+};
+
 /// Magnus solver state: H_0, H(s), eta(s), the Omega stack and s (imsrg++
 /// `IMSRGSolver` with method magnus, Omega kept in memory, hunter-gatherer
 /// optional). Owns a commutator `Workspace` for H_0's model space. Not copyable
@@ -99,6 +116,10 @@ class MagnusSolver {
  public:
   /// Callback receiving every flow-log line (istep 0 and each step).
   using StatusCallback = std::function<void(const FlowStatus&)>;
+  /// Callback after every completed step (after the status line), with the
+  /// loop state; the solver's `hamiltonian()`, `saved_hamiltonian()` and
+  /// `omegas()` are those of the same step (checkpoint writers).
+  using StepCallback = std::function<void(const MagnusLoopState&)>;
 
   /// Sets up the solver for H0 (copied; scalar, Hermitian, particle_rank 2 or
   /// 3, normal ordered with respect to the reference of its model space). With
@@ -178,7 +199,22 @@ class MagnusSolver {
   ///
   /// Collective over the Workspace communicator: every rank calls it with
   /// identical inputs.
-  SolveResult Solve(const StatusCallback& on_status = {});
+  SolveResult Solve(const StatusCallback& on_status = {},
+                    const StepCallback& on_step = {});
+
+  /// Restores the solver to a checkpointed step (see `MagnusLoopState`): the
+  /// next `Solve` continues stage `state.stage` from step `state.istep + 1`
+  /// (no domega bump, no istep-0 status line; eta is recomputed from `h`)
+  /// and returns the same result as the uninterrupted call. `omegas` is the
+  /// whole stack (oldest first, non-empty), `h_saved` the Hamiltonian the
+  /// last Omega acts on (ignored, may be empty, for a one-entry stack), `h`
+  /// H(s); all on the solver's model space with H_0's particle rank. With
+  /// the exact operators of the checkpoint the continuation is bit for bit.
+  /// @throws InputError for a hunter-gatherer solver (not supported yet), an
+  ///   empty stack or operators on another model space.
+  void Restore(const MagnusLoopState& state, const GeneratorOptions& generator,
+               std::vector<op::Operator> omegas, op::Operator h_saved,
+               op::Operator h);
 
   /// e^Omega_n ... e^Omega_1 O e^-Omega_1 ... e^-Omega_n: replays the Omega
   /// stack in chronological order with `BchTransform` (imsrg++
@@ -198,6 +234,9 @@ class MagnusSolver {
   const BchOptions& bch_options() const noexcept { return bch_; }
   /// H(s).
   const op::Operator& hamiltonian() const noexcept { return h_; }
+  /// H_saved: the Hamiltonian the last Omega acts on once the stack has more
+  /// than one entry (empty before the first split).
+  const op::Operator& saved_hamiltonian() const noexcept { return h_saved_; }
   /// eta(s) (zero before the first `solve`).
   const op::Operator& eta() const noexcept { return eta_; }
   /// The Omega stack, oldest first; the last entry is the one being built.
@@ -238,6 +277,7 @@ class MagnusSolver {
   int num_gathers_ = 0;
   int stage_ = 0;
   double t_start_ = 0.0;
+  std::optional<MagnusLoopState> resume_;  ///< Set by `Restore`.
 };
 
 }  // namespace imsrg::flow
