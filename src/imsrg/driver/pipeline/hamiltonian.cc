@@ -32,6 +32,7 @@
 #include "imsrg/operator/truncate.h"
 #include "imsrg/opslib/center_of_mass.h"
 #include "imsrg/opslib/kinetic.h"
+#include "imsrg/opslib/nreft.h"
 #include "imsrg/opslib/radius.h"
 
 namespace imsrg::driver::pipeline {
@@ -247,6 +248,11 @@ op::Operator BuildBareOperator(const OperatorRequest& request,
   const int A = ph.mass_number;
   const int Z = ph.proton_number;
   switch (request.kind) {
+    case OperatorKind::kNreft: {
+      const auto s = opslib::nreft::ParseShorthand(request.canonical_name);
+      IMSRG_CHECK(s.has_value());
+      return opslib::nreft::BuildScalarShorthand(ms, *s);
+    }
     case OperatorKind::kRp2:
       return opslib::Rp2(ms, A, Z);
     case OperatorKind::kRso:
