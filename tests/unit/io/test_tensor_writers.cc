@@ -208,6 +208,7 @@ struct Synth {
     const auto i3 = tb.local_index(c3, tb.ket_index(pd5, pd3));
     const auto i4 = tb.local_index(c4, tb.ket_index(pd5, pd3));
     op.two_body().set(c3, c4, *i3, *i4, 5.0e-8);
+    op.SyncToDevice();
   }
 };
 

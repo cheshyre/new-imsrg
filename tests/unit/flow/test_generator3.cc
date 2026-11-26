@@ -98,6 +98,7 @@ TEST(Generator3, VanishingDelta3IsFloored) {
   Operator H =
       testing::RandomThreeBodyOperator(ctx, Hermiticity::kHermitian, 13);
   H.one_body().set_zero();  // every Delta3 is exactly zero
+  H.SyncToDevice();
   GeneratorOptions opts;
   opts.kind = GeneratorKind::kWhite;
   opts.denominator_cutoff = 1.0e-3;
@@ -108,6 +109,7 @@ TEST(Generator3, VanishingDelta3IsFloored) {
   }
   // Delta3 = f_00 - 0 = -1e-9 and +1e-9: floored to -+cutoff, sign kept.
   H.one_body().set(o0, o0, -1.0e-9);
+  H.SyncToDevice();
   {
     const flow::Denominators den(H, opts);
     EXPECT_EQ(
@@ -118,6 +120,7 @@ TEST(Generator3, VanishingDelta3IsFloored) {
         1.0e-3);
   }
   H.one_body().set_zero();
+  H.SyncToDevice();
   const Operator eta_a = flow::ComputeGenerator(H, opts);
   opts.denominator_cutoff = 1.0e-2;
   const Operator eta_b = flow::ComputeGenerator(H, opts);
