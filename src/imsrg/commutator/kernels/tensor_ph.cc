@@ -302,14 +302,17 @@ IMSRG_FORCEINLINE_FUNCTION void PhstQuad(const exec::TeamMember& member,
     if (off < 0) return;
     if (cb == ck && iket < ibra) return;  // lower triangle: the mirror
     const int nb = v.tb.channel_num_kets[cb];
+    // The 9j boxes of both sums, looked up once per (J1, J2).
+    const angmom::NineJView::Slice s1 = v.ninej.MakeSlice(
+        TwoJ{ji}, TwoJ{jl}, TwoJ{jj}, TwoJ{jk}, TwoJ{2 * J1}, TwoJ{2 * J2});
+    const angmom::NineJView::Slice s2 = v.ninej.MakeSlice(
+        TwoJ{jj}, TwoJ{jl}, TwoJ{ji}, TwoJ{jk}, TwoJ{2 * J1}, TwoJ{2 * J2});
     double commij = 0.0;
     for (int J3 = Iabs(ji - jl) / 2; J3 <= (ji + jl) / 2; ++J3) {
       const int J4min = Imax(Iabs(jk - jj) / 2, Iabs(J3 - v.L));
       const int J4max = Imin((jk + jj) / 2, J3 + v.L);
       for (int J4 = J4min; J4 <= J4max; ++J4) {
-        const double nj9 =
-            v.ninej(TwoJ{ji}, TwoJ{jl}, TwoJ{2 * J3}, TwoJ{jj}, TwoJ{jk},
-                    TwoJ{2 * J4}, TwoJ{2 * J1}, TwoJ{2 * J2});
+        const double nj9 = s1(J3, J4);
         if (nj9 == 0.0) continue;
         const double hat = Kokkos::sqrt((2.0 * J1 + 1) * (2.0 * J2 + 1) *
                                         (2.0 * J3 + 1) * (2.0 * J4 + 1));
@@ -324,9 +327,7 @@ IMSRG_FORCEINLINE_FUNCTION void PhstQuad(const exec::TeamMember& member,
         const int J4min = Imax(Iabs(jk - ji) / 2, Iabs(J3 - v.L));
         const int J4max = Imin((jk + ji) / 2, J3 + v.L);
         for (int J4 = J4min; J4 <= J4max; ++J4) {
-          const double nj9 =
-              v.ninej(TwoJ{jj}, TwoJ{jl}, TwoJ{2 * J3}, TwoJ{ji}, TwoJ{jk},
-                      TwoJ{2 * J4}, TwoJ{2 * J1}, TwoJ{2 * J2});
+          const double nj9 = s2(J3, J4);
           if (nj9 == 0.0) continue;
           const double hat = Kokkos::sqrt((2.0 * J1 + 1) * (2.0 * J2 + 1) *
                                           (2.0 * J3 + 1) * (2.0 * J4 + 1));
@@ -633,9 +634,14 @@ void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   // One item per row of the stacked stored blocks, its columns iket >= the
   // first stored one (iket >= ibra in diagonal blocks): looped inside the
   // item on the host, over a team's threads on the device (M14).
-  if constexpr (exec::kDeviceKernels) {
-    // Device (M14): one team per ket pair (a, b) of compatible classes; the
-    // Zbar values of the pair are gathered once for all (J1, J2) blocks.
+  // Device (M14), rank L >= kQuadMinRank: one team per ket pair (a, b) of
+  // compatible classes; the Zbar values of the pair are gathered once for
+  // all (J1, J2) blocks. For small L few (J1, J2) share a pair and the
+  // element-wise form below is faster. Measured at emax 10 (ms, element /
+  // quad): L = 1 275 / 583, 2 675 / 775, 3 1173 / 944, 4 1642 / 1094,
+  // 5 2150 / 1206.
+  constexpr int kQuadMinRank = 3;
+  if (exec::kDeviceKernels && L >= kQuadMinRank) {
     const basis::TwoBodyChannels& tbh = ctx.ms->two_body();
     const basis::SingleParticleBasis& sp = ctx.ms->basis();
     std::vector<std::vector<std::int32_t>> by_class(6);
