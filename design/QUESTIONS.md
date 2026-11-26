@@ -1435,3 +1435,16 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
   matrices). **Assumed meanwhile:** keep the emulation; the odd-rank files are NOT within the 5e-7 rule
   (the integration test compares them with the strict rule and therefore fails for them; no tolerance
   was loosened).
+* **AL-F2** (lead F, C10 file names) - The transform farm writes the fork's names `<stem><name>.snt` /
+  `<stem><name>_2b.snt` (with `output.stem = "int"` exactly the archive's), the in-process driver keeps
+  `<stem>_<name>.snt` / `<stem>_<name>_2b.snt`. **Assumed:** keep both (no change for existing runs);
+  say if the in-process names should follow the fork under `run.compat`.
+* **AL-F3** (lead F, C10 cost model) - The static assignment weighs an item by num_omegas x the
+  block-gemm work of one [Omega, O] for its rank L (design/50 §6.1), assuming the same number of BCH
+  terms for every operator of a stack. Not yet timed at emax 10 (one item per rank makes it irrelevant
+  for the planned 2415-rank jobs; it matters only with fewer ranks than items). **Assumed:** fine until a
+  timing of one item at emax 10 exists; refit then.
+* **AL-F4** (lead F, C10 farm resubmission) - A killed farm job leaves `failed.txt` listing every item
+  (written first, rewritten at the end), and outputs are renamed into place; resubmission uses either
+  the failure manifest as the work list or the same list with `transform.skip_existing = true`.
+  **Assumed:** enough; a per-item progress log is not written.
