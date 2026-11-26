@@ -158,8 +158,6 @@ void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   if (!X.two_body().allocated() || !Y.two_body().allocated() ||
       !Z.two_body().allocated())
     return;
-  IMSRG_CHECK(Z.one_body().buffer().host_is_device(),
-              "comm222_phst: host BLAS on device memory");
   exec::Fence("commutator::comm222_phst");
   auto& ctx = ws.context();
   const auto& cc = ctx.cross_coupled();
@@ -357,12 +355,15 @@ void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
         });
   }
   exec::Fence("commutator::comm222_phst::pandya");
-  // 3. Zbar^{c3 c4} = Xbar3[:, ph3] YA - hX YB Xbar4[:, ph4]^T (host BLAS).
+  // 3. Zbar^{c3 c4} = Xbar3[:, ph3] YA - hX YB Xbar4[:, ph4]^T (device BLAS:
+  //    the first products in one grouped call, then the subtractions).
   {
     const double* xcd = xc.device_data();
     const double* yad = ya.device_data();
     const double* ybd = yb.device_data();
     double* zbd = zb.device_data();
+    std::vector<linalg::GemmProblem> first;
+    std::vector<linalg::GemmProblem> second;
     for (std::int32_t P = 0; P < npairs; ++P) {
       const std::int32_t c3 = p3[static_cast<std::size_t>(P)];
       const std::int32_t c4 = p4[static_cast<std::size_t>(P)];
@@ -380,11 +381,13 @@ void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
           ybd + yb_off[static_cast<std::size_t>(P)], n3, m4, n3};
       linalg::MatrixView<const double> X4{
           xcd + xc_off[static_cast<std::size_t>(c4)], n4, m4, n4};
-      linalg::DeviceGemm(1.0, X3, linalg::Op::kNoTrans, YA,
-                         linalg::Op::kNoTrans, 0.0, Zm);
-      linalg::DeviceGemm(-1.0 * hX, YB, linalg::Op::kNoTrans, X4,
-                         linalg::Op::kTrans, 1.0, Zm);
+      first.push_back(linalg::GemmProblem{1.0, X3, linalg::Op::kNoTrans, YA,
+                                          linalg::Op::kNoTrans, 0.0, Zm});
+      second.push_back(linalg::GemmProblem{-1.0 * hX, YB, linalg::Op::kNoTrans,
+                                           X4, linalg::Op::kTrans, 1.0, Zm});
     }
+    linalg::DeviceGroupedGemm(first);
+    linalg::DeviceGroupedGemm(second);
   }
   // 4. Inverse transform into the stored blocks of Z.
   std::vector<std::int32_t> zcb, zck, znb, znk, zro{0};

@@ -45,9 +45,6 @@ int CheckInputs(const op::Operator& X, const op::Operator& Y,
     throw NotImplementedError(
         "tensor commutator: rank_J > 2 emax + 1 exceeds the 6j tables");
   }
-  IMSRG_CHECK(Z.one_body().buffer().host_is_device(),
-              "tensor commutator: host BLAS on device memory (GPU backends "
-              "need a device gemm)");
   exec::Fence("commutator::tensor");
   return op::HermiticitySign(zs.hermiticity);
 }
@@ -102,6 +99,13 @@ OneBodyArgs MakeOneBodyArgs(const op::Operator& X, const op::Operator& Y,
   return a;
 }
 
+template <class T>
+exec::DeviceBuffer<T> ToDevice(const std::vector<T>& v, const char* label) {
+  exec::DeviceBuffer<T> b(v.size(), label);
+  if (!v.empty()) b.CopyFromHost(v);
+  return b;
+}
+
 IMSRG_INLINE_FUNCTION int Imin(int a, int b) { return a < b ? a : b; }
 IMSRG_INLINE_FUNCTION int Imax(int a, int b) { return a > b ? a : b; }
 IMSRG_INLINE_FUNCTION int Iabs(int a) { return a < 0 ? -a : a; }
@@ -114,10 +118,10 @@ void Comm111st(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   const auto x1 = std::as_const(X).one_body().device_view();
   const auto y1 = std::as_const(Y).one_body().device_view();
   const auto z1 = Z.one_body().device_view();
-  linalg::Gemm(1.0, x1, linalg::Op::kNoTrans, y1, linalg::Op::kNoTrans, 1.0,
-               z1);
-  linalg::Gemm(-1.0, y1, linalg::Op::kNoTrans, x1, linalg::Op::kNoTrans, 1.0,
-               z1);
+  linalg::DeviceGemm(1.0, x1, linalg::Op::kNoTrans, y1, linalg::Op::kNoTrans,
+                     1.0, z1);
+  linalg::DeviceGemm(-1.0, y1, linalg::Op::kNoTrans, x1, linalg::Op::kNoTrans,
+                     1.0, z1);
 }
 
 void Comm121st(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
@@ -473,57 +477,128 @@ void Comm222PpHh221st(const op::Operator& X, const op::Operator& Y,
       whh[static_cast<std::size_t>(c)].push_back((ha && hb) ? na * nb : 0.0);
     }
   }
-  // Mpp and Mhh with Z's block layout (host-accessible memory, host BLAS).
+  // Mpp and Mhh with Z's block layout, on the device (M14):
+  //   M_c(b, k) = X_b diag(w_b) Y_bk - Y_bk diag(w_k) X_k
+  // for w = Pbar (pp) and P (hh). The weights go into scaled copies of the
+  // scalar X (XD = X diag(w), DX = diag(w) X: four copies of the small scalar
+  // two-body part) instead of a weighted copy of every tensor block of Y.
+  // Two grouped GEMM calls (the beta = 0 products, then the subtractions into
+  // the same C), then Z += Mpp - Mhh element-wise.
   op::TwoBody mpp(Z.two_body());
   op::TwoBody mhh(Z.two_body());
   mpp.set_zero();
   mhh.set_zero();
-  mpp.SyncToHost();
-  mhh.SyncToHost();
-  X.SyncToHost();
-  Y.SyncToHost();
-  Z.SyncToHost();
-  const op::TwoBody& x2 = X.two_body();
-  const op::TwoBody& y2 = Y.two_body();
+  const auto nchan = static_cast<std::size_t>(tbh.num_channels());
+  std::vector<std::int64_t> ket_off(nchan + 1, 0);
+  for (std::size_t c = 0; c < nchan; ++c)
+    ket_off[c + 1] = ket_off[c] + static_cast<std::int64_t>(wpp[c].size());
+  const std::int64_t nk_all = ket_off.back();
+  std::vector<double> w_host(2 * static_cast<std::size_t>(nk_all));
+  for (std::size_t c = 0; c < nchan; ++c) {
+    for (std::size_t k = 0; k < wpp[c].size(); ++k) {
+      w_host[static_cast<std::size_t>(ket_off[c]) + k] = wpp[c][k];
+      w_host[static_cast<std::size_t>(nk_all + ket_off[c]) + k] = whh[c][k];
+    }
+  }
+  // X's diagonal blocks: offset (-1: absent) and dimension per channel, and
+  // the compact offsets of the scaled copies.
+  std::vector<std::int64_t> x_block(nchan, -1);
+  std::vector<std::int64_t> x_dim(nchan, 0);
+  for (const auto& info : X.two_body().matrix().blocks()) {
+    if (info.row_block != info.col_block || info.rows == 0) continue;
+    const auto c = static_cast<std::size_t>(info.row_block.value());
+    x_block[c] = info.offset;
+    x_dim[c] = info.rows;
+  }
+  std::vector<std::int64_t> x_off(nchan + 1, 0);
+  for (std::size_t c = 0; c < nchan; ++c)
+    x_off[c + 1] = x_off[c] + x_dim[c] * x_dim[c];
+  const std::int64_t xsize = x_off.back();
+  const auto d_w = ToDevice(w_host, "imsrg::tensor_ladder::w");
+  const auto d_xblock = ToDevice(x_block, "imsrg::tensor_ladder::x_block");
+  const auto d_xdim = ToDevice(x_dim, "imsrg::tensor_ladder::x_dim");
+  const auto d_xoff = ToDevice(x_off, "imsrg::tensor_ladder::x_off");
+  const auto d_kofs = ToDevice(ket_off, "imsrg::tensor_ladder::ket_off");
+  // xs = [XD_pp | DX_pp | XD_hh | DX_hh], each compact by channel.
+  exec::DeviceBuffer<double> xs(static_cast<std::size_t>(4 * xsize),
+                                "imsrg::tensor_ladder::xs");
+  if (xsize > 0) {
+    const double* xd = X.two_body().matrix().buffer().device_data();
+    const double* w = d_w.device_data();
+    const std::int64_t* xb = d_xblock.device_data();
+    const std::int64_t* xn = d_xdim.device_data();
+    const std::int64_t* xo = d_xoff.device_data();
+    const std::int64_t* ko = d_kofs.device_data();
+    const int nc = static_cast<int>(nchan);
+    double* out = xs.device_data();
+    exec::ParallelFor(
+        "commutator::comm222_pp_hh_221st::scale_x", xsize,
+        IMSRG_LAMBDA(const exec::Index e) {
+          const int c = detail::FindBlock(xo, nc, e);
+          const std::int64_t dim = xn[c];
+          const std::int64_t local = e - xo[c];
+          const std::int64_t col = local / dim;
+          const std::int64_t row = local - col * dim;
+          const double x = xd[xb[c] + local];
+          const double* wpp_c = w + ko[c];
+          const double* whh_c = w + nk_all + ko[c];
+          out[e] = x * wpp_c[col];
+          out[xsize + e] = wpp_c[row] * x;
+          out[2 * xsize + e] = x * whh_c[col];
+          out[3 * xsize + e] = whh_c[row] * x;
+        });
+  }
+  std::vector<linalg::GemmProblem> first;
+  std::vector<linalg::GemmProblem> second;
+  const auto& ymat = Y.two_body().matrix();
+  const double* yd = ymat.buffer().device_data();
+  const double* xsd = xs.device_data();
   for (const auto& info : Z.two_body().matrix().blocks()) {
     if (info.rows == 0 || info.cols == 0) continue;
-    const ChannelIndex cb{info.row_block.value()};
-    const ChannelIndex ck{info.col_block.value()};
-    const auto yblk = y2.host_block(cb, ck);
-    const auto xb = x2.host_block(cb);
-    const auto xk = x2.host_block(ck);
-    linalg::Matrix<double> ys(info.rows, info.cols);
-    for (const int which : {0, 1}) {
-      const auto& w = (which == 0) ? wpp : whh;
-      const auto out =
-          (which == 0) ? mpp.host_block(cb, ck) : mhh.host_block(cb, ck);
-      const auto& wb = w[cb.ToSize()];
-      const auto& wk = w[ck.ToSize()];
-      for (std::int64_t c = 0; c < info.cols; ++c)
-        for (std::int64_t r = 0; r < info.rows; ++r)
-          ys(r, c) = wb[static_cast<std::size_t>(r)] * yblk(r, c);
-      linalg::Gemm(1.0, xb, linalg::Op::kNoTrans, ys.const_view(),
-                   linalg::Op::kNoTrans, 0.0, out);
-      for (std::int64_t c = 0; c < info.cols; ++c)
-        for (std::int64_t r = 0; r < info.rows; ++r)
-          ys(r, c) = yblk(r, c) * wk[static_cast<std::size_t>(c)];
-      linalg::Gemm(-1.0, ys.const_view(), linalg::Op::kNoTrans, xk,
-                   linalg::Op::kNoTrans, 1.0, out);
+    const auto cb = static_cast<std::size_t>(info.row_block.value());
+    const auto ck = static_cast<std::size_t>(info.col_block.value());
+    const auto yk = ymat.find_block(info.row_block, info.col_block);
+    if (!yk.has_value()) continue;  // Y block absent: M = 0
+    const linalg::MatrixView<const double> yblk{
+        yd + ymat.block_info(*yk).offset, info.rows, info.cols, info.rows};
+    for (int which = 0; which < 2; ++which) {
+      double* out = (which == 0 ? mpp : mhh).matrix().buffer().device_data() +
+                    info.offset;
+      const linalg::MatrixView<double> cv{out, info.rows, info.cols, info.rows};
+      // An absent X block is zero: its product term vanishes.
+      if (x_block[cb] >= 0) {
+        const linalg::MatrixView<const double> xdb{
+            xsd + 2 * which * xsize + x_off[cb], info.rows, info.rows,
+            info.rows};
+        first.push_back(linalg::GemmProblem{1.0, xdb, linalg::Op::kNoTrans,
+                                            yblk, linalg::Op::kNoTrans, 0.0,
+                                            cv});
+      }
+      if (x_block[ck] >= 0) {
+        const linalg::MatrixView<const double> dxk{
+            xsd + (2 * which + 1) * xsize + x_off[ck], info.cols, info.cols,
+            info.cols};
+        second.push_back(linalg::GemmProblem{-1.0, yblk, linalg::Op::kNoTrans,
+                                             dxk, linalg::Op::kNoTrans, 1.0,
+                                             cv});
+      }
     }
-    if (two_body) {
-      const auto z = Z.two_body().host_block(cb, ck);
-      const auto p = std::as_const(mpp).host_block(cb, ck);
-      const auto h = std::as_const(mhh).host_block(cb, ck);
-      for (std::int64_t c = 0; c < info.cols; ++c)
-        for (std::int64_t r = 0; r < info.rows; ++r)
-          z(r, c) += p(r, c) - h(r, c);
-    }
+  }
+  linalg::DeviceGroupedGemm(first);
+  linalg::DeviceGroupedGemm(second);
+  if (two_body) {
+    double* zd = Z.two_body().matrix().buffer().device_data();
+    const double* pd = mpp.matrix().buffer().device_data();
+    const double* hd = mhh.matrix().buffer().device_data();
+    exec::ParallelFor(
+        "commutator::comm222_pp_hh_221st::z2",
+        static_cast<exec::Index>(Z.two_body().matrix().buffer().size()),
+        IMSRG_LAMBDA(const exec::Index e) { zd[e] += pd[e] - hd[e]; });
   }
   mpp.set_hermiticity(Z.hermiticity());
   mhh.set_hermiticity(Z.hermiticity());
-  mpp.SyncToDevice();
-  mhh.SyncToDevice();
-  Z.SyncToDevice();
+  // The temporaries above (xs, offset tables) must outlive the queued work.
+  exec::Fence("commutator::comm222_pp_hh_221st::gemm");
   if (!one_body) return;
   const std::int32_t nch = ctx.tables.two_body().num_channels;
   const auto zoff = detail::BlockOffsetTable(Z.two_body(), nch);

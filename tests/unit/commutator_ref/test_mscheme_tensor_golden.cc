@@ -166,6 +166,8 @@ TEST(MSchemeTensorGolden, AllTermsAndRanksEmax1) {
             }
           }
         }
+        // Host writes into `want`: publish them (Deviation may sync to host).
+        want.two_body().matrix().buffer().SyncToDevice();
         double d1 = 0.0;
         double d2 = 0.0;
         const double dev = Deviation(z, want, &d1, &d2);
