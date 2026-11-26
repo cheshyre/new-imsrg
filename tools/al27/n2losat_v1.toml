@@ -118,6 +118,7 @@ flow_file = "/lustre/orion/nph123/scratch/mheinz/imsrg/runs/al27/v1/N2LOsat/flow
 valence_file_format = "tokyo"
 write_omega = true
 omega_format = "native"
+omega_second_format = true
 write_ho_ops = false
 write_hf_ops = false
 spwf = []
