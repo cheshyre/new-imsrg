@@ -238,6 +238,25 @@ As implemented in M0:
   `new-imsrg-reference/build` for the standalone build, and `add_subdirectory(<src> build)` in the
   wrapper `tools/reference/CMakeLists.txt` (binary dir `new-imsrg-reference/harness-build`).
   The wrapper also needs its own `find_package(OpenMP)` (imported targets are directory-scoped).
+* **Frontier (2026-11-26).** All paths come from `tools/reference/ref_env.sh` (sourced by every
+  script): `REF_ROOT` = `$IMSRG_REFERENCE_ROOT` (SHA files, read-only), `REF_BUILD` =
+  `$IMSRG_REFERENCE_BUILD`, else `$IMSRG_WORK/reference-build` (all copies, builds, runs; the SHA
+  files it writes there are used only when `REF_ROOT` has none), `REF_SRC` = `$REF_ROOT/imsrg-devel`,
+  `DATA` = `$IMSRG_TEST_DATA_DIR`, else `$IMSRG_WORK/inputs`; without `IMSRG_WORK` the Mac
+  defaults apply. Build on a compute node (no internet there, nothing to download):
+  `source tools/lib/frontier_env.sh; imsrg_compute tools/reference/build_imsrg_devel.sh patched`
+  (then `all` for the pristine pair; about 1 min each on 56 cores). The script loads the CPU modules of
+  section 9 plus `gsl/2.8 boost/1.88.0` (the login node's system Boost is 1.66, the compute nodes have
+  none) and uses the Cray wrappers `cc`/`CC` (gcc 14.2, cray-libsci as BLAS). What differed from
+  the Mac: (1) the hard-coded `BLA_VENDOR OpenBLAS` finds nothing, so `-DBLAS_LIBRARIES=sci_gnu_mp`
+  is preset (the wrapper links libsci itself); (2) gcc 14 needs `<cstdint>` in
+  `imsrg_util/Pwd.hh`, supplied by `-DCMAKE_CXX_FLAGS="-include cstdint"` instead of a source patch;
+  (3) the wrappers default to static linking, so `CRAYPE_LINK_TYPE=dynamic` and
+  `CMAKE_POSITION_INDEPENDENT_CODE=ON` for `libIMSRG.so`. The source checksum equals the Mac one
+  (`ddcbf1af...`). Regenerated `golden-generated` agrees with the Mac files to about 1e-15 relative
+  in the physics numbers (E_HF, MP2, norms) and 1e-13 absolute in the dumps; the entries below
+  about 1e-17 are rounding noise that the dumps write or omit differently.
+
 
 ## 6. Plain Makefile (later, M13)
 
@@ -304,3 +323,61 @@ next to it), so `PYTHONPATH=<build>/python` works. `tools/ci.sh` runs `pytest te
 the integration step when the extension exists, and prints a skip message otherwise. Planned
 (owner, 2026-11-16, D51): the Python step runs with `IMSRG_RESIDENCY=strict`, so the tests and
 examples stay GPU-portable (they call `sync_to_host()` explicitly).
+
+## 9. OLCF Frontier (since 2026-11-26)
+
+The project moved from the Mac to Frontier (project nph123). The Mac sections above stay valid for
+the Mac presets; this section is the Frontier recipe. Paths come from `~/.bashrc`: `IMSRG_HUB`,
+`IMSRG_WORK` (`$IMSRG_WORK/main` = the integrator's clone, `agents/` = agent clones, `inputs/`,
+`golden-generated/`, `logs/`), `IMSRG_REFERENCE_ROOT`, `IMSRG_DEPS_PREFIX` (`$IMSRG_WORK/deps`),
+`CCACHE_DIR`, `CCACHE_BASEDIR`.
+
+**Toolchain** (`tools/lib/frontier_env.sh`, `imsrg_frontier_modules cpu|hip`): PrgEnv-gnu 8.7.0
+with gcc-native 14.2 through the Cray wrapper `CC` (it links cray-mpich 9.1.0 and cray-libsci
+26.03.0 implicitly: FindMPI and FindBLAS/FindLAPACK report "implicitly linked", the BLAS backend
+name is "All"), cmake 4.1.5, ninja 1.13.2, ccache 4.12.1, Python 3.14.3 (spack module; the
+`cray-python` modules are older). `hip` adds rocm 7.0.2 and uses `hipcc`, with `MPI_HOME=$MPICH_DIR`
+(hipcc is not a Cray wrapper). Kokkos 5.3.0 per backend in `$IMSRG_DEPS_PREFIX`: `kokkos-openmp`
+and `kokkos-serial` built with `CC`, `kokkos-hip` with hipcc (`Kokkos_ENABLE_HIP`,
+`Kokkos_ARCH_AMD_GFX90A`, `Kokkos_ARCH_ZEN3`, Serial host space). Lint tools come pinned from pip
+into the venv (`tools/requirements-dev.txt`): cpplint 2.0.2, clang-format 23.1.5 (same as the
+Mac's Homebrew one), clang-tidy 23.1.4 (no 23.1.5 wheel; only `readability-identifier-naming` is
+used). `ci.sh` and `lint.sh` prefer the venv's binaries.
+
+**Compute node rule.** The login node is shared: editing, git, short commands, job submission.
+Configure, builds and tests run on a compute node of a running allocation, normally one named
+`imsrg`: `salloc -A nph123 -N 1 -t 02:00:00 -J imsrg --no-shell` (batch partition, 2 h limit for
+1-node jobs; renew when it ends). `imsrg_frontier_jobid` finds it (`IMSRG_SLURM_JOBID`, else
+`SLURM_JOB_ID`, else the newest running job of the user named `$IMSRG_SLURM_JOBNAME`, default
+`imsrg`); `imsrg_compute <cmd>` runs `srun --jobid=<job> --overlap -N1 -n1 -c 56 --cpu-bind=none
+--export=ALL <cmd>`. `--overlap` lets several agents share the node (56 cores, 112 hardware threads,
+512 GB). Compute nodes have no internet access: anything that downloads (pip, submodule fetches)
+runs on the login node.
+
+**Presets.** `frontier-cpu` (CI; Debug `-O1 -g`, Kokkos OpenMP, `CMAKE_CXX_COMPILER=CC`), `frontier-serial` (the same with the debug Serial Kokkos, the Mac `dev-serial` equivalent),
+`frontier-cpu-release` (Release, `IMSRG_NATIVE_ARCH`, i.e. `-march=native` = znver3), `frontier-hip`
+(Release, hipcc, `IMSRG_BUILD_PYTHON=OFF`; compile check). All set
+`IMSRG_TEST_DATA_DIR=$IMSRG_WORK/inputs`, `IMSRG_GENERATED_GOLDEN_DIR=$IMSRG_WORK/golden-generated`
+(shared by every clone, so agent clones need no copy), and the MPI test launcher
+`MPIEXEC_EXECUTABLE=/usr/bin/srun`, `MPIEXEC_NUMPROC_FLAG=-n`,
+`IMSRG_MPIEXEC_PREFLAGS=--overlap --cpu-bind=none -c 4`: inside the compute step, ctest starts each
+MPI test as a nested `srun -n <ranks>` step.
+
+**`tools/ci.sh frontier-*`** loads the modules, finds the allocation, and runs configure, build,
+unit, integration, MPI and Python tests through `imsrg_compute` (56 build jobs, 14 test slots of 4
+threads); layering, clang-format, cpplint and the license check run on the login node.
+`frontier-hip` stops after the build. **`tools/bootstrap_deps.sh`** loads the modules itself and
+builds `openmp serial hip` by default on Frontier; run it on a compute node
+(`srun --jobid=<job> --overlap -n1 -c 56 tools/bootstrap_deps.sh`), which skips the venv, then
+`tools/bootstrap_deps.sh --backends ""` on the login node for the venv.
+
+**Pitfalls found during the port.**
+* pip on a compute node hangs (no network): the venv is made on the login node.
+* `.gitmodules` asks for shallow submodules; local clones ignore `--depth` with a warning. The
+  nested `extern/nanobind/ext/robin_map` must be initialized in the integrator's clone
+  (`git submodule update --init --recursive`) before agent clones can borrow it.
+* The OpenMP cray-libsci that `CC -fopenmp` links (`libsci_gnu_mp`) is not reentrant across host
+  threads: two threads in `dgemm` at once segfault (`dgemm_kernel_loop_mnk_a1b1_mt_naples`), with
+  or without Kokkos. `linalg` serializes its BLAS/LAPACK calls (`IMSRG_BLAS_SERIALIZE`, FP-Q6).
+* The integrator's clone has its own git identity (`git config user.name/user.email`, local);
+  `tools/agent_clone.sh` copies it into each agent clone.

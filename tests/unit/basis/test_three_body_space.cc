@@ -51,7 +51,9 @@ TEST(ThreeBodySpaceTest, O16SizesMatchBenchmark) {
     const ThreeBodySpaceCounts c = ms->three_body_space()->Counts();
     EXPECT_EQ(c.sum_dim, e.sum) << e.emax << " " << e.e3max << " " << e.de3max;
     EXPECT_EQ(c.max_dim, e.max_dim);
-    if (e.packed != 0) EXPECT_EQ(c.sum_packed, e.packed);
+    if (e.packed != 0) {
+      EXPECT_EQ(c.sum_packed, e.packed);
+    }
   }
 }
 

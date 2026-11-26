@@ -6,7 +6,12 @@
 # Installs into ${IMSRG_DEPS_PREFIX:-$HOME/.cache/imsrg-deps}, shared by all git worktrees:
 #   kokkos-openmp/  Kokkos from extern/kokkos with the OpenMP (+ Serial) backend, Release
 #   kokkos-serial/  Kokkos with the Serial backend, RelWithDebInfo, debug checks + bounds checking
+#   kokkos-hip/     Kokkos HIP (gfx90a) + Serial host (ZEN3), Release; default only on Frontier
 #   venv/           Python venv ($IMSRG_VENV) with tools/requirements-dev.txt
+# On OLCF Frontier (tools/lib/frontier_env.sh) the default backends are "openmp serial hip", the
+# pinned modules are loaded (CC wrapper for openmp/serial, hipcc for hip), and the builds should
+# run on a compute node: `srun --jobid=<job> --overlap -n1 -c 56 tools/bootstrap_deps.sh`; the venv
+# is skipped there (no internet) and made on a login node with `tools/bootstrap_deps.sh --backends ""`.
 # and links <this worktree>/.venv -> $IMSRG_VENV (gitignored).
 #
 # Idempotent: a backend is rebuilt only if its stamp (Kokkos commit, compiler, options) changed;
@@ -18,9 +23,12 @@ set -euo pipefail
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=lib/imsrg_env.sh
 . "$script_dir/lib/imsrg_env.sh"
+# shellcheck source=lib/frontier_env.sh
+. "$script_dir/lib/frontier_env.sh"
 repo_root=$(imsrg_repo_root "$script_dir")
 
 backends="openmp serial"
+if imsrg_on_frontier; then backends="openmp serial hip"; fi
 do_venv=1
 force=0
 jobs=$(imsrg_ncpu)
@@ -97,9 +105,17 @@ case $sm_status in
 esac
 kokkos_commit=$(echo "$sm_status" | sed 's/^[-+ U]//' | awk '{print $1}')
 
-cxx=${CXX:-c++}
-cxx_path=$(command -v "$cxx")
-cxx_version=$("$cxx" --version 2>/dev/null | head -n 1)
+# The compiler of a backend: hipcc for hip; otherwise $CXX (default c++). On Frontier the pinned
+# modules are loaded first (CC for openmp/serial, hipcc plus rocm for hip).
+backend_cxx() {
+  case $1 in
+    hip) echo hipcc ;;
+    *) echo "${CXX:-c++}" ;;
+  esac
+}
+if imsrg_on_frontier; then
+  imsrg_frontier_modules cpu
+fi
 generator_args=""
 if command -v ninja >/dev/null 2>&1; then generator_args="-G Ninja"; fi
 launcher_args=""
@@ -129,7 +145,13 @@ kokkos_options() {
       echo "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
       echo "-DKokkos_ENABLE_DEBUG=ON"
       echo "-DKokkos_ENABLE_DEBUG_BOUNDS_CHECK=ON" ;;
-    *) echo "bootstrap_deps: unsupported backend '$1' (openmp, serial)" >&2; return 1 ;;
+    hip)
+      # Frontier MI250X (gfx90a) with a ZEN3 (Trento) host; compile checks only so far.
+      echo "-DCMAKE_BUILD_TYPE=Release"
+      echo "-DKokkos_ENABLE_HIP=ON"
+      echo "-DKokkos_ARCH_AMD_GFX90A=ON"
+      echo "-DKokkos_ARCH_ZEN3=ON" ;;
+    *) echo "bootstrap_deps: unsupported backend '$1' (openmp, serial, hip)" >&2; return 1 ;;
   esac
 }
 
@@ -138,7 +160,13 @@ build_kokkos() {
   local install_dir="$IMSRG_DEPS_PREFIX/kokkos-$backend"
   local build_dir="$IMSRG_DEPS_PREFIX/build/kokkos-$backend"
   local stage_dir="$IMSRG_DEPS_PREFIX/build/kokkos-$backend-stage"
-  local options stamp t0
+  local options stamp t0 cxx cxx_path cxx_version
+  if [ "$backend" = hip ] && imsrg_on_frontier; then
+    imsrg_frontier_modules hip
+  fi
+  cxx=$(backend_cxx "$backend")
+  cxx_path=$(command -v "$cxx") || { log "compiler '$cxx' for kokkos-$backend not found" >&2; return 1; }
+  cxx_version=$("$cxx" --version 2>/dev/null | head -n 1)
   options=$(kokkos_options "$backend")
   stamp=$(printf 'kokkos_commit=%s\nbackend=%s\ncxx=%s\ncxx_version=%s\noptions:\n%s\n' \
     "$kokkos_commit" "$backend" "$cxx_path" "$cxx_version" "$options")
@@ -153,7 +181,7 @@ build_kokkos() {
   # shellcheck disable=SC2086  # option lists are intentionally word-split (no spaces inside)
   cmake -S "$repo_root/extern/kokkos" -B "$build_dir" $generator_args \
     -C "$repo_root/cmake/ImsrgAppleSdk.cmake" \
-    -DCMAKE_INSTALL_PREFIX="$install_dir" $launcher_args $options
+    -DCMAKE_INSTALL_PREFIX="$install_dir" -DCMAKE_CXX_COMPILER="$cxx_path" $launcher_args $options
   cmake --build "$build_dir" --parallel "$jobs"
   rm -rf "$stage_dir"
   DESTDIR="$stage_dir" cmake --install "$build_dir" >/dev/null
@@ -172,12 +200,18 @@ build_kokkos() {
 }
 
 for backend in $backends; do
-  build_kokkos "$backend"
+  ( build_kokkos "$backend" )  # a subshell: the hip module environment must not leak
 done
 
 # ---- Python venv -----------------------------------------------------------------------------
+if [ "$do_venv" -eq 1 ] && imsrg_on_frontier && [ -n "${SLURM_JOB_ID:-}" ]; then
+  # Frontier compute nodes have no internet access (pip hangs there): the venv is made on a login
+  # node, e.g. `tools/bootstrap_deps.sh --backends ""`.
+  log "skipping the venv on a compute node; run 'tools/bootstrap_deps.sh --backends \"\"' on a login node"
+  do_venv=0
+fi
 if [ "$do_venv" -eq 1 ]; then
-  check_imports='import numpy, pytest, sympy, scikit_build_core, cpplint'
+  check_imports='import numpy, pytest, sympy, scikit_build_core, cpplint, clang_format, clang_tidy'
   if [ -x "$IMSRG_VENV/bin/python" ] && "$IMSRG_VENV/bin/python" -c "$check_imports" 2>/dev/null
   then
     log "venv $IMSRG_VENV is up to date"

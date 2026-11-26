@@ -49,6 +49,11 @@ must compile and run on clusters later. Threads is optional.
   (`VECLIB_MAXIMUM_THREADS=1`, `OPENBLAS_NUM_THREADS=1`, or MKL sequential); large standalone GEMMs
   outside parallel regions may use threaded BLAS. MPI tests set `OMP_NUM_THREADS` so that
   ranks × threads ≤ cores (e.g. 4 ranks × 4 threads).
+* Reentrancy: with `IMSRG_BLAS_SERIALIZE` (CMake option; ON for every backend but Accelerate) each
+  BLAS/LAPACK call of `linalg` holds one process-wide mutex, so calls from different host threads
+  (two Python threads solving at once) run one after another, each still with all its BLAS
+  threads. The OpenMP cray-libsci (`libsci_gnu_mp`) crashes when two host threads are in `dgemm`
+  at once, even with `OMP_NUM_THREADS=1`; the serial `libsci_gnu` does not (FP-Q6).
 
 ## 4. Kernel strategy
 

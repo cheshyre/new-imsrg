@@ -34,7 +34,9 @@ bool IsPartition(const std::vector<const std::vector<int>*>& parts, int n) {
 void CheckDump(const GoldenBasisDump& d) {
   const int norb = static_cast<int>(d.orbits.size());
   ASSERT_GT(norb, 0);
-  if (d.lmax >= d.emax) EXPECT_EQ(norb, (d.emax + 1) * (d.emax + 2));
+  if (d.lmax >= d.emax) {
+    EXPECT_EQ(norb, (d.emax + 1) * (d.emax + 2));
+  }
   EXPECT_EQ(d.hw, 16.0);
 
   int max_j2 = 0;

@@ -139,7 +139,9 @@ void ExpectContiguousCut(const WorkSizes& s, std::int32_t parts) {
     EXPECT_EQ(row_local[pos - 1], b.row_end - 1);
     const auto r = static_cast<std::size_t>(items.owner[i]);
     ASSERT_LT(r, load.size());
-    if (i > 0) EXPECT_LE(items.owner[i - 1], items.owner[i]);
+    if (i > 0) {
+      EXPECT_LE(items.owner[i - 1], items.owner[i]);
+    }
     EXPECT_EQ(items.cost[i], RowCost(s, static_cast<std::size_t>(b.channel)) *
                                  static_cast<double>(rows));
     load[r] += items.cost[i];
@@ -314,7 +316,9 @@ void ExpectJointCut(const WorkSizes& s, std::int32_t parts) {
     EXPECT_EQ(b.row_begin, next_row[c]);
     ASSERT_GT(b.row_end, b.row_begin);
     next_row[c] = b.row_end;
-    if (i > 0) EXPECT_LE(items.owner[i - 1], items.owner[i]);
+    if (i > 0) {
+      EXPECT_LE(items.owner[i - 1], items.owner[i]);
+    }
     load[static_cast<std::size_t>(items.owner[i])] += items.cost[i];
     total += items.cost[i];
   }
@@ -343,9 +347,10 @@ void ExpectJointCut(const WorkSizes& s, std::int32_t parts) {
     const auto ri = static_cast<std::size_t>(r);
     const double cap = std::max(0.0, target - other[ri]) * total / cap_sum;
     EXPECT_LE(std::abs(load[ri] - cap), max_row) << "rank " << r;
-    if (!clamped)
+    if (!clamped) {
       EXPECT_LE(std::abs(other[ri] + load[ri] - target), max_row)
           << "rank " << r;
+    }
   }
 }
 

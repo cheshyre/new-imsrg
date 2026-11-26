@@ -8,12 +8,12 @@
 # Writes OUT_DIR/hamiltonian/emax4_O16/{T,V2,H,V3_NO2B,Rp2}.dump + norms.json and
 # OUT_DIR/hf/emax4_O16_{2N,2N3N}/{hf.json,HNO.dump}. Takes about 2 s.
 set -euo pipefail
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ref_env.sh"
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUT="${1:-${REPO}/build/golden-generated}"
-RH="${REFHARNESS:-${IMSRG_REFERENCE_ROOT:-/Users/cheshyre/Downloads/new-imsrg-reference}/harness-build-d35/refharness}"
+RH="${REFHARNESS:-${REF_BUILD}/harness-build-d35/refharness}"
 # D35: default = the patched harness (harness-build-d35) and its version string (tests/golden/README.md).
-export IMSRG_REFERENCE_SHA_FILE="${IMSRG_REFERENCE_SHA_FILE:-${IMSRG_REFERENCE_ROOT:-/Users/cheshyre/Downloads/new-imsrg-reference}/REFERENCE_SRC_SHA256_D35}"
-DATA="${IMSRG_TEST_DATA_DIR:-/Users/cheshyre/Downloads/new-imsrg}"
+export IMSRG_REFERENCE_SHA_FILE="${IMSRG_REFERENCE_SHA_FILE:-${REF_SHA_D35}}"
 F2="${DATA}/VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz"
 F3="${DATA}/NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin"
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-8}"

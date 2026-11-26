@@ -17,6 +17,9 @@ list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+# No C++20 named modules are used: skip the per-source module dependency scan that CMake runs
+# with GCC >= 14 + Ninja (it roughly doubles the compile steps; Apple clang never triggered it).
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # ---- Options (design/20 section 2) ----------------------------------------------------------------
@@ -64,16 +67,18 @@ if(IMSRG_ENABLE_KOKKOS_KERNELS)
 endif()
 
 include(ImsrgCompilerFlags)  # ccache, sanitizers, native arch, imsrg::warnings
+# The module libraries and the bundled fmt are linked into the shared object
+# imsrg._core, so they need PIC (GCC does not default to it). Set before the
+# dependencies are added.
+if(IMSRG_BUILD_PYTHON)
+  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif()
+
 include(ImsrgDependencies)   # Kokkos, MPI, fmt, toml++, CLI11, GoogleTest, Python
 include(ImsrgModule)         # imsrg_add_module()
 if(IMSRG_BUILD_TESTS)
   enable_testing()
   include(ImsrgTesting)      # imsrg_add_test()
-endif()
-
-# The module libraries are linked into the shared object imsrg._core, so they need PIC.
-if(IMSRG_BUILD_PYTHON)
-  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 endif()
 
 add_subdirectory(src)

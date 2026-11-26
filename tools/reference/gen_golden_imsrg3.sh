@@ -19,22 +19,22 @@
 #            gen_golden_e2e.sh (method magnus = harness defaults; the same 2N file) for He4 emax 2 and
 #            O16 emax 3 -> tests/golden/e2e/IT-8/{He4_emax2,emax3}/harness_triples.json.
 #
-# Env: IMSRG_REFERENCE_ROOT (default /Users/cheshyre/Downloads/new-imsrg-reference),
+# Env: IMSRG_REFERENCE_ROOT (default: see ref_env.sh; build outputs go to IMSRG_REFERENCE_BUILD),
 #      HARNESS_BUILD_DIR_D35 (default $ROOT/harness-build-d35; must contain a refharness built from
 #        this checkout: `HARNESS_BUILD_DIR_D35=<dir> tools/reference/build_imsrg_devel.sh patched-harness`),
 #      BENCH_BUILD_DIR (default build/golden-imsrg3 of this checkout: release-openmp preset with
 #        -DIMSRG_BUILD_BENCH=ON, configured and built on demand), OMP_NUM_THREADS (default 8).
 # The harness is the D35 patched build; IMSRG_REFERENCE_SHA_FILE selects its version string.
 set -euo pipefail
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ref_env.sh"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "${HERE}/../.." && pwd)"
-ROOT="${IMSRG_REFERENCE_ROOT:-/Users/cheshyre/Downloads/new-imsrg-reference}"
+ROOT="${REF_BUILD}"
 RH="${HARNESS_BUILD_DIR_D35:-${ROOT}/harness-build-d35}/refharness"
 BENCH_DIR="${BENCH_BUILD_DIR:-${REPO}/build/golden-imsrg3}"
 BENCH="${BENCH_DIR}/tools/bench/imsrg3_layout/imsrg3_layout_bench"
-export IMSRG_REFERENCE_SHA_FILE="${IMSRG_REFERENCE_SHA_FILE:-${ROOT}/REFERENCE_SRC_SHA256_D35}"
+export IMSRG_REFERENCE_SHA_FILE="${IMSRG_REFERENCE_SHA_FILE:-${REF_SHA_D35}}"
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-8}"
-DATA="${IMSRG_TEST_DATA_DIR:-/Users/cheshyre/Downloads/new-imsrg}"
 F2="${DATA}/VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz"
 OUT="${REPO}/tests/golden/imsrg3"
 E2E="${REPO}/tests/golden/e2e"

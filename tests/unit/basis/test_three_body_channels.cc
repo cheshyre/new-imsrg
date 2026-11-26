@@ -139,7 +139,9 @@ TEST(ThreeBodyChannels, MembershipAndLocalIndexAreConsistent) {
       EXPECT_EQ(a.tz2.twice + bb.tz2.twice + d.tz2.twice, info.two_tz.twice);
       EXPECT_LE(std::abs(k.two_jpq.twice - d.j2.twice), info.two_j.twice);
       EXPECT_GE(k.two_jpq.twice + d.j2.twice, info.two_j.twice);
-      if (i > 0) EXPECT_LT(kets[i - 1].value(), kets[i].value());
+      if (i > 0) {
+        EXPECT_LT(kets[i - 1].value(), kets[i].value());
+      }
       const auto local = tb.local_index(c, kets[i]);
       ASSERT_TRUE(local.has_value());
       EXPECT_EQ(local->value(), static_cast<std::int32_t>(i));

@@ -10,18 +10,27 @@ we do not port it line by line.
 * Design docs: `design/` (start with `design/README.md`). Current progress: `design/STATUS.md`.
   Open questions: `design/QUESTIONS.md`.
 * Reference code (READ-ONLY, never modify, never build in place):
-  `/Users/cheshyre/Downloads/new-imsrg/imsrg-devel`. Analyses of it, with file:line citations:
-  `design/reference/01..05-*.md`.
-* Big test inputs (never copy them into the repo), in `/Users/cheshyre/Downloads/new-imsrg/`:
+  `$IMSRG_REFERENCE_ROOT/imsrg-devel`. Analyses of it, with file:line citations:
+  `design/reference/01..05-*.md`. (Paths like `/Users/cheshyre/Downloads/...` in older documents
+  are the Mac locations before the move to Frontier, 2026-11-26.)
+* Big test inputs (never copy them into the repo), in `$IMSRG_WORK/inputs/`:
   * 2N: `VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz` → `file2e1max=14 file2e2max=28 file2lmax=14 hw=16`
   * 3N: `NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin` → `3bme_type=no2b file3e1max=6 file3e2max=12 file3e3max=18 hw=16`
+* **Layout on OLCF Frontier** (variables from `~/.bashrc`): `$IMSRG_HUB` bare hub repository (all
+  branches); `$IMSRG_WORK/main` the integrator's clone (remotes `origin` = hub, `github`);
+  `$IMSRG_WORK/agents/<name>` one clone per code-writing agent; `$IMSRG_REFERENCE_ROOT` reference
+  material (imsrg-devel, plans, SHA files, D35 goldens); `$IMSRG_WORK/golden-generated` the
+  generated goldens; `$IMSRG_DEPS_PREFIX` Kokkos installs and the venv; `$CCACHE_DIR`.
 
 ## Golden rules
 
-1. **Git is local only.** Never `git push`. Never commit to `main`. Work on
-   `feature/<milestone>-<topic>` branches cut from `develop`, and merge back with `--no-ff` only
-   after `tools/ci.sh` passes. Never use bare `git stash` (the stash is shared between worktrees);
-   use WIP commits.
+1. **Git goes through the hub.** Agents push only their own feature branch to the hub
+   (`git push -u origin HEAD` from their clone) and never touch GitHub or git remotes. Only the
+   integrator (main session or owner, `IMSRG_INTEGRATOR=1`) commits in `$IMSRG_WORK/main`, merges
+   into `develop` (`--no-ff`, after `tools/ci.sh frontier-cpu` passes on the merged result) and
+   pushes `develop` to the hub and GitHub; hooks enforce this. Never commit to or push `main`.
+   Branches: `feature/<milestone>-<topic>` cut from `develop`. Never force-push, never rewrite
+   published history. Never use bare `git stash`; use WIP commits.
 2. **Tests gate everything.** No merge without unit tests. Numerics must match imsrg-devel (or the
    brute-force reference) within the tolerances of `design/30-testing-and-validation.md` §2. Never
    loosen a tolerance silently.
@@ -38,45 +47,56 @@ we do not port it line by line.
 7. Never commit large files (> 1 MB) or generated data. Golden data in `tests/golden/` stays small
    and is regenerated only through the `tools/reference` scripts, with the reason and the old vs
    new numbers in the commit message (D42).
-8. Never run two builds in the same build directory at once. Tasks sharing a checkout use their own
-   build directory (`cmake --preset dev-openmp -B build/<task>`) or build one after another.
-9. Scripts and globs work on `git ls-files`: the main checkout root also holds untracked
-   `imsrg-devel/` and `.claude/worktrees/`.
-10. **Stay inside the project directories.** File searches and listings (`find`, `du`, `ls -R`,
-    `grep -r`, globs) run only in the repository and its worktrees, `/Users/cheshyre/Downloads/new-imsrg-reference/`,
-    `~/.cache/imsrg-deps/`, the Homebrew prefix and temp/scratch directories. Never `find /`, `find ~`
-    or `mdfind`: a whole-disk search walks into other apps' private data (`~/Library/Containers`)
-    and triggers a macOS privacy prompt for the owner (2026-11-15).
+8. **One checkout per code-writing agent** (`$IMSRG_WORK/agents/<name>`, made by the WorktreeCreate
+   hook for `isolation: worktree` agents, or by `tools/agent_clone.sh`); never run two builds in
+   the same build directory. Read-only agents (reviewers, explorers, planners) work in
+   `$IMSRG_WORK/main` without isolation and change nothing there.
+9. Scripts and globs work on `git ls-files`, so untracked files in a checkout never leak into
+   checks.
+10. **Stay inside the project directories, and respect the shared machine.** File searches and
+    listings (`find`, `du`, `ls -R`, `grep -r`, globs) run only in your checkout, `$IMSRG_WORK`,
+    `$IMSRG_REFERENCE_ROOT`, `$IMSRG_DEPS_PREFIX` and temp/scratch directories; never `find /` or
+    `find ~`. The Frontier login node is for editing, git, short commands and job submission:
+    builds and tests run on a compute node (rule below), large data and job output live under
+    `/lustre/orion/nph123/scratch/mheinz`, never in `/ccs/home`.
 
-## Build and test (since milestone M0; details in `design/20-build-and-tooling.md`)
+## Build and test (details in `design/20-build-and-tooling.md`; Frontier: section 9 there)
 
+On Frontier everything heavy runs on a compute node of a running allocation named `imsrg`
+(`salloc -A nph123 -N 1 -t 02:00:00 -J imsrg --no-shell`; several agents share it with
+`srun --overlap`). `tools/ci.sh frontier-*` finds the job itself (or `IMSRG_SLURM_JOBID`).
 ```bash
-tools/bootstrap_deps.sh            # once per machine (idempotent): Kokkos openmp+serial and the venv
-cmake --preset dev-openmp          # or dev-serial, release-openmp, asan
-cmake --build --preset dev-openmp
-ctest --preset dev-openmp -L unit  # labels: unit, integration, mpi, slow, reference
-tools/ci.sh dev-openmp             # the full pre-merge check; last line: CI PASS/FAIL <preset>
+tools/bootstrap_deps.sh            # once (idempotent; run it on a compute node): Kokkos openmp,
+                                   # serial, hip and the venv in $IMSRG_DEPS_PREFIX
+tools/ci.sh frontier-cpu           # the full pre-merge check; last line: CI PASS/FAIL <preset>
+tools/ci.sh frontier-hip           # compile check of the Kokkos HIP build (no GPU tests yet)
+# single steps: load the modules, then run on the compute node
+source tools/lib/frontier_env.sh && imsrg_frontier_modules cpu
+imsrg_compute cmake --preset frontier-cpu && imsrg_compute cmake --build --preset frontier-cpu
+imsrg_compute ctest --preset frontier-cpu -L unit   # labels: unit, integration, mpi, slow, reference
 ```
-* **Shared per-machine state (one rule):** `IMSRG_DEPS_PREFIX` (default `~/.cache/imsrg-deps`)
-  holds the Kokkos installs `kokkos-<backend>/`; `IMSRG_VENV` (default `$IMSRG_DEPS_PREFIX/venv`)
-  is the one Python venv (numpy, pytest, sympy, scikit-build-core, cpplint) for all worktrees.
-  `tools/bootstrap_deps.sh` and `tools/ci.sh` link it as `.venv` in each worktree (gitignored).
-  Never create a venv per worktree.
-* **Several tasks in one checkout:** give each its own build tree:
-  `cmake --preset dev-openmp -B build/<task>`, `cmake --build build/<task>`,
-  `ctest --test-dir build/<task> -L unit`, and `IMSRG_BUILD_DIR=build/<task> tools/ci.sh dev-openmp`.
+* Presets: `frontier-serial` (Kokkos Serial with debug checks, for kernel changes), `frontier-cpu` (CI: PrgEnv-gnu through the Cray `CC` wrapper, cray-mpich, cray-libsci,
+  Kokkos OpenMP, Debug -O1 -g, MPI tests via nested `srun -n`), `frontier-cpu-release`,
+  `frontier-hip` (hipcc, Kokkos HIP gfx90a + ZEN3). The Mac presets (`dev-openmp`, `dev-serial`,
+  `release-openmp`, `asan`) are unchanged.
+* **Shared per-machine state (one rule):** `IMSRG_DEPS_PREFIX` (default `~/.cache/imsrg-deps`;
+  Frontier: `$IMSRG_WORK/deps`) holds the Kokkos installs `kokkos-<backend>/`; `IMSRG_VENV`
+  (default `$IMSRG_DEPS_PREFIX/venv`) is the one Python venv (numpy, pytest, sympy,
+  scikit-build-core and the pinned cpplint 2.0.2, clang-format 23.1.5, clang-tidy 23.1.4) for all
+  checkouts. `tools/bootstrap_deps.sh` and `tools/ci.sh` link it as `.venv` (gitignored). Never
+  create a venv per checkout.
 * **New module:** add `src/imsrg/<m>/CMakeLists.txt` with `imsrg_add_module(NAME <m> SOURCES ...
   DEPS ...)` and `tests/unit/<m>/CMakeLists.txt` with `imsrg_add_test(NAME <m>_<topic> SOURCES ...
   DEPS <m> LABELS unit)` (test names are global, hence the module prefix). Both directories are
   discovered automatically; no shared CMake file changes. Include project headers as
   `"imsrg/<module>/x.h"`. Kernels in tests go into free functions, never into a `TEST` body
   (`design/12-compute-backend.md` §5).
-* macOS: the default SDK of this machine does not link; CMake works around it by itself
-  (`cmake/ImsrgAppleSdk.cmake`). For compiles outside CMake, export
+* macOS (before the move): the presets `dev-openmp` etc., `cmake/ImsrgAppleSdk.cmake` works around
+  the SDK that does not link; for compiles outside CMake export
   `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk`.
 
-Python (from M11): `CMAKE_ARGS="-DKokkos_ROOT=$HOME/.cache/imsrg-deps/kokkos-openmp -DOpenMP_ROOT=$(brew --prefix libomp)" .venv/bin/pip install -e . --no-build-isolation`,
-then `.venv/bin/pytest tests/python`.
+Python (from M11): `CMAKE_ARGS="-DKokkos_ROOT=$IMSRG_DEPS_PREFIX/kokkos-openmp -DCMAKE_CXX_COMPILER=CC" .venv/bin/pip install -e . --no-build-isolation`
+(modules loaded; on the Mac add `-DOpenMP_ROOT=$(brew --prefix libomp)`), then `.venv/bin/pytest tests/python`.
 
 ## Code conventions
 

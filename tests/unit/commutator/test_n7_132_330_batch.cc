@@ -182,8 +182,9 @@ void CheckAgainstReference(const Term& term, int emax,
       }
     }
   }
-  if (need_nonzero)
+  if (need_nonzero) {
     EXPECT_GT(nonzero, 0) << term.name << " is zero in every case";
+  }
 }
 
 TEST(N7Comm132Batch, MatchesReferenceEmax1) {

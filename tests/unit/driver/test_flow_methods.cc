@@ -79,11 +79,16 @@ void ExpectDeviationsSmall(const Deviations& d) {
 }
 
 #ifndef IMSRG_FLOW_SLOW  // the fast executable
+/// He4 emax 2 with imsrg++'s HF (linear density mixing, D37): the DIIS default
+/// stops after 8 iterations at an H0 that differs from imsrg++'s at the HF
+/// tolerance and moves with round-off (FMA changed e1 by 1.2e-6), which the
+/// adaptive step control turned into s deviations of 1.3e-5 at s ~ 96 (FP-Q5).
 std::string He4Toml() {
   std::ostringstream t;
   t << "[basis]\nemax = 2\nhw = 16.0\n\n[reference]\nnucleus = \"He4\"\n\n"
     << "[interaction.two_body]\nfile = \"" << DataFile(TwoBodyName()).string()
-    << "\"\ne1max = 14\ne2max = 28\nlmax = 14\n";
+    << "\"\ne1max = 14\ne2max = 28\nlmax = 14\n\n"
+    << "[hartree_fock]\nmixing = \"linear\"\n";  // imsrg++ (D37)
   return t.str();
 }
 
@@ -418,7 +423,9 @@ void TwoStage(const std::string& method, const char* gdir, const char* tag,
               e0 - e0_gold);
   // The golden's last flow line is the last hunter step, not the rebuilt H
   // (D48): the .snt (rebuilt H) is compared at 1e-9 instead.
-  if (!sc.hg) EXPECT_NEAR(e0, e0_gold, 1.0e-3);
+  if (!sc.hg) {
+    EXPECT_NEAR(e0, e0_gold, 1.0e-3);
+  }
   const double tol = sc.hg ? 1.0e-9 : 1.0e-3;
 
   ASSERT_EQ(r.results["valence_interaction"].kind, Json::Kind::kString);

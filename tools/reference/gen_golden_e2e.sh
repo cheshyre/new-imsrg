@@ -5,8 +5,8 @@
 # Usage: tools/reference/gen_golden_e2e.sh [JOB ...]
 #   JOB is an IT id (IT-2) or a sub-job (IT-8/emax3); an IT id selects all of its sub-jobs.
 #   Default: all jobs, in the order below (the slow emax-3 jobs last).
-#   Env: IMSRG_REFERENCE_ROOT (default /Users/cheshyre/Downloads/new-imsrg-reference),
-#        IMSRG_TEST_DATA_DIR (default /Users/cheshyre/Downloads/new-imsrg),
+#   Env: IMSRG_REFERENCE_ROOT (default: see ref_env.sh; build outputs go to IMSRG_REFERENCE_BUILD),
+#        IMSRG_TEST_DATA_DIR (default: see ref_env.sh),
 #        IT_TIMEOUT_S (default 3600: wall-time cap per run; killed runs are recorded as timed out),
 #        OMP_NUM_THREADS (default 8),
 #        IMSRG_REFERENCE_EXE (default $ROOT/build-d35/imsrg++), IMSRG_REFERENCE_RUNS (default
@@ -19,15 +19,15 @@
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "${HERE}/../.." && pwd)"
-ROOT="${IMSRG_REFERENCE_ROOT:-/Users/cheshyre/Downloads/new-imsrg-reference}"
-DATA="${IMSRG_TEST_DATA_DIR:-/Users/cheshyre/Downloads/new-imsrg}"
+. "${HERE}/ref_env.sh"
+ROOT="${REF_BUILD}"
 EXE="${IMSRG_REFERENCE_EXE:-${ROOT}/build-d35/imsrg++}"   # D35: the patched build (default)
 F2="${DATA}/VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz"
 F3="${DATA}/NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin"
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-8}"
 CAP="${IT_TIMEOUT_S:-3600}"
 RUNS="${IMSRG_REFERENCE_RUNS:-${ROOT}/runs-d35/e2e}"   # D35: the patched runs (keeps the pristine runs)
-export IMSRG_REFERENCE_SHA_FILE="${IMSRG_REFERENCE_SHA_FILE:-${IMSRG_REFERENCE_ROOT:-/Users/cheshyre/Downloads/new-imsrg-reference}/REFERENCE_SRC_SHA256_D35}"
+export IMSRG_REFERENCE_SHA_FILE="${IMSRG_REFERENCE_SHA_FILE:-${REF_SHA_D35}}"
 OUT="${IMSRG_GOLDEN_E2E_OUT:-${REPO}/tests/golden/e2e}"
 
 # common 2N arguments (C) and 3N arguments (N) of the brief

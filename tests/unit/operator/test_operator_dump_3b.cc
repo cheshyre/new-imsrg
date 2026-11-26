@@ -64,7 +64,8 @@ Operator RandomThreeBody(const std::shared_ptr<const basis::ModelSpace>& ms,
 
 std::string WriteText(const Operator& op) {
   std::ostringstream os;
-  WriteOperatorDump(os, op, OperatorDumpWriteOptions{.source = "unit test"});
+  WriteOperatorDump(
+      os, op, OperatorDumpWriteOptions{.source = "unit test", .reference = {}});
   return os.str();
 }
 

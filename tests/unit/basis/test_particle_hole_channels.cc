@@ -43,7 +43,9 @@ TEST(ParticleHoleChannels, MembershipFollowsTheTriangleParityAndTzRules) {
     EXPECT_EQ(c.J(), ch / 6);
     EXPECT_EQ(c.Tz(), (ch % 6) / 2 - 1);
     EXPECT_EQ(static_cast<std::int32_t>(c.parity), ch % 2);
-    if (c.Tz() < 0) EXPECT_EQ(c.num_kets, 0) << "Tz = -1 slots are empty";
+    if (c.Tz() < 0) {
+      EXPECT_EQ(c.num_kets, 0) << "Tz = -1 slots are empty";
+    }
     const auto kets = ph.channel_kets(ChannelIndex{ch});
     ASSERT_EQ(static_cast<std::int32_t>(kets.size()), c.num_kets);
     total += c.num_kets;
@@ -55,7 +57,9 @@ TEST(ParticleHoleChannels, MembershipFollowsTheTriangleParityAndTzRules) {
       EXPECT_GE(a.j2.twice + b.j2.twice, 2 * c.J());
       EXPECT_EQ((a.l + b.l) % 2, ch % 2);
       EXPECT_EQ(std::abs(a.tz2.twice - b.tz2.twice) / 2, c.Tz());
-      if (i > 0) EXPECT_LT(kets[i - 1].value(), kets[i].value());
+      if (i > 0) {
+        EXPECT_LT(kets[i - 1].value(), kets[i].value());
+      }
       const auto local = ph.local_index(ChannelIndex{ch}, kets[i]);
       ASSERT_TRUE(local.has_value());
       EXPECT_EQ(local->value(), static_cast<std::int32_t>(i));

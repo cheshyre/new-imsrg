@@ -1184,3 +1184,88 @@ the orchestrator uses `O4` and up).
   Run 4: decide whether it becomes a runtime option; refit at another emax and thread count with a
   committed fit script; validate `n7_bench --row-overhead` (silently ignored without `--partition`
   or with `--partition-contiguous`) and add it to the usage text; P = 64 still has max/mean 1.16.
+
+## Added during the Frontier port
+
+Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an owner decision
+(D-rows) in the interview after the port; until then the session works as assumed.
+
+* **P-F1** (2026-11-26, isolation scheme) - **Proposal: scheme (a)**, Claude Code's own isolation:
+  `isolation: worktree` in `imsrg-lead`, `imsrg-implementer`, `imsrg-mechanic`, with the committed
+  `.claude/settings.json` hooks `WorktreeCreate` (clone the hub into `$IMSRG_WORK/agents/<name>` on
+  `feature/<name>`; workers of a lead start from the lead's pushed branch), `WorktreeRemove`
+  (`tools/agent_retire.sh`) and the `PreToolUse` guard `tools/hooks/agent_guard.py`; read-only
+  agents in the integrator's clone. Tested and working (design/41 §3); fallback (b),
+  `tools/agent_clone.sh` plus `cd <clone> &&` briefs, exists but was not needed. **Assumed
+  meanwhile:** (a) is in use. Open points: Claude Code never calls `WorktreeRemove` when a
+  subagent finishes, so clones accumulate until `tools/agent_retire.sh --all --merged`; the hub
+  keeps every pushed feature branch, including the test branches `feature/agent-aed5510638e6f6d22`,
+  `feature/agent-ab7ad3f93c28d0a1e` and `feature/selftest` of this session: delete merged or test
+  branches on the hub (who, when), or keep them all?
+* **P-F2** (2026-11-26, GitHub policy) - **Proposal:** only the integrator talks to GitHub
+  (`github` remote of `$IMSRG_WORK/main`); GitHub changes come in with `--ff-only` merges;
+  `develop` is pushed to the hub first and to GitHub only after `tools/ci.sh frontier-cpu` passed
+  on it; never force-push, never delete or rename a remote branch, never rewrite published
+  history; `main` is left alone; feature branches stay on the hub. Agents never touch GitHub (their
+  clones have no GitHub remote; `agent_guard.py` denies pushes elsewhere than `origin`).
+  **Assumed meanwhile:** as proposed. Question: should `main` follow `develop` at milestones
+  (fast-forward by the owner), and should feature branches be mirrored to GitHub for review?
+* **FP-Q1** (2026-11-26, settings) - `design/claude-settings.proposed.json` now proposes allow rules
+  for hub pushes (`git push origin *`), `git fetch`, Slurm and module commands, and denies force
+  pushes and remote branch deletion. **Assumed meanwhile:** the current
+  `.claude/settings.local.json` (Mac era) stays; the owner installs the proposal if wanted.
+* **FP-Q2** (2026-11-26, git identity) - the integrator's clone had no git identity, so commits
+  made by agents in clones were attributed to `mheinz@login10...`. **Assumed meanwhile:** set
+  `user.name`/`user.email` locally in `$IMSRG_WORK/main` to the identity of the existing history;
+  `tools/agent_clone.sh` copies it into each clone. A global `~/.gitconfig` would also work.
+* **FP-Q3** (2026-11-26, compute allocations) - builds and tests need an allocation; the session
+  keeps one 1-node `batch` job named `imsrg` (2 h limit) and queues the next with
+  `--dependency=afterany`. **Assumed meanwhile:** fine for supervised sessions; for long
+  unattended runs, is a chain of 2-hour jobs acceptable for the nph123 allocation, or should runs
+  use the `extended` partition / a reservation?
+* **FP-Q4** (2026-11-26, generated goldens) - the emax-4 dumps are shared by every clone in
+  `$IMSRG_WORK/golden-generated` (copied from the integrator's `build/golden-generated`, which
+  differs file by file from `$IMSRG_REFERENCE_ROOT/golden-generated-d35`; which one is newer is
+  not recorded). **Assumed meanwhile:** the presets point at `$IMSRG_WORK/golden-generated`.
+  Which of the two sets is current, and should the other be removed?
+* **FP-Q5** (2026-11-26, adaptive flow vs IT-14) - `FlowMethods.He4Emax2AdaptiveMatchesImsrgFlowFile`
+  failed on Frontier with max |Δs| = 1.27e-5 > 1e-5 (E0, |H|, eta within 3e-9). Cause: the test's
+  TOML used the DIIS HF default, imsrg++ uses linear mixing. DIIS stops after 8 iterations at an H0
+  that differs from imsrg++'s at the HF tolerance (|H| by 2.5e-8 at s = 0) and moves with round-off
+  (an `-O2 -ffp-contract=fast` build changed e1 by 1.2e-6 and max |Δs| to 5.1e-5); the adaptive
+  step control amplifies that in the converged tail (s > 80, ||eta|| ~ eta_criterion), where s
+  carries no physics. With `mixing = "linear"` (as the other imsrg++ comparisons, D37): HF 26
+  iterations and e1 equal to imsrg++, every printed s equal to imsrg++ run on Frontier (0 of 572
+  rows differ), E0/|H|/eta within 8e-10/2.7e-9/5.4e-10, FMA and non-FMA builds within 5e-9 in s;
+  vs the Mac golden max |Δs| = 7.6e-6, the same 25 rows whose printed s differ between imsrg++ on
+  the Mac and on Frontier (imsrg++'s own platform spread). Tolerance unchanged. **Open:** the
+  driver-level flow tests (and O16 under `slow`) still run DIIS and keep 1e-5 with less margin;
+  should every imsrg++ flow comparison use linear mixing, and is DIIS's round-off sensitivity at
+  the 1e-8 HF tolerance acceptable for production (it changes nothing physical)?
+* **FP-Q6** (2026-11-26, BLAS reentrancy) - `test_two_threads_on_distinct_solvers_and_operators`
+  segfaulted on Frontier in `dgemm_kernel_loop_mnk_a1b1_mt_naples` (`libsci_gnu_mp.so.6`, the
+  OpenMP cray-libsci that `CC -fopenmp` links). gdb: one Python thread in libsci `dgemm` with its
+  OpenMP team, the other in a Kokkos `parallel_for` (Comm121ss); `OMP_NUM_THREADS=1` passes. A
+  20-line C++ program without Kokkos or imsrg code (two `std::thread`s calling `dgemm_` on their
+  own matrices, n = 100 or 400) crashes with `libsci_gnu_mp` at 4 and at 1 OpenMP thread; it runs
+  clean when the calls are under a mutex, when one thread runs plain `omp parallel for` loops
+  instead, and with the serial `libsci_gnu`. `CRAYBLAS_ALLOC_TYPE=2` and
+  `CRAYBLAS_FORCE_HEAP_ALLOC=1` do not help; `man intro_libsci` says nothing about reentrancy.
+  So Kokkos OpenMP entered from two host threads is fine; the threaded libsci is not reentrant.
+  **Assumed meanwhile:** `linalg` holds a process-wide mutex around every BLAS/LAPACK call
+  (`IMSRG_BLAS_SERIALIZE`, default ON except Accelerate); single-threaded hosts pay one uncontended
+  lock per call, and threaded BLAS stays available for large gemms. The alternative, linking the
+  serial `libsci_gnu` (reentrant, would also allow concurrent `GroupedGemm` items, M12-Q5), loses
+  BLAS threading for the large ladder gemms; decide with the Frontier benchmarks.
+* **FP-Q7** (2026-11-26, frontier-serial) - with the debug Serial Kokkos (`Kokkos_ENABLE_DEBUG`,
+  bounds checks) GCC 14 at `-O1` reports `-Wmaybe-uninitialized` in `Kokkos_View.hpp:1143` (View
+  copy, `from`/`to`), inlined into our units, so the `-isystem` treatment of the installed Kokkos
+  does not hide it (21 diagnostics; none with the OpenMP Kokkos or Apple clang). **Assumed
+  meanwhile:** the `frontier-serial` preset adds `-Wno-error=maybe-uninitialized` (warning still
+  printed, not fatal); no other preset changes. Alternative: report upstream / build kokkos-serial
+  without `Kokkos_ENABLE_DEBUG`.
+  Also (frontier-serial, 2026-11-26): `driver_imsrg3_n7.Imsrg3N7.He4Emax2OccNat3Cut` exceeds its
+  300 s timeout with the single-threaded debug Serial Kokkos (it takes ~113 s under frontier-cpu);
+  every other unit and integration test of the preset passes up to that point. **Assumed
+  meanwhile:** `frontier-serial` is not the merge gate (frontier-cpu is); raise the test's timeout
+  or label it `slow` for serial builds? Owner to decide.

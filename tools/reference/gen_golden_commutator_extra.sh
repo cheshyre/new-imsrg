@@ -12,13 +12,13 @@
 #
 # Usage: tools/reference/gen_golden_commutator_extra.sh
 set -euo pipefail
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ref_env.sh"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "${HERE}/../.." && pwd)"
-ROOT="${IMSRG_REFERENCE_ROOT:-/Users/cheshyre/Downloads/new-imsrg-reference}"
+ROOT="${REF_BUILD}"
 RH="${REFHARNESS:-${ROOT}/harness-build-d35/refharness}"
 # D35: default = the patched harness (harness-build-d35) and its version string (tests/golden/README.md).
-export IMSRG_REFERENCE_SHA_FILE="${IMSRG_REFERENCE_SHA_FILE:-${IMSRG_REFERENCE_ROOT:-/Users/cheshyre/Downloads/new-imsrg-reference}/REFERENCE_SRC_SHA256_D35}"
-DATA="${IMSRG_TEST_DATA_DIR:-/Users/cheshyre/Downloads/new-imsrg}"
+export IMSRG_REFERENCE_SHA_FILE="${IMSRG_REFERENCE_SHA_FILE:-${REF_SHA_D35}}"
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-8}"
 TMP="$(mktemp -d)"
 trap 'rm -rf "${TMP}"' EXIT

@@ -7,6 +7,7 @@
 
 #include <cstdio>
 #include <map>
+#include <cstdlib>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
@@ -63,9 +64,18 @@ std::unique_ptr<ModelSpace> make_modelspace(const SpaceParams& p);
 /// reference == "default".
 std::string reference_name(const SpaceParams& p);
 
+/// Directory of the big test inputs: $IMSRG_TEST_DATA_DIR, else $IMSRG_WORK/inputs, else the
+/// owner's Mac path (same precedence as tools/reference/ref_env.sh).
+inline std::string default_data_dir() {
+  if (const char* d = std::getenv("IMSRG_TEST_DATA_DIR")) return d;
+  if (const char* w = std::getenv("IMSRG_WORK")) return std::string(w) + "/inputs";
+  return "/Users/cheshyre/Downloads/new-imsrg";
+}
+
 /// Interaction-file parameters (imsrg++ names). Defaults: the project's test files.
 struct InteractionParams {
-  std::string file2 = "/Users/cheshyre/Downloads/new-imsrg/VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz";
+  // Default: $IMSRG_TEST_DATA_DIR/VNN_..., else $IMSRG_WORK/inputs/..., else the Mac path.
+  std::string file2 = default_data_dir() + "/VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz";
   int file2e1max = 14, file2e2max = 28, file2lmax = 14;
   std::string file3 = "none";
   std::string type3 = "no2b";

@@ -287,8 +287,8 @@ INSTANTIATE_TEST_SUITE_P(
         UnknownCase{"NoSuggestion", "[basis]\nzzzzzzzzzz = 4\n",
                     "basis.zzzzzzzzzz", "unknown key 'basis.zzzzzzzzzz'",
                     nullptr}),
-    [](const ::testing::TestParamInfo<UnknownCase>& info) {
-      return std::string(info.param.name);
+    [](const ::testing::TestParamInfo<UnknownCase>& param_info) {
+      return std::string(param_info.param.name);
     });
 
 TEST(TomlReader, SeveralUnknownKeysAreReportedTogether) {

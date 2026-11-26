@@ -22,7 +22,9 @@ import sys
 
 REF_SHA_FILE = os.environ.get(
     "IMSRG_REFERENCE_SHA_FILE",
-    "/Users/cheshyre/Downloads/new-imsrg-reference/REFERENCE_SRC_SHA256")
+    os.path.join(os.environ.get("IMSRG_REFERENCE_ROOT",
+                                "/Users/cheshyre/Downloads/new-imsrg-reference"),
+                 "REFERENCE_SRC_SHA256"))
 FLOW_COLS = ["istep", "s", "E0", "norm_H", "estim_err", "norm_Omega1", "norm_Omega2",
              "norm_Omega3", "norm_Eta1", "norm_Eta2", "norm_Eta3", "Ncomm", "E_MP2", "N_Ops",
              "walltime_s", "rss_MB", "slash", "max_MB"]
