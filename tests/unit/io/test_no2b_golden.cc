@@ -5,8 +5,10 @@
 // compared with the harness dumps; and a check against an independent
 // transcription of imsrg++ ReadFile.
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -168,6 +170,28 @@ TEST(No2bReaderGolden, FillsTheSameContainerAsTheTranscription) {
   EXPECT_EQ(mine.size(), theirs.size());
   EXPECT_EQ(mine.norm(), theirs.norm());
   EXPECT_GT(stored, 1000);
+}
+
+TEST(No2bReaderGolden, FullEmax6IsBitIdenticalToPerValueSetIsospin) {
+  if (!fs::exists(kFile)) GTEST_SKIP() << "NO2B file not found: " << kFile;
+  const No2bTruncation tr{6, 12, 18, 6};
+  No2bThreeBody mine(tr), theirs(tr);
+  io::No2bReadReport rep;
+  io::ReadNo2b(kFile, {.file = kFileTrunc}, mine, &rep);
+  const auto t0 = std::chrono::steady_clock::now();
+  const std::int64_t stored = ReferenceRead(kFile, theirs);
+  const double ref_s =
+      std::chrono::duration<double>(std::chrono::steady_clock::now() - t0)
+          .count();
+  std::cout << "[emax6] fast reader " << rep.seconds
+            << " s; per-value set_isospin transcription (incl. file parse) "
+            << ref_s << " s\n";
+  EXPECT_EQ(rep.values_stored, stored);
+  ASSERT_EQ(mine.size(), theirs.size());
+  EXPECT_GT(stored, 100000);
+  EXPECT_EQ(std::memcmp(mine.values().data(), theirs.values().data(),
+                        mine.size() * sizeof(float)),
+            0);
 }
 
 TEST(No2bReaderGolden, FullEmax6ReadIsFast) {
