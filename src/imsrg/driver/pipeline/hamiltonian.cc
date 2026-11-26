@@ -21,6 +21,7 @@
 #include "imsrg/basis/model_space.h"
 #include "imsrg/driver/config/compat.h"
 #include "imsrg/driver/operators/operator_request.h"
+#include "imsrg/driver/pipeline/operator_frame.h"
 #include "imsrg/io/me2j.h"
 #include "imsrg/io/no2b.h"
 #include "imsrg/mbpt/energies.h"
@@ -240,50 +241,6 @@ void SolveReferenceState(const op::Operator& H, const op::No2bThreeBody* v3p,
   }
 }
 
-/// Builds the bare (oscillator-basis) operator of `request` in the model space
-/// of `ph`; `Planned` for kinds that are not implemented.
-op::Operator BuildBareOperator(const OperatorRequest& request,
-                               const PreparedHamiltonian& ph) {
-  const auto& ms = ph.ms_bare;
-  const int A = ph.mass_number;
-  const int Z = ph.proton_number;
-  switch (request.kind) {
-    case OperatorKind::kNreft: {
-      const auto s = opslib::nreft::ParseShorthand(request.canonical_name);
-      IMSRG_CHECK(s.has_value());
-      return opslib::nreft::BuildScalarShorthand(ms, *s);
-    }
-    case OperatorKind::kRp2:
-      return opslib::Rp2(ms, A, Z);
-    case OperatorKind::kRso:
-      return opslib::RpSpinOrbitCorrection(ms);
-    case OperatorKind::kRn2:
-      return opslib::Rn2(ms, A, Z);
-    case OperatorKind::kRm2:
-      return opslib::Rm2(ms, A);
-    case OperatorKind::kTcm:
-      return opslib::TCm(ms, A);
-    case OperatorKind::kTrel:
-      return opslib::TRel(ms, A);
-    case OperatorKind::kTlab:
-      return opslib::KineticEnergy(ms);
-    case OperatorKind::kHcm: {
-      std::optional<double> hw;
-      if (!request.params.empty()) {
-        if (const auto* d = std::get_if<double>(&request.params.front())) {
-          hw = *d;
-        } else if (const auto* i =
-                       std::get_if<std::int64_t>(&request.params.front())) {
-          hw = static_cast<double>(*i);
-        }
-      }
-      return opslib::HCm(ms, A, hw);
-    }
-    default:
-      Planned("operator '" + request.canonical_name + "'");
-  }
-}
-
 }  // namespace
 
 PreparedHamiltonian PrepareHamiltonian(const RunConfig& config) {
@@ -342,21 +299,8 @@ PreparedHamiltonian PrepareHamiltonian(const RunConfig& config) {
 
 op::Operator PrepareOperator(const OperatorRequest& request,
                              const PreparedHamiltonian& ph,
-                             const RunConfig& /*config*/) {
-  op::Operator o = BuildBareOperator(request, ph);
-  if (ph.nat) {
-    o = hf::ToHfBasis(o, *ph.nat);
-  } else if (ph.hf) {
-    o = hf::ToHfBasis(o, *ph.hf);
-  }
-  const auto no_ms =
-      ph.ms_normal_ordering ? ph.ms_normal_ordering : ph.hno.model_space_ptr();
-  if (no_ms != o.model_space_ptr()) o = op::WithModelSpace(o, no_ms);
-  o = op::NormalOrder(o);
-  // [imsrg.space]: normal ordered in the full space, then cut (imsrg++.cc:
-  // 1427-1475).
-  if (ph.ms_normal_ordering) o = op::Truncate(o, ph.hno.model_space_ptr());
-  return o;
+                             const RunConfig& config) {
+  return PrepareOperator(request, MakeOperatorFrame(ph, config));
 }
 
 }  // namespace imsrg::driver::pipeline

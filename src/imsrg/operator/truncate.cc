@@ -23,10 +23,6 @@ Operator Truncate(const Operator& O,
     throw NotImplementedError(
         "Truncate: three-body parts are not supported yet");
   }
-  if (spec.particle_rank == 2 && !spec.is_scalar()) {
-    throw NotImplementedError(
-        "Truncate: two-body parts of tensor operators are not supported yet");
-  }
   const basis::SingleParticleBasis& src = O.model_space().basis();
   const basis::SingleParticleBasis& dst = target->basis();
   if (src.hbar_omega() != dst.hbar_omega()) {
@@ -63,7 +59,33 @@ Operator Truncate(const Operator& O,
           O.one_body().get(m(OrbitIndex(a)), m(OrbitIndex(b))));
     }
   }
-  if (spec.particle_rank == 2) {
+  if (spec.particle_rank == 2 && !spec.is_scalar()) {
+    // Tensor: per stored block (ch_bra <= ch_ket), the reduced elements of
+    // the kets of the target, looked up through the source (exchange phases
+    // and hermiticity phases are applied by the getter).
+    const basis::TwoBodyChannels& tb = target->two_body();
+    const TwoBody& v = O.two_body();
+    for (std::int32_t cb = 0; cb < tb.num_channels(); ++cb) {
+      const ChannelIndex chb(cb);
+      const basis::TwoBodyChannel& bc = tb.channel(chb);
+      for (std::int32_t ck = cb; ck < tb.num_channels(); ++ck) {
+        const ChannelIndex chk(ck);
+        if (!out.two_body().block_index(chb, chk)) continue;
+        const basis::TwoBodyChannel& kc = tb.channel(chk);
+        for (std::int32_t i = 0; i < bc.num_kets; ++i) {
+          const basis::Ket& bra = tb.ket(tb.global_ket(chb, LocalKetIndex(i)));
+          for (std::int32_t j = 0; j < kc.num_kets; ++j) {
+            const basis::Ket& ket =
+                tb.ket(tb.global_ket(chk, LocalKetIndex(j)));
+            const double x = v.get_normalized(m(bra.p), m(bra.q), m(ket.p),
+                                              m(ket.q), bc.two_j, kc.two_j);
+            out.two_body().set(chb, chk, LocalKetIndex(i), LocalKetIndex(j),
+                               x);
+          }
+        }
+      }
+    }
+  } else if (spec.particle_rank == 2) {
     const basis::TwoBodyChannels& tb = target->two_body();
     const TwoBody& v = O.two_body();
     for (std::int32_t c = 0; c < tb.num_channels(); ++c) {

@@ -36,6 +36,7 @@
 #include "imsrg/driver/pipeline/checkpoint.h"
 #include "imsrg/driver/pipeline/hamiltonian.h"
 #include "imsrg/driver/pipeline/mpi_sync.h"
+#include "imsrg/driver/pipeline/operator_frame.h"
 #include "imsrg/flow/magnus.h"
 #include "imsrg/flow/ode.h"
 #include "imsrg/flow/triples.h"
@@ -116,22 +117,6 @@ void RejectPlanned(const RunConfig& c) {
   }
   if (!c.operators.first_order.empty()) Planned("operators.first_order");
   if (!c.operators.from_file.empty()) Planned("operators.from_file");
-}
-
-/// The zero-, one- and two-body parts of `O` as a particle-rank-2 operator
-/// (imsrg++.cc:1177-1180, 1256-1260 throw the residual 3-body part away);
-/// `O` itself if its rank is below 3.
-op::Operator TwoBodyPart(const op::Operator& O) {
-  if (O.spec().particle_rank < 3) return O;
-  O.SyncToHost();
-  op::OperatorSpec spec = O.spec();
-  spec.particle_rank = 2;
-  op::Operator out(O.model_space_ptr(), spec);
-  out.zero_body() = O.zero_body();
-  out.one_body() = O.one_body();
-  out.two_body() = O.two_body();
-  out.SyncToDevice();
-  return out;
 }
 
 /// driver::Generator -> flow::GeneratorKind (the enums list the same
@@ -435,74 +420,15 @@ std::optional<ChargeRadiusSlots> PlanChargeRadius(
   return ChargeRadiusSlots{*rp2, *rso};
 }
 
-/// Occupations of the core (1 for core orbits, 0 otherwise).
-std::vector<double> CoreOccupations(const basis::ModelSpace& ms) {
-  std::vector<double> occ(static_cast<std::size_t>(ms.num_orbits()), 0.0);
-  for (const OrbitIndex a : ms.partition().core()) occ[a.ToSize()] = 1.0;
-  return occ;
-}
-
-/// imsrg++.cc:1221-1277: with a valence space, re-normal order w.r.t. the core
-/// if the reference used for normal ordering is not the core (ensemble /
-/// targeted normal ordering).
-bool NeedsRenormalOrdering(const basis::ModelSpace& ms) {
-  if (ms.partition().is_single_reference()) return false;
-  const std::vector<double> core = CoreOccupations(ms);
-  const auto occ = ms.reference().occupations();
-  for (std::size_t a = 0; a < core.size(); ++a) {
-    if (std::abs(occ[a] - core[a]) > 1.0e-12) return true;
-  }
-  return false;
-}
-
-/// Undoes the normal ordering w.r.t. the reference, then normal order w.r.t.
-/// the core.
-op::Operator RenormalOrderToCore(const op::Operator& O) {
-  const op::Operator vacuum = op::UndoNormalOrder(O);
-  const std::vector<double> core = CoreOccupations(O.model_space());
-  return op::NormalOrder(vacuum, core, op::NormalOrderDirection::kToReference);
-}
-
-io::TokyoWriteOptions TokyoOptions(const RunConfig& c,
-                                   const pipeline::PreparedHamiltonian& ph,
-                                   io::ValenceWriteMode mode) {
-  io::TokyoWriteOptions o;
-  o.mode = mode;
-  o.file_2n = c.interaction.two_body.file.empty()
-                  ? ""
-                  : c.interaction.two_body.file.front();
-  o.file_3n =
-      c.interaction.three_body ? c.interaction.three_body->file : "none";
-  o.e1max = c.basis.emax;
-  o.e2max = 2 * c.basis.emax;
-  o.e3max = c.basis.e3max;
-  o.hbar_omega = c.basis.hw;
-  o.a_ref = static_cast<std::int32_t>(ph.ms_bare->reference().target_mass());
-  o.z_ref = static_cast<std::int32_t>(ph.ms_bare->reference().target_Z());
-  o.a_target = static_cast<double>(ph.mass_number);
-  if (CompatOptionsFor(c.run.compat).tokyo_writer_fork_79e9330) {
-    // The fork writes after SetReference(core): Aref, Zref and the mass
-    // number of the kinetic-energy term are those of the core.
-    const basis::Partition& part = ph.ms_bare->partition();
-    o.tokyo_format = io::TokyoNumberFormat::kFork79e9330;
-    o.a_ref = static_cast<std::int32_t>(std::lround(part.A_core()));
-    o.z_ref = static_cast<std::int32_t>(std::lround(part.Z_core()));
-    o.a_target = static_cast<double>(std::lround(part.A_core()));
-  }
-  o.version =
-      c.provenance.version.empty() ? "imsrg" : "imsrg " + c.provenance.version;
-  return o;
-}
-
 /// Writes `O` as a valence-space file; only rank 0 writes (the device-to-host
 /// sync, a possible collective of later phases, runs on every rank first).
 void WriteValenceFile(const fs::path& path, op::Operator O, const RunConfig& c,
-                      const pipeline::PreparedHamiltonian& ph,
+                      const pipeline::OperatorFrame& frame,
                       io::ValenceWriteMode mode,
                       const comm::Communicator& comm) {
   O.SyncToHost();
   if (!comm.is_root()) return;
-  const io::ValenceWriteOptions o = TokyoOptions(c, ph, mode);
+  const io::ValenceWriteOptions o = pipeline::MakeValenceWriteOptions(c, frame, mode);
   if (c.output.valence_file_format == ValenceFileFormat::kNushellx) {
     fs::path base = path;
     io::WriteNushellxInt(base.replace_extension(".int"), O, o);
@@ -682,6 +608,9 @@ FlowStart MakeFlowStart(const RunConfig& config,
     copts.terms = commutator::TermMask::Imsrg3N7();
     copts.threebody_threshold = config.imsrg3.threebody_threshold;
   }
+  if (CompatOptionsFor(config.run.compat).tensor_ninej_threshold_1e8) {
+    copts.tensor_ninej_threshold = 1.0e-8;
+  }
   return start;
 }
 
@@ -692,8 +621,9 @@ std::vector<op::Operator> PrepareFlowingOperators(
     const pipeline::PreparedHamiltonian& ph, const RunConfig& config,
     const comm::Communicator& comm, std::vector<OperatorRecord>& ops) {
   std::vector<op::Operator> prepared;
+  const pipeline::OperatorFrame frame = pipeline::MakeOperatorFrame(ph, config);
   for (const OperatorRequest& req : requests) {
-    prepared.push_back(pipeline::PrepareOperator(req, ph, config));
+    prepared.push_back(pipeline::PrepareOperator(req, frame));
     pipeline::BroadcastOperator(prepared.back(), comm);
     OperatorRecord rec;
     rec.name = req.canonical_name;
@@ -754,10 +684,10 @@ void RunValenceStage(Engine& solver, FlowLog& flow_log, const RunConfig& config,
 /// broadcast from rank 0, so that all ranks replay the Omegas on identical
 /// bits.
 void TransformOperators(const std::vector<OperatorRequest>& requests,
-                        const pipeline::PreparedHamiltonian& ph,
+                        const pipeline::OperatorFrame& frame,
                         const RunConfig& config, Engine& solver, bool magnus,
                         const std::shared_ptr<const basis::ModelSpace>& ms_flow,
-                        bool renormal, const fs::path& dir,
+                        const fs::path& dir,
                         const std::string& stem, const comm::Communicator& comm,
                         std::vector<OperatorRecord>& ops) {
   const bool imsrg3 = config.imsrg3.in_flow;
@@ -765,7 +695,7 @@ void TransformOperators(const std::vector<OperatorRequest>& requests,
     const OperatorRequest& req = requests[i];
     op::Operator hf;
     if (magnus) {
-      hf = pipeline::PrepareOperator(req, ph, config);
+      hf = pipeline::PrepareOperator(req, frame);
       pipeline::BroadcastOperator(hf, comm);
       OperatorRecord rec;
       rec.name = req.canonical_name;
@@ -775,14 +705,19 @@ void TransformOperators(const std::vector<OperatorRequest>& requests,
     }
     OperatorRecord& rec = ops.at(i);
     if (imsrg3 && magnus) hf = op::WithModelSpace(hf, ms_flow);
-    op::Operator O = TwoBodyPart(solver.Transformed(i, hf));
-    if (renormal) O = RenormalOrderToCore(O);
+    const op::Operator O =
+        pipeline::FinishOperator(solver.Transformed(i, hf), frame);
     rec.imsrg = O.zero_body();
     log::Info("{}   IMSRG: {:.8f}", rec.name, rec.imsrg);
     if (i >= config.operators.list.size()) continue;  // internal Rso
-    rec.file = (dir / (stem + "_" + rec.name + ".snt")).string();
-    WriteValenceFile(rec.file, O, config, ph,
-                     io::ValenceWriteMode::kIsospinAveragedOperator, comm);
+    rec.file =
+        (dir / pipeline::OperatorFileName(stem, rec.name, O.spec())).string();
+    if (O.spec().is_scalar()) {
+      WriteValenceFile(rec.file, O, config, frame,
+                       io::ValenceWriteMode::kIsospinAveragedOperator, comm);
+    } else if (comm.is_root()) {
+      pipeline::WriteTensorSnt(rec.file, O, config, frame);
+    }
   }
 }
 
@@ -918,16 +853,15 @@ void FinishRun(const RunConfig& config, const pipeline::PreparedHamiltonian& ph,
   // transformations) inside a root-only branch: in phase 2 op::Norm and the
   // gathers become collectives that every rank must call.
   const fs::path dir(config.output.directory);
-  const basis::ModelSpace& ms = ph.hno.model_space();
   const bool diverged =
       stages.back().result.reason == flow::StopReason::kDiverged;
 
   // ---- Final Hamiltonian, re-normal ordered w.r.t. the core for ensemble
   // references.
-  const bool renormal = NeedsRenormalOrdering(ms);
+  const pipeline::OperatorFrame frame = pipeline::MakeOperatorFrame(ph, config);
   // IMSRG(3): the residual three-body part is dropped here, as in imsrg++.
-  const op::Operator h_flow = TwoBodyPart(solver.hamiltonian());
-  op::Operator h_final = renormal ? RenormalOrderToCore(h_flow) : h_flow;
+  const op::Operator h_final =
+      pipeline::FinishOperator(solver.hamiltonian(), frame);
   const double e0 = solver.hamiltonian().zero_body();
   if (config.valence.has_valence_space()) {
     log::Info("Core Energy = {:.6f} (valence-space zero body {:.6f})", e0,
@@ -941,14 +875,14 @@ void FinishRun(const RunConfig& config, const pipeline::PreparedHamiltonian& ph,
       config.output.stem.empty() ? "imsrg" : config.output.stem;
   if (config.valence.has_valence_space()) {
     valence_file = (dir / (stem + ".snt")).string();
-    WriteValenceFile(valence_file, h_final, config, ph,
+    WriteValenceFile(valence_file, h_final, config, frame,
                      io::ValenceWriteMode::kHamiltonian, comm);
   }
 
   // ---- Operators: HF-basis, normal-ordered operators transformed with the
   // Omega stack.
-  TransformOperators(requests, ph, config, solver, magnus, start.ms_flow,
-                     renormal, dir, stem, comm, ops);
+  TransformOperators(requests, frame, config, solver, magnus, start.ms_flow,
+                     dir, stem, comm, ops);
   // ---- output.write_omega (design/50 C6): the Omega stack plus what a later
   // transformation needs (basis C, occupations, manifest).
   if (config.output.write_omega && comm.is_root()) {
