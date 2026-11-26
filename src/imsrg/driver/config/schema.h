@@ -546,6 +546,9 @@ struct OutputConfig {
   bool write_omega = false;
   /// Format of the Omega files of `write_omega`.
   OperatorFileKind omega_format = OperatorFileKind::kNative;
+  /// With `write_omega`: also write the stack in the other format, under the
+  /// stem `<stem>_me2jp` (or `<stem>_native`), for comparisons in the farm.
+  bool omega_second_format = false;
   bool write_ho_ops = false;      ///< planned
   bool write_hf_ops = false;      ///< planned
   std::vector<std::string> spwf;  ///< orbit labels or "valence"
