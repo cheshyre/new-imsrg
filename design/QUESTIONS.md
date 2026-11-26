@@ -1228,6 +1228,20 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
   differs file by file from `$IMSRG_REFERENCE_ROOT/golden-generated-d35`; which one is newer is
   not recorded). **Assumed meanwhile:** the presets point at `$IMSRG_WORK/golden-generated`.
   Which of the two sets is current, and should the other be removed?
+* **FP-Q5** (2026-11-26, adaptive flow vs IT-14) - `FlowMethods.He4Emax2AdaptiveMatchesImsrgFlowFile`
+  failed on Frontier with max |Δs| = 1.27e-5 > 1e-5 (E0, |H|, eta within 3e-9). Cause: the test's
+  TOML used the DIIS HF default, imsrg++ uses linear mixing. DIIS stops after 8 iterations at an H0
+  that differs from imsrg++'s at the HF tolerance (|H| by 2.5e-8 at s = 0) and moves with round-off
+  (an `-O2 -ffp-contract=fast` build changed e1 by 1.2e-6 and max |Δs| to 5.1e-5); the adaptive
+  step control amplifies that in the converged tail (s > 80, ||eta|| ~ eta_criterion), where s
+  carries no physics. With `mixing = "linear"` (as the other imsrg++ comparisons, D37): HF 26
+  iterations and e1 equal to imsrg++, every printed s equal to imsrg++ run on Frontier (0 of 572
+  rows differ), E0/|H|/eta within 8e-10/2.7e-9/5.4e-10, FMA and non-FMA builds within 5e-9 in s;
+  vs the Mac golden max |Δs| = 7.6e-6, the same 25 rows whose printed s differ between imsrg++ on
+  the Mac and on Frontier (imsrg++'s own platform spread). Tolerance unchanged. **Open:** the
+  driver-level flow tests (and O16 under `slow`) still run DIIS and keep 1e-5 with less margin;
+  should every imsrg++ flow comparison use linear mixing, and is DIIS's round-off sensitivity at
+  the 1e-8 HF tolerance acceptable for production (it changes nothing physical)?
 * **FP-Q6** (2026-11-26, BLAS reentrancy) - `test_two_threads_on_distinct_solvers_and_operators`
   segfaulted on Frontier in `dgemm_kernel_loop_mnk_a1b1_mt_naples` (`libsci_gnu_mp.so.6`, the
   OpenMP cray-libsci that `CC -fopenmp` links). gdb: one Python thread in libsci `dgemm` with its
