@@ -30,6 +30,42 @@
 
 namespace imsrg::comm {
 
+/// A block of memory shared by the ranks of one node (MPI-3 shared-memory
+/// window, `MPI_Win_allocate_shared`), created by
+/// `Communicator::AllocateShared`. The whole block is allocated by rank 0 of
+/// the node communicator; every rank sees it at its own address (`data()`).
+/// Writes by one rank become visible to the others after a
+/// `Communicator::Barrier()` of the node communicator (the window is used in
+/// the "write once, then read" pattern: rank 0 fills it, barrier, everybody
+/// reads). Movable handle; the window is freed (collectively, by the ranks
+/// that still hold their handle) when the last copy is destroyed, so all
+/// ranks must destroy their handles in the same order, before MPI_Finalize.
+/// In a serial build or for the serial communicator the block is plain heap
+/// memory.
+class SharedMemory {
+ public:
+  SharedMemory() = default;
+  SharedMemory(const SharedMemory&) = delete;
+  SharedMemory& operator=(const SharedMemory&) = delete;
+  SharedMemory(SharedMemory&&) = default;
+  SharedMemory& operator=(SharedMemory&&) = default;
+  ~SharedMemory() = default;
+
+  /// The shared block (size `size()` bytes).
+  std::span<std::byte> data() const noexcept { return {data_, size_}; }
+  /// Size in bytes.
+  std::size_t size() const noexcept { return size_; }
+
+  /// Implementation detail (defined in the communicator_*.cc file).
+  struct Window;
+
+ private:
+  friend class Communicator;
+  std::shared_ptr<Window> window_;
+  std::byte* data_ = nullptr;
+  std::size_t size_ = 0;
+};
+
 /// Cheap, copyable handle to a group of ranks. Copies share the underlying
 /// communicator, which is freed (if it was created by `split`/`duplicate`) when
 /// the last handle is destroyed, never after MPI_Finalize. Not thread-safe
@@ -152,6 +188,15 @@ class Communicator {
   /// MPI_Comm_dup: a communicator over the same ranks with an independent
   /// message context.
   Communicator Duplicate() const;
+  /// MPI_Comm_split_type(MPI_COMM_TYPE_SHARED): the ranks that can share
+  /// memory with the caller (one communicator per node), ordered by rank.
+  /// Collective. The serial communicator returns itself.
+  Communicator SplitShared() const;
+  /// Collective over a communicator from `SplitShared`: allocates `bytes`
+  /// bytes of node-shared memory (`MPI_Win_allocate_shared`, all on rank 0,
+  /// zero size on the others, then `MPI_Win_shared_query`). Every rank passes
+  /// the same `bytes`. The memory is not initialized.
+  SharedMemory AllocateShared(std::size_t bytes) const;
 
   /// Implementation detail (defined in the communicator_*.cc file of the
   /// build).
