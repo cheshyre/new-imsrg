@@ -1352,3 +1352,15 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
   bit exact except for entries with exactly one identical-orbit pair (x*sqrt2 then /sqrt2, within
   2 ulp); native files are the exact format. (c) A `.bin` header without a tag is accepted. The
   `asan` preset was not run (Mac-only preset). **Assumed:** fine; fix the formula in the doc.
+* **AL-D1** (lead D, C7 at production size) - A restart re-runs the whole preparation (me2j and
+  48 GB NO2B read, HF, NAT, NO2B contraction): ~16 min of every 2-hour job at emax 14 (13 %), and
+  the 30-minute checkpoint interval loses up to 30 min more per job boundary (the N2LOsat run lost
+  21 stage-2 steps). Restarts are bit-identical across nodes (checked at stage 2, steps 79/80).
+  **Assumed:** acceptable tonight; for the farm and longer chains, store H_0 (emax 10, ~0.3 GB)
+  and the NAT C in the checkpoint so a restart skips the readers and HF (answers AL-C2), and write a
+  checkpoint on SIGTERM / before the job's end (Slurm `--signal`).
+* **AL-D2** (lead D, NAT) - Our MBPT(2) density matrix dropped the PP elements between a particle
+  and a partially filled hole (imsrg++ tests 1 - n_b); fixed (commit "Include partially filled
+  orbits ..."). This was a bug of the port, not of imsrg++, so it is not in design/30 §6. AL-C3's
+  pending comparison against fork dumps: done indirectly, emax 6 and 14 EMP2/EMP3/E_Nat agree with
+  the fork build to all printed digits.
