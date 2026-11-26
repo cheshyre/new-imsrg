@@ -794,9 +794,8 @@ void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
         "commutator::comm222_phst::inverse_quad",
         static_cast<int>(pitems.back()), opts,
         IMSRG_LAMBDA(const exec::TeamMember& member) {
-          auto* scratch =
-              static_cast<double*>(member.team_scratch(level).get_shmem(
-                  2 * q.nj * q.nj * sizeof(double)));
+          auto* scratch = static_cast<double*>(
+              member.team_scratch(level).get_shmem(opts.scratch_bytes));
           PhstQuad(member, q, scratch);
         });
     exec::Fence("commutator::comm222_phst");

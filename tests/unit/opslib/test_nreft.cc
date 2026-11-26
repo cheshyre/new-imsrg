@@ -345,7 +345,8 @@ TEST(NreftLimits, FM0IsTheNumberOperator) {
   const auto tp = BuildShorthandTable(basis, *ParseShorthand("FM0p_0"));
   const auto tn = BuildShorthandTable(basis, *ParseShorthand("FM0n_0"));
   for (int a = 0; a < basis.num_orbits(); ++a) {
-    const bool proton = basis.orbits()[a].tz2.twice < 0;
+    const bool proton =
+        basis.orbits()[static_cast<std::size_t>(a)].tz2.twice < 0;
     EXPECT_NEAR(Diag(tp, a), proton ? 1.0 : 0.0, 1.0e-14);
     EXPECT_NEAR(Diag(tn, a), proton ? 0.0 : 1.0, 1.0e-14);
     for (int b = 0; b < basis.num_orbits(); ++b) {
@@ -389,7 +390,7 @@ TEST(NreftLimits, Sigmap1AndSigmapp1AreSigma) {
   const auto tp = BuildShorthandTable(basis, *ParseShorthand("FSigmap1p_0"));
   const auto tpp = BuildShorthandTable(basis, *ParseShorthand("FSigmapp1p_0"));
   for (int a : {0, 2, 4, 6, 8, 10}) {
-    const basis::Orbit& o = basis.orbits()[a];
+    const basis::Orbit& o = basis.orbits()[static_cast<std::size_t>(a)];
     const double s = SigmaReduced(o.l, o.j2.twice);
     EXPECT_NEAR(Diag(tp, a), s / std::sqrt(6 * std::numbers::pi), 1.0e-13);
     EXPECT_NEAR(Diag(tpp, a), s / (2 * std::sqrt(3 * std::numbers::pi)),
@@ -401,7 +402,7 @@ TEST(NreftLimits, Delta1IsMinusL) {
   const auto basis = Emax2Basis();
   const auto t = BuildShorthandTable(basis, *ParseShorthand("FDelta1p_0"));
   for (int a : {0, 2, 4, 6, 8, 10}) {
-    const basis::Orbit& o = basis.orbits()[a];
+    const basis::Orbit& o = basis.orbits()[static_cast<std::size_t>(a)];
     EXPECT_NEAR(
         Diag(t, a),
         -LReduced(o.l, o.j2.twice) / (2 * std::sqrt(6 * std::numbers::pi)),
