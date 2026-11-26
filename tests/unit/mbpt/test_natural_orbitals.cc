@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "imsrg/basis/model_space.h"
+#include "imsrg/operator/random_operator.h"
 #include "tests/unit/mbpt/mbpt_test_support.h"
 
 namespace imsrg::mbtest {
@@ -255,6 +256,137 @@ TEST(MbptNaturalOrbitals, AbsoluteOccupationSorting) {
     for (std::int64_t k = 0; k < N; ++k)
       EXPECT_EQ(abs_nat.c_hf2nat(k, i), signed_nat.c_hf2nat(k, i));
   }
+}
+
+// Al27 ensemble reference at emax 4, random Hermitian H with ordered
+// single-particle energies: the (proton 1d5/2, proton 0d5/2) element of the
+// MBPT(2) density equals imsrg++'s DensityMatrixPP + DensityMatrixPH
+// (HFMBPT.cc), transcribed here loop by loop. The PP term couples the
+// particle 1d5/2 to the partially filled 0d5/2 (n = 5/6): imsrg++ tests
+// 1 - n_b, not the particle list (lead D, 2026-11-26: missing this term
+// moved EMP2 of the 27Al production run by 0.026 MeV).
+TEST(MbptNaturalOrbitals, PartiallyFilledOrbitEntersPpBlock) {
+  const auto ms = basis::ModelSpace::FromNames(
+      basis::BasisTruncation{.emax = 4, .lmax = -1}, 16.0, "Al27", "sd-shell");
+  const auto& basis = ms->basis();
+  const auto& ref = ms->reference();
+  const std::int32_t N = ms->num_orbits();
+  op::Operator H = op::RandomOperator(
+      ms, op::OperatorSpec::Scalar(2, Hermiticity::kHermitian),
+      {.seed = 7, .one_body_scale = 0.0, .two_body_scale = 0.5});
+  H.SyncToHost();
+  for (std::int32_t a = 0; a < N; ++a) {
+    const OrbitIndex oa(a);
+    const auto& o = basis.orbit(oa);
+    H.one_body().set(oa, oa, 3.0 * o.e() - 9.0 + 0.1 * a);
+  }
+  H.SyncToDevice();
+  std::int32_t a = -1, b = -1;  // proton 1d5/2, proton 0d5/2
+  for (std::int32_t k = 0; k < N; ++k) {
+    const auto& o = basis.orbit(OrbitIndex(k));
+    if (o.l == 2 && o.j2.twice == 5 && o.tz2.twice < 0) (o.n == 0 ? b : a) = k;
+  }
+  ASSERT_GE(a, 0);
+  ASSERT_GE(b, 0);
+  ASSERT_NEAR(ref.occupation(OrbitIndex(b)), 5.0 / 6.0, 1.0e-12);
+
+  op::Operator h = H;
+  const linalg::Matrix<double> rho = mbpt::Mbpt2DensityMatrix(h);
+
+  const auto n = [&](std::int32_t k) { return ref.occupation(OrbitIndex(k)); };
+  const auto e = [&](std::int32_t k) {
+    return H.one_body().get(OrbitIndex(k), OrbitIndex(k));
+  };
+  const auto j2 = [&](std::int32_t k) {
+    return basis.orbit(OrbitIndex(k)).j2.twice;
+  };
+  const auto V = [&](std::int32_t p, std::int32_t q, std::int32_t r,
+                     std::int32_t s, int J) {
+    const auto &P = basis.orbit(OrbitIndex(p)), &Q = basis.orbit(OrbitIndex(q)),
+               &R = basis.orbit(OrbitIndex(r)), &S = basis.orbit(OrbitIndex(s));
+    if ((P.l + Q.l + R.l + S.l) % 2 != 0) return 0.0;
+    if (P.tz2.twice + Q.tz2.twice != R.tz2.twice + S.tz2.twice) return 0.0;
+    return H.two_body().get_unnormalized(OrbitIndex(p), OrbitIndex(q),
+                                         OrbitIndex(r), OrbitIndex(s),
+                                         TwoJ{2 * J});
+  };
+  const double cut = 1.0e-6;
+  // DensityMatrixPP, element (a, b), b < a.
+  double pp = 0.0;
+  for (std::int32_t c = 0; c < N; ++c) {
+    if (n(c) >= cut || 1 - n(c) < cut) continue;  // particles
+    for (std::int32_t i = 0; i < N; ++i) {
+      if (n(i) < cut) continue;  // holes
+      for (std::int32_t j = 0; j < N; ++j) {
+        if (n(j) < cut) continue;
+        const double eac = e(a) + e(c) - e(i) - e(j);
+        const double ebc = e(b) + e(c) - e(i) - e(j);
+        if (std::abs(eac * ebc) < 1.0e-8) continue;
+        const int jmin =
+            std::max({std::abs(j2(a) - j2(c)), std::abs(j2(i) - j2(j)),
+                      std::abs(j2(b) - j2(c))}) /
+            2;
+        const int jmax =
+            std::min({j2(a) + j2(c), j2(i) + j2(j), j2(b) + j2(c)}) / 2;
+        double t = 0.0;
+        for (int J = jmin; J <= jmax; ++J)
+          t += (2 * J + 1) * V(a, c, i, j, J) * V(i, j, b, c, J);
+        t *= (1 - n(a)) * (1 - n(b)) * (1 - n(c)) * (1 - n(c)) * n(i) * n(i) *
+             n(j) * n(j);
+        const double eps = 0.5 * std::sqrt(std::abs(eac * ebc));
+        pp += 0.5 * (std::sqrt(t + eps * eps) - eps) / std::sqrt(t + eps * eps);
+      }
+    }
+  }
+  pp *= 0.5 / (j2(a) + 1);
+  // DensityMatrixPH, element (a, i = b).
+  const std::int32_t i = b;
+  double r1 = 0.0, r2 = 0.0;
+  const double eai = e(a) - e(i);
+  for (std::int32_t p = 0; p < N; ++p) {
+    if (n(p) >= cut) continue;  // particles
+    for (std::int32_t q = 0; q < N; ++q) {
+      if (n(q) >= cut) continue;
+      for (std::int32_t j = 0; j < N; ++j) {
+        if (n(j) < cut) continue;
+        const double d = e(p) + e(q) - e(i) - e(j);
+        if (eai * d < 1.0e-8) continue;
+        const int jmin =
+            std::max({std::abs(j2(a) - j2(j)), std::abs(j2(p) - j2(q)),
+                      std::abs(j2(i) - j2(j))}) /
+            2;
+        const int jmax =
+            std::min({j2(a) + j2(j), j2(p) + j2(q), j2(i) + j2(j)}) / 2;
+        double t = 0.0;
+        for (int J = jmin; J <= jmax; ++J)
+          t += (2 * J + 1) * V(a, j, p, q, J) * V(p, q, i, j, J);
+        r1 +=
+            t * (1 - n(a)) * (1 - n(p)) * (1 - n(q)) * n(i) * n(j) / (eai * d);
+      }
+    }
+    for (std::int32_t j = 0; j < N; ++j) {
+      if (n(j) < cut) continue;
+      for (std::int32_t k = 0; k < N; ++k) {
+        if (n(k) < cut) continue;
+        const double d = e(a) + e(p) - e(k) - e(j);
+        if (eai * d < 1.0e-8) continue;
+        const int jmin =
+            std::max({std::abs(j2(k) - j2(j)), std::abs(j2(i) - j2(p)),
+                      std::abs(j2(a) - j2(p))}) /
+            2;
+        const int jmax =
+            std::min({j2(k) + j2(j), j2(i) + j2(p), j2(a) + j2(p)}) / 2;
+        double t = 0.0;
+        for (int J = jmin; J <= jmax; ++J)
+          t += (2 * J + 1) * V(k, j, i, p, J) * V(a, p, k, j, J);
+        r2 += t * (1 - n(a)) * n(i) * n(j) * n(k) * (1 - n(p)) / (eai * d);
+      }
+    }
+  }
+  const double ph = (r1 - r2) * 0.5 / (j2(a) + 1);
+  ASSERT_GT(std::abs(pp), 1.0e-8);  // the term under test is not trivial
+  EXPECT_NEAR(rho(a, b), pp + ph, 1.0e-12 * (std::abs(pp) + std::abs(ph)));
+  EXPECT_EQ(rho(a, b), rho(b, a));
 }
 
 }  // namespace
