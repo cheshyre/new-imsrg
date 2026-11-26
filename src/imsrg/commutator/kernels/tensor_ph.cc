@@ -229,7 +229,7 @@ struct QuadArgs {
 static_assert(std::is_trivially_copyable_v<QuadArgs>);
 
 /// The inverse transform of comm222_phst for one ket pair (a = (i, j),
-/// b = (k, l)) and all (J1, J2) (device, M14): the team gathers
+/// b = (k, l)) and all (J1, J2) (M14): the team gathers
 /// Zbar^{J3 J4}_{(il),(kj)} and Zbar^{J3 J4}_{(jl),(ki)} once into team
 /// scratch, then its threads compute the elements of every stored block
 /// (J1, J2) that contains the pair, in exactly the order of
@@ -634,14 +634,16 @@ void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   // One item per row of the stacked stored blocks, its columns iket >= the
   // first stored one (iket >= ibra in diagonal blocks): looped inside the
   // item on the host, over a team's threads on the device (M14).
-  // Device (M14), rank L >= kQuadMinRank: one team per ket pair (a, b) of
-  // compatible classes; the Zbar values of the pair are gathered once for
-  // all (J1, J2) blocks. For small L few (J1, J2) share a pair and the
-  // element-wise form below is faster. Measured at emax 10 (ms, element /
-  // quad): L = 1 275 / 583, 2 675 / 775, 3 1173 / 944, 4 1642 / 1094,
-  // 5 2150 / 1206.
-  constexpr int kQuadMinRank = 3;
-  if (exec::kDeviceKernels && L >= kQuadMinRank) {
+  // Quadruple form (M14): one team per ket pair (a, b) of compatible classes;
+  // the Zbar values of the pair are gathered once for all (J1, J2) blocks
+  // (the element form below gathers them once per block). Bitwise equal to
+  // the element form. Host: always (team size 1; emax 8 rank 5 on 56 cores
+  // 2348 -> 882 ms, emax 10 rank 5 18.9 -> 4.9 s, rank 2 5.3 -> 2.4 s).
+  // Device: only for L >= 3, since for small L few (J1, J2) share a pair and
+  // the element form fills the GPU better; emax 10 (ms, element / quad):
+  // L = 1 275 / 583, 2 675 / 775, 3 1173 / 944, 4 1642 / 1094, 5 2150 / 1206.
+  constexpr int kQuadMinRankDevice = 3;
+  if (!exec::kDeviceKernels || L >= kQuadMinRankDevice) {
     const basis::TwoBodyChannels& tbh = ctx.ms->two_body();
     const basis::SingleParticleBasis& sp = ctx.ms->basis();
     std::vector<std::vector<std::int32_t>> by_class(6);
@@ -677,7 +679,6 @@ void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
         pb.push_back(y);
         pitems.push_back(pitems.back() + na * nbk);
       }
-    const std::int32_t nch = ctx.tables.two_body().num_channels;
     const auto zblock = detail::BlockOffsetTable(Z.two_body(), nch);
     const auto d_ck = ToDevice(class_kets, "imsrg::phst::class_kets");
     const auto d_co = ToDevice(class_off, "imsrg::phst::class_off");
@@ -698,7 +699,9 @@ void Comm222Phst(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
     IMSRG_CHECK(pitems.back() <= std::int64_t{2147483647},
                 "comm222_phst: too many ket pairs for one launch");
     exec::TeamOptions opts;
-    opts.team_size = 64;
+    opts.team_size = exec::kDeviceKernels ? 64 : 1;
+    opts.schedule = exec::kDeviceKernels ? exec::Schedule::kStatic
+                                         : exec::Schedule::kDynamic;
     opts.vector_length = 1;
     opts.scratch_bytes = 2 * static_cast<std::size_t>(q.nj) *
                          static_cast<std::size_t>(q.nj) * sizeof(double);
