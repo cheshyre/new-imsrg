@@ -440,6 +440,215 @@ IMSRG_FORCEINLINE_FUNCTION void Comm122stElement(
     zb[iket + static_cast<std::int64_t>(ibra) * nb] += a.hZ * v;
 }
 
+/// comm122st on the device as GEMMs (M14). With the lifted scalar one-body
+/// operators per channel, L_c(r, m) = sum_t coef_t x1(from_t, to_t) and R_c
+/// the same with x1 transposed (lists 1 and 2 of row r; list 1 twice for
+/// r = (i, i)), and the part-2 lists folded into B (bra lists, rows scaled by
+/// hat ph1 resp. hat ph23) and K (ket lists, columns scaled by hat ph23 resp.
+/// hat ph4; K4 = -K3 for k = l), every stored block (b, k) of Z gets
+///   G1 = L_b Y_bk + B_bk X_kk,   G2 = X_bb K_bk - Y_bk R_k^T,
+///   Z(r, c) += (s_c G1 + s_r G2) / norm(r, c)
+/// with s = sqrt2 for an equal-orbit ket (the unnormalized elements), which is
+/// the element-wise formula of Comm122stElement regrouped (summation order
+/// differs). Four grouped device GEMM calls; scratch: four Z-sized buffers.
+void Comm122stGemm(const op::Operator& X, const op::Operator& Y,
+                   op::Operator& Z, const OneBodyArgs& a, const Comm122Args& k,
+                   const basis::TwoBodyTableView& tb, const BlockRows& rows,
+                   const basis::TwoBodyChannels& tbh, int hZ) {
+  const auto nchan = static_cast<std::size_t>(tbh.num_channels());
+  std::vector<std::int64_t> kofs(nchan + 1, 0);
+  std::vector<std::int64_t> lofs(nchan + 1, 0);
+  for (std::size_t c = 0; c < nchan; ++c) {
+    const auto n = static_cast<std::int64_t>(
+        tbh.channel_kets(ChannelIndex{static_cast<std::int32_t>(c)}).size());
+    kofs[c + 1] = kofs[c] + n;
+    lofs[c + 1] = lofs[c] + n * n;
+  }
+  const auto d_kofs = ToDevice(kofs, "imsrg::comm122st::kofs");
+  const auto d_lofs = ToDevice(lofs, "imsrg::comm122st::lofs");
+  const std::int64_t lsize = lofs.back();
+  exec::DeviceBuffer<double> lr(static_cast<std::size_t>(2 * lsize),
+                                "imsrg::comm122st::lr");
+  const std::size_t zsize = Z.two_body().matrix().buffer().size();
+  exec::DeviceBuffer<double> bk(2 * zsize, "imsrg::comm122st::bk");
+  exec::DeviceBuffer<double> g(2 * zsize, "imsrg::comm122st::g");
+  const auto zs = static_cast<std::int64_t>(zsize);
+  const int nc = static_cast<int>(nchan);
+  double* lrd = lr.device_data();
+  double* bkd = bk.device_data();
+  double* gd = g.device_data();
+  const std::int64_t* ko = d_kofs.device_data();
+  const std::int64_t* lo = d_lofs.device_data();
+  // 1. L and R, one thread per row of every channel.
+  exec::ParallelFor(
+      "commutator::comm122st::lift", kofs.back(),
+      IMSRG_LAMBDA(const exec::Index row) {
+        const int c = detail::FindBlock(ko, nc, row);
+        const std::int64_t n = ko[c + 1] - ko[c];
+        const std::int64_t r = row - ko[c];
+        const KetIndex gk =
+            tb.global_ket(ChannelIndex{c}, LocalKetIndex{static_cast<int>(r)});
+        const bool dij = tb.ket_p[gk.value()] == tb.ket_q[gk.value()];
+        const int e1 = k.lifted.offsets[2 * row];
+        const int e2 = k.lifted.offsets[2 * row + 1];
+        const int e3 = dij ? e2 : k.lifted.offsets[2 * row + 2];
+        const double w1 = dij ? 2.0 : 1.0;
+        double* lc = lrd + lo[c];
+        double* rc = lrd + lsize + lo[c];
+        for (int e = e1; e < e3; ++e) {
+          const double w = e < e2 ? w1 : 1.0;
+          const std::int64_t idx = r + k.lifted.m[e] * n;
+          lc[idx] +=
+              w * k.lifted.coef[e] * a.x1(k.lifted.from[e], k.lifted.to[e]);
+          rc[idx] +=
+              w * k.lifted.coef[e] * a.x1(k.lifted.to[e], k.lifted.from[e]);
+        }
+      });
+  // 2. B (rows of the stored blocks) and K (columns), Z's block layout.
+  exec::ParallelFor(
+      "commutator::comm122st::bra_lists", rows.num_rows,
+      IMSRG_LAMBDA(const exec::Index rr) {
+        const int blk = detail::FindBlock(k.br.row_offset, k.br.num_blocks, rr);
+        const int ibra = static_cast<int>(rr) - k.br.row_offset[blk];
+        const int cb = k.br.ch_bra[blk];
+        const int ck = k.br.ch_ket[blk];
+        const int J1 = tb.channel_two_j[cb] / 2;
+        const int J2 = tb.channel_two_j[ck] / 2;
+        const int nb = k.br.nbra[blk];
+        const double hat = Kokkos::sqrt((2.0 * J1 + 1) * (2.0 * J2 + 1));
+        const KetIndex gb =
+            tb.global_ket(ChannelIndex{cb}, LocalKetIndex{ibra});
+        const int ji = a.j2[tb.ket_p[gb.value()]];
+        const int jj = a.j2[tb.ket_q[gb.value()]];
+        const double f1 = hat * Phase((ji + jj) / 2 + J2 + a.L);
+        const double f2 = hat * Phase(J1 - J2 + a.L);
+        double* bb = bkd + k.br.offset[blk] + ibra;
+        for (int e = k.bra1.offsets[rr]; e < k.bra1.offsets[rr + 1]; ++e)
+          bb[static_cast<std::int64_t>(k.bra1.m[e]) * nb] +=
+              f1 * a.y1(k.bra1.from[e], k.bra1.to[e]) * k.bra1.coef[e];
+        for (int e = k.bra2.offsets[rr]; e < k.bra2.offsets[rr + 1]; ++e)
+          bb[static_cast<std::int64_t>(k.bra2.m[e]) * nb] +=
+              f2 * a.y1(k.bra2.from[e], k.bra2.to[e]) * k.bra2.coef[e];
+      });
+  const std::int32_t* col_offset = k.col_offset;
+  std::int64_t ncols = 0;  // = col_offset[num_blocks]
+  for (const auto& info : Z.two_body().matrix().blocks()) ncols += info.cols;
+  exec::ParallelFor(
+      "commutator::comm122st::ket_lists", ncols,
+      IMSRG_LAMBDA(const exec::Index col) {
+        const int blk = detail::FindBlock(col_offset, k.br.num_blocks, col);
+        const int iket = static_cast<int>(col) - col_offset[blk];
+        const int cb = k.br.ch_bra[blk];
+        const int ck = k.br.ch_ket[blk];
+        const int J1 = tb.channel_two_j[cb] / 2;
+        const int J2 = tb.channel_two_j[ck] / 2;
+        const int nb = k.br.nbra[blk];
+        const double hat = Kokkos::sqrt((2.0 * J1 + 1) * (2.0 * J2 + 1));
+        const KetIndex gk =
+            tb.global_ket(ChannelIndex{ck}, LocalKetIndex{iket});
+        const int kk = tb.ket_p[gk.value()];
+        const int l = tb.ket_q[gk.value()];
+        const bool dkl = kk == l;
+        const double ph23 = Phase(J1 - J2 + a.L);
+        const double ph4 = Phase((a.j2[kk] + a.j2[l]) / 2 - J1 + a.L);
+        const double f3 = hat * (dkl ? ph23 - ph4 : ph23);
+        const double f4 = hat * ph4;
+        double* kc =
+            bkd + zs + k.br.offset[blk] + static_cast<std::int64_t>(iket) * nb;
+        for (int e = k.ket3.offsets[col]; e < k.ket3.offsets[col + 1]; ++e)
+          kc[k.ket3.m[e]] +=
+              f3 * a.y1(k.ket3.from[e], k.ket3.to[e]) * k.ket3.coef[e];
+        if (!dkl) {
+          for (int e = k.ket4.offsets[col]; e < k.ket4.offsets[col + 1]; ++e)
+            kc[k.ket4.m[e]] +=
+                f4 * a.y1(k.ket4.from[e], k.ket4.to[e]) * k.ket4.coef[e];
+        }
+      });
+  // 3. The GEMMs (beta = 1 onto the zeroed G; one C per call and buffer).
+  const auto& ymat = Y.two_body().matrix();
+  const double* yd =
+      Y.two_body().allocated() ? ymat.buffer().device_data() : nullptr;
+  std::vector<std::int64_t> x_block(nchan, -1);
+  const double* xd = nullptr;
+  if (X.two_body().allocated()) {
+    xd = X.two_body().matrix().buffer().device_data();
+    for (const auto& info : X.two_body().matrix().blocks()) {
+      if (info.row_block != info.col_block || info.rows == 0) continue;
+      x_block[static_cast<std::size_t>(info.row_block.value())] = info.offset;
+    }
+  }
+  using linalg::GemmProblem;
+
+  using linalg::Op;
+  std::vector<GemmProblem> call_a;
+  std::vector<GemmProblem> call_b;
+  for (const auto& info : Z.two_body().matrix().blocks()) {
+    const std::int64_t nb = info.rows;
+    const std::int64_t nk = info.cols;
+    if (nb == 0 || nk == 0) continue;
+    const auto cb = static_cast<std::size_t>(info.row_block.value());
+    const auto ck = static_cast<std::size_t>(info.col_block.value());
+    const MatrixView<double> g1{gd + info.offset, nb, nk, nb};
+    const MatrixView<double> g2{gd + zs + info.offset, nb, nk, nb};
+    if (yd != nullptr) {
+      const auto yk = ymat.find_block(info.row_block, info.col_block);
+      if (yk.has_value()) {
+        const MatrixView<const double> yb{yd + ymat.block_info(*yk).offset, nb,
+                                          nk, nb};
+        call_a.push_back(GemmProblem{
+            1.0, MatrixView<const double>{lrd + lofs[cb], nb, nb, nb},
+            Op::kNoTrans, yb, Op::kNoTrans, 1.0, g1});
+        call_b.push_back(GemmProblem{
+            -1.0, yb, Op::kNoTrans,
+            MatrixView<const double>{lrd + lsize + lofs[ck], nk, nk, nk},
+            Op::kTrans, 1.0, g2});
+      }
+    }
+    if (xd != nullptr && x_block[ck] >= 0) {
+      call_b.push_back(GemmProblem{
+          1.0, MatrixView<const double>{bkd + info.offset, nb, nk, nb},
+          Op::kNoTrans, MatrixView<const double>{xd + x_block[ck], nk, nk, nk},
+          Op::kNoTrans, 1.0, g1});
+    }
+    if (xd != nullptr && x_block[cb] >= 0) {
+      call_a.push_back(GemmProblem{
+          1.0, MatrixView<const double>{xd + x_block[cb], nb, nb, nb},
+          Op::kNoTrans,
+          MatrixView<const double>{bkd + zs + info.offset, nb, nk, nb},
+          Op::kNoTrans, 1.0, g2});
+    }
+  }
+  linalg::DeviceGroupedGemm(call_a);
+  linalg::DeviceGroupedGemm(call_b);
+  // 4. Z += (s_c G1 + s_r G2) / norm; diagonal blocks: c <= r and the mirror.
+  double* zd = Z.two_body().matrix().buffer().device_data();
+  exec::ParallelFor(
+      "commutator::comm122st::combine", zs, IMSRG_LAMBDA(const exec::Index e) {
+        const int blk = detail::FindBlock(k.br.offset, k.br.num_blocks, e);
+        const std::int64_t nb = k.br.nbra[blk];
+        const std::int64_t local = e - k.br.offset[blk];
+        const std::int64_t c = local / nb;
+        const std::int64_t r = local - c * nb;
+        const int cb = k.br.ch_bra[blk];
+        const int ck = k.br.ch_ket[blk];
+        if (cb == ck && c > r) return;  // written as the mirror of (c, r)
+        const KetIndex gb =
+            tb.global_ket(ChannelIndex{cb}, LocalKetIndex{static_cast<int>(r)});
+        const KetIndex gk =
+            tb.global_ket(ChannelIndex{ck}, LocalKetIndex{static_cast<int>(c)});
+        const bool dij = tb.ket_p[gb.value()] == tb.ket_q[gb.value()];
+        const bool dkl = tb.ket_p[gk.value()] == tb.ket_q[gk.value()];
+        const double sc = dkl ? constants::kSqrt2 : 1.0;
+        const double sr = dij ? constants::kSqrt2 : 1.0;
+        const double norm =
+            (dij == dkl) ? (dij ? 2.0 : 1.0) : constants::kSqrt2;
+        const double v = (sc * gd[e] + sr * gd[zs + e]) / norm;
+        zd[e] += v;
+        if (cb == ck && c < r) zd[k.br.offset[blk] + c + r * nb] += hZ * v;
+      });
+  exec::Fence("commutator::comm122st_gemm");
+}
+
 }  // namespace
 
 void Comm122st(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
@@ -471,6 +680,10 @@ void Comm122st(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
   // One item per row of the stacked stored blocks, its columns iket (up to
   // ibra in diagonal blocks): inside the item on the host, over a team's
   // threads on the device (M14). Bitwise equal across the shapes.
+  if constexpr (exec::kDeviceKernels) {
+    Comm122stGemm(X, Y, Z, a, k, tb, rows, ctx.ms->two_body(), hZ);
+    return;
+  }
   exec::NestedFor(
       "commutator::comm122st", rows.num_rows,
       IMSRG_LAMBDA(const exec::Index rr) {
