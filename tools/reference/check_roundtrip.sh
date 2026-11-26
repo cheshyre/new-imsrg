@@ -6,9 +6,10 @@
 # Usage: tools/reference/check_roundtrip.sh [refharness-binary]
 # Output files go to $IMSRG_REFERENCE_ROOT/roundtrip-check/ (outside the repo, overwritten).
 set -euo pipefail
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ref_env.sh"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "${HERE}/../.." && pwd)"
-ROOT="${IMSRG_REFERENCE_ROOT:-/Users/cheshyre/Downloads/new-imsrg-reference}"
+ROOT="${REF_BUILD}"
 RH="${1:-${ROOT}/harness-build/refharness}"
 WORK="${ROOT}/roundtrip-check"
 mkdir -p "${WORK}"

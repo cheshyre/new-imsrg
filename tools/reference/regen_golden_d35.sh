@@ -21,13 +21,13 @@
 # content equals the old one (only the version string in its `source` line differs).
 # Environment: IMSRG_REFERENCE_ROOT, IMSRG_TEST_DATA_DIR (as in the gen scripts), OMP_NUM_THREADS.
 set -euo pipefail
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ref_env.sh"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="${IMSRG_REFERENCE_ROOT:-/Users/cheshyre/Downloads/new-imsrg-reference}"
-export IMSRG_REFERENCE_ROOT="${ROOT}"
+ROOT="${REF_BUILD}"
 export REFHARNESS="${ROOT}/harness-build-d35/refharness"
 export IMSRG_REFERENCE_EXE="${ROOT}/build-d35/imsrg++"
 export IMSRG_REFERENCE_RUNS="${ROOT}/runs-d35/e2e"
-export IMSRG_REFERENCE_SHA_FILE="${ROOT}/REFERENCE_SRC_SHA256_D35"
+export IMSRG_REFERENCE_SHA_FILE="${REF_SHA_D35}"
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-8}"
 
 for f in "${REFHARNESS}" "${IMSRG_REFERENCE_EXE}" "${IMSRG_REFERENCE_SHA_FILE}"; do

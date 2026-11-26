@@ -17,7 +17,7 @@
 # Cases: He4_emax2 and O16_emax2, hw 16, valence = reference, E3max as in E3MAXS below (dumps only
 # at DUMP_E3MAX = 3; the larger E3max give norms only, they are where the hhh-ppp terms live).
 #
-# Env: IMSRG_REFERENCE_ROOT (default /Users/cheshyre/Downloads/new-imsrg-reference),
+# Env: IMSRG_REFERENCE_ROOT (default: see ref_env.sh; build outputs go to IMSRG_REFERENCE_BUILD),
 #      HARNESS_BUILD_DIR_D35 (default $ROOT/harness-build-d35; must contain a refharness built from
 #        this checkout: `HARNESS_BUILD_DIR_D35=<dir> tools/reference/build_imsrg_devel.sh patched-harness`),
 #      BENCH_BUILD_DIR (default build/golden-n7 of this checkout: release-openmp preset with
@@ -29,13 +29,14 @@
 # to run (e.g. n7, He4 E3max 3, 2B entry 1 1: 3.4421068778002937 vs 3.4421068778002946); compare to
 # 1e-12 relative. Dump files must stay below 1 MB (golden rule 7): the script fails otherwise.
 set -euo pipefail
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ref_env.sh"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "${HERE}/../.." && pwd)"
-ROOT="${IMSRG_REFERENCE_ROOT:-/Users/cheshyre/Downloads/new-imsrg-reference}"
+ROOT="${REF_BUILD}"
 RH="${HARNESS_BUILD_DIR_D35:-${ROOT}/harness-build-d35}/refharness"
 BENCH_DIR="${BENCH_BUILD_DIR:-${REPO}/build/golden-n7}"
 INPUTS="${BENCH_DIR}/tools/bench/imsrg_n7_inputs"
-export IMSRG_REFERENCE_SHA_FILE="${IMSRG_REFERENCE_SHA_FILE:-${ROOT}/REFERENCE_SRC_SHA256_D35}"
+export IMSRG_REFERENCE_SHA_FILE="${IMSRG_REFERENCE_SHA_FILE:-${REF_SHA_D35}}"
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-8}"
 export OMP_PROC_BIND="${OMP_PROC_BIND:-false}"
 OUT="${REPO}/tests/golden/n7"
