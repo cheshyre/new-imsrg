@@ -117,10 +117,10 @@ TEST_P(MSchemeTensorCommutatorTest, AllTermsAgainstMScheme) {
 INSTANTIATE_TEST_SUITE_P(
     EnsembleAndRanks, MSchemeTensorCommutatorTest,
     ::testing::Combine(::testing::Range(0, 3), ::testing::Range(0, 6)),
-    [](const ::testing::TestParamInfo<std::tuple<int, int>>& info) {
-      return std::string(SpaceName(std::get<0>(info.param))) + "_rank" +
+    [](const ::testing::TestParamInfo<std::tuple<int, int>>& p) {
+      return std::string(SpaceName(std::get<0>(p.param))) + "_rank" +
              std::to_string(
-                 Kinds()[static_cast<std::size_t>(std::get<1>(info.param))]
+                 Kinds()[static_cast<std::size_t>(std::get<1>(p.param))]
                      .rank_J);
     });
 

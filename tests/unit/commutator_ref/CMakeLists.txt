@@ -66,3 +66,12 @@ imsrg_add_test(NAME commutator_ref_mscheme_tensor_comm
   DEPS commutator_ref commutator operator
   LABELS unit
   NO_GTEST_MAIN)
+
+# Tensor normal ordering against the m-scheme (closed and fractional
+# occupations, ranks 0 to 5).
+imsrg_add_test(NAME commutator_ref_mscheme_tensor_normal_order
+  SOURCES test_mscheme_tensor_normal_order.cc ${_imsrg_exec_main} ${_imsrg_comm_support}
+          ${_imsrg_tensor_ms_support}
+  DEPS commutator_ref operator
+  LABELS unit
+  NO_GTEST_MAIN)

@@ -1351,3 +1351,12 @@ Supervised session 2026-11-26 (OLCF Frontier, nph123). Proposals P-F* need an ow
 * **AL-A-Q4** (2026-11-26) - `[scalar, tensor]` with a one-body Y: imsrg++ gives Z Y's particle rank,
   the rewrite gives Z max(rank X, rank Y) (so comm122st is kept for a one-body Y). BCH promotes Y to
   rank 2 first in both codes, so transformed operators agree. **Assumed:** keep the rewrite's rule.
+* **AL-A-Q5** (2026-11-26) - Storage convention of reduced elements (follow-up to M15-Q1). The m-scheme
+  oracle (`commutator_ref::mscheme::ExpandTensor`) reproduces every emax-1 tensor golden (all terms, four
+  hermiticity pairs, 1.7e-15) only with PLAIN Edmonds reduction, <j'm'|T_mu|jm> = <j m L mu|j' m'> R /
+  sqrt(2j'+1), for one-body elements and J-coupled pairs alike; extra phases (-1)^(j_bra-j_ket),
+  (-1)^(J_bra-J_ket) or (-1)^L deviate by O(1). So imsrg++'s storage IS Edmonds; the "gauge" of
+  design/15 is a property of the closed forms of its operator builders (E2, GT), i.e. of which physical
+  operator a name denotes. **Assumed:** the rewrite stores what imsrg++ stores (owner answer to M15-Q1
+  holds unchanged); the NREFT builders (lead B) must reproduce the fork's closed forms, and an Edmonds
+  converter at the edges is then the identity on storage. Worth a line in design/15.
