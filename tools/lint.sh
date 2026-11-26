@@ -32,6 +32,9 @@ extra_args=()
 if imsrg_on_frontier; then
   default_build=frontier-cpu
   if [ -n "${MPICH_DIR:-}" ]; then extra_args+=("--extra-arg=-isystem$MPICH_DIR/include"); fi
+  # The pip clang-tidy has no omp.h of its own; Kokkos' OpenMP headers need GCC's.
+  gcc_inc=$(dirname "$(gcc -print-file-name=include/omp.h 2>/dev/null)")
+  if [ -f "$gcc_inc/omp.h" ]; then extra_args+=("--extra-arg=-isystem$gcc_inc"); fi
 fi
 build_dir=${IMSRG_BUILD_DIR:-$repo_root/build/$default_build}
 db=$build_dir/compile_commands.json
