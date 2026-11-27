@@ -222,6 +222,17 @@ TEST(Writer, OutputReadsBackWithoutIssuesAndContainsEveryKey) {
   EXPECT_GT(checked, 30u);
 }
 
+TEST(Writer, IsospinAverageOperatorsRoundTrips) {
+  RunConfig cfg = SampleConfig();
+  EXPECT_TRUE(HasLine(ToToml(cfg, false), "isospin_average_operators = true"));
+  cfg.output.isospin_average_operators = false;
+  const std::string text = ToToml(cfg, false);
+  EXPECT_TRUE(HasLine(text, "isospin_average_operators = false"));
+  RawTree tree;
+  EXPECT_TRUE(ReadTomlString(text, "rt", tree).empty());
+  EXPECT_TRUE(tree.contains("output.isospin_average_operators"));
+}
+
 TEST(Writer, FactorizedRecipeValuesRoundTrip) {
   RunConfig cfg = SampleConfig();
   cfg.reference.nucleus = "O16";

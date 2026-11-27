@@ -91,6 +91,15 @@ TEST(Resolve, defaults_equal_default_config_except_required_and_derived) {
   EXPECT_TRUE(r.config == expect);
 }
 
+TEST(Resolve, isospin_average_operators_default_true_and_explicit_false) {
+  EXPECT_TRUE(ResolveTree(Minimal()).config.output.isospin_average_operators);
+  const auto off =
+      With(Minimal(), {{"output.isospin_average_operators", B(false)}});
+  const auto r = ResolveTree(off);
+  EXPECT_FALSE(HasErrors(r.issues));
+  EXPECT_FALSE(r.config.output.isospin_average_operators);
+}
+
 TEST(Resolve, hf_mixing_defaults_to_diis_in_toml_and_linear_in_legacy) {
   // D37: the TOML default is DIIS; the legacy layer keeps imsrg++'s linear
   // density mixing.

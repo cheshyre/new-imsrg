@@ -198,6 +198,12 @@ io::ValenceWriteOptions MakeValenceWriteOptions(const RunConfig& c,
   return o;
 }
 
+io::ValenceWriteMode ScalarOperatorWriteMode(const RunConfig& config) {
+  return config.output.isospin_average_operators
+             ? io::ValenceWriteMode::kIsospinAveragedOperator
+             : io::ValenceWriteMode::kHamiltonian;
+}
+
 std::string OperatorFileName(const std::string& stem, const std::string& name,
                              const op::OperatorSpec& spec) {
   return stem + "_" + name + (spec.is_scalar() ? "" : "_2b") + ".snt";
