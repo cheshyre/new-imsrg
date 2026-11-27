@@ -199,8 +199,16 @@ io::ValenceWriteOptions MakeValenceWriteOptions(const RunConfig& c,
 }
 
 std::string OperatorFileName(const std::string& stem, const std::string& name,
-                             const op::OperatorSpec& spec) {
-  return stem + "_" + name + (spec.is_scalar() ? "" : "_2b") + ".snt";
+                             bool tensor, bool fork_names) {
+  return stem + (fork_names ? "" : "_") + name + (tensor ? "_2b" : "") + ".snt";
+}
+
+std::string OperatorFileName(const std::string& stem, const std::string& name,
+                             const op::OperatorSpec& spec,
+                             const RunConfig& config) {
+  return OperatorFileName(
+      stem, name, !spec.is_scalar(),
+      CompatOptionsFor(config.run.compat).fork_operator_file_names);
 }
 
 void WriteTensorSnt(const std::filesystem::path& path, op::Operator O,

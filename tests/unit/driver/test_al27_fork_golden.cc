@@ -151,13 +151,13 @@ void RunCase(const std::string& golden_dir, const std::string& tag) {
   std::vector<std::pair<std::string, std::string>> files = {
       {"int.snt", "int.snt"}};
   // Golden file names: int<name>.snt (scalar) and int<name>_2b.snt (tensor);
-  // ours: int_<name>.snt / int_<name>_2b.snt.
+  // ours (run.compat fork, fork_operator_file_names): the same names.
   for (const auto& entry : fs::directory_iterator(gold)) {
     const std::string f = entry.path().filename().string();
     if (f.rfind("int", 0) != 0 || f.size() < 5 ||
         f.substr(f.size() - 4) != ".snt" || f == "int.snt")
       continue;
-    files.emplace_back("int_" + f.substr(3), f);
+    files.emplace_back(f, f);
   }
   EXPECT_EQ(files.size(), 12U);
   for (const auto& [mine, golden] : files) {

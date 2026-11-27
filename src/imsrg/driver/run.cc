@@ -721,7 +721,8 @@ void TransformOperators(const std::vector<OperatorRequest>& requests,
     log::Info("{}   IMSRG: {:.8f}", rec.name, rec.imsrg);
     if (i >= config.operators.list.size()) continue;  // internal Rso
     rec.file =
-        (dir / pipeline::OperatorFileName(stem, rec.name, O.spec())).string();
+        (dir / pipeline::OperatorFileName(stem, rec.name, O.spec(), config))
+            .string();
     if (O.spec().is_scalar()) {
       WriteValenceFile(rec.file, O, config, frame,
                        io::ValenceWriteMode::kIsospinAveragedOperator, comm);

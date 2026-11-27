@@ -23,6 +23,9 @@
 ///   * `tensor_no_fork_diagonal_bug`: tensor normal ordering omits, for
 ///     a == b, the channel pairs with ch(a h, J_bra) > ch(a h, J_ket)
 ///     (also in the re-normal-ordering).
+///   * `fork_operator_file_names` (lead B, AL-F2): operator files are named
+///     `<stem><name>.snt` / `<stem><name>_2b.snt` (no separator, the fork's
+///     `<intfile><op>`) instead of `<stem>_<name>.snt`.
 ///   * `tensor_ninej_threshold_1e8`: 9j skip threshold 1e-8 (not 1e-10) in
 ///     the tensor commutators of the flow.
 ///   * `tensor_fork_ph_missing_rank_phase`: the fork's particle-hole tensor
@@ -57,6 +60,9 @@ struct CompatOptions {
   /// kImsrgppInteger`, integer-division degeneracy, can be NaN) instead of
   /// the degeneracy-weighted one, in the flow's BCH.
   bool tensor_one_body_norm_imsrgpp = false;
+  /// Operator valence files `<stem><name>[_2b].snt` (fork) instead of
+  /// `<stem>_<name>[_2b].snt`; the Hamiltonian file `<stem>.snt` is unchanged.
+  bool fork_operator_file_names = false;
   friend bool operator==(const CompatOptions&, const CompatOptions&) = default;
 };
 
@@ -70,6 +76,7 @@ constexpr CompatOptions CompatOptionsFor(Compat c) noexcept {
       o.tensor_one_body_norm_imsrgpp = true;
       o.fork_step_defaults = true;
       o.tokyo_writer_fork_79e9330 = true;
+      o.fork_operator_file_names = true;
       o.tensor_no_fork_diagonal_bug = true;
       o.tensor_ninej_threshold_1e8 = true;
       o.tensor_fork_ph_missing_rank_phase = true;
