@@ -25,3 +25,11 @@ Answers so far (owner chose the recommendation unless noted):
   you have available."
 * Paused (owner) before: v2/v3 acceptance, miss-1e-4 policy, results location, never-do list,
   logistics (C), write-up (D). Owner asked for: v1/v2/v3 differences, node-hour estimates.
+* NAT sort (owner, verbatim): "To be clear NAT orbitals should be sorted by |occupation| not
+  signed occupation. Verify that this is what is done in v2 and v3." Checked: it is NOT. The
+  default is `mbpt::NatSorting::kSignedDescending` (imsrg-devel `DiagonalizeRho`); |occupation|
+  (`kAbsDescending`) is only switched on by the compat option `nat_sort_by_abs_occupation`
+  (src/imsrg/driver/config/compat.h:40, driver/pipeline/hamiltonian.cc:86). To do (Phase 0,
+  before any v2/v3 flow): |occupation| becomes the default NAT order for every run, taken out of
+  the compat profile; signed order stays only as an explicit option for imsrg-devel comparisons;
+  record the devel behaviour as an old-code bug in design/30 §6.
