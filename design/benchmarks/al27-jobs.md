@@ -11,7 +11,7 @@ Node-hours = nodes x elapsed (Frontier bills whole nodes for the job length).
 | 6006648 | v1 CPU timing, one item per L = 2..5 (8 items, N2LOsat native) | 1 | batch | 00:28:17 | 0.5 | L2 ~740 s, L3 ~1160 s, L4 ~1370 s, L5 ~1690 s per item (7 threads) |
 | 6006851 | v1 native, L = 2..5 operators, both H (8 steps, CPU) | 108 | batch | 01:29:41 | 161.4 | 3,408 items, 0 failed; v1 native complete, all archived columns PASS (max 1e-9) |
 | 6007374 | GPU farm test (frontier-hip, A's branch): 13 items (L0-L5 + TCM) x native/ME2JP, N2LOsat | 2 | batch | 00:13:23 | 0.45 | 0 failed; GPU native = CPU native at every printed digit; ME2JP vs native <= 1e-8 |
-| 6007467 | v1 ME2JP farm + native GPU rerun, both H (4 steps x 2415 items, GPU) | 60 | batch | running | | |
+| 6007467 | v1 ME2JP farm + native GPU rerun, both H (4 steps x 2415 items, GPU) | 60 | batch | 00:19:34 | 19.6 | 9,660 items, 0 failed; ME2JP all archived columns PASS (max 1e-6); GPU native = CPU native (6e-18) |
 
 ## Lead A (GPU production path, branch feature/al27-gpu-production)
 

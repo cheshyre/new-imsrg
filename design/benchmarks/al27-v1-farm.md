@@ -17,6 +17,15 @@ one file only compared against 0). Acceptance: every archived element to 1e-4 ab
   + TCM for both Hamiltonians (4,830 files, 0 failed). **Every archived element of every column
   matches to <= 1.0e-9 (N2LOsat: 2,111 archived files; DN2LOGO: 2,105), all 31 archived columns
   PASS at 1e-4**; no row missing on either side (tables below).
+* **v1 ME2JP complete (2026-11-27 01:38, GPU, job 6007467, 60 nodes, 19.6 min, frontier-hip with
+  lead A's device path, one rank per GCD):** 2 x 2,415 files, 0 failed; **every archived element
+  PASS at 1e-4, max |diff| 1.0e-7 (N2LOsat), 1.0e-6 (DN2LOGO)**. Native vs ME2JP (ours vs ours,
+  all 35 columns incl. FPhitp and the q gaps): max 1e-7 (N2LOsat) / 1e-6 (DN2LOGO, the zero-body
+  term of FPhipp0n at q = 45; 1b/2b <= 1e-7 everywhere), per column 1e-9 ... 1e-7 (tables below):
+  the float32 Omegas cost at most the 7th printed digit.
+* **GPU vs CPU (production check):** the same job reran the native set on GPUs; GPU vs CPU native
+  (job 6006851/6006462) over all 4,830 files: max |diff| 6.4e-18 (N2LOsat), 3.5e-18 (DN2LOGO),
+  i.e. identical printed digits.
 * Archive gaps (counted as "placeholder"): q = 0 of FM2/4, FPhipp4, FSigmap3/5, FSigmapp3/5,
   FDelta3/5 and q = 15 of FDelta5: the fork wrote no file; ours are identically zero there
   (max |me| <= 1e-7, the q^L limit), so nothing is lost. The six **DN2LOGO FM2p q = 975-1050 MeV**
@@ -187,3 +196,187 @@ Reference TCM: 419 copies; max |diff| of any copy vs the first 0.00e+00 (0 copie
 
 Placeholders (absent/empty/zero in reference): FM2n: q=0; FM2p: q=0,975,990,1005,1020,1035,1050; FM4n: q=0; FM4p: q=0; FPhipp4n: q=0; FPhipp4p: q=0; FSigmap3n: q=0; FSigmap3p: q=0; FSigmap5n: q=0; FSigmap5p: q=0; FSigmapp3n: q=0; FSigmapp3p: q=0; FSigmapp5n: q=0; FSigmapp5p: q=0; FDelta3n: q=0; FDelta3p: q=0; FDelta5n: q=0,15; FDelta5p: q=0,15
 <!-- compare_farm:v1 native, all operators, DN2LOGO (CPU jobs 6006462 + 6006851) end -->
+
+<!-- compare_farm:v1 ME2JP Omegas (float32), all operators, N2LOsat (GPU job 6007467) vs archive begin -->
+## v1 ME2JP Omegas (float32), all operators, N2LOsat (GPU job 6007467) vs archive
+
+Archive `/lustre/orion/nph123/scratch/mheinz/imsrg/inputs/al27/al27_provenance/original/al27_data/output_2024_03_01_Al27CorrFull/raw` (N2LOsat) vs `/lustre/orion/nph123/scratch/mheinz/imsrg/runs/al27/v1/N2LOsat/farm-me2jp`. Placeholder = archive file absent/empty/zero.
+
+| column | q cmp | missing | placeholder | max abs diff | at q | max 1b | max 2b | only ref | only test | status |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| FM0n | 71 | 0 | 0 | 1.00e-08 | 270 | 1.00e-08 | 1.00e-08 | 0 | 0 | PASS |
+| FM0p | 71 | 0 | 0 | 1.00e-08 | 105 | 1.00e-08 | 1.00e-08 | 0 | 0 | PASS |
+| FM2n | 70 | 0 | 1 | 1.00e-08 | 135 | 1.00e-08 | 1.00e-08 | 0 | 0 | PASS |
+| FM2p | 70 | 0 | 1 | 1.00e-08 | 135 | 1.00e-08 | 1.00e-08 | 0 | 0 | PASS |
+| FM4n | 70 | 0 | 1 | 1.00e-07 | 375 | 1.00e-07 | 1.00e-08 | 0 | 0 | PASS |
+| FM4p | 70 | 0 | 1 | 1.00e-08 | 240 | 1.00e-08 | 1.00e-08 | 0 | 0 | PASS |
+| FPhipp0n | 71 | 0 | 0 | 1.00e-08 | 165 | 1.00e-08 | 1.00e-08 | 0 | 0 | PASS |
+| FPhipp0p | 71 | 0 | 0 | 1.00e-08 | 240 | 1.00e-08 | 1.00e-08 | 0 | 0 | PASS |
+| FPhipp2n | 71 | 0 | 0 | 1.00e-07 | 30 | 1.00e-07 | 1.00e-08 | 0 | 0 | PASS |
+| FPhipp2p | 71 | 0 | 0 | 1.00e-07 | 105 | 1.00e-07 | 1.00e-08 | 0 | 0 | PASS |
+| FPhipp4n | 70 | 0 | 1 | 1.00e-08 | 180 | 1.00e-08 | 1.00e-08 | 0 | 0 | PASS |
+| FPhipp4p | 70 | 0 | 1 | 1.00e-08 | 195 | 1.00e-09 | 1.00e-08 | 0 | 0 | PASS |
+| FSigmap1n | 71 | 0 | 0 | 1.00e-08 | 75 | 1.00e-08 | 1.00e-08 | 0 | 0 | PASS |
+| FSigmap1p | 71 | 0 | 0 | 1.00e-07 | 0 | 1.00e-07 | 1.00e-09 | 0 | 0 | PASS |
+| FSigmap3n | 70 | 0 | 1 | 1.00e-08 | 390 | 1.00e-08 | 1.00e-09 | 0 | 0 | PASS |
+| FSigmap3p | 70 | 0 | 1 | 1.00e-08 | 225 | 1.00e-08 | 1.00e-08 | 0 | 0 | PASS |
+| FSigmap5n | 70 | 0 | 1 | 1.00e-09 | 225 | 1.00e-09 | 1.00e-09 | 0 | 0 | PASS |
+| FSigmap5p | 70 | 0 | 1 | 1.00e-09 | 165 | 1.00e-09 | 1.00e-09 | 0 | 0 | PASS |
+| FSigmapp1n | 71 | 0 | 0 | 1.00e-09 | 60 | 1.00e-09 | 1.00e-09 | 0 | 0 | PASS |
+| FSigmapp1p | 71 | 0 | 0 | 1.00e-08 | 135 | 1.00e-08 | 1.00e-09 | 0 | 0 | PASS |
+| FSigmapp3n | 70 | 0 | 1 | 1.00e-08 | 180 | 1.00e-08 | 1.00e-09 | 0 | 0 | PASS |
+| FSigmapp3p | 70 | 0 | 1 | 1.00e-08 | 540 | 1.00e-08 | 1.00e-09 | 0 | 0 | PASS |
+| FSigmapp5n | 70 | 0 | 1 | 1.00e-09 | 255 | 1.00e-10 | 1.00e-09 | 0 | 0 | PASS |
+| FSigmapp5p | 70 | 0 | 1 | 1.00e-09 | 240 | 1.00e-09 | 1.00e-09 | 0 | 0 | PASS |
+| FDelta1n | 71 | 0 | 0 | 1.00e-08 | 210 | 1.00e-08 | 1.00e-09 | 0 | 0 | PASS |
+| FDelta1p | 71 | 0 | 0 | 1.00e-07 | 75 | 1.00e-07 | 1.00e-09 | 0 | 0 | PASS |
+| FDelta3n | 70 | 0 | 1 | 1.00e-08 | 210 | 1.00e-08 | 1.00e-09 | 0 | 0 | PASS |
+| FDelta3p | 70 | 0 | 1 | 1.00e-09 | 420 | 1.00e-09 | 1.00e-09 | 0 | 0 | PASS |
+| FDelta5n | 69 | 0 | 2 | 1.00e-09 | 240 | 1.00e-09 | 1.00e-09 | 0 | 0 | PASS |
+| FDelta5p | 69 | 0 | 2 | 1.00e-09 | 285 | 1.00e-10 | 1.00e-09 | 0 | 0 | PASS |
+| TCM | 1 | 0 | 0 | 1.00e-08 | - | 0.00e+00 | 1.00e-08 | 0 | 0 | PASS |
+
+**Summary:** 31/31 columns pass (tol 1e-04); overall max 1.00e-07; files missing 0
+
+Reference TCM: 420 copies; max |diff| of any copy vs the first 1.00e-10 (33 copies not bit-identical in value); compared against the first copy.
+
+Placeholders (absent/empty/zero in reference): FM2n: q=0; FM2p: q=0; FM4n: q=0; FM4p: q=0; FPhipp4n: q=0; FPhipp4p: q=0; FSigmap3n: q=0; FSigmap3p: q=0; FSigmap5n: q=0; FSigmap5p: q=0; FSigmapp3n: q=0; FSigmapp3p: q=0; FSigmapp5n: q=0; FSigmapp5p: q=0; FDelta3n: q=0; FDelta3p: q=0; FDelta5n: q=0,15; FDelta5p: q=0,15
+<!-- compare_farm:v1 ME2JP Omegas (float32), all operators, N2LOsat (GPU job 6007467) vs archive end -->
+
+<!-- compare_farm:Native vs ME2JP Omegas (ours vs ours), N2LOsat begin -->
+## Native vs ME2JP Omegas (ours vs ours), N2LOsat
+
+`/lustre/orion/nph123/scratch/mheinz/imsrg/runs/al27/v1/N2LOsat/farm-native` vs `/lustre/orion/nph123/scratch/mheinz/imsrg/runs/al27/v1/N2LOsat/farm-me2jp`.
+
+| column | q cmp | missing | placeholder | max abs diff | at q | max 1b | max 2b | only ref | only test | status |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| FM0n | 71 | 0 | 0 | 1.00e-08 | 270 | 1.00e-08 | 1.00e-08 | 0 | 0 | - |
+| FM0p | 71 | 0 | 0 | 1.00e-08 | 105 | 1.00e-08 | 1.00e-08 | 0 | 0 | - |
+| FM2n | 71 | 0 | 0 | 1.00e-08 | 135 | 1.00e-08 | 1.00e-08 | 0 | 0 | - |
+| FM2p | 71 | 0 | 0 | 1.00e-08 | 135 | 1.00e-08 | 1.00e-08 | 0 | 0 | - |
+| FM4n | 71 | 0 | 0 | 1.00e-07 | 375 | 1.00e-07 | 1.00e-08 | 0 | 0 | - |
+| FM4p | 71 | 0 | 0 | 1.00e-08 | 240 | 1.00e-08 | 1.00e-08 | 0 | 0 | - |
+| FPhipp0n | 71 | 0 | 0 | 1.00e-08 | 165 | 1.00e-08 | 1.00e-08 | 0 | 0 | - |
+| FPhipp0p | 71 | 0 | 0 | 1.00e-08 | 240 | 1.00e-08 | 1.00e-08 | 0 | 0 | - |
+| FPhipp2n | 71 | 0 | 0 | 1.00e-07 | 30 | 1.00e-07 | 1.00e-08 | 0 | 0 | - |
+| FPhipp2p | 71 | 0 | 0 | 1.00e-07 | 105 | 1.00e-07 | 1.00e-08 | 0 | 0 | - |
+| FPhipp4n | 71 | 0 | 0 | 1.00e-08 | 180 | 1.00e-08 | 1.00e-08 | 0 | 0 | - |
+| FPhipp4p | 71 | 0 | 0 | 1.00e-08 | 195 | 1.00e-09 | 1.00e-08 | 0 | 0 | - |
+| FPhitp2n | 71 | 0 | 0 | 1.00e-08 | 0 | 1.00e-08 | 1.00e-08 | 0 | 0 | - |
+| FPhitp2p | 71 | 0 | 0 | 1.00e-07 | 15 | 1.00e-07 | 1.00e-07 | 0 | 0 | - |
+| FPhitp4n | 71 | 0 | 0 | 1.00e-08 | 300 | 1.00e-08 | 1.00e-08 | 0 | 0 | - |
+| FPhitp4p | 71 | 0 | 0 | 1.00e-08 | 150 | 1.00e-09 | 1.00e-08 | 0 | 0 | - |
+| FSigmap1n | 71 | 0 | 0 | 1.00e-08 | 75 | 1.00e-08 | 1.00e-08 | 0 | 0 | - |
+| FSigmap1p | 71 | 0 | 0 | 1.00e-07 | 0 | 1.00e-07 | 1.00e-09 | 0 | 0 | - |
+| FSigmap3n | 71 | 0 | 0 | 1.00e-08 | 390 | 1.00e-08 | 1.00e-09 | 0 | 0 | - |
+| FSigmap3p | 71 | 0 | 0 | 1.00e-08 | 225 | 1.00e-08 | 1.00e-08 | 0 | 0 | - |
+| FSigmap5n | 71 | 0 | 0 | 1.00e-09 | 225 | 1.00e-09 | 1.00e-09 | 0 | 0 | - |
+| FSigmap5p | 71 | 0 | 0 | 1.00e-09 | 165 | 1.00e-09 | 1.00e-09 | 0 | 0 | - |
+| FSigmapp1n | 71 | 0 | 0 | 1.00e-09 | 60 | 1.00e-09 | 1.00e-09 | 0 | 0 | - |
+| FSigmapp1p | 71 | 0 | 0 | 1.00e-08 | 135 | 1.00e-08 | 1.00e-09 | 0 | 0 | - |
+| FSigmapp3n | 71 | 0 | 0 | 1.00e-08 | 180 | 1.00e-08 | 1.00e-09 | 0 | 0 | - |
+| FSigmapp3p | 71 | 0 | 0 | 1.00e-08 | 540 | 1.00e-08 | 1.00e-09 | 0 | 0 | - |
+| FSigmapp5n | 71 | 0 | 0 | 1.00e-09 | 255 | 1.00e-10 | 1.00e-09 | 0 | 0 | - |
+| FSigmapp5p | 71 | 0 | 0 | 1.00e-09 | 240 | 1.00e-09 | 1.00e-09 | 0 | 0 | - |
+| FDelta1n | 71 | 0 | 0 | 1.00e-08 | 210 | 1.00e-08 | 1.00e-09 | 0 | 0 | - |
+| FDelta1p | 71 | 0 | 0 | 1.00e-07 | 75 | 1.00e-07 | 1.00e-09 | 0 | 0 | - |
+| FDelta3n | 71 | 0 | 0 | 1.00e-08 | 210 | 1.00e-08 | 1.00e-09 | 0 | 0 | - |
+| FDelta3p | 71 | 0 | 0 | 1.00e-09 | 420 | 1.00e-09 | 1.00e-09 | 0 | 0 | - |
+| FDelta5n | 71 | 0 | 0 | 1.00e-09 | 240 | 1.00e-09 | 1.00e-09 | 0 | 0 | - |
+| FDelta5p | 71 | 0 | 0 | 1.00e-09 | 285 | 1.00e-10 | 1.00e-09 | 0 | 0 | - |
+| TCM | 1 | 0 | 0 | 1.00e-08 | - | 0.00e+00 | 1.00e-08 | 0 | 0 | - |
+
+**Summary:** 35/35 columns compared; overall max 1.00e-07; files missing 0
+<!-- compare_farm:Native vs ME2JP Omegas (ours vs ours), N2LOsat end -->
+
+<!-- compare_farm:v1 ME2JP Omegas (float32), all operators, DN2LOGO (GPU job 6007467) vs archive begin -->
+## v1 ME2JP Omegas (float32), all operators, DN2LOGO (GPU job 6007467) vs archive
+
+Archive `/lustre/orion/nph123/scratch/mheinz/imsrg/inputs/al27/al27_provenance/original/al27_data/output_2024_03_01_Al27CorrFull/raw` (DN2LOGO) vs `/lustre/orion/nph123/scratch/mheinz/imsrg/runs/al27/v1/DN2LOGO/farm-me2jp`. Placeholder = archive file absent/empty/zero.
+
+| column | q cmp | missing | placeholder | max abs diff | at q | max 1b | max 2b | only ref | only test | status |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| FM0n | 71 | 0 | 0 | 1.00e-07 | 120 | 1.00e-07 | 1.00e-08 | 0 | 0 | PASS |
+| FM0p | 71 | 0 | 0 | 1.00e-07 | 120 | 1.00e-07 | 1.00e-08 | 0 | 0 | PASS |
+| FM2n | 70 | 0 | 1 | 1.00e-08 | 135 | 1.00e-08 | 1.00e-08 | 0 | 0 | PASS |
+| FM2p | 64 | 0 | 7 | 1.00e-07 | 315 | 1.00e-07 | 1.00e-08 | 0 | 0 | PASS |
+| FM4n | 70 | 0 | 1 | 1.00e-07 | 375 | 1.00e-07 | 1.00e-08 | 0 | 0 | PASS |
+| FM4p | 70 | 0 | 1 | 1.00e-08 | 285 | 1.00e-08 | 1.00e-08 | 0 | 0 | PASS |
+| FPhipp0n | 71 | 0 | 0 | 1.00e-06 | 45 | 1.00e-09 | 1.00e-08 | 0 | 0 | PASS |
+| FPhipp0p | 71 | 0 | 0 | 1.00e-07 | 375 | 1.00e-08 | 1.00e-08 | 0 | 0 | PASS |
+| FPhipp2n | 71 | 0 | 0 | 1.00e-07 | 15 | 1.00e-07 | 1.00e-08 | 0 | 0 | PASS |
+| FPhipp2p | 71 | 0 | 0 | 1.00e-07 | 90 | 1.00e-07 | 1.00e-08 | 0 | 0 | PASS |
+| FPhipp4n | 70 | 0 | 1 | 1.00e-07 | 225 | 1.00e-07 | 1.00e-08 | 0 | 0 | PASS |
+| FPhipp4p | 70 | 0 | 1 | 1.00e-08 | 195 | 1.00e-09 | 1.00e-08 | 0 | 0 | PASS |
+| FSigmap1n | 71 | 0 | 0 | 1.00e-08 | 15 | 1.00e-08 | 1.00e-09 | 0 | 0 | PASS |
+| FSigmap1p | 71 | 0 | 0 | 1.00e-08 | 180 | 1.00e-08 | 1.00e-08 | 0 | 0 | PASS |
+| FSigmap3n | 70 | 0 | 1 | 1.00e-08 | 165 | 1.00e-08 | 1.00e-08 | 0 | 0 | PASS |
+| FSigmap3p | 70 | 0 | 1 | 1.00e-08 | 360 | 1.00e-08 | 1.00e-09 | 0 | 0 | PASS |
+| FSigmap5n | 70 | 0 | 1 | 1.00e-09 | 210 | 1.00e-11 | 1.00e-09 | 0 | 0 | PASS |
+| FSigmap5p | 70 | 0 | 1 | 1.00e-09 | 165 | 1.00e-11 | 1.00e-09 | 0 | 0 | PASS |
+| FSigmapp1n | 71 | 0 | 0 | 1.00e-08 | 15 | 1.00e-08 | 1.00e-09 | 0 | 0 | PASS |
+| FSigmapp1p | 71 | 0 | 0 | 1.00e-08 | 405 | 1.00e-08 | 1.00e-08 | 0 | 0 | PASS |
+| FSigmapp3n | 70 | 0 | 1 | 1.00e-08 | 135 | 1.00e-08 | 1.00e-09 | 0 | 0 | PASS |
+| FSigmapp3p | 70 | 0 | 1 | 1.00e-08 | 495 | 1.00e-08 | 1.00e-09 | 0 | 0 | PASS |
+| FSigmapp5n | 70 | 0 | 1 | 1.00e-07 | 360 | 1.00e-07 | 1.00e-09 | 0 | 0 | PASS |
+| FSigmapp5p | 70 | 0 | 1 | 1.00e-09 | 165 | 1.00e-09 | 1.00e-09 | 0 | 0 | PASS |
+| FDelta1n | 71 | 0 | 0 | 1.00e-08 | 165 | 1.00e-08 | 1.00e-08 | 0 | 0 | PASS |
+| FDelta1p | 71 | 0 | 0 | 1.00e-09 | 180 | 1.00e-09 | 1.00e-09 | 0 | 0 | PASS |
+| FDelta3n | 70 | 0 | 1 | 1.00e-08 | 210 | 1.00e-08 | 1.00e-09 | 0 | 0 | PASS |
+| FDelta3p | 70 | 0 | 1 | 1.00e-09 | 165 | 1.00e-09 | 1.00e-09 | 0 | 0 | PASS |
+| FDelta5n | 69 | 0 | 2 | 1.00e-09 | 240 | 1.00e-10 | 1.00e-09 | 0 | 0 | PASS |
+| FDelta5p | 69 | 0 | 2 | 1.00e-09 | 330 | 1.00e-10 | 1.00e-09 | 0 | 0 | PASS |
+| TCM | 1 | 0 | 0 | 1.00e-08 | - | 0.00e+00 | 1.00e-08 | 0 | 0 | PASS |
+
+**Summary:** 31/31 columns pass (tol 1e-04); overall max 1.00e-06; files missing 0
+
+Reference TCM: 419 copies; max |diff| of any copy vs the first 0.00e+00 (0 copies not bit-identical in value); compared against the first copy.
+
+Placeholders (absent/empty/zero in reference): FM2n: q=0; FM2p: q=0,975,990,1005,1020,1035,1050; FM4n: q=0; FM4p: q=0; FPhipp4n: q=0; FPhipp4p: q=0; FSigmap3n: q=0; FSigmap3p: q=0; FSigmap5n: q=0; FSigmap5p: q=0; FSigmapp3n: q=0; FSigmapp3p: q=0; FSigmapp5n: q=0; FSigmapp5p: q=0; FDelta3n: q=0; FDelta3p: q=0; FDelta5n: q=0,15; FDelta5p: q=0,15
+<!-- compare_farm:v1 ME2JP Omegas (float32), all operators, DN2LOGO (GPU job 6007467) vs archive end -->
+
+<!-- compare_farm:Native vs ME2JP Omegas (ours vs ours), DN2LOGO begin -->
+## Native vs ME2JP Omegas (ours vs ours), DN2LOGO
+
+`/lustre/orion/nph123/scratch/mheinz/imsrg/runs/al27/v1/DN2LOGO/farm-native` vs `/lustre/orion/nph123/scratch/mheinz/imsrg/runs/al27/v1/DN2LOGO/farm-me2jp`.
+
+| column | q cmp | missing | placeholder | max abs diff | at q | max 1b | max 2b | only ref | only test | status |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| FM0n | 71 | 0 | 0 | 1.00e-07 | 120 | 1.00e-07 | 1.00e-08 | 0 | 0 | - |
+| FM0p | 71 | 0 | 0 | 1.00e-07 | 120 | 1.00e-07 | 1.00e-08 | 0 | 0 | - |
+| FM2n | 71 | 0 | 0 | 1.00e-08 | 135 | 1.00e-08 | 1.00e-08 | 0 | 0 | - |
+| FM2p | 71 | 0 | 0 | 1.00e-07 | 315 | 1.00e-07 | 1.00e-08 | 0 | 0 | - |
+| FM4n | 71 | 0 | 0 | 1.00e-07 | 375 | 1.00e-07 | 1.00e-08 | 0 | 0 | - |
+| FM4p | 71 | 0 | 0 | 1.00e-08 | 285 | 1.00e-08 | 1.00e-08 | 0 | 0 | - |
+| FPhipp0n | 71 | 0 | 0 | 1.00e-06 | 45 | 1.00e-09 | 1.00e-08 | 0 | 0 | - |
+| FPhipp0p | 71 | 0 | 0 | 1.00e-07 | 375 | 1.00e-08 | 1.00e-08 | 0 | 0 | - |
+| FPhipp2n | 71 | 0 | 0 | 1.00e-07 | 15 | 1.00e-07 | 1.00e-08 | 0 | 0 | - |
+| FPhipp2p | 71 | 0 | 0 | 1.00e-07 | 90 | 1.00e-07 | 1.00e-08 | 0 | 0 | - |
+| FPhipp4n | 71 | 0 | 0 | 1.00e-07 | 225 | 1.00e-07 | 1.00e-08 | 0 | 0 | - |
+| FPhipp4p | 71 | 0 | 0 | 1.00e-08 | 195 | 1.00e-09 | 1.00e-08 | 0 | 0 | - |
+| FPhitp2n | 71 | 0 | 0 | 1.00e-07 | 75 | 1.00e-07 | 1.00e-08 | 0 | 0 | - |
+| FPhitp2p | 71 | 0 | 0 | 1.00e-07 | 45 | 1.00e-08 | 1.00e-07 | 0 | 0 | - |
+| FPhitp4n | 71 | 0 | 0 | 1.00e-08 | 105 | 1.00e-09 | 1.00e-08 | 0 | 0 | - |
+| FPhitp4p | 71 | 0 | 0 | 1.00e-08 | 120 | 1.00e-08 | 1.00e-08 | 0 | 0 | - |
+| FSigmap1n | 71 | 0 | 0 | 1.00e-08 | 15 | 1.00e-08 | 1.00e-09 | 0 | 0 | - |
+| FSigmap1p | 71 | 0 | 0 | 1.00e-08 | 180 | 1.00e-08 | 1.00e-08 | 0 | 0 | - |
+| FSigmap3n | 71 | 0 | 0 | 1.00e-08 | 165 | 1.00e-08 | 1.00e-08 | 0 | 0 | - |
+| FSigmap3p | 71 | 0 | 0 | 1.00e-08 | 360 | 1.00e-08 | 1.00e-09 | 0 | 0 | - |
+| FSigmap5n | 71 | 0 | 0 | 1.00e-09 | 210 | 1.00e-11 | 1.00e-09 | 0 | 0 | - |
+| FSigmap5p | 71 | 0 | 0 | 1.00e-09 | 165 | 1.00e-11 | 1.00e-09 | 0 | 0 | - |
+| FSigmapp1n | 71 | 0 | 0 | 1.00e-08 | 15 | 1.00e-08 | 1.00e-09 | 0 | 0 | - |
+| FSigmapp1p | 71 | 0 | 0 | 1.00e-08 | 405 | 1.00e-08 | 1.00e-08 | 0 | 0 | - |
+| FSigmapp3n | 71 | 0 | 0 | 1.00e-08 | 135 | 1.00e-08 | 1.00e-09 | 0 | 0 | - |
+| FSigmapp3p | 71 | 0 | 0 | 1.00e-08 | 495 | 1.00e-08 | 1.00e-09 | 0 | 0 | - |
+| FSigmapp5n | 71 | 0 | 0 | 1.00e-07 | 360 | 1.00e-07 | 1.00e-09 | 0 | 0 | - |
+| FSigmapp5p | 71 | 0 | 0 | 1.00e-09 | 165 | 1.00e-09 | 1.00e-09 | 0 | 0 | - |
+| FDelta1n | 71 | 0 | 0 | 1.00e-08 | 165 | 1.00e-08 | 1.00e-08 | 0 | 0 | - |
+| FDelta1p | 71 | 0 | 0 | 1.00e-09 | 180 | 1.00e-09 | 1.00e-09 | 0 | 0 | - |
+| FDelta3n | 71 | 0 | 0 | 1.00e-08 | 210 | 1.00e-08 | 1.00e-09 | 0 | 0 | - |
+| FDelta3p | 71 | 0 | 0 | 1.00e-09 | 165 | 1.00e-09 | 1.00e-09 | 0 | 0 | - |
+| FDelta5n | 71 | 0 | 0 | 1.00e-09 | 240 | 1.00e-10 | 1.00e-09 | 0 | 0 | - |
+| FDelta5p | 71 | 0 | 0 | 1.00e-09 | 330 | 1.00e-10 | 1.00e-09 | 0 | 0 | - |
+| TCM | 1 | 0 | 0 | 1.00e-08 | - | 0.00e+00 | 1.00e-08 | 0 | 0 | - |
+
+**Summary:** 35/35 columns compared; overall max 1.00e-06; files missing 0
+<!-- compare_farm:Native vs ME2JP Omegas (ours vs ours), DN2LOGO end -->
