@@ -29,7 +29,7 @@ Brief: design/NEXT_SESSION_PROMPT.md "Brief B".
 - [x] WE-A-4: FlowConfigHash/PreparationHash hash explicit tables only (7b77a05)
 - [x] merged develop incl. lead A GPU path (22e7767); flows_gpu.sh SIGTERM forwarding (b1edb4f)
 - [x] CI frontier-cpu PASS on 22e7767 (+ script-only b1edb4f); configs v1/v2/v3 --validate OK
-- [ ] ctest -L slow on the merged head, report
+- [x] ctest -L slow: 7/7 pass on the merged head (22e7767 code); reported
 
 ## Notes
 * First merged CI run (2026-11-26 23:xx) FAILED only by timeouts of driver_mpi_2ranks /
