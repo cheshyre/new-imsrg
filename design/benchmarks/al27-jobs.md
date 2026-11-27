@@ -20,6 +20,11 @@ Node-hours = nodes x elapsed (Frontier bills whole nodes for the job length).
 | 6006671 | al27-farm-j5check-native: same for DN2LOGO | 3 | batch | 0:16:45 | 0.84 | |
 | 6006799 | al27-flows: full v1 N2LOsat flow on one GCD (14 cores): emax-10 flow step timing and GPU-vs-CPU check against the v1 CPU flow; output runs/al27/v1-gpu/N2LOsat | 1 | batch | 0:40:00 | 0.67 | |
 
+## Lead D (variants, branch feature/al27-variants)
+
+| Job id | Purpose | Nodes | Partition | Elapsed | Node-hours | Result |
+|---|---|---|---|---|---|---|
+
 ## Development chains (`tools/al27/alloc_chain.sh`, one node each)
 
 | Chain | First job | Last job | Jobs | Node-hours |
