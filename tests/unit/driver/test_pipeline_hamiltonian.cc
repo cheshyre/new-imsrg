@@ -137,6 +137,18 @@ TEST(PipelineHamiltonian, Ne20Sd) {
   EXPECT_EQ(ph.proton_number, 10);
 }
 
+// D72 / AL-NAT: natural_orbitals.sort defaults to |occupation| and parses
+// signed_occupation (also in an HF-basis run: the OccNat3 cut uses it).
+TEST(PipelineHamiltonian, NatSortKey) {
+  const std::string ref =
+      "[reference]\nnucleus = \"O16\"\n";
+  EXPECT_EQ(Load(Toml(ref, false)).natural_orbitals.sort,
+            NatSort::kAbsOccupation);
+  const RunConfig c = Load(
+      Toml(ref, false) + "[natural_orbitals]\nsort = \"signed_occupation\"\n");
+  EXPECT_EQ(c.natural_orbitals.sort, NatSort::kSignedOccupation);
+}
+
 // C4 (design/50): 27Al ensemble reference (sd shell) at emax 4, NAT basis with
 // the holes reset to HF (fork use_HF_reference_in_NAT): E_ref(NAT) = E_HF.
 // With the compat profile the NAT orbitals are ordered by |occupation|.

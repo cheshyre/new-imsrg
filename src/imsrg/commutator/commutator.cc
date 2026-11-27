@@ -166,7 +166,8 @@ void TwoBodyTerms(const op::Operator& X, const op::Operator& Y, op::Operator& Z,
 /// True if the IMSRG(3) block runs. imsrg++ evaluates it iff ||X|| >
 /// threshold and ||Y|| > threshold (Commutator.cc:396); with the default
 /// threshold 0 that only skips an exactly zero operand, whose terms vanish
-/// anyway. The norms are computed only for a positive threshold.
+/// anyway. The norms are computed only for a positive threshold. IMSRG(3) is
+/// scalar only, so the tensor one-body norm mode does not matter here.
 bool ThreeBodyGateOpen(const op::Operator& X, const op::Operator& Y,
                        const double threshold) {
   return !(threshold > 0.0 &&

@@ -44,7 +44,9 @@ void Check(const std::string& dir, double scale, const std::string& y_file,
   const op::Operator Y = op::ReadTensorDump(Golden(y_file), ms);
   commutator::Workspace ws(ms);
   BchReport report;
-  op::Operator out = BchTransform(Y, omega, BchOptions{},
+  BchOptions bopts;  // imsrg-devel goldens: imsrg++'s integer tensor norm
+  bopts.tensor_one_body_norm = op::TensorOneBodyNorm::kImsrgppInteger;
+  op::Operator out = BchTransform(Y, omega, bopts,
                                   commutator::CommutatorOptions{}, ws, &report);
   out.SyncToHost();
   const op::Operator ref = op::ReadTensorDump(
