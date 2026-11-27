@@ -24,6 +24,7 @@ Node-hours = nodes x elapsed (Frontier bills whole nodes for the job length).
 
 | Job id | Purpose | Nodes | Partition | Elapsed | Node-hours | Result |
 |---|---|---|---|---|---|---|
+| 6007408, 6007411, 6007430, 6007431, 6007492, 6007493, 6007524, 6007525 | al27-chaintest: flows_chain.sh with a mock binary (4 two-link chains t1-t4; t2/t3 TIMEOUT while fixing the TERM delivery) | 1 each | batch | 0:19:48 total | 0.33 | t4: TERM -> checkpoint -> exit 75 -> link 2 restart -> FLOW_DONE; v3-style wait for prepared/ OK; VRAM log OK |
 
 ## Development chains (`tools/al27/alloc_chain.sh`, one node each)
 

@@ -22,13 +22,31 @@ Runs (never in git): `$IMSRG_WORK/runs/al27/{v2,v3}/{N2LOsat,DN2LOGO}/`, farms i
   and the decision is revisited above ~120 Omegas.
 
 ## Tasks
-- [ ] (a) tools/al27/diff_variants.py + tests (worker, branch feature/al27-variants-diff)
-- [ ] (b) tools/al27/flows_chain.sh + flow_summary.py (worker, branch feature/al27-variants-chain)
+- [x] (a) tools/al27/diff_variants.py + tests (merged from feature/al27-variants-diff 6318a22)
+- [x] (b) tools/al27/flows_chain.sh + flow_summary.py (merged from feature/al27-variants-chain bc154cf; mock chain t4 OK)
 - [ ] wait for B merged into develop; merge develop; build frontier-hip release binary
 - [ ] v2 + v3 flows (chain job)
 - [ ] v2 farms (both H), compare v2 vs v1
 - [ ] v3 farms, compare v3 vs v2, investigate > 1e-3 relative
 - [ ] design/benchmarks/al27-variants.md
+
+## Exit codes (checked in B's branch)
+* SIGTERM -> flag; after the next Magnus step `Run` writes a checkpoint and throws
+  `InterruptedError`; apps/imsrg/main.cc returns `kInterruptedExitStatus` = 75
+  (src/imsrg/driver/termination.h). The chain's `st == 75` branch is right; no change to B.
+* TERM during the preparation or the final writers/transforms is not acted on (the flag is read
+  only between flow steps): the step is killed at the walltime; the chain counts no error
+  (`stop` flag) and the next link restarts from the last checkpoint / prepared/.
+* `checkpoint.restart = true` with only `prepared/` (no state.txt) starts the flow from the
+  prepared H_0 (run.cc ~1058); prepared.toml is written last (readiness marker).
+
+## Launch (after B is merged and develop merged here; frontier-hip build)
+```
+tools/al27/flows_chain.sh tools/al27/n2losat_v2.toml:$IMSRG_WORK/runs/al27/v2/N2LOsat \
+  tools/al27/dn2logo_v2.toml:$IMSRG_WORK/runs/al27/v2/DN2LOGO \
+  tools/al27/n2losat_v3.toml:$IMSRG_WORK/runs/al27/v3/N2LOsat \
+  tools/al27/dn2logo_v3.toml:$IMSRG_WORK/runs/al27/v3/DN2LOGO
+```
 
 ## Jobs
 See design/benchmarks/al27-jobs.md, section Lead D.
