@@ -249,6 +249,7 @@ writes `<output.directory>/<output.stem><name>.snt` (scalars, isospin-averaged o
 | `manifest` | path | `""` (required) | `<stem>_omegas.toml` written by `output.write_omega` (format native or me2jp, the Omega files in the order to apply them, C, occupations, layout hash). |
 | `work_list` | path | `""` | file with one operator name per line (`#` comments, blank lines ignored); appended to `operators.list`. |
 | `failure_manifest` | path | `""` | operators that did not finish, one `name<TAB>reason` per line, written by rank 0 at the end (always written, empty on success; usable as the next `work_list`). Empty: `<output.directory>/failed.txt`. Rank 0 first writes it with EVERY item ("job did not complete"), so a killed job leaves a complete list; it is rewritten at the end. |
+| `dump_native` | bool | `false` | also write every finished operator as a native float64 file `<stem><name>.opb` (`_2b.opb` for tensors; design/19 section 3.2) next to its `.snt`: full-precision output for device-vs-host checks (Brief A). |
 | `skip_existing` | bool | `false` | skip items whose output file exists (outputs are written to a temporary name and renamed, so an existing file is complete): resume a killed farm with the same work list. |
 
 #### `results.json` schema

@@ -190,6 +190,12 @@ fs::path TransformItem(const OperatorRequest& request,
                        io::ValenceWriteMode::kIsospinAveragedOperator));
   }
   fs::rename(tmp, path);
+  if (ctx.config->transform.dump_native) {
+    // Full precision for device-vs-host checks (the .snt has 6-9 digits).
+    fs::path opb = path;
+    opb.replace_extension(".opb");
+    io::WriteOperatorBinary(opb, F, request.canonical_name);
+  }
   return path;
 }
 
