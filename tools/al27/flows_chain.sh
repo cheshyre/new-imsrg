@@ -53,17 +53,22 @@ stamp=$(date +%Y%m%d-%H%M%S)
 py=${IMSRG_DEPS_PREFIX:-$HOME/.cache/imsrg-deps}/venv/bin/python
 [[ -x $py ]] || py=$(command -v python3)
 
-cfgs=(); runs=(); bins=()
+srccfgs=(); cfgs=(); runs=(); bins=()
 for p in "${pairs[@]}"; do
   cfg=$(realpath "${p%%:*}")
   [[ -f $cfg ]] || { echo "flows_chain.sh: no config $cfg" >&2; exit 2; }
   run=${p#*:}
   if [[ -z ${DRY_RUN:-} ]]; then mkdir -p "$run"; fi
   [[ -d $run ]] && run=$(cd "$run" && pwd)
-  cfgs+=("$cfg"); runs+=("$run"); bins+=("$run/imsrg.gpu-$stamp")
+  # Every link uses a copy of the config taken at submission (like the
+  # binary), so later edits of the source file cannot change a running chain
+  # (the restart refuses a changed flow configuration).
+  srccfgs+=("$cfg"); cfgs+=("$run/config-$stamp.toml")
+  runs+=("$run"); bins+=("$run/imsrg.gpu-$stamp")
 done
 script=${runs[0]}/chain-$stamp.sh
-q() { printf '%q ' "$@"; }
+# printf '%q ' with no arguments prints '' (one empty word): print nothing then.
+q() { (( $# )) && printf '%q ' "$@"; return 0; }
 
 header=$(cat <<EOF
 #!/bin/bash
@@ -249,7 +254,10 @@ if [[ -n ${DRY_RUN:-} ]]; then
   echo "$job"
   exit 0
 fi
-for i in "${!runs[@]}"; do cp "$bin" "${bins[$i]}"; done
+for i in "${!runs[@]}"; do
+  cp "$bin" "${bins[$i]}"
+  cp "${srccfgs[$i]}" "${cfgs[$i]}"
+done
 echo "$job" > "$script"
 chmod +x "$script"
 echo "job script: $script"
