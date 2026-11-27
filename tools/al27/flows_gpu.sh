@@ -11,7 +11,8 @@
 # usage: tools/al27/flows_gpu.sh CONFIG:RUN_DIR [CONFIG:RUN_DIR ...] [-- --set k=v ...]
 #   Every flow writes <RUN_DIR>/flow-gpu.log (stdout+stderr, /usr/bin/time -v);
 #   output.directory is set to RUN_DIR. Arguments after "--" go to every flow.
-#   Environment: WALLTIME (default 06:00:00), ACCOUNT (nph123), PARTITION
+#   Environment: WALLTIME (default 02:00:00, the batch limit for 1-91 nodes;
+#   flows longer than that continue from their checkpoint in a new job), ACCOUNT (nph123), PARTITION
 #   (batch), IMSRG_BIN (default build/frontier-hip/apps/imsrg/imsrg, copied
 #   into each run directory first), CORES (per flow, default 14), DRY_RUN=1
 #   (print the job instead of submitting it).
@@ -52,7 +53,7 @@ job=$(cat <<EOF
 #SBATCH -A ${ACCOUNT:-nph123}
 #SBATCH -J al27-flows
 #SBATCH -N 1
-#SBATCH -t ${WALLTIME:-06:00:00}
+#SBATCH -t ${WALLTIME:-02:00:00}
 #SBATCH -p ${PARTITION:-batch}
 #SBATCH -o ${pairs[0]#*:}/slurm-flows-%j.out
 #SBATCH --gpus-per-node=8

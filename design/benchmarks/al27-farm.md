@@ -53,22 +53,68 @@ Timings of this check (not benchmarks, node shared with builds and tests): GPU f
 114 steps; CPU flow 1283 s (the CPU run shared the node with a hipcc build and GPU tests; the
 threaded libsci behind the BLAS lock degrades badly under oversubscription, AL-E-Q3).
 
-## 3. Farm items at emax 10 on one GCD (item 5; preliminary)
+## 3. Farm items at emax 10 on one GCD (item 5)
 
-v1 N2LOsat Omegas (2 Omegas, native float64, manifest `N2LOsat_omegas_no.toml`), one rank, one
-GCD, 7 host threads, `tools/al27/time_farm_gpu.sh`. **Preliminary:** node frontier03560 shared
-with the lead's CI (load average 7-15, GPU 0 also used by GPU tests at the start).
+Job 6006593 (dedicated node frontier00021, idle before; four farm runs side by side, each with one
+GCD and 7 host cores, `--exact`): one rank, `tools/al27/timing_job.sh`. Seconds per item:
 
-| item | L | GPU (s) | CPU 7 cores (s, orchestrator farm-test1) |
-|---|---:|---:|---:|
-| FM0p_150 | 0 | 3.3 | 27.2 |
-| FSigmap1p_150 | 1 | 20.2 | 373 (FSigmap1n_150) |
-| FM2p_150 | 2 | 45.5 | |
-| FSigmap3p_150 | 3 | 77.8 | |
-| FM4p_150 | 4 | 103.7 | |
-| FSigmap5p_150 | 5 | 129.4 | |
-| TCM | 0 | 786 | |
+| item | L | N2LOsat native | N2LOsat ME2JP | DN2LOGO native | DN2LOGO ME2JP | CPU 7 cores (orchestrator farm-test1) |
+|---|---:|---:|---:|---:|---:|---:|
+| FM0p_150 | 0 | 3.10 | 3.06 | 3.07 | 3.04 | 27.2 |
+| FSigmap1p_150 | 1 | 19.2 | 19.1 | 19.1 | 19.1 | 373 (FSigmap1n_150) |
+| FM2p_150 | 2 | 40.8 | 40.8 | 39.7 | 39.5 | |
+| FSigmap3p_150 | 3 | 69.0 | 69.2 | 69.1 | 69.1 | |
+| FM4p_150 | 4 | 95.6 | 95.7 | 95.8 | 95.7 | |
+| FSigmap5p_150 | 5 | 125.5 | 125.6 | 125.6 | 125.6 | |
+| FM0p_1050 | 0 | 2.64 | 2.63 | 2.71 | 2.62 | |
+| FSigmap5p_1050 | 5 | 50.1 | 50.3 | 52.3 | 52.3 | |
+| TCM | 0 | 749 | | | | |
 
-Every item logged "BCH transform not converged after 12 nested commutators" (the warning
-threshold; the limit is 40). TCM is dominated by its host preparation at basis.emax 14 (Moshinsky
-table to e2max 28 and the two-body build, ~2 min on 56 cores, here on 7); host RSS peak 22 GB.
+* The Omega format does not matter for the time (both are materialized as float64 operators); the
+  setup (frame + Omegas into the shared window) takes 1.5-12 s. Farm process: 10.9 GB host RSS
+  per rank (8 per node: 87 GB of 512 GB).
+* Items with every q at rank 5 (all 426 J = 5 items of each Hamiltonian, jobs 6006670/6006671,
+  3 nodes = 24 GCDs each): 426 items in 1003 s (N2LOsat) and 995 s (DN2LOGO), i.e. at most
+  56 GCD-seconds per J = 5 item on average (q = 150: 125 s, q = 1050: 50 s).
+* GPU vs CPU (same 7 cores): 8.8x for rank 0, 19x for rank 1.
+* TCM is host-bound (built at basis.emax 14: Moshinsky table to e2max 28 and the two-body
+  part, on 7 cores) and is the longest item; every flow writes TCM already (WE-A-3).
+* Every timed item logged "BCH transform not converged after 12 nested commutators" (the
+  warning threshold; the limit is 40).
+
+**J = 5 NaN-norm check (AL-A-Q6).** The one-body norm keeps imsrg++'s integer degeneracy, which
+is negative for (2j_p, 2j_q, L) = (21, 11, 5) at emax 10; a negative weighted sum gives a NaN
+norm (imsrg++: 40 nested commutators; the rewrite: stops with the warning "non-finite nested
+commutator"). In all runs above (every timed item, and the rank-0 items of the two J = 5 jobs:
+18 of 426 per Hamiltonian) no non-finite norm and no 40-term series occurred. **Incomplete:** the
+farm logs only on rank 0 (`Logger::set_rank`), so the warnings of the other ranks' 408 items per
+Hamiltonian were not printed; the per-item log line of Brief B (BCH terms) or a comparison of the
+852 J = 5 outputs (`$IMSRG_WORK/runs/al27/v1/{N2LOsat,DN2LOGO}/farm_j5check-native/`, native
+Omegas, v1) with the archive settles it.
+
+## 4. Cost model (AL-F3) and farm walltime
+
+`CommutatorWeight(L)` at emax 10 grows 1 : 1.97 : 2.86 : 3.61 : 4.20 : 4.57 (L = 0..5), the
+measured times 1 : 6.2 : 13.1 : 22.3 : 30.9 : 40.4. Their ratio is 4.55 for L = 0 and
+7.6 + 6.5 L for L = 1..5 (within 1 %), so `ItemCost` now multiplies by
+`TensorCostFactor(L)` = 1 (L = 0), 1.67 + 1.43 L (L >= 1) and adds TCM's preparation
+(`kTcmPreparationCost` = 250 scalar commutators). The q dependence (rank 5: 0.4x at q = 1050 vs
+q = 150) is not modeled.
+
+**One farm** (one flow, one Omega format: 2414 NREFT items + TCM): from the q = 150 times
+(upper bound, 142 items per family) 149,600 GCD-s = **42 GCD-hours = 5.2 node-hours**; with the
+measured J = 5 average (<= 56 s instead of 125 s, the same q factor for every rank) ~65,000 GCD-s
+= **18 GCD-hours = 2.3 node-hours**. Longest item: TCM 750 s (without TCM: rank 5 at low q,
+~125 s). Walltime per job (+ ~10 s setup, items packed longest first):
+
+| nodes | GCDs | walltime estimate | node-hours | note |
+|---:|---:|---|---:|---|
+| 1,200 | 9,600 | 12.5 min (TCM-bound; 2.2 min without TCM) | 250 (45) | most GCDs idle |
+| 600 | 4,800 | 12.5 min (2.2 min without TCM) | 125 (22) | most GCDs idle |
+| 302 | 2,416 | 12.5 min (2.2 min without TCM) | 63 (11) | one item per GCD |
+| 76 | 608 | 12.5 min (2-4 min without TCM) | 16 (3-5) | |
+| 38 | 304 | 12.5 min (4-8 min without TCM) | 8 (3-5) | recommended (WE-A-2) |
+
+Request 2x the estimate (30 min). The v1 sweep (2 Hamiltonians x 2 formats) plus v2 and v3
+(2 x 1 each) is 8 farms: 8 x 2.3-5.2 = 18-42 node-hours of GCD work. 19,320 ranks = 8 farms x
+2415 items, one item per GCD: 2415 nodes for ~13 min (~520 node-hours, TCM-bound) in one job.

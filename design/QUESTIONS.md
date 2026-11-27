@@ -1580,3 +1580,10 @@ all remaining assumptions in one go, the owner answered (verbatim): "Interview m
   preparation at basis.emax 14) and is already written by every flow (same Omegas, same
   `BchTransform`). **Assumed:** keep it in the default work list (the cost model now puts it alone
   on a rank); `make_work_list.py --no-tcm` drops it.
+* **WE-A-4** (lead A, checkpoint hash) - `FlowConfigHash` hashes `ToToml` of the whole configuration
+  (minus output and checkpoint), so any new schema key (also `transform.dump_native` of this
+  branch, which never affects a flow) changes the hash of every configuration: a checkpoint written
+  by an older binary cannot be restarted by a newer one (seen: the v1 N2LOsat checkpoint refused by
+  the GPU build, job 6006593). **Assumed:** unchanged here (Brief B owns the checkpoint code);
+  proposal: hash only the flow-relevant tables, or keys whose value differs from the default, and
+  pin the binary for a flow's whole lifetime meanwhile (flows_gpu.sh copies it per run).
