@@ -24,6 +24,12 @@ namespace imsrg::exec {
 void HostParallelForDynamic(const char* name, std::int64_t n,
                             const std::function<void(std::int64_t)>& f);
 
+/// True inside an active host-parallel region (an OpenMP parallel region,
+/// e.g. the body of `HostParallelForDynamic` with the OpenMP host space);
+/// always false without OpenMP. O(1). Used by debug guards against
+/// allocations and global fences in parallel regions (design/12 section 5).
+bool InHostParallelRegion();
+
 /// Number of threads of the host execution space (1 for Serial). O(1).
 int HostConcurrency();
 
