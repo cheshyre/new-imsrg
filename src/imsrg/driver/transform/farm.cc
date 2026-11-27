@@ -10,6 +10,7 @@
 #include <optional>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "imsrg/base/assert.h"
@@ -63,6 +64,13 @@ double CommutatorWeight(const basis::ModelSpace& ms, std::int32_t rank_J,
   return w;
 }
 
+namespace {
+// The work-list name of the intrinsic kinetic energy of the center of mass
+// (opslib catalog), the one item with a host preparation that dominates its
+// cost (kTcmPreparationCost).
+constexpr std::string_view kTcmItemName = "TCM";
+}  // namespace
+
 double TensorCostFactor(std::int32_t rank_J) {
   // Fit (AL-F3, 2026-11-26): t(L) / CommutatorWeight(L) at emax 10 on one
   // GCD is 4.55 (L = 0) and 7.6 + 6.5 L (L = 1..5, within 1 %), in units of
@@ -84,7 +92,7 @@ double ItemCost(const OperatorRequest& request, const basis::ModelSpace& ms,
   const double n = static_cast<double>(num_omegas);
   double cost =
       n * CommutatorWeight(ms, rank_J, parity) * TensorCostFactor(rank_J);
-  if (request.canonical_name == "TCM") {
+  if (request.canonical_name == kTcmItemName) {
     cost += kTcmPreparationCost * CommutatorWeight(ms, 0, Parity::kEven);
   }
   return cost;

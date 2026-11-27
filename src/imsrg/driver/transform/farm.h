@@ -48,7 +48,8 @@ double TensorCostFactor(std::int32_t rank_J);
 /// Host preparation cost of TCM, once per item (independent of the number of
 /// Omegas), in units of `CommutatorWeight` of a scalar (its two-body part is
 /// built at basis.emax from the Moshinsky table; 27Al: ~750 s on 7 threads,
-/// ~240x a scalar NREFT item with two Omegas).
+/// ~240x a scalar NREFT item with two Omegas). A 27Al fit (emax 14 basis,
+/// emax 10 IMSRG space, one GCD with 7 host threads); refit for other spaces.
 inline constexpr double kTcmPreparationCost = 500.0;
 
 /// Cost model of one work item (design/50 section 6): the number of nested
