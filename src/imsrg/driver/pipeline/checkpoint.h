@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -37,9 +38,21 @@ op::Operator ReadStoredOperator(const std::filesystem::path& stem,
                                 std::shared_ptr<const basis::ModelSpace> ms,
                                 OperatorFileKind kind, Hermiticity h);
 
-/// FNV-1a hash of everything in `config` that determines the flow: the
-/// resolved TOML without `[output]`, `[checkpoint]`, `run.log_level` and the
-/// provenance. A restart refuses a checkpoint written with another hash.
+/// FNV-1a hash of the lines of the resolved TOML (`ToToml` without
+/// provenance) that belong to the tables named in `tables` (exact names, e.g.
+/// "imsrg.space"; the header line is included) and of the `[run]` keys named
+/// in `run_keys`. Tables not listed (new ones too) do not enter, so a binary
+/// that adds a key outside these tables (WE-A-4) computes the same hash.
+std::uint64_t ConfigTablesHash(const RunConfig& config,
+                               std::span<const std::string_view> tables,
+                               std::span<const std::string_view> run_keys);
+
+/// FNV-1a hash of what determines the flow (`ConfigTablesHash`): the tables
+/// basis, reference, valence, hamiltonian, interaction.two_body,
+/// interaction.three_body, hartree_fock, natural_orbitals, imsrg and its
+/// sub-tables, imsrg3, operators, and run.task, run.compat. Output,
+/// checkpoint, transform, provenance and the other run keys do not enter. A
+/// restart refuses a checkpoint written with another hash.
 std::uint64_t FlowConfigHash(const RunConfig& config);
 
 /// A finished stage as recorded in a checkpoint.

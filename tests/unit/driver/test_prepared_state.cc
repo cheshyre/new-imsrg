@@ -88,6 +88,30 @@ TEST(PreparationHash, SeesTheHamiltonian) {
   EXPECT_NE(pipeline::PreparationHash(c), h);
 }
 
+// WE-A-4: the flow hash ignores output, checkpoint, transform and run options
+// other than task and compat, so keys added to those tables by a newer binary
+// do not invalidate older checkpoints.
+TEST(FlowConfigHash, IgnoresNonFlowTables) {
+  const RunConfig base = BaseConfig();
+  const std::uint64_t h = pipeline::FlowConfigHash(base);
+  RunConfig c = base;
+  c.output.directory = "/elsewhere";
+  c.output.write_omega = true;
+  c.checkpoint.directory = "/ckpt";
+  c.checkpoint.prepared_from = "/other";
+  c.transform = TransformConfig{};
+  c.transform.manifest = "/some/omegas.toml";
+  c.run.log_level = LogLevel::kDebug;
+  c.run.scratch_dir = "/scratch";
+  EXPECT_EQ(pipeline::FlowConfigHash(c), h);
+  c = base;
+  c.run.compat = Compat::kImsrgFork79e9330;
+  EXPECT_NE(pipeline::FlowConfigHash(c), h);
+  c = base;
+  c.imsrg.space->emax = 3;
+  EXPECT_NE(pipeline::FlowConfigHash(c), h);
+}
+
 TEST(Termination, FlagIsSetByTheHandlerAndCleared) {
   ClearTerminationRequest();
   EXPECT_FALSE(TerminationRequested());

@@ -35,13 +35,12 @@
 
 namespace imsrg::driver::pipeline {
 
-/// FNV-1a hash of everything in `config` that determines the prepared
-/// Hamiltonian H_0: the resolved TOML without `[output]`, `[checkpoint]`,
-/// `[operators]`, `[transform]`, every `[imsrg]` key except `imsrg.space`
-/// (step, omega, generator, denominator, method, steps, ...),
-/// `run.log_level`, `run.task`, `run.scratch_dir` and the provenance. Basis,
-/// reference, valence, interaction, hamiltonian, hartree_fock,
-/// natural_orbitals, imsrg.space, imsrg3 and run.compat stay in.
+/// FNV-1a hash of what determines the prepared Hamiltonian H_0
+/// (`ConfigTablesHash`): the tables basis, reference, valence, hamiltonian,
+/// interaction.two_body, interaction.three_body, hartree_fock,
+/// natural_orbitals, imsrg.space, imsrg3 and the key run.compat. Everything
+/// else (step, omega, generator, operators, output, checkpoint, transform,
+/// tables added later) does not enter (WE-A-4).
 std::uint64_t PreparationHash(const RunConfig& config);
 
 /// `<checkpoint_dir>/prepared`.

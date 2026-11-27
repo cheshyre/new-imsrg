@@ -3,6 +3,7 @@
 
 #include "imsrg/driver/pipeline/prepared_state.h"
 
+#include <array>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -12,6 +13,7 @@
 #include <ostream>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -30,15 +32,6 @@ namespace fs = std::filesystem;
 
 constexpr int kVersion = 1;
 constexpr const char* kManifest = "prepared.toml";
-
-std::uint64_t Fnv1a(const std::string& s) {
-  std::uint64_t h = 0xcbf29ce484222325ULL;
-  for (const char ch : s) {
-    h ^= static_cast<unsigned char>(ch);
-    h *= 0x100000001b3ULL;
-  }
-  return h;
-}
 
 /// Exact text form of a double (hexfloat), quoted.
 std::string Hex(double x) {
@@ -235,19 +228,21 @@ std::shared_ptr<const basis::ModelSpace> WithOccupations(
 }  // namespace
 
 std::uint64_t PreparationHash(const RunConfig& config) {
-  RunConfig c = config;
-  c.output = OutputConfig{};
-  c.checkpoint = CheckpointConfig{};
-  c.operators = OperatorsConfig{};
-  c.transform = TransformConfig{};
-  ImsrgConfig im;
-  im.space = config.imsrg.space;
-  c.imsrg = im;
-  const TaskConfig task_defaults;
-  c.run.log_level = task_defaults.log_level;
-  c.run.task = task_defaults.task;
-  c.run.scratch_dir = task_defaults.scratch_dir;
-  return Fnv1a(ToToml(c, /*include_provenance=*/false));
+  // Only the physics inputs of H_0 (WE-A-4: keys added elsewhere in the schema
+  // must not invalidate stored prepared states).
+  static constexpr std::array<std::string_view, 10> kTables = {
+      "basis",
+      "reference",
+      "valence",
+      "hamiltonian",
+      "interaction.two_body",
+      "interaction.three_body",
+      "hartree_fock",
+      "natural_orbitals",
+      "imsrg.space",
+      "imsrg3"};
+  static constexpr std::array<std::string_view, 1> kRunKeys = {"compat"};
+  return ConfigTablesHash(config, kTables, kRunKeys);
 }
 
 fs::path PreparedStateDirectory(const fs::path& checkpoint_dir) {
