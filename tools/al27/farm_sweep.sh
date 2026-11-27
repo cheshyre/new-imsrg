@@ -79,15 +79,17 @@ imsrg_frontier_modules hip
 export OMP_NUM_THREADS=7 OMP_PROC_BIND=spread OMP_PLACES=threads
 # One rank per GCD: 7 cores each (the 8th core of each L3 region is reserved
 # by the low-noise mode); closest GPU binding for the device version.
-srun -N $NODES -n $RANKS --ntasks-per-node=$RANKS_PER_NODE -c 7 \\
-     --gpus-per-task=1 --gpu-bind=closest \\
-  "$IMSRG_BIN" --config "$CONFIG" \\
-    --set run.task=transform \\
-    --set "operators.list=[]" \\
-    --set "output.directory=$OUT" \\
-    --set "transform.manifest=$MANIFEST" \\
-    --set "transform.work_list=$WORK_LIST" \\
-    --set transform.skip_existing=true
+# (No backslash continuations: inside \$(cat <<EOF) they would join the lines.)
+args=(
+  --config "$CONFIG"
+  --set run.task=transform
+  --set "operators.list=[]"
+  --set "output.directory=$OUT"
+  --set "transform.manifest=$MANIFEST"
+  --set "transform.work_list=$WORK_LIST"
+  --set transform.skip_existing=true
+)
+srun -N $NODES -n $RANKS --ntasks-per-node=$RANKS_PER_NODE -c 7 --gpus-per-task=1 --gpu-bind=closest "$IMSRG_BIN" "\${args[@]}"
 EOF
 )
 echo "farm: $ITEMS items, $NODES nodes, $RANKS ranks, Omegas $FORMAT -> $OUT"

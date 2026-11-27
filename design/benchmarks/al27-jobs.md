@@ -6,5 +6,7 @@ self-resubmitting development chains (`imsrg`, `imsrg-a`, `imsrg-b`, ...) are no
 | job id | name | who | nodes | elapsed | node-hours | purpose |
 |---|---|---|---:|---|---:|---|
 | 6006593 | al27-timing | lead A | 1 | (pending) | | emax-10 farm item timings (v1 Omegas, both formats) + GPU flow restart (Brief A item 5) |
-| 6006646 | al27-farm-j5check-native | lead A | 3 | | | v1 N2LOsat farm, all 426 J = 5 items (native Omegas): NaN-norm / 40-term check, timings |
-| 6006647 | al27-farm-j5check-native | lead A | 3 | | | same for DN2LOGO |
+| 6006646 | al27-farm-j5check-native | lead A | 3 | 0:03 | 0.0 | FAILED at once (farm_sweep.sh heredoc joined the srun lines; fixed) |
+| 6006647 | al27-farm-j5check-native | lead A | 3 | 0:03 | 0.0 | FAILED, same; resubmitted as 6006670 / 6006671 |
+| 6006670 | al27-farm-j5check-native | lead A | 3 | | | v1 N2LOsat farm, all 426 J = 5 items (native): NaN-norm / 40-term check, timings |
+| 6006671 | al27-farm-j5check-native | lead A | 3 | | | same for DN2LOGO |
