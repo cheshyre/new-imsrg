@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright 2026 The imsrg authors
+#
+# Cost model of the 27Al response farm planner (tools/al27/farm_plan.py).
+# `seconds` are MEASURED (or placeholder) wall seconds of one item of the
+# given kind on ONE rank, summed over the stored Omegas; `[model]` holds the
+# weights the BINARY uses to assign items to ranks (ItemCost = num_omegas x
+# CommutatorWeight(rank L) in src/imsrg/driver/transform/farm.cc). Keep
+# [model] in step with the binary; update `seconds` after each farm test.
+
+[model]
+# W(L)/W(0) of CommutatorWeight at emax 10, L = 0..5 (design/50 section 6.1,
+# from the binary, 2026-11-26). TCM is a scalar: weight of L = 0.
+weights = [1.0, 1.97, 2.86, 3.61, 4.20, 4.57]
+tcm_weight = 1.0
+
+[cpu]
+ranks_per_node = 8   # one rank per GCD-sized share (design/50 section 6)
+threads_per_rank = 7 # 7 cores per rank, 8th of each L3 region reserved
+setup_s = 60         # PLACEHOLDER: per-job start-up, Omegas read, MPI init
+
+[cpu.seconds]
+# PLACEHOLDERS (2026-11-26), to be replaced by farm_test.sh timings.
+L0 = 27.0       # L0 item (FM0, FPhipp0): initial value from the lead
+L1 = 106.38     # 27 x 1.97 x 2 (placeholder: weight scaling, factor 2)
+L2 = 154.44     # 27 x 2.86 x 2
+L3 = 194.94     # 27 x 3.61 x 2
+L4 = 226.8      # 27 x 4.20 x 2
+L5 = 246.78     # 27 x 4.57 x 2
+TCM = 300.0     # PLACEHOLDER from the lead: scalar two-body kinetic item
+# Per-family overrides win over the L-kind, e.g.
+# FSigmap5 = 300.0
+
+[hip]
+ranks_per_node = 8   # one rank per GCD
+threads_per_rank = 7
+setup_s = 60         # PLACEHOLDER, as cpu
+
+[hip.seconds]
+# PLACEHOLDERS: cpu / 10 (assumed GPU speedup; no hip measurement yet).
+L0 = 2.7
+L1 = 10.638
+L2 = 15.444
+L3 = 19.494
+L4 = 22.68
+L5 = 24.678
+TCM = 30.0
