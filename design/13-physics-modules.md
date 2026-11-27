@@ -47,8 +47,11 @@ parity ±, delta_Tz 0..2 (particle_rank <= 2, Hermitian or anti-Hermitian); ever
 stored REDUCED as imsrg++ stores it (M15-Q1..Q3; the m-scheme oracle shows this is plain Edmonds
 reduction for 1B and pairs alike, AL-A-Q5). `TwoBody` keeps one block per channel pair ch_bra <= ch_ket
 allowed by `ConnectsChannels` (D25); getters with (J_bra, J_ket) apply h (-1)^(J_bra-J_ket) for the
-other orientation. Norms copy imsrg++ (1B integer degeneracy incl. its quirk AL-A-Q6, 2B weight
-1/(2L+1), x2 off-diagonal). `TransformBasis` handles tensors (D_bra^T V D_ket). `NormalOrderTensor`
+other orientation. Norms: 2B weight 1/(2L+1), x2 off-diagonal as imsrg++; the tensor 1B norm is by default
+degeneracy-weighted, sum O_pq^2 (2j_p+1)(2j_q+1)/(2L+1) (`op::TensorOneBodyNorm::
+kDegeneracyWeighted`), and imsrg++'s integer degeneracy incl. its quirk AL-A-Q6 (can be
+negative, NaN norm) only as `kImsrgppInteger` (`BchOptions::tensor_one_body_norm`, compat
+`tensor_one_body_norm_imsrgpp`). `TransformBasis` handles tensors (D_bra^T V D_ket). `NormalOrderTensor`
 / `ReNormalOrder` (ensemble -> core) sum both channel orientations; the fork's diagonal omission is
 `TensorNormalOrderOptions::fork79e9330_diagonal_bug` (design/30 section 6, M15-1). I/O: raw `.tdump`
 reader/writer (`tensor_dump.h`), `io::WriteTensorTokyo` (fork 79e9330 and devel formats).

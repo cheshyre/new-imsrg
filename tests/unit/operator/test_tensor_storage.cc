@@ -101,8 +101,8 @@ TEST(TensorStorage, GoldenDumpsReadWithImsrgppNormsAndHermiticity) {
       const Operator op =
           ReadTensorDump(Golden(c.file), cases == &cases2 ? ms2 : ms1);
       EXPECT_FALSE(op.spec().is_scalar());
-      EXPECT_NEAR(OneBodyNorm(op), c.one_body_norm,
-                  1.0e-10 * std::max(1.0, c.one_body_norm));
+      EXPECT_NEAR(OneBodyNorm(op, TensorOneBodyNorm::kImsrgppInteger),
+                  c.one_body_norm, 1.0e-10 * std::max(1.0, c.one_body_norm));
       EXPECT_NEAR(TwoBodyNorm(op), c.two_body_norm,
                   1.0e-10 * std::max(1.0, c.two_body_norm));
       EXPECT_LE(HermiticityDefect(op),

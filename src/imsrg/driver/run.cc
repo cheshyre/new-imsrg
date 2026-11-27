@@ -561,6 +561,9 @@ flow::BchOptions MakeBchOptions(const RunConfig& config) {
       config.imsrg3.factorized_1b_intermediates;
   bch.factorized_terms.two_body_intermediates =
       config.imsrg3.factorized_2b_intermediates;
+  if (CompatOptionsFor(config.run.compat).tensor_one_body_norm_imsrgpp) {
+    bch.tensor_one_body_norm = op::TensorOneBodyNorm::kImsrgppInteger;
+  }
   return bch;
 }
 
@@ -568,11 +571,17 @@ flow::BchOptions MakeBchOptions(const RunConfig& config) {
 /// (imsrg++.cc:570): those of the MBPT(2) density matrix of `ph.hno`, also in
 /// an HF-basis run; the NAT step's values are reused for `basis.kind = "nat"`.
 /// Shared by the IMSRG(3) flow and the perturbative triples.
-std::vector<double> CutOccupations(const pipeline::PreparedHamiltonian& ph) {
+std::vector<double> CutOccupations(const pipeline::PreparedHamiltonian& ph,
+                                   const RunConfig& config) {
   if (!ph.nat_occupations.empty()) return ph.nat_occupations;
   op::Operator hno = ph.hno;  // Mbpt2DensityMatrix syncs its argument
   const linalg::Matrix<double> rho = mbpt::Mbpt2DensityMatrix(hno);
-  return mbpt::ComputeNaturalOrbitals(rho, ph.hno.model_space()).occupations;
+  return mbpt::ComputeNaturalOrbitals(
+             rho, ph.hno.model_space(),
+             config.natural_orbitals.sort == NatSort::kSignedOccupation
+                 ? mbpt::NatSorting::kSignedDescending
+                 : mbpt::NatSorting::kAbsDescending)
+      .occupations;
 }
 
 /// The Hamiltonian and model space the flow starts from.
@@ -596,7 +605,7 @@ FlowStart MakeFlowStart(const RunConfig& config,
     if (config.imsrg3.de3max) cuts.de3max = *config.imsrg3.de3max;
     if (config.imsrg3.occ_nat3_cut) {
       cuts.occnat3_cut = *config.imsrg3.occ_nat3_cut;
-      cuts.natural_occupations = CutOccupations(ph);
+      cuts.natural_occupations = CutOccupations(ph, config);
     }
     const std::shared_ptr<const basis::ModelSpace> ms3 =
         ph.hno.model_space_ptr()->WithThreeBody(cuts);
@@ -643,7 +652,7 @@ TriplesRecord EvaluatePerturbativeTriples(
   if (config.imsrg3.de3max) to.de3max = *config.imsrg3.de3max;
   if (config.imsrg3.occ_nat3_cut) {
     to.occnat3_cut = *config.imsrg3.occ_nat3_cut;
-    to.natural_occupations = CutOccupations(ph);
+    to.natural_occupations = CutOccupations(ph, config);
   }
   const flow::TriplesResult tr =
       flow::PerturbativeTriples(solver.magnus_solver(), to);

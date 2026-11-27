@@ -266,6 +266,9 @@ TransformReport RunTransform(const RunConfig& config,
   ctx.frame = &frame;
   ctx.omegas = &omegas;
   ctx.copts = TransformCommutatorOptions(config);
+  if (CompatOptionsFor(config.run.compat).tensor_one_body_norm_imsrgpp) {
+    ctx.bch.tensor_one_body_norm = op::TensorOneBodyNorm::kImsrgppInteger;
+  }
   ctx.workspace = &workspace;
   ctx.out_dir = out_dir;
   ctx.stem = config.output.stem;

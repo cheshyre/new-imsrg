@@ -13,13 +13,13 @@
 ///
 /// Profile `imsrg_fork_79e9330` (the fork imsrg++ 79e9330 of the 27Al
 /// archive, reference/06 section 4.1):
-///   * `nat_sort_by_abs_occupation` (lead C): natural orbitals re-sorted by
-///     |occupation| inside each channel (HFMBPT.cc:131-182).
 ///   * `fork_step_defaults` (lead C): the fork's Parameters.hh default
 ///     domega = 0.2 (imsrg-devel: 0.1) when imsrg.step.domega is not given.
 ///   * `tokyo_writer_fork_79e9330` (lead B): the tokyo writers (scalar and
 ///     tensor) in the fork format (7 significant digits, absolute 1e-7
 ///     thresholds, core reference in the header).
+///   * `tensor_one_body_norm_imsrgpp`: imsrg++'s integer tensor one-body norm
+///     in the BCH thresholds (the default is degeneracy-weighted).
 ///   * `tensor_no_fork_diagonal_bug`: tensor normal ordering omits, for
 ///     a == b, the channel pairs with ch(a h, J_bra) > ch(a h, J_ket)
 ///     (also in the re-normal-ordering).
@@ -35,9 +35,6 @@ namespace imsrg::driver {
 
 /// The internal options a compatibility profile switches on.
 struct CompatOptions {
-  /// Sort natural orbitals by descending |occupation| (fork 79e9330), instead
-  /// of descending signed occupation (imsrg-devel).
-  bool nat_sort_by_abs_occupation = false;
   /// Default imsrg.step.domega = 0.2 (fork Parameters.hh:117) instead of 0.1.
   bool fork_step_defaults = false;
   /// Tokyo (.snt) writer in the fork 79e9330 format: 7 significant
@@ -56,6 +53,10 @@ struct CompatOptions {
   /// Fork particle-hole tensor commutator without the (-1)^L of devel for odd
   /// L (`CommutatorOptions::tensor_fork_ph_missing_rank_phase`).
   bool tensor_fork_ph_missing_rank_phase = false;
+  /// Tensor one-body norm of imsrg++ (`op::TensorOneBodyNorm::
+  /// kImsrgppInteger`, integer-division degeneracy, can be NaN) instead of
+  /// the degeneracy-weighted one, in the flow's BCH.
+  bool tensor_one_body_norm_imsrgpp = false;
   friend bool operator==(const CompatOptions&, const CompatOptions&) = default;
 };
 
@@ -66,7 +67,7 @@ constexpr CompatOptions CompatOptionsFor(Compat c) noexcept {
     case Compat::kNone:
       break;
     case Compat::kImsrgFork79e9330:
-      o.nat_sort_by_abs_occupation = true;
+      o.tensor_one_body_norm_imsrgpp = true;
       o.fork_step_defaults = true;
       o.tokyo_writer_fork_79e9330 = true;
       o.tensor_no_fork_diagonal_bug = true;

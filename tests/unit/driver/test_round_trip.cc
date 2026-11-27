@@ -141,6 +141,7 @@ freeze_occupations = true
 [natural_orbitals]
 use_occupations = true
 order = "energy"
+sort = "signed_occupation"
 
 [imsrg]
 method = "magnus"
@@ -383,6 +384,9 @@ class Gen {
     if (Coin())
       t << "order = \"" << Pick<std::string>({"occupation", "energy"})
         << "\"\n";
+    if (Coin())
+      t << "sort = \""
+        << Pick<std::string>({"abs_occupation", "signed_occupation"}) << "\"\n";
 
     t << "[imsrg]\n";
     if (Coin())
