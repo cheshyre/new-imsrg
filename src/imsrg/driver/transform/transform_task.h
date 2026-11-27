@@ -54,13 +54,50 @@ struct TransformContext {
   commutator::CommutatorOptions copts;
   commutator::Workspace* workspace = nullptr;
   std::filesystem::path out_dir;
-  std::string stem;  ///< file prefix: `<stem><name>.snt`
+  std::string stem;  ///< file prefix of the operator files
+  double max_omega_norm = 0.0;  ///< max over the stack of `op::Norm(Omega)`
 };
 
-/// File of a finished operator: `<out_dir>/<stem><name>.snt` for scalars,
-/// `..._2b.snt` for tensors (the fork's `<intfile><op>` names).
+/// File of a finished operator: `<out_dir>/<stem>_<name>.snt` for scalars,
+/// `..._2b.snt` for tensors; under `run.compat = imsrg_fork_79e9330` without
+/// the `_` (the fork's `<intfile><op>` names), the rule of
+/// `pipeline::OperatorFileName` shared with the flow driver.
 std::filesystem::path TransformOutputPath(const TransformContext& ctx,
                                           const std::string& name, bool tensor);
+
+/// Diagnostics of one work item (the per-item farm log, AL-F4).
+struct ItemReport {
+  int bch_terms = 0;          ///< nested commutators, summed over the Omegas
+  bool bch_converged = true;  ///< every BCH series converged
+};
+
+/// One line of the per-item farm log (`farm_log/rank_<NNNNN>.log`), parseable
+/// `key=value` pairs separated by single blanks, in this order:
+/// `item=<name> rank=<r> start=<iso> end=<iso> seconds=<f> bch_terms=<n>
+/// bch_converged=<0|1> max_omega_norm=<e> status=<ok|failed|skipped>`, and for
+/// `failed` a last field `error=<text>` (the text runs to the end of the line,
+/// newlines replaced by blanks).
+struct ItemLogEntry {
+  std::string item;
+  int rank = 0;
+  std::string start;  ///< `IsoTimestamp`, local time
+  std::string end;
+  double seconds = 0.0;
+  ItemReport report;
+  double max_omega_norm = 0.0;
+  std::string status = "ok";  ///< `ok`, `failed` or `skipped`
+  std::string error;          ///< failure text (status `failed` only)
+};
+
+/// The line of `e` as described at `ItemLogEntry` (no trailing newline).
+std::string FormatItemLogLine(const ItemLogEntry& e);
+
+/// Current local time as `YYYY-MM-DDTHH:MM:SS` (ISO 8601, seconds).
+std::string IsoTimestamp();
+
+/// Path of rank `rank`'s item log: `<out_dir>/farm_log/rank_<NNNNN>.log`.
+std::filesystem::path ItemLogPath(const std::filesystem::path& out_dir,
+                                  int rank);
 
 /// The per-item computation, the unit a device version replaces: build the
 /// operator at basis.emax, change basis, normal order, truncate
@@ -68,10 +105,12 @@ std::filesystem::path TransformOutputPath(const TransformContext& ctx,
 /// = 0, 1, ... with one `flow::BchTransform` each (as
 /// `flow::MagnusSolver::Transform`), `pipeline::FinishOperator`, and write
 /// the `.snt` (scalar writer in isospin-averaged operator mode, or the
-/// tensor writer). Returns the file written. Rank-local (no collectives).
+/// tensor writer). Returns the file written; `report` (optional) receives the
+/// BCH diagnostics. Rank-local (no collectives).
 /// @throws whatever the steps throw (the farm records it as a failure).
 std::filesystem::path TransformItem(const OperatorRequest& request,
-                                    const TransformContext& ctx);
+                                    const TransformContext& ctx,
+                                    ItemReport* report = nullptr);
 
 /// Outcome of `RunTransform` on this rank.
 struct TransformReport {
@@ -86,7 +125,8 @@ struct TransformReport {
 /// (`SplitShared`), the shared Omega window, the static assignment
 /// (`ItemCost`, `AssignStatic`), the items of this rank (each in its own
 /// try/catch), then the failures gathered on rank 0, which writes the failure
-/// manifest. Logs one line per item.
+/// manifest. Writes one `ItemLogEntry` line per item to the rank's item log
+/// (flushed per line) and logs it (rank 0 prints).
 /// @throws ConfigError if `transform.manifest` is empty or the configuration
 ///   cannot be transformed (IMSRG(3), factorized BCH); InputError for bad
 ///   manifest files (on every rank).

@@ -16,7 +16,10 @@
 #include "imsrg/base/error.h"
 #include "imsrg/basis/model_space.h"
 #include "imsrg/driver/operators/operator_request.h"
+#include "imsrg/driver/config/compat.h"
+#include "imsrg/driver/pipeline/operator_frame.h"
 #include "imsrg/driver/transform/farm.h"
+#include "imsrg/driver/transform/transform_task.h"
 
 namespace imsrg::driver::transform {
 namespace {
@@ -105,6 +108,63 @@ TEST(TransformFarm, AssignStaticIsBalancedAndDeterministic) {
     // LPT: makespan <= mean + largest item.
     EXPECT_LE(max, total / ranks + 6.0) << ranks;
   }
+}
+
+TEST(TransformFarm, OperatorFileNameRule) {
+  namespace pl = imsrg::driver::pipeline;
+  EXPECT_EQ(pl::OperatorFileName("int", "TCM", false, false), "int_TCM.snt");
+  EXPECT_EQ(pl::OperatorFileName("int", "FM2p_150", true, false),
+            "int_FM2p_150_2b.snt");
+  EXPECT_EQ(pl::OperatorFileName("int", "TCM", false, true), "intTCM.snt");
+  EXPECT_EQ(pl::OperatorFileName("int", "FM2p_150", true, true),
+            "intFM2p_150_2b.snt");
+  EXPECT_FALSE(
+      driver::CompatOptionsFor(driver::Compat::kNone).fork_operator_file_names);
+  EXPECT_TRUE(driver::CompatOptionsFor(driver::Compat::kImsrgFork79e9330)
+                  .fork_operator_file_names);
+}
+
+TEST(TransformFarm, FarmOutputPathFollowsCompat) {
+  driver::RunConfig cfg;
+  driver::transform::TransformContext ctx;
+  ctx.config = &cfg;
+  ctx.out_dir = "out";
+  ctx.stem = "int";
+  cfg.run.compat = driver::Compat::kNone;
+  EXPECT_EQ(driver::transform::TransformOutputPath(ctx, "TCM", false),
+            std::filesystem::path("out/int_TCM.snt"));
+  EXPECT_EQ(driver::transform::TransformOutputPath(ctx, "FM2p_150", true),
+            std::filesystem::path("out/int_FM2p_150_2b.snt"));
+  cfg.run.compat = driver::Compat::kImsrgFork79e9330;
+  EXPECT_EQ(driver::transform::TransformOutputPath(ctx, "TCM", false),
+            std::filesystem::path("out/intTCM.snt"));
+  EXPECT_EQ(driver::transform::TransformOutputPath(ctx, "FM2p_150", true),
+            std::filesystem::path("out/intFM2p_150_2b.snt"));
+}
+
+TEST(TransformFarm, ItemLogLineFormat) {
+  driver::transform::ItemLogEntry e;
+  e.item = "FM0p_150";
+  e.rank = 3;
+  e.start = "2026-11-27T01:02:03";
+  e.end = "2026-11-27T01:02:05";
+  e.seconds = 2.5;
+  e.report.bch_terms = 7;
+  e.max_omega_norm = 0.125;
+  EXPECT_EQ(driver::transform::FormatItemLogLine(e),
+            "item=FM0p_150 rank=3 start=2026-11-27T01:02:03 "
+            "end=2026-11-27T01:02:05 seconds=2.500 bch_terms=7 "
+            "bch_converged=1 max_omega_norm=1.250000000e-01 status=ok");
+  e.status = "failed";
+  e.error = "a\nb";
+  EXPECT_NE(
+      driver::transform::FormatItemLogLine(e).find(" status=failed error=a b"),
+      std::string::npos);
+  EXPECT_EQ(driver::transform::ItemLogPath("o", 12),
+            std::filesystem::path("o/farm_log/rank_00012.log"));
+  const std::string ts = driver::transform::IsoTimestamp();
+  EXPECT_EQ(ts.size(), 19U);
+  EXPECT_EQ(ts[10], 'T');
 }
 
 }  // namespace

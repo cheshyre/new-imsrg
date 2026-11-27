@@ -32,7 +32,7 @@ Conventions: keys are `snake_case`; enum values are lower `snake_case` strings (
 | `task` | enum `imsrg`, `hf`, `mp3`, `fci_export`, `transform` | `imsrg` | `hf`: stop after HF/basis + normal ordering (old `method=HF`); `mp3`: stop after MBPT(3) diagnostics (old `method=MP3`); `fci_export`: vacuum HF + write FCI interaction (old `method=FCI`, PL); `transform`: no HF and no flow, transform operators with stored Omegas (`[transform]`, section 2.11b; design/50 C10). |
 | `scratch_dir` | string | `""` | directory for Omega spill files; used only when `imsrg.omega.storage="scratch"`. Probed for writability at preflight. |
 | `log_level` | enum `quiet`, `normal`, `debug` | `normal` | stdout verbosity (new key; no legacy equivalent). |
-| `compat` | enum `none`, `imsrg_fork_79e9330` | `none` | compatibility profile (design/50 §5): one key that switches on named internal options reproducing another code version; `none` is the fixed behaviour. The options and their profiles are listed in `src/imsrg/driver/config/compat.h` (`CompatOptions`). `imsrg_fork_79e9330`: `nat_sort_by_abs_occupation` (NAT orbitals ordered by \|occupation\|, fork HFMBPT.cc:131-182), `fork_step_defaults` (`imsrg.step.domega` defaults to the fork's 0.2 instead of 0.1), `tensor_no_fork_diagonal_bug` (fork's tensor normal ordering omits one orientation for a == b, also in the re-normal-ordering), `tensor_ninej_threshold_1e8` (9j skip threshold 1e-8 in the flow's tensor commutators), `tokyo_writer_fork_79e9330` (79e9330 writers for scalar and tensor `.snt`: 7 significant digits, absolute 1e-7 thresholds, header A/Z of the core). No legacy equivalent. |
+| `compat` | enum `none`, `imsrg_fork_79e9330` | `none` | compatibility profile (design/50 §5): one key that switches on named internal options reproducing another code version; `none` is the fixed behaviour. The options and their profiles are listed in `src/imsrg/driver/config/compat.h` (`CompatOptions`). `imsrg_fork_79e9330`: `nat_sort_by_abs_occupation` (NAT orbitals ordered by \|occupation\|, fork HFMBPT.cc:131-182), `fork_step_defaults` (`imsrg.step.domega` defaults to the fork's 0.2 instead of 0.1), `tensor_no_fork_diagonal_bug` (fork's tensor normal ordering omits one orientation for a == b, also in the re-normal-ordering), `tensor_ninej_threshold_1e8` (9j skip threshold 1e-8 in the flow's tensor commutators), `fork_operator_file_names` (operator files `<stem><name>.snt` without the `_`), `tokyo_writer_fork_79e9330` (79e9330 writers for scalar and tensor `.snt`: 7 significant digits, absolute 1e-7 thresholds, header A/Z of the core). No legacy equivalent. |
 
 ### 2.2 `[basis]` (model space and single-particle basis)
 
@@ -241,8 +241,8 @@ The configuration is the flow's (`resolved_config.toml` of the run that wrote th
 `run.task = "transform"`): basis, reference, valence space, `[imsrg.space]`, `run.compat` and the
 interaction file names (header only) must be those of the flow; nothing is read but the manifest's
 files. Every rank of the job takes a static share of the work list (cost-weighted, design/50 §6) and
-writes `<output.directory>/<output.stem><name>.snt` (scalars, isospin-averaged operator mode) or
-`..._2b.snt` (tensors), the fork's names. Omegas are read once per node into MPI shared memory.
+writes `<output.directory>/<output.stem>_<name>.snt` (scalars, isospin-averaged operator mode) or
+`..._2b.snt` (tensors), the same names as the flow driver; under `run.compat = imsrg_fork_79e9330` (`fork_operator_file_names`) both drop the `_`: `<stem><name>.snt`, the fork's names (AL-F2). Each rank also appends one line per item to `<output.directory>/farm_log/rank_<NNNNN>.log` (`item= rank= start= end= seconds= bch_terms= bch_converged= max_omega_norm= status=`, AL-F4). Omegas are read once per node into MPI shared memory.
 
 | key | type | default | meaning |
 |---|---|---|---|
