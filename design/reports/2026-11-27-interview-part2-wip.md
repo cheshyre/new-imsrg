@@ -33,3 +33,7 @@ Answers so far (owner chose the recommendation unless noted):
   before any v2/v3 flow): |occupation| becomes the default NAT order for every run, taken out of
   the compat profile; signed order stays only as an explicit option for imsrg-devel comparisons;
   record the devel behaviour as an old-code bug in design/30 §6.
+* Difference reports (owner, verbatim): "When you compare the differences between v1 v2 and v3,
+  note both absolute and relative differences (ignoring matrix elements in the .snt that are
+  very small, smaller than 1e-6)." -> per element: |Δ| and |Δ|/|ref|, the relative one only for
+  elements with |ref| >= 1e-6; summarized per operator column and q.
