@@ -13,7 +13,8 @@
 #   OUT_DIR   output directory of the .snt files (created)
 #   WORK_LIST one operator name per line
 # The binary is IMSRG_BIN (default build/frontier-cpu-release); it is copied to
-# OUT_DIR so later rebuilds do not affect a running test.
+# OUT_DIR so later rebuilds do not affect a running test. EXTRA_SET=key=value
+# adds one more --set (e.g. output.isospin_average_operators=false).
 set -euo pipefail
 flow=$(realpath "$1"); manifest=$2; out=$3; work=$(realpath "$4")
 root=$(cd "$(dirname "$0")/../.." && pwd)
@@ -36,5 +37,5 @@ srun --jobid="$job" --overlap -N 1 -n "$ranks" -c "$threads" --cpu-bind=none \
   --set "operators.list=[]" --set "output.directory=$out" \
   --set "transform.manifest=$flow/$manifest" \
   --set "transform.work_list=$work" \
-  --set transform.skip_existing=true || st=$?
+  --set transform.skip_existing=true ${EXTRA_SET:+--set "$EXTRA_SET"} || st=$?
 echo "end $(date -Is) status $st"
