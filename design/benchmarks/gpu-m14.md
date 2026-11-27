@@ -107,25 +107,40 @@ host loops) run on one core there.
   fork onto 4 side streams (largest problem first, least loaded stream) and join with events.
   GEMM share of the kernel time: scalar emax 10 12.5 ms of ~110 ms (11 %, 248 GEMMs per
   commutator) before the comm122 GEMMs, ~26 ms of ~64 ms (~40 %) after them; tensor emax 10 rank 2 ~14 % (3888 GEMMs per three calls).
-* **Kokkos Kernels**: the backend is written (`IMSRG_DEVICE_BLAS=KOKKOSKERNELS`, KokkosBlas::gemm
-  on LayoutLeft subviews; `tools/bootstrap_deps.sh` builds `kokkoskernels-hip` from a tarball)
-  but **not measured**: the Kokkos Kernels 5.3.0 source could not be downloaded from the agent
-  session (the worktree hook rejects commands containing the GitHub URL; compute nodes have no
-  internet; the Frontier `kokkos-kernels` modules are 3.x-4.6 and do not match Kokkos 5.3).
-  To measure: put `kokkos-kernels-5.3.0.tar.gz` into `$IMSRG_DEPS_PREFIX/src/`, run
-  `tools/bootstrap_deps.sh --backends hip` on the compute node, configure frontier-hip with
-  `-DIMSRG_DEVICE_BLAS=KOKKOSKERNELS`, rerun the three benchmarks.
-* **Bound on the choice:** the GEMMs are ~14 % of the tensor and ~40 % of the scalar GPU time.
-  A Kokkos Kernels GEMM 5x slower than rocBLAS (plausible: rocBLAS uses the MFMA matrix cores)
-  would make the tensor commutator ~1.6x and the scalar one ~2.6x slower in total; an equally
-  fast one would gain nothing. Per the owner's rule the vendor path is preferred only if the
-  measured benefit is >= 5x; that needs the measurement above.
+* **Kokkos Kernels** (measured 2026-11-26, branch `feature/m14-kokkos-kernels-measure`):
+  Kokkos Kernels 5.3.0 built with `tools/bootstrap_deps.sh --backends hip` (native kernels, no TPLs,
+  ETI double/LayoutLeft; build ~5 min on the node), frontier-hip configured with
+  `-DIMSRG_DEVICE_BLAS=KOKKOSKERNELS` in `build/hip-kk` against `build/hip-rocblas` (ROCBLAS),
+  `-DIMSRG_BUILD_BENCH=ON`, one GCD, back to back, same node:
+
+  | benchmark | rocBLAS | Kokkos Kernels | rocBLAS benefit |
+  |-----------|--------:|---------------:|----------------:|
+  | scalar commutator emax 8 (ms) | 13.0 | 60.2 | 4.6x |
+  | scalar commutator emax 10 (ms) | 58.4 | 366.7 | 6.3x |
+  | tensor rank 5 emax 10, all terms (ms) | 1537 | 5556 | 3.6x |
+  | tensor first call (tables, s) | 11.3 | 15.0 | - |
+
+  Tensor terms (ms, rocBLAS / KK): comm121st 87 / 92, comm122st 108 / 1903, comm221st 97 / 1882,
+  comm222_pp_hhst 100 / 1884, comm222_phst 1233 / 1683 (the GEMM-heavy terms carry the gap).
+  Results: [X, Y] dumps of the two builds agree to 1.1e-15 / 2.1e-15 (scalar emax 8 / 10) and
+  2.3e-15 (tensor rank 5 emax 10), relative, limit 1e-12. Unit tests with Kokkos Kernels on the
+  GCD: 1353 of 1358 pass, the same 5 `flow_generator3_kernel` Bitwise failures as with rocBLAS
+  (AL-E-Q2); all commutator, linalg and tensor tests pass.
+* **Owner rule** (verbatim): "Try both. If there is a significant performance benefit (5x or more)
+  prefer the vendor-tuned path. But portability is better long term." Outcome: rocBLAS wins by
+  4.6x (scalar emax 8), 6.3x (scalar emax 10) and 3.6x (tensor rank 5 emax 10). Only the large
+  scalar case crosses 5x, the tensor commutator and the small scalar one do not. **Selection:**
+  the scalar emax-10 case is the one where the GPU matters for flows and clears the threshold, so
+  the rule picks rocBLAS there; the tensor case alone (3.6x) would pick Kokkos Kernels. We keep
+  **rocBLAS as the hip default** with Kokkos Kernels as the portable option (`-DIMSRG_DEVICE_BLAS=
+  KOKKOSKERNELS`); owner may overrule (borderline, see AL-E-Q1 follow-up).
+  (An earlier bound estimate of the GEMM share, ~40 % scalar / ~14 % tensor, understated the gap:
+  KK GEMMs are far slower than 5x for the grouped small-matrix shapes.)
 
 **Proposed D-row (pending the KK measurement):** "M14 device BLAS: `linalg::DeviceGemm` /
 `DeviceGroupedGemm` with configure-time backends HOST (CPU), ROCBLAS, KOKKOSKERNELS. Default
 for hip: KOKKOSKERNELS if its GEMM time on the emax-10 scalar and the emax-10 rank-2 tensor
-commutator is within 5x of rocBLAS (owner: portability first), otherwise ROCBLAS. Until
-measured, ROCBLAS is the default (it is the only tested one)."
+commutator is within 5x of rocBLAS (owner: portability first), otherwise ROCBLAS. Measured: KK is 4.6x / 6.3x / 3.6x slower, so ROCBLAS stays the default."
 
 ## Device residency across a BCH series
 
