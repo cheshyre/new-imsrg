@@ -22,8 +22,17 @@ Brief: design/NEXT_SESSION_PROMPT.md "Brief B".
 * Farm log per item; file names `<stem><name>.snt` under compat, `<stem>_<name>.snt` otherwise.
 
 ## Tasks
-- [ ] T1 nat-sort + tensor norm (implementer, branch feature/al27-defaults-restart-t1)
-- [ ] T2 farm log + file names (implementer, branch feature/al27-defaults-restart-t2)
-- [ ] T3 prepared-H0 restart + SIGTERM (implementer opus, branch feature/al27-defaults-restart-t3)
-- [ ] T4 v2/v3 configs + run_flow.sh (lead)
-- [ ] merge, CI frontier-cpu, ctest -L slow, report
+- [x] T1 nat-sort + tensor norm (t1 head 90f14ac, merged c328be2; own CI PASS)
+- [x] T2 farm log + file names (t2 head d545053, merged 5c553de; own CI PASS)
+- [x] T3 prepared-H0 restart + SIGTERM (t3 head c952615, merged 5170aa0; report pending)
+- [x] T4 v2/v3 configs (all four `--validate` OK after merge); run_flow.sh done by T3
+- [ ] CI frontier-cpu on the merged head, ctest -L slow, report
+
+## Notes
+* First merged CI run (2026-11-26 23:xx) FAILED only by timeouts of driver_mpi_2ranks /
+  driver_mpi_it11_2ranks while 3 worker CIs shared the node and the allocation was ending;
+  `ctest -L mpi` alone on the fresh node: 22/22 pass incl. the two slow MPI tests.
+* The tensor writer (devel format) still thresholds with imsrg++'s integer norm (falls back
+  to the weighted one when NaN) so the devel-format golden stays byte-equal (T1).
+* The integer degeneracy is already negative at emax 4 (g9/2 -> s1/2, L = 4), not first
+  at emax 10 as AL-A-Q6 says (T1 test).
