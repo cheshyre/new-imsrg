@@ -130,12 +130,25 @@ print(d.get("checkpoint",{}).get("prepared_from",""))' "$1" 2>/dev/null) || pf="
   echo "$pf"
 }
 
+# SIGTERM to the imsrg process of a flow: the children of the /usr/bin/time
+# wrapper, whose pid the task wrote to $1 (single node: the pid is visible
+# here). srun itself must not get TERM (it would tear the step down with KILL),
+# and scancel -s TERM on a step does the same.
+term_flow() {
+  local pid
+  pid=$(cat "$1" 2>/dev/null)
+  echo "link $LINK $(date -Is): TERM to the children of pid '$pid'" >> "$2"
+  if [[ -n $pid ]]; then pkill -TERM -P "$pid"; fi
+}
+
 # One flow: runs in a background subshell. TERM from the batch shell is
 # forwarded to the srun step (which forwards it to the task).
 run_flow() {
   local cfg=$1 run=$2 bin=$3
   local log=$run/flow-gpu.log stop=0 child="" st=0 restart=0 pf waited=0 n
-  trap 'stop=1; [[ -n $child ]] && kill -TERM "$child" 2>/dev/null' TERM
+  local inrun=0
+  # During the wait for prepared/ the child is a sleep.
+  trap 'stop=1; if (( inrun )); then term_flow "$run/.flow.pid" "$log"; elif [[ -n $child ]]; then kill -TERM "$child" 2>/dev/null; fi' TERM
   cd "$run" || return 1
   if [[ -e FLOW_DONE || -e FLOW_FAILED ]]; then
     echo "link $LINK job $JOB skip $(date -Is): finished" >> "$log"
@@ -166,15 +179,16 @@ run_flow() {
   fi
   echo "link $LINK job $JOB start $(date -Is)" >> "$log"
   # shellcheck disable=SC2016
+  inrun=1
   srun -N1 -n1 -c "$CORES" --gpus=1 --gpu-bind=closest --exact \
-    bash -c 'trap "" TERM; exec /usr/bin/time -v "$@"' time \
-    "$bin" "${args[@]}" >> "$log" 2>&1 &
+    bash -c 'echo $$ > "$1"; shift; trap "" TERM; exec /usr/bin/time -v "$@"' \
+    wrap "$run/.flow.pid" "$bin" "${args[@]}" >> "$log" 2>&1 &
   child=$!
   while true; do
     wait "$child"; st=$?
     kill -0 "$child" 2>/dev/null || break   # still a zombie after a trap: loop
   done
-  child=""
+  child=""; inrun=0
   echo "link $LINK job $JOB end $(date -Is) status $st" >> "$log"
   if (( st == 0 )) && [[ -f results.json ]]; then
     touch FLOW_DONE
