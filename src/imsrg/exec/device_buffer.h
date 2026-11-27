@@ -50,9 +50,10 @@ struct DeviceBufferAccess;
 /// default construction, moves of empty buffers, and destruction of empty
 /// buffers. Empty buffers (size 0, also after `resize(0)` or a move) hold no
 /// allocation, so they may outlive the Runtime; non-empty buffers must be
-/// destroyed before it. Not thread-safe: the lazily created host mirror is
-/// mutable state (also behind `const`), so create it (`host_span()` or
-/// `SyncToHost()`) before sharing a buffer between host threads.
+/// destroyed before it. Not thread-safe, except that concurrent const reads
+/// (`host_span() const`, which may create the host mirror lazily) are safe:
+/// the mirror creation is guarded, since host-parallel loops of the HIP build
+/// (OpenMP host space, D73) read operators from several threads.
 template <class T>
 class DeviceBuffer {
   static_assert(std::is_trivially_copyable_v<T>,

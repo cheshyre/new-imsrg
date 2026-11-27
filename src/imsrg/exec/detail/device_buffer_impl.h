@@ -10,9 +10,11 @@
 /// instantiate `DeviceBuffer<MyPod>`.
 
 #include <algorithm>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -64,7 +66,12 @@ struct DeviceBuffer<T>::Impl {
   std::string label;
   DeviceView<T> dev;
   mutable detail::HostView<T> host;  // valid iff has_host
-  mutable bool has_host = false;
+  // Set (release) after `host` is complete. Atomic with a mutex for the
+  // creation: host-parallel loops (OpenMP host space of the HIP build, D73)
+  // may read an operator's host mirror from several threads, and two threads
+  // creating the mirror at once would race on the View assignment.
+  mutable std::atomic<bool> has_host = false;
+  mutable std::mutex host_mutex;
 
   Impl(std::string_view lab, std::size_t n) : label(lab), dev(label, n) {}
 
@@ -72,13 +79,18 @@ struct DeviceBuffer<T>::Impl {
   /// exist yet. The mirror has the view's own `host_mirror_type`, so it aliases
   /// the device data whenever that is host accessible (including unified-memory
   /// architectures) and is a separate copy otherwise.
+  /// Thread-safe (double-checked: the common case is one atomic load).
   void EnsureHost() const {
-    if (!has_host) {
+    if (has_host.load(std::memory_order_acquire)) {
+      return;
+    }
+    const std::lock_guard<std::mutex> lock(host_mutex);
+    if (!has_host.load(std::memory_order_relaxed)) {
       host = Kokkos::create_mirror_view(dev);
       if (host.data() != dev.data()) {
         Kokkos::deep_copy(host, dev);
       }
-      has_host = true;
+      has_host.store(true, std::memory_order_release);
     }
   }
 
