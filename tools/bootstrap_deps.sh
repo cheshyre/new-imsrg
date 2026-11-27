@@ -6,7 +6,8 @@
 # Installs into ${IMSRG_DEPS_PREFIX:-$HOME/.cache/imsrg-deps}, shared by all git worktrees:
 #   kokkos-openmp/  Kokkos from extern/kokkos with the OpenMP (+ Serial) backend, Release
 #   kokkos-serial/  Kokkos with the Serial backend, RelWithDebInfo, debug checks + bounds checking
-#   kokkos-hip/     Kokkos HIP (gfx90a) + Serial host (ZEN3), Release; default only on Frontier
+#   kokkos-hip-openmp/  Kokkos HIP (gfx90a) + OpenMP host space (+ Serial, ZEN3), Release; only on
+#                   Frontier (D73, AL-E-Q5; the older kokkos-hip with a Serial host is left alone)
 #   kokkoskernels-hip/  Kokkos Kernels (BLAS, native kernels) for it, only if the tarball is in src/
 #   venv/           Python venv ($IMSRG_VENV) with tools/requirements-dev.txt
 # On OLCF Frontier (tools/lib/frontier_env.sh) the default backends are "openmp serial hip", the
@@ -127,6 +128,16 @@ if command -v brew >/dev/null 2>&1; then
   if [ ! -d "$omp_root" ]; then omp_root=""; fi
 fi
 
+# The install directory name of backend $1 below the prefix. The hip backend has an OpenMP host
+# space since D73; it got a new name so that the switch never rewrote an install other checkouts
+# were building against.
+kokkos_dir_name() {
+  case $1 in
+    hip) echo kokkos-hip-openmp ;;
+    *) echo "kokkos-$1" ;;
+  esac
+}
+
 # Prints the Kokkos CMake options for backend $1, one per line (part of the stamp).
 kokkos_options() {
   echo "-DCMAKE_CXX_STANDARD=20"
@@ -147,9 +158,11 @@ kokkos_options() {
       echo "-DKokkos_ENABLE_DEBUG=ON"
       echo "-DKokkos_ENABLE_DEBUG_BOUNDS_CHECK=ON" ;;
     hip)
-      # Frontier MI250X (gfx90a) with a ZEN3 (Trento) host; compile checks only so far.
+      # Frontier MI250X (gfx90a) with a ZEN3 (Trento) host. OpenMP is the host execution space
+      # (D73): host-parallel preparation (tables, normal ordering, generator) uses the rank's cores.
       echo "-DCMAKE_BUILD_TYPE=Release"
       echo "-DKokkos_ENABLE_HIP=ON"
+      echo "-DKokkos_ENABLE_OPENMP=ON"
       echo "-DKokkos_ARCH_AMD_GFX90A=ON"
       echo "-DKokkos_ARCH_ZEN3=ON" ;;
     *) echo "bootstrap_deps: unsupported backend '$1' (openmp, serial, hip)" >&2; return 1 ;;
@@ -158,15 +171,17 @@ kokkos_options() {
 
 build_kokkos() {
   local backend=$1
-  local install_dir="$IMSRG_DEPS_PREFIX/kokkos-$backend"
-  local build_dir="$IMSRG_DEPS_PREFIX/build/kokkos-$backend"
-  local stage_dir="$IMSRG_DEPS_PREFIX/build/kokkos-$backend-stage"
+  local name
+  name=$(kokkos_dir_name "$backend")
+  local install_dir="$IMSRG_DEPS_PREFIX/$name"
+  local build_dir="$IMSRG_DEPS_PREFIX/build/$name"
+  local stage_dir="$IMSRG_DEPS_PREFIX/build/$name-stage"
   local options stamp t0 cxx cxx_path cxx_version
   if [ "$backend" = hip ] && imsrg_on_frontier; then
     imsrg_frontier_modules hip
   fi
   cxx=$(backend_cxx "$backend")
-  cxx_path=$(command -v "$cxx") || { log "compiler '$cxx' for kokkos-$backend not found" >&2; return 1; }
+  cxx_path=$(command -v "$cxx") || { log "compiler '$cxx' for $name not found" >&2; return 1; }
   cxx_version=$("$cxx" --version 2>/dev/null | head -n 1)
   options=$(kokkos_options "$backend")
   stamp=$(printf 'kokkos_commit=%s\nbackend=%s\ncxx=%s\ncxx_version=%s\noptions:\n%s\n' \
@@ -174,10 +189,10 @@ build_kokkos() {
   if [ "$force" -eq 0 ] && [ -f "$install_dir/.imsrg-stamp" ] \
      && [ "$(cat "$install_dir/.imsrg-stamp")" = "$stamp" ] \
      && ls "$install_dir"/lib*/cmake/Kokkos/KokkosConfig.cmake >/dev/null 2>&1; then
-    log "kokkos-$backend is up to date (commit ${kokkos_commit:0:10})"
+    log "$name is up to date (commit ${kokkos_commit:0:10})"
     return 0
   fi
-  log "building kokkos-$backend (commit ${kokkos_commit:0:10}) with $cxx_version"
+  log "building $name (commit ${kokkos_commit:0:10}) with $cxx_version"
   t0=$(date +%s)
   # shellcheck disable=SC2086  # option lists are intentionally word-split (no spaces inside)
   cmake -S "$repo_root/extern/kokkos" -B "$build_dir" $generator_args \
@@ -193,11 +208,11 @@ build_kokkos() {
   if [ -e "$install_dir" ]; then mv "$install_dir" "$install_dir.old"; fi
   if ! mv "$stage_dir$install_dir" "$install_dir"; then
     if [ -e "$install_dir.old" ]; then mv "$install_dir.old" "$install_dir"; fi
-    log "could not move the new kokkos-$backend into place" >&2
+    log "could not move the new $name into place" >&2
     return 1
   fi
   rm -rf "$install_dir.old" "$stage_dir"
-  log "installed kokkos-$backend into $install_dir in $(( $(date +%s) - t0 ))s"
+  log "installed $name into $install_dir in $(( $(date +%s) - t0 ))s"
 }
 
 for backend in $backends; do
@@ -229,7 +244,7 @@ build_kokkos_kernels() {
   cxx=$(backend_cxx "$backend")
   cxx_path=$(command -v "$cxx") || { log "compiler '$cxx' not found" >&2; return 1; }
   stamp=$(printf 'kokkos_kernels=%s\nkokkos=%s\nbackend=%s\ncxx=%s\n' "$kk_version" \
-    "$(cat "$IMSRG_DEPS_PREFIX/kokkos-$backend/.imsrg-stamp" 2>/dev/null | head -n 1)" \
+    "$(cat "$IMSRG_DEPS_PREFIX/$(kokkos_dir_name "$backend")/.imsrg-stamp" 2>/dev/null | tail -n +2 | tr '\n' ' ')" \
     "$backend" "$cxx_path")
   if [ "$force" -eq 0 ] && [ -f "$install_dir/.imsrg-stamp" ] \
      && [ "$(cat "$install_dir/.imsrg-stamp")" = "$stamp" ]; then
@@ -246,7 +261,7 @@ build_kokkos_kernels() {
     -DCMAKE_INSTALL_PREFIX="$install_dir" -DCMAKE_CXX_COMPILER="$cxx_path" $launcher_args \
     -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_EXTENSIONS=OFF \
     -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-    -DKokkos_ROOT="$IMSRG_DEPS_PREFIX/kokkos-$backend" \
+    -DKokkos_ROOT="$IMSRG_DEPS_PREFIX/$(kokkos_dir_name "$backend")" \
     -DKokkosKernels_ENABLE_TPL_BLAS=OFF -DKokkosKernels_ENABLE_TPL_ROCBLAS=OFF \
     -DKokkosKernels_ENABLE_TPL_CUBLAS=OFF -DKokkosKernels_ENABLE_TPL_LAPACK=OFF \
     -DKokkosKernels_ENABLE_TESTS=OFF -DKokkosKernels_ENABLE_EXAMPLES=OFF \

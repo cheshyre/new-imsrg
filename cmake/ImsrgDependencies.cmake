@@ -29,7 +29,12 @@ if(APPLE AND IMSRG_KOKKOS_BACKEND STREQUAL "openmp" AND NOT OpenMP_ROOT
 endif()
 
 if(NOT Kokkos_ROOT AND "$ENV{Kokkos_ROOT}" STREQUAL "" AND NOT Kokkos_DIR)
-  set(Kokkos_ROOT "${IMSRG_DEPS_PREFIX}/kokkos-${IMSRG_KOKKOS_BACKEND}")
+  # hip: the install with an OpenMP host space (D73; tools/bootstrap_deps.sh kokkos_dir_name).
+  if(IMSRG_KOKKOS_BACKEND STREQUAL "hip")
+    set(Kokkos_ROOT "${IMSRG_DEPS_PREFIX}/kokkos-hip-openmp")
+  else()
+    set(Kokkos_ROOT "${IMSRG_DEPS_PREFIX}/kokkos-${IMSRG_KOKKOS_BACKEND}")
+  endif()
   file(GLOB _imsrg_kokkos_config "${Kokkos_ROOT}/lib*/cmake/Kokkos/KokkosConfig.cmake")
 else()
   set(_imsrg_kokkos_config "user-given")
