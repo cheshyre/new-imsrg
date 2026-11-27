@@ -15,6 +15,27 @@ one file only compared against 0). Acceptance: every archived element to 1e-4 ab
   elements and the 1b part identical (AL-D3 resolved by the fork tokyo format under compat).
 * CPU time per item (1 rank x 7 threads, emax 10): L = 0 27 s, L = 1 373 s, TCM 989 s (23 GB RSS).
 
+## C14: isospin averaging of scalar operators (one example, N2LOsat, native Omegas)
+
+The 79e9330 writer (and ours, `output.isospin_average_operators = true`, the default in every
+variant) replaces each proton-neutron two-body element <ab|O|cd> of a scalar operator by the mean of
+itself and its isospin mirror (p and n swapped in all four orbits); NuShellX needs Vpnpn = Vnpnp.
+The same items were written once more with `--set output.isospin_average_operators=false`
+(`tools/al27/farm_test.sh` with EXTRA_SET; output `runs/al27/v1/N2LOsat/farm-c14/`):
+
+| item | 1b, pp/nn 2b | pn 2b: max abs(averaged - unaveraged) | worst element (averaged / unaveraged) | average(unaveraged) vs averaged |
+|---|---|---|---|---|
+| FM0p_450 | identical | 2.98e-3 | (0d3/2 p, 1s1/2 n; 0d5/2 p, 1s1/2 n; J=2): 1.79281e-3 / -1.18913e-3 | 7.0e-10 |
+| FPhipp0n_450 | identical | 3.33e-4 | (0d3/2 p, 0d3/2 n; 0d3/2 p, 0d5/2 n; J=3): -4.15581e-4 / -8.26609e-5 | 2.5e-10 |
+
+* Only pn two-body elements change; the changes (up to 3e-3, O(100%) of the element for the
+  proton-only FM0p) are far above the 1e-4 acceptance, so the archive is reproduced only with
+  averaging (it is: step 1). Averaging our unaveraged file (`compare_snt.py
+  --isospin-average-test`) reproduces the written file to the printed digits.
+* Physics note for the owner: for an operator acting on protons only (FM0p) the IMSRG-evolved pn
+  elements are genuinely not mirror symmetric; the average mixes in the neutron-mirror part. This
+  is the fork's (imsrg++ "op" mode) convention, kept in all variants by decision.
+
 <!-- compare_farm:Step 1: J = 0/1 and TCM, N2LOsat, native Omegas, CPU (job 6006462) begin -->
 ## Step 1: J = 0/1 and TCM, N2LOsat, native Omegas, CPU (job 6006462)
 
