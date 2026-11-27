@@ -10,4 +10,4 @@ self-resubmitting development chains (`imsrg`, `imsrg-a`, `imsrg-b`, ...) are no
 | 6006647 | al27-farm-j5check-native | lead A | 3 | 0:03 | 0.0 | FAILED, same; resubmitted as 6006670 / 6006671 |
 | 6006670 | al27-farm-j5check-native | lead A | 3 | 0:16:54 | 0.85 | v1 N2LOsat farm, all 426 J = 5 items (native): NaN-norm / 40-term check, timings |
 | 6006671 | al27-farm-j5check-native | lead A | 3 | 0:16:45 | 0.84 | same for DN2LOGO |
-| 6006799 | al27-flows | lead A | 1 | | | full v1 N2LOsat flow on one GCD (14 cores): emax-10 flow step timing and GPU-vs-CPU check against the v1 CPU flow; output runs/al27/v1-gpu/N2LOsat |
+| 6006799 | al27-flows | lead A | 1 | 0:40:00 | 0.67 | full v1 N2LOsat flow on one GCD (14 cores): emax-10 flow step timing and GPU-vs-CPU check against the v1 CPU flow; output runs/al27/v1-gpu/N2LOsat |

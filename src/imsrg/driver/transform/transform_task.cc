@@ -189,13 +189,15 @@ fs::path TransformItem(const OperatorRequest& request,
                        *ctx.config, frame,
                        io::ValenceWriteMode::kIsospinAveragedOperator));
   }
-  fs::rename(tmp, path);
   if (ctx.config->transform.dump_native) {
-    // Full precision for device-vs-host checks (the .snt has 6-9 digits).
+    // Full precision for device-vs-host checks (the .snt has 6-9 digits);
+    // written (atomically) before the .snt is renamed into place, so an
+    // existing .snt (transform.skip_existing) implies its .opb.
     fs::path opb = path;
     opb.replace_extension(".opb");
     io::WriteOperatorBinary(opb, F, request.canonical_name);
   }
+  fs::rename(tmp, path);
   return path;
 }
 

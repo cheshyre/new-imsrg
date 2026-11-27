@@ -45,10 +45,11 @@ double CommutatorWeight(const basis::ModelSpace& ms, std::int32_t rank_J,
 /// AL-F3).
 double TensorCostFactor(std::int32_t rank_J);
 
-/// Host preparation cost of TCM in units of one scalar commutator of the
-/// item stack (its two-body part is built at basis.emax from the Moshinsky
-/// table; 27Al: ~790 s on 7 threads vs ~3 s for a scalar NREFT item).
-inline constexpr double kTcmPreparationCost = 250.0;
+/// Host preparation cost of TCM, once per item (independent of the number of
+/// Omegas), in units of `CommutatorWeight` of a scalar (its two-body part is
+/// built at basis.emax from the Moshinsky table; 27Al: ~750 s on 7 threads,
+/// ~240x a scalar NREFT item with two Omegas).
+inline constexpr double kTcmPreparationCost = 500.0;
 
 /// Cost model of one work item (design/50 section 6): the number of nested
 /// commutators is num_omegas x (BCH terms per Omega), the BCH terms are taken
@@ -56,7 +57,7 @@ inline constexpr double kTcmPreparationCost = 250.0;
 /// on O; measured: rank 5 at q = 1050 MeV takes 0.4x the time of q = 150),
 /// so the cost is num_omegas x `CommutatorWeight` x `TensorCostFactor` of
 /// the operator's rank and parity (TCM: plus its preparation,
-/// `kTcmPreparationCost` x num_omegas x the scalar weight). Rank and parity
+/// `kTcmPreparationCost` x the scalar weight). Rank and parity
 /// come from the request: NREFT shorthands `F<family><L>...` have rank L and
 /// even parity (the stored tensors are parity even, opslib/nreft.h); other
 /// operators the catalog shape.

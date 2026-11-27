@@ -101,7 +101,7 @@
     {
       "name": "hip",
       "displayName": "Cluster (Kokkos HIP, Release)",
-      "description": "Cluster build, Kokkos HIP (not testable on the dev machine). Needs Kokkos installed with HIP in $IMSRG_DEPS_PREFIX/kokkos-hip or -DKokkos_ROOT=...",
+      "description": "Cluster build, Kokkos HIP (not testable on the dev machine). Needs Kokkos installed with HIP in $IMSRG_DEPS_PREFIX/kokkos-hip-openmp or -DKokkos_ROOT=...",
       "inherits": [
         "base"
       ],

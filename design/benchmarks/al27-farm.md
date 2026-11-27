@@ -98,7 +98,7 @@ Omegas, v1) with the archive settles it.
 measured times 1 : 6.2 : 13.1 : 22.3 : 30.9 : 40.4. Their ratio is 4.55 for L = 0 and
 7.6 + 6.5 L for L = 1..5 (within 1 %), so `ItemCost` now multiplies by
 `TensorCostFactor(L)` = 1 (L = 0), 1.67 + 1.43 L (L >= 1) and adds TCM's preparation
-(`kTcmPreparationCost` = 250 scalar commutators). The q dependence (rank 5: 0.4x at q = 1050 vs
+(`kTcmPreparationCost` = 500 scalar commutator weights, once per item). The q dependence (rank 5: 0.4x at q = 1050 vs
 q = 150) is not modeled.
 
 **One farm** (one flow, one Omega format: 2414 NREFT items + TCM): from the q = 150 times
@@ -118,3 +118,26 @@ measured J = 5 average (<= 56 s instead of 125 s, the same q factor for every ra
 Request 2x the estimate (30 min). The v1 sweep (2 Hamiltonians x 2 formats) plus v2 and v3
 (2 x 1 each) is 8 farms: 8 x 2.3-5.2 = 18-42 node-hours of GCD work. 19,320 ranks = 8 farms x
 2415 items, one item per GCD: 2415 nodes for ~13 min (~520 node-hours, TCM-bound) in one job.
+
+## 5. Whole v1 flow (N2LOsat, emax 14/10) on one GCD
+
+Job 6006799 (`tools/al27/flows_gpu.sh`, one GCD, 14 host cores, frontier-hip with the OpenMP host
+space; run directory `$IMSRG_WORK/runs/al27/v1-gpu/N2LOsat`) against the v1 CPU flow
+(56 cores, design/benchmarks/al27-production.md):
+
+| | GPU, 1 GCD + 14 cores | CPU, 56 cores | speed-up |
+|---|---:|---:|---:|
+| preparation (start to flow step 0: me2j, NO2B, HF, NAT, MBPT) | ~22 min | 16-17 min | 0.75x |
+| stage 1, s per step (37 steps) | 1.24 | 13.8 | 11x |
+| stage 2, s per step (272 steps) | 2.10 | 26.4 | 12.6x |
+| whole run incl. TCM, writers, Omegas in two formats | 40 min | ~1 h 55 min (+ restart) | 2.9x |
+| peak host RSS | 66.1 GB | 65.8 GB | |
+
+Results: every common row of the flow files (194 (stage, step) rows: the CPU file of the
+restarted run) agrees to 3.5e-14 in E0, 2.6e-13 in ||Omega_2b||, 5.4e-13 in ||eta_2b|| (relative
+to the column maximum); final E0 -213.961459717498 vs -213.961459717501; the two native Omegas
+agree to 2.8e-13 and 2.1e-12 (36.7 million values each, identical headers). The `.snt` files are
+not comparable digit by digit: the CPU files of v1 were written by the imsrg-devel writer, the GPU
+run by the merged fork writer (`TokyoNumberFormat::kFork79e9330`, 6-7 digits, Aref 16), so they
+differ by the rounding (max 5.0e-7). Four flows per node (one per GCD) make the preparation the
+largest part of a flow; restarts redo it (AL-D1, Brief B).
