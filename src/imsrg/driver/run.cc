@@ -38,6 +38,8 @@
 #include "imsrg/driver/pipeline/hamiltonian.h"
 #include "imsrg/driver/pipeline/mpi_sync.h"
 #include "imsrg/driver/pipeline/operator_frame.h"
+#include "imsrg/driver/pipeline/prepared_state.h"
+#include "imsrg/driver/termination.h"
 #include "imsrg/driver/transform/transform_task.h"
 #include "imsrg/flow/magnus.h"
 #include "imsrg/flow/ode.h"
@@ -777,15 +779,29 @@ void RunStages(Engine& solver, FlowLog& flow_log, const RunConfig& config,
                std::vector<StageRecord>& stages,
                std::optional<TriplesRecord>& triples,
                pipeline::FlowCheckpointer& ckpt,
-               std::optional<pipeline::Checkpoint> restored) {
+               std::optional<pipeline::Checkpoint> restored,
+               const comm::Communicator& comm) {
   const Generator core_gen = config.imsrg.generator.core;
   std::vector<pipeline::FinishedStage> finished;
-  flow::MagnusSolver::StepCallback on_step;
-  if (ckpt.enabled()) {
-    on_step = [&](const flow::MagnusLoopState& st) {
-      ckpt.OnStep(solver.magnus_solver(), st, finished);
-    };
-  }
+  // After every Magnus step: a termination request (SIGTERM, design/00 D75)
+  // on any rank stops all ranks alike (one small allreduce per step) after a
+  // checkpoint; otherwise the regular checkpoint schedule.
+  const flow::MagnusSolver::StepCallback on_step =
+      [&](const flow::MagnusLoopState& st) {
+        const std::int64_t flag = TerminationRequested() ? 1 : 0;
+        if (comm.AllreduceMax(flag) > 0) {
+          std::string where = "no checkpoint (checkpoint.directory is empty)";
+          if (ckpt.enabled()) {
+            ckpt.WriteNow(solver.magnus_solver(), st, finished);
+            where = "checkpoint written to '" + config.checkpoint.directory +
+                    "'; continue with checkpoint.restart = true";
+          }
+          throw InterruptedError("termination requested (SIGTERM) at stage " +
+                                 std::to_string(st.stage) + ", step " +
+                                 std::to_string(st.istep) + ": " + where);
+        }
+        if (ckpt.enabled()) ckpt.OnStep(solver.magnus_solver(), st, finished);
+      };
   int start_stage = 1;
   if (restored) {
     start_stage = restored->loop.stage;
@@ -920,6 +936,59 @@ void FinishRun(const RunConfig& config, const pipeline::PreparedHamiltonian& ph,
   }
 }
 
+/// Stage 1 or its stored result (design/00 D75): with checkpoint.restart and
+/// a `prepared/` in the own checkpoint directory, it is read from there
+/// (`from_own_checkpoint` is set); else with checkpoint.prepared_from from
+/// that directory; else `PrepareHamiltonian` runs. Every rank reads the same
+/// files, so all hold identical bits without a broadcast. Unless it came
+/// from the own directory, the result is written to `<checkpoint
+/// dir>/prepared/` (root only) for later restarts.
+pipeline::PreparedHamiltonian ObtainPreparedHamiltonian(
+    const RunConfig& config, const comm::Communicator& comm,
+    bool& from_own_checkpoint) {
+  const fs::path ckpt_dir(config.checkpoint.directory);
+  const bool flow_task = config.run.task != Task::kHf;
+  from_own_checkpoint = false;
+  pipeline::PreparedHamiltonian ph;
+  if (flow_task && config.checkpoint.restart && !ckpt_dir.empty() &&
+      pipeline::HasPreparedState(ckpt_dir)) {
+    ph = pipeline::ReadPreparedState(ckpt_dir, config);
+    from_own_checkpoint = true;
+    log::Info("restart: prepared Hamiltonian read from {}",
+              pipeline::PreparedStateDirectory(ckpt_dir).string());
+    return ph;
+  }
+  if (flow_task && !config.checkpoint.prepared_from.empty()) {
+    const fs::path from(config.checkpoint.prepared_from);
+    if (!pipeline::HasPreparedState(from)) {
+      throw InputError(
+          "checkpoint.prepared_from: no prepared Hamiltonian in '" +
+          pipeline::PreparedStateDirectory(from).string() + "'");
+    }
+    ph = pipeline::ReadPreparedState(from, config);
+    log::Info("prepared Hamiltonian read from {} (checkpoint.prepared_from)",
+              pipeline::PreparedStateDirectory(from).string());
+  } else {
+    if (flow_task && config.checkpoint.restart) {
+      log::Info(
+          "restart: no prepared Hamiltonian in {}, preparing it (readers, HF, "
+          "NAT)",
+          pipeline::PreparedStateDirectory(ckpt_dir).string());
+    }
+    ph = pipeline::PrepareHamiltonian(config);
+    // HF and the normal ordering use parallel reductions: the ranks agree
+    // only to rounding, so all start the flow from the bits of rank 0.
+    // Nothing in the driver derives the model space from NAT occupations yet
+    // (imsrg3.occ_nat3_cut is E-PLANNED); when it does, broadcast it here
+    // too.
+    pipeline::BroadcastOperator(ph.hno, comm);
+  }
+  if (flow_task && !ckpt_dir.empty() && comm.is_root()) {
+    pipeline::WritePreparedState(ckpt_dir, ph, config);
+  }
+  return ph;
+}
+
 }  // namespace
 
 void Run(const RunConfig& config, const comm::Communicator& comm) {
@@ -935,12 +1004,9 @@ void Run(const RunConfig& config, const comm::Communicator& comm) {
   }
   RejectPlanned(config);
 
-  pipeline::PreparedHamiltonian ph = pipeline::PrepareHamiltonian(config);
-  // HF and the normal ordering use parallel reductions: the ranks agree only
-  // to rounding, so all start the flow from the bits of rank 0. Nothing in the
-  // driver derives the model space from NAT occupations yet
-  // (imsrg3.occ_nat3_cut is E-PLANNED); when it does, broadcast it here too.
-  pipeline::BroadcastOperator(ph.hno, comm);
+  bool from_own_checkpoint = false;
+  pipeline::PreparedHamiltonian ph =
+      ObtainPreparedHamiltonian(config, comm, from_own_checkpoint);
   if (config.run.task == Task::kHf) {
     if (comm.is_root()) {
       WriteResults(dir / "results.json", ph, {}, ph.e_reference, 0, 0, {}, "");
@@ -980,11 +1046,20 @@ void Run(const RunConfig& config, const comm::Communicator& comm) {
   pipeline::FlowCheckpointer ckpt(config, comm.is_root());
   std::optional<pipeline::Checkpoint> restored;
   if (config.checkpoint.restart) {
-    // Every rank reads the same files (identical bits on all ranks).
-    restored = pipeline::ReadCheckpoint(config, start.ms_flow);
+    if (from_own_checkpoint &&
+        !fs::exists(fs::path(config.checkpoint.directory) / "state.txt")) {
+      // Killed after the preparation but before the first flow checkpoint.
+      log::Info(
+          "restart: no flow checkpoint in {} yet, starting the flow from the "
+          "prepared Hamiltonian",
+          config.checkpoint.directory);
+    } else {
+      // Every rank reads the same files (identical bits on all ranks).
+      restored = pipeline::ReadCheckpoint(config, start.ms_flow);
+    }
   }
   RunStages(solver, flow_log, config, ph, ms, magnus, stages, triples, ckpt,
-            std::move(restored));
+            std::move(restored), comm);
   FinishRun(config, ph, solver, start, magnus, requests, radius_slots, stages,
             triples, comm, ops);
 }

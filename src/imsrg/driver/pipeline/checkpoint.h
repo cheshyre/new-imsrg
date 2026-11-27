@@ -87,6 +87,12 @@ class FlowCheckpointer {
   void OnStep(const flow::MagnusSolver& solver,
               const flow::MagnusLoopState& state,
               const std::vector<FinishedStage>& finished);
+  /// Writes a checkpoint of this step now, whatever the interval (SIGTERM,
+  /// design/00 D75). No-op unless `enabled()`. Every rank calls it with the
+  /// same arguments; only the root writes files.
+  void WriteNow(const flow::MagnusSolver& solver,
+                const flow::MagnusLoopState& state,
+                const std::vector<FinishedStage>& finished);
   /// Number of checkpoints written so far by this object.
   int num_written() const noexcept { return num_written_; }
 
