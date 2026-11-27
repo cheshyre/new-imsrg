@@ -5,6 +5,7 @@
 // lambdas only, no device code).
 #include "imsrg/exec/host_parallel.h"
 
+#include <atomic>
 #include <cstdint>
 #include <vector>
 
@@ -14,6 +15,7 @@ namespace {
 
 using imsrg::exec::HostConcurrency;
 using imsrg::exec::HostParallelForDynamic;
+using imsrg::exec::InHostParallelRegion;
 
 TEST(ExecHostParallel, ConcurrencyIsPositive) {
   EXPECT_GE(HostConcurrency(), 1);
@@ -32,6 +34,21 @@ TEST(ExecHostParallel, EachSlotWrittenExactlyOnce) {
       ASSERT_EQ(out[static_cast<std::size_t>(i)], 3 * i + 7);
     }
   }
+}
+
+TEST(ExecHostParallel, InHostParallelRegionInsideTheLoopOnly) {
+  EXPECT_FALSE(InHostParallelRegion());
+  std::atomic<int> inside{0};
+  HostParallelForDynamic("test::in_region", 64, [&](std::int64_t) {
+    if (InHostParallelRegion()) ++inside;
+  });
+  // OpenMP reports an active region only with more than one thread.
+  if (HostConcurrency() > 1) {
+    EXPECT_EQ(inside.load(), 64);
+  } else {
+    EXPECT_EQ(inside.load(), 0);
+  }
+  EXPECT_FALSE(InHostParallelRegion());
 }
 
 }  // namespace

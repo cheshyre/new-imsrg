@@ -1562,6 +1562,37 @@ all remaining assumptions in one go, the owner answered (verbatim): "Interview m
   have available." (D77)
 * "later" = after the weekend: the owner chose "27Al only, no fillers" for the weekend run (D77).
 
+## Added during the 27Al weekend
+
+* **WE-A-1** (lead A, Brief A) - `tools/ci.sh frontier-hip-run` stops after the unit step, which
+  always fails on the five known atan Bitwise tests (AL-E-Q2, 4-ulp fix decided for "later"), so
+  the integration step never runs there. **Done meanwhile:** the integration tests were run by hand
+  on a GCD (`ctest -L integration -LE 'slow|mpi' -j 3`, `OMP_NUM_THREADS=2`): 87/87 pass with the
+  OpenMP host space. The script is unchanged (the AL-E-Q2 fix removes the need).
+* **WE-A-2** (lead A, farm sizing) - At the measured emax-10 GPU cost a whole farm of one flow
+  (2414 NREFT items + TCM) is ~42 GCD-hours (~5.3 node-hours, design/benchmarks/al27-farm.md
+  section 4); the longest item takes ~2 min (rank 5, q = 150 MeV; TCM ~13 min, host-bound). A
+  600-1,200-node job (4,800-9,600 GCDs) has more GCDs than items, so most idle and the job ends
+  after the longest item. **Assumed:** recommend ~38-76 nodes per farm job with the refit cost model
+  (longest first, 1-2 items per GCD-minute balance), or 302 nodes for one item per GCD; the
+  orchestrator decides (D77 says "use the GPU resources efficiently").
+* **WE-A-3** (lead A, TCM in the farm) - TCM is the farm's longest item (~790 s on 7 host threads,
+  preparation at basis.emax 14) and is already written by every flow (same Omegas, same
+  `BchTransform`). **Assumed:** keep it in the default work list (the cost model now puts it alone
+  on a rank); `make_work_list.py --no-tcm` drops it.
+* **WE-A-4** (lead A, checkpoint hash) - `FlowConfigHash` hashes `ToToml` of the whole configuration
+  (minus output and checkpoint), so any new schema key (also `transform.dump_native` of this
+  branch, which never affects a flow) changes the hash of every configuration: a checkpoint written
+  by an older binary cannot be restarted by a newer one (seen: the v1 N2LOsat checkpoint refused by
+  the GPU build, job 6006593). **Assumed:** unchanged here (Brief B owns the checkpoint code);
+  proposal: hash only the flow-relevant tables, or keys whose value differs from the default, and
+  pin the binary for a flow's whole lifetime meanwhile (flows_gpu.sh copies it per run).
+  **Resolved (lead B, feature/al27-defaults-restart):** `FlowConfigHash` and
+  `PreparationHash` now hash only explicit tables (`pipeline::ConfigTablesHash`): basis,
+  reference, valence, hamiltonian, interaction.*, hartree_fock, natural_orbitals, imsrg.space,
+  imsrg3, run.compat (+ imsrg.*, operators, run.task for the flow). Checkpoints written before
+  that change are refused once by the new hash.
+
 ## 27Al weekend, Lead B task T3 (restarts without re-preparation, D75), 2026-11-27
 
 Assumptions taken (most reversible option; open for the owner or the lead):

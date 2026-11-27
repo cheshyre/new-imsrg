@@ -1,0 +1,122 @@
+# GPU-vs-CPU check of the 27Al production path (Brief A, acceptance item 4):
+# tools/al27/n2losat_v1.toml shrunk to emax 4 with the repository's test
+# inputs (EM500 2N, cE-only 3N; AGENTS.md), unsplit Magnus, compat profile,
+# Omegas written for the farm check. @INPUTS@ and @OUT@ are substituted by
+# tools/al27/gpu_check/run_check.sh.
+
+[run]
+task = "imsrg"
+scratch_dir = ""
+log_level = "normal"
+compat = "imsrg_fork_79e9330"
+
+[basis]
+emax = 4
+hw = 16.0
+e3max = 12
+mass_number = 27
+kind = "nat"
+
+[reference]
+nucleus = "Al27"
+
+[valence]
+space = "sd-shell"
+
+[hamiltonian]
+kinetic = "intrinsic"
+beta_cm = 0.0
+beta_cm_hw = 16.0
+nucleon_mass_correction = false
+relativistic_correction = false
+
+[interaction.two_body]
+file = "@INPUTS@/VNN_N3LO_EM500_lambda_1.80_hw16.00_emax_14.me2j.gz"
+format = "me2j"
+e1max = 14
+e2max = 28
+lmax = 14
+
+[interaction.three_body]
+file = "@INPUTS@/NO2B_ThBME_N2LO_cE_NonLocal4_394_IS_hw16_ms6_12_18.stream.bin"
+type = "no2b"
+format = "me3j"
+no2b_precision = "single"
+e1max = 6
+e3max = 18
+e2max = 12
+store_pn = false
+discard_no2b_after_hf = false
+
+[hartree_fock]
+mixing = "linear"
+freeze_occupations = false
+
+[natural_orbitals]
+use_occupations = false
+order = "occupation"
+use_hf_reference = true
+
+[imsrg]
+method = "magnus"
+steps = 2
+use_brueckner_bch = false
+goose_tank = false
+perturbative_triples = false
+
+[imsrg.generator]
+core = "atan"
+valence = "shell_model_atan"
+qtransfer_n = 1
+
+[imsrg.denominator]
+partitioning = "epstein_nesbet"
+delta = 0.0
+
+[imsrg.step]
+smax = 100.0
+dsmax = 0.5
+omega_norm_max = 50000.0
+eta_criterion = 0.001
+ode_tolerance = 9.9999999999999995e-07
+
+[imsrg.omega]
+storage = "memory"
+hunter_gatherer = false
+
+[imsrg3]
+in_flow = false
+at_end = false
+variant = "full"
+factorized = false
+factorized_1b_intermediates = true
+factorized_2b_intermediates = false
+no_qqq = false
+only_2b_eta = false
+only_2b_omega = false
+discard_residual_input_3n = false
+threebody_threshold = 0.0
+
+[operators]
+list = ["TCM"]
+first_order = []
+from_file = []
+
+[output]
+directory = "@OUT@"
+stem = "al27e4"
+flow_file = "@OUT@/flow.txt"
+valence_file_format = "tokyo"
+write_omega = true
+omega_format = "native"
+omega_second_format = true
+write_ho_ops = false
+write_hf_ops = false
+spwf = []
+
+[checkpoint]
+directory = "@OUT@/checkpoint"
+interval_minutes = 30.0
+format = "native"
+restart = false
+abort_after_steps = 0

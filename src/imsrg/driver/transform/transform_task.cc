@@ -231,6 +231,14 @@ fs::path TransformItem(const OperatorRequest& request,
                        *ctx.config, frame,
                        pipeline::ScalarOperatorWriteMode(*ctx.config)));
   }
+  if (ctx.config->transform.dump_native) {
+    // Full precision for device-vs-host checks (the .snt has 6-9 digits);
+    // written (atomically) before the .snt is renamed into place, so an
+    // existing .snt (transform.skip_existing) implies its .opb.
+    fs::path opb = path;
+    opb.replace_extension(".opb");
+    io::WriteOperatorBinary(opb, F, request.canonical_name);
+  }
   fs::rename(tmp, path);
   return path;
 }
@@ -360,7 +368,12 @@ TransformReport RunTransform(const RunConfig& config,
         for (const bool tensor : {false, true}) {
           const fs::path p =
               TransformOutputPath(ctx, requests[i]->canonical_name, tensor);
-          if (fs::exists(p)) {
+          fs::path opb = p;
+          opb.replace_extension(".opb");
+          // With dump_native an item is done only with its .opb as well
+          // (a .snt of a run without dump_native does not count).
+          if (fs::exists(p) &&
+              (!config.transform.dump_native || fs::exists(opb))) {
             report.written.push_back(p);
             done = true;
           }

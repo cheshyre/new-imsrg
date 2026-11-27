@@ -10,7 +10,9 @@
 
 #include <gtest/gtest.h>
 
+#include "imsrg/base/assert.h"
 #include "imsrg/base/error.h"
+#include "imsrg/exec/host_parallel.h"
 
 namespace {
 
@@ -177,6 +179,37 @@ TEST(ExecDeviceBuffer, AllInstantiatedTypes) {
   ExerciseType<std::int64_t>();
   ExerciseType<std::uint16_t>();
   ExerciseType<std::uint8_t>();
+}
+
+// Kept in a free function (no kernel lambda in a TEST body, design/12 s5).
+void ReadHostMirrorInParallel(const DeviceBuffer<double>& b) {
+  imsrg::exec::HostParallelForDynamic(
+      "test::mirror_in_region", 16,
+      [&b](std::int64_t) { static_cast<void>(b.host_span()); });
+}
+
+// Creating the host mirror inside a host-parallel region is the deadlock of
+// the HIP build with an OpenMP host (global fence under the instance mutex);
+// the debug guard turns it into a loud failure on every backend.
+TEST(ExecDeviceBufferDeathTest, MirrorCreationInParallelRegionIsCaught) {
+  if (!IMSRG_ASSERTS_ENABLED || imsrg::exec::HostConcurrency() < 2) {
+    GTEST_SKIP() << "needs assertions and an OpenMP host with >= 2 threads";
+  }
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
+  EXPECT_DEATH(
+      {
+        const DeviceBuffer<double> b(8);
+        ReadHostMirrorInParallel(b);
+      },
+      "");
+}
+
+TEST(ExecDeviceBuffer, MirrorCreatedBeforeTheLoopIsReadInParallel) {
+  DeviceBuffer<double> b(8);
+  b.fill(1.5);
+  b.SyncToHost();  // creates the mirror outside the region
+  ReadHostMirrorInParallel(b);
+  EXPECT_EQ(b.host_span()[7], 1.5);
 }
 
 }  // namespace

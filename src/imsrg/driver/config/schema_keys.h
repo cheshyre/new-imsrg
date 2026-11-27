@@ -413,6 +413,12 @@ void VisitSchema(Config& c, Visitor&& v) {
                   "an interrupted farm)",
                   "false"},
           c.transform.skip_existing);
+  v.Field(KeyInfo{"transform.dump_native",
+                  "also write every finished operator as a native float64 "
+                  "file <stem><name>.opb (full-precision checks, e.g. GPU vs "
+                  "CPU)",
+                  "false"},
+          c.transform.dump_native);
 }
 
 /// All schema keys in canonical order (keys of optional tables included).
