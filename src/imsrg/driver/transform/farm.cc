@@ -63,6 +63,14 @@ double CommutatorWeight(const basis::ModelSpace& ms, std::int32_t rank_J,
   return w;
 }
 
+double TensorCostFactor(std::int32_t rank_J) {
+  // Fit (AL-F3, 2026-11-27): t(L) / CommutatorWeight(L) at emax 10 on one
+  // GCD is 4.55 (L = 0) and 7.6 + 6.5 L (L = 1..5, within 1 %), in units of
+  // seconds per 1e10 for two Omegas; normalized to L = 0.
+  if (rank_J <= 0) return 1.0;
+  return 1.67 + 1.43 * static_cast<double>(rank_J);
+}
+
 double ItemCost(const OperatorRequest& request, const basis::ModelSpace& ms,
                 std::size_t num_omegas) {
   std::int32_t rank_J = request.shape.rank_j;
@@ -73,7 +81,13 @@ double ItemCost(const OperatorRequest& request, const basis::ModelSpace& ms,
       parity = Parity::kEven;
     }
   }
-  return static_cast<double>(num_omegas) * CommutatorWeight(ms, rank_J, parity);
+  const double n = static_cast<double>(num_omegas);
+  double cost =
+      n * CommutatorWeight(ms, rank_J, parity) * TensorCostFactor(rank_J);
+  if (request.canonical_name == "TCM") {
+    cost += kTcmPreparationCost * n * CommutatorWeight(ms, 0, Parity::kEven);
+  }
+  return cost;
 }
 
 std::vector<int> AssignStatic(std::span<const double> costs, int num_ranks) {

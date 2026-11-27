@@ -38,13 +38,28 @@ std::vector<std::string> ReadWorkList(const std::filesystem::path& path);
 double CommutatorWeight(const basis::ModelSpace& ms, std::int32_t rank_J,
                         Parity parity);
 
+/// Measured cost of one tensor commutator relative to `CommutatorWeight`,
+/// normalized to the scalar commutator: 1 for rank 0, 1.67 + 1.43 rank_J
+/// for rank_J >= 1 (the tensor particle-hole recoupling grows with the rank;
+/// fit of the emax-10 farm items on one GCD, design/benchmarks/al27-farm.md,
+/// AL-F3).
+double TensorCostFactor(std::int32_t rank_J);
+
+/// Host preparation cost of TCM in units of one scalar commutator of the
+/// item stack (its two-body part is built at basis.emax from the Moshinsky
+/// table; 27Al: ~790 s on 7 threads vs ~3 s for a scalar NREFT item).
+inline constexpr double kTcmPreparationCost = 250.0;
+
 /// Cost model of one work item (design/50 section 6): the number of nested
 /// commutators is num_omegas x (BCH terms per Omega), the BCH terms are taken
-/// equal for all operators of a stack (they depend on ||Omega_k||, not much
-/// on O), so the cost is num_omegas x `CommutatorWeight` of the operator's
-/// rank and parity. Rank and parity come from the request: NREFT shorthands
-/// `F<family><L>...` have rank L and even parity (the stored tensors are
-/// parity even, opslib/nreft.h); other operators the catalog shape.
+/// equal for all operators of a stack (they depend on ||Omega_k|| and less
+/// on O; measured: rank 5 at q = 1050 MeV takes 0.4x the time of q = 150),
+/// so the cost is num_omegas x `CommutatorWeight` x `TensorCostFactor` of
+/// the operator's rank and parity (TCM: plus its preparation,
+/// `kTcmPreparationCost` x num_omegas x the scalar weight). Rank and parity
+/// come from the request: NREFT shorthands `F<family><L>...` have rank L and
+/// even parity (the stored tensors are parity even, opslib/nreft.h); other
+/// operators the catalog shape.
 double ItemCost(const OperatorRequest& request, const basis::ModelSpace& ms,
                 std::size_t num_omegas);
 
