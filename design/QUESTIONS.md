@@ -1561,3 +1561,22 @@ all remaining assumptions in one go, the owner answered (verbatim): "Interview m
   job; document how 19,320 ranks would be reached. Use the GPU resources efficiently with what you
   have available." (D77)
 * "later" = after the weekend: the owner chose "27Al only, no fillers" for the weekend run (D77).
+
+## Added during the 27Al weekend
+
+* **WE-A-1** (lead A, Brief A) - `tools/ci.sh frontier-hip-run` stops after the unit step, which
+  always fails on the five known atan Bitwise tests (AL-E-Q2, 4-ulp fix decided for "later"), so
+  the integration step never runs there. **Done meanwhile:** the integration tests were run by hand
+  on a GCD (`ctest -L integration -LE 'slow|mpi' -j 3`, `OMP_NUM_THREADS=2`): 87/87 pass with the
+  OpenMP host space. The script is unchanged (the AL-E-Q2 fix removes the need).
+* **WE-A-2** (lead A, farm sizing) - At the measured emax-10 GPU cost a whole farm of one flow
+  (2414 NREFT items + TCM) is ~42 GCD-hours (~5.3 node-hours, design/benchmarks/al27-farm.md
+  section 4); the longest item takes ~2 min (rank 5, q = 150 MeV; TCM ~13 min, host-bound). A
+  600-1,200-node job (4,800-9,600 GCDs) has more GCDs than items, so most idle and the job ends
+  after the longest item. **Assumed:** recommend ~38-76 nodes per farm job with the refit cost model
+  (longest first, 1-2 items per GCD-minute balance), or 302 nodes for one item per GCD; the
+  orchestrator decides (D77 says "use the GPU resources efficiently").
+* **WE-A-3** (lead A, TCM in the farm) - TCM is the farm's longest item (~790 s on 7 host threads,
+  preparation at basis.emax 14) and is already written by every flow (same Omegas, same
+  `BchTransform`). **Assumed:** keep it in the default work list (the cost model now puts it alone
+  on a rank); `make_work_list.py --no-tcm` drops it.
