@@ -573,6 +573,10 @@ struct CheckpointConfig {
   bool restart = false;       ///< continue from the checkpoint in `directory`
   int abort_after_steps = 0;  ///< testing aid: stop with an error right after
                               ///< the checkpoint of this flow step (0: never)
+  /// Another run's checkpoint directory: a fresh flow takes its prepared
+  /// Hamiltonian from `<prepared_from>/prepared/` (design/00 D75; the same
+  /// `PreparationHash` is required). Empty: prepare H_0 in this run.
+  std::string prepared_from;
   friend bool operator==(const CheckpointConfig&,
                          const CheckpointConfig&) = default;
 };

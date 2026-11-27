@@ -382,6 +382,11 @@ void VisitSchema(Config& c, Visitor&& v) {
                   "step (0: never)",
                   "0"},
           c.checkpoint.abort_after_steps);
+  v.Field(KeyInfo{"checkpoint.prepared_from",
+                  "another run's checkpoint directory whose prepared/ "
+                  "Hamiltonian this flow starts from (empty: prepare here)",
+                  "\"\""},
+          c.checkpoint.prepared_from);
   // [transform]
   v.Field(KeyInfo{"transform.manifest",
                   "Omega manifest (<stem>_omegas.toml) for run.task = "

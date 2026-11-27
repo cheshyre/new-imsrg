@@ -188,6 +188,12 @@ void FlowCheckpointer::OnStep(const flow::MagnusSolver& solver,
   }
 }
 
+void FlowCheckpointer::WriteNow(const flow::MagnusSolver& solver,
+                                const flow::MagnusLoopState& state,
+                                const std::vector<FinishedStage>& finished) {
+  if (enabled_) Write(solver, state, finished);
+}
+
 void FlowCheckpointer::Write(const flow::MagnusSolver& solver,
                              const flow::MagnusLoopState& state,
                              const std::vector<FinishedStage>& finished) {

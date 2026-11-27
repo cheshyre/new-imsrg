@@ -227,12 +227,15 @@ Old `OperatorsRPA`/`OperatorsTDA`: not supported (no schema key).
 | `directory` | path | `""` | checkpoint directory; empty = no checkpoints. Created if missing. |
 | `interval_minutes` | float >= 0 | `30.0` | wall time between checkpoints; `0` = after every step. |
 | `format` | enum `native`, `me2jp` | `native` | operator files of a checkpoint (see `output.omega_format`). A native restart continues bit for bit; an ME2JP restart within float32 precision (owner O4). |
-| `restart` | bool | `false` | continue the flow from the checkpoint in `directory` (HF/NAT and the operators are recomputed; the flow configuration must be unchanged: `FlowConfigHash` over the resolved TOML without `[output]`, `[checkpoint]`, `run.log_level`). |
+| `restart` | bool | `false` | continue the flow from the checkpoint in `directory` (the flow configuration must be unchanged: `FlowConfigHash` over the resolved TOML without `[output]`, `[checkpoint]`, `run.log_level`). With `<directory>/prepared/` (D75) H_0, C and the occupations are read from there (no readers, HF or NAT); without it (older checkpoints) they are recomputed. The operators are always recomputed. |
 | `abort_after_steps` | int >= 0 | `0` | testing aid: stop with an error right after the checkpoint of this flow step (counted over all stages), simulating a killed job. |
+| `prepared_from` | path | `""` | another run's checkpoint directory: a fresh flow takes its prepared Hamiltonian from `<prepared_from>/prepared/` (D75; e.g. 27Al v3 from v2) and is refused (input error) unless `PreparationHash` matches (resolved TOML without `[output]`, `[checkpoint]`, `[operators]`, `[transform]`, the `[imsrg]` keys other than `imsrg.space`, `run.task`, `run.log_level`, `run.scratch_dir`). The run still writes its own `prepared/`. With `restart = true` and an own `prepared/`, the own one is used. |
 
 Contents of the directory (design/13 §7.3): `omega_<k>.*` once per closed Omega, `h_saved_<k>.*` once per
 Omega piece, `omega_cur_<seq>.*` and `h_<seq>.*` per checkpoint, `state.txt` (written last and atomically:
-config hash, format, sequence, Omega count, loop state and step options as hexfloats, finished stages).
+config hash, format, sequence, Omega count, loop state and step options as hexfloats, finished stages),
+and `prepared/` (D75: `hno.opb`, `c_hf.bin`, `c_nat.bin`, `prepared.toml`; design/13 §7.3). On SIGTERM
+the executable writes a checkpoint after the current Magnus step and exits with status 75.
 E-PLANNED with: methods other than `magnus`, hunter-gatherer, `imsrg3.in_flow`, perturbative triples.
 The flow file of a restarted run starts at the restored step.
 
@@ -487,7 +490,7 @@ imsrg 2bme=... emax=6 hw=16 reference=O16 valence_space=O16 ...      # legacy fo
 * `--set a.b=v`: `v` parsed as a TOML value; if that fails, as a bare string (`--set imsrg.method=magnus` works). Arrays: `--set operators.list='["Rp2","E2"]'`. Applied after the file; repeated key = last wins.
 * `--validate`: resolve and validate, write nothing, exit 0/2. `--print-config`: print the resolved TOML to stdout and exit.
 * Legacy mode is selected when no `--config` is given and at least one positional token contains `=`. Mixing `--config` with legacy tokens is an error (`E-CLI-MIX`) so provenance stays unambiguous. Legacy `help`, `-help`, `--help` print the CLI11 help plus a pointer to `--legacy-keys` (table of old keys with new names).
-* Exit codes: 0 ok, 2 configuration/validation error, 3 input file error, 1 runtime failure.
+* Exit codes: 0 ok, 2 configuration/validation error, 3 input file error, 1 runtime failure, 75 stopped by SIGTERM after a checkpoint (D75; restart with `checkpoint.restart = true`; all ranks stop alike, no MPI abort).
 * Legacy quirks removed in the parser: `key=` (empty value) is an error rather than "keep default"; a token without `=` is an error; scalar keys given twice: last wins plus warning; vector keys given twice append (old behaviour, kept); integers must parse completely (`emax=4.5` is an error, old truncated); booleans must be `true`/`false` (old: anything else silently false).
 * MPI (M12b): `mpirun -n N imsrg <config>` runs on N ranks. Every rank reads the inputs (M12b-Q6) and runs the whole pipeline on replicated data (rank 0 broadcasts the starting operators so all ranks start the flow from identical bits); rank 0 alone writes all outputs (resolved config, `results.json`, flow CSV, `.snt` files) and prints. Use the same `OMP_NUM_THREADS` on every rank. A failure on any rank aborts the whole job with the usual exit code (the message carries the rank), so no rank is left blocked in a collective. The command-line and configuration errors of the first part are detected on every rank before MPI starts.
 

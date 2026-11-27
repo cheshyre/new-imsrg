@@ -308,6 +308,26 @@ at emax 8 per commutator (`tools/bench/tensor_commutator_bench`); memory and GPU
   continues the stage in progress; stage 2 is entered directly when the checkpoint is in stage 2.
 * Formats: native float64 (`io::WriteOperatorBinary`, bit-exact restart) or ME1J + float32 binary
   ME2JP (restart within float32 precision, owner answer to O4).
+* **Prepared state (D75, 2026-11-27; `driver/pipeline/prepared_state.{h,cc}`).** With a checkpoint
+  directory, `Run` writes `prepared/` once after stage 1 (as `prepared.tmp/`, then renamed):
+  `hno.opb` (H_0 normal ordered in the IMSRG space, always native f64), `c_hf.bin` / `c_nat.bin`,
+  and `prepared.toml` (written last: `preparation_hash`, mass/proton number, e_reference, e_mp2 as
+  hexfloats, occupations and reference names of the IMSRG and normal-ordering spaces, HF/NAT
+  scalars and occupations, natural occupations). A restart with `prepared/` (and the same
+  `PreparationHash`) reads it on every rank instead of running readers, HF and NAT; the model spaces
+  are rebuilt from the config and the stored occupations as `PrepareHamiltonian` builds them, so the
+  restart stays bit for bit. Not stored: `HFResult::spe/rho/F/ediff_history` (unused downstream).
+  A checkpoint without `prepared/` (older builds) is restarted with preparation; one with
+  `prepared/` but no `state.txt` (killed before the first checkpoint) starts the flow from it.
+  `checkpoint.prepared_from` starts a fresh flow from another run's `prepared/` (27Al v3 from v2).
+  `PreparationHash` = `FlowConfigHash` without `[operators]`, `[transform]`, the `[imsrg]` keys other
+  than `imsrg.space`, `run.task`, `run.scratch_dir`.
+* **SIGTERM (D75).** `driver::InstallTerminationHandler()` (called by the executable's `main` only)
+  sets a `sig_atomic_t` flag and nothing else. After every Magnus step all ranks combine it
+  (`AllreduceMax`); if set, `FlowCheckpointer::WriteNow` writes a checkpoint (if a directory is
+  configured) and `InterruptedError` is thrown; `main` returns exit status 75 (EX_TEMPFAIL) without
+  aborting MPI. ODE methods do not check the flag. `tools/al27/run_flow.sh` forwards the batch
+  shell's TERM (`#SBATCH --signal=B:TERM@300`) to srun.
 
 ## 8. opslib (reference: `reference/05` §1)
 

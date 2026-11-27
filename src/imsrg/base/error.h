@@ -101,6 +101,20 @@ class NotImplementedError : public Error {
   NotImplementedError& operator=(NotImplementedError&&) = default;
 };
 
+/// The run was stopped on request (SIGTERM from the batch system, design/00
+/// D75) after writing a checkpoint if one was configured. Not a failure of
+/// the computation: the `imsrg` executable maps it to exit status 75
+/// (EX_TEMPFAIL, "restart later").
+class InterruptedError : public Error {
+ public:
+  using Error::Error;
+
+  InterruptedError(const InterruptedError&) = default;
+  InterruptedError& operator=(const InterruptedError&) = default;
+  InterruptedError(InterruptedError&&) = default;
+  InterruptedError& operator=(InterruptedError&&) = default;
+};
+
 }  // namespace imsrg
 
 #endif  // IMSRG_BASE_ERROR_H_
