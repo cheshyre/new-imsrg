@@ -26,9 +26,9 @@ milestone after tensor operators (D53, D54); `40-roadmap.md` M15+.
 * Shells e = 2n + l from 0 to emax; inside a shell, l ascending from e mod 2 to e in steps of 2;
   for each l, 2j = 2l − 1 (only for l > 0), then 2l + 1; for each (n, l, j) **the neutron orbit
   first, then the proton orbit**.
-* Index: idx(n, l, j, tz) = e(e + 1) + o_l + o_j + [proton], with o_l = 4⌊l/2⌋ − 2·((l + 1) mod 2)
-  and o_j = 2j − 2l + 1 ∈ {0, 2} (2j and 2l as integers). Equivalently idx = 2·nlj + [proton],
-  where nlj is the orbit index of ME2J (e ascending, then l ascending, then j ascending).
+* Index: idx(n, l, j, tz) = 2·nlj + [proton], where nlj is the orbit index of ME2J (e ascending,
+  then l ascending, then j ascending). (An earlier closed formula, e(e + 1) + o_l + o_j + [proton],
+  was wrong: it puts d3/2 at 10 instead of 8; AL-C5, owner-confirmed 2026-11-27.)
 * Single-particle energies are non-decreasing in the index.
 * This is **not** our orbit order (proton even, neutron = proton + 1; l and j descending inside a
   shell; AGENTS.md). Readers and writers map orbits by their quantum numbers, never by index

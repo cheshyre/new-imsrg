@@ -1,6 +1,6 @@
 # 50 — The ²⁷Al dark-matter response task (weekend task, from 2026-11-26)
 
-Status: decided in the owner interview of 2026-11-26 (D-rows D61ff in `00`); implementation started
+Status: decided in the owner interviews of 2026-11-26 and 2026-11-27 (part 2: D72-D78, weekend plan §7) (D-rows D61ff in `00`); implementation started
 the same night (leads A, B, C below); the unsupervised session runs until **Monday 2026-11-30,
 10:00 Knoxville time**. Sources: the provenance package `$IMSRG_WORK/inputs/al27/`
 (`README_al27_provenance.md`, unpacked `al27_provenance/`) and the analysis of the fork
@@ -112,7 +112,8 @@ Assumed (owner did not answer; golden rule 4, most reversible): one config key
 `compat = "imsrg_fork_79e9330"` switches on every fork behaviour needed to match the archive, each a
 named internal option with its own test against the fork reference build; the default is the fixed
 behaviour. Behaviours (`reference/06` §4.1): tensor normal-ordering a==b / J_bra≠J_ket term omitted;
-NAT orbitals re-sorted by |occupation| (variant 1 only); 9j skip threshold 1e-8 in the tensor
+odd-L particle-hole phases (AL-F1); imsrg++'s tensor one-body norm (AL-A-Q6, D72); domega 0.2
+(AL-C4); 9j skip threshold 1e-8 in the tensor
 commutators; isospin averaging of pn 2B elements in the scalar operator writer (owner: always, all
 variants, plus one documented example without it); 79e9330 writer details (7 significant digits,
 1e-7 drop thresholds, tensor writer orderings, `A_for_kinetic_energy` header). FDelta and FPhitp are
@@ -159,3 +160,44 @@ format), work list `tools/al27/make_work_list.py` (34 x 71 names + TCM = 2415 li
 * **Not done yet:** a timing of one item at emax 10 (needed for the walltime; the template uses 2 h),
   the device path, measuring the split-variant Omega count.
 
+
+**NAT ordering (owner, 2026-11-27, D72):** natural orbitals are ordered by descending |occupation|
+in EVERY variant (it was a compat-only option until then; Phase 0 makes it the default).
+
+## 7. Weekend plan (part-2 interview, 2026-11-27; D76, D77)
+
+Run: right after the interview until **Mon 2026-11-30 10:00 EST**; prompt `design/NEXT_SESSION_PROMPT.md`.
+
+| Variant | Behaviour | Magnus | Acceptance |
+|---|---|---|---|
+| v1 | `run.compat = "imsrg_fork_79e9330"` (§5) | unsplit (2 Omegas) | every archived `.snt` element to 1e-4 absolute; README §3.3 numbers (done for the flows) |
+| v2 | default (no fork emulation, domega 0.1, D72 norm) | unsplit | converged flows; difference report vs v1 |
+| v3 | as v2 | split, omega_norm_max 0.25 | converged flows; difference report vs v2, elements > 1e-3 relative investigated |
+
+Difference reports: per element |Δ| and |Δ|/|ref| (relative only for |ref| ≥ 1e-6), summarized per
+operator column and q, plus E0 and H; in `design/benchmarks/al27-variants.md`.
+
+Phases: **0** shake-down (GPU in flow driver and farm, HIP+OpenMP host, |occupation| NAT default,
+H_0 in checkpoints + SIGTERM checkpoint, per-item log, fork file names under compat; one item per L
+and TCM timed on a GCD; J = 0 and J = 1 v1 operators vs the archive; TCM fork format verified);
+**1** v1 farm, both Omega formats; **2/3** v2 and v3 flows on GPUs (overlapping Phase 1), then their
+farms. v1 must be complete by Monday; v3 may be partial (the failure manifest lists what is missing).
+
+### 7.1 Compute estimate (node-hours; extrapolated, refit after the Phase-0 timing)
+
+Basis: GCD timings of one commutator at emax 10 (scalar ~0.07 s, tensor L = 5 1.5 s, L < 5 by the
+cost model W(L)); ~15 nested commutators per unsplit Omega (40 for the v1 J = 5 NaN-norm items),
+~6 per split Omega; ~40 s setup per item; Frontier bills whole nodes for the job length.
+
+| Item | Ideal GPU work | One item per rank | With retries (~1.5x) |
+|---|---|---|---|
+| v1 farm (2 formats, 9,660 items) | ~26 nh | 1,208 nodes × 0.3-0.5 h | ~500-900 |
+| v2 flows + farm (4,830 items) | ~2-5 + ~12 | 604 nodes × 0.3-0.5 h | ~300-450 |
+| v3 flows + farm (30-100 Omegas/flow) | ~2-8 + ~50-200 | 604 nodes × 0.5-1.5 h | ~450-1,400 |
+| development, CI, Phase-0 tests, investigations | | | ~250-450 |
+| **total** | | | **~1,500-3,300** (budget 50,000, D65) |
+
+Packing several items per rank (LPT with the refit cost model) brings each farm close to its ideal
+GPU work; the owner asked to use the GPUs efficiently rather than to reach the rank count. **Path to
+19,320 ranks** (to document, not to run): all four item sets (v1 native and ME2JP, v2, v3) in one
+2,415-node job, one item per GCD.
