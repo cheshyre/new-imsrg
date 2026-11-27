@@ -7,3 +7,4 @@ Node-hours = nodes x elapsed (Frontier bills whole nodes for the job length).
 
 | Job id | Purpose | Nodes | Partition | Elapsed | Node-hours | Result |
 |---|---|---|---|---|---|---|
+| 6006462 | v1 J=0/1 + TCM validation, native, both H (4 steps, CPU) | 32 | batch | 00:30:54 | 16.5 | 1,422 items, 0 failed; all columns PASS vs archive (max 1e-9) |
