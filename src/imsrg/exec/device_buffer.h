@@ -52,7 +52,10 @@ struct DeviceBufferAccess;
 /// allocation, so they may outlive the Runtime; non-empty buffers must be
 /// destroyed before it. Not thread-safe: the lazily created host mirror is
 /// mutable state (also behind `const`), so create it (`host_span()` or
-/// `SyncToHost()`) before sharing a buffer between host threads.
+/// `SyncToHost()`) before sharing a buffer between host threads. Creating it
+/// inside a host-parallel region (`InHostParallelRegion()`) is an error
+/// (`IMSRG_ASSERT`): with a separate mirror (HIP) it allocates and fences
+/// globally, which deadlocks inside an OpenMP-host parallel_for.
 template <class T>
 class DeviceBuffer {
   static_assert(std::is_trivially_copyable_v<T>,

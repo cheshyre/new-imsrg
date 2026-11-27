@@ -4,6 +4,9 @@
 #include "imsrg/exec/host_parallel.h"
 
 #include <Kokkos_Core.hpp>
+#if defined(KOKKOS_ENABLE_OPENMP)
+#include <omp.h>
+#endif
 
 #include "imsrg/base/assert.h"
 
@@ -20,6 +23,14 @@ void HostParallelForDynamic(const char* name, std::int64_t n,
   policy.set_chunk_size(1);
   Kokkos::parallel_for(name, policy, [&f](const std::int64_t i) { f(i); });
   Kokkos::DefaultHostExecutionSpace().fence(name);
+}
+
+bool InHostParallelRegion() {
+#if defined(KOKKOS_ENABLE_OPENMP)
+  return omp_in_parallel() != 0;
+#else
+  return false;
+#endif
 }
 
 int HostConcurrency() {

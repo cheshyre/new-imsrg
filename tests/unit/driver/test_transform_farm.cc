@@ -79,10 +79,21 @@ TEST(TransformFarm, ItemCostUsesTheShorthandRank) {
   };
   EXPECT_DOUBLE_EQ(ItemCost(req("FM0p_15"), *ms, 2),
                    2.0 * CommutatorWeight(*ms, 0, Parity::kEven));
-  EXPECT_DOUBLE_EQ(ItemCost(req("FSigmap3n_15"), *ms, 3),
-                   3.0 * CommutatorWeight(*ms, 3, Parity::kEven));
-  EXPECT_DOUBLE_EQ(ItemCost(req("TCM"), *ms, 1),
-                   CommutatorWeight(*ms, 0, Parity::kEven));
+  EXPECT_DOUBLE_EQ(
+      ItemCost(req("FSigmap3n_15"), *ms, 3),
+      3.0 * CommutatorWeight(*ms, 3, Parity::kEven) * TensorCostFactor(3));
+  // TCM: its preparation at basis.emax dominates (AL-F3).
+  EXPECT_DOUBLE_EQ(
+      ItemCost(req("TCM"), *ms, 1),
+      (1.0 + kTcmPreparationCost) * CommutatorWeight(*ms, 0, Parity::kEven));
+}
+
+TEST(TransformFarm, TensorCostFactorGrowsWithTheRank) {
+  EXPECT_DOUBLE_EQ(TensorCostFactor(0), 1.0);
+  for (int L = 1; L <= 5; ++L) {
+    EXPECT_GT(TensorCostFactor(L), TensorCostFactor(L - 1));
+  }
+  EXPECT_NEAR(TensorCostFactor(5), 8.82, 1.0e-12);
 }
 
 TEST(TransformFarm, AssignStaticIsBalancedAndDeterministic) {
