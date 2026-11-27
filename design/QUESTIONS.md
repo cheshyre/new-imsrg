@@ -1513,3 +1513,51 @@ commutators and the tensor first call unchanged. Owner/integrator to decide with
   written, max deviation 5e-7). **Assumed:** lead B's `TokyoNumberFormat::kFork79e9330`
   (feature/al27-tokyo-fork-format) gets selected by the compat profile when that branch merges
   (one line in driver `TokyoOptions`); not done here to keep the branches disjoint.
+
+### Answers (owner interview part 2, 2026-11-27; D72-D78)
+
+The owner chose the recommended option unless a verbatim answer is given. Asked whether to confirm
+all remaining assumptions in one go, the owner answered (verbatim): "Interview me on all questions."
+
+* **AL-A-Q6:** emulate imsrg++'s tensor one-body norm under `run.compat` only (variant 1); default
+  (2j_p+1)(2j_q+1)/(2L+1) per element; Phase 0 checks which archived J=5 logs hit the NaN (D72).
+* **AL-NAT (new, owner, verbatim):** "To be clear NAT orbitals should be sorted by |occupation| not
+  signed occupation. Verify that this is what is done in v2 and v3." Checked: it was not (default
+  `mbpt::NatSorting::kSignedDescending`, |occupation| only under compat). To do in Phase 0:
+  |occupation| becomes the default for every run (D72, design/30 §6 row AL-NAT).
+* **GPU BLAS (D70 follow-up):** rocBLAS stays the hip default (D73).
+* **AL-E-Q1:** Kokkos Kernels gets a compile check in `tools/ci.sh frontier-hip` (later; D73).
+* **AL-E-Q2:** 4-ulp relative tolerance in the five Bitwise tests on device builds only (later).
+* **AL-E-Q3:** switch the `frontier-cpu*` presets to serial libsci + concurrent items after the
+  Python two-thread test passes (D74; after the weekend).
+* **AL-E-Q4:** one flow per GCD; GPU-aware distribution later (M12b).
+* **AL-E-Q5:** kokkos-hip with OpenMP host space (Phase 0; D73).
+* **Fork tensor goldens (1.7 MB):** keep.
+* **AL-C1:** e2max cut later, in `basis::TwoBodyChannels`.
+* **AL-C2 / AL-D1:** store H_0 and the NAT coefficients in checkpoints; checkpoint on SIGTERM;
+  operators stay in the config hash (Phase 0, before the v2/v3 flows; D75).
+* **AL-C3:** keep `std::stable_sort`.
+* **AL-C4:** variants 2/3 use the imsrg-devel default domega 0.1; 0.2 only under compat.
+* **AL-C5:** design/19 formula fixed (done 2026-11-27); 2-ulp text round trips and tag-less headers
+  accepted.
+* **AL-A-Q1:** every golden script that builds random operators stores its inputs (later).
+* **AL-A-Q2:** memory is enough for the farm; unordered rows and tiling later.
+* **AL-A-Q3:** explicit sum of both orientations (design/30 §6 row M15-1).
+* **AL-A-Q4:** keep the rewrite's particle-rank rule.
+* **AL-A-Q5:** storage is plain Edmonds; the gauge belongs to the builders (design/15, confirmed).
+* **AL-B2:** keep the rule with the mpmath reference (design/30 §2).
+* **AL-B3:** the default path returns the analytic q → 0 limit, compat keeps the fork's NaN (later).
+* **AL-B4, AL-D2:** confirmed.
+* **AL-D3:** confirmed; the TCM `.snt` of both v1 flows is re-checked in Phase 0 (158 archived
+  two-body elements to 1e-4).
+* **AL-F2:** fork file names under `run.compat` in the in-process driver and in the farm; devel names
+  otherwise (Phase 0).
+* **AL-F3:** refit the cost model after the Phase-0 timing.
+* **AL-F4:** add a per-item farm log (name, start, end, seconds, BCH terms, Omega norm) (Phase 0).
+* **Difference reports (owner, verbatim):** "When you compare the differences between v1 v2 and v3,
+  note both absolute and relative differences (ignoring matrix elements in the .snt that are very
+  small, smaller than 1e-6)." (D76)
+* **Scale (owner, verbatim):** "Not a must this weekend. Run each variant as its own ~600-1,200-node
+  job; document how 19,320 ranks would be reached. Use the GPU resources efficiently with what you
+  have available." (D77)
+* "later" = after the weekend: the owner chose "27Al only, no fillers" for the weekend run (D77).

@@ -87,3 +87,24 @@ script (D61); the DIIS/linear-mixing change (D64); AL-D1 (every restart re-runs 
 * The 1.7 MB of fork tensor goldens in `tests/golden/tensor/fork-79e9330/` (every file < 1 MB).
 * Weekend logistics: usage pauses every ~3 h, self-sustaining allocation chains, farm jobs of
   ~600-1,800 nodes (12 h limit for >= 184 nodes), the order of variants, reporting.
+
+## 5. Part 2 (2026-11-27 10:00 JST = 2026-11-26 20:00 EST): the weekend plan
+
+Ten question rounds; answers in `QUESTIONS.md` ("Answers (owner interview part 2)"), decisions
+D72-D78, plan in `design/50` §7, prompt `design/NEXT_SESSION_PROMPT.md`.
+
+| Topic | Decision | Row |
+|---|---|---|
+| Tensor 1B norm (AL-A-Q6) | imsrg++ formula only under compat (v1); default (2j_p+1)(2j_q+1)/(2L+1) | D72 |
+| NAT order | \|occupation\| in every run (was compat-only: found during the interview) | D72 |
+| GPU | rocBLAS default, KK compile check, kokkos-hip with OpenMP host, 4-ulp device tolerance (atan), one flow per GCD, fork goldens kept | D73 |
+| CPU BLAS | serial libsci + concurrent items in `frontier-cpu*` (after the weekend) | D74 |
+| Restarts | H_0 + NAT C in checkpoints, SIGTERM checkpoint | D75 |
+| Variants | v1 compat / v2 default unsplit / v3 split 0.25; reports with absolute and relative differences (\|ref\| ≥ 1e-6); v3 vs v2 > 1e-3 relative investigated | D76 |
+| Weekend run | phases 0-3 overlapping, v1 must, v3 may be partial; no fillers, no cap, ≤ 3 Opus leads, self-resubmitting allocations, per-phase reports, develop to GitHub after each CI PASS; scale not a must | D77 |
+| Night questions | all 19 asked one by one ("Interview me on all questions.") | D78 |
+
+Also answered for the owner: what v1/v2/v3 change (design/50 §5, §7) and node-hour estimates
+(design/50 §7.1: ~1,500-3,300 node-hours in total, ~250-450 of them development). Done during the
+interview: design/19 index formula (AL-C5), design/30 §2 rules (NREFT tables, 27Al acceptance, device
+atan) and §6 rows AL-A-Q6 and AL-NAT.
