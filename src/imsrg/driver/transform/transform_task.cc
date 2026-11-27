@@ -161,15 +161,15 @@ commutator::CommutatorOptions TransformCommutatorOptions(
 
 fs::path TransformOutputPath(const TransformContext& ctx,
                              const std::string& name, bool tensor) {
-  return ctx.out_dir / pipeline::OperatorFileName(
-                           ctx.stem, name, tensor,
-                           CompatOptionsFor(ctx.config->run.compat)
-                               .fork_operator_file_names);
+  return ctx.out_dir /
+         pipeline::OperatorFileName(
+             ctx.stem, name, tensor,
+             CompatOptionsFor(ctx.config->run.compat).fork_operator_file_names);
 }
 
 std::string IsoTimestamp() {
-  const std::time_t t = std::chrono::system_clock::to_time_t(
-      std::chrono::system_clock::now());
+  const std::time_t t =
+      std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
   std::tm tm{};
   localtime_r(&t, &tm);
   char buf[32];
@@ -368,8 +368,7 @@ TransformReport RunTransform(const RunConfig& config,
           continue;
         }
       }
-      report.written.push_back(
-          TransformItem(*requests[i], ctx, &entry.report));
+      report.written.push_back(TransformItem(*requests[i], ctx, &entry.report));
       ok[i] = 1;
       finish("ok", "");
     } catch (const std::exception& e) {

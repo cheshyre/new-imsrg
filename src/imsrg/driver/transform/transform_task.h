@@ -54,7 +54,7 @@ struct TransformContext {
   commutator::CommutatorOptions copts;
   commutator::Workspace* workspace = nullptr;
   std::filesystem::path out_dir;
-  std::string stem;  ///< file prefix of the operator files
+  std::string stem;             ///< file prefix of the operator files
   double max_omega_norm = 0.0;  ///< max over the stack of `op::Norm(Omega)`
 };
 

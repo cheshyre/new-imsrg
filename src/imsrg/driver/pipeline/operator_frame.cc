@@ -200,8 +200,7 @@ io::ValenceWriteOptions MakeValenceWriteOptions(const RunConfig& c,
 
 std::string OperatorFileName(const std::string& stem, const std::string& name,
                              bool tensor, bool fork_names) {
-  return stem + (fork_names ? "" : "_") + name + (tensor ? "_2b" : "") +
-         ".snt";
+  return stem + (fork_names ? "" : "_") + name + (tensor ? "_2b" : "") + ".snt";
 }
 
 std::string OperatorFileName(const std::string& stem, const std::string& name,

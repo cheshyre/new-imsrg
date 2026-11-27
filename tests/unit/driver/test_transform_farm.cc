@@ -15,8 +15,8 @@
 
 #include "imsrg/base/error.h"
 #include "imsrg/basis/model_space.h"
-#include "imsrg/driver/operators/operator_request.h"
 #include "imsrg/driver/config/compat.h"
+#include "imsrg/driver/operators/operator_request.h"
 #include "imsrg/driver/pipeline/operator_frame.h"
 #include "imsrg/driver/transform/farm.h"
 #include "imsrg/driver/transform/transform_task.h"
