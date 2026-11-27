@@ -25,8 +25,8 @@ Runs (never in git): `$IMSRG_WORK/runs/al27/{v2,v3}/{N2LOsat,DN2LOGO}/`, farms i
 - [x] (a) tools/al27/diff_variants.py + tests (merged from feature/al27-variants-diff 6318a22)
 - [x] (b) tools/al27/flows_chain.sh + flow_summary.py (merged from feature/al27-variants-chain bc154cf; mock chain t4 OK)
 - [x] B (origin/feature/al27-defaults-restart 90f59c6) merged into this branch (orchestrator: develop 4583b44 = B, review running); frontier-hip built in this clone (build/frontier-hip, 2026-11-27 18:2x); the 4 v2/v3 configs pass `--validate`; chain fixed (empty argument) and re-tested (t5)
-- [ ] orchestrator "go" -> merge develop -> submit the chain (command below)
-- [ ] v2 + v3 flows (chain job)
+- [x] orchestrator "go" (18:32 EST Fri): chain submitted, link 1 job 6015996 (frontier00102, started 18:33), link 2 6015997 pending (afterany); chain script runs/al27/v2/N2LOsat/chain-20261127-183256.sh; binary = this clone's build/frontier-hip at 42a46f7 (contains B 90f59c6); develop to be merged later
+- [ ] v2 + v3 flows (chain job running)
 - [ ] v2 farms (both H), compare v2 vs v1
 - [ ] v3 farms, compare v3 vs v2, investigate > 1e-3 relative
 - [ ] design/benchmarks/al27-variants.md
