@@ -26,7 +26,10 @@ Brief: design/NEXT_SESSION_PROMPT.md "Brief B".
 - [x] T2 farm log + file names (t2 head d545053, merged 5c553de; own CI PASS)
 - [x] T3 prepared-H0 restart + SIGTERM (t3 head c952615, merged 5170aa0; report pending)
 - [x] T4 v2/v3 configs (all four `--validate` OK after merge); run_flow.sh done by T3
-- [ ] CI frontier-cpu on the merged head, ctest -L slow, report
+- [x] WE-A-4: FlowConfigHash/PreparationHash hash explicit tables only (7b77a05)
+- [x] merged develop incl. lead A GPU path (22e7767); flows_gpu.sh SIGTERM forwarding (b1edb4f)
+- [x] CI frontier-cpu PASS on 22e7767 (+ script-only b1edb4f); configs v1/v2/v3 --validate OK
+- [ ] ctest -L slow on the merged head, report
 
 ## Notes
 * First merged CI run (2026-11-26 23:xx) FAILED only by timeouts of driver_mpi_2ranks /
