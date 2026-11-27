@@ -40,10 +40,16 @@ for p in "${pairs[@]}"; do
   cp "$bin" "$run/imsrg.gpu-$stamp"
   quoted=""
   for e in "${extra[@]}"; do quoted+=" $(printf '%q' "$e")"; done
-  steps+="( cd $run && echo \"start \$(date -Is) job \$SLURM_JOB_ID\" > flow-gpu.log && \\
+  # Paths are %q-quoted: the generated script must survive spaces or shell
+  # characters in them.
+  qrun=$(printf '%q' "$run")
+  qcfg=$(printf '%q' "$cfg")
+  qbin=$(printf '%q' "$run/imsrg.gpu-$stamp")
+  qout=$(printf '%q' "output.directory=$run")
+  steps+="( cd $qrun && echo \"start \$(date -Is) job \$SLURM_JOB_ID\" > flow-gpu.log && \\
   srun -N1 -n1 -c $cores --gpus=1 --gpu-bind=closest --exact \\
-    /usr/bin/time -v $run/imsrg.gpu-$stamp --config $cfg \\
-    --set output.directory=$run$quoted >> flow-gpu.log 2>&1; \\
+    /usr/bin/time -v $qbin --config $qcfg \\
+    --set $qout$quoted >> flow-gpu.log 2>&1; \\
   echo \"end \$(date -Is) status \$?\" >> flow-gpu.log ) &
 "
 done

@@ -3,7 +3,7 @@
 # Copyright 2026 The imsrg authors
 #
 # Times farm items (run.task = "transform") on ONE GCD of the running job
-# $IMSRG_SLURM_JOBNAME (default imsrg-a): one rank, 7 OpenMP host threads,
+# $IMSRG_SLURM_JOBNAME (default imsrg, the shared chain): one rank, 7 OpenMP host threads,
 # frontier-hip build. Default work list: one item per rank L = 0..5 at
 # q = 150 MeV plus TCM (Brief A item 5). Records the node load before and
 # after (uptime, GPU use) in OUT_DIR/load.txt; per-item times are the
@@ -23,7 +23,7 @@ if (( ${#items[@]} == 0 )); then
          TCM)
 fi
 root=$(cd "$(dirname "$0")/../.." && pwd)
-export IMSRG_SLURM_JOBNAME=${IMSRG_SLURM_JOBNAME:-imsrg-a}
+export IMSRG_SLURM_JOBNAME=${IMSRG_SLURM_JOBNAME:-imsrg}
 # shellcheck source=/dev/null
 source "$root/tools/lib/frontier_env.sh"
 imsrg_frontier_modules hip >/dev/null 2>&1
