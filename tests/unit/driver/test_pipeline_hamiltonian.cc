@@ -140,8 +140,7 @@ TEST(PipelineHamiltonian, Ne20Sd) {
 // D72 / AL-NAT: natural_orbitals.sort defaults to |occupation| and parses
 // signed_occupation (also in an HF-basis run: the OccNat3 cut uses it).
 TEST(PipelineHamiltonian, NatSortKey) {
-  const std::string ref =
-      "[reference]\nnucleus = \"O16\"\n";
+  const std::string ref = "[reference]\nnucleus = \"O16\"\n";
   EXPECT_EQ(Load(Toml(ref, false)).natural_orbitals.sort,
             NatSort::kAbsOccupation);
   const RunConfig c = Load(

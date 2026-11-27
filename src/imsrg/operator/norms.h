@@ -33,8 +33,9 @@ enum class TensorOneBodyNorm : std::int8_t {
 /// Entries between orbits of different (l, 2j, tz2) are ignored, as in imsrg++.
 /// Tensor operators: sum over the connected (p, q) weighted as `mode` says.
 /// Host computation, O(norb^2); syncs the one-body part to the host.
-double OneBodyNorm(const Operator& op,
-                   TensorOneBodyNorm mode = TensorOneBodyNorm::kDegeneracyWeighted);
+double OneBodyNorm(
+    const Operator& op,
+    TensorOneBodyNorm mode = TensorOneBodyNorm::kDegeneracyWeighted);
 
 /// imsrg++ `TwoBodyME::Norm` (TwoBodyME.cc:781-803) for scalar operators: sqrt(
 /// sum_channels ((2J + 1) ||V^J||_F)^2 ) over the stored normalized blocks

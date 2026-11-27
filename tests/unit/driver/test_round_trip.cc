@@ -385,9 +385,8 @@ class Gen {
       t << "order = \"" << Pick<std::string>({"occupation", "energy"})
         << "\"\n";
     if (Coin())
-      t << "sort = \"" << Pick<std::string>({"abs_occupation",
-                                              "signed_occupation"})
-        << "\"\n";
+      t << "sort = \""
+        << Pick<std::string>({"abs_occupation", "signed_occupation"}) << "\"\n";
 
     t << "[imsrg]\n";
     if (Coin())

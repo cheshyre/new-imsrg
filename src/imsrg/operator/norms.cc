@@ -24,7 +24,8 @@ double OneBodyNorm(const Operator& op, TensorOneBodyNorm mode) {
   if (!op.spec().is_scalar()) {
     // kImsrgppInteger: imsrg++ Operator::OneBodyNorm with its integer
     // degeneracy factor, which mixes 2j with the undoubled rank_J (it drives
-    // the BCH thresholds of the fork reference). Default: (2jp+1)(2jq+1)/(2L+1).
+    // the BCH thresholds of the fork reference). Default:
+    // (2jp+1)(2jq+1)/(2L+1).
     const std::int32_t L = op.spec().rank_J;
     for (std::int32_t p = 0; p < n; ++p) {
       const basis::Orbit& op_ = basis.orbit(OrbitIndex{p});

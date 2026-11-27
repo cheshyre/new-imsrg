@@ -305,7 +305,6 @@ TEST(OperatorNorms, TensorOneBodyNormBothWeights) {
     OperatorSpec spec = OperatorSpec::Scalar(1);
     spec.rank_J = L;
     spec.parity = L % 2 == 0 ? Parity::kEven : Parity::kOdd;
-    spec.hermiticity = Hermiticity::kNonHermitian;
     Operator o(MakeMs(), spec);
     const TensorSums t = FillTensor(o, L);
     ASSERT_GT(t.weighted, 0.0);
@@ -328,7 +327,6 @@ TEST(OperatorNorms, TensorOneBodyNormIntegerDegeneracyCanBeNegative) {
       basis::BasisTruncation{.emax = 4}, 16.0, "O16", "O16");
   OperatorSpec spec = OperatorSpec::Scalar(1);
   spec.rank_J = 4;
-  spec.hermiticity = Hermiticity::kNonHermitian;
   Operator o(ms, spec);
   const auto& b = ms->basis();
   OrbitIndex g{-1};
