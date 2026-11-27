@@ -13,7 +13,8 @@
 #     FLOW_DIR    output directory of the flow (resolved_config.toml and the
 #                 manifest <stem>_omegas.toml of output.write_omega)
 #     FORMAT_TAG  label of the output directory (default: the manifest's format)
-#   Environment: NODES (default: work items / 8 rounded up, at most 604),
+#   Environment: MANIFEST (default: native before me2jp, *_omegas_no.toml
+#     before *_omegas.toml), NODES (default: work items / 8 rounded up, at most 604),
 #     WALLTIME (default 02:00:00), ACCOUNT (nph123), WORK_LIST (default:
 #     tools/al27/make_work_list.py), IMSRG_BIN (default build/frontier-hip/...
 #     falls back to frontier-cpu-release), PARTITION (batch), DRY_RUN.
@@ -30,7 +31,19 @@ FLOW_DIR=$(cd "$FLOW_DIR" && pwd)
 REPO=$(cd "$(dirname "$0")/../.." && pwd)
 CONFIG="$FLOW_DIR/resolved_config.toml"
 [[ -f $CONFIG ]] || { echo "no $CONFIG" >&2; exit 2; }
-MANIFEST=$(ls "$FLOW_DIR"/*_omegas.toml | head -n 1)
+# The manifest: $MANIFEST, else the native one before the ME2JP one, and a
+# manifest with normal_ordering_occupations (*_omegas_no.toml, needed with
+# [imsrg.space]) before one without.
+if [[ -z ${MANIFEST:-} ]]; then
+  for m in $(ls "$FLOW_DIR"/*_omegas_no.toml "$FLOW_DIR"/*_omegas.toml \
+               2>/dev/null | grep -v _me2jp_) \
+           $(ls "$FLOW_DIR"/*_me2jp_omegas_no.toml \
+               "$FLOW_DIR"/*_me2jp_omegas.toml 2>/dev/null); do
+    MANIFEST=$m
+    break
+  done
+fi
+MANIFEST=$(realpath "${MANIFEST:-/nonexistent}")
 [[ -f $MANIFEST ]] || { echo "no *_omegas.toml in $FLOW_DIR" >&2; exit 2; }
 FORMAT=$(sed -n 's/^format = "\(.*\)"/\1/p' "$MANIFEST")
 TAG=${2:-$FORMAT}
