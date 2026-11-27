@@ -579,6 +579,7 @@ struct TransformConfig {
   std::string work_list;  ///< file: one operator name per line (# comments)
   std::string failure_manifest;  ///< empty: <output.directory>/failed.txt
   bool skip_existing = false;    ///< skip items whose output file exists
+  bool dump_native = false;  ///< also write <stem><name>.opb (native float64)
   friend bool operator==(const TransformConfig&,
                          const TransformConfig&) = default;
 };

@@ -22,6 +22,7 @@
 
 #include "imsrg/driver/config/load_config.h"
 #include "imsrg/driver/run.h"
+#include "imsrg/io/operator_binary.h"
 #include "tests/unit/driver/integration/run_support.h"
 
 namespace imsrg::it {
@@ -179,6 +180,42 @@ TEST(TransformTask, FailureManifestListsBrokenItems) {
   EXPECT_EQ(failed, (std::vector<std::string>{"FNoSuchFamily0p_150", "E0",
                                               "FM0p_abc"}));
   EXPECT_TRUE(fs::exists(farm_dir / "intFM0n_150.snt"));
+}
+
+// transform.dump_native writes the exact operator next to every .snt, and
+// with skip_existing an item counts as done only if its .opb exists too.
+TEST(TransformTask, DumpNativeWritesOpbAndSkipExistingNeedsIt) {
+  if (!fs::exists(DataFile(TwoBodyName()))) GTEST_SKIP() << "missing 2N file";
+  const fs::path flow_dir = FreshDir("transform_dump_flow");
+  RunToml(Al27Toml(flow_dir, "", "write_omega = true\n"));
+  const std::string manifest = (flow_dir / "int_omegas.toml").string();
+  const fs::path farm_dir = FreshDir("transform_dump_farm");
+  // A farm without dump_native: .snt only.
+  RunToml(Al27Toml(farm_dir, "task = \"transform\"\n",
+                   "\n[transform]\nmanifest = \"" + manifest + "\"\n"));
+  for (const std::string& name : OperatorNames()) {
+    const std::string stem = "int" + name + (IsTensor(name) ? "_2b" : "");
+    ASSERT_TRUE(fs::exists(farm_dir / (stem + ".snt"))) << stem;
+    EXPECT_FALSE(fs::exists(farm_dir / (stem + ".opb"))) << stem;
+  }
+  // Again with dump_native and skip_existing: the existing .snt files do not
+  // count, every item runs and writes its .opb, the .snt are unchanged.
+  const std::string tcm_snt = Slurp(farm_dir / "intTCM.snt");
+  RunToml(Al27Toml(farm_dir, "task = \"transform\"\n",
+                   "\n[transform]\nmanifest = \"" + manifest +
+                       "\"\nskip_existing = true\ndump_native = true\n"));
+  for (const std::string& name : OperatorNames()) {
+    const std::string stem = "int" + name + (IsTensor(name) ? "_2b" : "");
+    EXPECT_TRUE(fs::exists(farm_dir / (stem + ".opb"))) << stem;
+  }
+  EXPECT_EQ(Slurp(farm_dir / "intTCM.snt"), tcm_snt);
+  // The dump is a native operator file labeled with the item name; tensors
+  // keep their rank.
+  const io::OperatorFileHeader h =
+      io::ReadOperatorBinaryHeader(farm_dir / "intFM2p_150_2b.opb");
+  EXPECT_EQ(h.label, "FM2p_150");
+  EXPECT_EQ(h.spec.rank_J, 2);
+  EXPECT_GT(h.two_body_count, 0U);
 }
 
 }  // namespace

@@ -22,6 +22,7 @@
 
 #include "imsrg/base/assert.h"
 #include "imsrg/exec/device_buffer.h"
+#include "imsrg/exec/host_parallel.h"
 
 namespace imsrg::exec {
 
@@ -74,6 +75,13 @@ struct DeviceBuffer<T>::Impl {
   /// architectures) and is a separate copy otherwise.
   void EnsureHost() const {
     if (!has_host) {
+      // The creation allocates (separate mirror) and fences globally
+      // (deep_copy without an instance), which inside a Kokkos parallel_for
+      // on the OpenMP host space self-deadlocks on the instance mutex: create
+      // mirrors before host-parallel loops (design/12 section 5).
+      IMSRG_ASSERT(!InHostParallelRegion(),
+                   "DeviceBuffer: host mirror created inside a host-parallel "
+                   "region; call SyncToHost() before the loop");
       host = Kokkos::create_mirror_view(dev);
       if (host.data() != dev.data()) {
         Kokkos::deep_copy(host, dev);

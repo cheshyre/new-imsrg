@@ -338,8 +338,9 @@ with gcc-native 14.2 through the Cray wrapper `CC` (it links cray-mpich 9.1.0 an
 name is "All"), cmake 4.1.5, ninja 1.13.2, ccache 4.12.1, Python 3.14.3 (spack module; the
 `cray-python` modules are older). `hip` adds rocm 7.0.2 and uses `hipcc`, with `MPI_HOME=$MPICH_DIR`
 (hipcc is not a Cray wrapper). Kokkos 5.3.0 per backend in `$IMSRG_DEPS_PREFIX`: `kokkos-openmp`
-and `kokkos-serial` built with `CC`, `kokkos-hip` with hipcc (`Kokkos_ENABLE_HIP`,
-`Kokkos_ARCH_AMD_GFX90A`, `Kokkos_ARCH_ZEN3`, Serial host space). Lint tools come pinned from pip
+and `kokkos-serial` built with `CC`, `kokkos-hip-openmp` with hipcc (`Kokkos_ENABLE_HIP`,
+`Kokkos_ARCH_AMD_GFX90A`, `Kokkos_ARCH_ZEN3`, OpenMP host space since D73; the older `kokkos-hip`
+with a Serial host space is no longer used). Lint tools come pinned from pip
 into the venv (`tools/requirements-dev.txt`): cpplint 2.0.2, clang-format 23.1.5 (same as the
 Mac's Homebrew one), clang-tidy 23.1.4 (no 23.1.5 wheel; only `readability-identifier-naming` is
 used). `ci.sh` and `lint.sh` prefer the venv's binaries.
