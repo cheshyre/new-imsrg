@@ -37,10 +37,12 @@ linalg::Matrix<double> Mbpt2DensityMatrix(op::Operator& H);
 
 /// Order of the natural orbitals inside one (l,j,tz) channel.
 enum class NatSorting : std::int8_t {
-  /// Descending signed occupation (imsrg-devel `DiagonalizeRho`, the default).
+  /// Descending signed occupation (imsrg-devel `DiagonalizeRho`; only for
+  /// comparisons with imsrg-devel, config `natural_orbitals.sort =
+  /// "signed_occupation"`).
   kSignedDescending,
-  /// Descending |occupation| (the fork imsrg++ 79e9330 re-sorting,
-  /// HFMBPT.cc:131-182; compat profile "imsrg_fork_79e9330"): MBPT(2)
+  /// Descending |occupation| (the default, owner rule D72; the fork imsrg++
+  /// 79e9330 re-sorting, HFMBPT.cc:131-182): MBPT(2)
   /// occupations can be negative, and a negative one with a large magnitude
   /// moves to a lower slot (lower n label), which changes which orbits survive
   /// a later emax truncation. Ties in |occupation| keep the signed order
@@ -55,7 +57,7 @@ enum class NatSorting : std::int8_t {
 /// InvariantError if the trace check fails. Complexity O(sum n_ch^3).
 NaturalOrbitals ComputeNaturalOrbitals(
     const linalg::Matrix<double>& rho_hf, const basis::ModelSpace& ms,
-    NatSorting sorting = NatSorting::kSignedDescending);
+    NatSorting sorting = NatSorting::kAbsDescending);
 
 /// Resets the occupied natural orbitals to the HF orbitals (fork imsrg++
 /// 79e9330 `HFMBPT::UseHFForHoleStates`, HFMBPT.cc:892-1136, enabled by

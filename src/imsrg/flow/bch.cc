@@ -98,8 +98,8 @@ op::Operator BchTransform(const op::Operator& X, const op::Operator& Omega,
                           const commutator::CommutatorOptions& copts,
                           commutator::Workspace& ws, BchReport* report) {
   if (report != nullptr) *report = BchReport{};
-  const double nx = op::Norm(X);
-  const double ny = op::Norm(Omega);
+  const double nx = op::Norm(X, opts.tensor_one_body_norm);
+  const double ny = op::Norm(Omega, opts.tensor_one_body_norm);
   op::Operator out = WithParticleRank(X, CommutatorRank(copts, ws));
   if (!(nx > opts.transform_threshold)) return out;
 
@@ -137,7 +137,7 @@ op::Operator BchTransform(const op::Operator& X, const op::Operator& Omega,
     factorial_denom /= i;
     op::Axpy(factorial_denom, nested, out);
     epsilon *= i + 1;
-    const double norm_nested = op::Norm(nested);
+    const double norm_nested = op::Norm(nested, opts.tensor_one_body_norm);
     if (!std::isfinite(norm_nested)) {  // NaN/inf: stop, no 40 commutators
       log::Warn("BCH transform: non-finite nested commutator, stopping");
       break;
@@ -161,15 +161,15 @@ op::Operator BchProduct(const op::Operator& X, const op::Operator& Y,
   constexpr std::array<double, 9> factorial = {
       1.0, 1.0, 2.0, 6.0, 24.0, 120.0, 720.0, 5040.0, 40320.0};
   const double thr = opts.product_threshold;
-  const double nx = op::Norm(X);
-  const double ny = op::Norm(Y);
+  const double nx = op::Norm(X, opts.tensor_one_body_norm);
+  const double ny = op::Norm(Y, opts.tensor_one_body_norm);
 
   op::Operator Z = X + Y;
   if (CommutatorRank(copts, ws) == 3) Z = WithParticleRank(Z, 3);
   op::Operator nested = commutator::Commutator(Y, X, copts, ws);  // [Y, X]
   op::Operator next;
   op::Operator corr;  // factorized correction (IMSRG(3f2))
-  double nxy = op::Norm(nested);
+  double nxy = op::Norm(nested, opts.tensor_one_body_norm);
   if (nxy * nx > thr) {
     commutator::Commutator(nested, X, next, copts, ws);
     op::Axpy(1.0 / 12, next, Z);
@@ -192,7 +192,7 @@ op::Operator BchProduct(const op::Operator& X, const op::Operator& Y,
     commutator::Commutator(Y, nested, next, copts, ws);
     std::swap(nested, next);
     if (factorized) op::Axpy(1.0, corr, nested);
-    nxy = op::Norm(nested);
+    nxy = op::Norm(nested, opts.tensor_one_body_norm);
   }
   return Z;
 }

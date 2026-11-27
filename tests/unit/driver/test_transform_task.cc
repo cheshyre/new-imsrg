@@ -22,6 +22,7 @@
 
 #include "imsrg/driver/config/load_config.h"
 #include "imsrg/driver/run.h"
+#include "imsrg/driver/transform/transform_task.h"
 #include "imsrg/io/operator_binary.h"
 #include "tests/unit/driver/integration/run_support.h"
 
@@ -118,10 +119,31 @@ TEST(TransformTask, MatchesInProcessTransform) {
     const auto failed = SntRows(farm_dir / "failed.txt");
     EXPECT_TRUE(failed.empty());
 
+    // One log line per item in the rank's file (single rank here).
+    {
+      std::ifstream lg(driver::transform::ItemLogPath(farm_dir, 0));
+      std::vector<std::string> lines;
+      for (std::string l; std::getline(lg, l);) lines.push_back(l);
+      ASSERT_EQ(lines.size(), OperatorNames().size());
+      for (std::size_t i = 0; i < lines.size(); ++i) {
+        const std::string& l = lines[i];
+        EXPECT_EQ(l.find("item=" + OperatorNames()[i] + " rank=0 start="), 0U)
+            << l;
+        for (const char* key :
+             {" end=", " seconds=", " bch_terms=", " bch_converged=1",
+              " max_omega_norm=", " status=ok"}) {
+          EXPECT_NE(l.find(key), std::string::npos) << key << " in " << l;
+        }
+        const auto p = l.find("bch_terms=");
+        ASSERT_NE(p, std::string::npos);
+        EXPECT_GT(std::stoi(l.substr(p + 10)), 0) << l;
+      }
+    }
+
     for (const std::string& name : OperatorNames()) {
       SCOPED_TRACE(name);
       const std::string suffix = IsTensor(name) ? "_2b.snt" : ".snt";
-      const fs::path in_process = flow_dir / ("int_" + name + suffix);
+      const fs::path in_process = flow_dir / ("int" + name + suffix);
       const fs::path farm = farm_dir / ("int" + name + suffix);
       ASSERT_TRUE(fs::exists(in_process)) << in_process;
       ASSERT_TRUE(fs::exists(farm)) << farm;

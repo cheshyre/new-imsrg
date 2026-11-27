@@ -121,6 +121,9 @@ TEST(Resolve, fork_compat_profile_sets_domega_default) {
 }
 
 TEST(Resolve, compat_profile_tokyo_writer_option) {
+  EXPECT_FALSE(CompatOptionsFor(Compat::kNone).tensor_one_body_norm_imsrgpp);
+  EXPECT_TRUE(
+      CompatOptionsFor(Compat::kImsrgFork79e9330).tensor_one_body_norm_imsrgpp);
   EXPECT_FALSE(CompatOptionsFor(Compat::kNone).tokyo_writer_fork_79e9330);
   EXPECT_TRUE(
       CompatOptionsFor(Compat::kImsrgFork79e9330).tokyo_writer_fork_79e9330);

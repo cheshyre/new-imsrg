@@ -115,7 +115,13 @@ void WriteTensorTokyo(std::ostream& out, const op::Operator& op,
   }
   const std::int32_t n_head = a_head - z_head;
 
-  const double norm1b = fork ? 0.0 : op::OneBodyNorm(op);
+  // The devel format thresholds against imsrg-devel's integer tensor norm
+  // (AL-A-Q6); if that is NaN (negative degeneracy sum), the weighted one.
+  double norm1b = 0.0;
+  if (!fork) {
+    norm1b = op::OneBodyNorm(op, op::TensorOneBodyNorm::kImsrgppInteger);
+    if (!std::isfinite(norm1b)) norm1b = op::OneBodyNorm(op);
+  }
   const double norm2b = fork ? 0.0 : op::TwoBodyNorm(op);
   auto drop1 = [&](double v) {
     return fork ? std::abs(v) < 1.0e-7

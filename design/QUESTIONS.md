@@ -1587,3 +1587,23 @@ all remaining assumptions in one go, the owner answered (verbatim): "Interview m
   the GPU build, job 6006593). **Assumed:** unchanged here (Brief B owns the checkpoint code);
   proposal: hash only the flow-relevant tables, or keys whose value differs from the default, and
   pin the binary for a flow's whole lifetime meanwhile (flows_gpu.sh copies it per run).
+  **Resolved (lead B, feature/al27-defaults-restart):** `FlowConfigHash` and
+  `PreparationHash` now hash only explicit tables (`pipeline::ConfigTablesHash`): basis,
+  reference, valence, hamiltonian, interaction.*, hartree_fock, natural_orbitals, imsrg.space,
+  imsrg3, run.compat (+ imsrg.*, operators, run.task for the flow). Checkpoints written before
+  that change are refused once by the new hash.
+
+## 27Al weekend, Lead B task T3 (restarts without re-preparation, D75), 2026-11-27
+
+Assumptions taken (most reversible option; open for the owner or the lead):
+* **B-T3-1:** `checkpoint.restart = true` together with `checkpoint.prepared_from` is allowed (not
+  an error): the own `prepared/` wins when present, else `prepared_from` is used. So a v3 run
+  resubmitted with `restart = true` needs no config edit.
+* **B-T3-2:** a restart whose checkpoint directory has `prepared/` but no `state.txt` (killed before
+  the first flow checkpoint) starts the flow from the stored H_0 instead of failing.
+* **B-T3-3:** `PreparationHash` keeps `[imsrg3]` (conservative; it does not change H_0 today).
+* **B-T3-4:** the occupation and C-matrix file helpers of `transform/omega_store` were not moved
+  down to `pipeline` (another agent edits the transform code this weekend); `prepared_state.cc` has
+  its own small reader/writer for the same C format. Merge them later.
+* **B-T3-5:** the ODE methods (`flow`, `flow_rk4`) do not check the SIGTERM flag (no step callback);
+  only Magnus flows checkpoint on SIGTERM.

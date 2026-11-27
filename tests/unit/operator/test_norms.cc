@@ -17,6 +17,7 @@
 #include "imsrg/operator/detail/part_kernels.h"
 #include "imsrg/operator/norms.h"
 #include "imsrg/operator/random_operator.h"
+#include "imsrg/operator/two_body.h"
 
 namespace imsrg::op {
 namespace {
@@ -265,6 +266,86 @@ TEST(OperatorNorms, TwoBodyNormMatchesPerBlockFormulaOnRandomOperators) {
     ASSERT_GT(ref, 1.0);
     EXPECT_NEAR(TwoBodyNorm(o), ref, 1.0e-14 * ref);
   }
+}
+
+/// Tensor operator of rank `L`, one-body part only, with the connected
+/// elements filled by a deterministic pattern. Returns the operator and the
+/// two hand sums over the connected (p, q): the degeneracy-weighted one,
+/// sum v^2 (2jp+1)(2jq+1)/(2L+1), and the imsrg++ integer one.
+struct TensorSums {
+  double weighted = 0.0;
+  double integer = 0.0;
+};
+
+TensorSums FillTensor(Operator& o, int L) {
+  const auto& b = o.model_space().basis();
+  const int n = b.num_orbits();
+  TensorSums t;
+  for (int p = 0; p < n; ++p) {
+    for (int q = 0; q < n; ++q) {
+      const auto& a = b.orbit(OrbitIndex{p});
+      const auto& c = b.orbit(OrbitIndex{q});
+      if (!ConnectsOrbits(o.spec(), a, c)) continue;
+      const double v = 0.1 * (p + 1) - 0.03 * q;
+      o.one_body().set_element(OrbitIndex{p}, OrbitIndex{q}, v);
+      const int jp = a.j2.twice;
+      const int jq = c.j2.twice;
+      t.weighted += v * v * (jp + 1) * (jq + 1) / (2.0 * L + 1.0);
+      t.integer += v * v * (jp + 1) *
+                   ((std::min(jq, jp + L) - std::max(-jq, jp - L)) / 2 + 1);
+    }
+  }
+  o.SyncToDevice();
+  return t;
+}
+
+TEST(OperatorNorms, TensorOneBodyNormBothWeights) {
+  for (const int L : {1, 2}) {
+    SCOPED_TRACE(L);
+    OperatorSpec spec = OperatorSpec::Scalar(1);
+    spec.rank_J = L;
+    spec.parity = L % 2 == 0 ? Parity::kEven : Parity::kOdd;
+    Operator o(MakeMs(), spec);
+    const TensorSums t = FillTensor(o, L);
+    ASSERT_GT(t.weighted, 0.0);
+    EXPECT_NEAR(OneBodyNorm(o), std::sqrt(t.weighted),
+                1.0e-14 * std::sqrt(t.weighted));
+    EXPECT_NEAR(OneBodyNorm(o, TensorOneBodyNorm::kImsrgppInteger),
+                std::sqrt(t.integer), 1.0e-14 * std::sqrt(t.integer));
+    EXPECT_EQ(Norm(o), OneBodyNorm(o));  // the zero-body part is excluded
+    EXPECT_EQ(Norm(o, TensorOneBodyNorm::kImsrgppInteger),
+              OneBodyNorm(o, TensorOneBodyNorm::kImsrgppInteger));
+  }
+}
+
+// AL-A-Q6: imsrg++'s integer degeneracy mixes 2j with the undoubled L and is
+// negative for <g9/2||O||s1/2> of an L = 4 operator: (2jp+1) ((min(1, 9 + 4)
+// - max(-1, 9 - 4)) / 2 + 1) = 10 * (-1) = -10, i.e. NaN norm; the weighted
+// norm is sqrt(10 * 2 / 9).
+TEST(OperatorNorms, TensorOneBodyNormIntegerDegeneracyCanBeNegative) {
+  const auto ms = basis::ModelSpace::FromNames(
+      basis::BasisTruncation{.emax = 4}, 16.0, "O16", "O16");
+  OperatorSpec spec = OperatorSpec::Scalar(1);
+  spec.rank_J = 4;
+  Operator o(ms, spec);
+  const auto& b = ms->basis();
+  OrbitIndex g{-1};
+  OrbitIndex s{-1};
+  for (int i = 0; i < b.num_orbits(); ++i) {
+    const auto& orb = b.orbit(OrbitIndex{i});
+    if (orb.tz2.twice != -1) continue;
+    if (orb.l == 4 && orb.j2.twice == 9) g = OrbitIndex{i};
+    if (orb.l == 0 && s.value() < 0) s = OrbitIndex{i};
+  }
+  ASSERT_GE(g.value(), 0);
+  ASSERT_GE(s.value(), 0);
+  ASSERT_TRUE(ConnectsOrbits(spec, b.orbit(g), b.orbit(s)));
+  o.one_body().set_element(g, s, 1.0);
+  o.SyncToDevice();
+  EXPECT_TRUE(std::isnan(OneBodyNorm(o, TensorOneBodyNorm::kImsrgppInteger)));
+  EXPECT_TRUE(std::isnan(Norm(o, TensorOneBodyNorm::kImsrgppInteger)));
+  EXPECT_NEAR(OneBodyNorm(o), std::sqrt(20.0 / 9.0), 1.0e-14);
+  EXPECT_NEAR(Norm(o), std::sqrt(20.0 / 9.0), 1.0e-14);
 }
 
 }  // namespace

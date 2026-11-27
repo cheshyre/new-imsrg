@@ -5,8 +5,10 @@
 // the serial results, and only rank 0 writes files. He4 at emax 2 (the
 // smallest driver cases): single reference with Rp2 (so the internal Rso is
 // broadcast and transformed too), and the two-stage p-shell valence-space
-// case. Run as `driver_mpi_2ranks` and `driver_mpi_4ranks` (shared main of
-// tests/support/mpi_test_main.cc). Skips without the 2N input file.
+// case; and D75 (SIGTERM on one rank, restart from the prepared Hamiltonian
+// and the checkpoint). Run as `driver_mpi_2ranks` and `driver_mpi_4ranks`
+// (shared main of tests/support/mpi_test_main.cc). Skips without the 2N input
+// file.
 
 #include <algorithm>
 #include <cmath>
@@ -22,9 +24,11 @@
 
 #include <gtest/gtest.h>
 
+#include "imsrg/base/error.h"
 #include "imsrg/comm/communicator.h"
 #include "imsrg/driver/config/load_config.h"
 #include "imsrg/driver/run.h"
+#include "imsrg/driver/termination.h"
 #include "tests/support/mpi_test_main.h"
 #include "tests/support/scratch_dir.h"
 #include "tests/unit/driver/integration/mini_json.h"
@@ -184,6 +188,67 @@ TEST(DriverMpi, He4Emax2Magnus) {
 
 TEST(DriverMpi, He4Emax2PShellTwoStages) {
   CompareWithSerial("[valence]\nspace = \"p-shell\"\n", false);
+}
+
+/// Runs `cfg` on every rank; returns 0 on success, 1 for InterruptedError, 2
+/// for any other error (agreed on by all ranks: the maximum).
+std::int64_t RunAgreed(const driver::RunConfig& cfg) {
+  const Communicator& world = TestWorld();
+  std::int64_t status = 0;
+  try {
+    driver::Run(cfg, world);
+  } catch (const InterruptedError&) {
+    status = 1;
+  } catch (const std::exception& e) {
+    std::printf("[mpi-driver] rank %d: %s\n", world.rank(), e.what());
+    status = 2;
+  }
+  return world.AllreduceMax(status);
+}
+
+// D75 on several ranks: SIGTERM seen by the last rank only stops every rank
+// after a checkpoint (the request is combined per step); the restart reads
+// the prepared Hamiltonian and the checkpoint on every rank and reproduces
+// the uninterrupted run.
+TEST(DriverMpi, He4Emax2SigtermAndRestart) {
+  const Communicator& world = TestWorld();
+  if (!fs::exists(DataFile(TwoBodyName()))) {
+    GTEST_SKIP() << "missing 2N input file";
+  }
+  std::unique_ptr<ScratchDir> scratch;
+  if (world.is_root()) scratch = std::make_unique<ScratchDir>();
+  const fs::path base = BroadcastBase(world, scratch);
+  const std::string rank = "rank" + std::to_string(world.rank());
+  const std::string valence = "[valence]\nspace = \"p-shell\"\n\n";
+  const std::string ckpt = "[checkpoint]\ndirectory = \"" +
+                           (base / "ckpt").string() +
+                           "\"\ninterval_minutes = 60.0\n";
+
+  const driver::RunConfig ref = Load(base / "ref" / rank, valence);
+  ASSERT_EQ(RunAgreed(ref), 0);
+
+  if (world.rank() == world.size() - 1) driver::RequestTermination();
+  const driver::RunConfig killed =
+      Load(base / "killed" / rank, valence + ckpt + "\n");
+  EXPECT_EQ(RunAgreed(killed), 1);
+  driver::ClearTerminationRequest();
+  world.Barrier();
+
+  const driver::RunConfig restarted =
+      Load(base / "restart" / rank, valence + ckpt + "restart = true\n");
+  ASSERT_EQ(RunAgreed(restarted), 0);
+  if (world.is_root()) {
+    EXPECT_TRUE(fs::exists(base / "ckpt" / "prepared" / "prepared.toml"));
+    const Summary a = Summarize(ref);
+    const Summary c = Summarize(restarted);
+    EXPECT_EQ(c.e0, a.e0);
+    EXPECT_EQ(c.steps, a.steps);
+    const std::string stem =
+        ref.output.stem.empty() ? "imsrg" : ref.output.stem;
+    EXPECT_EQ(Slurp(base / "restart" / rank / (stem + ".snt")),
+              Slurp(base / "ref" / rank / (stem + ".snt")));
+  }
+  world.Barrier();
 }
 
 }  // namespace

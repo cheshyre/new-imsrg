@@ -32,7 +32,7 @@ Conventions: keys are `snake_case`; enum values are lower `snake_case` strings (
 | `task` | enum `imsrg`, `hf`, `mp3`, `fci_export`, `transform` | `imsrg` | `hf`: stop after HF/basis + normal ordering (old `method=HF`); `mp3`: stop after MBPT(3) diagnostics (old `method=MP3`); `fci_export`: vacuum HF + write FCI interaction (old `method=FCI`, PL); `transform`: no HF and no flow, transform operators with stored Omegas (`[transform]`, section 2.11b; design/50 C10). |
 | `scratch_dir` | string | `""` | directory for Omega spill files; used only when `imsrg.omega.storage="scratch"`. Probed for writability at preflight. |
 | `log_level` | enum `quiet`, `normal`, `debug` | `normal` | stdout verbosity (new key; no legacy equivalent). |
-| `compat` | enum `none`, `imsrg_fork_79e9330` | `none` | compatibility profile (design/50 §5): one key that switches on named internal options reproducing another code version; `none` is the fixed behaviour. The options and their profiles are listed in `src/imsrg/driver/config/compat.h` (`CompatOptions`). `imsrg_fork_79e9330`: `nat_sort_by_abs_occupation` (NAT orbitals ordered by \|occupation\|, fork HFMBPT.cc:131-182), `fork_step_defaults` (`imsrg.step.domega` defaults to the fork's 0.2 instead of 0.1), `tensor_no_fork_diagonal_bug` (fork's tensor normal ordering omits one orientation for a == b, also in the re-normal-ordering), `tensor_ninej_threshold_1e8` (9j skip threshold 1e-8 in the flow's tensor commutators), `tokyo_writer_fork_79e9330` (79e9330 writers for scalar and tensor `.snt`: 7 significant digits, absolute 1e-7 thresholds, header A/Z of the core). No legacy equivalent. |
+| `compat` | enum `none`, `imsrg_fork_79e9330` | `none` | compatibility profile (design/50 §5): one key that switches on named internal options reproducing another code version; `none` is the fixed behaviour. The options and their profiles are listed in `src/imsrg/driver/config/compat.h` (`CompatOptions`). `imsrg_fork_79e9330`: `tensor_one_body_norm_imsrgpp` (imsrg++'s integer tensor one-body norm in the BCH thresholds, AL-A-Q6), `fork_step_defaults` (`imsrg.step.domega` defaults to the fork's 0.2 instead of 0.1), `tensor_no_fork_diagonal_bug` (fork's tensor normal ordering omits one orientation for a == b, also in the re-normal-ordering), `tensor_ninej_threshold_1e8` (9j skip threshold 1e-8 in the flow's tensor commutators), `fork_operator_file_names` (operator files `<stem><name>.snt` without the `_`), `tokyo_writer_fork_79e9330` (79e9330 writers for scalar and tensor `.snt`: 7 significant digits, absolute 1e-7 thresholds, header A/Z of the core). No legacy equivalent. |
 
 ### 2.2 `[basis]` (model space and single-particle basis)
 
@@ -105,6 +105,7 @@ For single-reference runs set only `reference.nucleus`.
 | `hartree_fock.freeze_occupations` | bool | `false` | keep reference occupations fixed (default: fractional/ensemble occupations may follow HF energies). Ignored for `basis.kind="oscillator"`. |
 | `natural_orbitals.use_occupations` | bool | `false` | use NAT occupations for the reference (PL: `E-PLANNED`, M9-Q3). |
 | `natural_orbitals.order` | enum `occupation`, `energy` | `occupation` | orbit labelling order. Only valid with `basis.kind="nat"`; `energy` is PL (`E-PLANNED`, M9-Q3). |
+| `natural_orbitals.sort` | enum `abs_occupation`, `signed_occupation` | `abs_occupation` | order of the NAT orbitals inside a (l, j, tz) channel: descending \|occupation\| (owner rule D72, as the fork 79e9330) or descending signed occupation (imsrg-devel comparisons only). Valid also with `basis.kind != "nat"`: the OccNat3 cut uses the NAT occupations in HF-basis runs. Legacy parameters have no equivalent (the default applies). |
 | `natural_orbitals.use_hf_reference` | bool | `false` | reset the occupied natural orbitals to the HF orbitals, orthogonalize the virtuals against them (Gram-Schmidt in orbit order) and rebuild density and Fock matrix (fork imsrg++ 79e9330 `use_HF_reference_in_NAT`, `UseHFForHoleStates`; `mbpt::UseHfForHoleStates`). E_ref(NAT) = E_HF. Only valid with `basis.kind="nat"` (V-21). |
 
 ### 2.7 `[imsrg]`
@@ -227,12 +228,15 @@ Old `OperatorsRPA`/`OperatorsTDA`: not supported (no schema key).
 | `directory` | path | `""` | checkpoint directory; empty = no checkpoints. Created if missing. |
 | `interval_minutes` | float >= 0 | `30.0` | wall time between checkpoints; `0` = after every step. |
 | `format` | enum `native`, `me2jp` | `native` | operator files of a checkpoint (see `output.omega_format`). A native restart continues bit for bit; an ME2JP restart within float32 precision (owner O4). |
-| `restart` | bool | `false` | continue the flow from the checkpoint in `directory` (HF/NAT and the operators are recomputed; the flow configuration must be unchanged: `FlowConfigHash` over the resolved TOML without `[output]`, `[checkpoint]`, `run.log_level`). |
+| `restart` | bool | `false` | continue the flow from the checkpoint in `directory` (the flow configuration must be unchanged: `FlowConfigHash` over the resolved TOML without `[output]`, `[checkpoint]`, `run.log_level`). With `<directory>/prepared/` (D75) H_0, C and the occupations are read from there (no readers, HF or NAT); without it (older checkpoints) they are recomputed. The operators are always recomputed. |
 | `abort_after_steps` | int >= 0 | `0` | testing aid: stop with an error right after the checkpoint of this flow step (counted over all stages), simulating a killed job. |
+| `prepared_from` | path | `""` | another run's checkpoint directory: a fresh flow takes its prepared Hamiltonian from `<prepared_from>/prepared/` (D75; e.g. 27Al v3 from v2) and is refused (input error) unless `PreparationHash` matches (resolved TOML without `[output]`, `[checkpoint]`, `[operators]`, `[transform]`, the `[imsrg]` keys other than `imsrg.space`, `run.task`, `run.log_level`, `run.scratch_dir`). The run still writes its own `prepared/`. With `restart = true` and an own `prepared/`, the own one is used. |
 
 Contents of the directory (design/13 §7.3): `omega_<k>.*` once per closed Omega, `h_saved_<k>.*` once per
 Omega piece, `omega_cur_<seq>.*` and `h_<seq>.*` per checkpoint, `state.txt` (written last and atomically:
-config hash, format, sequence, Omega count, loop state and step options as hexfloats, finished stages).
+config hash, format, sequence, Omega count, loop state and step options as hexfloats, finished stages),
+and `prepared/` (D75: `hno.opb`, `c_hf.bin`, `c_nat.bin`, `prepared.toml`; design/13 §7.3). On SIGTERM
+the executable writes a checkpoint after the current Magnus step and exits with status 75.
 E-PLANNED with: methods other than `magnus`, hunter-gatherer, `imsrg3.in_flow`, perturbative triples.
 The flow file of a restarted run starts at the restored step.
 
@@ -242,8 +246,8 @@ The configuration is the flow's (`resolved_config.toml` of the run that wrote th
 `run.task = "transform"`): basis, reference, valence space, `[imsrg.space]`, `run.compat` and the
 interaction file names (header only) must be those of the flow; nothing is read but the manifest's
 files. Every rank of the job takes a static share of the work list (cost-weighted, design/50 §6) and
-writes `<output.directory>/<output.stem><name>.snt` (scalars, isospin-averaged operator mode) or
-`..._2b.snt` (tensors), the fork's names. Omegas are read once per node into MPI shared memory.
+writes `<output.directory>/<output.stem>_<name>.snt` (scalars, isospin-averaged operator mode) or
+`..._2b.snt` (tensors), the same names as the flow driver; under `run.compat = imsrg_fork_79e9330` (`fork_operator_file_names`) both drop the `_`: `<stem><name>.snt`, the fork's names (AL-F2). Each rank also appends one line per item to `<output.directory>/farm_log/rank_<NNNNN>.log` (`item= rank= start= end= seconds= bch_terms= bch_converged= max_omega_norm= status=`, AL-F4). Omegas are read once per node into MPI shared memory.
 
 | key | type | default | meaning |
 |---|---|---|---|
@@ -488,7 +492,7 @@ imsrg 2bme=... emax=6 hw=16 reference=O16 valence_space=O16 ...      # legacy fo
 * `--set a.b=v`: `v` parsed as a TOML value; if that fails, as a bare string (`--set imsrg.method=magnus` works). Arrays: `--set operators.list='["Rp2","E2"]'`. Applied after the file; repeated key = last wins.
 * `--validate`: resolve and validate, write nothing, exit 0/2. `--print-config`: print the resolved TOML to stdout and exit.
 * Legacy mode is selected when no `--config` is given and at least one positional token contains `=`. Mixing `--config` with legacy tokens is an error (`E-CLI-MIX`) so provenance stays unambiguous. Legacy `help`, `-help`, `--help` print the CLI11 help plus a pointer to `--legacy-keys` (table of old keys with new names).
-* Exit codes: 0 ok, 2 configuration/validation error, 3 input file error, 1 runtime failure.
+* Exit codes: 0 ok, 2 configuration/validation error, 3 input file error, 1 runtime failure, 75 stopped by SIGTERM after a checkpoint (D75; restart with `checkpoint.restart = true`; all ranks stop alike, no MPI abort).
 * Legacy quirks removed in the parser: `key=` (empty value) is an error rather than "keep default"; a token without `=` is an error; scalar keys given twice: last wins plus warning; vector keys given twice append (old behaviour, kept); integers must parse completely (`emax=4.5` is an error, old truncated); booleans must be `true`/`false` (old: anything else silently false).
 * MPI (M12b): `mpirun -n N imsrg <config>` runs on N ranks. Every rank reads the inputs (M12b-Q6) and runs the whole pipeline on replicated data (rank 0 broadcasts the starting operators so all ranks start the flow from identical bits); rank 0 alone writes all outputs (resolved config, `results.json`, flow CSV, `.snt` files) and prints. Use the same `OMP_NUM_THREADS` on every rank. A failure on any rank aborts the whole job with the usual exit code (the message carries the rank), so no rank is left blocked in a collective. The command-line and configuration errors of the first part are detected on every rank before MPI starts.
 

@@ -3,8 +3,10 @@
 
 #include "imsrg/driver/transform/transform_task.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <ctime>
 #include <exception>
 #include <fstream>
 #include <memory>
@@ -19,6 +21,7 @@
 #include "imsrg/driver/pipeline/hamiltonian.h"
 #include "imsrg/io/operator_binary.h"
 #include "imsrg/io/valence_writers.h"
+#include "imsrg/operator/norms.h"
 
 namespace imsrg::driver::transform {
 
@@ -158,11 +161,44 @@ commutator::CommutatorOptions TransformCommutatorOptions(
 
 fs::path TransformOutputPath(const TransformContext& ctx,
                              const std::string& name, bool tensor) {
-  return ctx.out_dir / (ctx.stem + name + (tensor ? "_2b" : "") + ".snt");
+  return ctx.out_dir /
+         pipeline::OperatorFileName(
+             ctx.stem, name, tensor,
+             CompatOptionsFor(ctx.config->run.compat).fork_operator_file_names);
+}
+
+std::string IsoTimestamp() {
+  const std::time_t t =
+      std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+  std::tm tm{};
+  localtime_r(&t, &tm);
+  char buf[32];
+  std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", &tm);
+  return buf;
+}
+
+std::string FormatItemLogLine(const ItemLogEntry& e) {
+  std::string s = fmt::format(
+      "item={} rank={} start={} end={} seconds={:.3f} bch_terms={} "
+      "bch_converged={} max_omega_norm={:.9e} status={}",
+      e.item, e.rank, e.start, e.end, e.seconds, e.report.bch_terms,
+      e.report.bch_converged ? 1 : 0, e.max_omega_norm, e.status);
+  if (e.status == "failed") {
+    std::string err = e.error;
+    for (char& ch : err) {
+      if (ch == '\n' || ch == '\r') ch = ' ';
+    }
+    s += " error=" + err;
+  }
+  return s;
+}
+
+fs::path ItemLogPath(const fs::path& out_dir, int rank) {
+  return out_dir / "farm_log" / fmt::format("rank_{:05d}.log", rank);
 }
 
 fs::path TransformItem(const OperatorRequest& request,
-                       const TransformContext& ctx) {
+                       const TransformContext& ctx, ItemReport* report) {
   const pipeline::OperatorFrame& frame = *ctx.frame;
   op::Operator O =
       flow::WithParticleRank(pipeline::PrepareOperator(request, frame), 2);
@@ -170,7 +206,13 @@ fs::path TransformItem(const OperatorRequest& request,
   // Omega (flow::MagnusSolver::Transform; imsrg++ Transform_Partial).
   for (std::size_t k = 0; k < ctx.omegas->size(); ++k) {
     const op::Operator omega = ctx.omegas->Omega(k);
-    O = flow::BchTransform(O, omega, ctx.bch, ctx.copts, *ctx.workspace);
+    flow::BchReport bch_report;
+    O = flow::BchTransform(O, omega, ctx.bch, ctx.copts, *ctx.workspace,
+                           &bch_report);
+    if (report != nullptr) {
+      report->bch_terms += bch_report.nested_commutators;
+      report->bch_converged = report->bch_converged && bch_report.converged;
+    }
   }
   op::Operator F = pipeline::FinishOperator(O, frame);
   F.SyncToHost();
@@ -274,9 +316,26 @@ TransformReport RunTransform(const RunConfig& config,
   ctx.frame = &frame;
   ctx.omegas = &omegas;
   ctx.copts = TransformCommutatorOptions(config);
+  if (CompatOptionsFor(config.run.compat).tensor_one_body_norm_imsrgpp) {
+    ctx.bch.tensor_one_body_norm = op::TensorOneBodyNorm::kImsrgppInteger;
+  }
   ctx.workspace = &workspace;
   ctx.out_dir = out_dir;
   ctx.stem = config.output.stem;
+  // Norm of the stack, once (the Omegas are shared by all items).
+  for (std::size_t k = 0; k < omegas.size(); ++k) {
+    ctx.max_omega_norm =
+        std::max(ctx.max_omega_norm, op::Norm(omegas.Omega(k)));
+  }
+  fs::create_directories(out_dir / "farm_log");
+  std::ofstream item_log(ItemLogPath(out_dir, comm.rank()), std::ios::app);
+  const auto write_item = [&](ItemLogEntry e) {
+    e.rank = comm.rank();
+    e.max_omega_norm = ctx.max_omega_norm;
+    const std::string line = FormatItemLogLine(e);
+    item_log << line << std::endl;
+    log::Info("transform: {}", line);
+  };
 
   TransformReport report;
   report.num_items = names.size();
@@ -286,8 +345,21 @@ TransformReport RunTransform(const RunConfig& config,
   for (std::size_t i = 0; i < names.size(); ++i) {
     if (owner[i] != comm.rank()) continue;
     ++report.num_assigned;
+    ItemLogEntry entry;
+    entry.item = names[i];
+    entry.start = IsoTimestamp();
+    const auto t_item = std::chrono::steady_clock::now();
+    const auto finish = [&](const std::string& status,
+                            const std::string& error) {
+      entry.end = IsoTimestamp();
+      entry.seconds = SecondsSince(t_item);
+      entry.status = status;
+      entry.error = error;
+      write_item(entry);
+    };
     if (!requests[i]) {
       mine.push_back({names[i], parse_errors[i]});
+      finish("failed", parse_errors[i]);
       continue;
     }
     try {
@@ -308,17 +380,17 @@ TransformReport RunTransform(const RunConfig& config,
         }
         if (done) {
           ok[i] = 1;
+          finish("skipped", "");
           continue;
         }
       }
-      const auto t_item = std::chrono::steady_clock::now();
-      report.written.push_back(TransformItem(*requests[i], ctx));
+      report.written.push_back(TransformItem(*requests[i], ctx, &entry.report));
       ok[i] = 1;
-      log::Info("transform: {} done in {:.2f} s", names[i],
-                SecondsSince(t_item));
+      finish("ok", "");
     } catch (const std::exception& e) {
       mine.push_back({names[i], e.what()});
       log::Warn("transform: {} FAILED: {}", names[i], e.what());
+      finish("failed", e.what());
     }
   }
 

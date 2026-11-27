@@ -140,6 +140,18 @@ TEST(TransformMpi, FarmMatchesSerialInProcessTransform) {
   std::printf("[transform-mpi] rank %d: %zu items, window %.3f MB\n",
               world.rank(), report.num_assigned,
               static_cast<double>(report.omega_window_bytes) * 1.0e-6);
+  // Each rank wrote one line per item it did, in its own file.
+  {
+    std::ifstream lg(driver::transform::ItemLogPath(farm_dir, world.rank()));
+    std::size_t n = 0;
+    for (std::string l; std::getline(lg, l); ++n) {
+      EXPECT_NE(l.find(" rank=" + std::to_string(world.rank()) + " "),
+                std::string::npos)
+          << l;
+      EXPECT_NE(l.find(" bch_terms="), std::string::npos) << l;
+    }
+    EXPECT_EQ(n, report.num_assigned);
+  }
   // Every rank knows the failures (the status table is reduced).
   ASSERT_EQ(report.failures.size(), 2U);
   EXPECT_EQ(report.failures[0].name, "E0");
@@ -150,7 +162,7 @@ TEST(TransformMpi, FarmMatchesSerialInProcessTransform) {
       for (const std::string name : kOps) {
         const std::string suffix = IsTensor(name) ? "_2b.snt" : ".snt";
         EXPECT_EQ(Slurp(farm_dir / ("int" + name + suffix)),
-                  Slurp(flow_dir / ("int_" + name + suffix)))
+                  Slurp(flow_dir / ("int" + name + suffix)))
             << name;
       }
       EXPECT_TRUE(fs::exists(farm_dir / "intFPhipp0n_150.snt"));

@@ -232,9 +232,13 @@ TEST(MbptNaturalOrbitals, AbsoluteOccupationSorting) {
   rho(ps[1], ps[1]) = 0.01;
   rho(ps[2], ps[2]) = -0.03;
   rho(ns[1], ns[1]) = 0.02;
-  const auto signed_nat = mbpt::ComputeNaturalOrbitals(rho, *ms);
-  const auto abs_nat =
+  const auto signed_nat = mbpt::ComputeNaturalOrbitals(
+      rho, *ms, mbpt::NatSorting::kSignedDescending);
+  // The default is the |occupation| order (D72, AL-NAT).
+  const auto abs_nat = mbpt::ComputeNaturalOrbitals(rho, *ms);
+  const auto abs_explicit =
       mbpt::ComputeNaturalOrbitals(rho, *ms, mbpt::NatSorting::kAbsDescending);
+  EXPECT_EQ(abs_nat.occupations, abs_explicit.occupations);
   auto occ = [](const mbpt::NaturalOrbitals& n, std::int64_t i) {
     return n.occupations[static_cast<std::size_t>(i)];
   };
