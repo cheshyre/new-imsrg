@@ -48,7 +48,8 @@ for p in "${pairs[@]}"; do
   qout=$(printf '%q' "output.directory=$run")
   steps+="( cd $qrun && echo \"start \$(date -Is) job \$SLURM_JOB_ID\" > flow-gpu.log && \\
   srun -N1 -n1 -c $cores --gpus=1 --gpu-bind=closest --exact \\
-    /usr/bin/time -v $qbin --config $qcfg \\
+    bash -c 'trap \"\" TERM; exec /usr/bin/time -v \"\$@\"' time \\
+    $qbin --config $qcfg \\
     --set $qout$quoted >> flow-gpu.log 2>&1; \\
   echo \"end \$(date -Is) status \$?\" >> flow-gpu.log ) &
 "
@@ -63,12 +64,20 @@ job=$(cat <<EOF
 #SBATCH -p ${PARTITION:-batch}
 #SBATCH -o ${pairs[0]#*:}/slurm-flows-%j.out
 #SBATCH --gpus-per-node=8
+#SBATCH --signal=B:TERM@300
 set -uo pipefail
 source "$root/tools/lib/frontier_env.sh"
 imsrg_frontier_modules hip
 export OMP_NUM_THREADS=$cores OMP_PROC_BIND=spread OMP_PLACES=threads
+# D75: 300 s before the end Slurm sends TERM to this script; forward it to
+# the srun steps (whole node is ours), which pass it to imsrg: it writes a
+# checkpoint after the current step and exits with 75 (continue with
+# --set checkpoint.restart=true). /usr/bin/time ignores TERM so the step
+# lives until imsrg is done.
+trap 'echo "SIGTERM \$(date -Is): forwarded to the flows"; pkill -TERM -x srun' TERM
 $steps
 wait
+while [[ -n "\$(jobs -rp)" ]]; do wait; done
 EOF
 )
 if [[ -n ${DRY_RUN:-} ]]; then echo "$job"; else echo "$job" | sbatch; fi

@@ -65,6 +65,8 @@ enum class No2bPrecision { kSingle, kHalf };
 enum class HartreeFockMixing { kDiis, kLinear };
 /// `natural_orbitals.order`.
 enum class NatOrder { kOccupation, kEnergy };
+/// `natural_orbitals.sort`: order inside one (l, j, tz) channel.
+enum class NatSort { kAbsOccupation, kSignedOccupation };
 /// `run.compat`: a named compatibility profile that switches on the internal
 /// options of `CompatOptions` (driver/config/compat.h; design/50 section 5).
 enum class Compat { kNone, kImsrgFork79e9330 };
@@ -230,6 +232,9 @@ IMSRG_DRIVER_ENUM_TRAITS(Compat, "compatibility profile",
 IMSRG_DRIVER_ENUM_TRAITS(NatOrder, "natural-orbital order",
                          {NatOrder::kOccupation, "occupation"},
                          {NatOrder::kEnergy, "energy"});
+IMSRG_DRIVER_ENUM_TRAITS(NatSort, "natural-orbital sorting",
+                         {NatSort::kAbsOccupation, "abs_occupation"},
+                         {NatSort::kSignedOccupation, "signed_occupation"});
 IMSRG_DRIVER_ENUM_TRAITS(
     Method, "method", {Method::kMagnus, "magnus"},
     {Method::kMagnusBackoff, "magnus_backoff", Phase::kPlanned},
@@ -413,6 +418,9 @@ struct HartreeFockConfig {
 struct NaturalOrbitalsConfig {
   bool use_occupations = false;
   NatOrder order = NatOrder::kOccupation;
+  /// Order of the natural orbitals inside a channel: descending |occupation|
+  /// (default) or descending signed occupation (imsrg-devel comparisons).
+  NatSort sort = NatSort::kAbsOccupation;
   /// Reset the occupied natural orbitals to the HF orbitals (fork imsrg++
   /// `use_HF_reference_in_NAT`, `mbpt::UseHfForHoleStates`).
   bool use_hf_reference = false;
@@ -568,6 +576,10 @@ struct CheckpointConfig {
   bool restart = false;       ///< continue from the checkpoint in `directory`
   int abort_after_steps = 0;  ///< testing aid: stop with an error right after
                               ///< the checkpoint of this flow step (0: never)
+  /// Another run's checkpoint directory: a fresh flow takes its prepared
+  /// Hamiltonian from `<prepared_from>/prepared/` (design/00 D75; the same
+  /// `PreparationHash` is required). Empty: prepare H_0 in this run.
+  std::string prepared_from;
   friend bool operator==(const CheckpointConfig&,
                          const CheckpointConfig&) = default;
 };

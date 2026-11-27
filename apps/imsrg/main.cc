@@ -3,7 +3,7 @@
 
 // The `imsrg` executable: CLI11 command line -> imsrg::driver (design/16
 // section 2.12). Exit codes: 0 ok, 1 runtime failure, 2 configuration error, 3
-// input file error.
+// input file error, 75 stopped on SIGTERM after a checkpoint (restartable).
 #include <exception>
 #include <filesystem>
 #include <iostream>
@@ -21,6 +21,7 @@
 #include "imsrg/driver/legacy/legacy_parameters.h"
 #include "imsrg/driver/operators/operator_request.h"
 #include "imsrg/driver/run.h"
+#include "imsrg/driver/termination.h"
 #include "imsrg/exec/runtime.h"
 
 namespace {
@@ -94,7 +95,15 @@ int RunPipeline(int argc, char** argv, const imsrg::driver::RunConfig& config) {
     environment = std::make_unique<imsrg::comm::Environment>(argc, argv);
     world = environment->world();
     imsrg::exec::Runtime runtime(argc, argv);
+    // SIGTERM (Slurm --signal=B:TERM@300) only sets a flag; Run checkpoints
+    // and stops between flow steps (design/00 D75).
+    imsrg::driver::InstallTerminationHandler();
     imsrg::driver::Run(config, world);
+  } catch (const imsrg::InterruptedError& e) {
+    // Every rank stops alike (the request is combined over all ranks), so no
+    // job abort: report on the root and finalize MPI normally.
+    if (world.is_root()) std::cerr << "imsrg: " << e.what() << "\n";
+    return imsrg::driver::kInterruptedExitStatus;
   } catch (const imsrg::ConfigError& e) {
     return Fail(world, 2, e.what());
   } catch (const imsrg::InputError& e) {

@@ -13,6 +13,7 @@
 /// exactly.
 #include "imsrg/commutator/commutator.h"
 #include "imsrg/commutator/factorized.h"
+#include "imsrg/operator/norms.h"
 #include "imsrg/operator/operator.h"
 
 namespace imsrg::flow {
@@ -48,6 +49,12 @@ struct BchOptions {
   /// any bookkeeping, hence epsilon is not multiplied by 2 and the counter of
   /// the factorial runs one ahead of the nested commutators.
   bool skip_first_commutator = false;
+  /// One-body norm weight of tensor operators in every norm of
+  /// `BchTransform` and `BchProduct` (termination and thresholds; scalars
+  /// ignore it). `kImsrgppInteger` reproduces imsrg++ / the fork 79e9330
+  /// (compat `tensor_one_body_norm_imsrgpp`); it can be NaN (AL-A-Q6).
+  op::TensorOneBodyNorm tensor_one_body_norm =
+      op::TensorOneBodyNorm::kDegeneracyWeighted;
 };
 
 /// Diagnostics of one `BchTransform` call.

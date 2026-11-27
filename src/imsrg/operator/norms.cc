@@ -15,16 +15,17 @@
 
 namespace imsrg::op {
 
-double OneBodyNorm(const Operator& op) {
+double OneBodyNorm(const Operator& op, TensorOneBodyNorm mode) {
   IMSRG_CHECK(!op.empty(), "one_body_norm: empty operator");
   const auto& basis = op.model_space().basis();
   const std::int32_t n = basis.num_orbits();
   const std::vector<double> data = op.one_body().buffer().ToVector();
   double sum = 0.0;
   if (!op.spec().is_scalar()) {
-    // imsrg++ Operator::OneBodyNorm with its integer degeneracy factor; note
-    // that it mixes 2j with the undoubled rank_J (kept: it drives the BCH
-    // thresholds and must agree with the reference).
+    // kImsrgppInteger: imsrg++ Operator::OneBodyNorm with its integer
+    // degeneracy factor, which mixes 2j with the undoubled rank_J (it drives
+    // the BCH thresholds of the fork reference). Default:
+    // (2jp+1)(2jq+1)/(2L+1).
     const std::int32_t L = op.spec().rank_J;
     for (std::int32_t p = 0; p < n; ++p) {
       const basis::Orbit& op_ = basis.orbit(OrbitIndex{p});
@@ -33,8 +34,13 @@ double OneBodyNorm(const Operator& op) {
         const basis::Orbit& oq = basis.orbit(OrbitIndex{q});
         if (!ConnectsOrbits(op.spec(), op_, oq)) continue;
         const std::int32_t jq = oq.j2.twice;
-        const std::int32_t deg =
-            (jp + 1) * ((std::min(jq, jp + L) - std::max(-jq, jp - L)) / 2 + 1);
+        const double deg =
+            mode == TensorOneBodyNorm::kImsrgppInteger
+                ? static_cast<double>(
+                      (jp + 1) *
+                      ((std::min(jq, jp + L) - std::max(-jq, jp - L)) / 2 + 1))
+                : static_cast<double>(jp + 1) * static_cast<double>(jq + 1) /
+                      static_cast<double>(2 * L + 1);
         const double v =
             data[static_cast<std::size_t>(p) +
                  static_cast<std::size_t>(q) * static_cast<std::size_t>(n)];
@@ -97,8 +103,8 @@ double ThreeBodyNorm(const Operator& op) {
   return ImsrgppNorm(*op.three_body());
 }
 
-double Norm(const Operator& op) {
-  const double n1 = OneBodyNorm(op);
+double Norm(const Operator& op, TensorOneBodyNorm mode) {
+  const double n1 = OneBodyNorm(op, mode);
   const double n2 = TwoBodyNorm(op);
   const double n3 = ThreeBodyNorm(op);
   return std::sqrt(n1 * n1 + n2 * n2 + n3 * n3);

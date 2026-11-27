@@ -3,6 +3,8 @@
 
 #include "imsrg/driver/pipeline/checkpoint.h"
 
+#include <algorithm>
+#include <array>
 #include <chrono>
 #include <cinttypes>
 #include <cstdint>
@@ -12,6 +14,7 @@
 #include <map>
 #include <memory>
 #include <ostream>
+#include <span>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -131,12 +134,57 @@ op::Operator ReadStoredOperator(const fs::path& stem,
   return io::ReadMe1jMe2jp(p1, p2, std::move(ms), h);
 }
 
+std::uint64_t ConfigTablesHash(const RunConfig& config,
+                               std::span<const std::string_view> tables,
+                               std::span<const std::string_view> run_keys) {
+  const auto contains = [](std::span<const std::string_view> list,
+                           std::string_view x) {
+    return std::find(list.begin(), list.end(), x) != list.end();
+  };
+  std::istringstream in(ToToml(config, /*include_provenance=*/false));
+  std::string selected;
+  std::string table;
+  std::string line;
+  while (std::getline(in, line)) {
+    if (!line.empty() && line.front() == '[' && line.back() == ']') {
+      table = line.substr(1, line.size() - 2);
+      if (contains(tables, table)) selected += line + "\n";
+      continue;
+    }
+    if (contains(tables, table)) {
+      selected += line + "\n";
+    } else if (table == "run") {
+      const std::size_t eq = line.find(" = ");
+      if (eq != std::string::npos &&
+          contains(run_keys, std::string_view(line).substr(0, eq))) {
+        selected += line + "\n";
+      }
+    }
+  }
+  return Fnv1a(selected);
+}
+
 std::uint64_t FlowConfigHash(const RunConfig& config) {
-  RunConfig c = config;
-  c.output = OutputConfig{};
-  c.checkpoint = CheckpointConfig{};
-  c.run.log_level = TaskConfig{}.log_level;
-  return Fnv1a(ToToml(c, /*include_provenance=*/false));
+  static constexpr std::array<std::string_view, 16> kTables = {
+      "basis",
+      "reference",
+      "valence",
+      "hamiltonian",
+      "interaction.two_body",
+      "interaction.three_body",
+      "hartree_fock",
+      "natural_orbitals",
+      "imsrg",
+      "imsrg.generator",
+      "imsrg.denominator",
+      "imsrg.step",
+      "imsrg.omega",
+      "imsrg.space",
+      "imsrg3",
+      "operators"};
+  static constexpr std::array<std::string_view, 2> kRunKeys = {"task",
+                                                               "compat"};
+  return ConfigTablesHash(config, kTables, kRunKeys);
 }
 
 FlowCheckpointer::FlowCheckpointer(const RunConfig& config, bool write_files)
@@ -186,6 +234,12 @@ void FlowCheckpointer::OnStep(const flow::MagnusSolver& solver,
         " reached (testing aid): checkpoint written to '" + dir_.string() +
         "'");
   }
+}
+
+void FlowCheckpointer::WriteNow(const flow::MagnusSolver& solver,
+                                const flow::MagnusLoopState& state,
+                                const std::vector<FinishedStage>& finished) {
+  if (enabled_) Write(solver, state, finished);
 }
 
 void FlowCheckpointer::Write(const flow::MagnusSolver& solver,

@@ -117,9 +117,17 @@ io::ValenceWriteOptions MakeValenceWriteOptions(const RunConfig& config,
 io::ValenceWriteMode ScalarOperatorWriteMode(const RunConfig& config);
 
 /// File name of an operator's valence file: `<stem>_<name>.snt` for scalars,
-/// `<stem>_<name>_2b.snt` for tensors (the fork's naming).
+/// `<stem>_<name>_2b.snt` for tensors; with `fork_names`
+/// (`CompatOptions::fork_operator_file_names`) without the `_` after the
+/// stem (the fork's `<intfile><op>` naming). Used by the flow driver and the
+/// transform farm alike.
 std::string OperatorFileName(const std::string& stem, const std::string& name,
-                             const op::OperatorSpec& spec);
+                             bool tensor, bool fork_names);
+
+/// As above for the operator's spec and the configuration's compat profile.
+std::string OperatorFileName(const std::string& stem, const std::string& name,
+                             const op::OperatorSpec& spec,
+                             const RunConfig& config);
 
 /// Writes a TENSOR operator in the (reduced matrix element) tokyo format of
 /// `io::WriteTensorTokyo`; format and header per `MakeValenceWriteOptions`.

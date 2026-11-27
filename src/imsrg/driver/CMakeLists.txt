@@ -23,6 +23,8 @@ imsrg_add_module(NAME driver
     pipeline/hamiltonian.cc
     pipeline/mpi_sync.cc
     pipeline/operator_frame.cc
+    pipeline/prepared_state.cc
+    termination.cc
     transform/farm.cc
     transform/omega_store.cc
     transform/transform_task.cc

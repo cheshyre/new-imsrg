@@ -201,6 +201,11 @@ void VisitSchema(Config& c, Visitor&& v) {
   v.Field(KeyInfo{"natural_orbitals.order",
                   "NAT orbit labelling: occupation, energy", "occupation"},
           c.natural_orbitals.order);
+  v.Field(KeyInfo{"natural_orbitals.sort",
+                  "NAT order inside a channel: abs_occupation, "
+                  "signed_occupation (imsrg-devel comparisons)",
+                  "abs_occupation"},
+          c.natural_orbitals.sort);
   v.Field(KeyInfo{"natural_orbitals.use_hf_reference",
                   "reset occupied NAT orbitals to the HF orbitals (fork "
                   "use_HF_reference_in_NAT)",
@@ -382,6 +387,11 @@ void VisitSchema(Config& c, Visitor&& v) {
                   "step (0: never)",
                   "0"},
           c.checkpoint.abort_after_steps);
+  v.Field(KeyInfo{"checkpoint.prepared_from",
+                  "another run's checkpoint directory whose prepared/ "
+                  "Hamiltonian this flow starts from (empty: prepare here)",
+                  "\"\""},
+          c.checkpoint.prepared_from);
   // [transform]
   v.Field(KeyInfo{"transform.manifest",
                   "Omega manifest (<stem>_omegas.toml) for run.task = "

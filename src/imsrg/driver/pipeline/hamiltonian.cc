@@ -73,18 +73,19 @@ void RejectPlanned(const RunConfig& c) {
 /// `out.nat` (its C maps the oscillator basis to the NAT basis).
 /// With `natural_orbitals.use_hf_reference` the occupied orbitals are reset
 /// to the HF orbitals (`mbpt::UseHfForHoleStates`), and the compat option
-/// `nat_sort_by_abs_occupation` orders the NAT orbitals by |occupation|.
+/// `natural_orbitals.sort` orders the NAT orbitals by |occupation| (default)
+/// or by signed occupation.
 void ToNaturalOrbitalBasis(const op::Operator& H, const op::No2bThreeBody* v3,
                            const hf::HFOptions& ho, const RunConfig& config,
                            PreparedHamiltonian& out) {
   IMSRG_CHECK(out.hf.has_value(), "the NAT basis is built on an HF solution");
   op::Operator hno = out.hno;  // Mbpt2DensityMatrix syncs its argument
   const linalg::Matrix<double> rho_hf = mbpt::Mbpt2DensityMatrix(hno);
-  const CompatOptions compat = CompatOptionsFor(config.run.compat);
   mbpt::NaturalOrbitals nat = mbpt::ComputeNaturalOrbitals(
       rho_hf, out.hno.model_space(),
-      compat.nat_sort_by_abs_occupation ? mbpt::NatSorting::kAbsDescending
-                                        : mbpt::NatSorting::kSignedDescending);
+      config.natural_orbitals.sort == NatSort::kSignedOccupation
+          ? mbpt::NatSorting::kSignedDescending
+          : mbpt::NatSorting::kAbsDescending);
   {
     const auto& basis = out.hno.model_space().basis();
     for (std::int32_t a = 0; a < basis.num_orbits(); ++a) {
