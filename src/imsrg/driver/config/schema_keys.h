@@ -353,6 +353,11 @@ void VisitSchema(Config& c, Visitor&& v) {
                   "format (stem <stem>_me2jp or <stem>_native)",
                   "false"},
           c.output.omega_second_format);
+  v.Field(KeyInfo{"output.isospin_average_operators",
+                  "average pn two-body elements of scalar operator .snt "
+                  "files with their isospin mirror (false: write as is)",
+                  "true"},
+          c.output.isospin_average_operators);
   v.Field(KeyInfo{"output.write_ho_ops", "write operators before HF", "false",
                   false, false, PL},
           c.output.write_ho_ops);

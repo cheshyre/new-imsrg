@@ -202,6 +202,7 @@ stem = "my_stem"
 flow_file = "out/my_stem.flow"
 valence_file_format = "tokyo"
 write_omega = true
+isospin_average_operators = false
 spwf = ["valence", "p0s1"]
 )toml";
 

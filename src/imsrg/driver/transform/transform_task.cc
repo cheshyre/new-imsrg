@@ -229,7 +229,7 @@ fs::path TransformItem(const OperatorRequest& request,
     io::WriteTokyo(tmp, F,
                    pipeline::MakeValenceWriteOptions(
                        *ctx.config, frame,
-                       io::ValenceWriteMode::kIsospinAveragedOperator));
+                       pipeline::ScalarOperatorWriteMode(*ctx.config)));
   }
   fs::rename(tmp, path);
   return path;

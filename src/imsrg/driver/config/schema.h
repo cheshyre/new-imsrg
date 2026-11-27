@@ -558,6 +558,9 @@ struct OutputConfig {
   /// With `write_omega`: also write the stack in the other format, under the
   /// stem `<stem>_me2jp` (or `<stem>_native`), for comparisons in the farm.
   bool omega_second_format = false;
+  /// Scalar operator `.snt` files: average the pn two-body elements with
+  /// their isospin mirror (true, owner default) or write them as they are.
+  bool isospin_average_operators = true;
   bool write_ho_ops = false;      ///< planned
   bool write_hf_ops = false;      ///< planned
   std::vector<std::string> spwf;  ///< orbit labels or "valence"

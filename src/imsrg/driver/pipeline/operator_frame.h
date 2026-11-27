@@ -110,6 +110,12 @@ io::ValenceWriteOptions MakeValenceWriteOptions(const RunConfig& config,
                                                 const OperatorFrame& frame,
                                                 io::ValenceWriteMode mode);
 
+/// Write mode of the valence file of a SCALAR operator (not the Hamiltonian,
+/// not tensors): `kIsospinAveragedOperator` unless
+/// `output.isospin_average_operators = false`, then `kHamiltonian` (the pn
+/// two-body elements are written unaveraged).
+io::ValenceWriteMode ScalarOperatorWriteMode(const RunConfig& config);
+
 /// File name of an operator's valence file: `<stem>_<name>.snt` for scalars,
 /// `<stem>_<name>_2b.snt` for tensors; with `fork_names`
 /// (`CompatOptions::fork_operator_file_names`) without the `_` after the

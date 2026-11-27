@@ -50,6 +50,9 @@ imsrg_add_test(NAME driver_prepared_state SOURCES test_prepared_state.cc DEPS dr
                LABELS unit)
 
 # The point-proton -> charge-radius conversion of the output stage (D35).
+imsrg_add_test(NAME driver_isospin_average SOURCES test_isospin_average.cc DEPS driver
+               LABELS unit)
+
 imsrg_add_test(NAME driver_charge_radius SOURCES test_charge_radius.cc DEPS driver LABELS unit)
 
 # Pipeline stage 1 (model space, interaction, HF, normal ordering) against the HF goldens; needs

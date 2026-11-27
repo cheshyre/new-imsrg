@@ -188,6 +188,55 @@ op::Operator ReadForkSnt(const fs::path& path,
   return op;
 }
 
+/// A pn element that differs from its isospin mirror is written unaveraged
+/// by kHamiltonian and as the mean of the two by kIsospinAveragedOperator.
+void CheckPnAveraging(io::ValenceWriteMode mode, double want_pn,
+                      double want_np) {
+  basis::BasisTruncation tr;
+  tr.emax = 2;
+  const auto ms = basis::ModelSpace::FromNames(tr, 16.0, "O16", "sd-shell");
+  std::vector<OrbitIndex> prot;
+  for (const OrbitIndex o : ms->partition().valence())
+    if (ms->basis().orbit(o).tz2.twice == -1) prot.push_back(o);
+  ASSERT_GE(prot.size(), 2u);
+  const OrbitIndex pa = prot[0], pb = prot[1];
+  const OrbitIndex na{pa.value() + 1}, nb{pb.value() + 1};
+  op::Operator op(ms, op::OperatorSpec::Scalar(2, Hermiticity::kHermitian));
+  // Two-body J = 2 is allowed for the first two sd-shell orbits (5/2, 1/2 or
+  // 3/2 in either order).
+  op.two_body().set_normalized(pa, nb, pa, nb, TwoJ(4), 1.0);
+  op.two_body().set_normalized(na, pb, na, pb, TwoJ(4), 3.0);
+
+  io::ValenceWriteOptions opt;
+  opt.mode = mode;
+  opt.tokyo_format = io::TokyoNumberFormat::kFork79e9330;
+  opt.e1max = 2;
+  opt.e2max = 4;
+  opt.e3max = 6;
+  opt.hbar_omega = 16.0;
+  opt.a_ref = 16;
+  opt.z_ref = 8;
+  opt.a_target = 16.0;
+  opt.version = "test";
+  const fs::path out = fs::temp_directory_path() / "imsrg_pn_averaging.snt";
+  io::WriteTokyo(out, op, opt);
+  const op::Operator back = ReadForkSnt(out, ms);
+  EXPECT_NEAR(back.two_body().get_normalized(pa, nb, pa, nb, TwoJ(4)), want_pn,
+              1.0e-12);
+  EXPECT_NEAR(back.two_body().get_normalized(na, pb, na, pb, TwoJ(4)), want_np,
+              1.0e-12);
+  std::error_code ec;
+  fs::remove(out, ec);
+}
+
+TEST(ValenceWritersPn, UnaveragedWhenHamiltonianMode) {
+  CheckPnAveraging(io::ValenceWriteMode::kHamiltonian, 1.0, 3.0);
+}
+
+TEST(ValenceWritersPn, AveragedInOperatorMode) {
+  CheckPnAveraging(io::ValenceWriteMode::kIsospinAveragedOperator, 2.0, 2.0);
+}
+
 void CheckForkRoundTrip(const std::string& name, io::ValenceWriteMode mode) {
   const fs::path golden =
       kGolden / "nreft/flow/fork-79e9330/nat_emax2" / (name + ".snt");

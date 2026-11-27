@@ -727,7 +727,7 @@ void TransformOperators(const std::vector<OperatorRequest>& requests,
             .string();
     if (O.spec().is_scalar()) {
       WriteValenceFile(rec.file, O, config, frame,
-                       io::ValenceWriteMode::kIsospinAveragedOperator, comm);
+                       pipeline::ScalarOperatorWriteMode(config), comm);
     } else if (comm.is_root()) {
       pipeline::WriteTensorSnt(rec.file, O, config, frame);
     }
