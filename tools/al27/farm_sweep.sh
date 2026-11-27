@@ -37,10 +37,13 @@
 #   DRY_RUN=1    print the plan and the job script; submit nothing, create
 #                nothing
 #
-# Resubmission: every step writes $FLOW_DIR/farm-$TAG/failed.txt (items that
+# Resubmission: step k writes $FLOW_DIR/farm-$TAG/failed-<jobtag>-s<k>.txt (items that
 # did not finish, also after a kill; lines `name<TAB>reason` are a valid work
 # list). Rerun the failures with
-#   SPEC=FLOW:MANIFEST:TAG:$FLOW/farm-$TAG/failed.txt
+#   SPEC=FLOW:MANIFEST:TAG:$FLOW/farm-$TAG/failed-<jobtag>-s<k>.txt
+# Several steps may share one TAG (output directory), e.g. one step per
+# operator rank L: the binary's cost weights do not follow the CPU timings
+# (L=1 items take 14x an L=0 item, not 2x), so homogeneous steps balance.
 # transform.skip_existing=true skips items whose files are already complete.
 #
 # A sweep = 2 Hamiltonians x 3 variants (x 2 Omega formats for the format
@@ -165,13 +168,14 @@ for ((k = 1; k <= NSPEC; k++)); do
   per_node=$(( (RANKS[k] + NODES[k] - 1) / NODES[k] ))
   JOB+="echo \"step $k (${TAGS[k]}) start \$(date -Is)\"
 srun -N ${NODES[k]} -n ${RANKS[k]} --ntasks-per-node=$per_node -c $THREADS \\
-     $GPU_OPTS --exact --export=ALL -o \"$out/step-%j.log\" \\
+     $GPU_OPTS --exact --mem=0 --export=ALL -o \"$out/step-%j-s$k.log\" \\
   \"$out/imsrg.$JOBTAG\" --config \"${FLOWS[k]}/resolved_config.toml\" \\
     --set run.task=transform \\
     --set \"operators.list=[]\" \\
     --set \"output.directory=$out\" \\
     --set \"transform.manifest=${FLOWS[k]}/${MANIFESTS[k]}\" \\
     --set \"transform.work_list=${WLISTS[k]}\" \\
+    --set \"transform.failure_manifest=$out/failed-$JOBTAG-s$k.txt\" \\
     --set transform.skip_existing=true &
 pids+=(\$!)
 "

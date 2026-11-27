@@ -20,14 +20,16 @@ threads_per_rank = 7 # 7 cores per rank, 8th of each L3 region reserved
 setup_s = 60         # PLACEHOLDER: per-job start-up, Omegas read, MPI init
 
 [cpu.seconds]
-# PLACEHOLDERS (2026-11-26), to be replaced by farm_test.sh timings.
-L0 = 27.0       # L0 item (FM0, FPhipp0): initial value from the lead
-L1 = 106.38     # 27 x 1.97 x 2 (placeholder: weight scaling, factor 2)
-L2 = 154.44     # 27 x 2.86 x 2
-L3 = 194.94     # 27 x 3.61 x 2
-L4 = 226.8      # 27 x 4.20 x 2
-L5 = 246.78     # 27 x 4.57 x 2
-TCM = 300.0     # PLACEHOLDER from the lead: scalar two-body kinetic item
+# Measured 2026-11-26 on imsrg-c (1 rank x 7 threads, frontier-cpu-release,
+# N2LOsat native Omegas, q = 150): FM0p 27.2 s, FSigmap1n 373.0 s
+# (farm-test1). L2-L5: PLACEHOLDER 373 x W(L)/W(1) until farm-test2.
+L0 = 27.2
+L1 = 373.0
+L2 = 541.5
+L3 = 683.5
+L4 = 795.2
+L5 = 865.3
+TCM = 300.0     # PLACEHOLDER (farm-test1 running)
 # Per-family overrides win over the L-kind, e.g.
 # FSigmap5 = 300.0
 
