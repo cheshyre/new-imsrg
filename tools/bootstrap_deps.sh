@@ -8,7 +8,8 @@
 #   kokkos-serial/  Kokkos with the Serial backend, RelWithDebInfo, debug checks + bounds checking
 #   kokkos-hip-openmp/  Kokkos HIP (gfx90a) + OpenMP host space (+ Serial, ZEN3), Release; only on
 #                   Frontier (D73, AL-E-Q5; the older kokkos-hip with a Serial host is left alone)
-#   kokkoskernels-hip/  Kokkos Kernels (BLAS, native kernels) for it, only if the tarball is in src/
+#   kokkoskernels-hip-openmp/  Kokkos Kernels (BLAS, native kernels) for it, only if the tarball
+#                   is in src/
 #   venv/           Python venv ($IMSRG_VENV) with tools/requirements-dev.txt
 # On OLCF Frontier (tools/lib/frontier_env.sh) the default backends are "openmp serial hip", the
 # pinned modules are loaded (CC wrapper for openmp/serial, hipcc for hip), and the builds should
@@ -230,12 +231,16 @@ build_kokkos_kernels() {
   local backend=$1
   local tarball="$IMSRG_DEPS_PREFIX/src/kokkos-kernels-$kk_version.tar.gz"
   local src_dir="$IMSRG_DEPS_PREFIX/src/kokkos-kernels-$kk_version"
-  local install_dir="$IMSRG_DEPS_PREFIX/kokkoskernels-$backend"
-  local build_dir="$IMSRG_DEPS_PREFIX/build/kokkoskernels-$backend"
-  local stage_dir="$IMSRG_DEPS_PREFIX/build/kokkoskernels-$backend-stage"
+  # Named after its Kokkos install (kokkoskernels-hip-openmp for kokkos-hip-openmp), so a new
+  # Kokkos never rebuilds a Kokkos Kernels other checkouts link against.
+  local name
+  name=kokkoskernels-$(kokkos_dir_name "$backend" | sed 's/^kokkos-//')
+  local install_dir="$IMSRG_DEPS_PREFIX/$name"
+  local build_dir="$IMSRG_DEPS_PREFIX/build/$name"
+  local stage_dir="$IMSRG_DEPS_PREFIX/build/$name-stage"
   local cxx cxx_path stamp t0
   if [ ! -f "$tarball" ]; then
-    log "kokkoskernels-$backend skipped: $tarball not found (optional, IMSRG_DEVICE_BLAS=KOKKOSKERNELS)"
+    log "$name skipped: $tarball not found (optional, IMSRG_DEVICE_BLAS=KOKKOSKERNELS)"
     return 0
   fi
   if [ "$backend" = hip ] && imsrg_on_frontier; then
@@ -248,13 +253,13 @@ build_kokkos_kernels() {
     "$backend" "$cxx_path")
   if [ "$force" -eq 0 ] && [ -f "$install_dir/.imsrg-stamp" ] \
      && [ "$(cat "$install_dir/.imsrg-stamp")" = "$stamp" ]; then
-    log "kokkoskernels-$backend is up to date ($kk_version)"
+    log "$name is up to date ($kk_version)"
     return 0
   fi
   if [ ! -d "$src_dir" ]; then
     tar -xzf "$tarball" -C "$IMSRG_DEPS_PREFIX/src"
   fi
-  log "building kokkoskernels-$backend ($kk_version)"
+  log "building $name ($kk_version)"
   t0=$(date +%s)
   # shellcheck disable=SC2086
   cmake -S "$src_dir" -B "$build_dir" $generator_args \
@@ -275,7 +280,7 @@ build_kokkos_kernels() {
   if [ -e "$install_dir" ]; then mv "$install_dir" "$install_dir.old"; fi
   mv "$stage_dir$install_dir" "$install_dir"
   rm -rf "$install_dir.old" "$stage_dir"
-  log "installed kokkoskernels-$backend into $install_dir in $(( $(date +%s) - t0 ))s"
+  log "installed $name into $install_dir in $(( $(date +%s) - t0 ))s"
 }
 for backend in $backends; do
   case $backend in
