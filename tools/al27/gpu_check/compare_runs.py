@@ -5,7 +5,8 @@
 
 Checks (Brief A, acceptance item 4), each as max|a - b| / max|a| over the
 compared values (a = reference directory):
-  * flow file: every column except wall-clock columns, and the final E0;
+  * flow file: every column but wall_s (relative to the column's
+    maximum), and the final E0;
   * the Omegas (native .opb, full float64 payload) and the flow's .snt files
     (every number, as printed);         tolerance --tol-flow (1e-10)
   * the farm's native .opb dumps (transform.dump_native) and .snt files;
@@ -65,19 +66,17 @@ def text_numbers(path, skip_cols=()):
 
 
 def flow_columns(path):
-    """Columns of the flow file without wall-clock ones; and the last E0."""
+    """The flow file (CSV with a header line) as {column: values}, without
+    the wall-clock column."""
     with open(path, encoding="utf-8") as f:
-        lines = [ln for ln in f if ln.strip()]
-    header = [ln for ln in lines if ln.lstrip().startswith("#")]
-    names = header[-1].lstrip("#").split() if header else []
-    skip = {i for i, n in enumerate(names)
-            if "wall" in n.lower() or "time" in n.lower() and n != "s"}
-    rows = [NUM.findall(ln) for ln in lines if not ln.lstrip().startswith("#")]
-    vals = [float(t) for r in rows for i, t in enumerate(r) if i not in skip]
-    e0 = None
-    if "E0" in names and rows:
-        e0 = float(rows[-1][names.index("E0")])
-    return vals, e0, names
+        lines = [ln.strip() for ln in f if ln.strip()]
+    names = lines[0].split(",")
+    cols = {n: [] for n in names if n != "wall_s"}
+    for ln in lines[1:]:
+        for n, t in zip(names, ln.split(",")):
+            if n in cols:
+                cols[n].append(float(t))
+    return cols
 
 
 def main():
@@ -101,14 +100,19 @@ def main():
         return sorted(f for f in os.listdir(d) if pred(f)) if os.path.isdir(d) \
             else []
 
-    # Flow file.
-    fr, ft = (os.path.join(x, "flow.txt") for x in (a.ref, a.test))
-    vr, er, names = flow_columns(fr)
-    vt, et, _ = flow_columns(ft)
-    report("flow.txt (all non-time columns)", rel_dev(vr, vt)[0], a.tol_flow,
-           "  E0 %r vs %r" % (er, et))
-    if er is not None and et is not None:
-        report("final E0", abs(er - et) / abs(er), a.tol_flow)
+    # Flow file: every column (relative to the column's maximum), final E0.
+    cr, ct = (flow_columns(os.path.join(x, "flow.txt"))
+              for x in (a.ref, a.test))
+    worst, wname = 0.0, ""
+    for n, v in cr.items():
+        d = rel_dev(v, ct.get(n, []))[0]
+        if d > worst:
+            worst, wname = d, n
+    report("flow.txt (every column but wall_s)", worst, a.tol_flow,
+           "  worst column %s, %d rows" % (wname, len(cr["E0"])))
+    er, et = cr["E0"][-1], ct["E0"][-1]
+    report("final E0", abs(er - et) / abs(er), a.tol_flow,
+           "  %.14f vs %.14f" % (er, et))
 
     for sub, tol in (("", a.tol_flow), ("farm", a.tol_farm)):
         for f in files(sub, lambda f: f.endswith(".opb")):
