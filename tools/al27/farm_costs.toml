@@ -20,16 +20,19 @@ threads_per_rank = 7 # 7 cores per rank, 8th of each L3 region reserved
 setup_s = 60         # PLACEHOLDER: per-job start-up, Omegas read, MPI init
 
 [cpu.seconds]
-# Measured 2026-11-26 on imsrg-c (1 rank x 7 threads, frontier-cpu-release,
-# N2LOsat native Omegas, q = 150): FM0p 27.2 s, FSigmap1n 373.0 s
-# (farm-test1). L2-L5: PLACEHOLDER 373 x W(L)/W(1) until farm-test2.
+# Measured 2026-11-26, frontier-cpu-release, N2LOsat native Omegas, 1 rank x
+# 7 threads: L0 FM0p_150 27.2 s, L1 FSigmap1n_150 373 s, TCM 989 s (imsrg-c,
+# farm-test1); L2-L5 from job 6006648 (8 ranks on one batch node, output
+# mtimes): FM2p_150 747 s, FPhipp2n_600 721 s, FSigmap3p_150 1179 s,
+# FDelta3n_600 1139 s, FM4p_150 1391 s, FPhitp4n_600 1342 s, FSigmap5p_150
+# 1693 s, FDelta5n_1050 1636 s. Job 6006462 (8 ranks per node): L1 ~430 s.
 L0 = 27.2
-L1 = 373.0
-L2 = 541.5
-L3 = 683.5
-L4 = 795.2
-L5 = 865.3
-TCM = 300.0     # PLACEHOLDER (farm-test1 running)
+L1 = 430.0
+L2 = 750.0
+L3 = 1180.0
+L4 = 1400.0
+L5 = 1700.0
+TCM = 989.0
 # Per-family overrides win over the L-kind, e.g.
 # FSigmap5 = 300.0
 
