@@ -50,8 +50,10 @@ Runs (never in git): `$IMSRG_WORK/runs/al27/{v2,v3}/{N2LOsat,DN2LOGO}/`, farms i
 - Report sources: generated sections in runs/al27/variants-md/*.md (diff_variants.py output); the document is
   assembled from a template by a scratch builder (placeholders SCANTABLE, V2V1TABLES, DECOMPTABLES, V3V2TABLES);
   if the builder is lost, edit design/benchmarks/al27-variants.md directly
-- [ ] v3 farms (job 6016892, 80 nodes, running), compare v3 vs v2, investigate > 1e-3 relative
-- [ ] design/benchmarks/al27-variants.md
+- [x] v3 farms (job 6016892, 80 nodes, 40 min, 0 failed); v3 vs v2 in al27-variants.md section 5 with the operator
+  investigation (split-threshold/step checks 6017305 + 6017358, ODE flow with FM0p_150/FPhipp0p_0): cause = the
+  Magnus(2)-vs-IMSRG(2) truncation of v2; v3 converged in threshold (few 1e-4), time-step error 0.3-1.2 %
+- [x] design/benchmarks/al27-variants.md (78 kB)
 
 ## Exit codes (checked in B's branch)
 * SIGTERM -> flag; after the next Magnus step `Run` writes a checkpoint and throws

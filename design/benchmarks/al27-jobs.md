@@ -37,8 +37,10 @@ Node-hours = nodes x elapsed (Frontier bills whole nodes for the job length).
 | 6016893 | al27-v2-compatop: v2 Omegas transformed with run.compat = fork (operator-side fork behaviours), 136 items per H (all 34 columns at q = 0, 150, 450, 900) | 4 | batch | 0:07:40 | 0.51 | 272 items, 0 failed (al27-variants.md section 4.2) |
 | 6016814 | al27-flows (flows_gpu.sh): scan points split 0.1 (domega 0.1) and ODE flow (imsrg.method = flow), both H, from v2's prepared H_0 | 1 | batch | 0:23:41 | 0.39 | all 4 converged (ODE 21-24 min on a GCD) |
 | 6016711, 6016712 (+6016713, 6016714) | al27-scan-N2LOsat / -DN2LOGO: v3-vs-v2 investigation flows (domega 0.025/0.05 split 0.25, split 1.0, unsplit domega 0.05; from v2's prepared H_0) | 1 each | batch | 0:30:03 + 0:28:08 (+0:01:36) | 0.99 | all 8 converged in link 1 |
-| 6017305 | al27-flows: N2LOsat operator checks: split 1.0 / 0.1 / 0.25 (domega 0.025) with Omegas, ODE flow carrying FM0p_150 + FPhipp0p_0 | 1 | batch | (running) | | |
-| 6017358 | al27-opcheck: 12 items (worst v3-vs-v2 columns) on the three split-check Omega stacks | 6 | batch | (queued) | | |
+| 6017305 | al27-flows: N2LOsat operator checks: split 1.0 / 0.1 / 0.25 (domega 0.025) with Omegas, ODE flow carrying FM0p_150 + FPhipp0p_0 | 1 | batch | 0:36:12 | 0.60 | all 4 converged; ODE with 2 operators 36 min |
+| 6017358 | al27-opcheck: 12 items (worst v3-vs-v2 columns) on the three split-check Omega stacks | 6 | batch | 0:15:50 | 1.58 | 36 items, 0 failed (al27-variants.md section 5.2) |
+
+Lead D total (2026-11-27 18:30 - 21:05 EST): ~68.8 node-hours (v3 farm 53.3, v2 farm 9.8, flows and scans 3.4, checks 2.3).
 
 ## Development chains (`tools/al27/alloc_chain.sh`, one node each)
 
