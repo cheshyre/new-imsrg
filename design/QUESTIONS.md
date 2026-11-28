@@ -1607,3 +1607,16 @@ Assumptions taken (most reversible option; open for the owner or the lead):
   its own small reader/writer for the same C format. Merge them later.
 * **B-T3-5:** the ODE methods (`flow`, `flow_rk4`) do not check the SIGTERM flag (no step callback);
   only Magnus flows checkpoint on SIGTERM.
+* **WE-O-1** (orchestrator, Opus review of feature/al27-defaults-restart, verdict merge) - Minor
+  follow-ups, none blocking the weekend: (1) `PreparationHash` (`prepared_state.cc:257`) hashes the
+  interaction file paths, not their contents, so a file regenerated at the same path reuses a stale
+  H_0; (2) hashing the `imsrg3` table blocks sharing one H_0 between IMSRG(2) and IMSRG(3) runs
+  (B-T3-3), and a new defaulted key in a hashed table invalidates stored states; (3) with
+  `abs_occupation`, the HF-basis `occ_nat3_cut` (`run.cc:576`) differs from imsrg-devel at emax >= 4,
+  so devel comparisons must set `sort = "signed_occupation"` (follows D72); (4) SIGTERM is acted on
+  only between Magnus steps (not during preparation, ODE methods, the farm or FinishRun), and the
+  `#SBATCH --signal` line of `run_flow.sh` has no effect inside a `salloc --no-shell` allocation
+  (lead D's `flows_chain.sh` sends TERM to the process itself); (5) `Run` never clears the
+  termination flag (a second run in one process, e.g. from Python, stops at once), and
+  `prepared_from` pointing at the run's own directory races with root's `remove_all` under MPI;
+  (6) `Manifest` does not declare its copy and move operations. **Assumed:** fix after the weekend.
