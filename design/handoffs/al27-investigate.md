@@ -2,34 +2,44 @@
 
 Branch: feature/al27-investigate-variants (hub), base develop 59eb116. Node chain: imsrg-e
 (`IMSRG_SLURM_JOBNAME=imsrg-e`). Deadline: report and push by Mon 2026-11-30 07:00 EST.
-Runs (never in git): `$IMSRG_WORK/runs/al27/investigate/` (configs in `configs/`).
-Jobs: design/benchmarks/al27-jobs.md, section "Lead E (investigation)".
+Runs (never in git): `$IMSRG_WORK/runs/al27/investigate/` (configs in `configs/`, decomposition
+farms in `compat/`, generated tables in `md/`, build and CI logs in `logs/`).
+Jobs: design/benchmarks/al27-jobs.md, section "Lead E (investigation)": 6018030 (0.56 node-hours),
+6018194 (4.95 node-hours); total 5.5 of 40 node-hours.
 
 ## Tasks
-- [ ] 1. v2 - v1 per compat sub-option: debug keys `run.compat_enable` / `run.compat_disable`
-  (implementer, branch feature/al27-investigate-compat-overrides), frontier-hip build, farms with
-  v2 Omegas and one sub-option at a time (136 items = 34 columns x q 0/150/450/900, as the
-  compatop farm 6016893), both Hamiltonians; table in al27-variants.md (or
-  al27-variants-decomposition.md).
-- [ ] 2. ODE IMSRG(2) with FM0p_150 + FPhipp0p_0 for DN2LOGO (job 6018030, config
-  `investigate/configs/DN2LOGO-ode-ops.toml` = scan DN2LOGO-ode.toml + the two operators, binary of
-  the N2LOsat ODE-ops run `imsrg.gpu-20261127-202543`), compare with v2/v3.
-- [ ] 3. Tensor operator in the ODE check: NOT supported (`flow::OdeSolver` throws InputError for a
-  non-scalar operator, src/imsrg/flow/ode.cc:214-220); question WE-E-1; al27-variants.md 5.2 says
-  "a tensor would make the ODE flow too slow", which is wrong (it is unsupported) -> correct it.
-- [ ] 4. WE-R-1 flow file continuous across restarts (implementer, branch
-  feature/al27-investigate-flowfile-restart).
-
-## State (2026-11-27 22:00 EST)
-* Workers: implementer compat-overrides (deadline 03:00), implementer flowfile-restart (08:00).
-* frontier-hip built in this clone at 271d10e (build/frontier-hip); rebuild after merging the
-  compat branch, then `tools/al27/make_compat_decomp.sh` and one farm job (24 specs, 1 node each,
-  `BACKEND=hip WALLTIME=00:30:00 NODES_i=1`, work list `investigate/compat/work136.txt`).
-* Analysis: `tools/al27/compat_decomp.py` (pre-checked on v2/compatop/v1: reproduces 4.2).
-* Pending text: WE-E-1 into design/QUESTIONS.md after the flowfile branch is merged (both append
-  at the end of the file).
+- [x] 1. v2 - v1 per compat sub-option. Debug keys `run.compat_enable` / `run.compat_disable`
+  (merged from feature/al27-investigate-compat-overrides 2dde92b; design/16 V-34, design/50 sec. 5),
+  `tools/al27/make_compat_decomp.sh` (24 directories), farm 6018194 (v2 Omegas, 136 items x 12
+  variants x 2 Hamiltonians), `tools/al27/compat_decomp.py` (tested). Result in al27-variants.md
+  4.3 and the new design/benchmarks/al27-variants-decomposition.md: M15-1 is the largest
+  operator-side part at every rank L >= 1 (1b only), AL-F1 adds 1b + 2b for odd L, cross term
+  1-1.5 %, the D72 norm / 9j / writer do not matter; controls bit-identical.
+- [x] 2. ODE IMSRG(2) with FM0p_150 + FPhipp0p_0 for DN2LOGO (job 6018030): v3 0.08-0.4 %, v2 4-8 %
+  (median, dominant elements); al27-variants.md 5.2; `tools/al27/ode_check.py` (tested; reproduces
+  the N2LOsat table).
+- [x] 3. Tensor operator in the ODE check: not supported (`flow::OdeSolver` rejects non-scalar
+  operators, src/imsrg/flow/ode.cc:214-220); WE-E-1; 5.2 text corrected (it gave cost as reason).
+- [x] 4. WE-R-1 fixed (merged from feature/al27-investigate-flowfile-restart 8c713a7 + baca471
+  field-count check): FlowLog keeps rows (stage, istep) <= checkpoint on restart; tests
+  `Checkpoint.RestartedFlowFileIsContinuous`, `Checkpoint.FlowFileTruncatedUnlessRestart`.
+- [x] Weekend report (design/reports/2026-11-27-weekend.md) and design/30 row AL-A-Q6 updated.
+- CI: `CI PASS frontier-cpu` at baca471 (all src changes); rerun at the head pending/see final
+  report. `pytest tools/al27`: 46 passed.
 
 ## Decisions
 * The new compat keys are not hashed (FlowConfigHash / PreparationHash): no compat option changes
   H_0 or the flow of the scalar H; domega (fork_step_defaults) is hashed through the resolved
   imsrg.step.domega. Existing checkpoints stay valid.
+* Farmed options: writer, D72 norm, M15-1, 9j threshold, AL-F1 (fork_step_defaults acts on the flow
+  only, fork_operator_file_names on names only).
+* The per-column tables of Lead D's decomposition farm 6016893 moved from al27-variants.md 4.2 to
+  al27-variants-decomposition.md section 4 (size limit; al27-variants.md is 91 kB). Lead D's
+  template placeholder DECOMPTABLES (handoffs/al27-variants.md) no longer has a target in
+  al27-variants.md: regenerate those tables into the companion file.
+
+## Notes for the next session
+* The M15-1 two-body differences are exactly 0 in every item: consistent with the bug acting in
+  the final re-normal-ordering of the evolved operator to the core (the bare NREFT operators are
+  one-body, so the bare normal ordering has nothing to contract); not verified in the code.
+* The ODE flow could carry tensors only after WE-E-1 is implemented (owner decision).
