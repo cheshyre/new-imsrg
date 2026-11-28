@@ -1669,4 +1669,4 @@ Assumptions taken (most reversible option; open for the owner or the lead):
   (design/13 says it warns); (3) design/16 line 24 omits `tensor_fork_ph_missing_rank_phase` from the
   compat profile list; `test_compat.cc:138` does not show that `fork_step_defaults` changes
   `FlowConfigHash`; `transform.skip_existing` (`transform_task.cc:366`) does not compare compat
-  options. **Assumed:** (1)-(2) fixed during the weekend (feature/al27-restart-followups), (3) later.
+  options. **Assumed:** (1)-(2) fixed during the weekend (feature/al27-restart-followups), (3) later. (1)-(2) done in fdd47e5.
