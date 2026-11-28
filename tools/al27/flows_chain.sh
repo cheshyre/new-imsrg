@@ -14,8 +14,9 @@
 #   can be resubmitted by hand: CHAIN_LINK=<n> sbatch --export=ALL,CHAIN_LINK=<n>
 #   <script>); the binary is copied once into every RUN_DIR as
 #   imsrg.gpu-<stamp> and all links use that copy. Arguments after "--" go to
-#   every flow. Every flow always gets output.directory=RUN_DIR and
-#   checkpoint.directory=RUN_DIR/checkpoint.
+#   every flow. Every flow always gets output.directory=RUN_DIR,
+#   output.flow_file=RUN_DIR/flow.txt and checkpoint.directory=RUN_DIR/checkpoint
+#   (every writable path of the config; checkpoint.prepared_from is only read).
 #   Per link, at job start: submit the successor (--dependency=afterany, so a
 #   killed job continues too; at most MAX_LINKS links; the successor exits at
 #   once if every flow has FLOW_DONE or FLOW_FAILED). Per flow: continue with
@@ -160,6 +161,7 @@ run_flow() {
     return 0
   fi
   local args=(--config "$cfg" --set "output.directory=$run"
+              --set "output.flow_file=$run/flow.txt"
               --set "checkpoint.directory=$run/checkpoint")
   if [[ -f checkpoint/state.txt || -f checkpoint/prepared/prepared.toml ]]; then
     restart=1   # a driver without a flow checkpoint starts the flow from prepared/

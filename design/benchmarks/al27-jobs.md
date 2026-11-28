@@ -46,3 +46,16 @@ Lead D total (2026-11-27 18:30 - 21:05 EST): ~68.8 node-hours (v3 farm 53.3, v2 
 
 | Chain | First job | Last job | Jobs | Node-hours |
 |---|---|---|---|---|
+
+## Restart check
+
+v3 N2LOsat, binary `imsrg.gpu-20261127-183256` of the reference run (frontier-hip, 42a46f7), one node each; details in `design/benchmarks/al27-restart.md`.
+
+| Job | What | Nodes | Partition | Elapsed | Node-hours | Notes |
+|---|---|---:|---|---|---:|---|
+| 6017687 | straight re-run, attempt 1 (flow_file not yet overridden) | 1 | batch | ~0:12 | 0.20 | results bit-identical to the reference; its flow.txt overwrote the production one |
+| 6017688 + 6017694 | killed run, attempt 1: link 1 (TERM at 21:08:02, stage 2 step 11) + link 2 (restart) | 1 + 1 | batch | ~0:01 + ~0:11 | 0.20 | bit-identical; flow.txt also went to the production path |
+| 6017812 | straight re-run, attempt 2 (flow_file overridden into the run directory) | 1 | batch | 0:11:25 | 0.19 | |
+| 6017813 + 6017827 | killed run, attempt 2: link 1 (TERM at 21:22:04, stage 2 step 3, exit 75, 0:39) + link 2 (restart, 11:03) | 1 + 1 | batch | 0:00:39 + 0:11:03 | 0.20 | |
+
+Restart check total: about 0.8 node-hours (a reservation of 6 min for link 1 and 30 min for link 2 and the straight job, billed by use).

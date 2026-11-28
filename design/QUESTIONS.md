@@ -1635,3 +1635,11 @@ Assumptions taken (most reversible option; open for the owner or the lead):
   above 1e-3 continue the stage. Harmless for E0 (stage-1 E0 constant to 1e-6) but costs time and
   shifts stage 2 to start at s = 100. **Assumed:** no change during the weekend; check the
   observer/stop logic of `flow::OdeSolver` against imsrg++ afterwards.
+
+* **WE-R-1 (restart rewrites flow.txt).** In the restart check (design/benchmarks/al27-restart.md)
+  the restarted link opened `output.flow_file` fresh: the killed v3 N2LOsat run's `flow.txt` holds
+  only the rows from the restart step on (143 of 192 data rows), and `flow_summary.py` then shows
+  one stage. All numerical results (E0, 42 Omegas, .snt) are bit-identical to an uninterrupted run
+  and the existing rows equal the straight ones. **Assumed:** no src/ change during the weekend; the
+  fix is append mode for the flow file on `checkpoint.restart` (src/imsrg/driver/run.cc, FlowLog
+  construction near line 1030), with a test; until then the full table is in `flow-gpu.log`.
