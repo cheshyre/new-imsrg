@@ -812,9 +812,9 @@ reference, job 6018030, Lead E):
 
   The same picture as for N2LOsat: v3 agrees with the ODE operators to 0.08-0.4 % (median of the
   dominant elements) and with the valence H to 0.04 %, v2 is 4-8 % off (valence H 3 %), and v2's
-  core energy is 0.19 MeV above the ODE value (v3: +2.2 keV). (Cells from `dominant_rel.py`'s
-  functions with its defaults, dominant = |ref| >= max(0.01 max|ref|, 1e-6); the script reproduces
-  the N2LOsat row above exactly.)
+  core energy is 0.19 MeV above the ODE value (v3: +2.2 keV). (Cells: `tools/al27/ode_check.py`,
+  built on `dominant_rel.py`, dominant = |ref| >= max(0.01 max|ref|, 1e-6); it reproduces the
+  N2LOsat table above exactly.)
 
 **Conclusion.** The v3-vs-v2 operator differences above 1e-3 relative are the same effect as in
 E0: v3 (split Magnus) is an IMSRG(2)-equivalent evolution, v2 (unsplit) is Magnus(2) with one
