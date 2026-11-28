@@ -67,4 +67,4 @@ Branch feature/al27-investigate-variants; development chain `imsrg-e`; runs in
 
 | Job | What | Nodes | Partition | Elapsed | Node-hours | Notes |
 |---|---|---:|---|---|---:|---|
-| 6018030 | al27-flows (flows_gpu.sh): DN2LOGO ODE IMSRG(2) flow (dopri5, tol 1e-6) carrying FM0p_150 + FPhipp0p_0, from v2's prepared H_0; binary `imsrg.gpu-20261127-202543` (that of the N2LOsat ODE-ops run 6017305) | 1 | batch | | | task 2 |
+| 6018030 | al27-flows (flows_gpu.sh): DN2LOGO ODE IMSRG(2) flow (dopri5, tol 1e-6) carrying FM0p_150 + FPhipp0p_0, from v2's prepared H_0; binary `imsrg.gpu-20261127-202543` (that of the N2LOsat ODE-ops run 6017305) | 1 | batch | 0:33:51 | 0.56 | task 2; converged, al27-variants.md 5.2 |

@@ -52,11 +52,12 @@ Jobs and node-hours: `design/benchmarks/al27-jobs.md`, section Lead D.
   lower at 600 than at 300 for 31 of 34 columns, higher at 900 than at 300 for 32); the largest |Δ| relative to the largest |ref| of a file occurs at q >= 300 for 32 of 34
   columns (median q 975). FM0 at q = 0 (particle number) agrees to 2e-16. Cause: the same
   Magnus(2)-vs-IMSRG(2) truncation difference. The ODE IMSRG(2) flow carrying FM0p_150 and
-  FPhipp0p_0 agrees with v3 to 0.1-0.3 % (median) and with v2 to 7-9 %; v3's operators are
+  FPhipp0p_0 agrees with v3 to 0.1-0.3 % (median) and with v2 to 7-9 % (N2LOsat); for DN2LOGO
+  (Lead E) 0.08-0.4 % and 4-8 %. Only scalars can be checked this way: the ODE flow cannot carry
+  a tensor operator (WE-E-1). v3's operators are
   converged in the split threshold (0.25 vs 0.1: 1-7e-4, median) and in the BCH series; v3's
   time-step error at domega 0.1 is 0.09-1.2 % (median, vs domega 0.025; two time steps only).
-  The decomposition farm (4.2) and the checks of 5.2 were analysed for N2LOsat; the tables of 4.2
-  are N2LOsat only (the DN2LOGO decomposition farm was run, with the same pattern: section 4.2).
+  The threshold and time-step checks of 5.2 were run for N2LOsat only.
 * **Farms**: v2 2 x 2415 items, 0 failed (job 6016703, 30 nodes, 19.6 min, 9.8 node-hours; 27
   GCD-hours of item work per Hamiltonian, TCM 792 s the longest item); v3: 2 x 2415 items, 0 failed (job 6016892, 80 nodes, 40 min,
   53.3 node-hours; 153 / 145 GCD-hours of item work). A v3 item
@@ -748,9 +749,9 @@ table was regenerated with `dominant_rel.py` and is not reproduced here.
 ### 5.2 Cause of the differences > 1e-3 (investigation)
 
 Candidates as in section 3: BCH truncation per Omega in the transform, the number of Omegas
-(threshold), the time step, and the Magnus(2)-vs-IMSRG(2) truncation of v2. Checks (N2LOsat only;
-jobs 6017305 and 6017358; 12 items from the worst columns, q = 0 to 990; not repeated for
-DN2LOGO):
+(threshold), the time step, and the Magnus(2)-vs-IMSRG(2) truncation of v2. Checks (N2LOsat;
+jobs 6017305 and 6017358; 12 items from the worst columns, q = 0 to 990; for DN2LOGO only the ODE
+reference, job 6018030, Lead E):
 
 * **BCH truncation per Omega:** every v3 item reports a converged series (`bch_converged=1`; the
   transform stops when a nested commutator falls below 1e-9-scaled epsilon, at most 40 terms);
@@ -780,8 +781,10 @@ DN2LOGO):
   changes them by 0.09-1.2 % (median; up to 3-8 % of the file maximum for the highest-q L = 4, 5
   items, whose elements are small). v2 differs from v3 by 6-17 % (median), about 10-20 times more.
 * **ODE reference:** the ODE IMSRG(2) flow (job 6017305, 36 min on a GCD) evolved FM0p_150 and
-  FPhipp0p_0 alongside H (scalars only; a tensor would make the ODE flow too slow). Against it
-  (same cells as above):
+  FPhipp0p_0 alongside H. Scalars only: `flow::OdeSolver` cannot carry a tensor operator (it
+  rejects non-scalar operators, src/imsrg/flow/ode.cc:214-220; WE-E-1), so no rank L > 0 item
+  can be checked this way (an earlier version of this section gave the cost as the reason).
+  Against it (same cells as above), N2LOsat:
 
 | quantity (vs ODE) | v3 (split 0.25, domega 0.1) | split 0.25, domega 0.025 | split 0.1, domega 0.1 | v2 (unsplit, domega 0.1) |
 |---|---|---|---|---|
@@ -793,6 +796,25 @@ DN2LOGO):
   The split runs agree with the ODE operators and valence H to 0.04-0.3 % (median of the dominant
   elements; domega 0.025 closest), v2 is 5-9 % off, and v2's core energy is 0.89 MeV above the
   ODE value (v3: -7 keV).
+
+  DN2LOGO (job 6018030, Lead E: the same two operators through the ODE flow from v2's prepared
+  H_0, config `runs/al27/investigate/configs/DN2LOGO-ode-ops.toml` = the scan's DN2LOGO-ode.toml
+  plus the operators, the binary of 6017305, 34 min on a GCD; E0 -216.989496 MeV, 1.3e-7 MeV from
+  the ODE flow without operators; 85 + 444 accepted steps vs 83 + 443 without them). The
+  split-check Omega stacks exist for N2LOsat only, so the comparison is with v3 and v2:
+
+| quantity (vs ODE), DN2LOGO | v3 (split 0.25, domega 0.1) | v2 (unsplit, domega 0.1) | ODE flow without operators (6016814) |
+|---|---|---|---|
+| FM0p_150: median rel (dominant) / max abs over max ref | 3.9e-03 / 4.1e-03 | 8.0e-02 / 3.2e-02 | |
+| FPhipp0p_0: median rel (dominant) / max abs over max ref | 7.8e-04 / 1.5e-03 | 4.3e-02 / 1.1e-02 | |
+| valence H: median rel (dominant) / max abs over max ref | 4.2e-04 / 1.1e-03 | 3.0e-02 / 9.3e-02 | 3.0e-08 / 1.1e-07 |
+| valence H: core energy - ODE (keV; ODE -116.479240 MeV) | +2.2 | +187.8 | +0.0 |
+
+  The same picture as for N2LOsat: v3 agrees with the ODE operators to 0.08-0.4 % (median of the
+  dominant elements) and with the valence H to 0.04 %, v2 is 4-8 % off (valence H 3 %), and v2's
+  core energy is 0.19 MeV above the ODE value (v3: +2.2 keV). (Cells from `dominant_rel.py`'s
+  functions with its defaults, dominant = |ref| >= max(0.01 max|ref|, 1e-6); the script reproduces
+  the N2LOsat row above exactly.)
 
 **Conclusion.** The v3-vs-v2 operator differences above 1e-3 relative are the same effect as in
 E0: v3 (split Magnus) is an IMSRG(2)-equivalent evolution, v2 (unsplit) is Magnus(2) with one
