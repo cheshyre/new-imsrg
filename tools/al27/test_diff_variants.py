@@ -39,8 +39,18 @@ def test_both_naming_and_renumbered(tmp_path):
     code, text = run(tmp_path, ref, test)
     assert code == 0
     assert "2 file pairs compared" in text
-    assert "| FM2p | 1 | 0.00e+00 (15) | 0.00e+00 (15) | 0 | 0 |" in text
+    assert ("| FM2p | 1 | 0.00e+00 (15) | 0.00e+00 (15) | 0 | 0.00e+00 | 0 | 0 |"
+            in text)
     assert "| TCM | 1 |" in text
+
+
+def test_big_statistic_ignores_moderately_small_refs():
+    # |ref| = 5e-4 (>= --small, < BIG) enters max_rel but not max_rel_big.
+    st = dv.diff_elements({"a": 5.0e-4, "b": 1.0}, {"a": 1.0e-3, "b": 1.002},
+                          1.0e-6, 1.0e-3, 3)
+    assert abs(st["max_rel"] - 1.0) < 1e-12
+    assert abs(st["max_rel_big"] - 2.0e-3) < 1e-12
+    assert st["n_flag"] == 2 and st["n_flag_big"] == 1
 
 
 def test_small_excluded_and_rel_flag(tmp_path):
@@ -51,7 +61,7 @@ def test_small_excluded_and_rel_flag(tmp_path):
     write_snt(test / "sFM0p_0.snt", one_t, [])
     code, text = run(tmp_path, ref, test)
     r = row(text, "| FM0p |")
-    assert "| 1.00e-02 (0) | 1 | 1 |" in r
+    assert "| 1.00e-02 (0) | 1 | 1.00e-02 | 1 | 1 |" in r
     st = dv.diff_elements({"a": 5.0e-7, "b": 1.0}, {"a": 5.0e-6, "b": 1.01},
                           1.0e-6, 1.0e-3, 3)
     assert st["n_small"] == 1 and st["n_flag"] == 1

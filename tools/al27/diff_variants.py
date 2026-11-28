@@ -19,6 +19,7 @@ Conventions
   (default 1e-6); elements with |ref| below it are counted as "small"
   and excluded from every relative statistic;
 * --rel-flag (default 1e-3) counts elements with relative diff above it;
+  the per-column table repeats max rel and the count for |ref| >= 1e-3 (BIG);
 * orbits are matched by labels (n, l, 2j, 2tz), not by index; scalar files
   use canonical 2b keys (compare_snt.py), tensor files (`_2b.snt`, rows with
   more than five integer columns) keep their keys as written;
@@ -44,6 +45,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import compare_farm as cf  # noqa: E402
 
 SECTIONS = ("0b", "1b", "2b")
+# Second relative statistic only over sizeable elements, |ref| >= BIG: the
+# relative maxima over |ref| >= --small are dominated by elements near 1e-6.
+BIG = 1.0e-3
 _CS = None
 
 
@@ -64,7 +68,7 @@ def diff_elements(ref, test, small, rel_flag, topk):
     """
     st = {"n": 0, "max_abs": 0.0, "abs_key": None, "max_rel": 0.0,
           "rel_key": None, "n_flag": 0, "n_small": 0, "only_ref": 0,
-          "only_test": 0, "max_ref": 0.0}
+          "only_test": 0, "max_ref": 0.0, "max_rel_big": 0.0, "n_flag_big": 0}
     cand_abs, cand_rel = [], []
     for k in set(ref) | set(test):
         r, t = ref.get(k), test.get(k)
@@ -92,6 +96,10 @@ def diff_elements(ref, test, small, rel_flag, topk):
             st["max_rel"], st["rel_key"] = rel, k
         if rel > rel_flag:
             st["n_flag"] += 1
+        if ar >= BIG:
+            st["max_rel_big"] = max(st["max_rel_big"], rel)
+            if rel > rel_flag:
+                st["n_flag_big"] += 1
         cand_rel.append((rel, k, r, t))
         if len(cand_rel) > 8 * topk + 64:
             cand_rel = heapq.nlargest(topk, cand_rel, key=lambda c: c[0])
@@ -126,11 +134,14 @@ def merge_stats(secs):
     """Merge per-section stats dicts into one over all sections."""
     tot = {"n": 0, "max_abs": 0.0, "abs_key": None, "max_rel": 0.0,
            "rel_key": None, "n_flag": 0, "n_small": 0, "only_ref": 0,
-           "only_test": 0, "max_ref": 0.0}
+           "only_test": 0, "max_ref": 0.0, "max_rel_big": 0.0,
+           "n_flag_big": 0}
     for name, s in secs.items():
         for f in ("n", "n_flag", "n_small", "only_ref", "only_test"):
             tot[f] += s[f]
         tot["max_ref"] = max(tot["max_ref"], s["max_ref"])
+        tot["max_rel_big"] = max(tot["max_rel_big"], s["max_rel_big"])
+        tot["n_flag_big"] += s["n_flag_big"]
         if s["max_abs"] > tot["max_abs"] or tot["abs_key"] is None:
             tot["max_abs"], tot["abs_key"] = s["max_abs"], (name, s["abs_key"])
         if s["rel_key"] is not None and (s["max_rel"] > tot["max_rel"]
@@ -317,8 +328,10 @@ def table_cols(results, rel_flag):
         if "secs" in r:
             cols.setdefault(r["col"], []).append(r)
     lines = ["| column | files | max abs (q) | max rel (q) | "
-             f"n rel>{rel_flag:g} | n small | only ref/test | max abs ref |",
-             "|---|---|---|---|---|---|---|---|"]
+             f"n rel>{rel_flag:g} | max rel, |ref|>={BIG:g} | "
+             f"n rel>{rel_flag:g}, |ref|>={BIG:g} | n small | only ref/test | "
+             "max abs ref |",
+             "|---|---|---|---|---|---|---|---|---|---|"]
     for col in sorted(cols, key=lambda c: (cf.op_sort_key(c), c)):
         tots = [(r, merge_stats(r["secs"])) for r in cols[col]]
         ra, sa = max(tots, key=lambda x: x[1]["max_abs"])
@@ -327,6 +340,8 @@ def table_cols(results, rel_flag):
             f"| {col} | {len(tots)} | {e2(sa['max_abs'])} ({qs(ra['q'])}) | "
             f"{e2(sr['max_rel'])} ({qs(rr['q'])}) | "
             f"{sum(t['n_flag'] for _, t in tots)} | "
+            f"{e2(max(t['max_rel_big'] for _, t in tots))} | "
+            f"{sum(t['n_flag_big'] for _, t in tots)} | "
             f"{sum(t['n_small'] for _, t in tots)} | "
             f"{sum(t['only_ref'] for _, t in tots)}/"
             f"{sum(t['only_test'] for _, t in tots)} | "
