@@ -33,10 +33,12 @@ Node-hours = nodes x elapsed (Frontier bills whole nodes for the job length).
 | 6015996 (+6015997, 0:00:03) | al27-v23-flows: v2 + v3 flows, N2LOsat + DN2LOGO, one GCD each (flows_chain.sh link 1; v3 from v2's prepared H_0) | 1 | batch | 0:47:00 | 0.78 | all 4 converged in link 1: v2 46-47 min (incl. ~22 min preparation, 66.1 GB RSS), v3 11-12 min after v2's prepared/ (17.4 GB RSS, 40-42 Omegas) |
 | 6016703 | al27-v2-farm: v2 native farms, both H (2 steps x 2415 items, GPU, 15 nodes each) | 30 | batch | 0:19:36 | 9.8 | 4,830 items, 0 failed; GPU work 27.0 GCD-h (N2LOsat), TCM 792 s longest item, ~28 BCH terms per item |
 | 6016727 | al27-v3-farmtime: v3 N2LOsat, 13 items (one per family x L + TCM), GPU | 2 | batch | 0:15:08 | 0.50 | v3/v2 item time 3.5-8x (42 Omegas, ~170 BCH terms in total vs ~28); TCM 806 s (host-bound, 1x) |
-| 6016892 | al27-v3-farm: v3 native farms, both H (2 x 2415 items, 40 nodes each) | 80 | batch | (queued) | | |
-| 6016893 | al27-v2-compatop: v2 Omegas transformed with run.compat = fork (operator-side fork behaviours), 136 items per H (all 34 columns at q = 0, 150, 450, 900) | 4 | batch | (queued) | | |
-| 6016814 | al27-flows (flows_gpu.sh): scan points split 0.1 (domega 0.1) and ODE flow (imsrg.method = flow), both H, from v2's prepared H_0 | 1 | batch | (queued) | | |
-| 6016711, 6016712 | al27-scan-N2LOsat / -DN2LOGO: v3-vs-v2 investigation flows (domega 0.025/0.05 split 0.25, split 1.0, unsplit domega 0.05; from v2's prepared H_0) | 1 each | batch | (queued) | | |
+| 6016892 | al27-v3-farm: v3 native farms, both H (2 x 2415 items, 40 nodes each) | 80 | batch | 0:39:57 | 53.3 | 4,830 items, 0 failed; item work 153 / 145 GCD-h (N2LOsat / DN2LOGO), ~170 BCH terms per item, longest 808 s; farm TCM = flow TCM exactly |
+| 6016893 | al27-v2-compatop: v2 Omegas transformed with run.compat = fork (operator-side fork behaviours), 136 items per H (all 34 columns at q = 0, 150, 450, 900) | 4 | batch | 0:07:40 | 0.51 | 272 items, 0 failed (al27-variants.md section 4.2) |
+| 6016814 | al27-flows (flows_gpu.sh): scan points split 0.1 (domega 0.1) and ODE flow (imsrg.method = flow), both H, from v2's prepared H_0 | 1 | batch | 0:23:41 | 0.39 | all 4 converged (ODE 21-24 min on a GCD) |
+| 6016711, 6016712 (+6016713, 6016714) | al27-scan-N2LOsat / -DN2LOGO: v3-vs-v2 investigation flows (domega 0.025/0.05 split 0.25, split 1.0, unsplit domega 0.05; from v2's prepared H_0) | 1 each | batch | 0:30:03 + 0:28:08 (+0:01:36) | 0.99 | all 8 converged in link 1 |
+| 6017305 | al27-flows: N2LOsat operator checks: split 1.0 / 0.1 / 0.25 (domega 0.025) with Omegas, ODE flow carrying FM0p_150 + FPhipp0p_0 | 1 | batch | (running) | | |
+| 6017358 | al27-opcheck: 12 items (worst v3-vs-v2 columns) on the three split-check Omega stacks | 6 | batch | (queued) | | |
 
 ## Development chains (`tools/al27/alloc_chain.sh`, one node each)
 
