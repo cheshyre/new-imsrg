@@ -7,7 +7,8 @@ Each config is tools/al27/<h>_v3.toml (H_0 from the v2 checkpoint through
 checkpoint.prepared_from, so no readers/HF/NAT) with another imsrg.step.domega
 and imsrg.step.omega_norm_max, its own output/flow/checkpoint paths below
 $IMSRG_WORK/runs/al27/scan/<H>-<label>, no Omega files and no operators (only
-the flow and E0 are wanted). Run with tools/al27/flows_chain.sh.
+the flow and E0 are wanted). Run with tools/al27/flows_chain.sh; the "ode"
+points (imsrg.method = "flow", no checkpoint) with tools/al27/flows_gpu.sh.
 
 usage: make_scan_configs.py OUT_DIR
 """
@@ -18,7 +19,11 @@ import sys
 
 SRC = os.path.dirname(os.path.abspath(__file__))
 POINTS = [("s025-d0025", 0.025, 0.25), ("s025-d005", 0.05, 0.25),
-          ("s1-d01", 0.1, 1.0), ("unsplit-d005", 0.05, 50000.0)]
+          ("s1-d01", 0.1, 1.0), ("unsplit-d005", 0.05, 50000.0),
+          ("s01-d01", 0.1, 0.1),
+          # ODE reference (imsrg.method = "flow", adaptive dopri5): no Omegas,
+          # no checkpoint (Magnus only); omega keys are ignored.
+          ("ode", 0.1, 0.25)]
 
 
 def main():
@@ -34,6 +39,11 @@ def main():
             s = s.replace(f"/runs/al27/v3/{H}", f"/runs/al27/scan/{H}-{lab}")
             s = re.sub(r"(?m)^write_omega = true", "write_omega = false", s)
             s = re.sub(r'(?m)^list = \["TCM"\]', "list = []", s)
+            if lab == "ode":
+                s = re.sub(r'(?m)^method = "magnus"', 'method = "flow"', s)
+                s = re.sub(r'(?m)^(\[checkpoint\]\ndirectory = ).*$',
+                           r'\1""', s)
+                assert 'method = "flow"' in s and 'directory = ""' in s
             assert "/v3/" not in s
             with open(f"{out}/{H}-{lab}.toml", "w", encoding="utf-8") as f:
                 f.write(s)
