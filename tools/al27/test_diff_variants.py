@@ -29,6 +29,31 @@ def row(text, start):
     return [ln for ln in text.splitlines() if ln.startswith(start)][0]
 
 
+def split_cells(line):
+    """Cells of a markdown table row; an escaped pipe does not split."""
+    body = line.strip()
+    assert body.startswith("|") and body.endswith("|"), line
+    body = body[1:-1].replace("\\|", "")
+    return body.split("|")
+
+
+def check_tables(text):
+    """Every markdown table: header, delimiter and rows have equal cells."""
+    block, ntab = [], 0
+    for ln in text.splitlines() + [""]:
+        if ln.startswith("|"):
+            block.append(ln)
+            continue
+        if block:
+            ntab += 1
+            n = len(split_cells(block[0]))
+            assert set(c.strip("- :") for c in split_cells(block[1])) == {""}
+            for b in block:
+                assert len(split_cells(b)) == n, (n, b)
+            block = []
+    return ntab
+
+
 def test_both_naming_and_renumbered(tmp_path):
     ref, test = mk(tmp_path, "ref"), mk(tmp_path, "test")
     write_snt(ref / "stemFM2p_15.snt", ONE, TWO)
@@ -39,8 +64,9 @@ def test_both_naming_and_renumbered(tmp_path):
     code, text = run(tmp_path, ref, test)
     assert code == 0
     assert "2 file pairs compared" in text
-    assert ("| FM2p | 1 | 0.00e+00 (15) | 0.00e+00 (15) | 0 | 0.00e+00 | 0 | 0 |"
-            in text)
+    assert ("| 0.00e+00 (15) | 0.00e+00 (15) | 0 | 0.00e+00 | 0 of 6 | 0 |"
+            in row(text, "| FM2p |"))
+    check_tables(text)
     assert "| TCM | 1 |" in text
 
 
@@ -61,7 +87,7 @@ def test_small_excluded_and_rel_flag(tmp_path):
     write_snt(test / "sFM0p_0.snt", one_t, [])
     code, text = run(tmp_path, ref, test)
     r = row(text, "| FM0p |")
-    assert "| 1.00e-02 (0) | 1 | 1.00e-02 | 1 | 1 |" in r
+    assert "| 1.00e-02 (0) | 1 | 1.00e-02 | 1 of 2 | 1 |" in r
     st = dv.diff_elements({"a": 5.0e-7, "b": 1.0}, {"a": 5.0e-6, "b": 1.01},
                           1.0e-6, 1.0e-3, 3)
     assert st["n_small"] == 1 and st["n_flag"] == 1
@@ -133,6 +159,23 @@ def test_flow_parsing_and_missing_dir(tmp_path):
     assert "| num_omegas (flow.txt, last row) | 2 | 2 | 0 |" in text
     assert "| H | 1 |" in text and "| TCM(flow) | 1 |" in text
     assert len(text) < 100000
+    assert check_tables(text) >= 5
+
+
+def test_per_column_and_q_counts(tmp_path):
+    ref, test = mk(tmp_path, "ref"), mk(tmp_path, "test")
+    one_r = [((1, 1), 5.0e-7), ((3, 3), 1.0)]
+    one_t = [((1, 1), 5.0e-6), ((3, 3), 1.01)]
+    for q in (0, 15):
+        write_snt(ref / f"sFM0p_{q}.snt", one_r, [])
+        write_snt(test / f"sFM0p_{q}.snt", one_t, [])
+    code, text = run(tmp_path, ref, test)
+    # per file: 3 elements (zero-body, two 1b), 1 small -> 2 rel-eligible
+    assert "| FM0p | 2 | 6 | 4 |" in text
+    assert "| 0 | 1 | 3 | 2 | 1 |" in text
+    assert "| 15 | 1 | 3 | 2 | 1 |" in text
+    assert "\\|ref\\|>=0.001" in text
+    assert check_tables(text) >= 5
 
 
 def test_top_and_size(tmp_path):

@@ -6,7 +6,8 @@
 usage: flow_summary.py RUN_DIR [RUN_DIR ...]
 
 Reads, per RUN_DIR: flow.txt (CSV flow file; for a restarted run duplicate
-(stage, istep) rows are resolved by keeping the last one), results.json (final
+(stage, istep) rows are resolved by keeping the last one; ODE flows, where
+istep stays 0, keep every row), steps = last istep for Magnus, results.json (final
 E0), the Omega files (<stem>_omegas.toml, omega_*.opb), and the job log
 flow-gpu.log (or flow[0-9]*.log if there is none): per link the start/end lines,
 "Maximum resident set size" and "Elapsed (wall clock) time" of /usr/bin/time -v.
@@ -24,19 +25,53 @@ import sys
 
 
 def read_flow(path):
-    """Return {stage: [row dicts ordered by istep]} with duplicates resolved."""
-    rows = {}
+    """Return {stage: [row dicts]} with restart duplicates resolved.
+
+    Magnus flows number their steps (istep 0 = initial state): rows are keyed
+    by (stage, istep), later rows (a restarted run) overwrite earlier ones.
+    ODE flows keep istep 0 in every row (accepted and trial steps alike):
+    a stage whose rows all have the same istep is kept row by row.
+    """
+    raw = {}
+    for r in _rows(path):
+        raw.setdefault(r[0], []).append(r[1:])
+    stages = {}
+    for st, lst in sorted(raw.items()):
+        if len({i for i, _ in lst}) == 1 and len(lst) > 1:
+            stages[st] = [r for _, r in lst]
+            continue
+        keyed = {}
+        for i, r in lst:
+            keyed[i] = r
+        stages[st] = [keyed[i] for i in sorted(keyed)]
+    return stages
+
+
+def _rows(path):
+    """Yield (stage, istep, row) for every parsable row of a flow file."""
     with open(path, newline="") as f:
         for r in csv.DictReader(f):
             try:
-                key = (int(r["stage"]), int(r["istep"]))
+                yield int(r["stage"]), int(r["istep"]), r
             except (KeyError, TypeError, ValueError):
                 continue
-            rows[key] = r  # later rows (restarted run) overwrite earlier ones
-    stages = {}
-    for (st, _), r in sorted(rows.items()):
-        stages.setdefault(st, []).append(r)
-    return stages
+
+
+def is_ode_stage(rs):
+    """True if all rows of the stage have the same istep (ODE flow)."""
+    return len(rs) > 1 and len({r["istep"] for r in rs}) == 1
+
+
+def steps_text(rs):
+    """Number of steps of a stage as text.
+
+    Magnus: the last step index (istep 0 is the initial state, so a stage
+    with rows 0..54 has 54 steps). ODE: the flow file lists trial steps as
+    well and has no step index, so only the row count is given.
+    """
+    if is_ode_stage(rs):
+        return "{} rows (ODE)".format(len(rs))
+    return str(max(int(r["istep"]) for r in rs))
 
 
 def fnum(r, k, fmt="{:.6g}"):
@@ -53,7 +88,7 @@ def stage_table(stages):
     for st, rs in stages.items():
         last = rs[-1]
         out.append("| {} | {} | {} | {} | {} | {} | {} | {} | {} |".format(
-            st, len(rs), fnum(last, "s", "{:.5f}"),
+            st, steps_text(rs), fnum(last, "s", "{:.5f}"),
             fnum(last, "E0", "{:.6f}"), fnum(last, "norm_H", "{:.6f}"),
             fnum(last, "norm_eta", "{:.3e}"),
             fnum(last, "norm_omega", "{:.5f}"),
