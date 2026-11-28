@@ -1620,3 +1620,18 @@ Assumptions taken (most reversible option; open for the owner or the lead):
   termination flag (a second run in one process, e.g. from Python, stops at once), and
   `prepared_from` pointing at the run's own directory races with root's `remove_all` under MPI;
   (6) `Manifest` does not declare its copy and move operations. **Assumed:** fix after the weekend.
+* **WE-D-1** (lead D, devel writer threshold for TCM) - The devel tokyo writer (`CollectTokyoTwoBody`,
+  imsrg-devel rule) drops scalar valence two-body elements below 1e-7 x ||O_2b|| of the whole
+  operator. For TCM (||TCM_2b|| ~ 1e4 at emax 10) that is ~1.2e-3: the v2/v3 TCM files keep
+  140-143 two-body elements, the fork writer (absolute 1e-7) 158; e.g. the N2LOsat pp
+  (0d5/2)^2 -> (0d3/2)^2 J = 2 element (1.9e-3 in v1) is absent in v2. The NREFT operators have
+  small norms (threshold <= 1e-7), so only TCM and H are affected (H: 1e-7 x ||H_2b||).
+  **Assumed:** keep the devel rule (v2/v3 use the devel writer by decision of Brief B); the
+  difference reports count such elements as "only in ref". Owner: an absolute threshold for
+  operators in the default writer?
+* **WE-D-2** (lead D, ODE stage end) - With `imsrg.method = "flow"` (dopri5) the stage-1 flow of
+  the 27Al scan reached |eta| = 1e-3 at s ~ 14 but integrated on to smax = 100 at constant E0
+  (|eta| hovering at 1.0e-3 +- 3e-6): the criterion appears to be checked so that values just
+  above 1e-3 continue the stage. Harmless for E0 (stage-1 E0 constant to 1e-6) but costs time and
+  shifts stage 2 to start at s = 100. **Assumed:** no change during the weekend; check the
+  observer/stop logic of `flow::OdeSolver` against imsrg++ afterwards.
