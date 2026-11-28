@@ -31,7 +31,11 @@ Node-hours = nodes x elapsed (Frontier bills whole nodes for the job length).
 | 6007408, 6007411, 6007430, 6007431, 6007492, 6007493, 6007524, 6007525 | al27-chaintest: flows_chain.sh with a mock binary (4 two-link chains t1-t4; t2/t3 TIMEOUT while fixing the TERM delivery) | 1 each | batch | 0:19:48 total | 0.33 | t4: TERM -> checkpoint -> exit 75 -> link 2 restart -> FLOW_DONE; v3-style wait for prepared/ OK; VRAM log OK |
 | 6015953, 6015954 | al27-chaintest t5: mock chain after the empty-argument fix (mock rejects empty words), configs copied | 1 each | batch | 0:03:02 total | 0.05 | link 1 TERM -> 75, link 2 FLOW_DONE for both; B waited for A's prepared/ |
 | 6015996 (+6015997, 0:00:03) | al27-v23-flows: v2 + v3 flows, N2LOsat + DN2LOGO, one GCD each (flows_chain.sh link 1; v3 from v2's prepared H_0) | 1 | batch | 0:47:00 | 0.78 | all 4 converged in link 1: v2 46-47 min (incl. ~22 min preparation, 66.1 GB RSS), v3 11-12 min after v2's prepared/ (17.4 GB RSS, 40-42 Omegas) |
-| 6016703 | al27-v2-farm: v2 native farms, both H (2 steps x 2415 items, GPU, 15 nodes each) | 30 | batch | (running) | | |
+| 6016703 | al27-v2-farm: v2 native farms, both H (2 steps x 2415 items, GPU, 15 nodes each) | 30 | batch | 0:19:36 | 9.8 | 4,830 items, 0 failed; GPU work 27.0 GCD-h (N2LOsat), TCM 792 s longest item, ~28 BCH terms per item |
+| 6016727 | al27-v3-farmtime: v3 N2LOsat, 13 items (one per family x L + TCM), GPU | 2 | batch | 0:15:08 | 0.50 | v3/v2 item time 3.5-8x (42 Omegas, ~170 BCH terms in total vs ~28); TCM 806 s (host-bound, 1x) |
+| 6016892 | al27-v3-farm: v3 native farms, both H (2 x 2415 items, 40 nodes each) | 80 | batch | (queued) | | |
+| 6016893 | al27-v2-compatop: v2 Omegas transformed with run.compat = fork (operator-side fork behaviours), 136 items per H (all 34 columns at q = 0, 150, 450, 900) | 4 | batch | (queued) | | |
+| 6016814 | al27-flows (flows_gpu.sh): scan points split 0.1 (domega 0.1) and ODE flow (imsrg.method = flow), both H, from v2's prepared H_0 | 1 | batch | (queued) | | |
 | 6016711, 6016712 | al27-scan-N2LOsat / -DN2LOGO: v3-vs-v2 investigation flows (domega 0.025/0.05 split 0.25, split 1.0, unsplit domega 0.05; from v2's prepared H_0) | 1 each | batch | (queued) | | |
 
 ## Development chains (`tools/al27/alloc_chain.sh`, one node each)
