@@ -308,8 +308,9 @@ at emax 8 per commutator (`tools/bench/tensor_commutator_bench`); memory and GPU
   continues the stage in progress; stage 2 is entered directly when the checkpoint is in stage 2.
   The flow file stays continuous: a restart from a flow checkpoint keeps the rows of the existing
   file with (stage, istep) <= the checkpoint's (the restarted flow logs from istep + 1), drops later
-  rows (written between the checkpoint and the kill) and appends; a missing file or one with another
-  header starts afresh (warning), and a restart from `prepared/` only or a non-restart run writes a
+  rows (written between the checkpoint and the kill) and appends; a missing file, one with another
+  header, or one whose last kept row is not the resume step with the checkpoint's `s` (another run's
+  file, a gap) starts afresh at the resume step (warning; the earlier rows are then absent), and a restart from `prepared/` only or a non-restart run writes a
   fresh file.
 * Formats: native float64 (`io::WriteOperatorBinary`, bit-exact restart) or ME1J + float32 binary
   ME2JP (restart within float32 precision, owner answer to O4).

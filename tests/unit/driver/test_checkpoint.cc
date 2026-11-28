@@ -16,6 +16,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -177,6 +178,107 @@ TEST(Checkpoint, RestartedFlowFileIsContinuous) {
           << "row " << i << " after a kill at step " << kill;
     }
   }
+}
+
+/// Kills a run after `kill` steps, rewrites its flow file (`lines`, header
+/// first) with `mutate` (setting `*remove` deletes the file instead), restarts
+/// and returns the restarted flow file; `log` receives the captured stdout of
+/// the restart.
+std::vector<std::string> RestartWithFlowFile(
+    const std::string& tag, const std::string& flow_name, int kill,
+    const std::function<void(std::vector<std::string>*, bool*)>& mutate,
+    std::string* log) {
+  const fs::path ck = FreshDir(tag + "_ck");
+  const fs::path dir = FreshDir(tag + "_run");
+  EXPECT_THROW(RunIn(dir, Checkpoint(ck, "native", kill, false)),
+               std::runtime_error);
+  std::vector<std::string> lines = Lines(dir / flow_name);
+  bool remove = false;
+  mutate(&lines, &remove);
+  if (remove) {
+    fs::remove(dir / flow_name);
+  } else {
+    std::ofstream out(dir / flow_name);
+    for (std::size_t i = 0; i < lines.size(); ++i) {
+      out << lines[i] << (i + 1 < lines.size() ? "\n" : "");  // keeps a torn
+    }
+  }
+  driver::ConfigSources src;
+  src.config_text = Al27Toml(dir, Checkpoint(ck, "native", 0, true));
+  testing::internal::CaptureStdout();
+  try {
+    const RunResult c = Execute(src, dir);
+    EXPECT_FALSE(c.planned) << c.note;
+  } catch (...) {
+    *log = testing::internal::GetCapturedStdout();
+    throw;
+  }
+  *log = testing::internal::GetCapturedStdout();
+  return Lines(dir / flow_name);
+}
+
+/// The torn row directly after the last valid row (the resume step) is
+/// dropped by the field-count check; the restarted file equals the straight
+/// one and nothing is warned. A missing file, the file of another run (other
+/// s at the resume step) and a file with a gap (no row for the resume step)
+/// start afresh at the resume step with a warning.
+TEST(Checkpoint, RestartedFlowFileProvenance) {
+  if (!fs::exists(DataFile(TwoBodyName()))) GTEST_SKIP() << "missing 2N file";
+  fs::path dir_a;
+  const RunResult a = RunWith("prov_ref", "", &dir_a);
+  ASSERT_FALSE(a.planned) << a.note;
+  const std::string flow_name = a.config.output.stem + ".flow";
+  const std::vector<std::string> ref = Lines(dir_a / flow_name);
+  const std::string kWarning = "afresh at the resume step";
+  const int kill = 3;
+
+  {  // A torn row right after the last valid row.
+    std::string log;
+    const auto got = RestartWithFlowFile(
+        "prov_torn", flow_name, kill,
+        [](std::vector<std::string>* lines, bool*) {
+          lines->push_back(lines->back().substr(0, 7));
+        },
+        &log);
+    EXPECT_EQ(log.find(kWarning), std::string::npos) << log;
+    ASSERT_EQ(got.size(), ref.size());
+    EXPECT_EQ(got[0], ref[0]);
+    for (std::size_t i = 1; i < ref.size(); ++i) {
+      EXPECT_EQ(WithoutWall(got[i]), WithoutWall(ref[i])) << "row " << i;
+    }
+  }
+
+  // Each of these: warning, fresh file whose first row is the step after the
+  // resume step (stage 1, step 4).
+  using Mutation = std::function<void(std::vector<std::string>*, bool*)>;
+  const auto expect_fresh = [&](const std::string& tag,
+                                const Mutation& mutate) {
+    std::string log;
+    const auto got = RestartWithFlowFile(tag, flow_name, kill, mutate, &log);
+    EXPECT_NE(log.find(kWarning), std::string::npos) << tag << "\n" << log;
+    ASSERT_GT(got.size(), 1u) << tag;
+    EXPECT_EQ(got[0], ref[0]) << tag;
+    EXPECT_EQ(got[1].substr(0, 4), "1,4,") << tag;
+    // The rows after the resume step equal the straight run's.
+    ASSERT_LT(got.size(), ref.size()) << tag;
+    for (std::size_t i = 1; i < got.size(); ++i) {
+      EXPECT_EQ(WithoutWall(got[got.size() - i]),
+                WithoutWall(ref[ref.size() - i]))
+          << tag << " row from the end " << i;
+    }
+  };
+  expect_fresh("prov_missing",
+               [](std::vector<std::string>*, bool* remove) { *remove = true; });
+  expect_fresh("prov_other_run", [](std::vector<std::string>* lines, bool*) {
+    std::string& last = lines->back();
+    const std::size_t c1 = last.find(',');
+    const std::size_t c2 = last.find(',', c1 + 1);
+    const std::size_t c3 = last.find(',', c2 + 1);
+    last = last.substr(0, c2 + 1) + "0.123" + last.substr(c3);
+  });
+  expect_fresh("prov_gap", [](std::vector<std::string>* lines, bool*) {
+    lines->pop_back();  // no row for the resume step
+  });
 }
 
 /// A run without restart truncates an existing flow file; a restart whose

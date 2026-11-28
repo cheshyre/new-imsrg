@@ -231,13 +231,20 @@ const char* StopName(flow::StopReason r) {
 
 /// The flow log: a CSV file (design/13 section 7) plus one stdout line per
 /// step.
+/// The flow-checkpoint position a restarted flow file continues from.
+struct ResumePoint {
+  int stage = 0;
+  int istep = 0;
+  double s = 0.0;
+};
+
 class FlowLog {
  public:
   /// `three_body`: add the columns norm_eta_3b and norm_omega_3b (IMSRG(3)).
   /// `write_file`: false on the ranks that write no files (every rank but rank
   /// 0): they open nothing but still evaluate every value of a step, so that
   /// collective evaluations stay matched across the ranks.
-  /// `resume`: the (stage, istep) of the flow checkpoint a restarted run
+  /// `resume`: the (stage, istep, s) of the flow checkpoint a restarted run
   /// continues from, or empty for a fresh file. A restart keeps the rows of
   /// the existing file up to and including that (stage, istep) (the restarted
   /// flow logs the steps after it, never the checkpointed step again: the
@@ -245,9 +252,12 @@ class FlowLog {
   /// later ones (written between the checkpoint and the kill) and appends the
   /// new rows, so that the file reads like one uninterrupted run. A file that
   /// is missing or has another header starts afresh (the latter with a
-  /// warning).
+  /// warning). The kept rows must end exactly at the resume step with the
+  /// checkpoint's `s` (compared as the "%.17g" text the writer prints, i.e.
+  /// exactly); otherwise they belong to another run or have a gap, and the
+  /// file starts afresh at the resume step (warning).
   FlowLog(const fs::path& path, bool three_body, bool write_file,
-          std::optional<std::pair<int, int>> resume = std::nullopt)
+          std::optional<ResumePoint> resume = std::nullopt)
       : three_body_(three_body), write_file_(write_file) {
     if (write_file_) {
       if (path.has_parent_path()) fs::create_directories(path.parent_path());
@@ -300,11 +310,37 @@ class FlowLog {
   }
 
   /// The data rows of the existing flow file that precede the first row a run
-  /// restarted at `resume` = (stage, istep) writes: those with (stage, istep)
-  /// <= `resume`. Empty if the file is missing or its header differs from
-  /// this run's (warned).
+  /// restarted at `resume` writes: those with (stage, istep) <= (resume.stage,
+  /// resume.istep). Empty (warned) if the file is missing, its header differs
+  /// from this run's, or the last kept row is not the resume step with
+  /// s == resume.s (another run's file, or rows lost); the caller then starts
+  /// a fresh file, without the rows before the resume step.
   std::vector<std::string> KeptRows(const fs::path& path,
-                                    std::pair<int, int> resume) const {
+                                    const ResumePoint& resume) const {
+    std::vector<std::string> kept = SelectRows(path, resume);
+    if (kept.empty() || !MatchesResume(kept.back(), resume)) {
+      log::Warn(
+          "restart: the flow file '{}' has no row for the resume step "
+          "(stage {}, step {}, s = {}), so it is not this run's; starting it "
+          "afresh at the resume step (the rows before it are absent)",
+          path.string(), resume.stage, resume.istep, Fmt17(resume.s));
+      kept.clear();
+    }
+    return kept;
+  }
+
+  /// True if `row` is the resume step: its first three fields are the
+  /// resume's stage, istep and the "%.17g" text of its s.
+  static bool MatchesResume(const std::string& row, const ResumePoint& r) {
+    return row.rfind(std::to_string(r.stage) + ',' + std::to_string(r.istep) +
+                         ',' + Fmt17(r.s) + ',',
+                     0) == 0;
+  }
+
+  /// The rows of the file with (stage, istep) <= `resume`, up to the first
+  /// torn row; empty if there are none (warned if the header differs).
+  std::vector<std::string> SelectRows(const fs::path& path,
+                                      const ResumePoint& resume) const {
     std::vector<std::string> kept;
     std::ifstream in(path);
     if (!in) return kept;
@@ -331,7 +367,10 @@ class FlowLog {
           commas(line) != n_commas) {
         break;  // a torn last row (kill during a write): drop it and the rest
       }
-      if (std::make_pair(stage, istep) > resume) break;
+      if (std::make_pair(stage, istep) >
+          std::make_pair(resume.stage, resume.istep)) {
+        break;
+      }
       kept.push_back(line);
     }
     return kept;
@@ -1120,13 +1159,14 @@ void Run(const RunConfig& config, const comm::Communicator& comm) {
   }
   // The flow file is opened only now: a restart from a flow checkpoint keeps
   // the rows that precede it (FlowLog); nothing logs before RunStages.
-  FlowLog flow_log(config.output.flow_file.empty()
-                       ? dir / "flow.csv"
-                       : fs::path(config.output.flow_file),
-                   config.imsrg3.in_flow, comm.is_root(),
-                   restored ? std::optional<std::pair<int, int>>(std::make_pair(
-                                  restored->loop.stage, restored->loop.istep))
-                            : std::nullopt);
+  FlowLog flow_log(
+      config.output.flow_file.empty() ? dir / "flow.csv"
+                                      : fs::path(config.output.flow_file),
+      config.imsrg3.in_flow, comm.is_root(),
+      restored
+          ? std::optional<ResumePoint>(ResumePoint{
+                restored->loop.stage, restored->loop.istep, restored->loop.s})
+          : std::nullopt);
   flow_log.set_hamiltonian(
       [&solver]() -> const op::Operator& { return solver.hamiltonian(); });
   RunStages(solver, flow_log, config, ph, ms, magnus, stages, triples, ckpt,
