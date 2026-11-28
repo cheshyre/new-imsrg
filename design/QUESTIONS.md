@@ -1643,3 +1643,7 @@ Assumptions taken (most reversible option; open for the owner or the lead):
   and the existing rows equal the straight ones. **Assumed:** no src/ change during the weekend; the
   fix is append mode for the flow file on `checkpoint.restart` (src/imsrg/driver/run.cc, FlowLog
   construction near line 1030), with a test; until then the full table is in `flow-gpu.log`.
+  **Fixed** (feature/al27-investigate-flowfile-restart): `FlowLog` is now built after the checkpoint is
+  read; on a restart from a flow checkpoint it keeps the existing rows with (stage, istep) <= the
+  checkpoint's, drops later and torn rows, and appends (other header: warn, fresh file). Tests
+  `Checkpoint.RestartedFlowFileIsContinuous` / `FlowFileTruncatedUnlessRestart`.
