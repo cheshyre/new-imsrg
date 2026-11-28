@@ -64,7 +64,7 @@ def test_both_naming_and_renumbered(tmp_path):
     code, text = run(tmp_path, ref, test)
     assert code == 0
     assert "2 file pairs compared" in text
-    assert ("| 0.00e+00 (15) | 0.00e+00 (15) | 0 | 0.00e+00 | 0 | 0 |"
+    assert ("| 0.00e+00 (15) | 0.00e+00 (15) | 0 | 0.00e+00 | 0 of 6 | 0 |"
             in row(text, "| FM2p |"))
     check_tables(text)
     assert "| TCM | 1 |" in text
@@ -87,7 +87,7 @@ def test_small_excluded_and_rel_flag(tmp_path):
     write_snt(test / "sFM0p_0.snt", one_t, [])
     code, text = run(tmp_path, ref, test)
     r = row(text, "| FM0p |")
-    assert "| 1.00e-02 (0) | 1 | 1.00e-02 | 1 | 1 |" in r
+    assert "| 1.00e-02 (0) | 1 | 1.00e-02 | 1 of 2 | 1 |" in r
     st = dv.diff_elements({"a": 5.0e-7, "b": 1.0}, {"a": 5.0e-6, "b": 1.01},
                           1.0e-6, 1.0e-3, 3)
     assert st["n_small"] == 1 and st["n_flag"] == 1

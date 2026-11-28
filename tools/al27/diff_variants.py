@@ -68,7 +68,7 @@ def diff_elements(ref, test, small, rel_flag, topk):
     """
     st = {"n": 0, "max_abs": 0.0, "abs_key": None, "max_rel": 0.0,
           "rel_key": None, "n_flag": 0, "n_small": 0, "only_ref": 0,
-          "only_test": 0, "max_ref": 0.0, "max_rel_big": 0.0, "n_flag_big": 0}
+          "only_test": 0, "max_ref": 0.0, "max_rel_big": 0.0, "n_flag_big": 0, "n_big": 0}
     cand_abs, cand_rel = [], []
     for k in set(ref) | set(test):
         r, t = ref.get(k), test.get(k)
@@ -97,6 +97,7 @@ def diff_elements(ref, test, small, rel_flag, topk):
         if rel > rel_flag:
             st["n_flag"] += 1
         if ar >= BIG:
+            st["n_big"] += 1
             st["max_rel_big"] = max(st["max_rel_big"], rel)
             if rel > rel_flag:
                 st["n_flag_big"] += 1
@@ -135,13 +136,14 @@ def merge_stats(secs):
     tot = {"n": 0, "max_abs": 0.0, "abs_key": None, "max_rel": 0.0,
            "rel_key": None, "n_flag": 0, "n_small": 0, "only_ref": 0,
            "only_test": 0, "max_ref": 0.0, "max_rel_big": 0.0,
-           "n_flag_big": 0}
+           "n_flag_big": 0, "n_big": 0}
     for name, s in secs.items():
         for f in ("n", "n_flag", "n_small", "only_ref", "only_test"):
             tot[f] += s[f]
         tot["max_ref"] = max(tot["max_ref"], s["max_ref"])
         tot["max_rel_big"] = max(tot["max_rel_big"], s["max_rel_big"])
         tot["n_flag_big"] += s["n_flag_big"]
+        tot["n_big"] += s["n_big"]
         if s["max_abs"] > tot["max_abs"] or tot["abs_key"] is None:
             tot["max_abs"], tot["abs_key"] = s["max_abs"], (name, s["abs_key"])
         if s["rel_key"] is not None and (s["max_rel"] > tot["max_rel"]
@@ -335,7 +337,7 @@ def table_cols(results, rel_flag):
     lines = ["| column | files | elements | rel-eligible | "
              "max abs (q) | max rel (q) | "
              f"n rel>{rel_flag:g} | max rel, \\|ref\\|>={BIG:g} | "
-             f"n rel>{rel_flag:g}, \\|ref\\|>={BIG:g} | n small | "
+             f"n rel>{rel_flag:g} of n \\|ref\\|>={BIG:g} | n small | "
              "only ref/test | max abs ref |",
              "|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for col in sorted(cols, key=lambda c: (cf.op_sort_key(c), c)):
@@ -350,7 +352,8 @@ def table_cols(results, rel_flag):
             f"{e2(sr['max_rel'])} ({qs(rr['q'])}) | "
             f"{sum(t['n_flag'] for _, t in tots)} | "
             f"{e2(max(t['max_rel_big'] for _, t in tots))} | "
-            f"{sum(t['n_flag_big'] for _, t in tots)} | "
+            f"{sum(t['n_flag_big'] for _, t in tots)} of "
+            f"{sum(t['n_big'] for _, t in tots)} | "
             f"{nsm} | "
             f"{sum(t['only_ref'] for _, t in tots)}/"
             f"{sum(t['only_test'] for _, t in tots)} | "
