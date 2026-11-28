@@ -1661,3 +1661,12 @@ Assumptions taken (most reversible option; open for the owner or the lead):
   one tensor commutator per operator (farm 6016893 at emax 10 on a GCD, v2 Omegas: FPhipp0p_0 2.7 s,
   FSigmapp1p_0 19 s, FPhitp2p_0 41 s, i.e. 7-15x a scalar item). Owner: wanted for the operator
   validation of v3?
+* **WE-O-2** (orchestrator, Opus review of feature/al27-investigate-variants, verdict merge) -
+  Follow-ups: (1) `tests/unit/driver/test_checkpoint.cc:167-168` appends the torn row after the
+  injected `(stage,99)` row, so the field-count check of the flow-file restart (`run.cc:330-331`) is
+  never exercised; (2) `run.cc:310-334` does not check that the kept flow-file rows belong to this run
+  (last kept row = resume step, its `s` = the restored `loop.s`) and does not warn on a missing file
+  (design/13 says it warns); (3) design/16 line 24 omits `tensor_fork_ph_missing_rank_phase` from the
+  compat profile list; `test_compat.cc:138` does not show that `fork_step_defaults` changes
+  `FlowConfigHash`; `transform.skip_existing` (`transform_task.cc:366`) does not compare compat
+  options. **Assumed:** (1)-(2) fixed during the weekend (feature/al27-restart-followups), (3) later.
