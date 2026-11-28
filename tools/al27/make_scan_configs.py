@@ -24,6 +24,12 @@ POINTS = [("s025-d0025", 0.025, 0.25), ("s025-d005", 0.05, 0.25),
           # ODE reference (imsrg.method = "flow", adaptive dopri5): no Omegas,
           # no checkpoint (Magnus only); omega keys are ignored.
           ("ode", 0.1, 0.25)]
+# Operator checks of the v3-vs-v2 differences (N2LOsat only): the same flows
+# with native Omegas (for a small farm), and the ODE flow carrying two scalar
+# NREFT operators alongside H (tensors would make it too slow).
+OPS_POINTS = [("s1-d01-om", 0.1, 1.0), ("s01-d01-om", 0.1, 0.1),
+              ("s025-d0025-om", 0.025, 0.25), ("ode-ops", 0.1, 0.25)]
+ODE_OPERATORS = '["FM0p_150", "FPhipp0p_0"]'
 
 
 def main():
@@ -32,14 +38,22 @@ def main():
     for H, h in [("N2LOsat", "n2losat"), ("DN2LOGO", "dn2logo")]:
         with open(f"{SRC}/{h}_v3.toml", encoding="utf-8") as f:
             src = f.read()
-        for lab, dom, onm in POINTS:
+        points = POINTS + (OPS_POINTS if H == "N2LOsat" else [])
+        for lab, dom, onm in points:
             s = re.sub(r"(?m)^domega = .*$", f"domega = {dom}", src)
             s = re.sub(r"(?m)^omega_norm_max = .*$",
                        f"omega_norm_max = {onm}", s)
             s = s.replace(f"/runs/al27/v3/{H}", f"/runs/al27/scan/{H}-{lab}")
             s = re.sub(r"(?m)^write_omega = true", "write_omega = false", s)
             s = re.sub(r'(?m)^list = \["TCM"\]', "list = []", s)
-            if lab == "ode":
+            if lab.endswith("-om"):
+                s = re.sub(r"(?m)^write_omega = false", "write_omega = true",
+                           s)
+                s = re.sub(r"(?m)^omega_second_format = true",
+                           "omega_second_format = false", s)
+            if lab == "ode-ops":
+                s = re.sub(r"(?m)^list = \[\]", f"list = {ODE_OPERATORS}", s)
+            if lab.startswith("ode"):
                 s = re.sub(r'(?m)^method = "magnus"', 'method = "flow"', s)
                 s = re.sub(r'(?m)^(\[checkpoint\]\ndirectory = ).*$',
                            r'\1""', s)
