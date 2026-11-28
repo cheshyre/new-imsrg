@@ -24,8 +24,8 @@ Jobs: design/benchmarks/al27-jobs.md, section "Lead E (investigation)": 6018030 
   field-count check): FlowLog keeps rows (stage, istep) <= checkpoint on restart; tests
   `Checkpoint.RestartedFlowFileIsContinuous`, `Checkpoint.FlowFileTruncatedUnlessRestart`.
 - [x] Weekend report (design/reports/2026-11-27-weekend.md) and design/30 row AL-A-Q6 updated.
-- CI: `CI PASS frontier-cpu` at baca471 (all src changes); rerun at the head pending/see final
-  report. `pytest tools/al27`: 46 passed.
+- CI: `CI PASS frontier-cpu` at baca471 (all src changes) and at d22241a (branch head, 2026-11-27
+  ~23:00 EST). `pytest tools/al27`: 46 passed.
 
 ## Decisions
 * The new compat keys are not hashed (FlowConfigHash / PreparationHash): no compat option changes
