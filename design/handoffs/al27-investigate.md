@@ -20,6 +20,15 @@ Jobs: design/benchmarks/al27-jobs.md, section "Lead E (investigation)".
 - [ ] 4. WE-R-1 flow file continuous across restarts (implementer, branch
   feature/al27-investigate-flowfile-restart).
 
+## State (2026-11-27 22:00 EST)
+* Workers: implementer compat-overrides (deadline 03:00), implementer flowfile-restart (08:00).
+* frontier-hip built in this clone at 271d10e (build/frontier-hip); rebuild after merging the
+  compat branch, then `tools/al27/make_compat_decomp.sh` and one farm job (24 specs, 1 node each,
+  `BACKEND=hip WALLTIME=00:30:00 NODES_i=1`, work list `investigate/compat/work136.txt`).
+* Analysis: `tools/al27/compat_decomp.py` (pre-checked on v2/compatop/v1: reproduces 4.2).
+* Pending text: WE-E-1 into design/QUESTIONS.md after the flowfile branch is merged (both append
+  at the end of the file).
+
 ## Decisions
 * The new compat keys are not hashed (FlowConfigHash / PreparationHash): no compat option changes
   H_0 or the flow of the scalar H; domega (fork_step_defaults) is hashed through the resolved
