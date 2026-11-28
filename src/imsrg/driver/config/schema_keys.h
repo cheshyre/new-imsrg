@@ -75,6 +75,16 @@ void VisitSchema(Config& c, Visitor&& v) {
                   "internal options, design/50 section 5)",
                   "none"},
           c.run.compat);
+  v.Field(KeyInfo{"run.compat_enable",
+                  "debug: names of CompatOptions fields switched on top of "
+                  "run.compat (design/50 section 5)",
+                  "[]"},
+          c.run.compat_enable);
+  v.Field(KeyInfo{"run.compat_disable",
+                  "debug: names of CompatOptions fields switched off on top "
+                  "of run.compat (applied after compat_enable)",
+                  "[]"},
+          c.run.compat_disable);
   // [basis]
   v.Field(KeyInfo{"basis.emax", "single-particle truncation e = 2n + l",
                   "required", true},

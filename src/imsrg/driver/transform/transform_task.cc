@@ -148,7 +148,7 @@ pipeline::OperatorFrame MakeFrameFromManifest(const RunConfig& config,
   f.mass_number = config.basis.mass_number;
   f.proton_number = f.ms_bare->reference().target_Z();
   f.tensor_no.fork79e9330_diagonal_bug =
-      CompatOptionsFor(config.run.compat).tensor_no_fork_diagonal_bug;
+      EffectiveCompatOptions(config.run).tensor_no_fork_diagonal_bug;
   return f;
 }
 
@@ -164,7 +164,7 @@ fs::path TransformOutputPath(const TransformContext& ctx,
   return ctx.out_dir /
          pipeline::OperatorFileName(
              ctx.stem, name, tensor,
-             CompatOptionsFor(ctx.config->run.compat).fork_operator_file_names);
+             EffectiveCompatOptions(ctx.config->run).fork_operator_file_names);
 }
 
 std::string IsoTimestamp() {
@@ -316,7 +316,7 @@ TransformReport RunTransform(const RunConfig& config,
   ctx.frame = &frame;
   ctx.omegas = &omegas;
   ctx.copts = TransformCommutatorOptions(config);
-  if (CompatOptionsFor(config.run.compat).tensor_one_body_norm_imsrgpp) {
+  if (EffectiveCompatOptions(config.run).tensor_one_body_norm_imsrgpp) {
     ctx.bch.tensor_one_body_norm = op::TensorOneBodyNorm::kImsrgppInteger;
   }
   ctx.workspace = &workspace;

@@ -31,6 +31,19 @@
 ///   * `tensor_fork_ph_missing_rank_phase`: the fork's particle-hole tensor
 ///     commutator omits (-1)^L (devel has it) when it reads Zbar through a
 ///     swapped pair; affects odd L only (Sigma', Sigma'', Delta').
+///
+/// Debug keys `run.compat_enable` / `run.compat_disable` (arrays of option
+/// names, exactly the field names of `CompatOptions`) switch single options
+/// on or off on top of the profile, e.g. to attribute the differences between
+/// two variants. The effective options are `EffectiveCompatOptions`; every
+/// production site uses it, never `CompatOptionsFor` directly. The two keys
+/// are NOT part of `FlowConfigHash` or `PreparationHash`: no option changes
+/// H_0 or the flow of the scalar Hamiltonian (the step default enters through
+/// the resolved and hashed `imsrg.step.domega`), so existing checkpoints stay
+/// valid.
+
+#include <span>
+#include <string_view>
 
 #include "imsrg/driver/config/schema.h"
 
@@ -84,6 +97,21 @@ constexpr CompatOptions CompatOptionsFor(Compat c) noexcept {
   }
   return o;
 }
+
+/// The names of the `CompatOptions` fields, in declaration order (7).
+std::span<const std::string_view> CompatOptionNames() noexcept;
+
+/// Sets the field of `o` called `name` to `value`. Returns false (and changes
+/// nothing) when `name` is not in `CompatOptionNames()`.
+bool SetCompatOption(CompatOptions& o, std::string_view name, bool value);
+
+/// The options of a run: `CompatOptionsFor(run.compat)`, then every name of
+/// `run.compat_enable` set true, then every name of `run.compat_disable` set
+/// false. Unknown names are ignored here (validation rejects them).
+CompatOptions EffectiveCompatOptions(const TaskConfig& run);
+
+/// The same for a whole configuration (`config.run`).
+CompatOptions EffectiveCompatOptions(const RunConfig& config);
 
 }  // namespace imsrg::driver
 

@@ -35,7 +35,7 @@ namespace {
 
 void ApplyCompatCommutatorOptions(const RunConfig& config,
                                   commutator::CommutatorOptions& copts) {
-  const CompatOptions c = CompatOptionsFor(config.run.compat);
+  const CompatOptions c = EffectiveCompatOptions(config.run);
   if (c.tensor_ninej_threshold_1e8) copts.tensor_ninej_threshold = 1.0e-8;
   copts.tensor_fork_ph_missing_rank_phase = c.tensor_fork_ph_missing_rank_phase;
 }
@@ -75,7 +75,7 @@ OperatorFrame MakeOperatorFrame(const PreparedHamiltonian& ph,
   f.mass_number = ph.mass_number;
   f.proton_number = ph.proton_number;
   f.tensor_no.fork79e9330_diagonal_bug =
-      CompatOptionsFor(config.run.compat).tensor_no_fork_diagonal_bug;
+      EffectiveCompatOptions(config.run).tensor_no_fork_diagonal_bug;
   return f;
 }
 
@@ -184,7 +184,7 @@ io::ValenceWriteOptions MakeValenceWriteOptions(const RunConfig& c,
   o.a_ref = static_cast<std::int32_t>(frame.ms_bare->reference().target_mass());
   o.z_ref = static_cast<std::int32_t>(frame.ms_bare->reference().target_Z());
   o.a_target = static_cast<double>(frame.mass_number);
-  if (CompatOptionsFor(c.run.compat).tokyo_writer_fork_79e9330) {
+  if (EffectiveCompatOptions(c.run).tokyo_writer_fork_79e9330) {
     // The fork writes the core's A and Z and, as a label artifact of
     // SetReference(core), the core mass as "A_for_kinetic_energy".
     const basis::Partition& p = frame.ms_imsrg->partition();
@@ -214,7 +214,7 @@ std::string OperatorFileName(const std::string& stem, const std::string& name,
                              const RunConfig& config) {
   return OperatorFileName(
       stem, name, !spec.is_scalar(),
-      CompatOptionsFor(config.run.compat).fork_operator_file_names);
+      EffectiveCompatOptions(config.run).fork_operator_file_names);
 }
 
 void WriteTensorSnt(const std::filesystem::path& path, op::Operator O,
@@ -223,7 +223,7 @@ void WriteTensorSnt(const std::filesystem::path& path, op::Operator O,
   const io::ValenceWriteOptions v = MakeValenceWriteOptions(
       config, frame, io::ValenceWriteMode::kHamiltonian);
   io::TensorTokyoOptions t;
-  t.format = CompatOptionsFor(config.run.compat).tokyo_writer_fork_79e9330
+  t.format = EffectiveCompatOptions(config.run).tokyo_writer_fork_79e9330
                  ? io::TokyoFormat::kFork79e9330
                  : io::TokyoFormat::kDevel;
   t.file_2n = v.file_2n;
