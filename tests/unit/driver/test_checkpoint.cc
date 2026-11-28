@@ -15,6 +15,8 @@
 #include <csignal>
 #include <cstdio>
 #include <filesystem>
+#include <fstream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -111,6 +113,108 @@ TEST(Checkpoint, NativeRestartIsBitForBit) {
           << "Omega " << k << " after a kill at step " << kill;
     }
   }
+}
+
+/// The lines of a text file.
+std::vector<std::string> Lines(const fs::path& path) {
+  std::vector<std::string> lines;
+  std::istringstream in(Slurp(path));
+  std::string line;
+  while (std::getline(in, line)) lines.push_back(line);
+  return lines;
+}
+
+/// A flow-file line without its last column (wall_s, not reproducible).
+std::string WithoutWall(const std::string& line) {
+  return line.substr(0, line.rfind(','));
+}
+
+/// Runs the configuration in the existing directory `dir` (no cleaning).
+RunResult RunIn(const fs::path& dir, const std::string& extra) {
+  driver::ConfigSources src;
+  src.config_text = Al27Toml(dir, extra);
+  return Execute(src, dir);
+}
+
+/// WE-R-1: the flow file of a killed and restarted run (same output
+/// directory) equals that of the uninterrupted run, but for wall_s: kept rows
+/// up to the checkpointed step, rows written after it dropped.
+TEST(Checkpoint, RestartedFlowFileIsContinuous) {
+  if (!fs::exists(DataFile(TwoBodyName()))) GTEST_SKIP() << "missing 2N file";
+  fs::path dir_a;
+  const RunResult a = RunWith("flow_ref", "", &dir_a);
+  ASSERT_FALSE(a.planned) << a.note;
+  const int steps1 = static_cast<int>(Stages(a).at(0)["steps"].number);
+  ASSERT_GE(steps1, 4);
+  const std::string flow_name = a.config.output.stem + ".flow";
+  const std::vector<std::string> ref = Lines(dir_a / flow_name);
+  ASSERT_GT(ref.size(), static_cast<std::size_t>(steps1 + 4));
+
+  // Stage 1 (step 3), the end of stage 1, the stage-2 start and its middle.
+  for (const int kill : {3, steps1, steps1 + 1, steps1 + 2}) {
+    const fs::path ck = FreshDir("flow_ck_" + std::to_string(kill));
+    const fs::path dir = FreshDir("flow_run_" + std::to_string(kill));
+    EXPECT_THROW(RunIn(dir, Checkpoint(ck, "native", kill, false)),
+                 std::runtime_error);
+    const std::vector<std::string> killed = Lines(dir / flow_name);
+    ASSERT_GT(killed.size(), 1u);
+    {
+      // A row past the checkpoint, and a torn row.
+      std::ofstream out(dir / flow_name, std::ios::app);
+      const std::string& last = killed.back();
+      const std::size_t c1 = last.find(',');
+      const std::size_t c2 = last.find(',', c1 + 1);
+      out << last.substr(0, c1 + 1) << "99" << last.substr(c2) << "\n"
+          << last.substr(0, 7);
+    }
+    const RunResult c = RunIn(dir, Checkpoint(ck, "native", 0, true));
+    ASSERT_FALSE(c.planned) << c.note;
+    const std::vector<std::string> got = Lines(dir / flow_name);
+    ASSERT_EQ(got.size(), ref.size()) << "kill at step " << kill;
+    EXPECT_EQ(got[0], ref[0]);
+    for (std::size_t i = 1; i < ref.size(); ++i) {
+      EXPECT_EQ(WithoutWall(got[i]), WithoutWall(ref[i]))
+          << "row " << i << " after a kill at step " << kill;
+    }
+  }
+}
+
+/// A run without restart truncates an existing flow file; a restart whose
+/// flow file has another header starts it afresh.
+TEST(Checkpoint, FlowFileTruncatedUnlessRestart) {
+  if (!fs::exists(DataFile(TwoBodyName()))) GTEST_SKIP() << "missing 2N file";
+  fs::path dir_a;
+  const RunResult a = RunWith("flow_trunc_ref", "", &dir_a);
+  ASSERT_FALSE(a.planned) << a.note;
+  const std::string flow_name = a.config.output.stem + ".flow";
+  const std::vector<std::string> ref = Lines(dir_a / flow_name);
+
+  const fs::path dir = FreshDir("flow_trunc");
+  {
+    std::ofstream out(dir / flow_name);
+    for (int i = 0; i < 400; ++i) out << "stale," << i << "\n";
+  }
+  const RunResult b = RunIn(dir, "");
+  ASSERT_FALSE(b.planned) << b.note;
+  const std::vector<std::string> got = Lines(dir / flow_name);
+  ASSERT_EQ(got.size(), ref.size());
+  EXPECT_EQ(got[0], ref[0]);
+
+  // Restart over a file with a foreign header: fresh file, restarted rows.
+  const fs::path ck = FreshDir("flow_trunc_ck");
+  const fs::path dir_k = FreshDir("flow_trunc_run");
+  EXPECT_THROW(RunIn(dir_k, Checkpoint(ck, "native", 3, false)),
+               std::runtime_error);
+  {
+    std::ofstream out(dir_k / flow_name);
+    out << "a,b,c\n1,2,3\n";
+  }
+  const RunResult c = RunIn(dir_k, Checkpoint(ck, "native", 0, true));
+  ASSERT_FALSE(c.planned) << c.note;
+  const std::vector<std::string> fresh = Lines(dir_k / flow_name);
+  EXPECT_EQ(fresh[0], ref[0]);
+  EXPECT_LT(fresh.size(), ref.size());
+  EXPECT_EQ(fresh[1].substr(0, 4), "1,4,");
 }
 
 TEST(Checkpoint, OmegaSecondFormatWritesBoth) {
