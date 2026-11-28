@@ -322,60 +322,79 @@ def flow_section(rinfo, tinfo):
 
 
 def table_cols(results, rel_flag):
-    """Lines of the per-column summary table."""
+    """Lines of the per-column summary table.
+
+    "elements" is the number of compared elements (zero-, one- and two-body,
+    union of the keys of both files, summed over the column's files),
+    "rel-eligible" those with |ref| >= --small (n small is the rest).
+    """
     cols = {}
     for r in results:
         if "secs" in r:
             cols.setdefault(r["col"], []).append(r)
-    lines = ["| column | files | max abs (q) | max rel (q) | "
-             f"n rel>{rel_flag:g} | max rel, |ref|>={BIG:g} | "
-             f"n rel>{rel_flag:g}, |ref|>={BIG:g} | n small | only ref/test | "
-             "max abs ref |",
-             "|---|---|---|---|---|---|---|---|---|---|"]
+    lines = ["| column | files | elements | rel-eligible | "
+             "max abs (q) | max rel (q) | "
+             f"n rel>{rel_flag:g} | max rel, \\|ref\\|>={BIG:g} | "
+             f"n rel>{rel_flag:g}, \\|ref\\|>={BIG:g} | n small | "
+             "only ref/test | max abs ref |",
+             "|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for col in sorted(cols, key=lambda c: (cf.op_sort_key(c), c)):
         tots = [(r, merge_stats(r["secs"])) for r in cols[col]]
         ra, sa = max(tots, key=lambda x: x[1]["max_abs"])
         rr, sr = max(tots, key=lambda x: x[1]["max_rel"])
+        nel = sum(t["n"] for _, t in tots)
+        nsm = sum(t["n_small"] for _, t in tots)
         lines.append(
-            f"| {col} | {len(tots)} | {e2(sa['max_abs'])} ({qs(ra['q'])}) | "
+            f"| {col} | {len(tots)} | {nel} | {nel - nsm} | "
+            f"{e2(sa['max_abs'])} ({qs(ra['q'])}) | "
             f"{e2(sr['max_rel'])} ({qs(rr['q'])}) | "
             f"{sum(t['n_flag'] for _, t in tots)} | "
             f"{e2(max(t['max_rel_big'] for _, t in tots))} | "
             f"{sum(t['n_flag_big'] for _, t in tots)} | "
-            f"{sum(t['n_small'] for _, t in tots)} | "
+            f"{nsm} | "
             f"{sum(t['only_ref'] for _, t in tots)}/"
             f"{sum(t['only_test'] for _, t in tots)} | "
             f"{e2(max(t['max_ref'] for _, t in tots))} |")
     return lines
 
 
-def table_q(results):
-    """Lines of the per-q table (farm columns only)."""
+def table_q(results, rel_flag):
+    """Lines of the per-q table (farm columns only).
+
+    Besides the maxima: the number of elements of the q, of those rel-eligible
+    (|ref| >= --small) and of those with rel > rel_flag, summed over columns.
+    """
     byq = {}
     for r in results:
         if "secs" in r and r["q"] is not None:
             byq.setdefault(r["q"], []).append((r, merge_stats(r["secs"])))
-    lines = ["| q | files | max abs | worst col (abs) | max rel | "
-             "worst col (rel) |", "|---|---|---|---|---|---|"]
+    lines = ["| q | files | elements | rel-eligible | "
+             f"n rel>{rel_flag:g} | max abs | worst col (abs) | max rel | "
+             "worst col (rel) |", "|---|---|---|---|---|---|---|---|---|"]
     for q in sorted(byq):
         lst = byq[q]
         ra, sa = max(lst, key=lambda x: x[1]["max_abs"])
         rr, sr = max(lst, key=lambda x: x[1]["max_rel"])
-        lines.append(f"| {q} | {len(lst)} | {e2(sa['max_abs'])} | "
+        nel = sum(t["n"] for _, t in lst)
+        nsm = sum(t["n_small"] for _, t in lst)
+        lines.append(f"| {q} | {len(lst)} | {nel} | {nel - nsm} | "
+                     f"{sum(t['n_flag'] for _, t in lst)} | "
+                     f"{e2(sa['max_abs'])} | "
                      f"{ra['col']} | {e2(sr['max_rel'])} | {rr['col']} |")
     return lines
 
 
 def table_sections(results):
     """Lines of the 0b/1b/2b breakdown for a set of results."""
-    lines = ["| part | max abs | max rel | n rel>flag | n small | "
-             "only ref/test |", "|---|---|---|---|---|---|"]
+    lines = ["| part | elements | max abs | max rel | n rel>flag | n small | "
+             "only ref/test |", "|---|---|---|---|---|---|---|"]
     for sec in SECTIONS:
         ss = [r["secs"][sec] for r in results if "secs" in r]
         if not ss:
             continue
         lines.append(
-            f"| {sec} | {e2(max(s['max_abs'] for s in ss))} | "
+            f"| {sec} | {sum(s['n'] for s in ss)} | "
+            f"{e2(max(s['max_abs'] for s in ss))} | "
             f"{e2(max(s['max_rel'] for s in ss))} | "
             f"{sum(s['n_flag'] for s in ss)} | "
             f"{sum(s['n_small'] for s in ss)} | "
@@ -416,7 +435,7 @@ def build_report(args, parts):
     if fr:
         out += ["#### Per operator column", "",
                 *table_cols(fr, args.rel_flag),
-                "", "#### Per q", "", *table_q(fr), "",
+                "", "#### Per q", "", *table_q(fr, args.rel_flag), "",
                 "#### By part", "", *table_sections(fr), ""]
     if allr:
         hdr = ["| file | key | ref | test | value |",

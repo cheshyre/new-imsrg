@@ -69,7 +69,8 @@ def test_logs(tmp_path):
 
 def test_summary_text(tmp_path):
     txt = fs.summarize(str(make_run(tmp_path)))
-    assert "| 2 | 5 |" in txt
+    assert "| 1 | 3 |" in txt  # rows istep 0..3: 3 steps
+    assert "| 2 | 4 |" in txt  # rows istep 0..4: 4 steps
     assert "-34.000000" in txt
     assert "2 .opb file(s)" in txt
     assert "X_omegas.toml" in txt
@@ -90,3 +91,26 @@ def test_legacy_log_without_link(tmp_path):
 def test_no_files(tmp_path):
     txt = fs.summarize(str(tmp_path))
     assert "no flow.txt" in txt and "not present" in txt
+
+
+def test_steps_magnus_is_last_istep(tmp_path):
+    stages = fs.read_flow(str(make_run(tmp_path) / "flow.txt"))
+    assert fs.steps_text(stages[1]) == "3"  # 4 rows, istep 0..3
+    assert fs.steps_text(stages[2]) == "4"  # 5 rows, istep 0..4
+
+
+def test_ode_rows_not_merged(tmp_path):
+    txt = HEADER
+    for i in range(6):
+        txt += row(1, 0, -10.0 - i, 1.0 + i)  # ODE: istep stays 0
+    for i in range(4):
+        txt += row(2, 0, -20.0 - i, 10.0 + i)
+    path = tmp_path / "flow.txt"
+    path.write_text(txt)
+    stages = fs.read_flow(str(path))
+    assert [len(stages[1]), len(stages[2])] == [6, 4]
+    assert fs.steps_text(stages[1]) == "6 rows (ODE)"
+    run = tmp_path / "ode"
+    run.mkdir()
+    (run / "flow.txt").write_text(txt)
+    assert "| 2 | 4 rows (ODE) |" in fs.summarize(str(run))
