@@ -33,13 +33,16 @@ Jobs and node-hours: `design/benchmarks/al27-jobs.md`, section Lead D.
   decomposition farm (v2 Omegas transformed with the fork's operator behaviour, i.e. with
   `run.compat = "imsrg_fork_79e9330"`) assigns this to the operator side of the compat switch,
   while the flow part (domega 0.2 -> 0.1, same operator code) is <= 6e-3 absolute (N2LOsat;
-  1.1e-3 DN2LOGO). The compat switch changes a bundle at once (D72 tensor norm, 9j threshold,
-  devel writer, fork operator behaviour); the pattern of the differences (one-body 0d diagonal
-  elements for the even ranks, many two-body elements for the odd ranks) is what the fork bugs fixed
-  in the default path would produce (design/30 section 6: M15-1, the missing a == b,
-  J_bra != J_ket normal-ordering term, for the even ranks; AL-F1, the missing (-1)^L particle-hole
-  phase, for Sigma'/Sigma''/Delta), but that attribution is inferred from the pattern: the
-  bundle was not split into its parts and no individual fix was switched on or off.
+  1.1e-3 DN2LOGO). **Measured per compat option** (section 4.3, Lead E; one fork option switched
+  at a time on the v2 Omegas, both Hamiltonians): the operator side is the two fork bugs fixed in
+  the default path (design/30 section 6), nothing else. M15-1 (the missing a == b,
+  J_bra != J_ket normal-ordering term) is the largest part for **every** rank L >= 1, odd ranks
+  included (one-body elements only; up to 0.10 / 0.12 at L = 2, 1.4e-2 at L = 1, 3); AL-F1 (the
+  missing (-1)^L particle-hole phase) adds one- and two-body changes for the odd ranks (up to
+  1.1e-2 at L = 1, <= 1.1e-3 at L = 3, 5); together they reproduce the bundle up to a 1-1.5 %
+  cross term. The D72 tensor norm (<= 3e-12), the 9j threshold (<= 5e-16) and the writer
+  (<= 2.6e-6, rounding) do not matter. (The first version read the odd ranks as AL-F1 from the
+  pattern; that was only partly right.)
 * **v3 vs v2 valence H** (`<stem>.snt` of the flow directories; section 5.3): N2LOsat: single-particle
   energies differ by up to 0.843 MeV, the core energy (zero-body term) by 0.898 MeV, two-body
   elements by up to 0.267 MeV; DN2LOGO: 0.624 / 0.186 / 0.201 MeV. (v2 vs v1, N2LOsat: 7.4e-3 /
@@ -52,11 +55,12 @@ Jobs and node-hours: `design/benchmarks/al27-jobs.md`, section Lead D.
   lower at 600 than at 300 for 31 of 34 columns, higher at 900 than at 300 for 32); the largest |Δ| relative to the largest |ref| of a file occurs at q >= 300 for 32 of 34
   columns (median q 975). FM0 at q = 0 (particle number) agrees to 2e-16. Cause: the same
   Magnus(2)-vs-IMSRG(2) truncation difference. The ODE IMSRG(2) flow carrying FM0p_150 and
-  FPhipp0p_0 agrees with v3 to 0.1-0.3 % (median) and with v2 to 7-9 %; v3's operators are
+  FPhipp0p_0 agrees with v3 to 0.1-0.3 % (median) and with v2 to 7-9 % (N2LOsat); for DN2LOGO
+  (Lead E) 0.08-0.4 % and 4-8 %. Only scalars can be checked this way: the ODE flow cannot carry
+  a tensor operator (WE-E-1). v3's operators are
   converged in the split threshold (0.25 vs 0.1: 1-7e-4, median) and in the BCH series; v3's
   time-step error at domega 0.1 is 0.09-1.2 % (median, vs domega 0.025; two time steps only).
-  The decomposition farm (4.2) and the checks of 5.2 were analysed for N2LOsat; the tables of 4.2
-  are N2LOsat only (the DN2LOGO decomposition farm was run, with the same pattern: section 4.2).
+  The threshold and time-step checks of 5.2 were run for N2LOsat only.
 * **Farms**: v2 2 x 2415 items, 0 failed (job 6016703, 30 nodes, 19.6 min, 9.8 node-hours; 27
   GCD-hours of item work per Hamiltonian, TCM 792 s the longest item); v3: 2 x 2415 items, 0 failed (job 6016892, 80 nodes, 40 min,
   53.3 node-hours; 153 / 145 GCD-hours of item work). A v3 item
@@ -543,96 +547,50 @@ Missing files:
 A third farm (job 6016893, 136 items per Hamiltonian: all 34 columns at q = 0, 150, 450, 900)
 transforms the **v2 Omegas with `run.compat = "imsrg_fork_79e9330"`** (fork operator behaviour and
 writer). Against v1 it shows the flow effect alone (v1 vs v2 Omegas, same operator code); against
-v2 the operator-side fork behaviour alone (same Omegas). Per-column tables below (N2LOsat;
-DN2LOGO is alike). Result: the scalar columns (FM0, FPhipp0) are untouched by the operator
-behaviour (<= 4e-7, the writer's rounding; DN2LOGO <= 2.6e-6); the even-rank tensors change in a few
-elements, mostly one-body (0d3/2 and 0d5/2 diagonal: FPhitp2n 0.358 -> 0.458 at q = 0), which is
-the signature of the missing a == b normal-ordering term (M15-1); the odd ranks change in many
-two-body elements by <= 1.4e-2 (AL-F1's missing phase would act like this). Both attributions are
-inferred from the pattern: the compat switch changes the D72 tensor norm, the 9j threshold, the
-writer and the fork operator behaviour together, and the decomposition farm did not separate them.
-The flow part is <= 6.3e-3 (FPhipp0p at q = 0), mostly 1e-4 to 1e-3. The tables below are N2LOsat;
-for DN2LOGO the decomposition farm (136 items) gives the same pattern (operator side: largest absolute
-difference 0.12 for FPhitp2p/n at q = 0, FPhipp0 <= 5e-7, FM0 <= 2.6e-6; flow part: <= 1.1e-3) but its
-tables are not reproduced here.
+v2 the operator-side fork behaviour alone (same Omegas). Result: the scalar columns (FM0, FPhipp0)
+are untouched by the operator behaviour (<= 4e-7, the writer's rounding; DN2LOGO <= 2.6e-6); the
+tensor columns change by up to 0.10 (N2LOsat) / 0.12 (DN2LOGO), most of all in one-body elements
+(0d3/2 and 0d5/2 diagonal: FPhitp2n 0.358 -> 0.458 at q = 0). The flow part is <= 6.3e-3
+(FPhipp0p at q = 0, N2LOsat; DN2LOGO <= 1.1e-3), mostly 1e-4 to 1e-3. The per-column tables of
+this farm (N2LOsat, `diff_variants.py`, with the relative statistics) are now in
+`al27-variants-decomposition.md` section 4. Section 4.3 splits the operator side into the
+individual compat options.
 
-#### flow effect (v2 vs v1 Omegas, both with fork operator behaviour), N2LOsat
+### 4.3 Decomposition by compat option (Lead E)
 
-| column | files | elements | rel-eligible | max abs (q) | max rel (q) | n rel>0.001 | max rel, \|ref\|>=0.001 | n rel>0.001 of n \|ref\|>=0.001 | n small | only ref/test | max abs ref |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| FM0n | 4 | 657 | 483 | 5.12e-04 (150) | 3.25e-01 (900) | 282 | 8.34e-02 | 91 of 195 | 174 | 0/0 | 8.00e+00 |
-| FM0p | 4 | 657 | 483 | 8.77e-04 (150) | 1.46e+00 (450) | 304 | 1.17e-01 | 106 of 197 | 174 | 0/0 | 8.00e+00 |
-| FM2n | 4 | 1732 | 1710 | 7.20e-04 (150) | 6.51e+00 (150) | 1319 | 3.66e-01 | 634 of 860 | 22 | 2/2 | 5.91e-01 |
-| FM2p | 4 | 1727 | 1709 | 8.50e-04 (150) | 5.53e+00 (450) | 1357 | 5.42e-01 | 646 of 863 | 18 | 1/0 | 5.88e-01 |
-| FM4n | 4 | 1336 | 1326 | 2.89e-04 (450) | 2.86e+00 (150) | 1037 | 1.16e-01 | 411 of 569 | 10 | 1/0 | 1.86e-01 |
-| FM4p | 4 | 1336 | 1321 | 4.61e-04 (450) | 5.07e+00 (450) | 1072 | 1.16e-01 | 446 of 582 | 15 | 0/0 | 1.74e-01 |
-| FPhipp0n | 4 | 660 | 580 | 3.28e-03 (0) | 6.08e-01 (450) | 387 | 5.61e-01 | 181 of 268 | 80 | 0/0 | 8.44e-01 |
-| FPhipp0p | 4 | 660 | 577 | 6.31e-03 (0) | 5.30e-01 (0) | 403 | 3.36e-01 | 187 of 265 | 83 | 0/0 | 8.61e-01 |
-| FPhipp2n | 4 | 2296 | 2200 | 1.35e-03 (0) | 3.15e+02 (0) | 1672 | 1.01e+00 | 940 of 1260 | 96 | 0/0 | 1.04e+00 |
-| FPhipp2p | 4 | 2294 | 2191 | 2.50e-03 (0) | 1.80e+00 (0) | 1691 | 7.37e-01 | 962 of 1264 | 103 | 0/0 | 1.04e+00 |
-| FPhipp4n | 4 | 1333 | 1259 | 1.60e-04 (150) | 7.94e-01 (450) | 919 | 1.09e-01 | 286 of 475 | 74 | 1/2 | 1.48e-01 |
-| FPhipp4p | 4 | 1332 | 1249 | 2.50e-04 (150) | 7.01e+00 (150) | 920 | 2.24e-01 | 285 of 475 | 83 | 1/1 | 1.50e-01 |
-| FPhitp2n | 4 | 2300 | 2188 | 1.65e-03 (0) | 3.15e+02 (0) | 1692 | 1.01e+00 | 909 of 1215 | 112 | 1/2 | 1.27e+00 |
-| FPhitp2p | 4 | 2294 | 2171 | 3.06e-03 (0) | 2.12e+01 (150) | 1693 | 7.37e-01 | 927 of 1220 | 123 | 0/0 | 1.27e+00 |
-| FPhitp4n | 4 | 1326 | 1249 | 1.36e-04 (150) | 1.98e+00 (150) | 930 | 7.58e-02 | 279 of 437 | 77 | 2/0 | 1.64e-01 |
-| FPhitp4p | 4 | 1323 | 1244 | 2.67e-04 (150) | 1.50e+00 (150) | 953 | 1.31e-01 | 290 of 443 | 79 | 2/3 | 1.65e-01 |
-| FSigmap1n | 4 | 1805 | 1715 | 7.18e-04 (0) | 1.50e+01 (0) | 1334 | 3.65e-01 | 557 of 730 | 90 | 3/3 | 6.22e-01 |
-| FSigmap1p | 4 | 1810 | 1743 | 1.22e-03 (0) | 2.36e+01 (150) | 1376 | 6.06e-01 | 589 of 753 | 67 | 0/1 | 6.21e-01 |
-| FSigmap3n | 4 | 1579 | 1521 | 1.68e-04 (150) | 1.22e+00 (450) | 1237 | 8.25e-02 | 308 of 419 | 58 | 0/0 | 1.42e-01 |
-| FSigmap3p | 4 | 1585 | 1499 | 2.92e-04 (150) | 3.56e+00 (150) | 1226 | 1.10e-01 | 317 of 432 | 86 | 3/0 | 1.43e-01 |
-| FSigmap5n | 4 | 777 | 748 | 1.11e-04 (450) | 3.68e+00 (450) | 539 | 5.37e-02 | 75 of 145 | 29 | 1/1 | 9.43e-02 |
-| FSigmap5p | 4 | 778 | 747 | 1.74e-04 (450) | 1.23e+00 (150) | 568 | 4.71e-02 | 83 of 146 | 31 | 2/0 | 9.12e-02 |
-| FSigmapp1n | 4 | 1809 | 1749 | 5.08e-04 (0) | 5.05e+00 (150) | 1404 | 3.20e-01 | 489 of 620 | 60 | 0/0 | 4.39e-01 |
-| FSigmapp1p | 4 | 1812 | 1756 | 8.64e-04 (0) | 5.03e+00 (0) | 1363 | 5.87e-01 | 492 of 647 | 56 | 0/0 | 4.39e-01 |
-| FSigmapp3n | 4 | 1578 | 1514 | 1.78e-04 (150) | 4.67e+00 (450) | 1246 | 7.64e-02 | 284 of 380 | 64 | 1/0 | 1.29e-01 |
-| FSigmapp3p | 4 | 1580 | 1501 | 3.07e-04 (150) | 1.17e+01 (450) | 1230 | 1.17e-01 | 284 of 384 | 79 | 3/2 | 1.31e-01 |
-| FSigmapp5n | 4 | 775 | 742 | 1.01e-04 (450) | 1.02e+00 (450) | 524 | 7.93e-02 | 65 of 128 | 33 | 0/0 | 8.47e-02 |
-| FSigmapp5p | 4 | 774 | 732 | 1.58e-04 (450) | 2.15e+01 (450) | 538 | 1.57e-01 | 75 of 133 | 42 | 3/4 | 8.19e-02 |
-| FDelta1n | 4 | 1737 | 1443 | 4.01e-04 (0) | 7.39e+00 (0) | 1174 | 2.90e-01 | 341 of 447 | 294 | 0/2 | 6.31e-01 |
-| FDelta1p | 4 | 1734 | 1440 | 3.50e-04 (0) | 7.96e+01 (0) | 1184 | 2.30e-01 | 376 of 473 | 294 | 0/4 | 6.29e-01 |
-| FDelta3n | 4 | 1526 | 1193 | 4.36e-05 (150) | 4.81e+00 (150) | 950 | 2.84e-02 | 92 of 151 | 333 | 3/2 | 4.59e-02 |
-| FDelta3p | 4 | 1519 | 1199 | 7.42e-05 (150) | 8.31e+00 (150) | 957 | 3.37e-02 | 81 of 150 | 320 | 2/1 | 4.65e-02 |
-| FDelta5n | 4 | 746 | 617 | 1.14e-06 (450) | 1.54e-01 (450) | 254 | 4.27e-04 | 0 of 7 | 129 | 0/1 | 1.81e-03 |
-| FDelta5p | 4 | 756 | 615 | 1.30e-06 (450) | 5.79e-02 (150) | 272 | 6.02e-04 | 0 of 4 | 141 | 0/0 | 1.69e-03 |
+The first version of 4.2 attributed the operator side to M15-1 (even ranks) and AL-F1 (odd ranks)
+from the pattern only. Measured now (job 6018194; details, per-column tables and method in
+`al27-variants-decomposition.md`): the v2 Omegas transformed with `run.compat = "none"` plus one
+fork option (debug key `run.compat_enable`), and with the bundle minus one option
+(`run.compat_disable`), 136 items per Hamiltonian, both Hamiltonians. Controls: compat none
+reproduces the v2 farm and the bundle reproduces farm 6016893 bit for bit. Per rank L, max |Δ| over
+the rank's elements / L2 share of the operator side (N2LOsat; DN2LOGO in the companion file, same
+picture):
 
-#### operator-side compat effect (v2 Omegas, default vs fork operator behaviour), N2LOsat
+| L | operator side max \|Δ\| | M15-1 (NO diag) | AL-F1 (ph phase) | non-additive rest | writer | D72 norm | 9j 1e-8 | flow / total (L2) |
+|---|---|---|---|---|---|---|---|---|
+| 0 | 4.1e-07 | 0 | 0 | 0 | 4.1e-07 / 1.00 | 0 | 0 | 1.00 |
+| 1 | 1.4e-02 | 1.4e-02 / 0.62 | 8.5e-03 / 0.79 | 2.5e-04 / 0.01 | 1e-07 | 2e-12 | 0 | 0.09 |
+| 2 | 1.0e-01 | 1.0e-01 / 1.00 | 0 | 4.6e-07 | 4e-07 | 5e-13 | 4e-16 | 0.06 |
+| 3 | 1.3e-02 | 1.3e-02 / 0.95 | 8.6e-04 / 0.32 | 1.5e-04 / 0.01 | 1e-07 | 9e-14 | 1e-16 | 0.04 |
+| 4 | 1.1e-02 | 1.1e-02 / 1.00 | 0 | 7.8e-08 | 9e-08 | 2e-15 | 5e-16 | 0.11 |
+| 5 | 2.4e-03 | 2.4e-03 / 0.87 | 5.7e-04 / 0.49 | 4.0e-05 / 0.01 | 1e-07 | 0 | 4e-16 | 0.07 |
 
-| column | files | elements | rel-eligible | max abs (q) | max rel (q) | n rel>0.001 | max rel, \|ref\|>=0.001 | n rel>0.001 of n \|ref\|>=0.001 | n small | only ref/test | max abs ref |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| FM0n | 4 | 657 | 483 | 4.10e-07 (150) | 6.84e-07 (900) | 0 | 5.15e-07 | 0 of 195 | 174 | 158/0 | 8.00e+00 |
-| FM0p | 4 | 657 | 484 | 3.30e-07 (150) | 4.89e-07 (150) | 0 | 4.89e-07 | 0 of 197 | 173 | 158/0 | 8.00e+00 |
-| FM2n | 4 | 1732 | 1710 | 3.75e-02 (150) | 1.40e+00 (900) | 12 | 7.56e-01 | 8 of 863 | 22 | 0/2 | 5.91e-01 |
-| FM2p | 4 | 1732 | 1704 | 3.29e-02 (150) | 2.58e+00 (900) | 12 | 7.56e-01 | 8 of 866 | 28 | 0/6 | 5.89e-01 |
-| FM4n | 4 | 1336 | 1325 | 1.09e-02 (450) | 1.10e+00 (900) | 6 | 1.02e-01 | 4 of 572 | 11 | 0/1 | 1.86e-01 |
-| FM4p | 4 | 1336 | 1320 | 8.54e-03 (450) | 7.26e-01 (900) | 6 | 7.99e-02 | 4 of 584 | 16 | 0/0 | 1.74e-01 |
-| FPhipp0n | 4 | 660 | 581 | 2.96e-07 (0) | 1.32e-06 (0) | 0 | 1.32e-06 | 0 of 269 | 79 | 1/0 | 8.44e-01 |
-| FPhipp0p | 4 | 660 | 579 | 3.97e-07 (150) | 3.42e-06 (900) | 0 | 3.03e-06 | 0 of 265 | 81 | 3/0 | 8.61e-01 |
-| FPhipp2n | 4 | 2308 | 2200 | 8.20e-02 (0) | 3.31e+00 (900) | 16 | 9.13e-01 | 11 of 1260 | 108 | 0/12 | 1.04e+00 |
-| FPhipp2p | 4 | 2308 | 2195 | 8.19e-02 (0) | 2.98e+00 (900) | 16 | 8.72e-01 | 11 of 1263 | 113 | 0/14 | 1.04e+00 |
-| FPhipp4n | 4 | 1335 | 1261 | 4.24e-03 (450) | 1.12e+00 (900) | 5 | 4.86e-01 | 3 of 476 | 74 | 0/3 | 1.48e-01 |
-| FPhipp4p | 4 | 1336 | 1250 | 3.55e-03 (450) | 9.23e-01 (900) | 6 | 4.70e-01 | 4 of 476 | 86 | 0/5 | 1.50e-01 |
-| FPhitp2n | 4 | 2308 | 2191 | 1.00e-01 (0) | 1.34e+00 (450) | 16 | 9.13e-01 | 11 of 1216 | 117 | 0/9 | 1.27e+00 |
-| FPhitp2p | 4 | 2308 | 2175 | 1.00e-01 (0) | 1.73e+00 (450) | 15 | 8.72e-01 | 11 of 1220 | 133 | 0/14 | 1.27e+00 |
-| FPhitp4n | 4 | 1336 | 1249 | 6.73e-03 (450) | 5.38e-01 (900) | 6 | 1.88e-01 | 4 of 436 | 87 | 0/12 | 1.64e-01 |
-| FPhitp4p | 4 | 1336 | 1244 | 5.73e-03 (450) | 3.29e-01 (900) | 6 | 2.16e-01 | 4 of 443 | 92 | 0/15 | 1.65e-01 |
-| FSigmap1n | 4 | 1816 | 1718 | 9.42e-03 (150) | 1.86e+02 (0) | 1699 | 1.95e+00 | 728 of 737 | 98 | 0/14 | 6.22e-01 |
-| FSigmap1p | 4 | 1816 | 1741 | 1.10e-02 (150) | 4.85e+01 (0) | 1701 | 2.38e+00 | 729 of 750 | 75 | 0/6 | 6.21e-01 |
-| FSigmap3n | 4 | 1588 | 1519 | 9.83e-03 (450) | 1.84e+01 (150) | 1488 | 4.73e-01 | 407 of 423 | 69 | 0/9 | 1.42e-01 |
-| FSigmap3p | 4 | 1588 | 1499 | 1.04e-02 (450) | 2.59e+01 (450) | 1462 | 4.28e-01 | 414 of 431 | 89 | 0/6 | 1.43e-01 |
-| FSigmap5n | 4 | 778 | 747 | 2.43e-03 (450) | 2.66e+01 (150) | 730 | 5.16e-01 | 139 of 146 | 31 | 0/2 | 9.43e-02 |
-| FSigmap5p | 4 | 778 | 749 | 2.02e-03 (150) | 3.00e+01 (450) | 723 | 4.19e-01 | 135 of 144 | 29 | 0/2 | 9.12e-02 |
-| FSigmapp1n | 4 | 1816 | 1749 | 6.01e-03 (0) | 1.86e+02 (0) | 1733 | 1.95e+00 | 612 of 623 | 67 | 0/7 | 4.39e-01 |
-| FSigmapp1p | 4 | 1816 | 1753 | 5.65e-03 (0) | 4.85e+01 (0) | 1716 | 2.38e+00 | 618 of 639 | 63 | 0/4 | 4.39e-01 |
-| FSigmapp3n | 4 | 1588 | 1516 | 1.28e-02 (150) | 1.79e+02 (150) | 1479 | 5.80e-01 | 361 of 380 | 72 | 0/11 | 1.29e-01 |
-| FSigmapp3p | 4 | 1588 | 1501 | 1.34e-02 (150) | 2.51e+02 (150) | 1462 | 4.11e-01 | 364 of 382 | 87 | 0/11 | 1.31e-01 |
-| FSigmapp5n | 4 | 778 | 743 | 2.19e-03 (450) | 1.34e+01 (150) | 728 | 3.52e-01 | 121 of 129 | 35 | 0/3 | 8.47e-02 |
-| FSigmapp5p | 4 | 778 | 732 | 1.96e-03 (450) | 2.15e+01 (450) | 720 | 2.37e-01 | 126 of 133 | 46 | 0/7 | 8.19e-02 |
-| FDelta1n | 4 | 1816 | 1444 | 1.38e-02 (150) | 4.10e+02 (0) | 1433 | 2.93e+00 | 445 of 448 | 372 | 0/79 | 6.31e-01 |
-| FDelta1p | 4 | 1816 | 1440 | 1.30e-02 (150) | 1.74e+02 (0) | 1424 | 1.62e+00 | 468 of 472 | 376 | 2/82 | 6.29e-01 |
-| FDelta3n | 4 | 1588 | 1196 | 2.78e-03 (150) | 6.28e+01 (150) | 1178 | 5.15e-01 | 147 of 150 | 392 | 0/65 | 4.59e-02 |
-| FDelta3p | 4 | 1587 | 1201 | 3.28e-03 (150) | 3.34e+01 (450) | 1167 | 4.65e-01 | 138 of 149 | 386 | 0/70 | 4.65e-02 |
-| FDelta5n | 4 | 778 | 617 | 9.68e-04 (450) | 4.44e+01 (450) | 600 | 5.33e-01 | 7 of 7 | 161 | 0/32 | 1.82e-03 |
-| FDelta5p | 4 | 777 | 615 | 8.27e-04 (450) | 8.19e+00 (450) | 591 | 5.08e-01 | 4 of 4 | 162 | 0/21 | 1.69e-03 |
+* **M15-1 is the largest operator-side effect for every rank L >= 1, odd ranks included**
+  (contrary to the pattern-based reading of the first version, which assigned the odd ranks to
+  AL-F1): FDelta1n changes by 1.4e-2 through M15-1 and by 3.4e-3 through AL-F1. M15-1 changes only
+  one-body elements (its two-body differences are exactly 0 in every item, both Hamiltonians),
+  consistent with it acting in the final re-normal-ordering of the evolved operator to the core.
+* **AL-F1** acts on odd ranks only, on one- and two-body elements (two-body larger in norm); for
+  L = 1 it is comparable to M15-1 (N2LOsat share 0.79 vs 0.62; DN2LOGO 0.86 vs 0.52), for L = 3, 5
+  smaller.
+* The two **add up** to the bundle up to a cross term of 1-1.5 % of the operator side (<= 2.7e-4).
+* The **D72 tensor norm** (AL-A-Q6) moves the BCH stopping point of 20-25 of the 136 items by 1-2
+  terms (all converged, no NaN norm, <= 29 terms) and the operators by <= 2.6e-12; the **9j
+  threshold** by <= 5e-16; the **fork writer** by <= 4e-7 (DN2LOGO 2.6e-6), which is the whole
+  operator-side difference of the scalar columns.
+* The scalar columns' v2 - v1 difference is entirely the flow (domega 0.2 -> 0.1); for the tensors
+  the flow is 2-11 % (L2) of v2 - v1.
 
 ## 5. v3 vs v2
 
@@ -748,9 +706,9 @@ table was regenerated with `dominant_rel.py` and is not reproduced here.
 ### 5.2 Cause of the differences > 1e-3 (investigation)
 
 Candidates as in section 3: BCH truncation per Omega in the transform, the number of Omegas
-(threshold), the time step, and the Magnus(2)-vs-IMSRG(2) truncation of v2. Checks (N2LOsat only;
-jobs 6017305 and 6017358; 12 items from the worst columns, q = 0 to 990; not repeated for
-DN2LOGO):
+(threshold), the time step, and the Magnus(2)-vs-IMSRG(2) truncation of v2. Checks (N2LOsat;
+jobs 6017305 and 6017358; 12 items from the worst columns, q = 0 to 990; for DN2LOGO only the ODE
+reference, job 6018030, Lead E):
 
 * **BCH truncation per Omega:** every v3 item reports a converged series (`bch_converged=1`; the
   transform stops when a nested commutator falls below 1e-9-scaled epsilon, at most 40 terms);
@@ -780,8 +738,10 @@ DN2LOGO):
   changes them by 0.09-1.2 % (median; up to 3-8 % of the file maximum for the highest-q L = 4, 5
   items, whose elements are small). v2 differs from v3 by 6-17 % (median), about 10-20 times more.
 * **ODE reference:** the ODE IMSRG(2) flow (job 6017305, 36 min on a GCD) evolved FM0p_150 and
-  FPhipp0p_0 alongside H (scalars only; a tensor would make the ODE flow too slow). Against it
-  (same cells as above):
+  FPhipp0p_0 alongside H. Scalars only: `flow::OdeSolver` cannot carry a tensor operator (it
+  rejects non-scalar operators, src/imsrg/flow/ode.cc:214-220; WE-E-1), so no rank L > 0 item
+  can be checked this way (an earlier version of this section gave the cost as the reason).
+  Against it (same cells as above), N2LOsat:
 
 | quantity (vs ODE) | v3 (split 0.25, domega 0.1) | split 0.25, domega 0.025 | split 0.1, domega 0.1 | v2 (unsplit, domega 0.1) |
 |---|---|---|---|---|
@@ -793,6 +753,25 @@ DN2LOGO):
   The split runs agree with the ODE operators and valence H to 0.04-0.3 % (median of the dominant
   elements; domega 0.025 closest), v2 is 5-9 % off, and v2's core energy is 0.89 MeV above the
   ODE value (v3: -7 keV).
+
+  DN2LOGO (job 6018030, Lead E: the same two operators through the ODE flow from v2's prepared
+  H_0, config `runs/al27/investigate/configs/DN2LOGO-ode-ops.toml` = the scan's DN2LOGO-ode.toml
+  plus the operators, the binary of 6017305, 34 min on a GCD; E0 -216.989496 MeV, 1.3e-7 MeV from
+  the ODE flow without operators; 85 + 444 accepted steps vs 83 + 443 without them). The
+  split-check Omega stacks exist for N2LOsat only, so the comparison is with v3 and v2:
+
+| quantity (vs ODE), DN2LOGO | v3 (split 0.25, domega 0.1) | v2 (unsplit, domega 0.1) | ODE flow without operators (6016814) |
+|---|---|---|---|
+| FM0p_150: median rel (dominant) / max abs over max ref | 3.9e-03 / 4.1e-03 | 8.0e-02 / 3.2e-02 | |
+| FPhipp0p_0: median rel (dominant) / max abs over max ref | 7.8e-04 / 1.5e-03 | 4.3e-02 / 1.1e-02 | |
+| valence H: median rel (dominant) / max abs over max ref | 4.2e-04 / 1.1e-03 | 3.0e-02 / 9.3e-02 | 3.0e-08 / 1.1e-07 |
+| valence H: core energy - ODE (keV; ODE -116.479240 MeV) | +2.2 | +187.8 | +0.0 |
+
+  The same picture as for N2LOsat: v3 agrees with the ODE operators to 0.08-0.4 % (median of the
+  dominant elements) and with the valence H to 0.04 %, v2 is 4-8 % off (valence H 3 %), and v2's
+  core energy is 0.19 MeV above the ODE value (v3: +2.2 keV). (Cells: `tools/al27/ode_check.py`,
+  built on `dominant_rel.py`, dominant = |ref| >= max(0.01 max|ref|, 1e-6); it reproduces the
+  N2LOsat table above exactly.)
 
 **Conclusion.** The v3-vs-v2 operator differences above 1e-3 relative are the same effect as in
 E0: v3 (split Magnus) is an IMSRG(2)-equivalent evolution, v2 (unsplit) is Magnus(2) with one

@@ -7,6 +7,7 @@
 // operators -> outputs (results.json, flow CSV, .snt).
 #include "imsrg/driver/run.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -17,6 +18,7 @@
 #include <limits>
 #include <memory>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <variant>
@@ -235,28 +237,36 @@ class FlowLog {
   /// `write_file`: false on the ranks that write no files (every rank but rank
   /// 0): they open nothing but still evaluate every value of a step, so that
   /// collective evaluations stay matched across the ranks.
-  FlowLog(const fs::path& path, bool three_body, bool write_file)
+  /// `resume`: the (stage, istep) of the flow checkpoint a restarted run
+  /// continues from, or empty for a fresh file. A restart keeps the rows of
+  /// the existing file up to and including that (stage, istep) (the restarted
+  /// flow logs the steps after it, never the checkpointed step again: the
+  /// Magnus loop starts at `istep + 1` and writes no step-0 row), drops the
+  /// later ones (written between the checkpoint and the kill) and appends the
+  /// new rows, so that the file reads like one uninterrupted run. A file that
+  /// is missing or has another header starts afresh (the latter with a
+  /// warning).
+  FlowLog(const fs::path& path, bool three_body, bool write_file,
+          std::optional<std::pair<int, int>> resume = std::nullopt)
       : three_body_(three_body), write_file_(write_file) {
     if (write_file_) {
       if (path.has_parent_path()) fs::create_directories(path.parent_path());
+      const std::vector<std::string> kept =
+          resume ? KeptRows(path, *resume) : std::vector<std::string>();
       out_.open(path);
       if (!out_) {
         throw InputError("cannot write the flow file '" + path.string() + "'");
       }
       WriteHeader();
+      for (const std::string& row : kept) out_ << row << '\n';
+      out_.flush();
     }
     log::Info(
         "{:>5} {:>5} {:>12} {:>18} {:>14} {:>14} {:>14} {:>14} {:>4} {:>10}",
         "stage", "step", "s", "E0", "|eta_1b|", "|eta_2b|", "|Omega_1b|",
         "|Omega_2b|", "nOm", "wall(s)");
   }
-  void WriteHeader() {
-    out_ << "stage,istep,s,ds,E0,norm_H,norm_eta_1b,norm_eta_2b,"
-         << (three_body_ ? "norm_eta_3b," : "")
-         << "norm_eta,norm_omega_1b,norm_omega_2b,"
-         << (three_body_ ? "norm_omega_3b," : "")
-         << "norm_omega,num_omegas,E_MP2,wall_s\n";
-  }
+  void WriteHeader() { out_ << HeaderLine() << '\n'; }
   /// Gives the current Hamiltonian that the `E_MP2` column evaluates.
   void set_hamiltonian(std::function<const op::Operator&()> current) {
     current_h_ = std::move(current);
@@ -281,6 +291,52 @@ class FlowLog {
   }
 
  private:
+  std::string HeaderLine() const {
+    return std::string("stage,istep,s,ds,E0,norm_H,norm_eta_1b,norm_eta_2b,") +
+           (three_body_ ? "norm_eta_3b," : "") +
+           "norm_eta,norm_omega_1b,norm_omega_2b," +
+           (three_body_ ? "norm_omega_3b," : "") +
+           "norm_omega,num_omegas,E_MP2,wall_s";
+  }
+
+  /// The data rows of the existing flow file that precede the first row a run
+  /// restarted at `resume` = (stage, istep) writes: those with (stage, istep)
+  /// <= `resume`. Empty if the file is missing or its header differs from
+  /// this run's (warned).
+  std::vector<std::string> KeptRows(const fs::path& path,
+                                    std::pair<int, int> resume) const {
+    std::vector<std::string> kept;
+    std::ifstream in(path);
+    if (!in) return kept;
+    std::string line;
+    if (!std::getline(in, line)) return kept;
+    if (line != HeaderLine()) {
+      log::Warn(
+          "restart: the flow file '{}' has another header than this run "
+          "writes; starting it afresh",
+          path.string());
+      return kept;
+    }
+    const auto commas = [](const std::string& s) {
+      return std::count(s.begin(), s.end(), ',');
+    };
+    const auto n_commas = commas(HeaderLine());
+    while (std::getline(in, line)) {
+      int stage = 0;
+      int istep = 0;
+      char c1 = 0;
+      char c2 = 0;
+      std::istringstream fields(line);
+      if (!(fields >> stage >> c1 >> istep >> c2) || c1 != ',' || c2 != ',' ||
+          commas(line) != n_commas) {
+        break;  // a torn last row (kill during a write): drop it and the rest
+      }
+      if (std::make_pair(stage, istep) > resume) break;
+      kept.push_back(line);
+    }
+    return kept;
+  }
+
   void WriteRow(const flow::FlowStatus& st, double e_mp2) {
     out_ << st.stage << ',' << st.istep << ',' << Fmt17(st.s) << ','
          << Fmt17(st.ds) << ',' << Fmt17(st.e0) << ',' << Fmt17(st.norm_h)
@@ -563,7 +619,7 @@ flow::BchOptions MakeBchOptions(const RunConfig& config) {
       config.imsrg3.factorized_1b_intermediates;
   bch.factorized_terms.two_body_intermediates =
       config.imsrg3.factorized_2b_intermediates;
-  if (CompatOptionsFor(config.run.compat).tensor_one_body_norm_imsrgpp) {
+  if (EffectiveCompatOptions(config.run).tensor_one_body_norm_imsrgpp) {
     bch.tensor_one_body_norm = op::TensorOneBodyNorm::kImsrgppInteger;
   }
   return bch;
@@ -1027,10 +1083,6 @@ void Run(const RunConfig& config, const comm::Communicator& comm) {
 
   // ---- IMSRG flow: stage 1 with the core generator, stage 2 (valence) with a
   // new Omega.
-  FlowLog flow_log(config.output.flow_file.empty()
-                       ? dir / "flow.csv"
-                       : fs::path(config.output.flow_file),
-                   config.imsrg3.in_flow, comm.is_root());
   // The ODE methods evolve the requested operators alongside H, so these are
   // built first (imsrg++.cc:1074); Magnus replays its Omega stack afterwards.
   const bool magnus = config.imsrg.method == Method::kMagnus;
@@ -1049,8 +1101,6 @@ void Run(const RunConfig& config, const comm::Communicator& comm) {
   commutator::CommutatorOptions copts;
   const FlowStart start = MakeFlowStart(config, ph, copts);
   Engine solver = MakeEngine(config, ph, start, prepared, copts, comm);
-  flow_log.set_hamiltonian(
-      [&solver]() -> const op::Operator& { return solver.hamiltonian(); });
   std::vector<StageRecord> stages;
   std::optional<TriplesRecord> triples;
   pipeline::FlowCheckpointer ckpt(config, comm.is_root());
@@ -1068,6 +1118,17 @@ void Run(const RunConfig& config, const comm::Communicator& comm) {
       restored = pipeline::ReadCheckpoint(config, start.ms_flow);
     }
   }
+  // The flow file is opened only now: a restart from a flow checkpoint keeps
+  // the rows that precede it (FlowLog); nothing logs before RunStages.
+  FlowLog flow_log(config.output.flow_file.empty()
+                       ? dir / "flow.csv"
+                       : fs::path(config.output.flow_file),
+                   config.imsrg3.in_flow, comm.is_root(),
+                   restored ? std::optional<std::pair<int, int>>(std::make_pair(
+                                  restored->loop.stage, restored->loop.istep))
+                            : std::nullopt);
+  flow_log.set_hamiltonian(
+      [&solver]() -> const op::Operator& { return solver.hamiltonian(); });
   RunStages(solver, flow_log, config, ph, ms, magnus, stages, triples, ckpt,
             std::move(restored), comm);
   FinishRun(config, ph, solver, start, magnus, requests, radius_slots, stages,

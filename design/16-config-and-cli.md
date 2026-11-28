@@ -33,6 +33,7 @@ Conventions: keys are `snake_case`; enum values are lower `snake_case` strings (
 | `scratch_dir` | string | `""` | directory for Omega spill files; used only when `imsrg.omega.storage="scratch"`. Probed for writability at preflight. |
 | `log_level` | enum `quiet`, `normal`, `debug` | `normal` | stdout verbosity (new key; no legacy equivalent). |
 | `compat` | enum `none`, `imsrg_fork_79e9330` | `none` | compatibility profile (design/50 §5): one key that switches on named internal options reproducing another code version; `none` is the fixed behaviour. The options and their profiles are listed in `src/imsrg/driver/config/compat.h` (`CompatOptions`). `imsrg_fork_79e9330`: `tensor_one_body_norm_imsrgpp` (imsrg++'s integer tensor one-body norm in the BCH thresholds, AL-A-Q6), `fork_step_defaults` (`imsrg.step.domega` defaults to the fork's 0.2 instead of 0.1), `tensor_no_fork_diagonal_bug` (fork's tensor normal ordering omits one orientation for a == b, also in the re-normal-ordering), `tensor_ninej_threshold_1e8` (9j skip threshold 1e-8 in the flow's tensor commutators), `fork_operator_file_names` (operator files `<stem><name>.snt` without the `_`), `tokyo_writer_fork_79e9330` (79e9330 writers for scalar and tensor `.snt`: 7 significant digits, absolute 1e-7 thresholds, header A/Z of the core). No legacy equivalent. |
+| `compat_enable`, `compat_disable` | array of string | `[]` | debug: names of `CompatOptions` fields (`fork_step_defaults`, `tokyo_writer_fork_79e9330`, `tensor_no_fork_diagonal_bug`, `tensor_ninej_threshold_1e8`, `tensor_fork_ph_missing_rank_phase`, `tensor_one_body_norm_imsrgpp`, `fork_operator_file_names`) switched on / off on top of the profile of `compat` (enable first, then disable). Unknown names and names in both lists are errors (V-34). Not part of `FlowConfigHash` or `PreparationHash` (no option changes H_0 or the scalar flow; the step default enters through the hashed `imsrg.step.domega`). |
 
 ### 2.2 `[basis]` (model space and single-particle basis)
 
@@ -769,6 +770,7 @@ Errors are collected; each rule has an id used in tests. TOML = strict; "legacy:
 * V-41 `steps=1` + valence space + `generator.valence` explicitly set: TOML error, legacy warning (Q1). `steps=1` + valence orbits + non-`shell_model*` core generator: warning in both.
 * V-42 `shell_model*` generator in a stage with no valence orbits: error (TOML), warning (legacy; old produced a degenerate decoupling).
 * V-43 `delta != 0` requires `delta_orbit` (Q3). `delta_orbit` other than `all` or a valid orbit label: error.
+* V-34 `run.compat_enable` / `run.compat_disable`: every entry is a `CompatOptions` field name; no name in both lists (error, lists the valid names).
 * V-44 `imsrg.omega.storage="discard"` with non-empty `operators.*`: error. `storage="scratch"` requires `run.scratch_dir` non-empty.
 * V-45 `perturbative_triples` requires `method="magnus"`.
 * V-46 methods other than `magnus` are PL; additionally flow-type methods (`flow*`, `restore_4th_order`) reject IMSRG(3) (ODE algebra has no 3-body part, R03 2.3) and `brueckner2` is PL.

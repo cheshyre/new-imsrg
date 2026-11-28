@@ -18,6 +18,7 @@
 #include "imsrg/basis/nucleus.h"
 #include "imsrg/basis/orbit.h"
 #include "imsrg/basis/valence_space.h"
+#include "imsrg/driver/config/compat.h"
 #include "imsrg/driver/config/resolve.h"
 #include "imsrg/driver/config/schema_keys.h"
 
@@ -64,6 +65,7 @@ class Checker {
   }
 
   void Run();
+  void CompatNames();
 
  private:
   void Ranges();
@@ -144,6 +146,7 @@ class PlannedEnumVisitor {
 };
 
 void Checker::Run() {
+  CompatNames();
   Ranges();
   Planned();
   Valence();
@@ -154,6 +157,37 @@ void Checker::Run() {
   Operators();
   Output();
   if (opt_.check_files) Files();
+}
+
+/// run.compat_enable / run.compat_disable: only names of CompatOptions
+/// fields, none in both lists.
+void Checker::CompatNames() {
+  std::string valid;
+  for (const auto n : CompatOptionNames()) {
+    if (!valid.empty()) valid += ", ";
+    valid += n;
+  }
+  const auto check = [&](const std::vector<std::string>& list,
+                         const std::string& key) {
+    for (const auto& n : list) {
+      const auto names = CompatOptionNames();
+      if (std::find(names.begin(), names.end(), n) == names.end()) {
+        AddError(
+            "V-34", key,
+            key + ": unknown compat option '" + n + "'; valid names: " + valid);
+      }
+    }
+  };
+  check(cfg_.run.compat_enable, "run.compat_enable");
+  check(cfg_.run.compat_disable, "run.compat_disable");
+  for (const auto& n : cfg_.run.compat_enable) {
+    const auto& d = cfg_.run.compat_disable;
+    if (std::find(d.begin(), d.end(), n) != d.end()) {
+      AddError("V-34", "run.compat_disable",
+               "compat option '" + n +
+                   "' is in both run.compat_enable and run.compat_disable");
+    }
+  }
 }
 
 void Checker::Ranges() {

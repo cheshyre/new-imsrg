@@ -59,3 +59,13 @@ v3 N2LOsat, binary `imsrg.gpu-20261127-183256` of the reference run (frontier-hi
 | 6017813 + 6017827 | killed run, attempt 2: link 1 (TERM at 21:22:04, stage 2 step 3, exit 75, 0:39) + link 2 (restart, 11:03) | 1 + 1 | batch | 0:00:39 + 0:11:03 | 0.20 | |
 
 Restart check total: about 0.8 node-hours (a reservation of 6 min for link 1 and 30 min for link 2 and the straight job, billed by use).
+
+## Lead E (investigation)
+
+Branch feature/al27-investigate-variants; development chain `imsrg-e`; runs in
+`$IMSRG_WORK/runs/al27/investigate/` (configs in `configs/`). Budget 40 node-hours.
+
+| Job | What | Nodes | Partition | Elapsed | Node-hours | Notes |
+|---|---|---:|---|---|---:|---|
+| 6018030 | al27-flows (flows_gpu.sh): DN2LOGO ODE IMSRG(2) flow (dopri5, tol 1e-6) carrying FM0p_150 + FPhipp0p_0, from v2's prepared H_0; binary `imsrg.gpu-20261127-202543` (that of the N2LOsat ODE-ops run 6017305) | 1 | batch | 0:33:51 | 0.56 | task 2; converged, al27-variants.md 5.2 |
+| 6018194 | al27-compat (farm_sweep.sh, BACKEND=hip): compat decomposition, 24 specs x 136 items (v2 Omegas; ctl-none, ctl-fork, only-/allbut- x 5 options; both Hamiltonians), 1 node each; binary frontier-hip at 5ae2720 | 24 | batch | 0:12:22 | 4.95 | task 1; 0 failed, al27-variants-decomposition.md |

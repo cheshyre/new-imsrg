@@ -1643,3 +1643,21 @@ Assumptions taken (most reversible option; open for the owner or the lead):
   and the existing rows equal the straight ones. **Assumed:** no src/ change during the weekend; the
   fix is append mode for the flow file on `checkpoint.restart` (src/imsrg/driver/run.cc, FlowLog
   construction near line 1030), with a test; until then the full table is in `flow-gpu.log`.
+  **Fixed** (feature/al27-investigate-flowfile-restart): `FlowLog` is now built after the checkpoint is
+  read; on a restart from a flow checkpoint it keeps the existing rows with (stage, istep) <= the
+  checkpoint's, drops later and torn rows, and appends (other header: warn, fresh file). Tests
+  `Checkpoint.RestartedFlowFileIsContinuous` / `FlowFileTruncatedUnlessRestart`.
+
+## 27Al weekend, Lead E (investigation of the variants), 2026-11-27
+
+* **WE-E-1** (tensor operators in the ODE flow) - `flow::OdeSolver` accepts only scalar,
+  number-conserving flowing operators (src/imsrg/flow/ode.cc:214-220 throws `InputError`
+  otherwise), so a rank-L > 0 NREFT operator (FSigmap1p, an L = 5 item) cannot be carried through
+  the ODE IMSRG(2) flow, and the v3-vs-ODE operator checks (al27-variants.md 5.2) cover scalars
+  only (FM0p_150, FPhipp0p_0). (5.2 said "a tensor would make the ODE flow too slow"; the actual
+  reason is that it is not supported.) **Assumed:** not implemented during the weekend (brief:
+  record, do not implement). It needs the tensor commutator [eta, O_L] in the ODE right-hand side
+  (the Magnus transform has it) and tensor norms in the step control; per ODE step it would add
+  one tensor commutator per operator (farm 6016893 at emax 10 on a GCD, v2 Omegas: FPhipp0p_0 2.7 s,
+  FSigmapp1p_0 19 s, FPhitp2p_0 41 s, i.e. 7-15x a scalar item). Owner: wanted for the operator
+  validation of v3?

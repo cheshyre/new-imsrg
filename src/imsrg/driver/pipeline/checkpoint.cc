@@ -182,6 +182,10 @@ std::uint64_t FlowConfigHash(const RunConfig& config) {
       "imsrg.space",
       "imsrg3",
       "operators"};
+  // run.compat_enable / run.compat_disable (debug keys) are deliberately not
+  // hashed: no compat option changes H_0 or the flow of the scalar
+  // Hamiltonian; fork_step_defaults enters through the hashed
+  // imsrg.step.domega.
   static constexpr std::array<std::string_view, 2> kRunKeys = {"task",
                                                                "compat"};
   return ConfigTablesHash(config, kTables, kRunKeys);

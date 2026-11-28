@@ -241,6 +241,10 @@ std::uint64_t PreparationHash(const RunConfig& config) {
       "natural_orbitals",
       "imsrg.space",
       "imsrg3"};
+  // run.compat_enable / run.compat_disable (debug keys) are deliberately not
+  // hashed: no compat option changes H_0 or the flow of the scalar
+  // Hamiltonian; fork_step_defaults enters through the hashed
+  // imsrg.step.domega.
   static constexpr std::array<std::string_view, 1> kRunKeys = {"compat"};
   return ConfigTablesHash(config, kTables, kRunKeys);
 }

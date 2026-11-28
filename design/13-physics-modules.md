@@ -306,6 +306,11 @@ at emax 8 per commutator (`tools/bench/tensor_commutator_bench`); memory and GPU
   rank 0 writes. A restart (`checkpoint.restart`) re-runs HF/NAT (deterministic), checks the flow
   configuration hash, reads the checkpoint on every rank, restores the finished stage records and
   continues the stage in progress; stage 2 is entered directly when the checkpoint is in stage 2.
+  The flow file stays continuous: a restart from a flow checkpoint keeps the rows of the existing
+  file with (stage, istep) <= the checkpoint's (the restarted flow logs from istep + 1), drops later
+  rows (written between the checkpoint and the kill) and appends; a missing file or one with another
+  header starts afresh (warning), and a restart from `prepared/` only or a non-restart run writes a
+  fresh file.
 * Formats: native float64 (`io::WriteOperatorBinary`, bit-exact restart) or ME1J + float32 binary
   ME2JP (restart within float32 precision, owner answer to O4).
 * **Prepared state (D75, 2026-11-27; `driver/pipeline/prepared_state.{h,cc}`).** With a checkpoint
