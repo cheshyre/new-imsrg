@@ -31,13 +31,14 @@ Runs (never in git): `$IMSRG_WORK/runs/al27/{v2,v3}/{N2LOsat,DN2LOGO}/`, farms i
 | flow | stage 1 steps / s / E0 | stage 2 steps / s / E0 | Omegas | wall |
 |---|---|---|---:|---|
 | v1 N2LOsat (ref) | 37 / 13.322 / -131.499115 | 272 / 57.655 / -213.961460 | 2 | |
-| v2 N2LOsat | 55 / 13.315 / -131.498815 | 490 / 57.914 / -213.956872 | 2 | 46:52 |
-| v3 N2LOsat | 45 / 13.049 / -131.608497 | 147 / 48.854 / -214.428763 | 42 | 11:35 (+prep of v2) |
+| v2 N2LOsat | 54 / 13.315 / -131.498815 | 489 / 57.914 / -213.956872 | 2 | 46:52 |
+| v3 N2LOsat | 44 / 13.049 / -131.608497 | 146 / 48.854 / -214.428763 | 42 | 11:35 (+prep of v2) |
 | v1 DN2LOGO (ref) | 30 / 11.306 / -157.357310 | 253 / 47.146 / -217.066365 | 2 | |
-| v2 DN2LOGO | 44 / 11.170 / -157.356574 | 466 / 47.305 / -217.070296 | 2 | 46:14 |
-| v3 DN2LOGO | 37 / 10.431 / -157.252591 | 136 / 41.727 / -216.987333 | 40 | 11:17 |
+| v2 DN2LOGO | 43 / 11.170 / -157.356574 | 465 / 47.305 / -217.070296 | 2 | 46:14 |
+| v3 DN2LOGO | 36 / 10.431 / -157.252591 | 135 / 41.727 / -216.987333 | 40 | 11:17 |
 
-  (steps = flow-file rows - 1 per stage.) v3 - v2: -0.472 MeV (N2LOsat), +0.083 MeV (DN2LOGO).
+  (steps = last step index = flow-file rows - 1 per stage; the first draft of this table
+  listed the row counts, one more.) v3 - v2: -0.472 MeV (N2LOsat), +0.083 MeV (DN2LOGO).
   Note: AdaptiveStep ds = min(domega/eta, domega/(eta |Omega|), ...): v3's small |Omega| gives
   up to |Omega| (~8) times larger steps than v2 -> scan 6016711/6016712 separates the step-size
   effect (domega 0.05, 0.025 at split 0.25), the split threshold (1.0) and v2's own step
@@ -52,7 +53,7 @@ Runs (never in git): `$IMSRG_WORK/runs/al27/{v2,v3}/{N2LOsat,DN2LOGO}/`, farms i
   if the builder is lost, edit design/benchmarks/al27-variants.md directly
 - [x] v3 farms (job 6016892, 80 nodes, 40 min, 0 failed); v3 vs v2 in al27-variants.md section 5 with the operator
   investigation (split-threshold/step checks 6017305 + 6017358, ODE flow with FM0p_150/FPhipp0p_0): cause = the
-  Magnus(2)-vs-IMSRG(2) truncation of v2; v3 converged in threshold (few 1e-4), time-step error 0.3-1.2 %
+  Magnus(2)-vs-IMSRG(2) truncation of v2; v3 converged in threshold (few 1e-4), time-step difference (domega 0.1 vs 0.025) 0.09-1.2 % (median)
 - [x] design/benchmarks/al27-variants.md (78 kB)
 
 ## Exit codes (checked in B's branch)
@@ -75,3 +76,16 @@ tools/al27/flows_chain.sh tools/al27/n2losat_v2.toml:$IMSRG_WORK/runs/al27/v2/N2
 
 ## Jobs
 See design/benchmarks/al27-jobs.md, section Lead D.
+
+## Review fixes (feature/al27-variants-fixes)
+* `tools/al27/diff_variants.py`: the per-column header (`\|ref\|`) was unescaped, so no per-column
+  table rendered; fixed, tables now also list element counts, rel-eligible counts and the denominator
+  of the |ref| >= 1e-3 count, per column, per q and per part; a test checks cell counts of every table.
+* `tools/al27/flow_summary.py`: steps = last istep for Magnus (not the row count), ODE stages (istep
+  stays 0) are kept row by row and reported as "N rows (ODE)".
+* `tools/al27/dominant_rel.py` (was the untested scratch `variants-md/domrel*.py`): dominant elements
+  now need |ref| >= 1e-6 as well; operators vanishing in the reference are reported as "vanishes".
+* `tools/al27/splice_tables.py` re-inserts regenerated tables into the report (headings stay).
+* Regeneration: `diff_variants.py` for the four comparisons and the two decomposition farms,
+  `dominant_rel.py --part all|1b` for 5.1; the "Flow (results.json, flow.txt)" parts of the report
+  were kept (v3 N2LOsat flow.txt was overwritten on 2026-11-27 21:09; its numbers are from results.json).
