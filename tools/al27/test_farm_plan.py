@@ -33,8 +33,12 @@ def test_item_kind_and_weight():
     assert fp.item_kind("TCM") == ("TCM", "TCM")
     assert fp.item_kind("FSigmapp3n_45") == ("L3", "FSigmapp3")
     assert fp.item_kind("FM0p_0") == ("L0", "FM0")
-    assert fp.item_weight("FSigmap5p_15", CFG["model"]) == 4.57
-    assert fp.item_weight("TCM", CFG["model"]) == 1.0
+    # The weights come from tools/al27/farm_costs.toml (refit to measured
+    # item times); check the lookup, not the fitted values.
+    model = CFG["model"]
+    assert fp.item_weight("FSigmap5p_15", model) == model["weights"][5]
+    assert fp.item_weight("FM0p_0", model) == model["weights"][0]
+    assert fp.item_weight("TCM", model) == model["tcm_weight"]
 
 
 def test_family_override():
