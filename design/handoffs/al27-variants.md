@@ -43,8 +43,14 @@ Runs (never in git): `$IMSRG_WORK/runs/al27/{v2,v3}/{N2LOsat,DN2LOGO}/`, farms i
   effect (domega 0.05, 0.025 at split 0.25), the split threshold (1.0) and v2's own step
   convergence (unsplit, domega 0.05). Configs: tools/al27/make_scan_configs.py, copies in
   runs/al27/scan/configs.
-- [ ] v2 farms (both H; job 6016703, 30 nodes), compare v2 vs v1
-- [ ] v3 farms, compare v3 vs v2, investigate > 1e-3 relative
+- [x] v2 farms (job 6016703, 30 nodes, 19.6 min, 0 failed); v2 vs v1 in design/benchmarks/al27-variants.md section 4,
+  decomposition farm 6016893 (v2 Omegas + fork operator behaviour, runs/al27/v2/<H>-compatop/)
+- [x] v3-vs-v2 E0 investigation: scan + ODE flows (runs/al27/scan/), report section 3: split converges to the ODE
+  IMSRG(2) result; the v3-v2 gap is the unsplit Magnus(2) truncation
+- Report sources: generated sections in runs/al27/variants-md/*.md (diff_variants.py output); the document is
+  assembled from a template by a scratch builder (placeholders SCANTABLE, V2V1TABLES, DECOMPTABLES, V3V2TABLES);
+  if the builder is lost, edit design/benchmarks/al27-variants.md directly
+- [ ] v3 farms (job 6016892, 80 nodes, running), compare v3 vs v2, investigate > 1e-3 relative
 - [ ] design/benchmarks/al27-variants.md
 
 ## Exit codes (checked in B's branch)
