@@ -2,11 +2,18 @@
 
 ## Current state (keep this section up to date)
 
-* **27Al weekend run (next, 2026-11-27):** planned in the part-2 owner interview (D72-D78; report
-  `design/reports/2026-11-26-owner-interview.md` §5); prompt `design/NEXT_SESSION_PROMPT.md`, plan and
-  node-hour estimate `design/50-al27-responses.md` §7. Variants v1 (compat, archive to 1e-4), v2
-  (default, unsplit), v3 (split 0.25); NAT |occupation| becomes the default in every run (D72).
-  Wrap-up Monday 2026-11-30 10:00 EST.
+* **27Al weekend run (done, 2026-11-26 22:00 to 2026-11-30 10:00 EST; report
+  `design/reports/2026-11-27-weekend.md`):** v1 (fork compat) reproduces every archived `.snt`
+  element (≤ 1e-9 native, ≤ 1e-6 ME2JP Omegas; `design/benchmarks/al27-v1-farm.md`); v2 (default,
+  unsplit) and v3 (split 0.25) complete for both Hamiltonians with difference reports
+  (`design/benchmarks/al27-variants.md`, `-decomposition.md`): v3 - v2 is the unsplit Magnus(2)
+  truncation (v3 within 2-16 keV of ODE IMSRG(2)), v2 - v1 operator-side is the emulated fork bugs
+  M15-1 and AL-F1 (measured per compat option). GPU production path (flows one per GCD, farm on GCDs;
+  `design/benchmarks/al27-farm.md`), NAT |occupation| default, D72 tensor norm, restarts from
+  `prepared/` H_0 with a SIGTERM checkpoint (bit-identical at emax 10, `al27-restart.md`). Results
+  and one tarball per variant in `$IMSRG_WORK/runs/al27/`. ~356 node-hours. Next: the owner's
+  review (`design/NEXT_SESSION_PROMPT.md`); open questions in QUESTIONS.md ("Added during the 27Al
+  weekend").
 * **Frontier port (2026-11-26, supervised session; report `design/reports/2026-11-26-frontier-port.md`):**
   the project moved from the Mac to OLCF Frontier (nph123). Layout: hub `$IMSRG_HUB`, integrator's
   clone `$IMSRG_WORK/main` (remotes origin = hub, github), one clone per code-writing agent under
