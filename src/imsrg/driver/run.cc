@@ -7,6 +7,7 @@
 // operators -> outputs (results.json, flow CSV, .snt).
 #include "imsrg/driver/run.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -316,13 +317,18 @@ class FlowLog {
           path.string());
       return kept;
     }
+    const auto commas = [](const std::string& s) {
+      return std::count(s.begin(), s.end(), ',');
+    };
+    const auto n_commas = commas(HeaderLine());
     while (std::getline(in, line)) {
       int stage = 0;
       int istep = 0;
       char c1 = 0;
       char c2 = 0;
       std::istringstream fields(line);
-      if (!(fields >> stage >> c1 >> istep >> c2) || c1 != ',' || c2 != ',') {
+      if (!(fields >> stage >> c1 >> istep >> c2) || c1 != ',' || c2 != ',' ||
+          commas(line) != n_commas) {
         break;  // a torn last row (kill during a write): drop it and the rest
       }
       if (std::make_pair(stage, istep) > resume) break;
