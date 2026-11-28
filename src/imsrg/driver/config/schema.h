@@ -313,6 +313,10 @@ struct TaskConfig {
   LogLevel log_level = LogLevel::kNormal;
   /// Compatibility profile (default: none = the fixed behaviour).
   Compat compat = Compat::kNone;
+  /// debug: `CompatOptions` field names switched ON on top of `compat`.
+  std::vector<std::string> compat_enable;
+  /// debug: `CompatOptions` field names switched OFF on top of `compat`.
+  std::vector<std::string> compat_disable;
   friend bool operator==(const TaskConfig&, const TaskConfig&) = default;
 };
 

@@ -14,7 +14,7 @@ imsrg_add_test(NAME driver_reader SOURCES test_toml_reader.cc test_writer.cc DEP
                LABELS unit)
 
 # Resolution (defaults, derived values) and the validation table (item 8).
-imsrg_add_test(NAME driver_resolve SOURCES test_resolve.cc test_validate.cc DEPS driver
+imsrg_add_test(NAME driver_resolve SOURCES test_resolve.cc test_validate.cc test_compat.cc DEPS driver
                LABELS unit)
 
 # Relative-path rules of load_config (config-file directory vs working directory, D37).

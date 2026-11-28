@@ -8,6 +8,7 @@
 # hf, commutator, flow) for pipeline/*.cc and run.cc.
 imsrg_add_module(NAME driver
   SOURCES
+    config/compat.cc
     config/config_issue.cc
     config/raw_tree.cc
     config/schema_table.cc

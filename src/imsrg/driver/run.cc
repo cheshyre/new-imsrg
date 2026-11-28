@@ -563,7 +563,7 @@ flow::BchOptions MakeBchOptions(const RunConfig& config) {
       config.imsrg3.factorized_1b_intermediates;
   bch.factorized_terms.two_body_intermediates =
       config.imsrg3.factorized_2b_intermediates;
-  if (CompatOptionsFor(config.run.compat).tensor_one_body_norm_imsrgpp) {
+  if (EffectiveCompatOptions(config.run).tensor_one_body_norm_imsrgpp) {
     bch.tensor_one_body_norm = op::TensorOneBodyNorm::kImsrgppInteger;
   }
   return bch;

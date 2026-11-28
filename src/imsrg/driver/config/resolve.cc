@@ -422,7 +422,7 @@ void DeriveImsrgDefaults(const RawTree& tree, RunConfig& cfg) {
   }
 
   // Compat profile (design/50 section 5): the fork's step default.
-  if (CompatOptionsFor(cfg.run.compat).fork_step_defaults &&
+  if (EffectiveCompatOptions(cfg.run).fork_step_defaults &&
       !tree.contains("imsrg.step.domega")) {
     cfg.imsrg.step.domega = 0.2;
   }

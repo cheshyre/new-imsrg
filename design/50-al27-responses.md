@@ -118,6 +118,7 @@ commutators; isospin averaging of pn 2B elements in the scalar operator writer (
 variants, plus one documented example without it); 79e9330 writer details (7 significant digits,
 1e-7 drop thresholds, tensor writer orderings, `A_for_kinetic_energy` header). FDelta and FPhitp are
 flagged Hermitian (numerically confirmed; master's anti-Hermitian Delta flag treated as a bug).
+Debug keys `run.compat_enable` / `run.compat_disable` switch single options (names as in `CompatOptions`), e.g. to attribute the v2-v1 differences.
 
 ## 6. Compute
 
