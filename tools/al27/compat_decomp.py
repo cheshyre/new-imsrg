@@ -199,21 +199,25 @@ def build(results, options, label, topk):
     # op (flow and total: over total).
     ranks = sorted({rank_of(c) for c in cols if rank_of(c) is not None})
     share = [n for n in [*options, "resid"] if n in names]
-    hdr = ["L", "\\|\\|op\\|\\|_2"] + [short(n) for n in share]
+    hdr = ["L", "max \\|op\\| / \\|\\|op\\|\\|_2"] + [short(n) for n in share]
     if "total" in names and "flow" in names:
         hdr += ["\\|\\|flow\\|\\| / \\|\\|total\\|\\|",
                 "\\|\\|op\\|\\| / \\|\\|total\\|\\|"]
-    out += ["Shares per rank L: \\|\\|X\\|\\|_2 / \\|\\|op\\|\\|_2 over all "
-            "elements of the rank's items:", "",
+    out += ["Per rank L: max |X| over the rank's elements / share "
+            "\\|\\|X\\|\\|_2 / \\|\\|op\\|\\|_2:", "",
             "| " + " | ".join(hdr) + " |", "|" + "---|" * len(hdr)]
     for L in ranks:
         rs = [r for r in good if rank_of(r[0]) == L]
 
         def norm(n, rs=rs):
             return math.sqrt(sum(r[2][n][2] for r in rs if n in r[2]))
+
+        def mx(n, rs=rs):
+            return max((r[2][n][0] for r in rs if n in r[2]), default=0.0)
         op = norm("op")
-        cells = [str(L), e2(op)]
-        cells += [f"{norm(n) / op:.3f}" if op > 0.0 else "-" for n in share]
+        cells = [str(L), f"{e2(mx('op'))} / {e2(op)}"]
+        cells += [f"{e2(mx(n))} / {norm(n) / op:.3f}" if op > 0.0 else "-"
+                  for n in share]
         if "total" in names and "flow" in names:
             t = norm("total")
             cells += [f"{norm('flow') / t:.3f}" if t > 0.0 else "-",

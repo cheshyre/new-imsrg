@@ -108,10 +108,12 @@ def test_end_to_end_tables(tmp_path):
     loo = [ln for ln in text.splitlines() if ln.startswith("| FSigmap1p |")][1]
     loo_cells = [c.strip() for c in loo.strip("|").split("|")]
     assert loo_cells[2:5] == ["1.25e-01 (0)", "6.25e-02 (0)", "0"]
-    # Shares per rank: L = 1 has A share 0.894 (0.125 / sqrt(0.125^2 +
-    # 0.0625^2)), B 0.447, resid 0.
+    # Per rank: L = 1 has A max 0.125, share 0.894 (0.125 / sqrt(0.125^2 +
+    # 0.0625^2)), B 0.0625 / 0.447, resid 0.
     row = cells(text, "| 1 |")
-    assert row[2:5] == ["0.894", "0.447", "0.000"]
+    assert row[1] == "1.25e-01 / 1.40e-01"
+    assert row[2:5] == ["1.25e-01 / 0.894", "6.25e-02 / 0.447",
+                        "0.00e+00 / 0.000"]
     assert "+1.250e-01" in text  # top element of op
 
 
