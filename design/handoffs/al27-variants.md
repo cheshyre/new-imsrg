@@ -26,8 +26,24 @@ Runs (never in git): `$IMSRG_WORK/runs/al27/{v2,v3}/{N2LOsat,DN2LOGO}/`, farms i
 - [x] (b) tools/al27/flows_chain.sh + flow_summary.py (merged from feature/al27-variants-chain bc154cf; mock chain t4 OK)
 - [x] B (origin/feature/al27-defaults-restart 90f59c6) merged into this branch (orchestrator: develop 4583b44 = B, review running); frontier-hip built in this clone (build/frontier-hip, 2026-11-27 18:2x); the 4 v2/v3 configs pass `--validate`; chain fixed (empty argument) and re-tested (t5)
 - [x] orchestrator "go" (18:32 EST Fri): chain submitted, link 1 job 6015996 (frontier00102, started 18:33), link 2 6015997 pending (afterany); chain script runs/al27/v2/N2LOsat/chain-20261127-183256.sh; binary = this clone's build/frontier-hip at 42a46f7 (contains B 90f59c6); develop to be merged later
-- [ ] v2 + v3 flows (chain job running)
-- [ ] v2 farms (both H), compare v2 vs v1
+- [x] v2 + v3 flows (job 6015996, 47 min, all converged in link 1; flow_summary.md in each run dir)
+
+| flow | stage 1 steps / s / E0 | stage 2 steps / s / E0 | Omegas | wall |
+|---|---|---|---:|---|
+| v1 N2LOsat (ref) | 37 / 13.322 / -131.499115 | 272 / 57.655 / -213.961460 | 2 | |
+| v2 N2LOsat | 55 / 13.315 / -131.498815 | 490 / 57.914 / -213.956872 | 2 | 46:52 |
+| v3 N2LOsat | 45 / 13.049 / -131.608497 | 147 / 48.854 / -214.428763 | 42 | 11:35 (+prep of v2) |
+| v1 DN2LOGO (ref) | 30 / 11.306 / -157.357310 | 253 / 47.146 / -217.066365 | 2 | |
+| v2 DN2LOGO | 44 / 11.170 / -157.356574 | 466 / 47.305 / -217.070296 | 2 | 46:14 |
+| v3 DN2LOGO | 37 / 10.431 / -157.252591 | 136 / 41.727 / -216.987333 | 40 | 11:17 |
+
+  (steps = flow-file rows - 1 per stage.) v3 - v2: -0.472 MeV (N2LOsat), +0.083 MeV (DN2LOGO).
+  Note: AdaptiveStep ds = min(domega/eta, domega/(eta |Omega|), ...): v3's small |Omega| gives
+  up to |Omega| (~8) times larger steps than v2 -> scan 6016711/6016712 separates the step-size
+  effect (domega 0.05, 0.025 at split 0.25), the split threshold (1.0) and v2's own step
+  convergence (unsplit, domega 0.05). Configs: tools/al27/make_scan_configs.py, copies in
+  runs/al27/scan/configs.
+- [ ] v2 farms (both H; job 6016703, 30 nodes), compare v2 vs v1
 - [ ] v3 farms, compare v3 vs v2, investigate > 1e-3 relative
 - [ ] design/benchmarks/al27-variants.md
 
